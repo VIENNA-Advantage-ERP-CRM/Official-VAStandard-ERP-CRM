@@ -1,4 +1,4 @@
-/**
+﻿/**
  * VAS_213_POsExpectedThisMonthWidget
  * Purchase Order Dashboard — Widget 11: POs Expected This Month
  * Widget size: 2 columns x 2 rows (2x2 Glass Widget).
@@ -90,7 +90,10 @@
     function lbl(key, fallback) {
         if (window.VIS && VIS.Msg && VIS.Msg.getMsg) {
             var msg = VIS.Msg.getMsg(key);
-            if (msg && msg !== key && msg.indexOf('**') === -1) {
+            // VIS.Msg.getMsg returns "[KEY]" when the AD_Message row is missing;
+            // that must fall through to the English fallback, not render as-is.
+            if (msg && msg !== key && msg !== '[' + key + ']' && msg.charAt(0) !== '['
+                && msg.indexOf('**') === -1) {
                 return msg;
             }
         }
@@ -205,7 +208,9 @@
         var currentModalCfg = null;
         var MT = {};
         var MT_SEQ = 0;
-        var MAX_ROWS = 10;
+        // Rows per page in the modal table. The stylesheet sizes the table body to
+        // exactly this many rows (--vas-213-rows), so the two must stay in step.
+        var MAX_ROWS = 6;
 
         function showBusy(show) {
             if (!$busy) { return; }
@@ -393,6 +398,9 @@
            ============================================================ */
         function openPurchaseOrderRecord(orderId) {
             if (!orderId) { return; }
+            // Navigating away must dismiss the popup: the record opens behind it
+            // otherwise, leaving the dialog stranded over the window it just opened.
+            closeModal();
 
             var ZOOM_TABLE = "C_Order";
             var ZOOM_WINDOW_NAME = "VAS_PurchaseOrder";
@@ -685,29 +693,11 @@
             });
         }
 
-        function fitTable(id) {
-            var t = MT[id];
-            var el = document.getElementById(id);
-            if (!t || !el || t.fixed) { return; }
-
-            var avail = el.clientHeight;
-            if (avail < 40) { return; }
-
-            var head = el.querySelector('.vas-213-mhead');
-            var foot = el.querySelector('.vas-213-mtfoot');
-            var row = el.querySelector('.vas-213-mbody .vas-213-mrow');
-            if (!head || !row) { return; }
-
-            var rowH = row.getBoundingClientRect().height || 30;
-            var used = head.getBoundingClientRect().height + (foot ? foot.getBoundingClientRect().height + 8 : 0);
-            var n = Math.floor((avail - used) / rowH);
-            n = Math.max(2, Math.min(t.max, n));
-
-            if (n !== t.size) {
-                t.size = n;
-                drawTable(id);
-            }
-        }
+        /* Rows per page are fixed and the stylesheet sizes the table body to exactly
+           that many rows, so there is nothing to measure or re-fit. The old body
+           derived the count from a rendered row height, but the rows are sized by
+           the stylesheet, so it was measuring its own output. */
+        function fitTable(id) { return; }
 
         function fitAllTables() {
             Object.keys(MT).forEach(function (id) {
@@ -860,14 +850,14 @@
                         return [
                             String(l.LineNo || (idx + 1)),
                             l.ProductName || l.ProductSKU || '—',
-                            l.Attribute || '—',
+                            l.Attribute || '',
                             l.UOM || '—',
                             formatDecimal(l.OrderedQty),
-                            formatDecimal(l.DeliveredQty),
-                            formatDecimal(l.PendingQty),
+                            nsDash(l, formatDecimal(l.DeliveredQty)),
+                            nsDash(l, formatDecimal(l.PendingQty)),
                             rateFmt,
                             amtFmt,
-                            { chip: chipClass, text: statusTxt }
+                            nsDash(l, null) ? '–' : { chip: chipClass, text: statusTxt }
                         ];
                     });
 
@@ -978,14 +968,14 @@
                                 return [
                                     String(l.LineNo || (idx + 1)),
                                     l.ProductName || l.ProductSKU || '—',
-                                    l.Attribute || '—',
+                                    l.Attribute || '',
                                     l.UOM || '—',
                                     formatDecimal(l.OrderedQty),
-                                    formatDecimal(l.DeliveredQty),
-                                    formatDecimal(l.PendingQty),
+                                    nsDash(l, formatDecimal(l.DeliveredQty)),
+                                    nsDash(l, formatDecimal(l.PendingQty)),
                                     rateFmt,
                                     amtFmt,
-                                    { chip: chipClass, text: statusTxt }
+                                    nsDash(l, null) ? '–' : { chip: chipClass, text: statusTxt }
                                 ];
                             });
 
@@ -1093,5 +1083,12 @@
         }
         this.frame = null;
     };
+
+
+    /* A charge line, or a product that is not of Item type, is never received:
+       received, pending and line status render as a dash instead of a figure. */
+    function nsDash(l, v) {
+        return (l && (l.IsNonStock || l.isNonStock)) ? '–' : v;
+    }
 
 })(VAS, jQuery);

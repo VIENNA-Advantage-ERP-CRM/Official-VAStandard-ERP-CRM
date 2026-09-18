@@ -24,7 +24,9 @@ namespace VAS.Controllers
     ///               field is tracked (selected = Y), so new fields are on by
     ///               default. The load endpoint returns the tracked set and the
     ///               incomplete products with their ordered missing-field keys;
-    ///               the save endpoint persists one field's Y/N immediately.
+    ///               the save endpoint persists one field's Y/N immediately, and
+    ///               its batch form persists a whole Select all / Clear in one
+    ///               request instead of one round trip per checkbox.
     ///               Verified is only a miss for BOM products. Preferred Vendor
     ///               means an active M_Product_PO with IsCurrentVendor='Y' to an
     ///               active vendor. Category is mandatory and never tracked.
@@ -141,11 +143,31 @@ namespace VAS.Controllers
         /// </summary>
         /// <param name="fieldKey">Catalog field key (e.g. "hsn").</param>
         /// <param name="value">'Y' to track, 'N' to stop tracking.</param>
-        /// <returns>JSON { success, fieldKey, value }.</returns>
+        /// <returns>JSON { success, fieldKeys, value }.</returns>
         [HttpPost]
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
         public JsonResult SaveFieldPreference(string fieldKey = "", string value = "Y")
+        {
+            return SaveFieldPreferences(fieldKey, value);
+        }
+
+        /// <summary>
+        /// Persists the SAME value for one or more tracked-field preferences in a
+        /// single request. "Select all" / "Clear" change up to 15 fields at once;
+        /// firing 15 separate POSTs made that visibly slow (ASP.NET serializes
+        /// requests per session, so they queued) and left the widget open to a
+        /// half-written selection whenever the user pressed Done before the last
+        /// one landed. One request writes them all, and one query reads every
+        /// existing row id up front instead of one SELECT per field.
+        /// </summary>
+        /// <param name="fieldKeys">Comma-separated catalog field keys.</param>
+        /// <param name="value">'Y' to track, 'N' to stop tracking.</param>
+        /// <returns>JSON { success, fieldKeys, value, failedKeys }.</returns>
+        [HttpPost]
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult SaveFieldPreferences(string fieldKeys = "", string value = "Y")
         {
             if (Session["ctx"] == null)
             {
@@ -154,48 +176,72 @@ namespace VAS.Controllers
 
             Ctx ctx = Session["ctx"] as Ctx;
 
-            string attributeSuffix = Catalog
-                .Where(c => c.Item1 == fieldKey)
-                .Select(c => c.Item2)
-                .FirstOrDefault();
-            if (attributeSuffix == null)
+            // Catalog lookup doubles as validation - anything not in the fixed
+            // catalog is rejected, so no caller-supplied text reaches the DB.
+            List<Tuple<string, string>> requested = (fieldKeys ?? "")
+                .Split(',')
+                .Select(k => k.Trim())
+                .Where(k => k.Length > 0)
+                .Distinct()
+                .Select(k => Catalog.FirstOrDefault(c => c.Item1 == k))
+                .ToList();
+
+            if (requested.Count == 0 || requested.Any(c => c == null))
             {
                 return Fail("Unknown field.");
             }
 
             string prefValue = "N".Equals(value, StringComparison.OrdinalIgnoreCase) ? "N" : "Y";
-            string attribute = PREF_PREFIX + attributeSuffix;
 
             try
             {
-                int preferenceId = FindPreferenceId(ctx, attribute);
+                Dictionary<string, int> idByAttribute = ReadPreferenceIds(ctx);
 
-                // Use the AD_Preference model (the project's ID-generator /
-                // repository convention) rather than a raw INSERT, so this works
-                // the same on Oracle and PostgreSQL - no MERGE / ON CONFLICT.
-                // Existing row loaded by id already carries the attribute; a new
-                // row gets it from the constructor (the proven VAS_080 pattern).
-                MPreference preference = preferenceId > 0
-                    ? new MPreference(ctx, preferenceId, null)
-                    : new MPreference(ctx, attribute, prefValue, null);
-                preference.SetValue(prefValue);
-                preference.SetAD_User_ID(ctx.GetAD_User_ID());
-                // Org 0: the user's tracked set follows them across organizations
-                // (matches the load-query filter). AD_Window_ID is deliberately
-                // LEFT NULL: forcing it to 0 violated the AD_Preference ->
-                // AD_Window foreign key (there is no AD_Window row with ID 0 -
-                // verified on both project Oracle DBs), so every save failed with
-                // ORA-02291 and the settings panel showed "Preference not saved."
-                // The column is nullable and both load queries filter with
-                // COALESCE(AD_Window_ID, 0) = 0, which a NULL row satisfies.
-                preference.SetAD_Org_ID(0);
+                List<string> savedKeys = new List<string>();
+                List<string> failedKeys = new List<string>();
 
-                if (!preference.Save())
+                foreach (Tuple<string, string> field in requested)
+                {
+                    string attribute = PREF_PREFIX + field.Item2;
+                    int preferenceId;
+                    if (!idByAttribute.TryGetValue(attribute, out preferenceId)) { preferenceId = 0; }
+
+                    // Use the AD_Preference model (the project's ID-generator /
+                    // repository convention) rather than a raw INSERT, so this works
+                    // the same on Oracle and PostgreSQL - no MERGE / ON CONFLICT.
+                    // Existing row loaded by id already carries the attribute; a new
+                    // row gets it from the constructor (the proven VAS_080 pattern).
+                    MPreference preference = preferenceId > 0
+                        ? new MPreference(ctx, preferenceId, null)
+                        : new MPreference(ctx, attribute, prefValue, null);
+                    preference.SetValue(prefValue);
+                    preference.SetAD_User_ID(ctx.GetAD_User_ID());
+                    // Org 0: the user's tracked set follows them across organizations
+                    // (matches the load-query filter). AD_Window_ID is deliberately
+                    // LEFT NULL: forcing it to 0 violated the AD_Preference ->
+                    // AD_Window foreign key (there is no AD_Window row with ID 0 -
+                    // verified on both project Oracle DBs), so every save failed with
+                    // ORA-02291 and the settings panel showed "Preference not saved."
+                    // The column is nullable and both load queries filter with
+                    // COALESCE(AD_Window_ID, 0) = 0, which a NULL row satisfies.
+                    preference.SetAD_Org_ID(0);
+
+                    if (preference.Save()) { savedKeys.Add(field.Item1); }
+                    else { failedKeys.Add(field.Item1); }
+                }
+
+                if (savedKeys.Count == 0)
                 {
                     return Fail("Preference could not be saved.");
                 }
 
-                return Ok(new { success = true, fieldKey = fieldKey, value = prefValue });
+                return Ok(new
+                {
+                    success = failedKeys.Count == 0,
+                    fieldKeys = savedKeys,
+                    failedKeys = failedKeys,
+                    value = prefValue
+                });
             }
             catch (Exception ex)
             {
@@ -256,11 +302,19 @@ namespace VAS.Controllers
             return map;
         }
 
-        /// <summary>AD_Preference_ID of the current user's row for one attribute, or 0.</summary>
-        private int FindPreferenceId(Ctx ctx, string attribute)
+        /// <summary>
+        /// AD_Preference_ID of the current user's newest active row for every
+        /// PM.IR.* attribute, keyed by attribute. One query serves a whole
+        /// "Select all" / "Clear" batch - the previous per-field lookup issued
+        /// one SELECT per checkbox.
+        /// </summary>
+        private Dictionary<string, int> ReadPreferenceIds(Ctx ctx)
         {
+            Dictionary<string, int> map = new Dictionary<string, int>();
+
             string sql = @"
                 SELECT p.AD_Preference_ID AS PreferenceId,
+                       p.Attribute AS PreferenceKey,
                        p.Updated AS UpdatedAt
                 FROM AD_Preference p
                 WHERE p.AD_Client_ID=@AD_Client_ID
@@ -268,23 +322,26 @@ namespace VAS.Controllers
                   AND p.AD_Org_ID=0
                   AND COALESCE(p.AD_Window_ID, 0)=0
                   AND p.IsActive='Y'
-                  AND p.Attribute=@Attribute
-                ORDER BY p.Updated DESC";
+                  AND p.Attribute LIKE 'PM.IR.%'
+                ORDER BY p.Attribute, p.Updated DESC";
 
-            int preferenceId = 0;
             IDataReader dr = null;
             try
             {
                 dr = DB.ExecuteReader(sql, new SqlParameter[]
                 {
                     new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
-                    new SqlParameter("@AD_User_ID", ctx.GetAD_User_ID()),
-                    new SqlParameter("@Attribute", attribute)
+                    new SqlParameter("@AD_User_ID", ctx.GetAD_User_ID())
                 });
-                if (dr != null && dr.Read())
+                while (dr != null && dr.Read())
                 {
-                    // First row = newest; take it and stop.
-                    preferenceId = Util.GetValueOfInt(dr["PreferenceId"]);
+                    string attribute = Util.GetValueOfString(dr["PreferenceKey"]);
+                    if (string.IsNullOrEmpty(attribute)) { continue; }
+                    // ORDER BY newest-first per attribute: keep the first seen.
+                    if (!map.ContainsKey(attribute))
+                    {
+                        map[attribute] = Util.GetValueOfInt(dr["PreferenceId"]);
+                    }
                 }
             }
             finally
@@ -292,7 +349,7 @@ namespace VAS.Controllers
                 if (dr != null) { dr.Close(); dr.Dispose(); }
             }
 
-            return preferenceId;
+            return map;
         }
 
         /// <summary>
@@ -330,30 +387,35 @@ namespace VAS.Controllers
                        CASE WHEN COALESCE(p.R_MailText_ID, 0) = 0 THEN 1 ELSE 0 END AS MissMailTemplate,
                        " + missQuality + @" AS MissQualityCriteria,
                        CASE WHEN p.IsBOM = 'Y' AND COALESCE(p.IsVerified, 'N') <> 'Y' THEN 1 ELSE 0 END AS MissVerified,
-                       CASE WHEN EXISTS (
-                               SELECT 1
-                               FROM M_Product_PO po
-                               JOIN C_BPartner v ON (v.C_BPartner_ID = po.C_BPartner_ID AND v.AD_Client_ID = po.AD_Client_ID)
-                               WHERE po.M_Product_ID = p.M_Product_ID
-                                 AND po.AD_Client_ID = p.AD_Client_ID
-                                 AND po.IsActive = 'Y'
-                                 AND po.IsCurrentVendor = 'Y'
-                                 AND v.IsActive = 'Y'
-                                 AND v.IsVendor = 'Y'
-                           ) THEN 0 ELSE 1 END AS MissPreferredVendor,
+                       CASE WHEN pv.M_Product_ID IS NULL THEN 1 ELSE 0 END AS MissPreferredVendor,
                        CASE WHEN p.GuaranteeDays IS NULL THEN 1 ELSE 0 END AS MissGuarantee,
                        CASE WHEN COALESCE(p.M_AttributeSet_ID, 0) = 0 THEN 1 ELSE 0 END AS MissAttributeGroup,
                        CASE WHEN COALESCE(p.M_CustomTariff_ID, 0) = 0 THEN 1 ELSE 0 END AS MissCustomTariff
                 FROM M_Product p
                 JOIN M_Product_Category pc ON (pc.M_Product_Category_ID = p.M_Product_Category_ID)
                 LEFT JOIN AD_User u ON (u.AD_User_ID = p.UpdatedBy)
+                LEFT JOIN PrefVendor pv ON (pv.M_Product_ID = p.M_Product_ID AND pv.AD_Client_ID = p.AD_Client_ID)
                 WHERE p.AD_Client_ID = @AD_Client_ID
                   AND p.IsActive = 'Y'
                   AND COALESCE(p.IsSummary, 'N') = 'N'";
 
-            // MRole (org/role data-access) on the primary table; AddAccessSQL
-            // appends its predicate to the END, and the EXISTS is in the SELECT
-            // list, so appending after the base WHERE stays valid.
+            // MRole (org/role data-access) on the primary table. AddAccessSQL
+            // hands the statement to AccessSqlParser, which finds the main table
+            // by the FIRST " FROM " it sees and only recognises a sub-select
+            // spelled exactly "(SELECT". The preferred-vendor test used to be a
+            // correlated EXISTS in the SELECT list written as "EXISTS (" +
+            // newline + "SELECT", so the parser missed it, read
+            // "FROM M_Product_PO po" as the main FROM, and appended the private
+            // record-access predicate against that alias:
+            //   AND po.M_Product_PO_ID NOT IN (SELECT Record_ID FROM AD_Private_Access ...)
+            // "po" only exists inside the sub-select, so Oracle raised
+            // ORA-00904 "PO"."M_PRODUCT_PO_ID": invalid identifier and the
+            // widget showed "Couldn't load" (the trigger is per database - the
+            // predicate is only emitted where the role carries private-access
+            // rows for that table). The vendor test now lives in the PrefVendor
+            // CTE below, so this statement contains no sub-select at all: the
+            // parser always resolves M_Product/p and qualifies its predicate
+            // with "p.", whatever the formatting.
             innerSql = MRole.GetDefault(ctx).AddAccessSQL(
                 innerSql,
                 "p",
@@ -402,8 +464,25 @@ namespace VAS.Controllers
                 return new List<object>();
             }
 
+            // PrefVendor carries the "has a preferred vendor" set that used to be
+            // a correlated EXISTS inside ProdStatus. It is keyed by client as
+            // well as product so the LEFT JOIN reproduces the old correlation
+            // exactly, and DISTINCT keeps it one row per (product, client) so
+            // the join can never duplicate a product row. It needs no bind
+            // variable of its own: @AD_Client_ID still occurs exactly once in
+            // the whole statement, which positional binding requires.
             string sql = @"
-                WITH ProdStatus AS (
+                WITH PrefVendor AS (
+                    SELECT DISTINCT po.M_Product_ID AS M_Product_ID,
+                                    po.AD_Client_ID AS AD_Client_ID
+                    FROM M_Product_PO po
+                    JOIN C_BPartner v ON (v.C_BPartner_ID = po.C_BPartner_ID AND v.AD_Client_ID = po.AD_Client_ID)
+                    WHERE po.IsActive = 'Y'
+                      AND po.IsCurrentVendor = 'Y'
+                      AND v.IsActive = 'Y'
+                      AND v.IsVendor = 'Y'
+                ),
+                ProdStatus AS (
                     " + innerSql + @"
                 )
                 SELECT s.ProductId, s.ProductName, s.ProductCode, s.CategoryName,

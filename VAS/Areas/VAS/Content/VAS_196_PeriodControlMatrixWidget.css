@@ -470,8 +470,8 @@
    share the sm size and are told apart by weight and color, per the Cell Types
    rule - the whole cell truncates as one run. */
 .vas-196-cell-name {
-    font-size: .75em;
-    font-weight: 700;
+    font-size: .85em;
+    font-weight: 600;
     color: #102C3F;
     line-height: 1.3;
     min-width: 0;

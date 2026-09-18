@@ -86,7 +86,13 @@
     border-radius: 8px;
     padding: 0.35em 0.75em;
     min-width: 4.5em;
-    text-align: center;
+    /* Alignment is deliberately SPLIT (user request 2026-08-29):
+         - text-align      -> inherited by the <option> elements, so the list inside the OPEN
+                              dropdown reads left aligned;
+         - text-align-last -> governs the single displayed line of the CLOSED control, so the
+                              selected value stays centred, as AGENTS.md Rule 13 specifies.
+       Rule 13's "text-align: center" was centring both; only the selected value was meant to be. */
+    text-align: left;
     text-align-last: center;
     font-family: 'Roboto', sans-serif;
     font-weight: 500;
@@ -96,6 +102,13 @@
     cursor: pointer;
     box-sizing: border-box;
     transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+/* Explicit, for engines that do not inherit text-align into the native popup list. */
+.vas-adjwisecount-select option {
+    text-align: left;
+    color: #102C3F;
+    background-color: #FFFFFF;
 }
 
 .vas-adjwisecount-select:hover,
@@ -344,6 +357,21 @@
 .vas-adjwisecount-cell-doc {
     font-weight: 700;
     color: #102C3F;
+}
+
+/* The document number opens the Inventory Count record - give it a visible link affordance. */
+.vas-adjwisecount-doclink {
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+    text-decoration-color: rgba(31, 131, 255, 0.45);
+}
+
+.vas-adjwisecount-doclink:hover,
+.vas-adjwisecount-doclink:focus-visible {
+    color: #1F83FF;
+    text-decoration-color: #1F83FF;
+    outline: none;
 }
 
 .vas-adjwisecount-modal-body {

@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -116,6 +116,7 @@ namespace VIS.Controllers
                 WHERE r.AD_Client_ID = @AD_Client_ID
                   AND r.IsActive = 'Y'
                   AND r.DocStatus = 'CO'
+                  AND r.M_Requisition_ID IN (@P_REQ_ACCESS@)
                 GROUP BY
                     r.M_Requisition_ID,
                     r.DocumentNo,
@@ -136,12 +137,17 @@ namespace VIS.Controllers
                 ) > 0
                 ORDER BY r.DateRequired, r.DocumentNo";
 
-            string sql = MRole.GetDefault(ctx).AddAccessSQL(
-                rawSql,
-                "r",
+            // MRole.AddAccessSQL cannot parse this statement (GROUP BY / HAVING / JOIN..ON):
+            // AccessSqlParser mis-locates the insertion point and appends the access predicates
+            // after GROUP BY / HAVING / ORDER BY, producing ORA-00979 / ORA-00933. Apply the same
+            // role access through a simple, parseable sub-query on M_Requisition instead.
+            string reqAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                "SELECT accessReq.M_Requisition_ID FROM M_Requisition accessReq WHERE accessReq.AD_Client_ID = " + ctx.GetAD_Client_ID(),
+                "accessReq",
                 MRole.SQL_FULLYQUALIFIED,
                 MRole.SQL_RO
             );
+            string sql = rawSql.Replace("@P_REQ_ACCESS@", reqAccessSql);
 
             List<SqlParameter> parameters = new List<SqlParameter>
             {
@@ -263,6 +269,12 @@ namespace VIS.Controllers
                 return Fail(Msg.GetMsg(ctx, "VAS_RequisitionRequired") ?? "Requisition ID is required.");
             }
 
+            // M_RequisitionLine.C_BPartner_ID is not present on every database (absent on DB 1 and DB 2);
+            // selecting it unconditionally raised ORA-00904 and no line could ever be picked.
+            string lineVendorExpr = HasColumn("M_RequisitionLine", "C_BPartner_ID")
+                ? "COALESCE(rl.C_BPartner_ID, r.C_BPartner_ID)"
+                : "r.C_BPartner_ID";
+
             string rawSql = @"
                 SELECT
                     rl.M_RequisitionLine_ID AS requisition_line_id,
@@ -272,7 +284,9 @@ namespace VIS.Controllers
                     COALESCE(p.Name, rl.Description, N'') AS product_name,
                     COALESCE(p.Value, N'') AS product_code,
                     rl.M_AttributeSetInstance_ID AS attribute_set_instance_id,
-                    COALESCE(asi.Description, N'Standard specification') AS attribute_description,
+                    CASE WHEN COALESCE(rl.M_AttributeSetInstance_ID, 0) > 0
+                             THEN COALESCE(asi.Description, N'')
+                             ELSE N'' END AS attribute_description,
                     COALESCE(rl.C_UOM_ID, p.C_UOM_ID, 0) AS uom_id,
                     COALESCE(u.UOMSymbol, u.Name, N'') AS uom_name,
                     COALESCE(rl.Qty, 0) AS requested_qty,
@@ -285,7 +299,7 @@ namespace VIS.Controllers
                     COALESCE(rl.PriceActual, 0) AS requisition_rate,
                     COALESCE(rl.Description, N'') AS description,
                     COALESCE(rl.PrintDescription, N'') AS print_description,
-                    COALESCE(rl.C_BPartner_ID, r.C_BPartner_ID, 0) AS line_vendor_id,
+                    COALESCE(" + lineVendorExpr + @", 0) AS line_vendor_id,
                     COALESCE(bp.Name, N'') AS line_vendor_name
                 FROM M_RequisitionLine rl
                 INNER JOIN M_Requisition r
@@ -297,20 +311,26 @@ namespace VIS.Controllers
                 LEFT JOIN C_UOM u
                     ON u.C_UOM_ID = COALESCE(rl.C_UOM_ID, p.C_UOM_ID)
                 LEFT JOIN C_BPartner bp
-                    ON bp.C_BPartner_ID = COALESCE(rl.C_BPartner_ID, r.C_BPartner_ID)
+                    ON bp.C_BPartner_ID = " + lineVendorExpr + @"
                 WHERE rl.M_Requisition_ID = @M_Requisition_ID
                   AND rl.IsActive = 'Y'
                   AND r.IsActive = 'Y'
                   AND r.DocStatus = 'CO'
+                  AND r.M_Requisition_ID IN (@P_REQ_ACCESS@)
                   AND COALESCE(rl.Qty, 0) > COALESCE(rl.QtyOrdered, 0)
                 ORDER BY rl.Line ASC";
 
-            string sql = MRole.GetDefault(ctx).AddAccessSQL(
-                rawSql,
-                "r",
+            // MRole.AddAccessSQL cannot parse this statement (GROUP BY / HAVING / JOIN..ON):
+            // AccessSqlParser mis-locates the insertion point and appends the access predicates
+            // after GROUP BY / HAVING / ORDER BY, producing ORA-00979 / ORA-00933. Apply the same
+            // role access through a simple, parseable sub-query on M_Requisition instead.
+            string reqAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                "SELECT accessReq.M_Requisition_ID FROM M_Requisition accessReq WHERE accessReq.AD_Client_ID = " + ctx.GetAD_Client_ID(),
+                "accessReq",
                 MRole.SQL_FULLYQUALIFIED,
                 MRole.SQL_RO
             );
+            string sql = rawSql.Replace("@P_REQ_ACCESS@", reqAccessSql);
 
             List<SqlParameter> parameters = new List<SqlParameter>
             {
@@ -546,14 +566,20 @@ namespace VIS.Controllers
                     }
                 }
 
-                // 6. Target Document Types (PO DocBaseType = 'POO')
+                // 6. Target Document Types - the same list the Purchase Order window offers in C_DocTypeTarget_ID
+                //    (validation rule "C_DocType PO or SO" for a purchase, non-return, non-blanket order in the requisition's org)
+                int reqOrgId = GetRequisitionOrgId(ctx, requisitionId);
                 List<object> docTypes = new List<object>();
                 string docTypeSql = @"
                     SELECT C_DocType_ID AS id, Name AS name
                     FROM C_DocType
-                    WHERE IsActive='Y' AND DocBaseType='POO' AND AD_Client_ID IN (0, @AD_Client_ID)
-                    ORDER BY Name ASC";
-                using (IDataReader dr = DB.ExecuteReader(docTypeSql, new SqlParameter[] { new SqlParameter("@AD_Client_ID", clientId) }))
+                    WHERE " + PurchaseDocTypeWhere + @"
+                    ORDER BY IsDefault DESC, Name ASC";
+                using (IDataReader dr = DB.ExecuteReader(docTypeSql, new SqlParameter[]
+                {
+                    new SqlParameter("@AD_Client_ID", clientId),
+                    new SqlParameter("@AD_Org_ID", reqOrgId)
+                }))
                 {
                     while (dr != null && dr.Read())
                     {
@@ -625,13 +651,13 @@ namespace VIS.Controllers
                     }
                 }
 
-                // 10. Currency Rate Types (Conversion Types)
+                // 10. Currency Rate Types (Conversion Types) - the default type (Spot) is listed first and flagged
                 List<object> conversionTypes = new List<object>();
                 string convSql = @"
-                    SELECT C_ConversionType_ID AS id, Name AS name
+                    SELECT C_ConversionType_ID AS id, Name AS name, IsDefault AS is_default
                     FROM C_ConversionType
                     WHERE IsActive='Y' AND AD_Client_ID IN (0, @AD_Client_ID)
-                    ORDER BY Name ASC";
+                    ORDER BY IsDefault DESC, Name ASC";
                 using (IDataReader dr = DB.ExecuteReader(convSql, new SqlParameter[] { new SqlParameter("@AD_Client_ID", clientId) }))
                 {
                     while (dr != null && dr.Read())
@@ -639,7 +665,8 @@ namespace VIS.Controllers
                         conversionTypes.Add(new
                         {
                             id = Util.GetValueOfInt(dr["id"]),
-                            name = Util.GetValueOfString(dr["name"])
+                            name = Util.GetValueOfString(dr["name"]),
+                            isDefault = Util.GetValueOfString(dr["is_default"]) == "Y"
                         });
                     }
                 }
@@ -663,14 +690,35 @@ namespace VIS.Controllers
                     }
                 }
 
-                // 12. Payment Methods (Reference List or default options)
+                // 12. Payment Methods - the options of the Purchase Order window's Payment Method field:
+                //     VA009_PaymentMethod_ID when the payment module is installed, else the C_Order.PaymentMethod list
                 List<object> paymentMethods = new List<object>();
-                string payMethSql = @"
-                    SELECT Value AS id, Name AS name
-                    FROM AD_Ref_List
-                    WHERE AD_Reference_ID = 195 AND IsActive='Y'
-                    ORDER BY Name ASC";
-                using (IDataReader dr = DB.ExecuteReader(payMethSql, null))
+                bool useVA009PaymentMethod = HasColumn("C_Order", "VA009_PaymentMethod_ID");
+                string payMethSql;
+                SqlParameter[] payMethParams;
+                if (useVA009PaymentMethod)
+                {
+                    payMethSql = @"
+                        SELECT VA009_PaymentMethod_ID AS id, VA009_Name AS name
+                        FROM VA009_PaymentMethod
+                        WHERE IsActive='Y' AND AD_Client_ID=@AD_Client_ID AND AD_Org_ID IN (0, @AD_Org_ID)
+                        ORDER BY VA009_Name ASC";
+                    payMethParams = new SqlParameter[]
+                    {
+                        new SqlParameter("@AD_Client_ID", clientId),
+                        new SqlParameter("@AD_Org_ID", reqOrgId)
+                    };
+                }
+                else
+                {
+                    payMethSql = @"
+                        SELECT Value AS id, Name AS name
+                        FROM AD_Ref_List
+                        WHERE AD_Reference_ID = 195 AND IsActive='Y'
+                        ORDER BY Name ASC";
+                    payMethParams = null;
+                }
+                using (IDataReader dr = DB.ExecuteReader(payMethSql, payMethParams))
                 {
                     while (dr != null && dr.Read())
                     {
@@ -681,13 +729,15 @@ namespace VIS.Controllers
                         });
                     }
                 }
-                if (paymentMethods.Count == 0)
-                {
-                    paymentMethods.Add(new { id = "P", name = "Payment Rule" });
-                    paymentMethods.Add(new { id = "T", name = "Direct Deposit / Wire" });
-                    paymentMethods.Add(new { id = "K", name = "Credit Card" });
-                    paymentMethods.Add(new { id = "S", name = "Check" });
-                }
+
+                // 13. Priorities - the C_Order.PriorityRule reference list (translated) and its column default (Medium)
+                string defaultPriority;
+                List<object> priorities = GetOrderColumnListOptions(ctx, "PriorityRule", null, out defaultPriority);
+
+                // 14. PO stage - Drafted or Completed from the C_Order.DocStatus list (translated); column default Drafted
+                string defaultDocStatus;
+                List<object> docStatuses = GetOrderColumnListOptions(ctx, "DocStatus",
+                    new string[] { MOrder.DOCSTATUS_Drafted, MOrder.DOCSTATUS_Completed }, out defaultDocStatus);
 
                 return Ok(new
                 {
@@ -702,7 +752,12 @@ namespace VIS.Controllers
                     currencies = currencies,
                     conversionTypes = conversionTypes,
                     incoterms = incoterms,
-                    paymentMethods = paymentMethods
+                    paymentMethods = paymentMethods,
+                    paymentMethodField = useVA009PaymentMethod ? "VA009_PaymentMethod_ID" : "PaymentMethod",
+                    priorities = priorities,
+                    defaultPriority = defaultPriority,
+                    docStatuses = docStatuses,
+                    defaultDocStatus = string.IsNullOrEmpty(defaultDocStatus) ? MOrder.DOCSTATUS_Drafted : defaultDocStatus
                 });
             }
             catch (Exception ex)
@@ -770,7 +825,33 @@ namespace VIS.Controllers
                     }
                 }
 
-                return Ok(new { locations = locations, contacts = contacts });
+                // Payment method configured on the vendor (purchase side first) - preselected in the PO form
+                string defaultPaymentMethodId = "";
+                if (HasColumn("C_Order", "VA009_PaymentMethod_ID"))
+                {
+                    List<string> vendorPaymentMethodColumns = new List<string>();
+                    if (HasColumn("C_BPartner", "VA009_PO_PaymentMethod_ID"))
+                    {
+                        vendorPaymentMethodColumns.Add("VA009_PO_PaymentMethod_ID");
+                    }
+                    if (HasColumn("C_BPartner", "VA009_PaymentMethod_ID"))
+                    {
+                        vendorPaymentMethodColumns.Add("VA009_PaymentMethod_ID");
+                    }
+                    if (vendorPaymentMethodColumns.Count > 0)
+                    {
+                        vendorPaymentMethodColumns.Add("0");
+                        int vendorPaymentMethodId = Util.GetValueOfInt(DB.ExecuteScalar(
+                            "SELECT COALESCE(" + string.Join(", ", vendorPaymentMethodColumns) + ") FROM C_BPartner WHERE C_BPartner_ID=@C_BPartner_ID",
+                            new SqlParameter[] { new SqlParameter("@C_BPartner_ID", vendorId) }, null));
+                        if (vendorPaymentMethodId > 0)
+                        {
+                            defaultPaymentMethodId = vendorPaymentMethodId.ToString(CultureInfo.InvariantCulture);
+                        }
+                    }
+                }
+
+                return Ok(new { locations = locations, contacts = contacts, defaultPaymentMethodId = defaultPaymentMethodId });
             }
             catch (Exception ex)
             {
@@ -857,7 +938,8 @@ namespace VIS.Controllers
         /// <param name="description">Header Description</param>
         /// <param name="defaultTaxId">Header fallback C_Tax_ID for lines</param>
         /// <param name="linesJson">JSON serialized array of line payloads</param>
-        /// <returns>JSON { success, orderId, documentNo, message }</returns>
+        /// <param name="docStatus">PO stage chosen by the user: DR (create drafted) or CO (create and complete)</param>
+        /// <returns>JSON { success, orderId, documentNo, docStatus, message }</returns>
         [HttpPost]
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
@@ -880,7 +962,8 @@ namespace VIS.Controllers
             string priority = null,
             string description = null,
             int defaultTaxId = 0,
-            string linesJson = null)
+            string linesJson = null,
+            string docStatus = null)
         {
             if (Session["ctx"] == null)
             {
@@ -946,15 +1029,38 @@ namespace VIS.Controllers
                     warehouseId = reqWhId > 0 ? reqWhId : GetDefaultWarehouse(ctx, reqOrgId);
                 }
 
-                // 3. Validate target DocType
+                // 3. Validate target DocType - only a type the Purchase Order window offers for this org
                 if (docTypeId <= 0)
                 {
                     string dtSql = @"
                         SELECT C_DocType_ID
                         FROM C_DocType
-                        WHERE DocBaseType='POO' AND IsActive='Y' AND AD_Client_ID IN (0, @AD_Client_ID)
-                        ORDER BY AD_Org_ID DESC, C_DocType_ID ASC";
-                    docTypeId = Util.GetValueOfInt(DB.ExecuteScalar(dtSql, new SqlParameter[] { new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()) }, trx));
+                        WHERE " + PurchaseDocTypeWhere + @"
+                        ORDER BY IsDefault DESC, Name ASC";
+                    docTypeId = Util.GetValueOfInt(DB.ExecuteScalar(dtSql, new SqlParameter[]
+                    {
+                        new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
+                        new SqlParameter("@AD_Org_ID", reqOrgId)
+                    }, trx));
+                }
+                else
+                {
+                    string dtCheckSql = @"
+                        SELECT COUNT(1)
+                        FROM C_DocType
+                        WHERE C_DocType_ID = @C_DocType_ID
+                          AND " + PurchaseDocTypeWhere;
+                    int allowedDocType = Util.GetValueOfInt(DB.ExecuteScalar(dtCheckSql, new SqlParameter[]
+                    {
+                        new SqlParameter("@C_DocType_ID", docTypeId),
+                        new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
+                        new SqlParameter("@AD_Org_ID", reqOrgId)
+                    }, trx));
+                    if (allowedDocType <= 0)
+                    {
+                        trx.Rollback();
+                        return Fail(MsgOr(ctx, "VAS_InvalidPODocType", "The selected document type is not valid for a Purchase Order."));
+                    }
                 }
 
                 // 4. Validate vendor location fallback
@@ -982,6 +1088,25 @@ namespace VIS.Controllers
                     if (DateTime.TryParse(datePromised, CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
                     {
                         promiseDate = parsed;
+                    }
+                }
+
+                // Date promised may not precede the order date - on the header or on any line
+                string datePromisedError = MsgOr(ctx, "VAS_DatePromisedBeforeDateOrdered", "Error: Date Promised should be greater than or equal to Date Ordered");
+                if (promiseDate.Date < orderDate.Date)
+                {
+                    trx.Rollback();
+                    return Fail(datePromisedError);
+                }
+                foreach (POLinePayload lineInput in lineInputs)
+                {
+                    DateTime linePromised;
+                    if (lineInput != null && !string.IsNullOrEmpty(lineInput.DatePromised)
+                        && DateTime.TryParse(lineInput.DatePromised, CultureInfo.InvariantCulture, DateTimeStyles.None, out linePromised)
+                        && linePromised.Date < orderDate.Date)
+                    {
+                        trx.Rollback();
+                        return Fail(datePromisedError);
                     }
                 }
 
@@ -1014,13 +1139,19 @@ namespace VIS.Controllers
                 {
                     order.SetC_PaymentTerm_ID(paymentTermId);
                 }
-                if (priceListId > 0)
+                int effectivePriceListId = priceListId > 0 ? priceListId : reqPlId;
+                if (effectivePriceListId > 0)
                 {
-                    order.SetM_PriceList_ID(priceListId);
-                }
-                else if (reqPlId > 0)
-                {
-                    order.SetM_PriceList_ID(reqPlId);
+                    order.SetM_PriceList_ID(effectivePriceListId);
+
+                    // Currency is read-only in the form: it always follows the selected price list
+                    int priceListCurrencyId = Util.GetValueOfInt(DB.ExecuteScalar(
+                        "SELECT C_Currency_ID FROM M_PriceList WHERE M_PriceList_ID = @M_PriceList_ID",
+                        new SqlParameter[] { new SqlParameter("@M_PriceList_ID", effectivePriceListId) }, trx));
+                    if (priceListCurrencyId > 0)
+                    {
+                        currencyId = priceListCurrencyId;
+                    }
                 }
                 if (currencyId > 0)
                 {
@@ -1034,7 +1165,31 @@ namespace VIS.Controllers
                 {
                     order.Set_Value("C_IncoTerm_ID", incotermId);
                 }
-                if (!string.IsNullOrEmpty(paymentMethod) && order.Get_ColumnIndex("PaymentMethod") >= 0)
+
+                int va009PaymentMethodId;
+                if (!string.IsNullOrEmpty(paymentMethod) && order.Get_ColumnIndex("VA009_PaymentMethod_ID") >= 0
+                    && int.TryParse(paymentMethod, NumberStyles.Integer, CultureInfo.InvariantCulture, out va009PaymentMethodId)
+                    && va009PaymentMethodId > 0)
+                {
+                    // Same field as the Purchase Order window; PaymentMethod / PaymentRule carry the method's
+                    // base type, exactly as on the purchase orders saved through that window
+                    order.Set_Value("VA009_PaymentMethod_ID", va009PaymentMethodId);
+                    string paymentBaseType = Util.GetValueOfString(DB.ExecuteScalar(
+                        "SELECT VA009_PaymentBaseType FROM VA009_PaymentMethod WHERE VA009_PaymentMethod_ID = @VA009_PaymentMethod_ID",
+                        new SqlParameter[] { new SqlParameter("@VA009_PaymentMethod_ID", va009PaymentMethodId) }, trx));
+                    if (!string.IsNullOrEmpty(paymentBaseType))
+                    {
+                        if (order.Get_ColumnIndex("PaymentMethod") >= 0)
+                        {
+                            order.Set_Value("PaymentMethod", paymentBaseType);
+                        }
+                        if (order.Get_ColumnIndex("PaymentRule") >= 0)
+                        {
+                            order.Set_Value("PaymentRule", paymentBaseType);
+                        }
+                    }
+                }
+                else if (!string.IsNullOrEmpty(paymentMethod) && order.Get_ColumnIndex("PaymentMethod") >= 0)
                 {
                     order.Set_Value("PaymentMethod", paymentMethod);
                 }
@@ -1193,6 +1348,25 @@ namespace VIS.Controllers
                     }
                 }
 
+                // PO stage chosen by the user: Completed runs the normal document workflow inside the same transaction
+                if (MOrder.DOCSTATUS_Completed.Equals(docStatus))
+                {
+                    order.SetDocAction(MOrder.DOCACTION_Complete);
+                    if (!order.ProcessIt(MOrder.DOCACTION_Complete))
+                    {
+                        string processMessage = order.GetProcessMsg();
+                        trx.Rollback();
+                        return Fail(!string.IsNullOrEmpty(processMessage)
+                            ? processMessage
+                            : MsgOr(ctx, "VAS_PONotCompleted", "Purchase order could not be completed."));
+                    }
+                    if (!order.Save(trx))
+                    {
+                        trx.Rollback();
+                        return Fail(GetSaveError(ctx, "VAS_PONotCompleted", "Purchase order could not be completed."));
+                    }
+                }
+
                 trx.Commit();
 
                 return Ok(new
@@ -1200,7 +1374,8 @@ namespace VIS.Controllers
                     success = true,
                     orderId = order.GetC_Order_ID(),
                     documentNo = order.GetDocumentNo(),
-                    message = Msg.GetMsg(ctx, "VAS_POSaved") ?? "Purchase Order created successfully."
+                    docStatus = order.GetDocStatus(),
+                    message = MsgOr(ctx, "VAS_POSaved", "Purchase Order created successfully.")
                 });
             }
             catch (Exception ex)
@@ -1219,6 +1394,138 @@ namespace VIS.Controllers
                     trx.Close();
                 }
             }
+        }
+
+        /// <summary>
+        /// Calculates each PO line's tax with the framework tax engine (MTax) - surcharge taxes included - on the
+        /// selected price list's tax inclusion and currency precision, the same calculation the saved PO line performs.
+        /// </summary>
+        /// <param name="priceListId">M_PriceList_ID selected on the PO</param>
+        /// <param name="linesJson">JSON array of { taxId, amount }</param>
+        /// <returns>JSON { success, isTaxIncluded, lines: [{ taxAmt, surchargeAmt }] }</returns>
+        [HttpPost]
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult CalculateLineTaxes(int priceListId = 0, string linesJson = null)
+        {
+            if (Session["ctx"] == null)
+            {
+                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+            try
+            {
+                bool isTaxIncluded = false;
+                int precision = 2;
+                if (priceListId > 0)
+                {
+                    string plSql = @"
+                        SELECT pl.IsTaxIncluded AS is_tax_included, c.StdPrecision AS std_precision
+                        FROM M_PriceList pl
+                        INNER JOIN C_Currency c ON (c.C_Currency_ID = pl.C_Currency_ID)
+                        WHERE pl.M_PriceList_ID = @M_PriceList_ID";
+                    using (IDataReader dr = DB.ExecuteReader(plSql, new SqlParameter[] { new SqlParameter("@M_PriceList_ID", priceListId) }))
+                    {
+                        if (dr != null && dr.Read())
+                        {
+                            isTaxIncluded = Util.GetValueOfString(dr["is_tax_included"]) == "Y";
+                            precision = Util.GetValueOfInt(dr["std_precision"]);
+                        }
+                    }
+                }
+
+                List<LineTaxInput> inputs = string.IsNullOrWhiteSpace(linesJson)
+                    ? null
+                    : JsonConvert.DeserializeObject<List<LineTaxInput>>(linesJson);
+
+                List<object> lines = new List<object>();
+                foreach (LineTaxInput input in inputs ?? new List<LineTaxInput>())
+                {
+                    decimal taxAmt = 0;
+                    decimal surchargeAmt = 0;
+                    if (input != null && input.TaxId > 0 && input.Amount != 0)
+                    {
+                        MTax tax = MTax.Get(ctx, input.TaxId);
+                        if (tax.Get_ColumnIndex("Surcharge_Tax_ID") >= 0 && tax.GetSurcharge_Tax_ID() > 0)
+                        {
+                            taxAmt = tax.CalculateSurcharge(input.Amount, isTaxIncluded, precision, out surchargeAmt);
+                        }
+                        else
+                        {
+                            taxAmt = tax.CalculateTax(input.Amount, isTaxIncluded, precision);
+                        }
+                    }
+                    lines.Add(new
+                    {
+                        taxAmt = taxAmt + surchargeAmt,
+                        surchargeAmt = surchargeAmt
+                    });
+                }
+
+                return Ok(new { success = true, isTaxIncluded = isTaxIncluded, lines = lines });
+            }
+            catch (Exception ex)
+            {
+                Log.Log(Level.SEVERE, "VAS_217_OpenRequisitionsWidget.CalculateLineTaxes", ex);
+                return Fail(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Options of a C_Order list column translated to the session language, plus the column's default value.
+        /// </summary>
+        /// <param name="ctx">Session context</param>
+        /// <param name="columnName">C_Order column (PriorityRule, DocStatus)</param>
+        /// <param name="onlyValues">Optional list values to keep - code constants only, never user input</param>
+        /// <param name="defaultValue">The column default when it is one of the options, else empty</param>
+        private List<object> GetOrderColumnListOptions(Ctx ctx, string columnName, string[] onlyValues, out string defaultValue)
+        {
+            defaultValue = "";
+            List<object> options = new List<object>();
+            string valueFilter = (onlyValues != null && onlyValues.Length > 0)
+                ? " AND RefList.Value IN ('" + string.Join("', '", onlyValues) + "')"
+                : "";
+            string sql = @"
+                SELECT RefList.Value AS id, COALESCE(RefListTrl.Name, RefList.Name) AS name, ColumnInfo.DefaultValue AS default_value
+                FROM AD_Column ColumnInfo
+                INNER JOIN AD_Table TableInfo ON (TableInfo.AD_Table_ID = ColumnInfo.AD_Table_ID)
+                INNER JOIN AD_Ref_List RefList ON (RefList.AD_Reference_ID = ColumnInfo.AD_Reference_Value_ID)
+                LEFT OUTER JOIN AD_Ref_List_Trl RefListTrl ON (RefListTrl.AD_Ref_List_ID = RefList.AD_Ref_List_ID AND RefListTrl.AD_Language = @AD_Language)
+                WHERE TableInfo.TableName = 'C_Order'
+                  AND ColumnInfo.ColumnName = @ColumnName
+                  AND RefList.IsActive = 'Y'" + valueFilter + @"
+                ORDER BY RefList.Value ASC";
+            using (IDataReader dr = DB.ExecuteReader(sql, new SqlParameter[]
+            {
+                new SqlParameter("@AD_Language", ctx.GetAD_Language()),
+                new SqlParameter("@ColumnName", columnName)
+            }))
+            {
+                while (dr != null && dr.Read())
+                {
+                    string value = Util.GetValueOfString(dr["id"]);
+                    options.Add(new
+                    {
+                        id = value,
+                        name = Util.GetValueOfString(dr["name"])
+                    });
+                    if (value == Util.GetValueOfString(dr["default_value"]))
+                    {
+                        defaultValue = value;
+                    }
+                }
+            }
+            return options;
+        }
+
+        private sealed class LineTaxInput
+        {
+            [JsonProperty("taxId")]
+            public int TaxId { get; set; }
+
+            [JsonProperty("amount")]
+            public decimal Amount { get; set; }
         }
 
         private Dictionary<int, ProductPoVendorDto> GetProductPreferredVendors(Ctx ctx, List<int> productIds)
@@ -1279,6 +1586,64 @@ namespace VIS.Controllers
             }
 
             return dict;
+        }
+
+        /// <summary>
+        /// Purchase document types offered by the Purchase Order window's Target Doc Type field
+        /// (validation rule "C_DocType PO or SO" for IsSOTrx='N', IsReturnTrx='N', IsSalesQuotation='N', IsBlanketTrx='N').
+        /// Binds @AD_Client_ID then @AD_Org_ID, in that order.
+        /// </summary>
+        private const string PurchaseDocTypeWhere = @"IsActive='Y'
+                      AND DocBaseType IN ('SOO', 'POO', 'BOO')
+                      AND IsSOTrx='N' AND IsReturnTrx='N' AND IsSalesQuotation='N' AND IsBlanketTrx='N'
+                      AND AD_Client_ID IN (0, @AD_Client_ID)
+                      AND AD_Org_ID IN (0, @AD_Org_ID)";
+
+        private int GetRequisitionOrgId(Ctx ctx, int requisitionId)
+        {
+            if (requisitionId <= 0)
+            {
+                return ctx.GetAD_Org_ID();
+            }
+            return Util.GetValueOfInt(DB.ExecuteScalar(
+                "SELECT AD_Org_ID FROM M_Requisition WHERE M_Requisition_ID = @M_Requisition_ID",
+                new SqlParameter[] { new SqlParameter("@M_Requisition_ID", requisitionId) }, null));
+        }
+
+        private bool HasColumn(string tableName, string columnName)
+        {
+            string sql;
+            if (DB.IsPostgreSQL())
+            {
+                sql = @"
+                    SELECT COUNT(1)
+                    FROM information_schema.columns
+                    WHERE UPPER(table_name)=UPPER(@TableName)
+                      AND UPPER(column_name)=UPPER(@ColumnName)";
+            }
+            else
+            {
+                sql = @"
+                    SELECT COUNT(1)
+                    FROM USER_TAB_COLUMNS
+                    WHERE TABLE_NAME=UPPER(@TableName)
+                      AND COLUMN_NAME=UPPER(@ColumnName)";
+            }
+
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql, new SqlParameter[]
+            {
+                new SqlParameter("@TableName", tableName),
+                new SqlParameter("@ColumnName", columnName)
+            }, null)) > 0;
+        }
+
+        /// <summary>
+        /// Msg.GetMsg returns the key itself when the message is not defined; fall back to readable text then.
+        /// </summary>
+        private string MsgOr(Ctx ctx, string key, string fallback)
+        {
+            string msg = Msg.GetMsg(ctx, key);
+            return (string.IsNullOrEmpty(msg) || msg == key || msg == "[" + key + "]") ? fallback : msg;
         }
 
         private int GetDefaultWarehouse(Ctx ctx, int orgId)

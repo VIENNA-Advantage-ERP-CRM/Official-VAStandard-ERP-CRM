@@ -126,16 +126,24 @@
     min-height: 0;
 }
 
+/* Column tracks favour the missing-data cell: it carries a variable number of
+   chips and was the only column that had to truncate, while item and
+   last-updated are fixed-shape and were over-provisioned. The tighter gap gives
+   the strip another 0.75em across the three gutters.
+   Category takes a little from the chip strip on its left AND from last-updated
+   on its right, so it both starts further left and has more room before the
+   date column. The four tracks still sum to 6fr, so the row geometry is
+   unchanged overall. */
 .MPC-ir-row {
     display: grid;
-    grid-template-columns: 1.6fr 2.1fr 0.9fr 1.1fr;
-    gap: 0.75em;
+    grid-template-columns: 1.45fr 2.6fr 1.05fr 0.9fr;
+    gap: 0.5em;
     align-items: center;
     padding: 0 0.5em;
 }
 
 .MPC-ir-ghead {
-    font-size: 0.75em;
+    font-size: 0.6875em;
     color: #748494;
     text-transform: capitalize;
     padding-bottom: 0.375em;
@@ -192,7 +200,7 @@
 
 .MPC-ir-name {
     display: block;
-    font-size: 0.75em;
+    font-size: 0.6875em;
     font-weight: 700;
     color: #102C3F;
     white-space: nowrap;
@@ -202,7 +210,7 @@
 
 .MPC-ir-code {
     display: block;
-    font-size: 0.6875em;
+    font-size: 0.625em;
     font-weight: 400;
     color: #748494;
     line-height: 1.3;
@@ -219,21 +227,23 @@
     text-overflow: ellipsis;
 }
 
+/* Tighter pill: smaller type plus trimmed padding/gutter fits noticeably more
+   field labels before the strip has to ellipsis. */
 .MPC-ir-chip {
     display: inline-block;
-    padding: 1px 7px;
+    padding: 1px 6px;
     border-radius: 999px;
-    font-size: 0.6875em;
+    font-size: 0.625em;
     font-weight: 500;
-    line-height: 1.6;
+    line-height: 1.5;
     background: #FDECEC;
     color: #A33F3F;
-    margin: 1px 3px 1px 0;
+    margin: 1px 2px 1px 0;
     white-space: nowrap;
 }
 
 .MPC-ir-c-cat {
-    font-size: 0.75em;
+    font-size: 0.6875em;
     color: #5F7283;
     white-space: nowrap;
     overflow: hidden;
@@ -247,7 +257,7 @@
 
 .MPC-ir-upd-date {
     display: block;
-    font-size: 0.75em;
+    font-size: 0.6875em;
     color: #5F7283;
     white-space: nowrap;
     overflow: hidden;
@@ -256,7 +266,7 @@
 
 .MPC-ir-upd-by {
     display: block;
-    font-size: 0.6875em;
+    font-size: 0.625em;
     color: #748494;
     line-height: 1.3;
     white-space: nowrap;
@@ -264,7 +274,21 @@
     text-overflow: ellipsis;
 }
 
-/* Loading / empty / error state inside the rows region. */
+/* Busy/loading veil over the whole card. The core stylesheet already makes
+   .vis-busyindicatorouterwrap absolute and full-size and centres the
+   .vis_widgetloader spinner inside it, so this only adds the translucent tint
+   and the card's corner radius. Toggled with visibility so the widget's layout
+   height never changes while loading. */
+.MPC-ir-busy {
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 14px;
+}
+
+.MPC-ir-busy-hidden {
+    visibility: hidden;
+}
+
+/* Empty / error state inside the rows region. */
 .MPC-ir-state {
     padding: 1.5em 0.5em;
     font-size: 0.75em;

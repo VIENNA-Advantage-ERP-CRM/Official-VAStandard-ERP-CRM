@@ -82,7 +82,7 @@
     }
     VIS.Model.CalloutDocumentType = CalloutDocumentType;
     //*************CalloutDocumentType Ends*************
-   
+
 
     /*  Callout Recurring*******************Added by Arpit Rai on 2nd Jan,2016  */
     function CalloutRecurring() {
@@ -104,7 +104,7 @@
         ctx = windowNo = mTab = mField = value = oldValue = null;
         return "";
     }
-    VIS.Model.CalloutRecurring = CalloutRecurring;    
+    VIS.Model.CalloutRecurring = CalloutRecurring;
 
 
     /*  Callout CalloutProfitLoss**********Added on 05 December, 2017 By SUkhwinder */
@@ -394,15 +394,15 @@
         return "";
     }
 
-     /**
-     * VIS430:System should save Current Date and Future Date in Response Date field on RFQ screen
-     * @param {any} ctx
-     * @param {any} windowNo
-     * @param {any} mTab
-     * @param {any} mField
-     * @param {any} value
-     * @param {any} oldValue
-     */
+    /**
+    * VIS430:System should save Current Date and Future Date in Response Date field on RFQ screen
+    * @param {any} ctx
+    * @param {any} windowNo
+    * @param {any} mTab
+    * @param {any} mField
+    * @param {any} value
+    * @param {any} oldValue
+    */
     CalloutRFQ.prototype.RfqDateResponse = function (ctx, windowNo, mTab, mField, value, oldValue) {
 
         if (this.isCalloutActive() || value == null || value.toString() == "") {
@@ -469,9 +469,56 @@
         this.setCalloutActive(false);
         return "";
     };
-    
+
     VIS.Model.CalloutPaymentTerm = CalloutPaymentTerm;
     //**************CalloutPaymentTerm End*************
+
+    function CalloutScreenZoomConfig() {
+        VIS.CalloutEngine.call(this, "VIS.CalloutScreenZoomConfig"); //must call
+    };
+    VIS.Utility.inheritPrototype(CalloutScreenZoomConfig, VIS.CalloutEngine);//inherit CalloutEngine
+
+    // Callout To Set Screen Name
+    CalloutScreenZoomConfig.prototype.SetScreenName = function (ctx, windowNo, mTab, mField, value, oldValue) {
+        if (value == null || value.toString() == "") {
+            return "";
+        }
+        this.setCalloutActive(true);
+        try {
+            /* Divert From and To Screen cant be same */
+            if (Util.getValueOfInt(mTab.getValue("AD_Window_ID")) != 0 && Util.getValueOfInt(mTab.getValue("AD_Window_ID_1")) != 0 &&
+                Util.getValueOfInt(mTab.getValue("AD_Window_ID")) == Util.getValueOfInt(mTab.getValue("AD_Window_ID_1"))) {
+                mTab.setValue(mField.getColumnName(), null);
+                if (mField.getColumnName() == "AD_Window_ID") {
+                    mTab.setValue("Name", "");
+                }
+                else if (mField.getColumnName() == "AD_Window_ID_1") {
+                    mTab.setValue("Value", "");
+                }
+
+                VIS.ADialog.info("VAS_DivertFrom_ToScreenNotSame");
+                this.setCalloutActive(false);
+                return "";
+            }
+            var screenName = VIS.dataContext.getJSONRecord("Common/GetWindowName", Util.getValueOfInt(value).toString());
+            if (screenName != null) {
+                if (mField.getColumnName() == "AD_Window_ID") {
+                    mTab.setValue("Name", screenName);
+                }
+                else if (mField.getColumnName() == "AD_Window_ID_1") {
+                    mTab.setValue("Value", screenName);
+                }
+            }
+        }
+        catch (err) {
+            this.setCalloutActive(false);
+            this.log.severe(err.toString());
+        }
+        this.setCalloutActive(false);
+        ctx = windowNo = mTab = mField = value = oldValue = null;
+        return "";
+    }
+    VIS.Model.CalloutScreenZoomConfig = CalloutScreenZoomConfig;
 
 
 })(VIS, jQuery);

@@ -350,6 +350,10 @@
 
             $body.html(rowsHtml);
 
+            // A single record keeps its natural height at the top of the body instead of
+            // stretching (flex: 1 1 0) into a vertically-centred full-height row.
+            $body.toggleClass('single-row', (endIndex - startIndex) === 1);
+
             // Footnote counts the bars actually on screen, so it can no longer overstate the page.
             var shownCount = endIndex - startIndex;
             if (categoriesData.length > shownCount) {

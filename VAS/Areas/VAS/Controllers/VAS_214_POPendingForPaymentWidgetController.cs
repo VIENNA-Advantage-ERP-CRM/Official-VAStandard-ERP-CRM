@@ -1,4 +1,4 @@
-﻿/************************************************************
+﻿﻿﻿﻿﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Controller for PO Pending for Payment Widget (Widget 12)
  *                  Operational Purchase Order queue of received Purchase Orders
@@ -104,9 +104,37 @@ namespace VIS.Controllers
                     schemaCurrencyId = ctx.GetContextAsInt("$C_Currency_ID");
                 }
 
-                // Step 2: Query Received POs with Outstanding Balance
+                // Step 2: Query POs with Outstanding Balance - received POs, plus completed advance-payment POs
                 DateTime today = DateTime.Today;
 
+                // A PO whose payment term - or one of the term's pay schedules - has VA009_Advance = 'Y' is payable once
+                // it is completed, before any receipt. Guarded so the query still runs where the payment module is absent.
+                bool hasAdvanceTerms = HasColumn("C_PaymentTerm", "VA009_Advance")
+                    && HasColumn("C_PaySchedule", "VA009_Advance")
+                    && HasColumn("VA009_OrderPaySchedule", "VA009_PaidAmnt");
+                string advancePaidExpr = hasAdvanceTerms ? "COALESCE(a.adv_paid, 0)" : "0";
+                string advanceDueSelect = hasAdvanceTerms ? "a.adv_next_due" : "NULL";
+                string advanceJoin = hasAdvanceTerms
+                    ? @"
+                    LEFT JOIN (SELECT sch.C_Order_ID,
+                            SUM(COALESCE(sch.VA009_PaidAmnt, 0)) AS adv_paid,
+                            MIN(CASE WHEN COALESCE(sch.VA009_IsPaid, 'N') = 'N' THEN sch.DueDate ELSE NULL END) AS adv_next_due
+                        FROM VA009_OrderPaySchedule sch
+                        WHERE sch.IsActive = 'Y'
+                        GROUP BY sch.C_Order_ID
+                    ) a
+                        ON a.C_Order_ID = o.C_Order_ID"
+                    : "";
+                string eligibilityWhere = hasAdvanceTerms
+                    ? @"(r.C_Order_ID IS NOT NULL
+                           OR (o.DocStatus IN ('CO', 'CL')
+                               AND (pt.VA009_Advance = 'Y'
+                                    OR EXISTS (SELECT 1 FROM C_PaySchedule ps WHERE ps.C_PaymentTerm_ID = o.C_PaymentTerm_ID AND ps.VA009_Advance = 'Y' AND ps.IsActive = 'Y'))))"
+                    : "r.C_Order_ID IS NOT NULL";
+
+                // Received value = received qty x unit price in the PO line's own UOM (2,000 ml x 0.20 = 400).
+                // MovementQty is in the product UOM while PriceEntered is per the line UOM, so MovementQty is
+                // rescaled by QtyEntered / QtyOrdered; MovementQty x PriceActual gave 0.40 for that example.
                 string sql = @"
                     SELECT
                         o.C_Order_ID AS purchase_order_id,
@@ -127,17 +155,21 @@ namespace VIS.Controllers
                         r.received_on,
                         r.received_value,
                         i.payment_due AS invoice_payment_due,
+                        " + advanceDueSelect + @" AS advance_next_due,
                         CASE
                             WHEN i.C_Order_ID IS NOT NULL THEN i.invoice_total
-                            ELSE r.received_value
+                            WHEN r.C_Order_ID IS NOT NULL THEN r.received_value
+                            ELSE o.GrandTotal
                         END AS total_payable,
                         CASE
                             WHEN i.C_Order_ID IS NOT NULL THEN i.paid_amount
-                            ELSE 0
+                            WHEN r.C_Order_ID IS NOT NULL THEN 0
+                            ELSE " + advancePaidExpr + @"
                         END AS paid_amount,
                         CASE
                             WHEN i.C_Order_ID IS NOT NULL THEN i.open_amount
-                            ELSE r.received_value
+                            WHEN r.C_Order_ID IS NOT NULL THEN r.received_value
+                            ELSE o.GrandTotal - " + advancePaidExpr + @"
                         END AS balance_due
                     FROM C_Order o
                     INNER JOIN C_BPartner bp
@@ -148,11 +180,15 @@ namespace VIS.Controllers
                         ON pt.C_PaymentTerm_ID = o.C_PaymentTerm_ID
                     LEFT JOIN C_Currency c
                         ON c.C_Currency_ID = o.C_Currency_ID
-                    INNER JOIN (
+                    LEFT JOIN (
                         SELECT
                             io.C_Order_ID,
                             MAX(COALESCE(io.DateReceived, io.MovementDate)) AS received_on,
-                            SUM(COALESCE(iol.MovementQty, 0) * COALESCE(ol.PriceActual, 0)) AS received_value
+                            SUM(CASE
+                                    WHEN COALESCE(ol.QtyOrdered, 0) <> 0
+                                    THEN COALESCE(iol.MovementQty, 0) * COALESCE(ol.PriceEntered, ol.PriceActual, 0) * COALESCE(ol.QtyEntered, ol.QtyOrdered) / ol.QtyOrdered
+                                    ELSE COALESCE(iol.QtyEntered, iol.MovementQty, 0) * COALESCE(ol.PriceEntered, ol.PriceActual, 0)
+                                END) AS received_value
                         FROM M_InOut io
                         INNER JOIN M_InOutLine iol
                             ON iol.M_InOut_ID = io.M_InOut_ID
@@ -189,25 +225,36 @@ namespace VIS.Controllers
                           AND inv.C_Order_ID IS NOT NULL
                         GROUP BY inv.C_Order_ID
                     ) i
-                        ON i.C_Order_ID = o.C_Order_ID
+                        ON i.C_Order_ID = o.C_Order_ID" + advanceJoin + @"
                     WHERE o.AD_Client_ID = " + clientId + @"
                       AND o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
+                      AND " + eligibilityWhere + @"
+                      AND o.C_Order_ID IN (@P_ORDER_ACCESS@)
                       AND (
                             CASE
                                 WHEN i.C_Order_ID IS NOT NULL THEN i.open_amount
-                                ELSE r.received_value
+                                WHEN r.C_Order_ID IS NOT NULL THEN r.received_value
+                                ELSE o.GrandTotal - " + advancePaidExpr + @"
                             END
                           ) > 0
                     ORDER BY
                         CASE
                             WHEN i.C_Order_ID IS NOT NULL THEN i.payment_due
-                            ELSE r.received_on + COALESCE(pt.NetDays, 0)
+                            ELSE COALESCE(r.received_on, o.DateOrdered) + COALESCE(pt.NetDays, 0)
                         END ASC,
                         o.DocumentNo ASC";
 
-                sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                // MRole.AddAccessSQL cannot parse this statement: it contains derived tables and
+                // several JOIN..ON clauses, so AccessSqlParser reports "More than one FROM clause",
+                // appends the access predicates AFTER the ORDER BY (ORA-00933) and emits predicates
+                // for aliases that exist only inside the sub-selects. Apply the very same role access
+                // through a simple, parseable sub-query on C_Order instead.
+                string orderAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                    "SELECT accessOrd.C_Order_ID FROM C_Order accessOrd WHERE accessOrd.AD_Client_ID = " + clientId,
+                    "accessOrd", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                sql = sql.Replace("@P_ORDER_ACCESS@", orderAccessSql);
 
                 var records = new List<object>();
                 decimal totalDueConvertedAcrossQueue = 0;
@@ -241,11 +288,21 @@ namespace VIS.Controllers
                         decimal paidAmount = Util.GetValueOfDecimal(dr["paid_amount"]);
                         decimal balanceDue = Util.GetValueOfDecimal(dr["balance_due"]);
 
-                        // Resolve effective payment due date: Invoice DueDate or (ReceivedOn + NetDays)
+                        // Resolve effective payment due date: Invoice DueDate, else (ReceivedOn + NetDays); a completed
+                        // advance-payment PO not yet received uses its next unpaid pay schedule, else (DateOrdered + NetDays)
+                        DateTime? advanceNextDue = Util.GetValueOfDateTime(dr["advance_next_due"]);
                         DateTime? paymentDue = invoicePaymentDue;
                         if (!paymentDue.HasValue && receivedOn.HasValue)
                         {
                             paymentDue = receivedOn.Value.Date.AddDays(netDays);
+                        }
+                        if (!paymentDue.HasValue && advanceNextDue.HasValue)
+                        {
+                            paymentDue = advanceNextDue.Value.Date;
+                        }
+                        if (!paymentDue.HasValue && orderDate.HasValue)
+                        {
+                            paymentDue = orderDate.Value.Date.AddDays(netDays);
                         }
 
                         // Determine Overdue status (computed in C# server code for 100% portability)
@@ -365,25 +422,41 @@ namespace VIS.Controllers
                     SELECT
                         ol.C_OrderLine_ID AS line_id,
                         ol.Line AS line_no,
-                        p.Name AS product_name,
+                        -- A charge line, or a product that is not of Item type, carries no
+                        -- stock movement: the widget shows its name, UOM, ordered, rate and
+                        -- amount, and dashes for received / pending / line status.
+                        CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0
+                             THEN COALESCE(ch.Name, N'')
+                             ELSE p.Name END AS product_name,
+                        CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0 THEN 'Y'
+                             WHEN ol.M_Product_ID IS NOT NULL AND COALESCE(p.ProductType, 'I') <> 'I' THEN 'Y'
+                             ELSE 'N' END AS IsNonStock,
                         p.Value AS product_sku,
-                        asi.Description AS attribute_desc,
+                        CASE WHEN COALESCE(ol.M_AttributeSetInstance_ID, 0) > 0
+                             THEN COALESCE(asi.Description, N'')
+                             ELSE N'' END AS attribute_desc,
                         COALESCE(u.UOMSymbol, u.Name) AS uom_name,
                         COALESCE(ol.QtyOrdered, 0) AS ordered_qty,
+                        -- QtyEntered is expressed in the line's own C_UOM_ID (the UOM the buyer
+                        -- picked); QtyOrdered / QtyDelivered are in the product's base UOM. The
+                        -- widget shows the selected UOM, so quantities are scaled to it.
+                        COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) AS QtyEntered,
                         COALESCE(ol.QtyDelivered, 0) AS delivered_qty,
+                        p.ProductType AS product_type,
                         CASE
-                            WHEN COALESCE(ol.QtyOrdered, 0) > COALESCE(ol.QtyDelivered, 0)
-                            THEN COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0)
-                            ELSE 0
-                        END AS pending_qty,
-                        COALESCE(ol.PriceActual, 0) AS price_actual,
-                        COALESCE(ol.LineNetAmt, COALESCE(ol.QtyOrdered, 0) * COALESCE(ol.PriceActual, 0)) AS line_net_amt,
+                            WHEN COALESCE(ol.QtyOrdered, 0) <> 0
+                            THEN COALESCE(ol.QtyDelivered, 0) * COALESCE(ol.QtyEntered, ol.QtyOrdered) / ol.QtyOrdered
+                            ELSE COALESCE(ol.QtyDelivered, 0)
+                        END AS delivered_qty,
+                        COALESCE(ol.PriceEntered, ol.PriceActual, 0) AS price_actual,
+                        COALESCE(ol.LineNetAmt, COALESCE(ol.QtyEntered, 0) * COALESCE(ol.PriceEntered, 0)) AS line_net_amt,
                         c.CurSymbol AS cur_symbol,
                         c.ISO_Code AS cur_iso,
                         c.StdPrecision AS std_precision
                     FROM C_OrderLine ol
                     INNER JOIN C_Order o ON o.C_Order_ID = ol.C_Order_ID
                     LEFT JOIN M_Product p ON p.M_Product_ID = ol.M_Product_ID
+                    LEFT JOIN C_Charge ch ON (ch.C_Charge_ID = ol.C_Charge_ID)
                     LEFT JOIN C_UOM u ON u.C_UOM_ID = ol.C_UOM_ID
                     LEFT JOIN M_AttributeSetInstance asi ON asi.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID
                     LEFT JOIN C_Currency c ON c.C_Currency_ID = o.C_Currency_ID
@@ -402,7 +475,18 @@ namespace VIS.Controllers
                     {
                         decimal orderedQty = Util.GetValueOfDecimal(dr["ordered_qty"]);
                         decimal deliveredQty = Util.GetValueOfDecimal(dr["delivered_qty"]);
+
+                        // Quantities are shown in the UOM the line was entered in. QtyEntered is in the
+                        // line's own C_UOM_ID; QtyOrdered / QtyDelivered are in the product's base UOM,
+                        // so delivered is scaled by this line's own entered/ordered ratio. Header
+                        // roll-ups above stay in the base UOM - summing mixed UOMs is meaningless.
+                        decimal enteredQtyUom = Util.GetValueOfDecimal(dr["QtyEntered"]);
+                        decimal uomRatio = (orderedQty != 0) ? (enteredQtyUom / orderedQty) : 1m;
+                        orderedQty = enteredQtyUom;
+                        deliveredQty = deliveredQty * uomRatio;
                         decimal pendingQty = Util.GetValueOfDecimal(dr["pending_qty"]);
+                        // Pending follows the converted figures, not the base-UOM value.
+                        pendingQty = Math.Max(0m, orderedQty - deliveredQty);
                         decimal priceActual = Util.GetValueOfDecimal(dr["price_actual"]);
                         decimal lineNetAmt = Util.GetValueOfDecimal(dr["line_net_amt"]);
 
@@ -428,6 +512,7 @@ namespace VIS.Controllers
                             LineID = Util.GetValueOfInt(dr["line_id"]),
                             LineNo = Util.GetValueOfInt(dr["line_no"]),
                             ProductName = Util.GetValueOfString(dr["product_name"]),
+                            ProductType = Util.GetValueOfString(dr["product_type"]),
                             ProductSKU = Util.GetValueOfString(dr["product_sku"]),
                             Attribute = Util.GetValueOfString(dr["attribute_desc"]),
                             UOM = Util.GetValueOfString(dr["uom_name"]),
@@ -436,6 +521,9 @@ namespace VIS.Controllers
                             PendingQty = pendingQty,
                             PriceActual = priceActual,
                             LineNetAmt = lineNetAmt,
+                            // Charge / non-Item lines are never received - the client renders dashes
+                            // for received, pending and line status.
+                            isNonStock = Util.GetValueOfString(dr["IsNonStock"]) == "Y",
                             LineStatus = lineStatus,
                             LineStatusKey = lineStatusKey,
                             LineStatusChip = lineStatusChip,
@@ -457,6 +545,33 @@ namespace VIS.Controllers
                 Log.Log(Level.SEVERE, "VAS_214_POPendingForPaymentWidget.GetPOLines", ex);
                 return Json(JsonConvert.SerializeObject(new { error = Msg.GetMsg(ctx, "Error") ?? "Error", success = false }), JsonRequestBehavior.AllowGet);
             }
+        }
+
+        private bool HasColumn(string tableName, string columnName)
+        {
+            string sql;
+            if (DB.IsPostgreSQL())
+            {
+                sql = @"
+                    SELECT COUNT(1)
+                    FROM information_schema.columns
+                    WHERE UPPER(table_name)=UPPER(@TableName)
+                      AND UPPER(column_name)=UPPER(@ColumnName)";
+            }
+            else
+            {
+                sql = @"
+                    SELECT COUNT(1)
+                    FROM USER_TAB_COLUMNS
+                    WHERE TABLE_NAME=UPPER(@TableName)
+                      AND COLUMN_NAME=UPPER(@ColumnName)";
+            }
+
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql, new System.Data.SqlClient.SqlParameter[]
+            {
+                new System.Data.SqlClient.SqlParameter("@TableName", tableName),
+                new System.Data.SqlClient.SqlParameter("@ColumnName", columnName)
+            }, null)) > 0;
         }
 
         /// <summary>

@@ -93,28 +93,38 @@
 }
 
 .vas-mpt-sel {
+    /* Shared filter control size across every PO widget: one type scale, one padding,
+       and month / year min-widths wide enough for the longest values ("September",
+       4-digit years). Values are in em so the control tracks the widget's scale. */
+    /* The closed control keeps the centred house style; only the values in the open
+       dropdown list are left-aligned (see the option rule below). */
     appearance: none !important;
     -webkit-appearance: none !important;
     -moz-appearance: none !important;
     background-image: none !important;
     font-family: inherit;
-    font-size: 0.6875em;
+    font-size: 0.8125em;
     font-weight: 500;
     color: #41576A;
     background-color: #FFFFFF;
     border: 1px solid #D9E2EB;
     border-radius: 8px;
-    padding: 0.35em 0.75em;
+    padding: 0.45em 0.85em;
     line-height: 1.2;
     cursor: pointer;
     box-shadow: 0 1px 2px rgba(16, 47, 74, 0.04);
-    min-width: 7.5em;
+    min-width: 8.5em;
     max-width: 9em;
     text-align: center;
     text-align-last: center;
     outline: none;
     transition: background-color 0.15s, border-color 0.15s;
 }
+
+.vas-mpt-sel option {
+    text-align: left;
+}
+
 
 .vas-mpt-sel:hover,
 .vas-mpt-sel:focus {
@@ -277,6 +287,11 @@
 }
 
 .vas-mpt-modal {
+    /* The type scale lives on the dialog, not just its body, so the header and
+       footer scale with the content instead of staying pinned at the app default. */
+    --panel-anchor: clamp(15px, 1.15vw, 26px);
+    font-size: var(--panel-anchor);
+
     width: min(1240px, 94vw);
     max-height: min(880px, 90dvh);
     background: #FFFFFF;
@@ -362,7 +377,7 @@
 
 /* Modal Body */
 .vas-mpt-modal-body {
-    flex: 1 1 auto;
+    flex: 0 1 auto;
     min-height: 0;
     overflow-y: auto;
     padding: 1.125em 0.875em;
@@ -370,8 +385,13 @@
     flex-direction: column;
     gap: 0.75em;
     container-type: inline-size;
-    --panel-anchor: clamp(14px, 1vw, 18px);
-    font-size: var(--panel-anchor);
+    /* The modal type scale. The previous clamp(18px, 1vw, 20px) only varied between a
+       ~1800px and ~2000px viewport - on every other screen it sat pinned to one of its
+       bounds, so the popup never grew with resolution. This range tracks across the
+       resolutions actually in use (~15px at 1366px, ~22px at 1920px, 26px at 2560px).
+       Everything inside the popup is sized in em against it, so the whole dialog -
+       rows, chips, buttons, icons - scales together. */
+    font-size: inherit;
 }
 
 .vas-mpt-modal-body button,
@@ -387,11 +407,11 @@
 .vas-mpt-modal-foot {
     flex: 0 0 auto;
     border-top: 1px solid #D9E2EB;
-    padding: 12px 16px;
+    padding: 0.6em 0.8em;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: 0.6em;
     background: #FBFDFF;
 }
 
@@ -469,9 +489,12 @@
 
 /* Modal Table */
 .vas-mpt-mtwrap {
+    --vas-mpt-rows: 6;
+    --vas-mpt-row-h: 1.9em;
+
     display: flex;
     flex-direction: column;
-    flex: 1 1 auto;
+    flex: none;
     min-height: 0;
     overflow: hidden;
 }
@@ -479,7 +502,7 @@
 .vas-mpt-mtbl {
     display: flex;
     flex-direction: column;
-    flex: 1 1 auto;
+    flex: none;
     min-height: 0;
     overflow: hidden;
 }
@@ -502,18 +525,27 @@
     flex: 0 0 auto;
 }
 
+/* Fixed-size modal table, matching VAS_216_POQueueWidget:
+   the body is exactly --vas-mpt-rows rows tall and never changes with how many rows a
+   page actually holds, each row occupies 1/rows of it and they stack from the top,
+   and anything beyond a page is reached through the pager. Sizing is in em against
+   the modal body's font-size, so the dialog scales with the screen - no px. */
 .vas-mpt-mbody {
     display: flex;
     flex-direction: column;
-    flex: 1 1 auto;
+    flex: none;
     min-height: 0;
     overflow-y: auto;
+    justify-content: flex-start;
+    height: calc(var(--vas-mpt-rows, 6) * var(--vas-mpt-row-h, 1.9em));
 }
 
 .vas-mpt-mbody .vas-mpt-mrow {
     font-size: 0.75em;
-    padding: 0.5em 0.5em;
+    padding: 0.75em 0.5em;
     border-bottom: 1px solid #E2EAF1;
+    flex: 0 0 calc(100% / var(--vas-mpt-rows, 6));
+    min-height: 0;
 }
 
 .vas-mpt-mbody .vas-mpt-mrow:last-child {
@@ -580,9 +612,9 @@
 }
 
 .vas-mpt-iconbtn {
-    width: 1.5em;
-    height: 1.5em;
-    border-radius: 7px;
+    width: 1.8em;
+    height: 1.8em;
+    border-radius: 8px;
     border: 1px solid #D9E2EB;
     background: #FFFFFF;
     display: grid;
@@ -591,6 +623,7 @@
     cursor: pointer;
     padding: 0;
     flex: 0 0 auto;
+    line-height: 1;
 }
 
 .vas-mpt-iconbtn:hover {
@@ -599,8 +632,10 @@
 }
 
 .vas-mpt-iconbtn svg {
-    width: 0.85em;
-    height: 0.85em;
+    width: 1em;
+    height: 1em;
+    display: block;
+    flex: none;
 }
 
 /* Modal Pager Footer */

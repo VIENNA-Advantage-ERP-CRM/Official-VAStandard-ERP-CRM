@@ -98,13 +98,25 @@
     border-radius: 8px;
     padding: 0.35em 0.75em;
     min-width: 5.5em;
-    text-align: center;
+    /* Alignment is deliberately SPLIT (user request 2026-08-29, same as VAS_161/162/165):
+         - text-align      -> inherited by the <option> elements, so the list inside the OPEN
+                              dropdown reads left aligned;
+         - text-align-last -> governs the single displayed line of the CLOSED control, so the
+                              selected warehouse stays centred, as AGENTS.md Rule 13 specifies. */
+    text-align: left;
     text-align-last: center;
     outline: none;
     cursor: pointer;
     box-sizing: border-box;
     transition: background-color 0.15s ease, border-color 0.15s ease;
     max-width: 160px;
+}
+
+/* Explicit, for engines that do not inherit text-align into the native popup list. */
+.vas-invaging-wh-select option {
+    text-align: left;
+    color: #102C3F;
+    background-color: #FFFFFF;
 }
 
 .vas-invaging-wh-select:hover {

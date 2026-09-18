@@ -22,10 +22,32 @@
  * 13  | Close                                            | VAS_165_Close
  * 14  | No location count records found                  | VAS_165_NoLocationCountRecords
  * 15  | Unable to load location count summary            | VAS_165_UnableToLoadLocationSummary
+ * 16  | Locator                                          | M_Locator_ID (global VA element key)
  */
 ; VAS = window.VAS || {};
 
 ; (function (VAS, $) {
+
+    /* Same helper as VAS_156/159/160/161/162. VIS.Msg.getMsg returns the bracketed key
+       ("[M_Locator_ID]") - not null - when the AD_Message row is missing, so the fallback has to
+       test for the leading '[' rather than rely on a null check. M_Locator_ID is the global VA
+       element key for the word "Locator" and already exists in AD_Message. */
+    function lbl(key, fallback) {
+        var t = VIS.Msg.getMsg(key);
+        return (t && t.charAt(0) !== '[') ? t : fallback;
+    }
+
+    /* Copied verbatim from VAS_159/VAS_160. Locator names are free-text database values that get
+       concatenated into innerHTML, so an unescaped quote or angle bracket in the data would break
+       the markup. */
+    function escapeHtml(value) {
+        return String(value == null ? "" : value)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
 
     function ensureDashInlineSizeVar($el) {
         var container = $el.closest('.vis-widget-container, [data-dashboard-container], .vis-widget-body, body')[0] || document.documentElement;
@@ -71,7 +93,16 @@
            A fixed count (not a measured one) is required because the dialog is content-sized -
            measuring the container would be circular, since its height comes from the rows. */
         var MODAL_PAGE_ROWS = 7;
+
+        /* CARD page size. Starts at MODAL_PAGE_ROWS only so the first paint has a row to measure;
+           from then on it is whatever actually fits (see summaryRowsThatFit). */
         var pageSize = MODAL_PAGE_ROWS;
+
+        /* Height of one rendered card row, px. Cached; cleared by the ResizeObserver, which must
+           also fire on WIDTH changes - row font-size is driven by --widget-inline-size. */
+        var measuredRowHeight = 0;
+        /* Re-entrancy guard: the repaint mutates the subtree the ResizeObserver watches. */
+        var refittingRows = false;
         var widgetObserver = null;
         var $modalOverlay = null;
 
@@ -148,6 +179,20 @@
                         if (width > 0 && $root[0]) {
                             $root[0].style.setProperty('--widget-inline-size', width + 'px');
                         }
+                    }
+
+                    /* Row height follows the widget's size, so drop the cached measurement and
+                       repaint at the new fit. The guard is required because this repaint mutates
+                       the observed subtree. */
+                    if (refittingRows) { return; }
+                    if (!summaryData || summaryData.length === 0) { return; }
+
+                    refittingRows = true;
+                    try {
+                        measuredRowHeight = 0;
+                        renderSummaryPage();
+                    } finally {
+                        refittingRows = false;
                     }
                 });
                 widgetObserver.observe($wrapper[0]);
@@ -232,10 +277,39 @@
             }
         }
 
-        function renderSummaryPage() {
-            $rowsContainer.empty();
+        /* How many summary rows actually fit the card at its current size.
 
-            pageSize = MODAL_PAGE_ROWS;
+           The CARD's height comes from the dashboard grid, so it can be measured. The detail
+           POPUP is the opposite case - its height comes from its row count, so measuring there
+           would be circular; MODAL_PAGE_ROWS still governs the popup and is unchanged.
+
+           The card was reusing that same fixed 7 while only about five rows physically fit, so the
+           footer read "1-7 of 12" against five visible rows (reported 2026-08-29). Identical
+           defect and identical fix to VAS_161. */
+        function summaryRowsThatFit() {
+            var el = $rowsContainer && $rowsContainer[0];
+            if (!el) { return MODAL_PAGE_ROWS; }
+
+            var available = el.clientHeight;
+            if (!available) { return MODAL_PAGE_ROWS; }
+
+            if (!measuredRowHeight) {
+                /* Probe a REAL row - filler rows share .vas-locwisecount-row-btn. */
+                var probe = el.querySelector('.vas-locwisecount-row-btn:not(.vas-locwisecount-filler)');
+                if (probe) {
+                    var h = probe.getBoundingClientRect().height;
+                    if (h > 0) { measuredRowHeight = h; }
+                }
+            }
+
+            if (!measuredRowHeight) { return MODAL_PAGE_ROWS; }
+
+            /* Half a pixel of slack absorbs sub-pixel row heights. */
+            return Math.max(1, Math.floor((available + 0.5) / measuredRowHeight));
+        }
+
+        function renderSummaryPage(isRefit) {
+            $rowsContainer.empty();
 
             if (!summaryData || summaryData.length === 0) {
                 $rowsContainer.html('<div class="vas-locwisecount-message">No location counts recorded for this period. Pick another month to review earlier counts.</div>');
@@ -259,9 +333,14 @@
                 var item = pageItems[i];
                 var formattedQty = Number(item.totalQtyCounted || 0).toLocaleString();
 
+                /* Display the locator NAME. item.locator remains the CODE and is what
+                   openDetailModal sends back as locatorCode - the endpoint filters on loc.Value,
+                   so displaying the name must not change what is sent. */
+                var locName = item.locatorName || item.locator;
+
                 var $row = $(
-                    '<button type="button" class="vas-locwisecount-row-btn vas-locwisecount-grid-template" aria-label="Open count details for locator ' + item.locator + '">' +
-                    '<div class="vas-locwisecount-cell vas-locwisecount-loc-title" title="' + item.locator + '">' + item.locator + '</div>' +
+                    '<button type="button" class="vas-locwisecount-row-btn vas-locwisecount-grid-template" aria-label="Open count details for locator ' + locName + '">' +
+                    '<div class="vas-locwisecount-cell vas-locwisecount-loc-title" title="' + locName + '">' + locName + '</div>' +
                     '<div class="vas-locwisecount-cell vas-locwisecount-wh-text" title="' + item.warehouse + '">' + item.warehouse + '</div>' +
                     '<div class="vas-locwisecount-cell vas-locwisecount-counts-num" title="' + item.sessionCount + '">' + item.sessionCount + '</div>' +
                     '<div class="vas-locwisecount-cell vas-locwisecount-qty-num" title="' + formattedQty + '">' + formattedQty + '</div>' +
@@ -275,6 +354,20 @@
                 })(item, $row);
 
                 $rowsContainer.append($row);
+            }
+
+            /* Rows are on screen now, so one can be measured. If the fit differs from what was
+               just rendered, adopt it and repaint once. isRefit stops the second pass from
+               measuring again, so this cannot loop. */
+            if (!isRefit) {
+                var fit = summaryRowsThatFit();
+                if (fit !== pageSize) {
+                    pageSize = fit;
+                    var refitPages = Math.ceil(totalItems / pageSize) || 1;
+                    if (currentPage > refitPages) { currentPage = refitPages; }
+                    renderSummaryPage(true);
+                    return;
+                }
             }
 
             appendFillerRows($rowsContainer, Math.max(0, pageSize - pageItems.length));
@@ -325,7 +418,13 @@
             // Modal Header Chrome
             var $header = $('<div class="vas-locwisecount-modal-header">');
             var $headerLeft = $('<div class="vas-locwisecount-modal-header-left">');
-            var $title = $('<h3 class="vas-locwisecount-modal-title" title="' + locItem.locator + '">Locator ' + locItem.locator + '</h3>');
+            /* Show the locator NAME, using the SAME fallback the card row uses (see
+               renderSummaryPage). locItem.locator stays the CODE and is still what the detail
+               request below sends as locatorCode - only the DISPLAY changes. 3 of 31 locators on
+               DB 2 have a NULL LocatorCombination, so the fallback to the code is load-bearing:
+               without it those headings would read "Locator" with nothing after it. */
+            var locName = escapeHtml(locItem.locatorName || locItem.locator);
+            var $title = $('<h3 class="vas-locwisecount-modal-title" title="' + locName + '">' + escapeHtml(lbl('M_Locator_ID', 'Locator')) + ' ' + locName + '</h3>');
             var $subtitle = $('<span class="vas-locwisecount-modal-subtitle">' + locItem.warehouse + ' · ' + monthName + ' ' + selectedYear + '</span>');
             $headerLeft.append($title).append($subtitle);
 
@@ -462,7 +561,10 @@
                         '<div class="vas-locwisecount-modal-grid-template vas-locwisecount-modal-data-row">' +
                         '<div class="vas-locwisecount-cell">' +
                         '<div class="vas-locwisecount-prod-title" title="' + line.product + '">' + line.product + '</div>' +
-                        '<div class="vas-locwisecount-prod-attr" title="' + line.attribute + '">' + line.attribute + '</div>' +
+                        /* Blank when the line has no attribute - the controller no longer
+                           substitutes "Standard", which read as a product category. The element
+                           is still rendered so the row keeps its height. */
+                        '<div class="vas-locwisecount-prod-attr" title="' + (line.attribute || '') + '">' + (line.attribute || '&nbsp;') + '</div>' +
                         '</div>' +
                         '<div class="vas-locwisecount-cell vas-locwisecount-wh-text" title="' + line.locator + '">' + line.locator + '</div>' +
                         '<div class="vas-locwisecount-cell"><span class="' + chipClass + '">' + line.inventoryType + '</span></div>' +

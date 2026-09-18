@@ -219,8 +219,14 @@ namespace VAS.Controllers
                     (
                         SELECT COUNT(1) AS PeriodCount,
                                MIN(CurrentPeriod.DateFrom) AS DateFrom,
-                               MAX(CurrentPeriod.DateTo) AS DateTo
+                               MAX(CurrentPeriod.DateTo) AS DateTo,
+                               MAX(Period.Name) AS PeriodName
                         FROM CurrentPeriod
+                        INNER JOIN C_Period Period ON
+                        (
+                            Period.C_Period_ID =
+                            CurrentPeriod.C_Period_ID
+                        )
                     ),
                     PaymentSummary AS
                     (
@@ -239,6 +245,7 @@ namespace VAS.Controllers
                     SELECT PeriodStatus.PeriodCount,
                            PeriodStatus.DateFrom,
                            PeriodStatus.DateTo,
+                           PeriodStatus.PeriodName,
                            PaymentSummary.TotalPayments,
                            PaymentSummary.MatchedPayments,
                            PaymentSummary.AutoAllocatedPercent
@@ -252,6 +259,8 @@ namespace VAS.Controllers
 
                 DateTime? dateFrom = null;
                 DateTime? dateTo = null;
+
+                string periodName = string.Empty;
 
                 dr = DB.ExecuteReader(
                     sql,
@@ -284,6 +293,13 @@ namespace VAS.Controllers
                     dateTo = Util.GetValueOfDateTime(
                         dr["DateTo"]
                     );
+
+                    if (dr["PeriodName"] != DBNull.Value)
+                    {
+                        periodName = Util.GetValueOfString(
+                            dr["PeriodName"]
+                        );
+                    }
                 }
 
                 if (periodCount <= 0 ||
@@ -332,7 +348,11 @@ namespace VAS.Controllers
                         ctx,
                         "VAS_CurrentFinancialPeriod",
                         "Current Financial Period"
-                    )
+                    ),
+
+                    /* The calendar period's own name ("Sep-26") - what the card
+                       header shows; the dates stay behind it in the tooltip. */
+                    periodName = periodName
                 };
 
                 return Json(

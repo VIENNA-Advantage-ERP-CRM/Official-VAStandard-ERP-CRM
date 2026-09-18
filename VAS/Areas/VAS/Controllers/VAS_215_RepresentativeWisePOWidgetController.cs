@@ -1,4 +1,4 @@
-/************************************************************
+﻿﻿﻿﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Representative Wise PO Widget (Purchase Order Dashboard - Widget 13)
  * Description    : Ranks purchase order spend and count by buying representative (C_Order.SalesRep_ID)
@@ -72,7 +72,7 @@ namespace VIS.Controllers
                         o.C_ConversionType_ID,
                         o.AD_Client_ID,
                         o.AD_Org_ID,
-                        COALESCE(o.GrandTotal, 0) AS po_value_doc
+                        COALESCE(o.TotalLines, 0) AS po_value_doc -- Sub total (excl. taxes) per specification
                     FROM C_Order o
                     INNER JOIN AD_User rep
                         ON rep.AD_User_ID = o.SalesRep_ID
@@ -255,10 +255,10 @@ namespace VIS.Controllers
                         bp.Name AS VendorName,
                         wh.Name AS WarehouseName,
                         rep.Name AS SalesRepName,
-                        COALESCE(o.GrandTotal, 0) AS PoValueDoc,
+                        COALESCE(o.TotalLines, 0) AS PoValueDoc, -- Sub total (excl. taxes) per specification
                         (SELECT COUNT(ol.C_OrderLine_ID) FROM C_OrderLine ol WHERE ol.C_Order_ID = o.C_Order_ID AND ol.IsActive = 'Y') AS LineCount,
-                        (SELECT SUM(COALESCE(ol.QtyOrdered, 0)) FROM C_OrderLine ol WHERE ol.C_Order_ID = o.C_Order_ID AND ol.IsActive = 'Y') AS OrderedQty,
-                        (SELECT SUM(COALESCE(ol.QtyDelivered, 0)) FROM C_OrderLine ol WHERE ol.C_Order_ID = o.C_Order_ID AND ol.IsActive = 'Y') AS DeliveredQty
+                        (SELECT SUM(COALESCE(ol.QtyOrdered, 0)) FROM C_OrderLine ol LEFT JOIN M_Product prd ON prd.M_Product_ID = ol.M_Product_ID WHERE ol.C_Order_ID = o.C_Order_ID AND ol.IsActive = 'Y' AND prd.ProductType = 'I') AS OrderedQty,
+                        (SELECT SUM(COALESCE(ol.QtyDelivered, 0)) FROM C_OrderLine ol LEFT JOIN M_Product prd ON prd.M_Product_ID = ol.M_Product_ID WHERE ol.C_Order_ID = o.C_Order_ID AND ol.IsActive = 'Y' AND prd.ProductType = 'I') AS DeliveredQty
                     FROM C_Order o
                     INNER JOIN C_BPartner bp ON bp.C_BPartner_ID = o.C_BPartner_ID
                     LEFT JOIN M_Warehouse wh ON wh.M_Warehouse_ID = o.M_Warehouse_ID
@@ -408,6 +408,48 @@ namespace VIS.Controllers
                 }
 
                 string avgCycleText = "—";
+                if (cycleDaysList.Count == 0)
+                {
+                    // Fallback for the Avg cycle card: the selected month may hold no COMPLETED
+                    // order for this representative, which left the card permanently empty. Widen
+                    // to the trailing 12 months so the card keeps reporting a meaningful average.
+                    DateTime wideStart = monthStart.AddMonths(-12);
+                    string cycleSql = @"
+                        SELECT o.DateOrdered, o.OrderCompletionDatetime
+                        FROM C_Order o
+                        WHERE o.AD_Client_ID = @ClientID
+                          AND o.IsActive = 'Y'
+                          AND o.IsSOTrx = 'N'
+                          AND COALESCE(o.IsReturnTrx, 'N') = 'N'
+                          AND o.DocStatus IN ('CO', 'CL')
+                          AND o.SalesRep_ID = @SalesRepID
+                          AND o.OrderCompletionDatetime IS NOT NULL
+                          AND o.DateOrdered >= @WideStart
+                          AND o.DateOrdered < @MonthEnd";
+                    cycleSql = MRole.GetDefault(ctx).AddAccessSQL(cycleSql, "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+                    SqlParameter[] cycleParams = new SqlParameter[]
+                    {
+                        new SqlParameter("@ClientID", clientId),
+                        new SqlParameter("@SalesRepID", representativeId),
+                        new SqlParameter("@WideStart", wideStart),
+                        new SqlParameter("@MonthEnd", monthEnd)
+                    };
+
+                    using (IDataReader cdr = DB.ExecuteReader(cycleSql, cycleParams, null))
+                    {
+                        while (cdr != null && cdr.Read())
+                        {
+                            DateTime? ord = Util.GetValueOfDateTime(cdr["DateOrdered"]);
+                            DateTime? comp = Util.GetValueOfDateTime(cdr["OrderCompletionDatetime"]);
+                            if (ord.HasValue && comp.HasValue)
+                            {
+                                int days = (int)Math.Round((comp.Value.Date - ord.Value.Date).TotalDays);
+                                if (days >= 0) { cycleDaysList.Add(days); }
+                            }
+                        }
+                    }
+                }
                 if (cycleDaysList.Count > 0)
                 {
                     double sumDays = 0;
@@ -516,16 +558,32 @@ namespace VIS.Controllers
                     SELECT
                         ol.C_OrderLine_ID,
                         ol.Line,
-                        p.Value AS ProductCode,
-                        p.Name AS ProductName,
-                        asi.Description AS AttributeDesc,
+                        COALESCE(p.Value, N'') AS ProductCode,
+                        -- A charge line, or a product that is not of Item type, carries no
+                        -- stock movement: the widget shows its name, UOM, ordered, rate and
+                        -- amount, and dashes for received / pending / line status.
+                        CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0
+                             THEN COALESCE(ch.Name, N'')
+                             ELSE COALESCE(p.Name, N'') END AS ProductName,
+                        CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0 THEN 'Y'
+                             WHEN ol.M_Product_ID IS NOT NULL AND COALESCE(p.ProductType, 'I') <> 'I' THEN 'Y'
+                             ELSE 'N' END AS IsNonStock,
+                        CASE WHEN COALESCE(ol.M_AttributeSetInstance_ID, 0) > 0
+                             THEN COALESCE(asi.Description, N'')
+                             ELSE N'' END AS AttributeDesc,
                         COALESCE(uom.UOMSymbol, uom.Name) AS UomName,
                         COALESCE(ol.QtyOrdered, 0) AS QtyOrdered,
+                        -- QtyEntered is expressed in the line's own C_UOM_ID (the UOM the buyer
+                        -- picked); QtyOrdered / QtyDelivered are in the product's base UOM. The
+                        -- widget shows the selected UOM, so quantities are scaled to it.
+                        COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) AS QtyEntered,
                         COALESCE(ol.QtyDelivered, 0) AS QtyDelivered,
                         COALESCE(ol.PriceActual, 0) AS PriceActual,
                         COALESCE(ol.LineNetAmt, 0) AS LineNetAmt
                     FROM C_OrderLine ol
-                    INNER JOIN M_Product p ON p.M_Product_ID = ol.M_Product_ID
+                    -- Charge lines have no M_Product, so this must not be an INNER JOIN.
+                    LEFT JOIN M_Product p ON p.M_Product_ID = ol.M_Product_ID
+                    LEFT JOIN C_Charge ch ON (ch.C_Charge_ID = ol.C_Charge_ID)
                     LEFT JOIN C_UOM uom ON uom.C_UOM_ID = ol.C_UOM_ID
                     LEFT JOIN M_AttributeSetInstance asi ON asi.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID
                     WHERE ol.C_Order_ID = @OrderID
@@ -540,6 +598,15 @@ namespace VIS.Controllers
                     {
                         decimal qtyOrd = Util.GetValueOfDecimal(dr["QtyOrdered"]);
                         decimal qtyDel = Util.GetValueOfDecimal(dr["QtyDelivered"]);
+
+                        // Quantities are shown in the UOM the line was entered in. QtyEntered is in the
+                        // line's own C_UOM_ID; QtyOrdered / QtyDelivered are in the product's base UOM,
+                        // so delivered is scaled by this line's own entered/ordered ratio. Header
+                        // roll-ups above stay in the base UOM - summing mixed UOMs is meaningless.
+                        decimal enteredQtyUom = Util.GetValueOfDecimal(dr["QtyEntered"]);
+                        decimal uomRatio = (qtyOrd != 0) ? (enteredQtyUom / qtyOrd) : 1m;
+                        qtyOrd = enteredQtyUom;
+                        qtyDel = qtyDel * uomRatio;
                         decimal qtyPend = Math.Max(0, qtyOrd - qtyDel);
                         decimal rate = Util.GetValueOfDecimal(dr["PriceActual"]);
                         decimal amount = Util.GetValueOfDecimal(dr["LineNetAmt"]);
@@ -586,6 +653,9 @@ namespace VIS.Controllers
                             pend = qtyPend,
                             rate = rate,
                             amount = amount,
+                            // Charge / non-Item lines are never received - the client renders dashes
+                            // for received, pending and line status.
+                            isNonStock = Util.GetValueOfString(dr["IsNonStock"]) == "Y",
                             statusText = lineStatus,
                             statusChip = lineChip
                         });

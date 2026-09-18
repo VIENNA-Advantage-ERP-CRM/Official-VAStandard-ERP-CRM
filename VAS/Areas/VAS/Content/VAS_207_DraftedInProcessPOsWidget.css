@@ -13,11 +13,25 @@
     min-height: 0;
     min-width: 0;
     position: relative;
+    overflow: hidden;
+    box-sizing: border-box;
+    /* Self-sizing anchor, identical to VAS_206: the type scale follows the widget's
+       own width. The previous 1.2cqi coefficient resolved to ~5px on a 400px widget,
+       so the clamp floor won every time and nothing ever scaled. */
+    container-type: inline-size;
+    font-family: Roboto, 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 400px)) * 0.045), 22px);
+    color: #102C3F;
+}
+
+.vas-207-widget-container *,
+.vas-207-widget-container *::before,
+.vas-207-widget-container *::after {
     box-sizing: border-box;
 }
 
 .vas-207-card {
-    font-size: clamp(16px, 1.2cqi, 20px);
+    font-size: inherit;
     background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
     border: 2px solid #FFFFFF;
     border-radius: 14px;
@@ -25,7 +39,7 @@
     box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: space-between;
     position: relative;
     min-height: 0;
     min-width: 0;
@@ -37,12 +51,14 @@
     text-align: left;
     cursor: pointer;
     box-sizing: border-box;
-    transition: box-shadow 0.15s ease, transform 0.15s ease;
+    outline: none;
+    transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
 }
 
 .vas-207-card:hover {
     box-shadow: 0 14px 30px rgba(15, 61, 97, 0.12);
     transform: translateY(-1px);
+    border-color: #9ED1FF;
 }
 
 .vas-207-card:focus-visible {
@@ -52,25 +68,7 @@
 
 .vas-207-border-info {
     border-color: #BFE4FF;
-}
-
-/* ---------- Top Open Cue Icon ---------- */
-.vas-207-opencue {
-    position: absolute;
-    top: 0.85em;
-    right: 0.85em;
-    width: 1em;
-    height: 1em;
-    color: #9AB8CE;
-    pointer-events: none;
-    transition: color 0.15s ease;
-}
-
-.vas-207-card:hover .vas-207-opencue {
-    color: #0083DA;
-}
-
-/* ---------- Title & KPI Row ---------- */
+}/* ---------- Title & KPI Row ---------- */
 .vas-207-title {
     font-weight: 400;
     color: #102C3F;
@@ -169,6 +167,11 @@
 }
 
 .vas-207-modal {
+    /* The type scale lives on the dialog, not just its body, so the header and
+       footer scale with the content instead of staying pinned at the app default. */
+    --panel-anchor: clamp(15px, 1.15vw, 26px);
+    font-size: var(--panel-anchor);
+
     width: min(1240px, 94vw);
     max-height: min(880px, 90dvh);
     background: #FFFFFF;
@@ -199,14 +202,14 @@
 
 /* Modal Header */
 .vas-207-modal-header {
-    height: 56px;
+    height: 3.2em;
     flex: none;
-    padding: 0 16px;
+    padding: 0 0.8em;
     border-bottom: 1px solid #1F83FF;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: 0.6em;
     background: #FFFFFF;
 }
 
@@ -276,8 +279,13 @@
     flex-direction: column;
     gap: 0.75em;
     container-type: inline-size;
-    --panel-anchor: clamp(18px, 1vw, 20px);
-    font-size: var(--panel-anchor);
+    /* The modal type scale. The previous clamp(18px, 1vw, 20px) only varied between a
+       ~1800px and ~2000px viewport - on every other screen it sat pinned to one of its
+       bounds, so the popup never grew with resolution. This range tracks across the
+       resolutions actually in use (~15px at 1366px, ~22px at 1920px, 26px at 2560px).
+       Everything inside the popup is sized in em against it, so the whole dialog -
+       rows, chips, buttons, icons - scales together. */
+    font-size: inherit;
     color: #102C3F;
 }
 
@@ -385,7 +393,7 @@
 
 .vas-207-data-row {
     font-size: 0.75em;
-    padding: 0.55em 0.5em;
+    padding: 0.67em 0.5em;
     border-bottom: 1px solid #E2EAF1;
     transition: background 0.15s ease;
 }
@@ -437,7 +445,7 @@
 
 .vas-207-lines-row {
     font-size: 0.75em;
-    padding: 0.55em 0.5em;
+    padding: 0.67em 0.5em;
     border-bottom: 1px solid #E2EAF1;
 }
 
@@ -456,9 +464,9 @@
 
 /* Buttons inside table */
 .vas-207-iconbtn {
-    width: 1.5em;
-    height: 1.5em;
-    border-radius: 7px;
+    width: 1.8em;
+    height: 1.8em;
+    border-radius: 8px;
     border: 1px solid #D9E2EB;
     background: #FFFFFF;
     display: grid;
@@ -468,6 +476,7 @@
     padding: 0;
     flex: none;
     transition: background 0.15s ease, border-color 0.15s ease;
+    line-height: 1;
 }
 
 .vas-207-iconbtn:hover {
@@ -476,8 +485,10 @@
 }
 
 .vas-207-iconbtn svg {
-    width: 0.85em;
-    height: 0.85em;
+    width: 1em;
+    height: 1em;
+    display: block;
+    flex: none;
 }
 
 .vas-207-lnk {
@@ -603,11 +614,11 @@
 .vas-207-modal-foot {
     flex: none;
     border-top: 1px solid #D9E2EB;
-    padding: 12px 16px;
+    padding: 0.6em 0.8em;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: 0.6em;
     background: #FBFDFF;
 }
 

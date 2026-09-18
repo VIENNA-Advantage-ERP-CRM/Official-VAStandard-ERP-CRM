@@ -1,4 +1,4 @@
-/**
+﻿/**
  * VAS_217_OpenRequisitionsWidget
  * Purchase Order Dashboard — Widget 15: Open Requisitions (3x3 Grid Widget)
  *
@@ -87,23 +87,22 @@
  *  72 | No open requisitions found                       | VAS_NoOpenReqsFound
  *  73 | Failed to load open requisitions                 | VAS_FailedToLoadOpenReqs
  *  74 | Retry                                            | VAS_Retry
- *  75 | Standard specification                           | VAS_StandardSpecification
+ *  75 | Select vendor                                    | VAS_SelectVendor
  *  76 | Purchase against                                 | VAS_PurchaseAgainst
  *  77 | Server error creating Purchase Order             | VAS_ServerTimeoutError
  *  78 | select the lines to raise a PO against           | VAS_SelectLinesToRaisePO
  *  79 | set quantity and vendor per line                 | VAS_SetQtyAndVendorPerLine
  *  80 | use the icons to add line description or print text | VAS_UseIconsToEditLineText
- *  81 | Standard                                         | VAS_Standard
+ *  81 | Select a vendor for the selected lines           | VAS_SelectVendorForLines
  *  82 | Preferred Vendor                                 | VAS_PreferredVendor
  *  83 | Select line                                      | VAS_SelectLine
- *  84 | Low                                              | VAS_PriorityLow
- *  85 | Normal                                           | VAS_PriorityNormal
- *  86 | High                                             | VAS_PriorityHigh
- *  87 | Urgent                                           | VAS_PriorityUrgent
- *  88 | required · line details on the next page         | VAS_RequiredLineDetailsOnNextPage
- *  89 | Default Location                                 | VAS_DefaultLocation
- *  90 | No Contact                                       | VAS_NoContact
- *  91 | Error creating Purchase Order                    | VAS_ErrorCreatingPO
+ *  84 | Error: Date Promised should be greater than or equal to Date Ordered | VAS_DatePromisedBeforeDateOrdered
+ *  85 | required · line details on the next page         | VAS_RequiredLineDetailsOnNextPage
+ *  86 | Default Location                                 | VAS_DefaultLocation
+ *  87 | No Contact                                       | VAS_NoContact
+ *  88 | Error creating Purchase Order                    | VAS_ErrorCreatingPO
+ *  89 | PO stage                                         | VAS_POStage
+ *  90 | Purchase Order created successfully with Document No.: | VAS_POCreatedWithDocNo
  */
 
 ; VAS = window.VAS || {};
@@ -145,7 +144,24 @@
         var curIso = "INR";
 
         var currentPage = 0; // 0-indexed
-        var pageSize = 6;
+
+        /* ---- Adaptive row count (pattern proven on VAS_161 / VAS_165) ----------------------
+           The card's height is fixed by the dashboard grid (3x3), so the number of rows that
+           genuinely fit can be MEASURED. The source design asks for "six rows a page", which
+           only holds at the size the mock was drawn at: at the real 3x3 tile the sixth row was
+           clipped by .vas-217-orw-tbody's overflow while the pager still honestly claimed
+           "Showing 1-6 of N".
+           DEFAULT_PAGE_ROWS is therefore a SEED for the very first paint only - it guarantees
+           there is a rendered row to measure. From then on pageSize is whatever actually fits
+           at the current widget size, zoom level and screen resolution. */
+        var DEFAULT_PAGE_ROWS = 6;
+        var pageSize = DEFAULT_PAGE_ROWS;
+        /* Height of one rendered data row, in px. Cached because it only moves when the widget
+           is resized - the row font-size is driven by --widget-inline-size, so a WIDTH change
+           shifts it just as a height change does. Cleared by the ResizeObserver. */
+        var measuredRowHeight = 0;
+        /* Re-entrancy guard: the refit repaint mutates the DOM the ResizeObserver watches. */
+        var refittingRows = false;
         var totalPages = 1;
 
         // Modal Stack & PO Conversion State
@@ -169,7 +185,10 @@
         function lbl(key, fallback) {
             if (window.VIS && VIS.Msg && VIS.Msg.getMsg) {
                 var msg = VIS.Msg.getMsg(key);
-                if (msg && msg !== key && msg.indexOf('**') === -1) {
+                // VIS.Msg.getMsg returns "[KEY]" when the AD_Message row is missing;
+                // that must fall through to the English fallback, not render as-is.
+                if (msg && msg !== key && msg !== '[' + key + ']' && msg.charAt(0) !== '['
+                    && msg.indexOf('**') === -1) {
                     return msg;
                 }
             }
@@ -258,6 +277,21 @@
                             $root[0].style.setProperty('--widget-inline-size', width + 'px');
                         }
                     }
+
+                    /* The row height follows the widget's size (font-size comes from
+                       --widget-inline-size and the available height changes directly), so the
+                       cached measurement is dropped and the page repainted at the new fit.
+                       The guard is required because that repaint mutates the observed subtree. */
+                    if (refittingRows) { return; }
+                    if (!requisitionsData || requisitionsData.length === 0) { return; }
+
+                    refittingRows = true;
+                    try {
+                        measuredRowHeight = 0;
+                        renderGridPage();
+                    } finally {
+                        refittingRows = false;
+                    }
                 });
                 widgetObserver.observe($wrapper[0]);
             } catch (e) { }
@@ -340,6 +374,8 @@
                         }
                     }
                     if (reqObj) {
+                        // A new requisition starts a new PO - header defaults (org doc types, vendor payment method) must not carry over
+                        poHeaderValues = {};
                         openStep2LinesModal(reqObj);
                     }
                 }
@@ -396,7 +432,8 @@
             $tblBody.empty();
             var R_COLS = 'minmax(0, 1.6fr) minmax(0, 0.6fr) minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 1fr)';
             var html = '';
-            for (var i = 0; i < 6; i++) {
+            // Seeded from pageSize so the placeholder never paints more rows than fit.
+            for (var i = 0; i < pageSize; i++) {
                 html += '<div class="vas-217-orw-trow" style="grid-template-columns:' + R_COLS + ';">' +
                     '<span class="vas-217-orw-cell"><span style="display:block;width:70%;height:1em;background:#EAF1F7;border-radius:4px;"></span></span>' +
                     '<span class="vas-217-orw-cell right"><span style="display:inline-block;width:40%;height:1em;background:#EAF1F7;border-radius:4px;"></span></span>' +
@@ -428,7 +465,39 @@
             $nextBtn.prop('disabled', true);
         }
 
-        function renderGridPage() {
+        /* How many requisition rows actually fit the card at its current size.
+
+           The CARD's height is imposed from outside (the 3x3 dashboard track), so it can be
+           measured - the opposite of a content-sized dialog, where measuring the container
+           would be circular because its height comes from the rows.
+
+           Returns the CURRENT pageSize whenever it cannot measure (widget not laid out yet,
+           hidden tab, no real row on screen) so an unmeasurable moment never changes the page. */
+        function rowsThatFit() {
+            var el = $tblBody && $tblBody[0];
+            if (!el) { return pageSize; }
+
+            var available = el.clientHeight;
+            if (!available) { return pageSize; }
+
+            if (!measuredRowHeight) {
+                /* Probe a REAL data row: skeleton rows carry .vas-217-orw-trow too but never
+                   .pickable, and the empty / error boxes are not rows at all. */
+                var probe = el.querySelector('.vas-217-orw-trow.pickable');
+                if (probe) {
+                    var h = probe.getBoundingClientRect().height;
+                    if (h > 0) { measuredRowHeight = h; }
+                }
+            }
+
+            if (!measuredRowHeight) { return pageSize; }
+
+            /* Half a pixel of slack absorbs sub-pixel row heights, which would otherwise round
+               a row that does fit down to one that does not. Never below one row. */
+            return Math.max(1, Math.floor((available + 0.5) / measuredRowHeight));
+        }
+
+        function renderGridPage(isRefit) {
             $tblBody.empty();
             var count = requisitionsData.length;
 
@@ -471,6 +540,21 @@
             }
 
             $tblBody.html(rowsHtml);
+
+            /* Real rows are on screen now, so one can be measured. If the number that fits is
+               not the number just rendered, adopt it and repaint once. isRefit stops the second
+               pass from measuring again, so this can never loop. */
+            if (!isRefit) {
+                var fit = rowsThatFit();
+                if (fit !== pageSize) {
+                    pageSize = fit;
+                    var refitPages = Math.max(1, Math.ceil(count / pageSize));
+                    if (currentPage > refitPages - 1) { currentPage = refitPages - 1; }
+                    if (currentPage < 0) { currentPage = 0; }
+                    renderGridPage(true);
+                    return;
+                }
+            }
 
             // Update footer helper and pager
             var helperString = lbl('VAS_Showing', 'Showing') + ' ' + (startIdx + 1) + '–' + endIdx + ' ' +
@@ -710,13 +794,18 @@
 
             var vendors = (formLookups && formLookups.vendors) || [];
 
-            var LINE_COLS = 'minmax(0, 0.28fr) minmax(0, 1.6fr) minmax(0, 1.25fr) minmax(0, 0.5fr) minmax(0, 0.75fr) minmax(0, 0.9fr) minmax(0, 0.75fr) minmax(0, 0.9fr) minmax(0, 1.6fr) minmax(0, 0.75fr)';
+            // The Attribute column is shown only when at least one pending line carries an attribute
+            var showAttr = activeReqLines.some(hasAttribute);
+            var LINE_COLS = ['minmax(0, 0.28fr)', 'minmax(0, 1.6fr)']
+                .concat(showAttr ? ['minmax(0, 1.25fr)'] : [])
+                .concat(['minmax(0, 0.5fr)', 'minmax(0, 0.75fr)', 'minmax(0, 0.9fr)', 'minmax(0, 0.75fr)', 'minmax(0, 0.9fr)', 'minmax(0, 1.6fr)', 'minmax(0, 0.9fr)'])
+                .join(' ');
 
             var $tableWrap = $('<div class="vas-217-orw-mtbl"></div>');
             var $tableHead = $('<div class="vas-217-orw-mrow vas-217-orw-mhead" style="grid-template-columns:' + LINE_COLS + ';">' +
                 '<span class="vas-217-orw-cell"></span>' +
                 '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_Product', 'Product')) + '">' + esc(lbl('VAS_Product', 'Product')) + '</span>' +
-                '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_Attribute', 'Attribute')) + '">' + esc(lbl('VAS_Attribute', 'Attribute')) + '</span>' +
+                (showAttr ? '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_Attribute', 'Attribute')) + '">' + esc(lbl('VAS_Attribute', 'Attribute')) + '</span>' : '') +
                 '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_UoM', 'UoM')) + '">' + esc(lbl('VAS_UoM', 'UoM')) + '</span>' +
                 '<span class="vas-217-orw-cell right" title="' + esc(lbl('VAS_ReqQty', 'Req qty')) + '">' + esc(lbl('VAS_ReqQty', 'Req qty')) + '</span>' +
                 '<span class="vas-217-orw-cell right" title="' + esc(lbl('VAS_AlreadyOrdered', 'Already ordered')) + '">' + esc(lbl('VAS_AlreadyOrdered', 'Already ordered')) + '</span>' +
@@ -752,27 +841,19 @@
                     var l = slice[i];
                     var globalIdx = sIdx + i;
 
-                    var vendorOpts = '';
-                    if (vendors.length > 0) {
-                        vendorOpts = vendors.map(function (v) {
-                            var isSelected = (v.id === l.vendorId) || (v.name === l.vendorName);
-                            return '<option value="' + v.id + '"' + (isSelected ? ' selected' : '') + '>' + esc(v.name) + '</option>';
-                        }).join('');
-                    } else {
-                        vendorOpts = '<option value="' + (l.vendorId || 0) + '">' + esc(l.vendorName || lbl('VAS_PreferredVendor', 'Preferred Vendor')) + '</option>';
-                    }
+                    var vendorOpts = buildVendorOptions(vendors, l);
 
                     var rowHtml = '<div class="vas-217-orw-mrow pick' + (l.selected ? ' sel' : '') + '" data-idx="' + globalIdx + '" style="grid-template-columns:' + LINE_COLS + ';">' +
                         '<span class="vas-217-orw-cell"><input type="checkbox" class="vas-217-orw-chk chk-line" data-idx="' + globalIdx + '"' + (l.selected ? ' checked' : '') + ' aria-label="' + esc(lbl('VAS_SelectLine', 'Select line')) + '"></span>' +
                         '<span class="vas-217-orw-cell c-dark" title="' + esc(l.productName) + '">' + esc(l.productName) + '</span>' +
-                        '<span class="vas-217-orw-cell c-std" title="' + esc(l.attributeDescription || lbl('VAS_Standard', 'Standard')) + '">' + esc(l.attributeDescription || lbl('VAS_Standard', 'Standard')) + '</span>' +
+                        (showAttr ? '<span class="vas-217-orw-cell c-std" title="' + esc(l.attributeDescription || '') + '">' + esc(l.attributeDescription || '') + '</span>' : '') +
                         '<span class="vas-217-orw-cell c-std" title="' + esc(l.uomName) + '">' + esc(l.uomName) + '</span>' +
                         '<span class="vas-217-orw-cell right c-std" title="' + num(l.requestedQty) + '">' + num(l.requestedQty) + '</span>' +
                         '<span class="vas-217-orw-cell right ' + (l.alreadyOrderedQty > 0 ? 'c-dark' : 'c-std') + '" title="' + (l.alreadyOrderedQty > 0 ? num(l.alreadyOrderedQty) : '—') + '">' + (l.alreadyOrderedQty > 0 ? num(l.alreadyOrderedQty) : '—') + '</span>' +
                         '<span class="vas-217-orw-cell right c-prim" title="' + num(l.pendingQty) + '">' + num(l.pendingQty) + '</span>' +
                         '<span class="vas-217-orw-cell"><input class="vas-217-orw-rowin in-qty" type="number" min="1" max="' + l.pendingQty + '" value="' + (l.orderQty || l.pendingQty) + '" data-idx="' + globalIdx + '" aria-label="' + esc(lbl('VAS_QtyToOrder', 'Qty to order')) + '"></span>' +
                         '<span class="vas-217-orw-cell"><select class="vas-217-orw-rowsel sel-vend" data-idx="' + globalIdx + '" aria-label="' + esc(lbl('VAS_Vendor', 'Vendor')) + '">' + vendorOpts + '</select></span>' +
-                        '<span class="vas-217-orw-cell right c-std" title="' + esc(fmtMoney(l.rate)) + '">' + esc(fmtMoney(l.rate)) + '</span>' +
+                        '<span class="vas-217-orw-cell"><input class="vas-217-orw-rowin in-rate" type="number" min="0" step="any" value="' + (Number(l.rate) || 0) + '" data-idx="' + globalIdx + '" aria-label="' + esc(lbl('VAS_Rate', 'Rate')) + '"></span>' +
                         '</div>';
 
                     $tableBody.append(rowHtml);
@@ -841,10 +922,46 @@
                 var idx = parseInt($(this).data('idx'), 10);
                 if (activeReqLines[idx]) {
                     activeReqLines[idx].vendorId = parseInt($(this).val(), 10) || 0;
-                    activeReqLines[idx].vendorName = $(this).find('option:selected').text();
+                    activeReqLines[idx].vendorName = activeReqLines[idx].vendorId > 0 ? $(this).find('option:selected').text() : '';
                     syncStep2FootNote();
                 }
             });
+
+            $tableBody.off('change.ratein').on('change.ratein', '.in-rate', function (e) {
+                var idx = parseInt($(this).data('idx'), 10);
+                if (activeReqLines[idx]) {
+                    var val = parseFloat($(this).val());
+                    if (isNaN(val) || val < 0) val = 0;
+                    activeReqLines[idx].rate = val;
+                    $(this).val(val);
+                    syncStep2FootNote();
+                }
+            });
+        }
+
+        function hasAttribute(line) {
+            return !!(line && line.attributeDescription && String(line.attributeDescription).trim());
+        }
+
+        /**
+         * Vendor options for a Step-2 line. The select always shows the vendor the line is really ordered
+         * from: a requisition vendor missing from the vendor lookup is added, and a line without a vendor
+         * shows a placeholder instead of silently displaying the first vendor of the list.
+         */
+        function buildVendorOptions(vendors, line) {
+            var found = false;
+            var html = vendors.map(function (v) {
+                var isSelected = v.id === line.vendorId;
+                if (isSelected) found = true;
+                return '<option value="' + v.id + '"' + (isSelected ? ' selected' : '') + '>' + esc(v.name) + '</option>';
+            }).join('');
+            if (line.vendorId > 0 && !found) {
+                html = '<option value="' + line.vendorId + '" selected>' + esc(line.vendorName) + '</option>' + html;
+            }
+            if (!(line.vendorId > 0)) {
+                html = '<option value="0" selected>' + esc(lbl('VAS_SelectVendor', 'Select vendor')) + '</option>' + html;
+            }
+            return html;
         }
 
         function getSelectedStep2Lines() {
@@ -863,24 +980,44 @@
                 return;
             }
 
-            var vendorMap = {};
+            // Vendor consistency is judged on vendor IDs, across the selected lines that have a vendor
+            var vendorIds = [];
+            var vendorNames = {};
             for (var i = 0; i < sel.length; i++) {
-                var vName = sel[i].vendorName || ('Vendor_' + sel[i].vendorId);
-                vendorMap[vName] = sel[i].vendorId;
+                var vId = sel[i].vendorId;
+                if (vId > 0 && vendorIds.indexOf(vId) < 0) {
+                    vendorIds.push(vId);
+                    vendorNames[vId] = sel[i].vendorName;
+                }
             }
-            var distinctVendors = Object.keys(vendorMap);
 
-            if (distinctVendors.length > 1) {
+            if (vendorIds.length > 1) {
                 $note.attr('class', 'vas-217-orw-warnnote').text(
                     sel.length + ' ' + lbl('VAS_LinesSelected', 'lines selected') + ' · ' +
-                    distinctVendors.length + ' ' + lbl('VAS_MultiVendorWarning', 'different vendors — one PO needs a single vendor')
+                    vendorIds.length + ' ' + lbl('VAS_MultiVendorWarning', 'different vendors — one PO needs a single vendor')
                 );
                 $btn.prop('disabled', true);
                 return;
             }
 
-            selectedVendorName = distinctVendors[0] || "";
-            selectedVendorId = vendorMap[selectedVendorName] || 0;
+            if (!vendorIds.length) {
+                $note.attr('class', 'vas-217-orw-warnnote').text(lbl('VAS_SelectVendorForLines', 'Select a vendor for the selected lines'));
+                $btn.prop('disabled', true);
+                return;
+            }
+
+            selectedVendorId = vendorIds[0];
+            selectedVendorName = vendorNames[selectedVendorId] || '';
+
+            // Selected lines without a vendor of their own are ordered from the vendor of the other selected lines
+            var vendors = (formLookups && formLookups.vendors) || [];
+            for (var j = 0; j < sel.length; j++) {
+                if (!(sel[j].vendorId > 0)) {
+                    sel[j].vendorId = selectedVendorId;
+                    sel[j].vendorName = selectedVendorName;
+                    $('#vas_217_lines_wrap .sel-vend[data-idx="' + activeReqLines.indexOf(sel[j]) + '"]').html(buildVendorOptions(vendors, sel[j]));
+                }
+            }
 
             var totalVal = sel.reduce(function (acc, l) {
                 return acc + ((l.orderQty || l.pendingQty) * (l.rate || 0));
@@ -897,9 +1034,57 @@
            STEP 3: PO DETAILS (PAGE 1 OF 2) & PO LINES (PAGE 2 OF 2)
            ============================================================ */
 
+        function findById(list, id) {
+            if (!list || !id) return null;
+            for (var i = 0; i < list.length; i++) {
+                if (list[i].id === id) return list[i];
+            }
+            return null;
+        }
+
+        // Priority options are the C_Order.PriorityRule list; the default is that column's default (Medium)
+        function getDefaultPriority() {
+            var list = (formLookups && formLookups.priorities) || [];
+            var def = formLookups && formLookups.defaultPriority;
+            if (def && findById(list, def)) return def;
+            return list.length ? list[0].id : '';
+        }
+
+        // Currency rate type defaults to the type flagged as default (Spot)
+        function getDefaultConversionTypeId() {
+            var list = (formLookups && formLookups.conversionTypes) || [];
+            for (var i = 0; i < list.length; i++) {
+                if (list[i].isDefault) return list[i].id;
+            }
+            return list.length ? list[0].id : 0;
+        }
+
         function proceedToStep3Details() {
             var sel = getSelectedStep2Lines();
             if (!sel.length) return;
+
+            // Initialize default header values once per requisition (reset when a requisition row is clicked)
+            if (!poHeaderValues.initialized) {
+                poHeaderValues.initialized = true;
+                poHeaderValues.docTypeId = (formLookups.docTypes && formLookups.docTypes[0]) ? formLookups.docTypes[0].id : 0;
+                poHeaderValues.orderReference = 'REF/' + new Date().getFullYear().toString().slice(-2) + '/' + (Math.floor(100 + Math.random() * 800));
+                poHeaderValues.dateOrdered = fIso();
+                // An older requisition's needed-by date can already be past; date promised may not precede the PO date
+                poHeaderValues.datePromised = (activeRequisition.neededBy && activeRequisition.neededBy > poHeaderValues.dateOrdered) ? activeRequisition.neededBy : poHeaderValues.dateOrdered;
+                poHeaderValues.priority = getDefaultPriority();
+                poHeaderValues.warehouseId = activeRequisition.warehouseId || (formLookups.warehouses && formLookups.warehouses[0] ? formLookups.warehouses[0].id : 0);
+                // The requisition's price list is used only when it is one of the purchase price lists offered
+                var defaultPriceList = findById(formLookups.priceLists, activeRequisition.priceListId) || (formLookups.priceLists && formLookups.priceLists[0]) || null;
+                poHeaderValues.priceListId = defaultPriceList ? defaultPriceList.id : 0;
+                // Currency is read-only and follows the price list
+                poHeaderValues.currencyId = (defaultPriceList && defaultPriceList.currencyId) || activeRequisition.currencyId || 0;
+                poHeaderValues.conversionTypeId = getDefaultConversionTypeId();
+                poHeaderValues.incotermId = activeRequisition.incotermId || (formLookups.incoterms && formLookups.incoterms[0] ? formLookups.incoterms[0].id : 0);
+                poHeaderValues.paymentTermId = (formLookups.paymentTerms && formLookups.paymentTerms[0]) ? formLookups.paymentTerms[0].id : 0;
+                poHeaderValues.paymentMethod = (formLookups.paymentMethods && formLookups.paymentMethods[0]) ? String(formLookups.paymentMethods[0].id) : '';
+                poHeaderValues.taxId = (formLookups.taxes && formLookups.taxes[0]) ? formLookups.taxes[0].id : 0;
+                poHeaderValues.description = lbl('VAS_PurchaseAgainst', 'Purchase against') + ' ' + activeRequisition.requisitionNumber;
+            }
 
             // Initialize PO Lines State from selected lines
             poLinesState = sel.map(function (l) {
@@ -910,37 +1095,18 @@
                     productName: l.productName,
                     productCode: l.productCode,
                     attributeSetInstanceId: l.attributeSetInstanceId,
-                    attributeDescription: l.attributeDescription || lbl('VAS_StandardSpecification', 'Standard specification'),
+                    attributeDescription: l.attributeDescription || '',
                     uomId: l.uomId,
                     uomName: l.uomName,
                     orderQty: l.orderQty || l.pendingQty,
                     rate: l.rate || 0,
                     taxId: poHeaderValues.taxId || (formLookups.taxes && formLookups.taxes[0] ? formLookups.taxes[0].id : 0),
-                    taxRate: (formLookups.taxes && formLookups.taxes[0] ? formLookups.taxes[0].rate : 0.18),
-                    datePromised: poHeaderValues.datePromised || (activeRequisition.neededBy || fIso()),
-                    description: l.description || (l.productName + ' — ' + (l.attributeDescription || lbl('VAS_Standard', 'Standard'))),
+                    taxAmt: 0,
+                    datePromised: poHeaderValues.datePromised || fIso(),
+                    description: l.description || (l.productName + (hasAttribute(l) ? ' — ' + l.attributeDescription : '')),
                     printDescription: l.printDescription || ''
                 };
             });
-
-            // Initialize default header values if not yet set
-            if (!poHeaderValues.initialized) {
-                poHeaderValues.initialized = true;
-                poHeaderValues.docTypeId = (formLookups.docTypes && formLookups.docTypes[0]) ? formLookups.docTypes[0].id : 0;
-                poHeaderValues.orderReference = 'REF/' + new Date().getFullYear().toString().slice(-2) + '/' + (Math.floor(100 + Math.random() * 800));
-                poHeaderValues.dateOrdered = fIso();
-                poHeaderValues.datePromised = activeRequisition.neededBy || fIso();
-                poHeaderValues.priority = '5'; // Normal
-                poHeaderValues.warehouseId = activeRequisition.warehouseId || (formLookups.warehouses && formLookups.warehouses[0] ? formLookups.warehouses[0].id : 0);
-                poHeaderValues.priceListId = activeRequisition.priceListId || (formLookups.priceLists && formLookups.priceLists[0] ? formLookups.priceLists[0].id : 0);
-                poHeaderValues.currencyId = activeRequisition.currencyId || (formLookups.currencies && formLookups.currencies[0] ? formLookups.currencies[0].id : 0);
-                poHeaderValues.conversionTypeId = (formLookups.conversionTypes && formLookups.conversionTypes[0]) ? formLookups.conversionTypes[0].id : 0;
-                poHeaderValues.incotermId = activeRequisition.incotermId || (formLookups.incoterms && formLookups.incoterms[0] ? formLookups.incoterms[0].id : 0);
-                poHeaderValues.paymentTermId = (formLookups.paymentTerms && formLookups.paymentTerms[0]) ? formLookups.paymentTerms[0].id : 0;
-                poHeaderValues.paymentMethod = (formLookups.paymentMethods && formLookups.paymentMethods[0]) ? formLookups.paymentMethods[0].id : '';
-                poHeaderValues.taxId = (formLookups.taxes && formLookups.taxes[0]) ? formLookups.taxes[0].id : 0;
-                poHeaderValues.description = lbl('VAS_PurchaseAgainst', 'Purchase against') + ' ' + activeRequisition.requisitionNumber;
-            }
 
             openStep3DetailsPage();
         }
@@ -952,19 +1118,50 @@
 
             for (var i = 0; i < poLinesState.length; i++) {
                 var l = poLinesState[i];
-                var amt = l.orderQty * l.rate;
-                subtotal += amt;
-                taxTotal += amt * (l.taxRate || 0);
+                subtotal += l.orderQty * l.rate;
+                taxTotal += Number(l.taxAmt) || 0;
                 totalQty += l.orderQty;
             }
 
             return {
                 subtotal: subtotal,
                 taxTotal: taxTotal,
-                grandTotal: subtotal + taxTotal,
+                // On a tax-inclusive price list the line amounts already contain the tax
+                grandTotal: poHeaderValues.taxIncluded ? subtotal : subtotal + taxTotal,
                 totalQty: totalQty,
                 lineCount: poLinesState.length
             };
+        }
+
+        /**
+         * Line tax (surcharge tax included) is calculated on the server with MTax - the same calculation
+         * the purchase order line uses - honouring a tax-inclusive price list. The old client formula
+         * multiplied the amount by the percentage itself and ignored surcharge taxes.
+         */
+        var taxRecalcSeq = 0;
+        function recalcTaxes($host) {
+            var seq = ++taxRecalcSeq;
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_217_OpenRequisitionsWidget/CalculateLineTaxes',
+                type: 'POST',
+                data: {
+                    priceListId: poHeaderValues.priceListId || 0,
+                    linesJson: JSON.stringify(poLinesState.map(function (l) {
+                        return { taxId: l.taxId || 0, amount: (Number(l.orderQty) || 0) * (Number(l.rate) || 0) };
+                    }))
+                },
+                cache: false,
+                success: function (res) {
+                    if (seq !== taxRecalcSeq) return; // a newer recalculation superseded this one
+                    var data = parseResponse(res);
+                    if (!data || data.success === false || !data.lines) return;
+                    poHeaderValues.taxIncluded = !!data.isTaxIncluded;
+                    for (var i = 0; i < poLinesState.length && i < data.lines.length; i++) {
+                        poLinesState[i].taxAmt = Number(data.lines[i].taxAmt) || 0;
+                    }
+                    refreshStep3Totals($host);
+                }
+            });
         }
 
         function openStep3DetailsPage() {
@@ -1025,10 +1222,9 @@
                 '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_PODate', 'PO date')) + star + '</label><input type="date" class="vas-217-orw-fctl" id="fPoDate" value="' + (poHeaderValues.dateOrdered || fIso()) + '"></div>' +
                 '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_DatePromised', 'Date promised')) + star + '</label><input type="date" class="vas-217-orw-fctl" id="fPromised" value="' + (poHeaderValues.datePromised || fIso()) + '"></div>' +
                 '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_Priority', 'Priority')) + '</label><select class="vas-217-orw-fctl" id="fPriority">' +
-                '      <option value="3"' + (poHeaderValues.priority === '3' ? ' selected' : '') + '>' + esc(lbl('VAS_PriorityLow', 'Low')) + '</option>' +
-                '      <option value="5"' + (poHeaderValues.priority === '5' ? ' selected' : '') + '>' + esc(lbl('VAS_PriorityNormal', 'Normal')) + '</option>' +
-                '      <option value="7"' + (poHeaderValues.priority === '7' ? ' selected' : '') + '>' + esc(lbl('VAS_PriorityHigh', 'High')) + '</option>' +
-                '      <option value="1"' + (poHeaderValues.priority === '1' ? ' selected' : '') + '>' + esc(lbl('VAS_PriorityUrgent', 'Urgent')) + '</option>' +
+                (formLookups.priorities || []).map(function (p) {
+                    return '<option value="' + esc(p.id) + '"' + (p.id === poHeaderValues.priority ? ' selected' : '') + '>' + esc(p.name) + '</option>';
+                }).join('') +
                 '    </select></div>' +
                 '  </div>' +
 
@@ -1045,7 +1241,7 @@
                 '  <div class="vas-217-orw-form-grid">' +
                 '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_Warehouse', 'Warehouse')) + star + '</label><select class="vas-217-orw-fctl" id="fWh">' + whOpts + '</select></div>' +
                 '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_PriceList', 'Price list')) + '</label><select class="vas-217-orw-fctl" id="fPrice">' + plOpts + '</select></div>' +
-                '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_Currency', 'Currency')) + '</label><select class="vas-217-orw-fctl" id="fCur">' + curOpts + '</select></div>' +
+                '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_Currency', 'Currency')) + '</label><select class="vas-217-orw-fctl" id="fCur" disabled>' + curOpts + '</select></div>' +
                 '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_CurrencyRateType', 'Currency rate type')) + '</label><select class="vas-217-orw-fctl" id="fRate">' + convOpts + '</select></div>' +
                 '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_Incoterm', 'Incoterm')) + '</label><select class="vas-217-orw-fctl" id="fInco">' + incoOpts + '</select></div>' +
                 '  </div>' +
@@ -1068,7 +1264,7 @@
                     openStep3DetailsPage();
                 },
                 foot: function ($foot) {
-                    $foot.html('<span class="vas-217-orw-foot-note"><span class="vas-217-orw-req-star">*</span> ' + esc(lbl('VAS_RequiredLineDetailsOnNextPage', 'required · line details on the next page')) + '</span>' +
+                    $foot.html('<span class="vas-217-orw-foot-note" id="vas_217_details_note">' + detailsFootNoteHtml() + '</span>' +
                         '<span>' +
                         '<button type="button" class="vas-217-orw-btn vas-217-orw-btn-back">' + esc(lbl('VAS_Back', 'Back')) + '</button> ' +
                         '<button type="button" class="vas-217-orw-btn vas-217-orw-btn-primary" id="vas_217_to_lines">' + esc(lbl('VAS_ContinueToLines', 'Continue to lines')) + '</button>' +
@@ -1077,6 +1273,7 @@
                     $foot.find('.vas-217-orw-btn-back').on('click', popModal);
                     $foot.find('#vas_217_to_lines').on('click', function () {
                         captureHeaderValues();
+                        if (!validateHeaderDates(getModalHost())) return;
                         openStep3LinesPage();
                     });
                 },
@@ -1085,6 +1282,31 @@
                     bindHeaderChangeEvents($host);
                 }
             });
+        }
+
+        function detailsFootNoteHtml() {
+            return '<span class="vas-217-orw-req-star">*</span> ' + esc(lbl('VAS_RequiredLineDetailsOnNextPage', 'required · line details on the next page'));
+        }
+
+        function datePromisedErrorText() {
+            return lbl('VAS_DatePromisedBeforeDateOrdered', 'Error: Date Promised should be greater than or equal to Date Ordered');
+        }
+
+        // Dates are yyyy-mm-dd strings, so text comparison orders them correctly
+        function isPromisedBeforeOrdered(promised, ordered) {
+            return !!(promised && ordered && promised < ordered);
+        }
+
+        function validateHeaderDates($host) {
+            var invalid = isPromisedBeforeOrdered($host.find('#fPromised').val(), $host.find('#fPoDate').val());
+            $host.find('#fPromised').toggleClass('vas-217-orw-invalid', invalid);
+            var $note = $host.find('#vas_217_details_note');
+            if (invalid) {
+                $note.attr('class', 'vas-217-orw-warnnote').text(datePromisedErrorText());
+            } else {
+                $note.attr('class', 'vas-217-orw-foot-note').html(detailsFootNoteHtml());
+            }
+            return !invalid;
         }
 
         function loadVendorLocationsAndContacts(vendorId, $host) {
@@ -1110,19 +1332,42 @@
                         return '<option value="' + c.id + '"' + (c.id === poHeaderValues.vendorContactId ? ' selected' : '') + '>' + esc(c.name + (c.phone ? ' · ' + c.phone : '')) + '</option>';
                     }).join('');
                     $conSelect.html(conHtml || '<option value="0">' + esc(lbl('VAS_NoContact', 'No Contact')) + '</option>');
+
+                    // Preselect the vendor's configured payment method - once per vendor, so a manual choice survives paging
+                    if (poHeaderValues.paymentMethodVendorId !== vendorId) {
+                        var defaultMethod = data.defaultPaymentMethodId ? String(data.defaultPaymentMethodId) : '';
+                        var $methSelect = $host.find('#fMethod');
+                        if (defaultMethod && $methSelect.find('option[value="' + defaultMethod + '"]').length) {
+                            poHeaderValues.paymentMethod = defaultMethod;
+                            $methSelect.val(defaultMethod);
+                        }
+                        poHeaderValues.paymentMethodVendorId = vendorId;
+                    }
                 }
             });
         }
 
         function bindHeaderChangeEvents($host) {
+            // Currency is read-only and follows the selected price list
+            $host.find('#fPrice').on('change', function () {
+                var priceList = findById(formLookups.priceLists, parseInt($(this).val(), 10) || 0);
+                poHeaderValues.priceListId = priceList ? priceList.id : 0;
+                if (priceList && priceList.currencyId) {
+                    poHeaderValues.currencyId = priceList.currencyId;
+                    $host.find('#fCur').val(priceList.currencyId);
+                }
+            });
+
+            $host.find('#fPoDate, #fPromised').on('change', function () {
+                validateHeaderDates($host);
+            });
+
             $host.find('#fTax').on('change', function () {
                 var taxId = parseInt($(this).val(), 10) || 0;
-                var rate = parseFloat($(this).find('option:selected').data('rate')) || 0.18;
                 poHeaderValues.taxId = taxId;
-                // Cascade default tax to all lines
+                // Cascade default tax to all lines; tax amounts are recalculated on the server when the lines page opens
                 for (var i = 0; i < poLinesState.length; i++) {
                     poLinesState[i].taxId = taxId;
-                    poLinesState[i].taxRate = rate;
                 }
             });
 
@@ -1198,18 +1443,43 @@
                     $foot.html('<span class="vas-217-orw-foot-note" id="vas_217_step3_footnote">' + poLinesState.length + ' ' + (poLinesState.length > 1 ? esc(lbl('VAS_Lines', 'lines')) : esc(lbl('VAS_LineSelected', 'line'))) + ' · ' + num(totals.totalQty) + ' ' + esc(lbl('VAS_Qty', 'qty')) + ' · ' + esc(lbl('VAS_OrderTotal', 'order total')) + ' ' + fmtMoney(totals.grandTotal) + '</span>' +
                         '<span>' +
                         '<button type="button" class="vas-217-orw-btn vas-217-orw-btn-back">' + esc(lbl('VAS_BackToDetails', 'Back to details')) + '</button> ' +
+                        '<select class="vas-217-orw-fctl vas-217-orw-stage" id="vas_217_po_stage" title="' + esc(lbl('VAS_POStage', 'PO stage')) + '" aria-label="' + esc(lbl('VAS_POStage', 'PO stage')) + '">' + docStatusOptionsHtml() + '</select> ' +
                         '<button type="button" class="vas-217-orw-btn vas-217-orw-btn-primary" id="vas_217_btn_create_po">' + esc(lbl('VAS_CreatePO', 'Create PO')) + '</button>' +
                         '</span>');
 
                     $foot.find('.vas-217-orw-btn-back').on('click', popModal);
+                    $foot.find('#vas_217_po_stage').on('change', function () {
+                        poHeaderValues.docStatus = $(this).val();
+                    });
                     $foot.find('#vas_217_btn_create_po').on('click', function () {
                         submitCreatePurchaseOrder();
                     });
                 },
                 afterRender: function ($host) {
                     renderPagedStep3LinesTable($host.find('#vas_217_polines_table_wrap'), $host);
+                    recalcTaxes($host);
                 }
             });
+        }
+
+        // PO stage options (Drafted / Completed) come from the C_Order.DocStatus list; default is the column default (Drafted)
+        function getDefaultDocStatus() {
+            var list = (formLookups && formLookups.docStatuses) || [];
+            var def = formLookups && formLookups.defaultDocStatus;
+            if (def && findById(list, def)) return def;
+            return findById(list, 'DR') ? 'DR' : (list.length ? list[0].id : 'DR');
+        }
+
+        function getDocStatusName(value) {
+            var item = findById((formLookups && formLookups.docStatuses) || [], value);
+            return item ? item.name : '';
+        }
+
+        function docStatusOptionsHtml() {
+            var selected = poHeaderValues.docStatus || getDefaultDocStatus();
+            return ((formLookups && formLookups.docStatuses) || []).map(function (s) {
+                return '<option value="' + esc(s.id) + '"' + (s.id === selected ? ' selected' : '') + '>' + esc(s.name) + '</option>';
+            }).join('');
         }
 
         function renderPagedStep3LinesTable($container, $host) {
@@ -1220,12 +1490,17 @@
 
             var taxes = (formLookups && formLookups.taxes) || [];
 
-            var PO_LINE_COLS = 'minmax(0, 1.45fr) minmax(0, 1.35fr) minmax(0, 0.75fr) minmax(0, 0.6fr) minmax(0, 0.7fr) minmax(0, 0.9fr) minmax(0, 0.85fr) minmax(0, 1.05fr) minmax(0, 0.6fr)';
+            // The Attribute column is shown only when at least one PO line carries an attribute
+            var showAttr = poLinesState.some(hasAttribute);
+            var PO_LINE_COLS = ['minmax(0, 1.45fr)']
+                .concat(showAttr ? ['minmax(0, 1.35fr)'] : [])
+                .concat(['minmax(0, 0.75fr)', 'minmax(0, 0.6fr)', 'minmax(0, 0.85fr)', 'minmax(0, 0.9fr)', 'minmax(0, 0.85fr)', 'minmax(0, 1.05fr)', 'minmax(0, 0.6fr)'])
+                .join(' ');
 
             var $tableWrap = $('<div class="vas-217-orw-mtbl"></div>');
             var $tableHead = $('<div class="vas-217-orw-mrow vas-217-orw-mhead" style="grid-template-columns:' + PO_LINE_COLS + ';">' +
                 '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_Product', 'Product')) + '">' + esc(lbl('VAS_Product', 'Product')) + '</span>' +
-                '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_Attribute', 'Attribute')) + '">' + esc(lbl('VAS_Attribute', 'Attribute')) + '</span>' +
+                (showAttr ? '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_Attribute', 'Attribute')) + '">' + esc(lbl('VAS_Attribute', 'Attribute')) + '</span>' : '') +
                 '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_UoM', 'UoM')) + '">' + esc(lbl('VAS_UoM', 'UoM')) + '</span>' +
                 '<span class="vas-217-orw-cell right" title="' + esc(lbl('VAS_Qty', 'Qty')) + '">' + esc(lbl('VAS_Qty', 'Qty')) + '</span>' +
                 '<span class="vas-217-orw-cell right" title="' + esc(lbl('VAS_Rate', 'Rate')) + '">' + esc(lbl('VAS_Rate', 'Rate')) + '</span>' +
@@ -1262,13 +1537,13 @@
 
                     var rowHtml = '<div class="vas-217-orw-mrow" data-idx="' + globalIdx + '" style="grid-template-columns:' + PO_LINE_COLS + ';">' +
                         '<span class="vas-217-orw-cell c-dark" title="' + esc(l.productName) + '">' + esc(l.productName) + '</span>' +
-                        '<span class="vas-217-orw-cell" title="' + esc(l.attributeDescription || lbl('VAS_Standard', 'Standard')) + '">' + esc(l.attributeDescription || lbl('VAS_Standard', 'Standard')) + '</span>' +
+                        (showAttr ? '<span class="vas-217-orw-cell" title="' + esc(l.attributeDescription || '') + '">' + esc(l.attributeDescription || '') + '</span>' : '') +
                         '<span class="vas-217-orw-cell" title="' + esc(l.uomName) + '">' + esc(l.uomName) + '</span>' +
                         '<span class="vas-217-orw-cell right c-dark" title="' + num(l.orderQty) + '">' + num(l.orderQty) + '</span>' +
-                        '<span class="vas-217-orw-cell right c-std" title="' + esc(fmtMoney(l.rate)) + '">' + esc(fmtMoney(l.rate)) + '</span>' +
+                        '<span class="vas-217-orw-cell"><input class="vas-217-orw-rowin in-lrate" type="number" min="0" step="any" value="' + (Number(l.rate) || 0) + '" data-idx="' + globalIdx + '" aria-label="' + esc(lbl('VAS_Rate', 'Rate')) + '"></span>' +
                         '<span class="vas-217-orw-cell"><select class="vas-217-orw-rowsel sel-ltax" data-idx="' + globalIdx + '" aria-label="' + esc(lbl('VAS_Tax', 'Tax')) + '">' + taxOptionsHtml + '</select></span>' +
-                        '<span class="vas-217-orw-cell right c-emph" title="' + esc(fmtMoney(amt)) + '">' + esc(fmtMoney(amt)) + '</span>' +
-                        '<span class="vas-217-orw-cell"><input class="vas-217-orw-rowin in-ldate" type="date" value="' + (l.datePromised || fIso()) + '" data-idx="' + globalIdx + '" aria-label="' + esc(lbl('VAS_DatePromised', 'Date promised')) + '"></span>' +
+                        '<span class="vas-217-orw-cell right c-emph amt-cell" title="' + esc(fmtMoney(amt)) + '">' + esc(fmtMoney(amt)) + '</span>' +
+                        '<span class="vas-217-orw-cell"><input class="vas-217-orw-rowin in-ldate' + (isPromisedBeforeOrdered(l.datePromised, poHeaderValues.dateOrdered) ? ' vas-217-orw-invalid' : '') + '" type="date" min="' + esc(poHeaderValues.dateOrdered || '') + '" value="' + (l.datePromised || fIso()) + '" data-idx="' + globalIdx + '" aria-label="' + esc(lbl('VAS_DatePromised', 'Date promised')) + '"></span>' +
                         '<span class="vas-217-orw-cell vas-217-orw-actcell">' +
                         '  <button type="button" class="vas-217-orw-iconbtn sm btn-act-desc" data-idx="' + globalIdx + '" title="' + esc(lbl('VAS_Description', 'Description')) + '">' + ICON_DESC + '</button>' +
                         '  <button type="button" class="vas-217-orw-iconbtn sm btn-act-print" data-idx="' + globalIdx + '" title="' + esc(lbl('VAS_PrintDescription', 'Print description')) + '">' + ICON_PRINT + '</button>' +
@@ -1310,8 +1585,7 @@
                 var idx = parseInt($(this).data('idx'), 10);
                 if (poLinesState[idx]) {
                     poLinesState[idx].taxId = parseInt($(this).val(), 10) || 0;
-                    poLinesState[idx].taxRate = parseFloat($(this).find('option:selected').data('rate')) || 0.18;
-                    refreshStep3Totals($host);
+                    recalcTaxes($host);
                 }
             });
 
@@ -1319,6 +1593,21 @@
                 var idx = parseInt($(this).data('idx'), 10);
                 if (poLinesState[idx]) {
                     poLinesState[idx].datePromised = $(this).val();
+                    validateLineDates($host);
+                }
+            });
+
+            $tableBody.off('change.lrate').on('change.lrate', '.in-lrate', function () {
+                var idx = parseInt($(this).data('idx'), 10);
+                if (poLinesState[idx]) {
+                    var val = parseFloat($(this).val());
+                    if (isNaN(val) || val < 0) val = 0;
+                    poLinesState[idx].rate = val;
+                    $(this).val(val);
+                    var amt = poLinesState[idx].orderQty * val;
+                    $(this).closest('.vas-217-orw-mrow').find('.amt-cell').attr('title', fmtMoney(amt)).text(fmtMoney(amt));
+                    refreshStep3Totals($host);
+                    recalcTaxes($host);
                 }
             });
 
@@ -1336,6 +1625,24 @@
             });
         }
 
+        // A line's date promised may not precede the PO date either
+        function validateLineDates($host) {
+            var anyInvalid = false;
+            for (var i = 0; i < poLinesState.length; i++) {
+                var invalid = isPromisedBeforeOrdered(poLinesState[i].datePromised, poHeaderValues.dateOrdered);
+                if (invalid) anyInvalid = true;
+                $host.find('.in-ldate[data-idx="' + i + '"]').toggleClass('vas-217-orw-invalid', invalid);
+            }
+            var $footNote = $host.find('#vas_217_step3_footnote');
+            if (anyInvalid) {
+                $footNote.attr('class', 'vas-217-orw-warnnote').text(datePromisedErrorText());
+            } else if ($footNote.hasClass('vas-217-orw-warnnote')) {
+                $footNote.attr('class', 'vas-217-orw-foot-note');
+                refreshStep3Totals($host);
+            }
+            return !anyInvalid;
+        }
+
         function refreshStep3Totals($host) {
             var totals = calculatePoTotals();
             var $totline = $host.find('#vas_217_totline');
@@ -1347,8 +1654,9 @@
                 );
             }
 
+            // While a date error is shown the footer keeps the error; totals return once it is fixed
             var $footNote = $host.find('#vas_217_step3_footnote');
-            if ($footNote.length) {
+            if ($footNote.length && !$footNote.hasClass('vas-217-orw-warnnote')) {
                 $footNote.text(poLinesState.length + ' ' + (poLinesState.length > 1 ? lbl('VAS_Lines', 'lines') : lbl('VAS_LineSelected', 'line')) + ' · ' + num(totals.totalQty) + ' ' + lbl('VAS_Qty', 'qty') + ' · ' + lbl('VAS_OrderTotal', 'order total') + ' ' + fmtMoney(totals.grandTotal));
             }
         }
@@ -1360,7 +1668,7 @@
             var $box = $host.find('#vas_217_linedesc_box');
             $box.removeAttr('hidden').show();
 
-            $host.find('#vas_217_ldName').text(line.productName + ' · ' + (line.attributeDescription || lbl('VAS_Standard', 'Standard')));
+            $host.find('#vas_217_ldName').text(line.productName + (hasAttribute(line) ? ' · ' + line.attributeDescription : ''));
             var $desc = $host.find('#vas_217_ldDesc');
             var $print = $host.find('#vas_217_ldPrint');
 
@@ -1388,6 +1696,9 @@
 
         function submitCreatePurchaseOrder() {
             if (isSubmitting) return;
+
+            // Date promised may not precede the PO date on any line
+            if (!validateLineDates(getModalHost())) return;
 
             var $btn = $('#vas_217_btn_create_po');
             $btn.prop('disabled', true);
@@ -1429,7 +1740,8 @@
                 priority: poHeaderValues.priority || '5',
                 description: poHeaderValues.description || '',
                 defaultTaxId: poHeaderValues.taxId || 0,
-                linesJson: JSON.stringify(payloadLines)
+                linesJson: JSON.stringify(payloadLines),
+                docStatus: poHeaderValues.docStatus || getDefaultDocStatus()
             };
 
             var url = VIS.Application.contextUrl + 'VAS_217_OpenRequisitionsWidget/CreatePurchaseOrder';
@@ -1445,9 +1757,16 @@
                         closeModal();
                         loadOpenRequisitions();
 
-                        // Confirmation toast
-                        var lineCountStr = payloadLines.length + ' ' + (payloadLines.length > 1 ? lbl('VAS_Lines', 'lines') : lbl('VAS_LineSelected', 'line'));
-                        toast(lbl('VAS_POCreatedFor', 'Purchase order created for') + ' ' + selectedVendorName + ' · ' + lineCountStr + ' · ' + fmtMoney(totals.grandTotal));
+                        // Confirmation carries the generated PO document number and the stage it was created in
+                        var stageName = getDocStatusName(data.docStatus || postData.docStatus);
+                        var confirmMsg = lbl('VAS_POCreatedWithDocNo', 'Purchase Order created successfully with Document No.:') + ' ' +
+                            (data.documentNo || '') + (stageName ? ' (' + stageName + ')' : '');
+                        if (window.VIS && VIS.ADialog && VIS.ADialog.info) {
+                            VIS.ADialog.info('', '', confirmMsg);
+                        } else {
+                            var lineCountStr = payloadLines.length + ' ' + (payloadLines.length > 1 ? lbl('VAS_Lines', 'lines') : lbl('VAS_LineSelected', 'line'));
+                            toast(confirmMsg + ' · ' + selectedVendorName + ' · ' + lineCountStr + ' · ' + fmtMoney(totals.grandTotal));
+                        }
                     } else {
                         var errMsg = (data && data.error) ? data.error : (data && data.message ? data.message : lbl('VAS_ErrorCreatingPO', 'Error creating Purchase Order'));
                         alert(errMsg);

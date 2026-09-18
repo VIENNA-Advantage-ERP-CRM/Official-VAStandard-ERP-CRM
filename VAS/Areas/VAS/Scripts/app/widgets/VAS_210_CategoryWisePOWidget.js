@@ -1,4 +1,4 @@
-/**
+﻿/**
  * VAS_210_CategoryWisePOWidget
  * 2x2 Category Wise PO Donut Widget for Purchase Order dashboard.
  * Displays monthly converted PO line value grouped by M_Product_Category (top 3 + Other),
@@ -174,8 +174,27 @@
 
         this.Initalize = function () {
             createWidget();
+            setupWidgetSizeObserver();
             loadCategoryData();
         };
+
+        /* Publishes the widget's own width as --widget-inline-size so the type scale
+           (and with it the donut's surroundings) tracks this widget rather than the
+           dashboard. Without it the stylesheet falls back to --dash-inline-size. */
+        function setupWidgetSizeObserver() {
+            if (typeof ResizeObserver === 'undefined' || !$root[0]) { return; }
+            try {
+                var ro = new ResizeObserver(function (entries) {
+                    for (var i = 0; i < entries.length; i++) {
+                        var width = entries[i].contentRect.width;
+                        if (width > 0 && $root[0]) {
+                            $root[0].style.setProperty('--widget-inline-size', width + 'px');
+                        }
+                    }
+                });
+                ro.observe($root[0]);
+            } catch (e) { }
+        }
 
         function createWidget() {
             var title = lbl("VAS_210_CategoryWisePO", "Category wise PO");
@@ -192,7 +211,7 @@
                 '    </div>' +
                 '  </div>' +
                 '  <div class="vas-cpow-donutwrap">' +
-                '    <div class="vas-cpow-donut" style="width:100%;max-width:11.5em;aspect-ratio:1;">' +
+                '    <div class="vas-cpow-donut">' +
                 '      <svg viewBox="0 0 42 42" width="100%" height="100%" style="transform:rotate(-90deg);" class="vas-cpow-svg"></svg>' +
                 '      <div class="vas-cpow-ctr"></div>' +
                 '    </div>' +
@@ -412,6 +431,9 @@
 
         function openRecord(orderId) {
             if (!orderId) { return; }
+            // Navigating away must dismiss the popup: the record opens behind it
+            // otherwise, leaving the dialog stranded over the window it just opened.
+            closeModal();
             var param = {
                 "Record_ID": orderId,
                 "TabIndex": "0"
@@ -695,14 +717,14 @@
                         '<div class="vas-cpow-mrow vas-cpow-lines-mrow">' +
                         '  <span class="vas-cpow-cell right c-std vas-cpow-lcol-seq">' + (start + j + 1) + '</span>' +
                         '  <span class="vas-cpow-cell c-prim vas-cpow-lcol-prod" title="' + escapeHtml(l.ProductName) + '">' + escapeHtml(l.ProductName) + '</span>' +
-                        '  <span class="vas-cpow-cell c-std vas-cpow-lcol-attr" title="' + escapeHtml(l.Attribute || '—') + '">' + escapeHtml(l.Attribute || '—') + '</span>' +
+                        '  <span class="vas-cpow-cell c-std vas-cpow-lcol-attr" title="' + escapeHtml(l.Attribute || '') + '">' + escapeHtml(l.Attribute || '') + '</span>' +
                         '  <span class="vas-cpow-cell c-std vas-cpow-lcol-uom" title="' + escapeHtml(l.Uom || '—') + '">' + escapeHtml(l.Uom || '—') + '</span>' +
                         '  <span class="vas-cpow-cell right c-std vas-cpow-lcol-ord">' + formatNumber(l.QtyOrdered) + '</span>' +
-                        '  <span class="vas-cpow-cell right c-std vas-cpow-lcol-recd">' + formatNumber(l.QtyDelivered) + '</span>' +
-                        '  <span class="vas-cpow-cell right c-prim vas-cpow-lcol-pend">' + formatNumber(l.QtyPending) + '</span>' +
+                        '  <span class="vas-cpow-cell right c-std vas-cpow-lcol-recd">' + nsDash(l, formatNumber(l.QtyDelivered)) + '</span>' +
+                        '  <span class="vas-cpow-cell right c-prim vas-cpow-lcol-pend">' + nsDash(l, formatNumber(l.QtyPending)) + '</span>' +
                         '  <span class="vas-cpow-cell right c-std vas-cpow-lcol-rate">' + escapeHtml(formatCurrency(l.Rate)) + '</span>' +
                         '  <span class="vas-cpow-cell right c-emph vas-cpow-lcol-amt">' + escapeHtml(formatCurrency(l.Amount)) + '</span>' +
-                        '  <span class="vas-cpow-cell vas-cpow-lcol-st" title="' + escapeHtml(l.LineStatus) + '"><span class="vas-cpow-chip ' + l.LineStatusChip + '">' + escapeHtml(l.LineStatus) + '</span></span>' +
+                        '  <span class="vas-cpow-cell vas-cpow-lcol-st" title="' + escapeHtml(nsDash(l, l.LineStatus)) + '"><span class="vas-cpow-chip ' + l.LineStatusChip + '">' + escapeHtml(nsDash(l, l.LineStatus)) + '</span></span>' +
                         '</div>';
                 }
 
@@ -773,5 +795,12 @@
         if (this.frame) { this.frame.dispose(); }
         this.frame = null;
     };
+
+
+    /* A charge line, or a product that is not of Item type, is never received:
+       received, pending and line status render as a dash instead of a figure. */
+    function nsDash(l, v) {
+        return (l && (l.IsNonStock || l.isNonStock)) ? '–' : v;
+    }
 
 })(VAS, jQuery);

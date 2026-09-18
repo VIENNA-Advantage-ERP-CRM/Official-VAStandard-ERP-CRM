@@ -10,11 +10,11 @@
  *  2  | All count sheets posted or completed             | VAS_158_AllCountSheetsPosted
  *  3  | draft physical inventory count sheet             | VAS_158_DraftCountSheet
  *  4  | draft physical inventory count sheets            | VAS_158_DraftCountSheets
- *  5  | Document No                                      | VAS_158_DocumentNo
+ *  5  | Document No.                                     | VAS_158_DocumentNo
  *  6  | Warehouse                                        | VAS_158_Warehouse
  *  7  | Location                                         | VAS_158_Location
  *  8  | Lines                                            | VAS_158_Lines
- *  9  | Started                                          | VAS_158_Started
+ *  9  | Movement Date                                    | VAS_158_MovementDate
  * 10  | Status                                           | VAS_158_Status
  * 11  | Page                                             | VAS_158_Page
  * 12  | of                                               | VAS_158_Of
@@ -75,9 +75,10 @@
         function createWidget() {
             var $label = $('<div class="vas-opencountsheets-label">Open Count Sheets</div>');
             $valEl = $('<div class="vas-opencountsheets-value">--</div>');
-            var $meta = $('<div class="vas-opencountsheets-meta">Tap to view drafted counts</div>');
-
-            $root.append($label).append($valEl).append($meta);
+            /* No meta subline. The card used to carry "Tap to view drafted counts" under the
+               value; removed on request. The card stays clickable - the affordance is the
+               cursor/hover state on .vas-opencountsheets-root, not a caption. */
+            $root.append($label).append($valEl);
             $wrapper.append($root);
 
             if (window.ResizeObserver && $wrapper[0]) {
@@ -151,13 +152,10 @@
 
             $closeBtn.focus();
 
+            /* Delegates to the module-scoped teardown so that code outside this closure -
+               updatePageRender's row/document-number handlers - can close the popup too. */
             var closeModal = function () {
-                $overlay.remove();
-                $modalOverlay = null;
-                if ($root) {
-                    $root.focus();
-                }
-                loadData();
+                closeModalDialog();
             };
 
             $closeBtn.on('click', closeModal);
@@ -193,6 +191,20 @@
             });
         }
 
+        /* Modal teardown. Module scoped (openModal's closeModal only ever delegated here) so the
+           row and document-number click handlers in updatePageRender can close the popup after
+           navigating. Refreshing the KPI on the way out is the original behaviour. */
+        function closeModalDialog() {
+            if (!$modalOverlay) { return; }
+
+            $modalOverlay.remove();
+            $modalOverlay = null;
+            if ($root) {
+                $root.focus();
+            }
+            loadData();
+        }
+
         function renderModalContent($body) {
             $body.empty();
 
@@ -203,11 +215,11 @@
 
             var $headerRow = $(
                 '<div class="vas-opencountsheets-grid-row vas-opencountsheets-header-row">' +
-                '<div class="vas-opencountsheets-th">Count Sheet</div>' +
+                '<div class="vas-opencountsheets-th">Document No.</div>' +
                 '<div class="vas-opencountsheets-th">Warehouse</div>' +
                 '<div class="vas-opencountsheets-th">Locator</div>' +
                 '<div class="vas-opencountsheets-th vas-opencountsheets-th-right">Lines</div>' +
-                '<div class="vas-opencountsheets-th">Started</div>' +
+                '<div class="vas-opencountsheets-th">Movement Date</div>' +
                 '<div class="vas-opencountsheets-th">Status</div>' +
                 '</div>'
             );
@@ -268,11 +280,11 @@
                 var item = pageItems[i];
                 var $row = $(
                     '<div class="vas-opencountsheets-grid-row vas-opencountsheets-data-row" data-id="' + item.InventoryId + '">' +
-                    '<div class="vas-opencountsheets-cell vas-opencountsheets-cell-doc" title="' + item.DocumentNo + '">' + item.DocumentNo + '</div>' +
+                    '<div class="vas-opencountsheets-cell vas-opencountsheets-cell-doc vas-opencountsheets-doclink" role="link" tabindex="0" title="' + item.DocumentNo + '">' + item.DocumentNo + '</div>' +
                     '<div class="vas-opencountsheets-cell vas-opencountsheets-cell-text" title="' + item.Warehouse + '">' + item.Warehouse + '</div>' +
                     '<div class="vas-opencountsheets-cell vas-opencountsheets-cell-text" title="' + item.Locator + '">' + item.Locator + '</div>' +
                     '<div class="vas-opencountsheets-cell vas-opencountsheets-cell-lines" title="' + item.Lines + '">' + item.Lines + '</div>' +
-                    '<div class="vas-opencountsheets-cell vas-opencountsheets-cell-date" title="' + item.Started + '">' + item.Started + '</div>' +
+                    '<div class="vas-opencountsheets-cell vas-opencountsheets-cell-date" title="' + item.MovementDate + '">' + item.MovementDate + '</div>' +
                     '<div class="vas-opencountsheets-cell"><span class="vas-opencountsheets-status-chip status-' + String(item.DocStatus || '').toLowerCase() + '">' + item.Status + '</span></div>' +
                     '</div>'
                 );
@@ -280,6 +292,17 @@
                 (function (invId) {
                     $row.on('click', function () {
                         openInventoryWindow(invId);
+                    });
+
+                    /* The document number is the explicit link to the count record.
+                       stopPropagation keeps the row handler from firing the same navigation
+                       twice; openInventoryWindow closes the popup either way. */
+                    $row.find('.vas-opencountsheets-doclink').on('click keydown', function (e) {
+                        if (e.type === 'click' || e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            openInventoryWindow(invId);
+                        }
                     });
                 })(item.InventoryId);
 
@@ -365,6 +388,10 @@
                 "ActionName": hostWindowName() || COUNT_WINDOW_NAME,
                 "ActionType": "W"
             });
+
+            /* The navigation happens on the screen behind the popup, so the popup has to get out
+               of the way - previously it stayed open on top of the record it had just opened. */
+            closeModalDialog();
         }
 
         this.getRoot = function () {

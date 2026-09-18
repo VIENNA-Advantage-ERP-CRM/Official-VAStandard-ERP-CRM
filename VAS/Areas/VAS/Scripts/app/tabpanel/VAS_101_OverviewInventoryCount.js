@@ -152,6 +152,10 @@
  *                        each one - who it went to, its subject, when it went
  *                        and who sent it, then the message itself. The body is
  *                        shown ONLY once the row is opened.
+ *   VAI163   2026-09-15  Count Timeline: a closed or voided count (StatusCode CL /
+ *                        VO) reads "Closed" / "Voided" under the Counted stage in
+ *                        place of the date or "Pending"; a voided one is not drawn
+ *                        as the active stage.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -819,6 +823,17 @@
                 } else {
                     stateCls = "is-pending";
                     metaText = VIS.Msg.getMsg("VAS_101_Pending");
+                }
+                // A closed or voided count says so under Counted — the stage that
+                // reports the document's completion. Closed keeps the tick and the
+                // word replaces the date; voided never completed, so the stage
+                // stays unreached and the word replaces "Pending".
+                if (s.key === "VAS_101_Counted") {
+                    if (data.StatusCode === "CL") metaText = VIS.Msg.getMsg("VAS_101_Closed");
+                    else if (data.StatusCode === "VO") {
+                        stateCls = "is-pending";
+                        metaText = VIS.Msg.getMsg("VAS_101_Voided");
+                    }
                 }
                 $tl.append(stepEntry(i + 1, VIS.Msg.getMsg(s.key), metaText, s.done, stateCls));
             }

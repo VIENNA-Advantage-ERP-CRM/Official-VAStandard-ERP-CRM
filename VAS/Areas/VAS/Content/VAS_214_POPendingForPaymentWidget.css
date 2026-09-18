@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
    VAS_214_POPendingForPaymentWidget.css
    Purchase Order Dashboard — Widget 12: PO Pending for Payment
    Grid size: 6 columns x 2 rows (6x2 Wide Grid Queue Widget)
@@ -424,6 +424,11 @@
 }
 
 .vas-214-modal {
+    /* The type scale lives on the dialog, not just its body, so the header and
+       footer scale with the content instead of staying pinned at the app default. */
+    --panel-anchor: clamp(15px, 1.15vw, 26px);
+    font-size: var(--panel-anchor);
+
     width: min(1240px, 94vw);
     max-height: min(880px, 90dvh);
     background: #FFFFFF;
@@ -445,14 +450,14 @@
 }
 
 .vas-214-modal-header {
-    height: 56px;
+    height: 3.2em;
     flex: none;
-    padding: 0 16px;
+    padding: 0 0.8em;
     border-bottom: 1px solid #1F83FF;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: 0.6em;
     background: #FFFFFF;
 }
 
@@ -516,7 +521,7 @@
 }
 
 .vas-214-modal-body {
-    flex: 1;
+    flex: 0 1 auto;
     min-height: 0;
     overflow: hidden;
     padding: 1.125em 0.875em;
@@ -524,8 +529,13 @@
     flex-direction: column;
     gap: 0.75em;
     container-type: inline-size;
-    --panel-anchor: clamp(14px, 1vw, 20px);
-    font-size: var(--panel-anchor);
+    /* The modal type scale. The previous clamp(18px, 1vw, 20px) only varied between a
+       ~1800px and ~2000px viewport - on every other screen it sat pinned to one of its
+       bounds, so the popup never grew with resolution. This range tracks across the
+       resolutions actually in use (~15px at 1366px, ~22px at 1920px, 26px at 2560px).
+       Everything inside the popup is sized in em against it, so the whole dialog -
+       rows, chips, buttons, icons - scales together. */
+    font-size: inherit;
     box-sizing: border-box;
 }
 
@@ -543,11 +553,11 @@
 .vas-214-modal-foot {
     flex: none;
     border-top: 1px solid #D9E2EB;
-    padding: 12px 16px;
+    padding: 0.6em 0.8em;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: 0.6em;
     background: #FBFDFF;
 }
 
@@ -638,9 +648,12 @@
 
 /* Modal paged tables */
 .vas-214-mtwrap {
+    --vas-214-rows: 6;
+    --vas-214-row-h: 1.9em;
+
     display: flex;
     flex-direction: column;
-    flex: 1;
+    flex: none;
     min-height: 0;
     overflow: hidden;
 }
@@ -648,7 +661,7 @@
 .vas-214-mtbl {
     display: flex;
     flex-direction: column;
-    flex: 1;
+    flex: none;
     min-height: 0;
     overflow: hidden;
 }
@@ -674,17 +687,26 @@
     flex: none;
 }
 
+/* Fixed-size modal table, matching VAS_216_POQueueWidget:
+   the body is exactly --vas-214-rows rows tall and never changes with how many rows a
+   page actually holds, each row occupies 1/rows of it and they stack from the top,
+   and anything beyond a page is reached through the pager. Sizing is in em against
+   the modal body's font-size, so the dialog scales with the screen - no px. */
 .vas-214-mbody {
     overflow: hidden;
-    flex: 1;
+    flex: none;
     display: flex;
     flex-direction: column;
+    justify-content: flex-start;
+    height: calc(var(--vas-214-rows, 6) * var(--vas-214-row-h, 1.9em));
 }
 
 .vas-214-mbody .vas-214-mrow {
     font-size: 0.75em;
     padding: 0.45em 0.5em;
     border-bottom: 1px solid #E2EAF1;
+    flex: 0 0 calc(100% / var(--vas-214-rows, 6));
+    min-height: 0;
 }
 
 .vas-214-mbody .vas-214-mrow:last-child {
@@ -703,9 +725,9 @@
 }
 
 .vas-214-iconbtn {
-    width: 1.5em;
-    height: 1.5em;
-    border-radius: 7px;
+    width: 1.8em;
+    height: 1.8em;
+    border-radius: 8px;
     border: 1px solid #D9E2EB;
     background: #FFFFFF;
     display: grid;
@@ -715,6 +737,7 @@
     padding: 0;
     flex: none;
     transition: background 0.15s ease, border-color 0.15s ease;
+    line-height: 1;
 }
 
 .vas-214-iconbtn:hover {
@@ -723,8 +746,10 @@
 }
 
 .vas-214-iconbtn svg {
-    width: 0.8em;
-    height: 0.8em;
+    width: 1em;
+    height: 1em;
+    display: block;
+    flex: none;
 }
 
 .vas-214-center {

@@ -89,7 +89,10 @@
     function lbl(key, fallback) {
         if (window.VIS && VIS.Msg && VIS.Msg.getMsg) {
             var msg = VIS.Msg.getMsg(key);
-            if (msg && msg !== key && msg.indexOf('**') === -1) {
+            // VIS.Msg.getMsg returns "[KEY]" when the AD_Message row is missing;
+            // that must fall through to the English fallback, not render as-is.
+            if (msg && msg !== key && msg !== '[' + key + ']' && msg.charAt(0) !== '['
+                && msg.indexOf('**') === -1) {
                 return msg;
             }
         }
@@ -106,18 +109,17 @@
         return status;
     }
 
+    // Totals are Item-type lines only. A completed PO with nothing received is Pending (it used to read
+    // "Fully delivered"), which matters now that completed advance-payment POs are listed before receipt.
     function getDeliveryStatusDisplay(status, totalOrdered, totalDelivered) {
-        if (status === 'CL' || status === 'Closed' || status === 'VO' || status === 'Voided') {
+        if (status === 'CL' || status === 'Closed' || status === 'VO' || status === 'Voided' || !(totalOrdered > 0)) {
             return lbl('VAS_NotApplicable', 'Not applicable');
         }
-        if (totalOrdered > 0 && totalDelivered >= totalOrdered) {
+        if (totalDelivered >= totalOrdered) {
             return lbl('VAS_FullyDelivered', 'Fully delivered');
         }
-        if (totalDelivered > 0 && totalDelivered < totalOrdered) {
+        if (totalDelivered > 0) {
             return lbl('VAS_Partial', 'Partial');
-        }
-        if (status === 'CO' || status === 'Completed') {
-            return lbl('VAS_FullyDelivered', 'Fully delivered');
         }
         return lbl('VAS_Pending', 'Pending');
     }
@@ -232,7 +234,9 @@
         var $modalHost = null;
         var MT = {};
         var MT_SEQ = 0;
-        var MAX_MODAL_ROWS = 10;
+        // Rows per page in the modal table. The stylesheet sizes the table body to
+        // exactly this many rows (--vas-214-rows), so the two must stay in step.
+        var MAX_MODAL_ROWS = 6;
 
         function showBusy(show) {
             if (!$busy) { return; }
@@ -492,6 +496,9 @@
            ============================================================ */
         function openPurchaseOrderRecord(orderId) {
             if (!orderId) { return; }
+            // Navigating away must dismiss the popup: the record opens behind it
+            // otherwise, leaving the dialog stranded over the window it just opened.
+            closeModal();
 
             // 1. Tab Panel / Widget Event firing
             try {
@@ -762,29 +769,11 @@
             });
         }
 
-        function fitTable(id) {
-            var t = MT[id];
-            var el = document.getElementById(id);
-            if (!t || !el || t.fixed) { return; }
-
-            var avail = el.clientHeight;
-            if (avail < 40) { return; }
-
-            var head = el.querySelector('.vas-214-mhead');
-            var foot = el.querySelector('.vas-214-mtfoot');
-            var row = el.querySelector('.vas-214-mbody .vas-214-mrow');
-            if (!head || !row) { return; }
-
-            var rowH = row.getBoundingClientRect().height || 30;
-            var used = head.getBoundingClientRect().height + (foot ? (foot.getBoundingClientRect().height + 8) : 0);
-            var n = Math.floor((avail - used) / rowH);
-            n = Math.max(2, Math.min(t.max, n));
-
-            if (n !== t.size) {
-                t.size = n;
-                drawTable(id);
-            }
-        }
+        /* Rows per page are fixed and the stylesheet sizes the table body to exactly
+           that many rows, so there is nothing to measure or re-fit. The old body
+           derived the count from a rendered row height, but the rows are sized by
+           the stylesheet, so it was measuring its own output. */
+        function fitTable(id) { return; }
 
         function fitAllTables() {
             Object.keys(MT).forEach(function (id) {
@@ -842,6 +831,8 @@
                             var totalDeliveredQty = 0;
                             var totalPendingQty = 0;
                             lines.forEach(function (l) {
+                                // Delivery status counts Item-type products only; charges and other product types are excluded
+                                if (l.ProductType !== 'I') { return; }
                                 totalOrderedQty += Number(l.OrderedQty || 0);
                                 totalDeliveredQty += Number(l.DeliveredQty || 0);
                                 totalPendingQty += Number(l.PendingQty || 0);
@@ -896,14 +887,14 @@
                                 return [
                                     String(l.LineNo || (idx + 1)),
                                     l.ProductName || l.ProductSKU || '—',
-                                    l.Attribute || '—',
+                                    l.Attribute || '',
                                     l.UOM || '—',
                                     formatDecimal(l.OrderedQty),
-                                    formatDecimal(l.DeliveredQty),
-                                    formatDecimal(l.PendingQty),
+                                    nsDash(l, formatDecimal(l.DeliveredQty)),
+                                    nsDash(l, formatDecimal(l.PendingQty)),
                                     rateFmt,
                                     amtFmt,
-                                    { chip: chipClass, text: statusTxt }
+                                    nsDash(l, null) ? '–' : { chip: chipClass, text: statusTxt }
                                 ];
                             });
 
@@ -981,5 +972,12 @@
         if (this.frame) { this.frame.dispose(); }
         this.frame = null;
     };
+
+
+    /* A charge line, or a product that is not of Item type, is never received:
+       received, pending and line status render as a dash instead of a figure. */
+    function nsDash(l, v) {
+        return (l && (l.IsNonStock || l.isNonStock)) ? '–' : v;
+    }
 
 })(VAS, jQuery);

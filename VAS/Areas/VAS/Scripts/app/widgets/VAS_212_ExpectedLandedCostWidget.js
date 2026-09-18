@@ -1,4 +1,4 @@
-/**
+﻿/**
  * VAS_212_ExpectedLandedCostWidget
  * 3x2 Read-only Widget for Purchase Order Dashboard.
  * Displays aggregated expected landed cost amounts by dynamic cost element (M_CostElement)
@@ -316,7 +316,11 @@
                 var color = PASTEL_COLORS[globalIndex % PASTEL_COLORS.length];
                 var percentage = Math.min(100, Math.max(2, (item.totalAmount / maxAmount) * 100));
 
-                var $row = $('<div class="vas-elc-row">');
+                var $row = $('<div class="vas-elc-row vas-elc-row-click">')
+                    .attr('data-cost-element-id', item.costElementId)
+                    .attr('role', 'button')
+                    .attr('tabindex', 0)
+                    .attr('title', item.costElementName);
 
                 var $line = $('<div class="vas-elc-line">');
                 var $name = $('<span class="vas-elc-name">').text(item.costElementName).attr('title', item.costElementName);
@@ -333,6 +337,19 @@
                 $row.append($line).append($track);
                 $listContainer.append($row);
             }
+
+            // Clicking a cost element opens its purchase-order breakdown.
+            $listContainer.off('click.elc keydown.elc')
+                .on('click.elc', '.vas-elc-row-click', function () {
+                    var id = parseInt($(this).attr('data-cost-element-id'), 10);
+                    if (id > 0) { openCostModal(id, $(this).attr('title')); }
+                })
+                .on('keydown.elc', '.vas-elc-row-click', function (e) {
+                    if (e.key === 'Enter' || e.key === ' ' || e.keyCode === 13 || e.keyCode === 32) {
+                        e.preventDefault();
+                        $(this).trigger('click');
+                    }
+                });
 
             // Footer Pager rendering
             if (costElements.length > pageSize) {
@@ -374,7 +391,139 @@
             return $wrapper;
         };
 
+
+        /* ============================================================
+           COST ELEMENT DRILL-DOWN MODAL
+           Clicking a cost element row opens the open purchase orders that make
+           up that element's expected landed cost for the selected month.
+           ============================================================ */
+        var $elcMask = null;
+
+        function ensureCostModal() {
+            if ($elcMask && $elcMask.length && document.body.contains($elcMask[0])) { return; }
+
+            $elcMask = $(
+                '<div class="vas-elc-mask" role="dialog" aria-modal="true">' +
+                    '<div class="vas-elc-modal">' +
+                        '<div class="vas-elc-modal-header">' +
+                            '<div class="vas-elc-mhead-txt">' +
+                                '<h2 class="vas-elc-mtitle"></h2>' +
+                                '<div class="vas-elc-msub"></div>' +
+                            '</div>' +
+                            '<button type="button" class="vas-elc-mclose" aria-label="' + escapeHtml(label('VAS_Close', 'Close')) + '">' +
+                                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>' +
+                            '</button>' +
+                        '</div>' +
+                        '<div class="vas-elc-modal-body"></div>' +
+                        '<div class="vas-elc-modal-foot">' +
+                            '<span class="vas-elc-mnote"></span>' +
+                            '<button type="button" class="vas-elc-mbtn">' + escapeHtml(label('VAS_Close', 'Close')) + '</button>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>'
+            );
+
+            $('body').append($elcMask);
+            $elcMask.find('.vas-elc-mclose, .vas-elc-mbtn').on('click', closeCostModal);
+            $elcMask.on('mousedown', function (e) {
+                if (e.target === $elcMask[0]) { closeCostModal(); }
+            });
+        }
+
+        function closeCostModal() {
+            if ($elcMask) { $elcMask.removeClass('vas-elc-mask-open'); }
+        }
+
+        function openCostModal(costElementId, costElementName) {
+            ensureCostModal();
+            $elcMask.find('.vas-elc-mtitle').text(costElementName || label('VAS_LandedCost', 'Landed cost'));
+            $elcMask.find('.vas-elc-msub').text(label('VAS_Loading', 'Loading...'));
+            $elcMask.find('.vas-elc-modal-body').empty();
+            $elcMask.find('.vas-elc-mnote').text('');
+            $elcMask.addClass('vas-elc-mask-open');
+
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_212_ExpectedLandedCostWidget/GetCostElementDetail',
+                type: 'GET',
+                cache: false,
+                data: { costElementId: costElementId, month: selectedMonth, year: selectedYear },
+                success: function (res) {
+                    var data = res;
+                    if (typeof data === 'string') { try { data = JSON.parse(data); } catch (e) { } }
+                    if (typeof data === 'string') { try { data = JSON.parse(data); } catch (e) { } }
+                    data = data || {};
+                    if (!data.success) { renderCostModalState(label('VAS_FailedToLoad', 'Failed to load data')); return; }
+                    renderCostModalRows(data);
+                },
+                error: function () {
+                    renderCostModalState(label('VAS_FailedToLoad', 'Failed to load data'));
+                }
+            });
+        }
+
+        function renderCostModalState(text) {
+            $elcMask.find('.vas-elc-msub').text('');
+            $elcMask.find('.vas-elc-modal-body')
+                .html('<div class="vas-elc-mempty">' + escapeHtml(text) + '</div>');
+        }
+
+        function renderCostModalRows(data) {
+            var rows = data.rows || [];
+            var sym = data.curSymbol || data.curIso || '';
+            var prec = (typeof data.stdPrecision === 'number') ? data.stdPrecision : 2;
+
+            $elcMask.find('.vas-elc-msub').text(
+                label('VAS_ExpectedLandedCost', 'Expected landed cost') + ' · ' +
+                formatCurrency(data.totalAmount, sym, prec));
+
+            if (!rows.length) {
+                renderCostModalState(label('VAS_NoPOsFound', 'No purchase orders found'));
+                return;
+            }
+
+            var head =
+                '<div class="vas-elc-mrow vas-elc-mhead">' +
+                    '<span class="vas-elc-mcell">' + escapeHtml(label('VAS_PurchaseOrder', 'Purchase order')) + '</span>' +
+                    '<span class="vas-elc-mcell">' + escapeHtml(label('VAS_Vendor', 'Vendor')) + '</span>' +
+                    '<span class="vas-elc-mcell">' + escapeHtml(label('VAS_Warehouse', 'Warehouse')) + '</span>' +
+                    '<span class="vas-elc-mcell">' + escapeHtml(label('VAS_PODate', 'PO date')) + '</span>' +
+                    '<span class="vas-elc-mcell">' + escapeHtml(label('VAS_Status', 'Status')) + '</span>' +
+                    '<span class="vas-elc-mcell vas-elc-mright">' + escapeHtml(label('VAS_Amount', 'Amount')) + '</span>' +
+                '</div>';
+
+            var body = '';
+            for (var i = 0; i < rows.length; i++) {
+                var r = rows[i];
+                var amt = formatCurrency(r.amount, sym, prec);
+                body +=
+                    '<div class="vas-elc-mrow">' +
+                        '<span class="vas-elc-mcell" title="' + escapeHtml(r.purchaseOrderNo) + '">' + escapeHtml(r.purchaseOrderNo) + '</span>' +
+                        '<span class="vas-elc-mcell" title="' + escapeHtml(r.vendorName) + '">' + escapeHtml(r.vendorName) + '</span>' +
+                        '<span class="vas-elc-mcell" title="' + escapeHtml(r.warehouseName) + '">' + escapeHtml(r.warehouseName) + '</span>' +
+                        '<span class="vas-elc-mcell">' + escapeHtml(r.orderDate) + '</span>' +
+                        '<span class="vas-elc-mcell">' + escapeHtml(docStatusText(r.docStatus)) + '</span>' +
+                        '<span class="vas-elc-mcell vas-elc-mright">' + escapeHtml(amt) + '</span>' +
+                    '</div>';
+            }
+
+            $elcMask.find('.vas-elc-modal-body').html(head + '<div class="vas-elc-mbody">' + body + '</div>');
+            $elcMask.find('.vas-elc-mnote').text(
+                label('VAS_Showing', 'Showing') + ' ' + rows.length + ' ' +
+                label('VAS_PurchaseOrders', 'purchase orders'));
+        }
+
+        function docStatusText(code) {
+            var c = String(code || '').toUpperCase();
+            if (c === 'DR') { return label('VAS_Drafted', 'Drafted'); }
+            if (c === 'IP') { return label('VAS_InProcess', 'In process'); }
+            if (c === 'CO') { return label('VAS_Completed', 'Completed'); }
+            if (c === 'CL') { return label('VAS_Closed', 'Closed'); }
+            return c;
+        }
+
         this.disposeComponent = function () {
+            // The modal lives on <body>, so it must be removed explicitly.
+            if ($elcMask) { $elcMask.off(); $elcMask.remove(); $elcMask = null; }
             $wrapper.remove();
         };
     };

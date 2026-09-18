@@ -1,4 +1,4 @@
-/**
+﻿/**
  * VAS_208_MonthlyPOTrendWidget
  * 4x2 Column Chart Widget for Purchase Order Dashboard.
  * Visualizes up to 12 months of Purchase Order value by DateOrdered with month bars
@@ -130,6 +130,9 @@
 
         var trendSeries = [];
         var currencyInfo = { symbol: '₹', iso: 'INR', precision: 2 };
+        // Months that actually hold PO data, as [{ y, m }] from the server.
+        // Null until the first load: the pickers then fall back to the calendar range.
+        var availableMonths = null;
 
         // Modal engine state
         var $mask = null;
@@ -187,10 +190,53 @@
 
         function populateSelectOptions($sel, selectedVal) {
             var html = '';
-            for (var i = minIdx; i <= maxIdx; i++) {
-                html += '<option value="' + i + '"' + (i === selectedVal ? ' selected' : '') + '>' + escapeHtml(idxToLabel(i)) + '</option>';
+            var values = [];
+            if (availableMonths && availableMonths.length > 0) {
+                for (var a = 0; a < availableMonths.length; a++) {
+                    values.push(availableMonths[a].y * 12 + (availableMonths[a].m - 1));
+                }
+                values.sort(function (x, y2) { return x - y2; });
+            } else {
+                for (var i = minIdx; i <= maxIdx; i++) {
+                    values.push(i);
+                }
+            }
+            for (var v = 0; v < values.length; v++) {
+                html += '<option value="' + values[v] + '"' + (values[v] === selectedVal ? ' selected' : '') + '>' + escapeHtml(idxToLabel(values[v])) + '</option>';
             }
             $sel.html(html);
+            return values;
+        }
+
+        /* Re-fill both pickers from the months that hold PO data and keep the
+           current window sensible: a selection that fell on an empty month moves
+           to the nearest month that has one. */
+        function refreshFilterOptions() {
+            var fromValues = populateSelectOptions($fromSel, fromIdx);
+            var toValues = populateSelectOptions($toSel, toIdx);
+
+            if (fromValues.length > 0 && fromValues.indexOf(fromIdx) < 0) {
+                fromIdx = nearestValue(fromValues, fromIdx);
+                $fromSel.val(String(fromIdx));
+            }
+            if (toValues.length > 0 && toValues.indexOf(toIdx) < 0) {
+                toIdx = nearestValue(toValues, toIdx);
+                $toSel.val(String(toIdx));
+            }
+            if (fromIdx > toIdx) {
+                fromIdx = toIdx;
+                $fromSel.val(String(fromIdx));
+            }
+        }
+
+        function nearestValue(values, target) {
+            var best = values[0];
+            for (var i = 1; i < values.length; i++) {
+                if (Math.abs(values[i] - target) < Math.abs(best - target)) {
+                    best = values[i];
+                }
+            }
+            return best;
         }
 
         function buildWidget() {
@@ -297,10 +343,20 @@
                 cache: false,
                 success: function (res) {
                     var data = parseResponse(res);
+                    if (data && data.error) {
+                        showToast(lbl("Error", "Error loading data"));
+                    }
                     if (data && data.series) {
                         trendSeries = data.series;
                         if (data.currency) {
                             currencyInfo = data.currency;
+                        }
+                        // Restrict the From/To pickers to months that actually
+                        // hold PO data (server reports them; falls back to the
+                        // calendar range when absent).
+                        if (data.availableMonths && data.availableMonths.length > 0) {
+                            availableMonths = data.availableMonths;
+                            refreshFilterOptions();
                         }
                     } else {
                         trendSeries = [];
@@ -473,6 +529,9 @@
 
         function zoomToPurchaseOrder(orderId) {
             if (!orderId) { return; }
+            // Navigating away must dismiss the popup: the record opens behind it
+            // otherwise, leaving the dialog stranded over the window it just opened.
+            closeModal();
             try {
                 $self.widgetFirevalueChanged({
                     "TabWhereClause": "C_Order.C_Order_ID=" + orderId,
@@ -504,6 +563,12 @@
                 cache: false,
                 success: function (res) {
                     var data = parseResponse(res);
+                    // A server-side failure returns { error: ... } with no records. Rendering it
+                    // as an empty list would tell the user this month has no POs, which is a lie.
+                    if (data.error) {
+                        showToast(lbl("Error", "Error loading data"));
+                        return;
+                    }
                     var records = data.records || [];
                     var poCount = data.poCount || records.length;
                     var poVal = data.poValue || 0;
@@ -523,7 +588,9 @@
         }
 
         function renderMonthPOModal(title, subtitle, monthLabel, records, poCount, poVal, vendorCount, avgPoVal, curSym, year, month) {
-            var PAGE_SIZE = 10;
+        // Rows per page in the modal table. The stylesheet sizes the table body to
+        // exactly this many rows (--vas-mpt-rows), so the two must stay in step.
+            var PAGE_SIZE = 6;
             var curPage = 0;
             var totalPages = Math.max(1, Math.ceil(records.length / PAGE_SIZE));
 
@@ -649,6 +716,10 @@
                 cache: false,
                 success: function (res) {
                     var data = parseResponse(res);
+                    if (data.error) {
+                        showToast(lbl("Error", "Error loading line details"));
+                        return;
+                    }
                     var lines = data.lines || [];
                     renderPOLinesModal(orderId, poNo, lines, curSym);
                 },
@@ -722,11 +793,11 @@
                                 '<span class="vas-mpt-cell vas-mpt-c-std" title="' + escapeHtml(l.attribute) + '">' + escapeHtml(l.attribute) + '</span>' +
                                 '<span class="vas-mpt-cell vas-mpt-c-std" title="' + escapeHtml(l.uom) + '">' + escapeHtml(l.uom) + '</span>' +
                                 '<span class="vas-mpt-cell right" title="' + formatNumber(l.qtyOrdered) + '">' + formatNumber(l.qtyOrdered) + '</span>' +
-                                '<span class="vas-mpt-cell right" title="' + formatNumber(l.qtyDelivered) + '">' + formatNumber(l.qtyDelivered) + '</span>' +
-                                '<span class="vas-mpt-cell right vas-mpt-c-prim" title="' + formatNumber(l.qtyPending) + '">' + formatNumber(l.qtyPending) + '</span>' +
+                                '<span class="vas-mpt-cell right" title="' + nsDash(l, formatNumber(l.qtyDelivered)) + '">' + nsDash(l, formatNumber(l.qtyDelivered)) + '</span>' +
+                                '<span class="vas-mpt-cell right vas-mpt-c-prim" title="' + nsDash(l, formatNumber(l.qtyPending)) + '">' + nsDash(l, formatNumber(l.qtyPending)) + '</span>' +
                                 '<span class="vas-mpt-cell right" title="' + formatNumber(l.rate) + '">' + curSym + ' ' + formatNumber(l.rate) + '</span>' +
                                 '<span class="vas-mpt-cell right vas-mpt-c-emph" title="' + formatCompactMoney(l.amount, curSym) + '">' + formatCompactMoney(l.amount, curSym) + '</span>' +
-                                '<span class="vas-mpt-cell"><span class="vas-mpt-chip ' + l.statusChip + '" title="' + escapeHtml(l.status) + '">' + escapeHtml(l.status) + '</span></span>' +
+                                '<span class="vas-mpt-cell"><span class="vas-mpt-chip ' + l.statusChip + '" title="' + escapeHtml(nsDash(l, l.status)) + '">' + escapeHtml(nsDash(l, l.status)) + '</span></span>' +
                             '</div>';
                     }
                 }
@@ -831,5 +902,12 @@
         }
         this.frame = null;
     };
+
+
+    /* A charge line, or a product that is not of Item type, is never received:
+       received, pending and line status render as a dash instead of a figure. */
+    function nsDash(l, v) {
+        return (l && (l.IsNonStock || l.isNonStock)) ? '–' : v;
+    }
 
 })(VAS, jQuery);

@@ -22,16 +22,23 @@ namespace VASLogic.Models
     /// <summary>
     /// Module Name : VAS_202_SuspenseBalances
     /// Purpose     : Backs the VAS_202_SuspenseBalancesWidget dashboard widget.
-    ///               The three CONTROL accounts of the tenant's primary accounting
+    ///               The four CONTROL accounts of the tenant's primary accounting
     ///               schema that should carry nothing at all, each with the number of
     ///               postings sitting on it in ONE open accounting period and its net
     ///               balance, and each openable as a paged list of those postings:
     ///
     ///                 Suspense Balancing   C_AcctSchema_GL.SuspenseBalancing_Acct
     ///                 Suspense Error       C_AcctSchema_GL.SuspenseError_Acct
+    ///                 Currency Balancing   C_AcctSchema_GL.CurrencyBalancing_Acct
     ///                 Rounding Off         C_AcctSchema_GL.FRPT_RoundingOff_Acct
     ///
-    ///               Resolution chain, deliberately three hops long: those three
+    ///               Currency Balancing sits right after Suspense Error because it is
+    ///               the same kind of finding: Fact.cs posts the rounding difference of
+    ///               a multi-currency document to it when the schema has
+    ///               UseCurrencyBalancing set, so a non-zero balance there is money to
+    ///               explain, not a normal operating account.
+    ///
+    ///               Resolution chain, deliberately three hops long: those four
     ///               settings hold a C_ValidCombination_ID, NOT a Fact_Acct.Account_ID,
     ///               so each is resolved
     ///
@@ -59,7 +66,7 @@ namespace VASLogic.Models
     ///               The card total is SUM(ABS(net balance)) over the DISTINCT resolved
     ///               account ids: one suspense account is never netted against another
     ///               (they are different errors), and an account configured into two of
-    ///               the three settings is counted once.
+    ///               the four settings is counted once.
     ///
     ///               Document numbers: Fact_Acct stores AD_Table_ID / Record_ID, not a
     ///               document number, so each posting's source is resolved from
@@ -93,6 +100,7 @@ namespace VASLogic.Models
            localized AD_Message label, so no display text is produced here. */
         public const string ACCOUNTTYPE_SUSPENSE_BALANCING = "SuspenseBalancing";
         public const string ACCOUNTTYPE_SUSPENSE_ERROR = "SuspenseError";
+        public const string ACCOUNTTYPE_CURRENCY_BALANCING = "CurrencyBalancing";
         public const string ACCOUNTTYPE_ROUNDING_OFF = "RoundingOff";
 
         /* Dr / Cr tokens for the detail list. */
@@ -121,15 +129,19 @@ namespace VASLogic.Models
            are not suspense to clear. */
         private const string POSTINGTYPE_Actual = "A";
 
-        /* The three C_AcctSchema_GL settings, in card display order. FRPT_RoundingOff_Acct
-           is an optional column in this schema (MAcctSchema probes it with
-           Get_ColumnIndex before reading it), so its presence is confirmed against
-           AD_Column before it is named in any SQL. */
+        /* The four C_AcctSchema_GL settings, in card display order. SuspenseBalancing /
+           SuspenseError / CurrencyBalancing are standard columns of the table (MSetup
+           seeds all three), so they are named directly. FRPT_RoundingOff_Acct is an
+           optional column in this schema (MAcctSchema probes it with Get_ColumnIndex
+           before reading it), so its presence is confirmed against AD_Column before it
+           is named in any SQL. */
         private const string COLUMN_SUSPENSE_BALANCING = "SuspenseBalancing_Acct";
         private const string COLUMN_SUSPENSE_ERROR = "SuspenseError_Acct";
+        private const string COLUMN_CURRENCY_BALANCING = "CurrencyBalancing_Acct";
         private const string COLUMN_ROUNDING_OFF = "FRPT_RoundingOff_Acct";
         private const string COLUMN_USE_SUSPENSE_BALANCING = "UseSuspenseBalancing";
         private const string COLUMN_USE_SUSPENSE_ERROR = "UseSuspenseError";
+        private const string COLUMN_USE_CURRENCY_BALANCING = "UseCurrencyBalancing";
         private const string COLUMN_USE_ROUNDING_OFF = "FRPT_IsRoundingOff";
 
         /* Preferred source-document display columns, in resolution order. */
@@ -166,7 +178,7 @@ namespace VASLogic.Models
         /// <summary>
         /// Bootstraps the widget in one round trip: the tenant's accounting context,
         /// every selectable open period of the primary calendar, the period to
-        /// preselect, and that period's three suspense figures.
+        /// preselect, and that period's four suspense figures.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <returns>Populated <see cref="SuspenseBootstrap"/> (never null).</returns>
@@ -447,10 +459,10 @@ namespace VASLogic.Models
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// The three configured control accounts of one accounting schema, resolved
+        /// The four configured control accounts of one accounting schema, resolved
         /// from C_AcctSchema_GL through C_ValidCombination to the natural account.
         ///
-        /// All three rows are ALWAYS returned, configured or not: these are control
+        /// All four rows are ALWAYS returned, configured or not: these are control
         /// settings, and a missing one is itself the finding the card has to show. An
         /// unconfigured or unresolvable row carries Account_ID 0, which is never sent
         /// to Fact_Acct.
@@ -458,13 +470,14 @@ namespace VASLogic.Models
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="acctSchemaId">Primary C_AcctSchema_ID.</param>
         /// <param name="warnings">Warning list being built (may be null).</param>
-        /// <returns>Exactly three rows in card display order (never null).</returns>
+        /// <returns>Exactly four rows in card display order (never null).</returns>
         public List<SuspenseAccount> GetConfiguredAccounts(Ctx ctx, int acctSchemaId,
             List<WarningItem> warnings)
         {
             List<SuspenseAccount> accounts = new List<SuspenseAccount>();
             accounts.Add(NewAccount(ACCOUNTTYPE_SUSPENSE_BALANCING));
             accounts.Add(NewAccount(ACCOUNTTYPE_SUSPENSE_ERROR));
+            accounts.Add(NewAccount(ACCOUNTTYPE_CURRENCY_BALANCING));
             accounts.Add(NewAccount(ACCOUNTTYPE_ROUNDING_OFF));
 
             if (ctx == null || acctSchemaId <= 0) { return accounts; }
@@ -484,7 +497,9 @@ namespace VASLogic.Models
                        COALESCE(gl.").Append(COLUMN_SUSPENSE_BALANCING).Append(@",0) AS Balancing_Combination_ID,
                        COALESCE(gl.").Append(COLUMN_USE_SUSPENSE_BALANCING).Append(@",'N') AS Balancing_Enabled,
                        COALESCE(gl.").Append(COLUMN_SUSPENSE_ERROR).Append(@",0) AS Error_Combination_ID,
-                       COALESCE(gl.").Append(COLUMN_USE_SUSPENSE_ERROR).Append(@",'N') AS Error_Enabled");
+                       COALESCE(gl.").Append(COLUMN_USE_SUSPENSE_ERROR).Append(@",'N') AS Error_Enabled,
+                       COALESCE(gl.").Append(COLUMN_CURRENCY_BALANCING).Append(@",0) AS Currency_Combination_ID,
+                       COALESCE(gl.").Append(COLUMN_USE_CURRENCY_BALANCING).Append(@",'N') AS Currency_Enabled");
 
             select.Append(hasRoundingAcct
                 ? ",COALESCE(gl." + COLUMN_ROUNDING_OFF + ",0) AS Rounding_Combination_ID"
@@ -521,12 +536,14 @@ namespace VASLogic.Models
             accounts[0].IsEnabledBySetup = "Y".Equals(Util.GetValueOfString(row["Balancing_Enabled"]));
             accounts[1].ConfiguredValidCombination_ID = Util.GetValueOfInt(row["Error_Combination_ID"]);
             accounts[1].IsEnabledBySetup = "Y".Equals(Util.GetValueOfString(row["Error_Enabled"]));
-            accounts[2].ConfiguredValidCombination_ID = Util.GetValueOfInt(row["Rounding_Combination_ID"]);
-            accounts[2].IsEnabledBySetup = "Y".Equals(Util.GetValueOfString(row["Rounding_Enabled"]));
+            accounts[2].ConfiguredValidCombination_ID = Util.GetValueOfInt(row["Currency_Combination_ID"]);
+            accounts[2].IsEnabledBySetup = "Y".Equals(Util.GetValueOfString(row["Currency_Enabled"]));
+            accounts[3].ConfiguredValidCombination_ID = Util.GetValueOfInt(row["Rounding_Combination_ID"]);
+            accounts[3].IsEnabledBySetup = "Y".Equals(Util.GetValueOfString(row["Rounding_Enabled"]));
 
-            /* One query resolves all three combinations - the three settings often point
-               at the same accounting element, and a per-setting join chain would read the
-               same rows three times. */
+            /* One query resolves all four combinations - the settings often point at the
+               same accounting element, and a per-setting join chain would read the same
+               rows four times. */
             ResolveCombinations(ctx, acctSchemaId, accounts);
 
             for (int i = 0; i < accounts.Count; i++)
@@ -654,7 +671,7 @@ namespace VASLogic.Models
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Everything the card shows for one period: the three configured control
+        /// Everything the card shows for one period: the four configured control
         /// accounts, each with its posting count and net balance, and the total that
         /// still has to be cleared.
         /// </summary>

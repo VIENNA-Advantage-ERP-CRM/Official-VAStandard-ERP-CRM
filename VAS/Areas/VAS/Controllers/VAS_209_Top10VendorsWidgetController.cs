@@ -1,4 +1,4 @@
-/************************************************************
+﻿﻿﻿﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Top 10 Vendors Widget (Purchase Order Dashboard - Widget 07)
  * Description    : Ranks top ten vendors by converted Purchase Order line value
@@ -69,7 +69,7 @@ namespace VIS.Controllers
                             o.C_ConversionType_ID,
                             o.AD_Client_ID,
                             o.AD_Org_ID,
-                            SUM(COALESCE(ol.LineNetAmt, 0)) AS po_value_document_currency,
+                            SUM(" + NetOfTaxLineAmount() + @") AS po_value_document_currency,
                             SUM(COALESCE(ol.QtyOrdered, 0)) AS ordered_qty,
                             SUM(COALESCE(ol.QtyDelivered, 0)) AS delivered_qty
                         FROM C_Order o
@@ -296,7 +296,7 @@ namespace VIS.Controllers
                         bp.Name AS VendorName,
                         wh.Name AS WarehouseName,
                         usr.Name AS SalesRepName,
-                        SUM(COALESCE(ol.LineNetAmt, 0)) AS PoValueDoc,
+                        SUM(" + NetOfTaxLineAmount() + @") AS PoValueDoc,
                         SUM(COALESCE(ol.QtyOrdered, 0)) AS OrderedQty,
                         SUM(COALESCE(ol.QtyDelivered, 0)) AS DeliveredQty,
                         COUNT(ol.C_OrderLine_ID) AS LineCount,
@@ -313,8 +313,7 @@ namespace VIS.Controllers
                     INNER JOIN C_BPartner bp ON bp.C_BPartner_ID = o.C_BPartner_ID
                     LEFT JOIN M_Warehouse wh ON wh.M_Warehouse_ID = o.M_Warehouse_ID
                     LEFT JOIN AD_User usr ON usr.AD_User_ID = o.SalesRep_ID
-                    LEFT JOIN C_OrderLine ol ON ol.C_Order_ID = o.C_Order_ID AND ol.IsActive = 'Y'
-                    WHERE o.AD_Client_ID = @ClientID
+                    LEFT JOIN C_OrderLine ol ON ol.C_Order_ID = o.C_Order_ID AND ol.IsActive = 'Y'                    WHERE o.AD_Client_ID = @ClientID
                       AND o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
@@ -543,16 +542,33 @@ namespace VIS.Controllers
                     SELECT
                         ol.C_OrderLine_ID,
                         ol.Line,
-                        p.Value AS ProductCode,
-                        p.Name AS ProductName,
-                        asi.Description AS AttributeDesc,
+                        COALESCE(p.Value, N'') AS ProductCode,
+                        -- A charge line, or a product that is not of Item type, carries no
+                        -- stock movement: the widget shows its name, UOM, ordered, rate and
+                        -- amount, and dashes for received / pending / line status.
+                        CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0
+                             THEN COALESCE(ch.Name, N'')
+                             ELSE COALESCE(p.Name, N'') END AS ProductName,
+                        CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0 THEN 'Y'
+                             WHEN ol.M_Product_ID IS NOT NULL AND COALESCE(p.ProductType, 'I') <> 'I' THEN 'Y'
+                             ELSE 'N' END AS IsNonStock,
+                        CASE WHEN COALESCE(ol.M_AttributeSetInstance_ID, 0) > 0
+                             THEN COALESCE(asi.Description, N'')
+                             ELSE N'' END AS AttributeDesc,
                         COALESCE(uom.UOMSymbol, uom.Name) AS UomName,
                         COALESCE(ol.QtyOrdered, 0) AS QtyOrdered,
+                        -- QtyEntered is expressed in the line's own C_UOM_ID (the UOM the buyer
+                        -- picked); QtyOrdered / QtyDelivered are in the product's base UOM. The
+                        -- widget shows the selected UOM, so quantities are scaled to it.
+                        COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) AS QtyEntered,
                         COALESCE(ol.QtyDelivered, 0) AS QtyDelivered,
                         COALESCE(ol.PriceActual, 0) AS PriceActual,
-                        COALESCE(ol.LineNetAmt, 0) AS LineNetAmt
+                        " + NetOfTaxLineAmount() + @" AS LineNetAmt
                     FROM C_OrderLine ol
-                    INNER JOIN M_Product p ON p.M_Product_ID = ol.M_Product_ID
+                    INNER JOIN C_Order o ON o.C_Order_ID = ol.C_Order_ID
+                    -- Charge lines have no M_Product, so this must not be an INNER JOIN.
+                    LEFT JOIN M_Product p ON p.M_Product_ID = ol.M_Product_ID
+                    LEFT JOIN C_Charge ch ON (ch.C_Charge_ID = ol.C_Charge_ID)
                     LEFT JOIN C_UOM uom ON uom.C_UOM_ID = ol.C_UOM_ID
                     LEFT JOIN M_AttributeSetInstance asi ON asi.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID
                     WHERE ol.C_Order_ID = @OrderID
@@ -567,6 +583,15 @@ namespace VIS.Controllers
                     {
                         decimal qtyOrd = Util.GetValueOfDecimal(dr["QtyOrdered"]);
                         decimal qtyDel = Util.GetValueOfDecimal(dr["QtyDelivered"]);
+
+                        // Quantities are shown in the UOM the line was entered in. QtyEntered is in the
+                        // line's own C_UOM_ID; QtyOrdered / QtyDelivered are in the product's base UOM,
+                        // so delivered is scaled by this line's own entered/ordered ratio. Header
+                        // roll-ups above stay in the base UOM - summing mixed UOMs is meaningless.
+                        decimal enteredQtyUom = Util.GetValueOfDecimal(dr["QtyEntered"]);
+                        decimal uomRatio = (qtyOrd != 0) ? (enteredQtyUom / qtyOrd) : 1m;
+                        qtyOrd = enteredQtyUom;
+                        qtyDel = qtyDel * uomRatio;
                         decimal qtyPend = Math.Max(0, qtyOrd - qtyDel);
                         decimal rate = Util.GetValueOfDecimal(dr["PriceActual"]);
                         decimal amount = Util.GetValueOfDecimal(dr["LineNetAmt"]);
@@ -613,6 +638,9 @@ namespace VIS.Controllers
                             pend = qtyPend,
                             rate = rate,
                             amount = amount,
+                            // Charge / non-Item lines are never received - the client renders dashes
+                            // for received, pending and line status.
+                            isNonStock = Util.GetValueOfString(dr["IsNonStock"]) == "Y",
                             statusText = lineStatus,
                             statusChip = lineChip
                         });
@@ -658,6 +686,45 @@ namespace VIS.Controllers
         }
 
         #region Helpers
+
+        /// <summary>
+        /// PO line amount without taxes. When the order is tax-inclusive (C_Order.IsTaxIncluded - the order's own
+        /// flag decides, not the price list's) LineNetAmt already contains the line tax and surcharge tax, so those
+        /// are taken off; otherwise LineNetAmt is already net of tax. Expects the line as "ol" and the order as "o".
+        /// </summary>
+        private static string NetOfTaxLineAmount()
+        {
+            string surcharge = HasColumn("C_OrderLine", "SurchargeAmt") ? " - COALESCE(ol.SurchargeAmt, 0)" : "";
+            return "CASE WHEN o.IsTaxIncluded = 'Y' THEN COALESCE(ol.LineNetAmt, 0) - COALESCE(ol.TaxAmt, 0)" + surcharge
+                + " ELSE COALESCE(ol.LineNetAmt, 0) END";
+        }
+
+        private static bool HasColumn(string tableName, string columnName)
+        {
+            string sql;
+            if (DB.IsPostgreSQL())
+            {
+                sql = @"
+                    SELECT COUNT(1)
+                    FROM information_schema.columns
+                    WHERE UPPER(table_name)=UPPER(@TableName)
+                      AND UPPER(column_name)=UPPER(@ColumnName)";
+            }
+            else
+            {
+                sql = @"
+                    SELECT COUNT(1)
+                    FROM USER_TAB_COLUMNS
+                    WHERE TABLE_NAME=UPPER(@TableName)
+                      AND COLUMN_NAME=UPPER(@ColumnName)";
+            }
+
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql, new SqlParameter[]
+            {
+                new SqlParameter("@TableName", tableName),
+                new SqlParameter("@ColumnName", columnName)
+            }, null)) > 0;
+        }
 
         private class CurrencyInfo
         {

@@ -1,4 +1,4 @@
-/// <summary>
+﻿/// <summary>
 /// Module Name : VASLogic
 /// Purpose     : Purchase Requisition overview tab panel data (read side).
 ///               Returns header identity, requester / preparer, origin +
@@ -408,6 +408,54 @@
 ///                          deployed, and a client carrying the rows without the
 ///                          module passed every ColumnExists and then had no screen
 ///                          to open.
+///   VAI163   2026-08-26  A requisition referencing a BLANKET order was reported as
+///                        an ordinary Sales Order in Generated From. Two causes,
+///                        both fixed:
+///                        - LoadBlanketOrderOrigin gated its three routes on
+///                          ColumnExists and merged them into ONE union. That guard
+///                          answers "absent" for a column the schema really has
+///                          whenever AD_Column lacks the row, and its scalar
+///                          sub-select RAISES where AD_Table carries more than one
+///                          row named C_Order — the catch turns that into the same
+///                          "absent". A single union also meant one bad column took
+///                          down the two routes beside it. Each route is now
+///                          ATTEMPTED in its own statement and remembers its
+///                          usability in a static flag; the first to answer wins,
+///                          so a direct reference to the commitment outranks one
+///                          inferred through a release.
+///                        - RefOrderIsBlanket: the referenced order's own
+///                          C_Order.IsBlanketTrx now travels with it
+///                          (LoadSalesOrderOrigin, attempted the same way), so the
+///                          origin is named Blanket Sales / Purchase Order even
+///                          where none of the routes above can run, and
+///                          RefOrderWindowId points that chip at the blanket screen
+///                          rather than at C_Order's ordinary one. A blanket
+///                          reference is also named FIRST where several orders feed
+///                          the requisition — the strip names one and counts the
+///                          rest, and the standing commitment is the stronger of
+///                          the two origins.
+///   VAI163   2026-09-01  - Unit price is M_RequisitionLine.PriceActual as it
+///                          stands, no longer scaled by UomRatio. PriceActual is
+///                          not a base-unit figure: the platform prices the line
+///                          off its own C_UOM_ID, so it already IS the per-selected
+///                          -unit rate the requisition window shows. Scaling it
+///                          made the panel disagree with that window by the size of
+///                          the pack. Reverses the price half of the 2026-08-12
+///                          restatement below; the QUANTITY half stands.
+///                        - Times were wrong on PostgreSQL — appointments first,
+///                          but every stamp the panel prints had the same defect.
+///                          The DateTimeKind the PROVIDER tags a value with reached
+///                          the JSON: Oracle says Unspecified and Npgsql says Utc
+///                          or Local, Newtonsoft writes a zone designator for the
+///                          latter two and none for the first, and the panel's
+///                          parseDbDate reads the two shapes differently. EVERY
+///                          date and timestamp this model emits now goes through
+///                          Stamp() — the header dates, the create / update and
+///                          posting / completion stamps, the change log's EventOn,
+///                          the chat and mail rows and the reference documents'
+///                          DocDate — as do the shared appointment / task / call /
+///                          letter sources in VAS_ActivitySourcesModel, where the
+///                          helper lives. A no-op on Oracle.
 /// </summary>
 
 using System;
@@ -559,8 +607,8 @@ namespace VASLogic.Models
             d.DocumentNo          = Util.GetValueOfString(r["DocumentNo"]);
             d.StatusCode          = Util.GetValueOfString(r["DocStatus"]);
             d.PriorityCode        = Util.GetValueOfString(r["PriorityRule"]);
-            d.DateDoc             = Util.GetValueOfDateTime(r["DateDoc"]);
-            d.DateRequired        = Util.GetValueOfDateTime(r["DateRequired"]);
+            d.DateDoc             = Stamp(r["DateDoc"]);
+            d.DateRequired        = Stamp(r["DateRequired"]);
             d.Description         = Util.GetValueOfString(r["Description"]);
             d.EstimatedValue      = Util.GetValueOfDecimal(r["TotalLines"]);
             d.Processed           = Util.GetValueOfString(r["Processed"]) == "Y";
@@ -569,8 +617,8 @@ namespace VASLogic.Models
             // and the raw code travels with it so the panel can flag an error.
             d.PostedCode          = Util.GetValueOfString(r["Posted"]);
             d.Posted              = d.PostedCode == "Y";
-            d.Created             = Util.GetValueOfDateTime(r["Created"]);
-            d.Updated             = Util.GetValueOfDateTime(r["Updated"]);
+            d.Created             = Stamp(r["Created"]);
+            d.Updated             = Stamp(r["Updated"]);
             d.RequesterName       = Util.GetValueOfString(r["RequesterName"]);
             d.PreparerName        = Util.GetValueOfString(r["PreparerName"]);
             d.CreatedByName       = Util.GetValueOfString(r["CreatedByName"]);
@@ -582,7 +630,7 @@ namespace VASLogic.Models
             d.ISO_Code            = Util.GetValueOfString(r["ISO_Code"]);
             d.StdPrecision        = Util.GetValueOfInt(r["StdPrecision"]);
             d.ConvertedLineCount  = Util.GetValueOfInt(r["ConvertedLineCount"]);
-            d.SystemDate          = Util.GetValueOfDateTime(r["SystemDate"]);
+            d.SystemDate          = Stamp(r["SystemDate"]);
             return true;
         }
 
@@ -775,8 +823,9 @@ namespace VASLogic.Models
                 //
                 // UomRatio is how many BASE units one SELECTED unit is (12, for a
                 // 12-EA box). Everything the database stores in the base unit —
-                // PriceActual, M_Storage.QtyOnHand, M_InOutLine.MovementQty — is
-                // brought onto the selected scale with it.
+                // M_Storage.QtyOnHand, M_InOutLine.MovementQty — is brought onto
+                // the selected scale with it. NOT the price: PriceActual is already
+                // per selected unit (see where UnitPrice is read below).
                 //
                 // It comes from the product's own UOM CONVERSION, which is the
                 // definition of the rate and is always there to be read. It used to
@@ -803,11 +852,18 @@ namespace VASLogic.Models
                 // unit the row is labelled with.
                 if (ln.RequestedQty == 0) ln.RequestedQty = ln.BaseQty / ln.UomRatio;
 
-                // Price per SELECTED unit. PriceActual is per base unit, and
-                // MRequisitionLine keeps LineNetAmt = Qty x PriceActual, so scaling
-                // by the ratio leaves the line's own total untouched:
-                // QtyEntered x (PriceActual x ratio) = Qty x PriceActual.
-                ln.UnitPrice     = Util.GetValueOfDecimal(r["PriceActual"]) * ln.UomRatio;
+                // The line's unit price is M_RequisitionLine.PriceActual, read as it
+                // stands. It is ALREADY the price per selected unit: the platform
+                // prices the line off its own C_UOM_ID (MRequisitionLine.SetPrice
+                // hands the UOM to the product-pricing engine), so it is the number
+                // the requisition window itself shows in Unit Price.
+                //   It used to be multiplied by UomRatio, on the reading that
+                // PriceActual is a BASE-unit figure. It is not, and the panel then
+                // reported a price the window disagreed with by the size of the pack
+                // — a line keyed in 12-EA boxes showed twelve times the real rate.
+                // UomRatio still scales the QUANTITIES and the stock figures beside
+                // them, which genuinely are stored in the base unit.
+                ln.UnitPrice     = Util.GetValueOfDecimal(r["PriceActual"]);
                 ln.LineAmount    = Util.GetValueOfDecimal(r["LineNetAmt"]);
                 ln.Description   = Util.GetValueOfString(r["LineDescription"]);
                 ln.M_Product_ID  = Util.GetValueOfInt(r["M_Product_ID"]);
@@ -999,7 +1055,7 @@ namespace VASLogic.Models
                     : "1 = 1";
 
                 string sql = @"SELECT rl.M_RequisitionLine_ID,
-                                      NVL(SUM(s.QtyOnHand), 0) AS SourceQtyOnHand
+                                      COALESCE(SUM(s.QtyOnHand), 0) AS SourceQtyOnHand
                                  FROM M_RequisitionLine rl
                                  LEFT OUTER JOIN M_Storage s
                                         ON (s.M_Product_ID = rl.M_Product_ID
@@ -1435,7 +1491,7 @@ namespace VASLogic.Models
                 DataSet ds = DB.ExecuteDataset(sql, ReqParam(M_Requisition_ID), null);
                 if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
                     return null;
-                return Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["PostedDate"]);
+                return Stamp(ds.Tables[0].Rows[0]["PostedDate"]);
             }
             catch (Exception ex)
             {
@@ -1471,7 +1527,7 @@ namespace VASLogic.Models
                 DataSet ds = DB.ExecuteDataset(sql, ReqParam(M_Requisition_ID), null);
                 if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
                     return null;
-                return Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["CompletedDate"]);
+                return Stamp(ds.Tables[0].Rows[0]["CompletedDate"]);
             }
             catch (Exception ex)
             {
@@ -1511,8 +1567,8 @@ namespace VASLogic.Models
                 {
                     orderCount++;
                     string status     = Util.GetValueOfString(r["DocStatus"]);
-                    DateTime? created = Util.GetValueOfDateTime(r["Created"]);
-                    DateTime? updated = Util.GetValueOfDateTime(r["Updated"]);
+                    DateTime? created = Stamp(r["Created"]);
+                    DateTime? updated = Stamp(r["Updated"]);
 
                     // Converted: the earliest linked order's creation.
                     if (!d.ConvertedDate.HasValue ||
@@ -1648,8 +1704,8 @@ namespace VASLogic.Models
 
                 foreach (DataRow r in ds.Tables[0].Rows)
                 {
-                    DateTime? created = Util.GetValueOfDateTime(r["Created"]);
-                    DateTime? updated = Util.GetValueOfDateTime(r["Updated"]);
+                    DateTime? created = Stamp(r["Created"]);
+                    DateTime? updated = Stamp(r["Updated"]);
                     string status     = Util.GetValueOfString(r["DocStatus"]);
 
                     if (created.HasValue &&
@@ -1758,7 +1814,7 @@ namespace VASLogic.Models
         /// entry still resolves.
         ///
         /// "Has an address" is tested against a SPACE, not against ''. Oracle
-        /// stores the empty string as NULL, so NVL(TRIM(x), '') yields NULL and
+        /// stores the empty string as NULL, so COALESCE(TRIM(x), '') yields NULL and
         /// `&lt;&gt; ''` compares against NULL — UNKNOWN for every row, including the
         /// ones that DO carry an address. Comparing to ' ' keeps the fallback
         /// non-null on Oracle, and SQL Server blank-pads the comparison so an
@@ -1783,14 +1839,21 @@ namespace VASLogic.Models
                                       (SELECT t.AD_Table_ID FROM AD_Table t
                                         WHERE UPPER(t.TableName) = 'M_REQUISITION')
                                   AND ma.Record_ID          = @M_Requisition_ID
-                                  AND NVL(ma.IsActive, 'Y') = 'Y'
+                                  AND COALESCE(ma.IsActive, 'Y') = 'Y'
                                   -- Letters ('I') are a kind of their own and are
                                   -- read by LoadSharedSourceActivity; without this
                                   -- they would appear twice, once as an e-mail.
-                                  AND COALESCE(ma.AttachmentType, 'M') <> 'I'
-                                  AND (NVL(TRIM(ma.MailAddress), ' ')    <> ' '
-                                    OR NVL(TRIM(ma.MailAddressCc), ' ')  <> ' '
-                                    OR NVL(TRIM(ma.MailAddressBcc), ' ') <> ' ')
+                                  -- Not COALESCE(TO_CHAR(...)): PostgreSQL has no
+                                  -- single-argument to_char, so that form failed
+                                  -- the whole statement there and the feed showed
+                                  -- no mails. An IS NULL branch needs neither it
+                                  -- nor a COALESCE across character sets, which is
+                                  -- what the TO_CHAR was answering on Oracle.
+                                  AND (ma.AttachmentType IS NULL
+                                    OR TRIM(ma.AttachmentType) <> 'I')
+                                  AND (COALESCE(TRIM(ma.MailAddress), ' ')    <> ' '
+                                    OR COALESCE(TRIM(ma.MailAddressCc), ' ')  <> ' '
+                                    OR COALESCE(TRIM(ma.MailAddressBcc), ' ') <> ' ')
                                 ORDER BY ma.Created DESC";
                 DataSet ds = DB.ExecuteDataset(sql, ReqParam(M_Requisition_ID), null);
                 if (ds == null || ds.Tables.Count == 0) return;
@@ -1812,7 +1875,7 @@ namespace VASLogic.Models
                         MailFrom   = Util.GetValueOfString(r["MailAddressFrom"]),
                         IsMailSent = Util.GetValueOfString(r["IsMailSent"]) == "Y",
                         UserName   = Util.GetValueOfString(r["UserName"]),
-                        Created    = Util.GetValueOfDateTime(r["Created"])
+                        Created    = Stamp(r["Created"])
                     });
                 }
             }
@@ -1908,7 +1971,7 @@ namespace VASLogic.Models
                             Type       = "po",
                             DocumentNo = Util.GetValueOfString(r["DocumentNo"]),
                             UserName   = Util.GetValueOfString(r["UserName"]),
-                            Created    = Util.GetValueOfDateTime(r["Created"])
+                            Created    = Stamp(r["Created"])
                         });
                     }
                 }
@@ -2002,7 +2065,7 @@ namespace VASLogic.Models
                         Type       = "grn",
                         DocumentNo = docNo,
                         UserName   = user,
-                        Created    = Util.GetValueOfDateTime(r["Created"])
+                        Created    = Stamp(r["Created"])
                     });
 
                     // A completed receipt gets its own entry, stamped with the
@@ -2014,7 +2077,7 @@ namespace VASLogic.Models
                             Type       = "grncomplete",
                             DocumentNo = docNo,
                             UserName   = user,
-                            Created    = Util.GetValueOfDateTime(r["Updated"])
+                            Created    = Stamp(r["Updated"])
                         });
                     }
                 }
@@ -2073,7 +2136,7 @@ namespace VASLogic.Models
                                         ON (u.AD_User_ID = cl.CreatedBy)
                                 WHERE cl.Record_ID = @M_Requisition_ID
                                   AND UPPER(adt.TableName) = 'M_REQUISITION'
-                                  AND NVL(cl.IsActive, 'Y') = 'Y'
+                                  AND COALESCE(cl.IsActive, 'Y') = 'Y'
                                 ORDER BY cl.Created DESC";
                 DataSet ds = DB.ExecuteDataset(sql, ReqParam(M_Requisition_ID), null);
                 if (ds != null && ds.Tables.Count > 0)
@@ -2116,7 +2179,7 @@ namespace VASLogic.Models
                                  LEFT OUTER JOIN AD_User u
                                         ON (u.AD_User_ID = cl.CreatedBy)
                                 WHERE UPPER(adt.TableName) = 'M_REQUISITIONLINE'
-                                  AND NVL(cl.IsActive, 'Y') = 'Y'
+                                  AND COALESCE(cl.IsActive, 'Y') = 'Y'
                                   AND l.M_Requisition_ID = @M_Requisition_ID
                                 ORDER BY cl.Created DESC";
                 DataSet ds = DB.ExecuteDataset(sql, ReqParam(M_Requisition_ID), null);
@@ -2151,7 +2214,7 @@ namespace VASLogic.Models
         /// <param name="list">Activity list being populated.</param>
         private void AddChangeRow(DataRow r, string scope, List<ActivityData> list)
         {
-            DateTime? at = Util.GetValueOfDateTime(r["EventOn"]);
+            DateTime? at = Stamp(r["EventOn"]);
             if (!at.HasValue) return;
 
             string field = Util.GetValueOfString(r["FieldLabel"]);
@@ -2238,7 +2301,7 @@ namespace VASLogic.Models
                         Type       = type,
                         DocumentNo = Util.GetValueOfString(r["DocumentNo"]),
                         UserName   = Util.GetValueOfString(r["UserName"]),
-                        Created    = Util.GetValueOfDateTime(r["Created"])
+                        Created    = Stamp(r["Created"])
                     });
                 }
             }
@@ -2293,6 +2356,22 @@ namespace VASLogic.Models
         /// overview panel shares (VAS_ActivitySourcesModel).</summary>
         private readonly VAS_ActivitySourcesModel _activitySources = new VAS_ActivitySourcesModel();
 
+        /// <summary>
+        /// Every date and timestamp this panel hands the client is read through
+        /// here rather than through Util.GetValueOfDateTime directly, so the
+        /// DateTimeKind the PROVIDER tagged the value with cannot reach the JSON.
+        /// Oracle tags Unspecified and Npgsql tags Utc or Local; Newtonsoft writes
+        /// a zone designator for the latter two and none for the first, and the
+        /// panel's parseDbDate reads the two shapes differently — which is why
+        /// times were hours out on PostgreSQL. A no-op for a value that is already
+        /// Unspecified, so the Oracle path is untouched. See
+        /// VAS_ActivitySourcesModel.Stamp for the full account.
+        /// </summary>
+        private static DateTime? Stamp(object value)
+        {
+            return VAS_ActivitySourcesModel.Stamp(value);
+        }
+
         /// <summary>Loads CM_ChatEntry comments logged against the requisition.</summary>
         private void LoadCommentActivity(int M_Requisition_ID, List<ActivityData> list)
         {
@@ -2329,7 +2408,7 @@ namespace VASLogic.Models
                         Type     = "comment",
                         Text     = Util.GetValueOfString(r["CharacterData"]),
                         UserName = Util.GetValueOfString(r["UserName"]),
-                        Created  = Util.GetValueOfDateTime(r["Created"])
+                        Created  = Stamp(r["Created"])
                     });
                 }
             }
@@ -2743,6 +2822,19 @@ namespace VASLogic.Models
                     d.BlanketOrderIsSOTrx ? "VAS_BlanketSalesOrder"
                                           : "VAS_BlanketPurchaseOrder");
             }
+
+            // The referenced order gets the same treatment, but ONLY when it is
+            // itself a blanket. It normally is not, and an ordinary order opens
+            // perfectly well through the client's own lookup — so the id is left at
+            // 0 for one and the blanket screen named for the other. This is the
+            // fallback path: where the blanket loader answered, it has already
+            // claimed the record and cleared this chip.
+            if (d.RefOrderId > 0 && d.RefOrderIsBlanket)
+            {
+                d.RefOrderWindowId = GetWindowId(ctx,
+                    d.RefOrderIsSOTrx ? "VAS_BlanketSalesOrder"
+                                      : "VAS_BlanketPurchaseOrder");
+            }
         }
 
         /// <summary>
@@ -2790,35 +2882,97 @@ namespace VASLogic.Models
         /// opens it in the matching window. Calling a purchase order a sales order
         /// because of where the link happens to point would be worse than saying
         /// nothing.
+        ///
+        /// IsBlanketTrx travels with it too. A requisition raised straight against
+        /// a BLANKET order reaches it through this same reference, and the
+        /// referenced document is then a standing commitment, not an ordinary
+        /// order — so the chip has to say Blanket Sales Order rather than Sales
+        /// Order. <see cref="LoadBlanketOrderOrigin"/> normally claims that record
+        /// for its own chip and clears this one, but it is reached through three
+        /// optional columns and any of them can be absent from a given schema;
+        /// carrying the flag here means the origin is named correctly even when
+        /// none of those routes answers.
         /// </summary>
         private void LoadSalesOrderOrigin(int M_Requisition_ID, RequisitionOverviewData d)
         {
             if (!ColumnExists("M_RequisitionLine", "Ref_OrderLine_ID")) return;
 
+            // The blanket flag is ATTEMPTED, not gated on ColumnExists: that guard
+            // reports "absent" for a column the schema really has whenever the
+            // dictionary lacks the AD_Column row, and its scalar sub-select RAISES
+            // where AD_Table carries more than one row named C_Order — which the
+            // catch turns into the same "absent". Both leave a blanket order
+            // labelled as a plain sales order. A schema that genuinely has no such
+            // column falls back to the flagless read, once, and remembers.
+            if (_orderBlanketFlagUsable != false)
+            {
+                try
+                {
+                    ReadRefOrderOrigin(M_Requisition_ID, d, true);
+                    _orderBlanketFlagUsable = true;
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    _orderBlanketFlagUsable = false;
+                    _log.Severe("LoadSalesOrderOrigin/blanketflag (M_Requisition_ID="
+                                + M_Requisition_ID + "): " + ex.Message);
+                }
+            }
+
             try
             {
-                string sql = @"SELECT DISTINCT o.C_Order_ID, o.DocumentNo, o.IsSOTrx
-                                 FROM M_RequisitionLine rl
-                                INNER JOIN C_OrderLine ol
-                                        ON (ol.C_OrderLine_ID = rl.Ref_OrderLine_ID)
-                                INNER JOIN C_Order o
-                                        ON (o.C_Order_ID = ol.C_Order_ID)
-                                WHERE rl.M_Requisition_ID = @M_Requisition_ID
-                                  AND rl.IsActive = 'Y'
-                                ORDER BY o.DocumentNo";
-                DataSet ds = DB.ExecuteDataset(sql, ReqParam(M_Requisition_ID), null);
-                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
-
-                DataRow r = ds.Tables[0].Rows[0];
-                d.RefOrderId    = Util.GetValueOfInt(r["C_Order_ID"]);
-                d.RefOrderNo    = Util.GetValueOfString(r["DocumentNo"]);
-                d.RefOrderIsSOTrx = Util.GetValueOfString(r["IsSOTrx"]) == "Y";
-                d.RefOrderCount = ds.Tables[0].Rows.Count;
+                ReadRefOrderOrigin(M_Requisition_ID, d, false);
             }
             catch (Exception ex)
             {
                 _log.Severe("LoadSalesOrderOrigin (M_Requisition_ID=" + M_Requisition_ID + "): " + ex.Message);
             }
+        }
+
+        /// <summary>
+        /// Remembers whether C_Order.IsBlanketTrx can be selected against this
+        /// schema, so a database that genuinely lacks it reports the failure once
+        /// rather than on every requisition the panel opens.
+        /// </summary>
+        private static bool? _orderBlanketFlagUsable;
+
+        /// <summary>
+        /// Reads the referenced order itself. Throws rather than swallowing, so the
+        /// caller can tell a missing IsBlanketTrx from an empty result.
+        /// </summary>
+        /// <param name="withBlanketFlag">Select C_Order.IsBlanketTrx; false reads a
+        /// constant 'N' instead, for a schema without the column.</param>
+        private void ReadRefOrderOrigin(int M_Requisition_ID, RequisitionOverviewData d,
+                                        bool withBlanketFlag)
+        {
+            string blanketSel = withBlanketFlag ? "COALESCE(o.IsBlanketTrx, 'N')" : "'N'";
+
+            // Blanket references are named FIRST where several orders feed the
+            // requisition: the strip names the first document and counts the rest,
+            // and a standing commitment is the stronger origin of the two.
+            // The ORDER BY runs on the SELECT alias, not on the expression — under
+            // DISTINCT the sort must come from the select list, and an unqualified
+            // IsBlanketTrx there would read ambiguously against the column itself.
+            string sql = @"SELECT DISTINCT o.C_Order_ID, o.DocumentNo, o.IsSOTrx,
+                                  " + blanketSel + @" AS IS_BLANKET
+                             FROM M_RequisitionLine rl
+                            INNER JOIN C_OrderLine ol
+                                    ON (ol.C_OrderLine_ID = rl.Ref_OrderLine_ID)
+                            INNER JOIN C_Order o
+                                    ON (o.C_Order_ID = ol.C_Order_ID)
+                            WHERE rl.M_Requisition_ID = @M_Requisition_ID
+                              AND rl.IsActive = 'Y'
+                            ORDER BY IS_BLANKET DESC, o.DocumentNo";
+            DataSet ds = DB.ExecuteDataset(sql, ReqParam(M_Requisition_ID), null);
+            if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
+
+            DataRow r = ds.Tables[0].Rows[0];
+            d.RefOrderId       = Util.GetValueOfInt(r["C_Order_ID"]);
+            d.RefOrderNo       = Util.GetValueOfString(r["DocumentNo"]);
+            d.RefOrderIsSOTrx  = Util.GetValueOfString(r["IsSOTrx"]) == "Y";
+            d.RefOrderIsBlanket = Util.GetValueOfString(r["IS_BLANKET"]) == "Y";
+            d.RefOrderCount    = ds.Tables[0].Rows.Count;
         }
 
         /// <summary>
@@ -2844,9 +2998,24 @@ namespace VASLogic.Models
         /// purchase order. Reporting the wrong one would send the reader to a window
         /// that cannot show the record.
         ///
-        /// Every column it rests on is optional and dictionary-guarded — the flag,
-        /// the header link and the line link each enable their own route — so a
-        /// schema carrying none of them simply draws no chip.
+        /// Every column the three routes rest on is optional, and each is ATTEMPTED
+        /// in a statement of its own rather than gated on ColumnExists and merged
+        /// into one UNION. Two faults came out of doing it the other way:
+        ///
+        ///   - The dictionary guard was itself what failed. ColumnExists answers
+        ///     "absent" for a column the schema really has whenever AD_Column lacks
+        ///     the row, and its scalar sub-select RAISES where AD_Table carries more
+        ///     than one row named C_Order, which the catch turns into the same
+        ///     "absent". A requisition raised directly against a blanket then lost
+        ///     route 1 and was labelled a plain sales order.
+        ///   - One UNION meant one failure. A column the dictionary claims but the
+        ///     schema does not have took down the two routes beside it as well, so a
+        ///     blanket reachable by either was reported as no blanket at all.
+        ///
+        /// Each route now remembers its own usability in a static flag, so a schema
+        /// that genuinely lacks a column reports it once rather than per record, and
+        /// the first route to answer wins: a direct reference to the commitment
+        /// outranks one inferred through a release.
         /// </summary>
         /// <param name="M_Requisition_ID">Selected requisition id.</param>
         /// <param name="d">Overview payload being populated.</param>
@@ -2854,74 +3023,105 @@ namespace VASLogic.Models
         {
             if (!ColumnExists("M_RequisitionLine", "Ref_OrderLine_ID")) return;
 
-            bool hasFlag       = ColumnExists("C_Order", "IsBlanketTrx");
-            bool hasHeaderLink = ColumnExists("C_Order", "C_Order_Blanket");
-            bool hasLineLink   = ColumnExists("C_OrderLine", "C_OrderLine_Blanket_ID");
-            if (!hasFlag && !hasHeaderLink && !hasLineLink) return;
+            // The id is inlined rather than bound: the id source is nested inside
+            // the outer statement, and positional binding gives a repeated bind name
+            // a second, unfilled placeholder. It is an int, so nothing can be
+            // injected.
+            string reqId = M_Requisition_ID.ToString();
+            const string REF_JOIN =
+                @"FROM M_RequisitionLine rl
+                 INNER JOIN C_OrderLine ol ON (ol.C_OrderLine_ID = rl.Ref_OrderLine_ID)";
+            string where = @"WHERE rl.M_Requisition_ID = " + reqId + @"
+                               AND rl.IsActive = 'Y'";
 
+            // 1. The referenced order IS the blanket.
+            bool found = TryBlanketRoute(M_Requisition_ID, d, "flag",
+                @"SELECT o.C_Order_ID AS BLANKET_ID " + REF_JOIN + @"
+                   INNER JOIN C_Order o ON (o.C_Order_ID = ol.C_Order_ID)
+                   " + where + @" AND COALESCE(o.IsBlanketTrx, 'N') = 'Y'",
+                ref _blanketFlagRouteUsable);
+
+            // 2. It is a RELEASE of one, per its header.
+            if (!found)
+                found = TryBlanketRoute(M_Requisition_ID, d, "header",
+                    @"SELECT o.C_Order_Blanket AS BLANKET_ID " + REF_JOIN + @"
+                       INNER JOIN C_Order o ON (o.C_Order_ID = ol.C_Order_ID)
+                       " + where + @" AND COALESCE(o.C_Order_Blanket, 0) > 0",
+                    ref _blanketHeaderRouteUsable);
+
+            // 3. Its LINE is a release of one — the route the header misses.
+            if (!found)
+                found = TryBlanketRoute(M_Requisition_ID, d, "line",
+                    @"SELECT bol.C_Order_ID AS BLANKET_ID " + REF_JOIN + @"
+                       INNER JOIN C_OrderLine bol
+                               ON (bol.C_OrderLine_ID = ol.C_OrderLine_Blanket_ID)
+                       " + where + @" AND COALESCE(ol.C_OrderLine_Blanket_ID, 0) > 0",
+                    ref _blanketLineRouteUsable);
+
+            if (!found) return;
+
+            // The plain Order chip stands down when it found this same record —
+            // a requisition raised straight against a blanket reaches it through
+            // Ref_OrderLine_ID, so both loaders land on it and the strip would
+            // carry one document twice, under two different names.
+            if (d.RefOrderId > 0 && d.RefOrderId == d.BlanketOrderId)
+            {
+                d.RefOrderId    = 0;
+                d.RefOrderNo    = "";
+                d.RefOrderCount = 0;
+                d.RefOrderIsBlanket = false;
+            }
+        }
+
+        /// <summary>
+        /// Whether each blanket route can be run against this schema. Null until
+        /// tried, false once its own statement has failed — see
+        /// <see cref="LoadBlanketOrderOrigin"/> for why these are remembered rather
+        /// than asked of the dictionary.
+        /// </summary>
+        private static bool? _blanketFlagRouteUsable;
+        private static bool? _blanketHeaderRouteUsable;
+        private static bool? _blanketLineRouteUsable;
+
+        /// <summary>
+        /// Runs one blanket route and, where it answers, fills the blanket chip's
+        /// fields from the first order it names.
+        /// </summary>
+        /// <param name="routeName">Route label, for the log line only.</param>
+        /// <param name="idSource">SELECT yielding candidate blanket order ids. It
+        /// carries the requisition id as a literal and binds nothing.</param>
+        /// <param name="usable">The route's remembered usability flag.</param>
+        /// <returns>True when this route named a blanket order.</returns>
+        private bool TryBlanketRoute(int M_Requisition_ID, RequisitionOverviewData d,
+                                     string routeName, string idSource, ref bool? usable)
+        {
+            if (usable == false) return false;
             try
             {
-                // The id is inlined rather than bound: each UNION branch below would
-                // otherwise carry the same bind name again, and positional binding
-                // gives a repeated name a second, unfilled placeholder. It is an
-                // int, so nothing can be injected.
-                string reqId = M_Requisition_ID.ToString();
-                const string REF_JOIN =
-                    @"FROM M_RequisitionLine rl
-                     INNER JOIN C_OrderLine ol ON (ol.C_OrderLine_ID = rl.Ref_OrderLine_ID)";
-                string where = @"WHERE rl.M_Requisition_ID = " + reqId + @"
-                                   AND rl.IsActive = 'Y'";
-
-                List<string> sources = new List<string>();
-                if (hasFlag)
-                {
-                    sources.Add(@"SELECT o.C_Order_ID AS BLANKET_ID " + REF_JOIN + @"
-                                   INNER JOIN C_Order o ON (o.C_Order_ID = ol.C_Order_ID)
-                                   " + where + @" AND COALESCE(o.IsBlanketTrx, 'N') = 'Y'");
-                }
-                if (hasHeaderLink)
-                {
-                    sources.Add(@"SELECT o.C_Order_Blanket AS BLANKET_ID " + REF_JOIN + @"
-                                   INNER JOIN C_Order o ON (o.C_Order_ID = ol.C_Order_ID)
-                                   " + where + @" AND COALESCE(o.C_Order_Blanket, 0) > 0");
-                }
-                if (hasLineLink)
-                {
-                    sources.Add(@"SELECT bol.C_Order_ID AS BLANKET_ID " + REF_JOIN + @"
-                                   INNER JOIN C_OrderLine bol
-                                           ON (bol.C_OrderLine_ID = ol.C_OrderLine_Blanket_ID)
-                                   " + where + @" AND COALESCE(ol.C_OrderLine_Blanket_ID, 0) > 0");
-                }
-
                 string sql = @"SELECT bo.C_Order_ID, bo.DocumentNo, bo.IsSOTrx
                                  FROM C_Order bo
                                 WHERE bo.IsActive = 'Y'
-                                  AND bo.C_Order_ID IN ("
-                                 + string.Join(" UNION ", sources.ToArray()) + @")
+                                  AND bo.C_Order_ID IN (" + idSource + @")
                                 ORDER BY bo.DocumentNo";
                 DataSet ds = DB.ExecuteDataset(sql, null, null);
-                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
+                usable = true;
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return false;
 
                 DataRow r = ds.Tables[0].Rows[0];
                 d.BlanketOrderId      = Util.GetValueOfInt(r["C_Order_ID"]);
                 d.BlanketOrderNo      = Util.GetValueOfString(r["DocumentNo"]);
                 d.BlanketOrderIsSOTrx = Util.GetValueOfString(r["IsSOTrx"]) == "Y";
                 d.BlanketOrderCount   = ds.Tables[0].Rows.Count;
-
-                // The plain Order chip stands down when it found this same record —
-                // a requisition raised straight against a blanket reaches it through
-                // Ref_OrderLine_ID, so both loaders land on it and the strip would
-                // carry one document twice, under two different names.
-                if (d.RefOrderId > 0 && d.RefOrderId == d.BlanketOrderId)
-                {
-                    d.RefOrderId    = 0;
-                    d.RefOrderNo    = "";
-                    d.RefOrderCount = 0;
-                }
+                return true;
             }
             catch (Exception ex)
             {
-                _log.Severe("LoadBlanketOrderOrigin (M_Requisition_ID=" + M_Requisition_ID + "): " + ex.Message);
+                // A schema without this route's column simply has no such route.
+                usable = false;
+                _log.Severe("LoadBlanketOrderOrigin/" + routeName + " (M_Requisition_ID="
+                            + M_Requisition_ID + "): " + ex.Message);
+                return false;
             }
         }
 
@@ -3323,7 +3523,7 @@ namespace VASLogic.Models
                         // names the window it opens, so a blanket carries its own.
                         Type       = isBlanket ? "blanket" : "order",
                         DocumentNo = Util.GetValueOfString(r["DocumentNo"]),
-                        DocDate    = Util.GetValueOfDateTime(r["DateOrdered"]),
+                        DocDate    = Stamp(r["DateOrdered"]),
                         DocStatus  = Util.GetValueOfString(r["DocStatus"]),
                         Amount     = Util.GetValueOfDecimal(r["GrandTotal"]),
                         LineCount  = Util.GetValueOfInt(r["LineCount"]),
@@ -3378,7 +3578,7 @@ namespace VASLogic.Models
                     {
                         Type       = "rfq",
                         DocumentNo = Util.GetValueOfString(r["DocumentNo"]),
-                        DocDate    = Util.GetValueOfDateTime(r["DateResponse"]),
+                        DocDate    = Stamp(r["DateResponse"]),
                         DocStatus  = Util.GetValueOfString(r["DocStatus"]),
                         Amount     = hasTotal ? (decimal?)Util.GetValueOfDecimal(r["TotalAmt"]) : null,
                         LineCount  = Util.GetValueOfInt(r["LineCount"]),
@@ -3429,7 +3629,7 @@ namespace VASLogic.Models
                                       x.MovementDate,
                                       x.DocStatus,
                                       x.LineCount,
-                                      (SELECT NVL(SUM(NVL(ml2.MovementQty, 0) * " + rateExpr + @"), 0)
+                                      (SELECT COALESCE(SUM(COALESCE(ml2.MovementQty, 0) * " + rateExpr + @"), 0)
                                          FROM M_MovementLine ml2
                                         WHERE ml2.M_Movement_ID = x.M_Movement_ID
                                           AND ml2.IsActive      = 'Y') AS MovementValue
@@ -3458,7 +3658,7 @@ namespace VASLogic.Models
                     {
                         Type       = "movement",
                         DocumentNo = Util.GetValueOfString(r["DocumentNo"]),
-                        DocDate    = Util.GetValueOfDateTime(r["MovementDate"]),
+                        DocDate    = Stamp(r["MovementDate"]),
                         DocStatus  = Util.GetValueOfString(r["DocStatus"]),
                         Amount     = Util.GetValueOfDecimal(r["MovementValue"]),
                         LineCount  = Util.GetValueOfInt(r["LineCount"]),
@@ -3516,7 +3716,7 @@ namespace VASLogic.Models
                                       x.MovementDate,
                                       x.DocStatus,
                                       x.LineCount,
-                                      (SELECT NVL(SUM(NVL(il2.QtyInternalUse, 0) * " + rateExpr + @"), 0)
+                                      (SELECT COALESCE(SUM(COALESCE(il2.QtyInternalUse, 0) * " + rateExpr + @"), 0)
                                          FROM M_InventoryLine il2
                                         INNER JOIN M_Inventory inv2
                                                 ON (inv2.M_Inventory_ID = il2.M_Inventory_ID)
@@ -3549,7 +3749,7 @@ namespace VASLogic.Models
                     {
                         Type       = "internaluse",
                         DocumentNo = Util.GetValueOfString(r["DocumentNo"]),
-                        DocDate    = Util.GetValueOfDateTime(r["MovementDate"]),
+                        DocDate    = Stamp(r["MovementDate"]),
                         DocStatus  = Util.GetValueOfString(r["DocStatus"]),
                         Amount     = Util.GetValueOfDecimal(r["IssueValue"]),
                         LineCount  = Util.GetValueOfInt(r["LineCount"]),
@@ -4031,6 +4231,18 @@ namespace VASLogic.Models
             public string    RefOrderNo      { get; set; }
             public bool      RefOrderIsSOTrx { get; set; }
             public int       RefOrderCount   { get; set; }
+            /// <summary>That referenced order is itself a BLANKET
+            /// (C_Order.IsBlanketTrx) — the chip then names it Blanket Sales /
+            /// Purchase Order rather than calling a standing commitment an ordinary
+            /// order. Normally the blanket loader claims the record and clears this
+            /// chip entirely; the flag is what keeps the naming right on a schema
+            /// where none of its three routes can run.</summary>
+            public bool      RefOrderIsBlanket { get; set; }
+            /// <summary>The window that referenced order opens in, resolved by name
+            /// only, and ONLY when it is a blanket: a blanket does not open in
+            /// C_Order's own window. 0 leaves the client to its normal lookup, which
+            /// is correct for an ordinary order.</summary>
+            public int       RefOrderWindowId  { get; set; }
             // The BLANKET order behind that reference — the standing commitment the
             // requisition draws on, reached either directly or through the release
             // it points at (LoadBlanketOrderOrigin). Its own chip, and its own

@@ -10,6 +10,10 @@ using System;
  * 2  | Upi is cheapest - shift small payments where...   | VAS_033_MessagePaymentMethodWhy
  * 3  | Not Specified                                     | VAS_033_MessageNotSpecified
  * 4  | Session Expired                                   | SessionExpired
+ *
+ * The response also carries the accounting period the figures cover
+ * (periodName / dateFrom / dateTo / periodFilter); the widget renders it as
+ * the header subtitle.
  */
 
 using System.Collections.Generic;
@@ -322,6 +326,11 @@ namespace VAS.Controllers
                             isYTD
                                 ? PeriodFilterYTD
                                 : PeriodFilterMonth,
+
+                        periodName =
+                            dateRange != null
+                                ? dateRange.PeriodName
+                                : string.Empty,
 
                         methods = methods
                     },
@@ -731,6 +740,7 @@ CurrentPeriodSource AS
         Period.C_Year_ID,
         Period.StartDate,
         Period.EndDate,
+        " + GetTextCastSql("Period.Name") + @" AS PeriodName,
         ROW_NUMBER() OVER
         (
             ORDER BY Period.StartDate DESC,Period.C_Period_ID DESC
@@ -756,7 +766,8 @@ CurrentPeriod AS
     SELECT
         CurrentPeriodSource.C_Year_ID,
         CurrentPeriodSource.StartDate,
-        CurrentPeriodSource.EndDate
+        CurrentPeriodSource.EndDate,
+        CurrentPeriodSource.PeriodName
     FROM CurrentPeriodSource CurrentPeriodSource
     WHERE CurrentPeriodSource.PeriodRowNumber=1
 )";
@@ -771,7 +782,8 @@ WITH
 " + currentPeriodSql + @"
 SELECT
     MIN(Period.StartDate) AS DateFrom,
-    MAX(CurrentPeriod.EndDate) AS DateTo
+    MAX(CurrentPeriod.EndDate) AS DateTo,
+    " + GetTextCastSql("NULL") + @" AS PeriodName
 FROM CurrentPeriod CurrentPeriod
 INNER JOIN C_Period Period ON
 (
@@ -788,7 +800,8 @@ WITH
 " + currentPeriodSql + @"
 SELECT
     CurrentPeriod.StartDate AS DateFrom,
-    CurrentPeriod.EndDate AS DateTo
+    CurrentPeriod.EndDate AS DateTo,
+    CurrentPeriod.PeriodName AS PeriodName
 FROM CurrentPeriod CurrentPeriod";
             }
 
@@ -827,7 +840,14 @@ FROM CurrentPeriod CurrentPeriod";
                                 ? Util.GetValueOfDateTime(
                                     dr["DateTo"]
                                 )
-                                : null
+                                : null,
+
+                        PeriodName =
+                            GetString(
+                                dr,
+                                "PeriodName",
+                                string.Empty
+                            )
                     };
                 }
             }
@@ -839,7 +859,8 @@ FROM CurrentPeriod CurrentPeriod";
             return new DateRangeResult
             {
                 DateFrom = null,
-                DateTo = null
+                DateTo = null,
+                PeriodName = string.Empty
             };
         }
 
@@ -1189,6 +1210,12 @@ AND ColumnData.ColumnName=" + ToSqlString(columnName);
             }
 
             public DateTime? DateTo
+            {
+                get;
+                set;
+            }
+
+            public string PeriodName
             {
                 get;
                 set;

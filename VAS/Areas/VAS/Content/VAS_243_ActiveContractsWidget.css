@@ -1,0 +1,147 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_243 Active Contracts — 2x1 KPI tile (Service Contracts dashboard).
+ *
+ * 2026-09-08 — Rebuilt directly against the attached kpi-active-contracts.html
+ * mock's own literal CSS (its `.widget`/`.kpi`/`.kpi-label`/`.kpi-val`/
+ * `.kpi-foot`/`.kpi-sub`/`.delta` rules and `--acc-*` token values), after an
+ * earlier pass that leaned on Design Specs/dashboard-widgets.md's generic "KPI
+ * And Summary Widget" section produced a visible mismatch against the mock
+ * (confirmed by screenshot comparison) - title-style dark label, SemiBold
+ * 1.75em value, and a single folded meta line all read differently from what
+ * the mock actually renders. Matching the mock's real output takes priority
+ * here; the structural shape below is copied from the mock verbatim:
+ *   <div class="card">                          (svc-widget-bg, kpi, space-between)
+ *     <div class="label">Active contracts</div>  (small muted caption)
+ *     <div class="valwrap">                       (plain block - stays close to label's opposite edge)
+ *       <div class="value">197</div>              (large bold success-tinted)
+ *       <div class="foot">                         (margin-top .5em, space-between)
+ *         <span class="sub">...</span> <span class="tag">live</span>
+ *       </div>
+ *     </div>
+ *   </div>
+ * The outer card's `space-between` pushes the label to the top edge and the
+ * valwrap (value+foot, held close together by the foot's own small margin-
+ * top) to the bottom edge - NOT a flat 3-way even split, which is what an
+ * earlier revision got wrong and produced uniformly-spaced tight stacking
+ * instead of "label far above a close-set value+foot block".
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas243-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+}
+
+    .vas243-root,
+    .vas243-root * {
+        box-sizing: border-box;
+    }
+
+/* .svc-widget-bg glass surface, applied directly (this tile is not shared with
+   any other widget's markup, so the utility is inlined here rather than kept
+   as a separate global class). */
+.vas243-card {
+    font-family: Roboto, sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 22px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 0.875em 1em 1em 1em;
+    background: linear-gradient(0deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 1));
+    border: 2px solid #FFFFFF;
+    border-radius: 0.875em;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    color: #102C3F;
+}
+
+.vas243-label {
+    display: flex;
+    align-items: center;
+    gap: 0.375em;
+    font-size: 0.8em;
+    font-weight: 400;
+    color: #748494;                 /* --acc-muted */
+    line-height: 1.2;
+}
+
+.vas243-valwrap {
+    min-width: 0;
+}
+
+.vas243-value {
+    font-size: 2.05em;
+    font-weight: 700;
+    line-height: 1.02;
+    color: #0B6B45;                 /* valClass:'ok' - --acc-successDeep */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas243-card.is-error .vas243-value {
+    color: #94A4B4;
+}
+
+.vas243-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 0.5em;
+    gap: 0.375em;
+}
+
+.vas243-sub {
+    font-size: 0.72em;
+    color: #5F7283;                 /* --acc-sub */
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Informational "live" tag (mock's .delta.flat) - muted, semi-bold text, no
+   chip/pill background. */
+.vas243-tag {
+    flex-shrink: 0;
+    font-size: 0.72em;
+    font-weight: 600;
+    color: #748494;                 /* --acc-muted, matches .delta.flat */
+    white-space: nowrap;
+}
+
+/* ── Loading skeleton: the shape of the tile it is replacing, never the
+   previous figures dimmed (those would read as live data while a request is
+   in flight). ────────────────────────────────────────────────────────── */
+.vas243-skel-value,
+.vas243-skel-sub {
+    display: inline-block;
+    border-radius: 6px;
+    background: #E6EBF1;
+    color: transparent !important;
+    animation: vas243-pulse 1.2s ease-in-out infinite;
+}
+
+.vas243-skel-value {
+    width: 3.5em;
+    height: 1.4em;
+}
+
+.vas243-skel-sub {
+    width: 7em;
+    height: 0.75em;
+}
+
+@keyframes vas243-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .vas243-skel-value,
+    .vas243-skel-sub {
+        animation: none;
+    }
+}

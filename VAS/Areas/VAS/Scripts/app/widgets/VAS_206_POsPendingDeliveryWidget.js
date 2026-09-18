@@ -1,4 +1,4 @@
-/**
+﻿/**
  * VAS_206_POsPendingDeliveryWidget
  * Purchase Order Dashboard — Widget 04: POs Pending Delivery
  * Widget size: 3 columns x 1 row (3x1 Warning KPI card).
@@ -142,7 +142,6 @@
         return sym ? (sym + ' ' + formatted) : formatted;
     }
 
-    var ICON_OPEN_CUE = '<svg class="vas-206-opencue" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>';
     var ICON_LINES = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>';
     var ICON_BACK = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>';
     var ICON_CLOSE = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
@@ -177,7 +176,9 @@
         var currentModalCfg = null;
         var MT = {};
         var MT_SEQ = 0;
-        var MAX_ROWS = 10;
+        // Rows per page in the modal table. The stylesheet sizes the table body to
+        // exactly this many rows (--vas-206-rows), so the two must stay in step.
+        var MAX_ROWS = 6;
 
         function showBusy(show) {
             if (!$busy) { return; }
@@ -212,7 +213,6 @@
 
             $card = $(
                 '<button type="button" class="vas-206-card vas-206-border-warn" aria-label="' + esc(title) + '">' +
-                    ICON_OPEN_CUE +
                     '<div class="vas-206-head">' +
                         '<div class="vas-206-head-txt">' +
                             '<p class="vas-206-title">' + esc(title) + '</p>' +
@@ -315,6 +315,9 @@
            ============================================================ */
         function openPurchaseOrderRecord(orderId) {
             if (!orderId) { return; }
+            // Navigating away must dismiss the popup: the record opens behind it
+            // otherwise, leaving the dialog stranded over the window it just opened.
+            closeModal();
 
             // 1. Fire value changed if tab panel / dashboard router is listening
             try {
@@ -602,29 +605,11 @@
             });
         }
 
-        function fitTable(id) {
-            var t = MT[id];
-            var el = document.getElementById(id);
-            if (!t || !el || t.fixed) { return; }
-
-            var avail = el.clientHeight;
-            if (avail < 40) { return; }
-
-            var head = el.querySelector('.vas-206-mhead');
-            var foot = el.querySelector('.vas-206-mtfoot');
-            var row = el.querySelector('.vas-206-mbody .vas-206-mrow');
-            if (!head || !row) { return; }
-
-            var rowH = row.getBoundingClientRect().height || 30;
-            var used = head.getBoundingClientRect().height + (foot ? foot.getBoundingClientRect().height + 8 : 0);
-            var n = Math.floor((avail - used) / rowH);
-            n = Math.max(2, Math.min(t.max, n));
-
-            if (n !== t.size) {
-                t.size = n;
-                drawTable(id);
-            }
-        }
+        /* Rows per page are fixed and the stylesheet sizes the table body to exactly
+           that many rows, so there is nothing to measure or re-fit. The old body
+           derived the count from a rendered row height, but the rows are sized by
+           the stylesheet, so it was measuring its own output. */
+        function fitTable(id) { return; }
 
         function fitAllTables() {
             Object.keys(MT).forEach(function (id) {
@@ -778,14 +763,14 @@
                         return [
                             String(l.LineNo || (idx + 1)),
                             l.ProductName || l.ProductSKU || '—',
-                            l.Attribute || '—',
+                            l.Attribute || '',
                             l.UOM || '—',
                             formatDecimal(l.OrderedQty),
-                            formatDecimal(l.DeliveredQty),
-                            formatDecimal(l.PendingQty),
+                            nsDash(l, formatDecimal(l.DeliveredQty)),
+                            nsDash(l, formatDecimal(l.PendingQty)),
                             rateFmt,
                             amtFmt,
-                            { chip: chipClass, text: statusTxt }
+                            nsDash(l, null) ? '–' : { chip: chipClass, text: statusTxt }
                         ];
                     });
 
@@ -902,14 +887,14 @@
                                 return [
                                     String(l.LineNo || (idx + 1)),
                                     l.ProductName || l.ProductSKU || '—',
-                                    l.Attribute || '—',
+                                    l.Attribute || '',
                                     l.UOM || '—',
                                     formatDecimal(l.OrderedQty),
-                                    formatDecimal(l.DeliveredQty),
-                                    formatDecimal(l.PendingQty),
+                                    nsDash(l, formatDecimal(l.DeliveredQty)),
+                                    nsDash(l, formatDecimal(l.PendingQty)),
                                     rateFmt,
                                     amtFmt,
-                                    { chip: chipClass, text: statusTxt }
+                                    nsDash(l, null) ? '–' : { chip: chipClass, text: statusTxt }
                                 ];
                             });
 
@@ -990,5 +975,12 @@
         if (this.frame) { this.frame.dispose(); }
         this.frame = null;
     };
+
+
+    /* A charge line, or a product that is not of Item type, is never received:
+       received, pending and line status render as a dash instead of a figure. */
+    function nsDash(l, v) {
+        return (l && (l.IsNonStock || l.isNonStock)) ? '–' : v;
+    }
 
 })(VAS, jQuery);

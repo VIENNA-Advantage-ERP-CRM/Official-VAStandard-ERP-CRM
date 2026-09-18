@@ -12,20 +12,20 @@ namespace VIS.Controllers
 {
     /// <summary>
     /// Module Name : Pending Inspection (Material Receipt / GRN dashboard KPI)
-    /// Purpose     : KPI = COUNT(DISTINCT M_InOutLineConfirm) of vendor-GRN receipt
-    ///               confirmation lines that are flagged for quality check
-    ///               (VA010_QualCheckMArk = 'Y') but whose QA actual value is still
-    ///               empty (no VA010_ShipConfParameters result yet) - i.e. lines
-    ///               still on QA hold / awaiting inspection. Read-only.
-    ///               MRole is applied to the primary fetched table
-    ///               (M_InOutLineConfirm); the other tables are join/filter only.
+    /// Purpose     : KPI = COUNT(DISTINCT M_InOutLine) of vendor-GRN lines awaiting inspection:
+    ///               the GRN document type has IsShipConfirm = 'Y', the GRN is In Progress,
+    ///               a receipt confirmation exists for it, and its confirmation line carries a
+    ///               quality parameter (VA010_ShipConfParameters) whose actual value is still
+    ///               empty. Read-only. MRole is applied to the primary fetched table
+    ///               (M_InOutLine); the other tables are join/filter only.
     /// Chronological development:
     ///   &lt;EmpCode&gt;   2026-06-18 Created
+    ///   2026-09-15 Criteria aligned with QA sheet GRN #2 (In Progress ship-confirm GRNs, parameter records only)
     /// </summary>
     public class VAS_084_PendingInspectionWidgetController : Controller
     {
         /// <summary>
-        /// KPI tile data: count of GRN confirmation lines awaiting QA inspection.
+        /// KPI tile data: count of GRN lines awaiting QA inspection.
         /// </summary>
         /// <returns>JSON { pendingInspection }.</returns>
         [AjaxAuthorizeAttribute]
@@ -46,33 +46,39 @@ namespace VIS.Controllers
             string confirmTable = GetQATableName("M_InOutConfirm");
             string inOutLineTable = GetQATableName("M_InOutLine");
             string inOutTable = GetQATableName("M_InOut");
+            string docTypeTable = GetQATableName("C_DocType");
             string qaTable = GetQATableName("VA010_ShipConfParameters");
 
+            /* A confirmation line without any quality parameter record is not pending
+               inspection, so the parameter table is an INNER JOIN (it was a LEFT JOIN,
+               which counted every such line as "actual value empty"). */
             string sql = @"
-                SELECT COUNT(DISTINCT LineConfirm.M_InOutLineConfirm_ID) AS Pending_Inspection_Count
-                FROM " + lineConfirmTable + @" LineConfirm
-                INNER JOIN " + confirmTable + @" Confirm ON (Confirm.M_InOutConfirm_ID=LineConfirm.M_InOutConfirm_ID)
-                INNER JOIN " + inOutLineTable + @" InOutLine ON (InOutLine.M_InOutLine_ID=LineConfirm.M_InOutLine_ID)
+                SELECT COUNT(DISTINCT InOutLine.M_InOutLine_ID) AS Pending_Inspection_Count
+                FROM " + inOutLineTable + @" InOutLine
                 INNER JOIN " + inOutTable + @" InOut ON (InOut.M_InOut_ID=InOutLine.M_InOut_ID)
-                LEFT OUTER JOIN " + qaTable + @" QAParam ON (QAParam.M_InOutLineConfirm_ID=LineConfirm.M_InOutLineConfirm_ID AND QAParam.IsActive='Y')
-                WHERE LineConfirm.IsActive='Y'
-                  AND Confirm.IsActive='Y'
-                  AND InOutLine.IsActive='Y'
+                INNER JOIN " + docTypeTable + @" DocType ON (DocType.C_DocType_ID=InOut.C_DocType_ID)
+                INNER JOIN " + confirmTable + @" Confirm ON (Confirm.M_InOut_ID=InOut.M_InOut_ID)
+                INNER JOIN " + lineConfirmTable + @" LineConfirm ON (LineConfirm.M_InOutConfirm_ID=Confirm.M_InOutConfirm_ID AND LineConfirm.M_InOutLine_ID=InOutLine.M_InOutLine_ID)
+                INNER JOIN " + qaTable + @" QAParam ON (QAParam.M_InOutLineConfirm_ID=LineConfirm.M_InOutLineConfirm_ID)
+                WHERE InOutLine.IsActive='Y'
                   AND InOut.IsActive='Y'
                   AND InOut.IsSOTrx='N'
                   AND InOut.MovementType='V+'
-                  AND LineConfirm.VA010_QualCheckMArk='Y'
-                  AND (QAParam.VA010_ActualValue IS NULL OR QAParam.VA010_ActualValue='')
-                  AND COALESCE(Confirm.Processed,'N')<>'Y'
-                  AND COALESCE(Confirm.DocStatus,'DR') IN ('DR','IP')";
+                  AND InOut.DocStatus='IP'
+                  AND DocType.IsShipConfirm='Y'
+                  AND Confirm.IsActive='Y'
+                  AND LineConfirm.IsActive='Y'
+                  AND QAParam.IsActive='Y'
+                  AND QAParam.VA010_ShipConfParameters_ID IS NOT NULL
+                  AND (QAParam.VA010_ActualValue IS NULL OR QAParam.VA010_ActualValue='')";
 
             /* MRole supplies tenant + organization access. Applied only to the
-               primary fetched table (M_InOutLineConfirm); the joined Confirm /
-               InOutLine / InOut / QAParam tables are filter/comparison sources
+               primary fetched table (M_InOutLine); the joined InOut / DocType /
+               Confirm / LineConfirm / QAParam tables are filter/comparison sources
                (shared Prompt_Instructions CTE/self-join rule). */
             sql = MRole.GetDefault(ctx).AddAccessSQL(
                 sql,
-                "LineConfirm",
+                "InOutLine",
                 MRole.SQL_FULLYQUALIFIED,
                 MRole.SQL_RO
             );

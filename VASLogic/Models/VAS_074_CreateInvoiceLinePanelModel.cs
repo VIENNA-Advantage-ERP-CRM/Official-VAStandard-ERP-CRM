@@ -685,7 +685,7 @@ namespace VASLogic.Models
                                   COALESCE(il.QtyEntered, 0)                AS QtyEntered,
                                   p.Name                          AS ProductName,
                                   p.ProductType                   AS ProductType,
-                                  COALESCE(u.UOMSymbol, u.Name)   AS UomName,
+                                  COALESCE(u.Name, u.UOMSymbol)   AS UomName,
                                   asi.Description                 AS AttrName
                            FROM C_InvoiceLine il
                            LEFT JOIN M_Product p ON (il.M_Product_ID = p.M_Product_ID)
@@ -1000,7 +1000,7 @@ namespace VASLogic.Models
             string sql = "SELECT " + cols.ToString() +
                 @"COALESCE(p.Name, N'') AS VASCILDISP_ProductName,
                   COALESCE(ch.Name, N'') AS VASCILDISP_ChargeName,
-                  COALESCE(uom.UOMSymbol, uom.Name, N'') AS VASCILDISP_UOMName,
+                  COALESCE(uom.Name,uom.UOMSymbol, N'') AS VASCILDISP_UOMName,
                   COALESCE(t.Name, N'') AS VASCILDISP_TaxName,
                   COALESCE(asi.Description, N'') AS VASCILDISP_AttrName,
                   COALESCE(p.M_AttributeSet_ID, 0) AS VASCILDISP_HasAttrSet,
@@ -1017,7 +1017,7 @@ namespace VASLogic.Models
             sql = MRole.GetDefault(ctx).AddAccessSQL(
                 sql, "il", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             if (page < 0) page = 0;
-            sql += " ORDER BY il.Line" + PagingSuffix(LINE_PAGE_SIZE, page * LINE_PAGE_SIZE);
+            sql += " ORDER BY il.Updated DESC" + PagingSuffix(LINE_PAGE_SIZE, page * LINE_PAGE_SIZE);
 
             DataSet ds = DB.ExecuteDataset(sql,
                 new SqlParameter[] { new SqlParameter("@C_Invoice_ID", C_Invoice_ID) }, null);
@@ -1344,13 +1344,15 @@ namespace VASLogic.Models
                                FROM M_Product p
                                WHERE p.IsActive = 'Y'
                                  AND p.AD_Client_ID = " + ctx.GetAD_Client_ID() + @"
-                                 AND (UPPER(p.UPC) = UPPER(@code) OR UPPER(p.Value) = UPPER(@code))";
+                                 AND (UPPER(p.UPC) = UPPER(@codeUpc) OR UPPER(p.Value) = UPPER(@codeValue))";
             string scanProdPred = GetValRulePredicate(ctx, "M_Product_ID", "M_Product", "p", C_Invoice_ID);
             if (scanProdPred.Length > 0) prodSql += " AND (" + scanProdPred + ")";
             prodSql = MRole.GetDefault(ctx).AddAccessSQL(prodSql, "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
+            // Oracle binds by POSITION: the UPC and Value placeholders each need their own
+            // SqlParameter (one "@code" used twice left the second slot unbound -> ORA-01008).
             DataSet ds = DB.ExecuteDataset(prodSql,
-                new SqlParameter[] { new SqlParameter("@code", key) }, null);
+                new SqlParameter[] { new SqlParameter("@codeUpc", key), new SqlParameter("@codeValue", key) }, null);
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
                 DataRow r = ds.Tables[0].Rows[0];
@@ -2011,7 +2013,7 @@ namespace VASLogic.Models
         {
             if (C_UOM_ID <= 0) return "";
             object o = DB.ExecuteScalar(
-                "SELECT COALESCE(UOMSymbol, Name) FROM C_UOM WHERE C_UOM_ID=@id",
+                "SELECT COALESCE(Name, UOMSymbol) FROM C_UOM WHERE C_UOM_ID=@id",
                 new SqlParameter[] { new SqlParameter("@id", C_UOM_ID) }, null);
             return Util.GetValueOfString(o);
         }

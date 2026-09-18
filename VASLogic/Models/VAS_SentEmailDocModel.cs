@@ -7,6 +7,12 @@
  * Class          : VAS_SentEmailDocModel
  * Chronological Development
  * Created Date   : 08-May-2026
+ * VAI163  01-Sep-2026 - Contact lookup now rejects blank and whitespace-only
+ *                       e-mail addresses, not just NULL ones. On Oracle the two
+ *                       are the same thing; on PostgreSQL they are not, so the
+ *                       first contact of a partner could be returned carrying an
+ *                       empty address and the caller was told the partner had
+ *                       none at all.
  ******************************************************/
 using CoreLibrary.DataBase;
 using System;
@@ -174,10 +180,17 @@ namespace VASLogic.Models
                 result.Name = Util.GetValueOfString(DB.ExecuteScalar(sql));
             }
 
+            // IS NOT NULL alone is an ORACLE-ONLY test for "has an address": there an
+            // empty string IS null, on PostgreSQL it is a real value that passes the
+            // test, so the first contact of a partner could come back with a BLANK
+            // e-mail and the caller was told the partner has no address at all.
+            // LENGTH(TRIM(..)) > 0 drops blank and whitespace-only addresses on both
+            // engines (on Oracle TRIM of a blank is null, so the row fails there too).
              sql = @"SELECT EMail, Name FROM AD_User
                                  WHERE C_BPartner_ID = @bpId
                                    AND IsActive = 'Y'
                                    AND EMail IS NOT NULL
+                                   AND LENGTH(TRIM(EMail)) > 0
                                  ORDER BY AD_User_ID";
             SqlParameter[] param = new SqlParameter[1];
             param[0] = new SqlParameter("@bpId", C_BPartner_ID);
@@ -187,9 +200,9 @@ namespace VASLogic.Models
             {
                 if (string.IsNullOrEmpty(result.EMailID))
                 {
-                    result.EMailID = Util.GetValueOfString(ds.Tables[0].Rows[0]["EMail"]);
+                    result.EMailID = Util.GetValueOfString(ds.Tables[0].Rows[0]["EMail"]).Trim();
                 }
-                string userName = Util.GetValueOfString(ds.Tables[0].Rows[0]["Name"]);
+                string userName = Util.GetValueOfString(ds.Tables[0].Rows[0]["Name"]).Trim();
                 if (string.IsNullOrEmpty(result.Name) && !string.IsNullOrEmpty(userName))
                 {
                     result.Name = userName;

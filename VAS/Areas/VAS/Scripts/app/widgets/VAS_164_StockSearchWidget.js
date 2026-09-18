@@ -15,7 +15,7 @@
  *  6  | Category                                         | VAS_164_Category
  *  7  | Unit of Measure                                  | VAS_164_UnitOfMeasure
  *  8  | Total On-Hand Qty                                | VAS_164_TotalOnHandQty
- *  9  | Locator Code                                     | VAS_164_LocatorCode
+ *  9  | Locator                                          | VAS_164_LocatorCode
  * 10  | Warehouse Name                                   | VAS_164_WarehouseName
  * 11  | Qty On Hand                                      | VAS_164_QtyOnHand
  * 12  | Page                                             | VAS_164_Page

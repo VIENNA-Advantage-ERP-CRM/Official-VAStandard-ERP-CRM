@@ -1,4 +1,4 @@
-/**
+﻿/**
  * VAS_205_POCompletedMTDWidget
  * 2x1 KPI Widget & Drill-down modal for Purchase Orders dashboard.
  * Displays count of purchase orders reaching terminal states (Completed / Closed) Month-to-Date.
@@ -65,15 +65,19 @@
         if (window.__vasDashInlineSizeObserver) { return; }
         if (typeof ResizeObserver === 'undefined') { return; }
 
-        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container], .vis-widget-body, body')[0];
         if (!container) { return; }
 
         var write = function () {
-            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+            var w = container.clientWidth || window.innerWidth;
+            if (w > 0) {
+                document.documentElement.style.setProperty('--dash-inline-size', w + 'px');
+            }
         };
 
         window.__vasDashInlineSizeObserver = new ResizeObserver(write);
         window.__vasDashInlineSizeObserver.observe(container);
+        window.addEventListener('resize', write);
         write();
     }
 
@@ -83,8 +87,12 @@
         this.windowNo;
 
         var $self = this;
+        // Single widget root, matching VAS_206 / VAS_207: this element is the container
+        // query context, the type-scale anchor and the ResizeObserver target all at once.
+        // It used to be a container div wrapping a second "root" div, with the anchor on
+        // the card and the observed width written to the inner div - so the measurement
+        // and the element that consumed it were never the same node.
         var $wrapper = $('<div class="vas-w205-container">');
-        var $root = $('<div class="vas-w205-root">');
         var $card = null;
         var $valueEl = null;
         var $metaEl = null;
@@ -151,8 +159,8 @@
                 widgetObserver = new ResizeObserver(function (entries) {
                     for (var i = 0; i < entries.length; i++) {
                         var width = entries[i].contentRect.width;
-                        if (width > 0 && $root[0]) {
-                            $root[0].style.setProperty('--widget-inline-size', width + 'px');
+                        if (width > 0 && $wrapper[0]) {
+                            $wrapper[0].style.setProperty('--widget-inline-size', width + 'px');
                         }
                     }
                 });
@@ -169,19 +177,32 @@
         function createWidget() {
             var title = lbl("VAS_205_POCompletedMTD", "Purchase Orders Completed MTD");
 
+            // Card scaffold shared with VAS_206 / VAS_207: head > head-txt > title, then a
+            // body row holding the left value/meta block. The 3-wide siblings add a
+            // right-hand kpi-side block to the same row; this 2-wide tile has no secondary
+            // stat to show, so the left block takes the whole row.
+            // Every class is scoped to this widget - the previous markup leaned on the
+            // unscoped mock class names (w / c2 / r1 / kpi / border-ok / clickable /
+            // w-title / kpi-val / kpi-meta) plus the shared .vas-widget-bg, whose white
+            // 2px border and 0.875em radius fought the card's own success border.
             $card = $(
-                '<button type="button" class="w c2 r1 kpi border-ok clickable vas-w205-card vas-widget-bg" aria-label="' + escapeHtml(title) + '">' +
-                    '<svg class="vas-w205-opencue" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
-                        '<path d="M7 17 17 7M9 7h8v8"/>' +
-                    '</svg>' +
-                    '<p class="w-title vas-w205-title">' + escapeHtml(title) + '</p>' +
-                    '<p class="kpi-val ok vas-w205-val">—</p>' +
-                    '<p class="kpi-meta vas-w205-meta"></p>' +
+                '<button type="button" class="vas-w205-card vas-w205-border-ok" aria-label="' + escapeHtml(title) + '">' +
+                    '<div class="vas-w205-head">' +
+                        '<div class="vas-w205-head-txt">' +
+                            '<p class="vas-w205-title">' + escapeHtml(title) + '</p>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="vas-w205-body-row">' +
+                        '<div class="vas-w205-left-block">' +
+                            '<p class="vas-w205-kpi-val vas-w205-ok">—</p>' +
+                            '<p class="vas-w205-kpi-meta"></p>' +
+                        '</div>' +
+                    '</div>' +
                 '</button>'
             );
 
-            $valueEl = $card.find('.vas-w205-val');
-            $metaEl = $card.find('.vas-w205-meta');
+            $valueEl = $card.find('.vas-w205-kpi-val');
+            $metaEl = $card.find('.vas-w205-kpi-meta');
 
             $card.on('click', function (e) {
                 e.preventDefault();
@@ -195,12 +216,10 @@
                 }
             });
 
-            $root.append($card);
+            $wrapper.append($card);
 
             $busy = $('<div class="vas-w205-busy vas-w205-hidden"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
-            $root.append($busy);
-
-            $wrapper.append($root);
+            $wrapper.append($busy);
         }
 
         function loadKpi() {
@@ -350,7 +369,7 @@
             $mTitle.text(cfg.title || '');
             $mSub.text(cfg.subtitle || '');
             $mBody.html(cfg.body || '');
-            $mFoot.html(cfg.foot || '<span class="vas-w205-foot-note foot-note"></span><button class="vas-w205-btn btn" data-close="1">' + escapeHtml(lbl("VAS_205_Close", "Close")) + '</button>');
+            $mFoot.html(cfg.foot || '<span class="vas-w205-foot-note foot-note"></span><button class="vas-w205-btn" data-close="1">' + escapeHtml(lbl("VAS_205_Close", "Close")) + '</button>');
 
             $mask.addClass('vas-w205-mask-open open');
 
@@ -381,8 +400,8 @@
         function createModalShell() {
             var shellHtml =
                 '<div class="vas-w205-mask mask" id="vas205-mask" role="dialog" aria-modal="true">' +
-                    '<div class="vas-w205-modal modal" id="vas205-modal">' +
-                        '<div class="vas-w205-modal-header modal-header">' +
+                    '<div class="vas-w205-modal" id="vas205-modal">' +
+                        '<div class="vas-w205-modal-header">' +
                             '<div style="display:flex;align-items:center;gap:8px;min-width:0">' +
                                 '<button type="button" class="vas-w205-xbtn xbtn" id="vas205-mBack" aria-label="' + escapeHtml(lbl("VAS_205_Back", "Back")) + '" style="display:none;">' +
                                     '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
@@ -402,7 +421,7 @@
                                 '</button>' +
                             '</div>' +
                         '</div>' +
-                        '<div class="vas-w205-modal-body modal-body" id="vas205-mBody"></div>' +
+                        '<div class="vas-w205-modal-body" id="vas205-mBody"></div>' +
                         '<div class="vas-w205-modal-foot modal-foot" id="vas205-mFoot"></div>' +
                     '</div>' +
                 '</div>';
@@ -480,8 +499,8 @@
             var footHtml =
                 '<span class="vas-w205-foot-note foot-note" id="vas205-doc-foot-note"></span>' +
                 '<span style="display:flex;align-items:center;gap:8px;">' +
-                    '<span class="vas-w205-pager pager" id="vas205-doc-pager"></span>' +
-                    '<button type="button" class="vas-w205-btn btn" data-close="1">' + escapeHtml(lbl("VAS_205_Close", "Close")) + '</button>' +
+                    '<span class="vas-w205-pager" id="vas205-doc-pager"></span>' +
+                    '<button type="button" class="vas-w205-btn" data-close="1">' + escapeHtml(lbl("VAS_205_Close", "Close")) + '</button>' +
                 '</span>';
 
             openModal({
@@ -697,12 +716,12 @@
                     po.DeliveryText +
                 '</span>' +
                 '<span style="display:flex;align-items:center;gap:8px;">' +
-                    '<span class="vas-w205-pager pager" id="vas205-lines-pager"></span>' +
-                    '<button type="button" class="vas-w205-btn vas-w205-btn-primary btn btn-primary" id="vas205-btn-zoom">' +
+                    '<span class="vas-w205-pager" id="vas205-lines-pager"></span>' +
+                    '<button type="button" class="vas-w205-btn vas-w205-btn-primary btn-primary" id="vas205-btn-zoom">' +
                         escapeHtml(lbl("VAS_205_OpenInWindow", "Open in Window")) +
                     '</button>' +
-                    '<button type="button" class="vas-w205-btn btn" id="vas205-btn-back">' + escapeHtml(lbl("VAS_205_Back", "Back")) + '</button>' +
-                    '<button type="button" class="vas-w205-btn btn" data-close="1">' + escapeHtml(lbl("VAS_205_Close", "Close")) + '</button>' +
+                    '<button type="button" class="vas-w205-btn" id="vas205-btn-back">' + escapeHtml(lbl("VAS_205_Back", "Back")) + '</button>' +
+                    '<button type="button" class="vas-w205-btn" data-close="1">' + escapeHtml(lbl("VAS_205_Close", "Close")) + '</button>' +
                 '</span>';
 
             openModal({
@@ -802,9 +821,9 @@
             var footHtml =
                 '<span class="vas-w205-foot-note foot-note">' + escapeHtml(po.PurchaseOrderNumber + ' · ' + po.VendorName) + '</span>' +
                 '<span style="display:flex;align-items:center;gap:8px;">' +
-                    '<span class="vas-w205-pager pager" id="vas205-lines-pager"></span>' +
-                    '<button type="button" class="vas-w205-btn btn" id="vas205-btn-back">' + escapeHtml(lbl("VAS_205_Back", "Back")) + '</button>' +
-                    '<button type="button" class="vas-w205-btn btn" data-close="1">' + escapeHtml(lbl("VAS_205_Close", "Close")) + '</button>' +
+                    '<span class="vas-w205-pager" id="vas205-lines-pager"></span>' +
+                    '<button type="button" class="vas-w205-btn" id="vas205-btn-back">' + escapeHtml(lbl("VAS_205_Back", "Back")) + '</button>' +
+                    '<button type="button" class="vas-w205-btn" data-close="1">' + escapeHtml(lbl("VAS_205_Close", "Close")) + '</button>' +
                 '</span>';
 
             openModal({
@@ -845,12 +864,12 @@
                         '<span class="vas-w205-cell cell c-std" title="' + escapeHtml(l.Attribute) + '">' + escapeHtml(l.Attribute) + '</span>' +
                         '<span class="vas-w205-cell cell c-std" title="' + escapeHtml(l.UOM) + '">' + escapeHtml(l.UOM) + '</span>' +
                         '<span class="vas-w205-cell cell right c-std" title="' + formatCount(l.QtyOrdered) + '">' + formatCount(l.QtyOrdered) + '</span>' +
-                        '<span class="vas-w205-cell cell right c-std" title="' + formatCount(l.QtyDelivered) + '">' + formatCount(l.QtyDelivered) + '</span>' +
-                        '<span class="vas-w205-cell cell right c-prim" title="' + formatCount(l.QtyPending) + '">' + formatCount(l.QtyPending) + '</span>' +
+                        '<span class="vas-w205-cell cell right c-std" title="' + nsDash(l, formatCount(l.QtyDelivered)) + '">' + nsDash(l, formatCount(l.QtyDelivered)) + '</span>' +
+                        '<span class="vas-w205-cell cell right c-prim" title="' + nsDash(l, formatCount(l.QtyPending)) + '">' + nsDash(l, formatCount(l.QtyPending)) + '</span>' +
                         '<span class="vas-w205-cell cell right c-std" title="' + escapeHtml(rateFormatted) + '">' + escapeHtml(rateFormatted) + '</span>' +
                         '<span class="vas-w205-cell cell right c-emph" title="' + escapeHtml(amtFormatted) + '">' + escapeHtml(amtFormatted) + '</span>' +
-                        '<span class="vas-w205-cell cell" title="' + escapeHtml(l.LineStatus) + '">' +
-                            '<span class="vas-w205-chip chip ' + l.LineStatusChip + '">' + escapeHtml(l.LineStatus) + '</span>' +
+                        '<span class="vas-w205-cell cell" title="' + escapeHtml(nsDash(l, l.LineStatus)) + '">' +
+                            '<span class="vas-w205-chip chip ' + l.LineStatusChip + '">' + escapeHtml(nsDash(l, l.LineStatus)) + '</span>' +
                         '</span>' +
                     '</div>';
             }
@@ -926,7 +945,6 @@
             }
             closeModal();
             $(document).off('keydown.vas205modal');
-            $root.remove();
             $wrapper.remove();
         };
     };
@@ -963,5 +981,12 @@
         }
         this.frame = null;
     };
+
+
+    /* A charge line, or a product that is not of Item type, is never received:
+       received, pending and line status render as a dash instead of a figure. */
+    function nsDash(l, v) {
+        return (l && (l.IsNonStock || l.isNonStock)) ? '–' : v;
+    }
 
 })(VAS, jQuery);

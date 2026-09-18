@@ -358,6 +358,18 @@
  *                          order was finished, never that it had reached the
  *                          vendor. A stage may now carry its own sub-line (meta),
  *                          which holds in every state.
+ *   VAI163   2026-09-15  Order Progress: a closed or voided order (data.DocStatus
+ *                        CL / VO) reads "Closed" / "Voided" under the Completed
+ *                        stage in place of the date or "Pending". New message key
+ *                        VAS_092_StVoided (default "Voided"). The header status
+ *                        pill (statusTone) reports Voided / Closed first too — it
+ *                        was read off the delivery / payment flags alone, so a
+ *                        voided order wore a "Drafted" pill.
+ *   VAI163   2026-09-16  A prepared order (DocStatus IP) wore a "Drafted" pill and
+ *                        read "Pending" under the Completed stage. statusTone
+ *                        reports "In Progress" for IP, and the model now puts an
+ *                        IP order on stage 2 so the Completed stage captions
+ *                        itself "In progress".
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -572,6 +584,7 @@
             VAS_092_StInProgress: "In Progress",
             VAS_092_StCompleted: "Completed",
             VAS_092_StClosed: "Closed",
+            VAS_092_StVoided: "Voided",
             VAS_092_StApproved: "Approved",
             VAS_092_StNotApproved: "Not Approved",
             VAS_092_StInvalid: "Invalid",
@@ -902,6 +915,19 @@
         // Fully received is checked before partial so a completed order never
         // reports "Partially Received".
         function statusTone(d) {
+            // A voided or closed order says so before anything else. The tone
+            // used to be read off the delivery / payment flags alone, so a voided
+            // order — none of whose flags are set — wore a "Drafted" pill beside
+            // a document the window itself marks Voided.
+            if (d.DocStatus === "VO")
+                return { tone: "risk", label: getMsg("VAS_092_StVoided") };
+            if (d.DocStatus === "CL")
+                return { tone: "neutral", label: getMsg("VAS_092_StClosed") };
+            // A prepared order (DocStatus IP) is past draft but not completed:
+            // none of the delivery / payment flags are set yet, so without this
+            // it fell through to "Drafted" while the window said In Progress.
+            if (d.DocStatus === "IP")
+                return { tone: "info", label: getMsg("VAS_092_StInProgress") };
             if (d.IsPaymentDone)
                 return { tone: "success", label: getMsg("VAS_092_PaymentDone") };
             if (d.IsFullyDelivered)
@@ -1011,13 +1037,15 @@
             var cur = (data.ISO_Code || "") + (data.CurSymbol ? " (" + data.CurSymbol + ")" : "");
             if (cur.trim())           $right.append(headerField(getMsg("VAS_092_Currency"), cur));
             if (data.WarehouseName) $right.append(headerField(getMsg("VAS_092_ShipTo"), data.WarehouseName));
-            // Drop Shipment (C_Order.IsDropShip) — always shown, Yes or No: "No"
-            // is as much of an answer as "Yes" here, and the reader is looking at
-            // a Warehouse right above it that a drop-shipped order never reaches.
-            // Reads as the WORD, like every other field in this column, so the
-            // answer needs no glyph to be decoded first.
-            $right.append(headerField(getMsg("VAS_092_DropShipment"),
-                data.IsDropShip ? getMsg("VAS_092_Yes") : getMsg("VAS_092_No")));
+            // Drop Shipment (C_Order.IsDropShip) — shown ONLY when the order IS a
+            // drop shipment. A "No" row said nothing the Warehouse line above it
+            // does not already say, so the field is now an exception flag: its
+            // presence is the message. Reads as the WORD, like every other field
+            // in this column, so the answer needs no glyph to be decoded first.
+            if (data.IsDropShip) {
+                $right.append(headerField(getMsg("VAS_092_DropShipment"),
+                    getMsg("VAS_092_Yes")));
+            }
             //if (data.OrgName) $right.append(headerField(getMsg("VAS_092_BillTo"), data.OrgName));
             if ($right.children().length) $card.append($right);
 
@@ -1353,6 +1381,15 @@
             var withVendorMeta = data.IsEmailSent
                 ? getMsg("VAS_092_EmailSent")
                 : getMsg("VAS_092_Pending");
+            // Some tenants have VAS_092_WithVendor seeded in AD_Message with the
+            // SAME text as VAS_092_Completed, which renders the timeline as two
+            // consecutive "Completed" stages and loses the distinction the stage
+            // exists to draw. A translation that collides with the stage above it
+            // is not a translation — fall back to the built-in wording.
+            var withVendorLabel = getMsg("VAS_092_WithVendor");
+            if (withVendorLabel === getMsg("VAS_092_Completed")) {
+                withVendorLabel = MSG_DEFAULTS.VAS_092_WithVendor;
+            }
             return [
                 // stamp: true marks a date that is a stored TIMESTAMP (UTC, no
                 // zone designator) rather than a document date field, so it is
@@ -1360,7 +1397,7 @@
                 // late in the local evening reports the following UTC day.
                 { key: "VAS_092_Drafted",          done: true,                     active: data.CurrentStage === 1, date: data.Created || data.DateOrdered, stamp: true },
                 { key: "VAS_092_Completed",        done: data.IsCompleted,         active: data.CurrentStage === 2, date: data.OrderCompletedDate || data.DateOrdered },
-                { key: "VAS_092_WithVendor",       done: data.IsWithVendor,        active: data.CurrentStage === 3, date: data.OrderCompletedDate || data.DateOrdered, meta: withVendorMeta },
+                { key: "VAS_092_WithVendor",       label: withVendorLabel, done: data.IsWithVendor, active: data.CurrentStage === 3, date: data.OrderCompletedDate || data.DateOrdered, meta: withVendorMeta },
                 { key: "VAS_092_ExpectedDelivery", done: data.IsExpectedDelivery,  active: data.CurrentStage === 4, date: data.DatePromised, required: true },
                 // The receipt stage dates from when the GRN was CREATED (model
                 // side), which is a stamp — not the movement date it used to
@@ -1408,6 +1445,16 @@
                 // A stage that states its own sub-line (With Vendor) keeps it in
                 // every state — the sentence is the point, not the date.
                 if (s.meta) metaText = s.meta;
+                // A closed or voided order says so under Completed. Closed is a
+                // completed order that was then shut, so the tick stays and the
+                // word replaces the date; voided never completed, so the stage
+                // stays unreached and the word replaces "Pending" / "In Progress"
+                // — either way the reader sees where the document ended rather
+                // than a stage that reads as though the order were still moving.
+                if (s.key === "VAS_092_Completed") {
+                    if (data.DocStatus === "CL") metaText = getMsg("VAS_092_StClosed");
+                    else if (data.DocStatus === "VO") metaText = getMsg("VAS_092_StVoided");
+                }
 
                 $tl.append(stepEntry(i + 1, s.label || getMsg(s.key), metaText, s.done, stateCls));
             }

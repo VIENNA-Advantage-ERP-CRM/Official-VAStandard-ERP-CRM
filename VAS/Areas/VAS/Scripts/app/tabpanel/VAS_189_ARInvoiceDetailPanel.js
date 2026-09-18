@@ -1772,7 +1772,15 @@
             if (+meta.Withholding > 0) {
                 statCard($stats, lbl("VAS_189_Withholding", "Withholding"), fmtAmountCur(meta.Withholding, cur, p), "amber");
             }
-            statCard($stats, lbl("VAS_189_NetReceivable", "Net Receivable"), fmtAmountCur(meta.NetReceivable, cur, p), "green");
+            // Net Receivable is what is STILL open on this invoice (after withholding
+            // and every allocation so far) - the same figure the panel hero shows -
+            // not the invoice's fixed net total. The modal is rebuilt from fresh meta
+            // after each allocation, so this card must move with it; the net total
+            // (NetReceivable) never did. NetOpenAmount is null only when the server
+            // could not resolve it, in which case the net total is the best guess.
+            var netOpen = (meta.NetOpenAmount === null || typeof meta.NetOpenAmount === "undefined")
+                ? (+meta.NetReceivable || 0) : (+meta.NetOpenAmount || 0);
+            statCard($stats, lbl("VAS_189_NetReceivable", "Net Receivable"), fmtAmountCur(netOpen, cur, p), "green");
             statCard($stats, lbl("VAS_189_AvailableToApply", "Available to Apply"), fmtAmountCur(meta.AvailableToApply, cur, p), "green");
             $bodyM.append($stats);
 
@@ -2679,16 +2687,34 @@
             return $f;
         }
 
+        /* Repaints the hosting window's CURRENT record from the database so the
+           header fields the allocation just changed (Paid, VA009 open / paid amount,
+           pay schedule tab) are no longer stale. dataRefresh() re-reads the current
+           row and restores it; dataRefreshAll() would close and re-run the whole
+           query and land the window on another record, so it is only the fallback
+           for a host tab that does not expose dataRefresh. The framework does not
+           re-drive the tab panel from dataRefresh (it calls refreshTabPanelData
+           explicitly where it wants that), so this never double-fetches the panel. */
+        function refreshCurTab() {
+            try {
+                var t = $self.curTab;
+                if (!t) return;
+                if (typeof t.dataRefresh === "function") { t.dataRefresh(); return; }
+                if (typeof t.dataRefreshAll === "function") t.dataRefreshAll();
+            } catch (e) { if (window.console) console.log(e); }
+        }
+
         function closeModal() {
             if (!$scrim) return;
             $scrim.removeClass("open");
             $(document).off("keydown.vas189Modal");
             setTimeout(removeModal, 220);
             // An allocation / receipt was created while the modal was open: reload the
-            // panel so the hero, the schedule table, the allocations and the action
-            // buttons show the new state.
+            // hosting tab's record AND the panel so the window header, the hero, the
+            // schedule table, the allocations and the action buttons show the new state.
             if (panelDirty) {
                 panelDirty = false;
+                refreshCurTab();
                 $self.fetchData($self.record_ID);
             }
         }

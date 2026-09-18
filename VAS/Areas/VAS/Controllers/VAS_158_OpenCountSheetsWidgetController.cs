@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Web.Mvc;
@@ -83,9 +83,9 @@ namespace VAS.Controllers
                                       i.DocumentNo,
                                       w.Name AS WarehouseName,
                                       (SELECT COUNT(DISTINCT il.M_Locator_ID) FROM M_InventoryLine il WHERE il.M_Inventory_ID = i.M_Inventory_ID AND il.IsActive = 'Y') AS LocatorCount,
-                                      (SELECT MAX(loc.Value) FROM M_InventoryLine il JOIN M_Locator loc ON (il.M_Locator_ID = loc.M_Locator_ID) WHERE il.M_Inventory_ID = i.M_Inventory_ID AND il.IsActive = 'Y') AS SingleLocator,
+                                      (SELECT MAX(COALESCE(loc.LocatorCombination, loc.Value)) FROM M_InventoryLine il JOIN M_Locator loc ON (il.M_Locator_ID = loc.M_Locator_ID) WHERE il.M_Inventory_ID = i.M_Inventory_ID AND il.IsActive = 'Y') AS SingleLocator,
                                       (SELECT COUNT(*) FROM M_InventoryLine il WHERE il.M_Inventory_ID = i.M_Inventory_ID AND il.IsActive = 'Y') AS LineCount,
-                                      i.Created,
+                                      i.MovementDate,
                                       i.DocStatus
                                FROM M_Inventory i
                                LEFT JOIN M_Warehouse w ON (i.M_Warehouse_ID = w.M_Warehouse_ID)
@@ -107,10 +107,10 @@ namespace VAS.Controllers
                     }
                     else if (locatorCount > 1)
                     {
-                        locatorStr = Msg.GetMsg(ctx, "VAS_Multiple") ?? "Multiple";
+                        locatorStr = SafeMsg(ctx, "VAS_Multiple", "Multiple");
                     }
 
-                    DateTime? createdDate = Util.GetValueOfDateTime(dr["Created"]);
+                    DateTime? movementDate = Util.GetValueOfDateTime(dr["MovementDate"]);
                     string docStatus = Util.GetValueOfString(dr["DocStatus"]);
 
                     list.Add(new
@@ -120,7 +120,10 @@ namespace VAS.Controllers
                         Warehouse = Util.GetValueOfString(dr["WarehouseName"]),
                         Locator = locatorStr,
                         Lines = Util.GetValueOfInt(dr["LineCount"]),
-                        Started = (createdDate.HasValue && createdDate.Value != DateTime.MinValue) ? createdDate.Value.ToString("dd MMM") : "",
+                        // Was the record's Created timestamp behind a "Started" header. The modal
+                        // now shows the count document's own M_Inventory.MovementDate, in the
+                        // "dd MMM yyyy" format used across these controllers.
+                        MovementDate = (movementDate.HasValue && movementDate.Value != DateTime.MinValue) ? movementDate.Value.ToString("dd MMM yyyy") : "",
                         // Was the hardcoded literal "Draft" for every row - wrong now that three
                         // statuses are returned, and a static literal besides.
                         DocStatus = docStatus,
@@ -152,11 +155,32 @@ namespace VAS.Controllers
         {
             switch (docStatus)
             {
-                case "DR": return Msg.GetMsg(ctx, "Drafted") ?? "Drafted";
-                case "IP": return Msg.GetMsg(ctx, "InProgress") ?? "In Progress";
-                case "WC": return Msg.GetMsg(ctx, "WaitingConfirmation") ?? "Waiting Confirmation";
+                case "DR": return SafeMsg(ctx, "Drafted", "Drafted");
+                case "IP": return SafeMsg(ctx, "InProgress", "In Progress");
+                case "WC": return SafeMsg(ctx, "WaitingConfirmation", "Waiting Confirmation");
                 default: return docStatus;
             }
+        }
+
+        /// <summary>
+        /// Message lookup that actually falls back.
+        ///
+        /// The status chips were rendering literally as "[Drafted]" and "[InProgress]": when the
+        /// AD_Message row does not exist, Msg.GetMsg returns the key wrapped in square brackets -
+        /// it does NOT return null - so the previous "?? fallback" could never fire and the raw
+        /// bracketed key went straight to the UI.
+        ///
+        /// Same helper as ExpectedReceiptsController / ExpectedThisWeekController /
+        /// CustomerPaidMethodController, which all hit this and guard it the same way.
+        /// </summary>
+        private static string SafeMsg(Ctx ctx, string key, string fallback)
+        {
+            string msg = Msg.GetMsg(ctx, key);
+            if (string.IsNullOrEmpty(msg) || (msg.StartsWith("[") && msg.EndsWith("]")))
+            {
+                return fallback;
+            }
+            return msg;
         }
     }
 }

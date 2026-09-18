@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -151,7 +151,18 @@
     <Compile Include="Models\VAS_189_ARInvoiceDetailPanelModel.Recurring.cs" />
     <Compile Include="Models\VAS_074_CreateInvoiceLinePanelModel.cs" />
     <Compile Include="Models\VAS_107_CreateOrderBottomPanelModel.cs" />
+    <Compile Include="Models\VAS_247_MaterialTransferBottomPanelModel.cs" />
+    <Compile Include="Models\VAS_248_DeliveryOrderBottomPanelModel.cs" />
+    <Compile Include="Models\VAS_249_GRNBottomPanelModel.cs" />
+    <Compile Include="Models\VAS_240_RequisitionBottomPanelModel.cs" />
     <Compile Include="Models\VAS_218_CreateOppLinesModel.cs" />
+    <Compile Include="Models\VAS_254_LargestBudgetVarianceModel.cs" />
+    <Compile Include="Models\VAS_252_TopBudgetOverRunsModel.cs" />
+    <Compile Include="Models\VAS_253_UtlizationbyDimensionModel.cs" />
+    <Compile Include="Models\VAS_255_BudgetNearLimitModel.cs" />
+    <Compile Include="Models\VAS_251_BudgetvsActualPeriodModel.cs" />
+    <Compile Include="Models\VAS_256_UnBudgetedActualModel.cs" />
+    <Compile Include="Models\VAS_250_BudgetSummaryModel.cs" />
     <Compile Include="Models\VAS_ActivitySourcesModel.cs" />
     <Compile Include="Models\VAS_ChangeLogValueModel.cs" />
     <Compile Include="Models\VAS_092_OverviewPurchaseOrderModel.cs" />
@@ -162,6 +173,7 @@
     <Compile Include="Models\VAS_190_ProductOverviewRightPanelModel.cs" />
     <Compile Include="Models\VAS_191_APPaymentDetailPanelModel.cs" />
     <Compile Include="Models\VAS_191_APPaymentDetailPanelModel.Actions.cs" />
+    <Compile Include="Models\VAS_291_GLJournalRightPanelModel.cs" />
     <Compile Include="Models\VAS_192_CurrentPeriodModel.cs" />
     <Compile Include="Models\VAS_193_PreviousPeriodModel.cs" />
     <Compile Include="Models\VAS_195_MandatoryChecklistModel.cs" />
@@ -173,6 +185,8 @@
     <Compile Include="Models\VAS_200_BankReconcilationModel.cs" />
     <Compile Include="Models\VAS_201_UnMatchedGRNInvoiceModel.cs" />
     <Compile Include="Models\VAS_202_SuspenseBalancesModel.cs" />
+    <Compile Include="Models\VAS_219_ActiveSetupsModel.cs" />
+    <Compile Include="Models\VAS_220_SchedulesDueModel.cs" />
     <Compile Include="Models\VAS_100_OverviewDOModel.cs" />
     <Compile Include="Models\VAS_101_OverviewInventoryCountModel.cs" />
     <Compile Include="Models\VAS_102_OverviewInternalUseModel.cs" />
@@ -181,6 +195,20 @@
     <Compile Include="Models\VAS_105_AccountRightPanelModel.cs" />
     <Compile Include="Models\VAS_290_ServiceContractRightPanelModel.cs" />
     <Compile Include="Models\VAS_106_OverviewSalesOrderModel.cs" />
+    <Compile Include="Models\VAS_221_RecordGeneratedModel.cs" />
+    <Compile Include="Models\VAS_222_UpcomingSchedulesModel.cs" />
+    <Compile Include="Models\VAS_223_ByDocumentTypeModel.cs" />
+    <Compile Include="Models\VAS_224_RecentlyGeneratedModel.cs" />
+    <Compile Include="Models\VAS_225_SetupsExpiringSoonModel.cs" />
+    <Compile Include="Models\VAS_227_SearchRecurringModel.cs" />
+    <Compile Include="Models\VAS_230_BankBalanceModel.cs" />
+    <Compile Include="Models\VAS_231_NetMovementModel.cs" />
+    <Compile Include="Models\VAS_233_BankChargesModel.cs" />
+    <Compile Include="Models\VAS_234_AccountBalanceModel.cs" />
+    <Compile Include="Models\VAS_235_AgingUnreconciledModel.cs" />
+    <Compile Include="Models\VAS_236_ReceiptvsPaymentModel.cs" />
+    <Compile Include="Models\VAS_238_UnreconciledBankLineModel.cs" />
+    <Compile Include="Models\VAS_239_CurrencyWiseBalanceModel.cs" />
     <Compile Include="Models\VAS_InvoiceOverviewModel.cs" />
     <Compile Include="Models\VAS_PaymentVoucherPanelModel.cs" />
     <Compile Include="Models\VAS_RecentReceiptsModel.cs" />

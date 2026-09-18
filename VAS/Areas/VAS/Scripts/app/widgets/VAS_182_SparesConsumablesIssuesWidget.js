@@ -109,6 +109,9 @@
 // ===== NEW CODE START — currency format (agent A04, 2026-08-19) =====
         var currencyIso = '';
         var currencySymbol = '';
+        // Work-order columns this installation actually has, reported by the KPI endpoint
+        // (they are manufacturing-module only and are absent on some databases).
+        var workOrderColumns = [];
 // ===== NEW CODE END — currency format =====
 
         function label(key, fallback) {
@@ -185,6 +188,7 @@
                 success: function (res) {
                     var data = parseResponse(res);
                     if (data.error) { setError(); return; }
+                    if (data.workOrderColumns) { workOrderColumns = data.workOrderColumns; }
                     renderMetric(data);
                 },
                 error: function () { setError(); },
@@ -272,19 +276,27 @@
         // current month that carry at least one spares / consumables line. The EXISTS predicate
         // mirrors the line-level classification in GetSparesConsumablesPercentageData() one-for-one,
         // so the list can never drift from the percentage on the tile.
-        // Portability: only columns present on every target DB are used here - the work-order
-        // columns (VA075_WorkOrder_ID / VAMFG_M_WorkOrder_ID) are module-specific and absent on
-        // DB 1, and an unresolved column makes the grid query throw instead of opening.
+        // Portability: the work-order columns (VA075_WorkOrder_ID / VAMFG_M_WorkOrder_ID) are
+        // manufacturing-module only and are absent on DB 1, so the controller reports which ones
+        // this installation actually has. With none of them every issue line is spares/consumables
+        // (the production KPI is a hard 0%), so the drill carries no work-order clause at all -
+        // an unresolved column would make the grid query throw instead of opening.
         function openSparesConsumablesList() {
             // Keep in lock-step with GetSparesConsumablesPercentageData in the controller, and the
             // exact complement of the VAS_181 drill-through. The classification is line-level but
             // this drills through at DOCUMENT level, so it is expressed as an EXISTS over the
             // non-work-order issue lines.
+            var woTests = [];
+            for (var w = 0; w < (workOrderColumns || []).length; w++) {
+                woTests.push("COALESCE(il." + workOrderColumns[w] + ", 0) > 0");
+            }
+            var woClause = woTests.length > 0
+                ? " AND EXISTS (SELECT 1 FROM M_InventoryLine il WHERE il.M_Inventory_ID = M_Inventory.M_Inventory_ID"
+                  + " AND il.IsActive = 'Y' AND COALESCE(il.QtyInternalUse, 0) > 0 AND NOT (" + woTests.join(" OR ") + "))"
+                : "";
             var where = "M_Inventory.IsActive = 'Y' AND M_Inventory.DocStatus IN ('CO', 'CL')"
                 + " AND COALESCE(M_Inventory.IsInternalUse, 'N') = 'Y'"
-                + " AND EXISTS (SELECT 1 FROM M_InventoryLine il WHERE il.M_Inventory_ID = M_Inventory.M_Inventory_ID"
-                + " AND il.IsActive = 'Y' AND COALESCE(il.QtyInternalUse, 0) > 0"
-                + " AND COALESCE(il.VA075_WorkOrder_ID, 0) = 0 AND COALESCE(il.VAMFG_M_WorkOrder_ID, 0) = 0)"
+                + woClause
                 + " AND M_Inventory.MovementDate >= TRUNC(SYSDATE, 'MM') AND M_Inventory.MovementDate < ADD_MONTHS(TRUNC(SYSDATE, 'MM'), 1)";
             $self.widgetFirevalueChanged({
                 "TabWhereClause": where,

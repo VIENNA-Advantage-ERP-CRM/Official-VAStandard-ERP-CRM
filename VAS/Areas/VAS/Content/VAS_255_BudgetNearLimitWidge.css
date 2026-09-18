@@ -1,0 +1,579 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_255_BudgetNearLimitWidge.css
+ * Budgets Near Limit (Budgeting dashboard, 3x2 paginated grid).
+ *
+ * TWO SOURCES, EACH FOR WHAT IT OWNS.
+ *   design.md -> dashboard-widgets.md owns the SHELL and the GRID: the glass card, the
+ *   icon well, the title / subtitle clamps, the header pill tier, §Grid Data Rows (header
+ *   row #C5D2DD, body divider #E2EAF1), the §Widget Footer Pager (border-top #D9E2EB),
+ *   §No Inner Scrollbars and the widget-root em anchor. That is what makes this card sit
+ *   correctly beside its Budgeting siblings.
+ *   The widget specification owns the FOUR COLUMNS and the Used tone tier.
+ *
+ * All internal sizing is em-driven off the widget root anchor; borders, radii and shadows
+ * stay in px ("Not Scaled With em"). No native tag selector is styled - every rule is
+ * scoped to a vas-255- class.
+ *
+ * THE SCALE LIVES ON THE CELLS, NEVER ON THE ROW. The row sizes its tracks in em, and an
+ * em resolves against the element's OWN font-size; a font-size on the row would compute
+ * the header's columns at a different width from the body's and every label would sit
+ * over the wrong column. .vas-255-row therefore carries the grid and nothing else.
+ *
+ * ALL THREE DIVIDER TONES ARE IN USE HERE, unlike the two-column sibling cards: #C5D2DD
+ * under the column header, #E2EAF1 between rows, #D9E2EB above the footer. One tone
+ * everywhere flattens a grid.
+ *
+ * THE TONE IS NEVER THE ONLY SIGNAL. .vas-255-risk colours the Used cell from 90%, but
+ * the percentage is printed in every row, so the reading survives print, a distance and a
+ * colour-blind reader.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas-255-root {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    box-sizing: border-box;
+    /* Named query container so the row layout and the base font can both step with the
+       CELL, not the viewport. Also the positioning context for the busy overlay. */
+    container: vas-255 / inline-size;
+}
+
+    .vas-255-root,
+    .vas-255-root * {
+        box-sizing: border-box;
+    }
+
+/* Widget root anchor: clamp(16px, 1.2cqi, 20px) expressed against the widget's own
+   measured width when available, falling back to the shared --dash-inline-size contract
+   and finally to the viewport. Everything inside is em against this.
+
+   Width only - the page size is MEASURED from the list height (see syncCapacity in the
+   JS), so a short cell shows fewer rows rather than smaller type. */
+.vas-255-card {
+    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 100vw)) * .012), 20px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: .85em;
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    backdrop-filter: blur(10px);
+    /* §No Inner Scrollbars - a page always fits, so nothing here ever scrolls. */
+    overflow: hidden;
+    font-variant-numeric: tabular-nums;
+}
+
+/* The form-control reset. Without it every em inside a button resolves against the
+   user-agent default (~13.33px), not the widget anchor. */
+.vas-255-card button {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    color: inherit;
+}
+
+/* ---- Header: icon well + title/subtitle + financial year filter ---- */
+
+/* Header -> body gap is 0.75em per the design contract. */
+.vas-255-header {
+    display: flex;
+    align-items: flex-start;
+    gap: .625em;
+    min-width: 0;
+    flex: 0 0 auto;
+    margin-bottom: .75em;
+}
+
+/* Icon well: 1.75em on the card's em lever - the sibling widgets' well, so the icons read
+   identically side by side. Flat #EAF8FF tile, 9px radius, no inset ring. */
+.vas-255-icon {
+    width: 1.75em;
+    height: 1.75em;
+    flex: 0 0 auto;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #EAF8FF;
+    color: #0083DA;
+}
+
+    .vas-255-icon svg {
+        width: .95em;
+        height: .95em;
+        display: block;
+    }
+
+.vas-255-head-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+/* §Widget Header title verbatim: the --dash-inline-size clamp, Medium (500), line-height
+   1.2, #102C3F - the sibling cards' title, so the headings match on a shared row. */
+.vas-255-title {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .011375), 17px);
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Subtitle: the §Widget Header pattern verbatim - Roboto Regular, #717182, line-height
+   1.3, FIXED 2px top margin. It carries the count and the threshold, so in a 3-column
+   cell sharing its header row with the year pill it WILL truncate; the full sentence is
+   on the element's title attribute, so nothing is lost. */
+.vas-255-subtitle {
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .009625), 13px);
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.3;
+    margin-top: 2px;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-255-subtitle:empty {
+    display: none;
+}
+
+/* Financial year filter - the interactive pill tier of the two-tier chip system (never a
+   third tier). Absolute clamp rather than an em, like the title: the card base drops in a
+   narrow cell and an em control would follow it down and stop being readable.
+
+   IDENTICAL TO .vas-252-year / .vas-254-year / .vas-256-year, deliberately and to the
+   value. These cards sit on the same Budgeting dashboard carrying the same control with
+   the same short label ("FY 2026", sometimes just "2026"), and year pills of different
+   widths or heights on one screen read as a mistake however defensible each is on its
+   own. If one of them is retuned, retune the others in the same pass. */
+.vas-255-year {
+    flex: 0 0 auto;
+    align-self: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-evenly;
+    gap: .35em;
+    min-width: 6.5em;
+    max-width: 42%;
+    font-family: inherit;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * .008125), 13px);
+    font-weight: 500;
+    line-height: 1.15;
+    color: #41576A;
+    background: rgba(255, 255, 255, .66);
+    border: 1px solid #D9E2EB;
+    border-radius: 999px;
+    padding: .15em 1em;
+    box-shadow: 0 4px 10px rgba(16, 47, 74, .05);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+    .vas-255-year:hover {
+        background: #FFFFFF;
+        border-color: #BFE4FF;
+    }
+
+    .vas-255-year:focus-visible {
+        outline: 2px solid #BFE4FF;
+        outline-offset: 1px;
+    }
+
+    .vas-255-year svg {
+        flex: 0 0 auto;
+        color: #0083DA;
+    }
+
+/* min-width:0 is what actually makes the ellipsis work. A flex item defaults to
+   min-width:auto and refuses to shrink below its content, so without this the label would
+   push past the pill's max-width and squeeze the chevron instead of clipping itself. */
+.vas-255-year-label {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---- Body ---- */
+.vas-255-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* THE shared row grid - header and body rows both. Account takes the room; the three
+   figure columns are narrow and equal, with Used narrowest of all: it is two or three
+   characters and pinning it wide would steal width from the account names. */
+.vas-255-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, .7fr);
+    gap: .625em;
+    align-items: center;
+}
+
+/* §Grid Data Rows header: 0.6875em Medium, TRANSPARENT background (never a tinted band -
+   it reads inconsistently against different glass gradients), #41576A, with a #C5D2DD
+   divider under it. The horizontal padding must match the body row's for the tracks to
+   line up. */
+.vas-255-ghead {
+    flex: 0 0 auto;
+    background: transparent;
+    padding: 0 .125em .5em .125em;
+    border-bottom: 1px solid #C5D2DD;
+}
+
+    .vas-255-ghead > span {
+        font-size: .6875em;
+        font-weight: 500;
+        color: #41576A;
+        line-height: 1.25;
+        text-transform: capitalize;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+/* The list holds exactly ONE page and never scrolls - the page size is measured from this
+   element's height (see syncCapacity in the JS), so overflow:hidden here is what makes the
+   measurement meaningful rather than a fallback. */
+.vas-255-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* §Grid Data Rows body row: 0.625em vertical padding, 1px #E2EAF1 divider, none on the
+   last. No font-size - see the file header. */
+.vas-255-brow {
+    padding: .625em .125em;
+    border-bottom: 1px solid #E2EAF1;
+    color: #102C3F;
+}
+
+    .vas-255-brow:last-child {
+        border-bottom: 0;
+    }
+
+    /* A hover tint, but no cursor change and no focus ring: this card has NO drill-down, so
+       the row must not read as activatable. The tint is only there to help the eye track a
+       row across four columns to its figures. */
+    .vas-255-brow:hover {
+        background: rgba(234, 248, 255, .45);
+    }
+
+/* §Body cell: 0.75em. The scale lives here, on the cells, never on the row. */
+.vas-255-brow > span {
+    font-size: .75em;
+    line-height: 1.4;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The account is the row's identity, so it carries the row's weight. */
+.vas-255-account {
+    font-weight:400;
+    color: #102C3F;
+}
+
+.vas-255-num {
+    text-align: right;
+}
+
+/* Budget and Actual are the two figures the ratio is derived from - stated plainly, at
+   Regular, so they support the conclusion rather than competing with it. */
+.vas-255-fig {
+    font-weight: 400;
+    color: #102C3F;
+}
+
+/* Used is the row's conclusion: the same tier as the figures beside it, but Medium, so
+   the eye lands on it without the column shouting. Under 90% it is simply a fact. */
+.vas-255-used {
+    font-weight: 500;
+    color: #102C3F;
+}
+
+/* From 90% the remaining room stops being comfortable. The printed percentage says the
+   same thing, so the tone is never the only signal - and nothing here is an overrun,
+   which is a different card entirely (VAS_252). */
+.vas-255-risk {
+    color: #A33F3F;
+}
+
+/* A missing value. Quiet enough that a gap never competes with the figures beside it, and
+   normal weight even in the columns that are Medium: the dash is not the row's identity or
+   its conclusion, it is the absence of one. Declared after the tone rules above so it wins
+   on source order at equal specificity. */
+.vas-255-nil {
+    color: #9AA7B4;
+    font-weight: 400;
+}
+
+/* Nothing near the limit is GOOD news, not an error - it is said inside the list and the
+   header keeps its title, subtitle and column labels. Only a load failure or a missing
+   configuration takes the whole card over (.vas-255-state below). */
+.vas-255-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 0 1em;
+    font-size: .75em;
+    color: #5F7283;
+    text-align: center;
+    line-height: 1.35;
+}
+
+/* ---- Footer pager (design.md §Widget Footer Pager) ----
+   Reserve the pager's height even on a single page so the list's measured height is
+   constant whether or not the pager is shown - otherwise the adaptive row-fit would
+   re-clip every time the pager appeared. The pager itself still hides on one page, which
+   is what makes it appear ONLY when the data overflows the body. */
+.vas-255-pagerwrap {
+    flex-shrink: 0;
+    min-height: 2.5em;
+}
+
+/* Body -> footer gap 0.625em, border-top 1px #D9E2EB, padding-top 0.5em. */
+.vas-255-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75em;
+    margin-top: .625em;
+    padding-top: .5em;
+    border-top: 1px solid #D9E2EB;
+}
+
+.vas-255-pager-info {
+    font-size: .6875em;
+    color: #748494;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.vas-255-pager-nav {
+    display: flex;
+    align-items: center;
+    gap: .35em;
+    flex-shrink: 0;
+}
+
+.vas-255-pager-label {
+    font-size: .75em;
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.vas-255-pgbtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5em;
+    height: 1.5em;
+    padding: 0;
+    border: 1px solid #D9E2EB;
+    border-radius: 6px;
+    background: #FFFFFF;
+    color: #0083DA;
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+}
+
+    .vas-255-pgbtn:hover:not(:disabled) {
+        background: #EAF4FC;
+        border-color: #C6D6E4;
+    }
+
+    /* A disabled control is visibly inert as well as programmatically disabled - it keeps its
+       box and reports its state, it is never hidden. */
+    .vas-255-pgbtn:disabled {
+        color: #B8C6D2;
+        border-color: #E2EAF1;
+        cursor: default;
+    }
+
+    .vas-255-pgbtn:focus-visible {
+        outline: 2px solid #BFE4FF;
+        outline-offset: 2px;
+    }
+
+/* ---- State takeover: a load failure or a missing configuration ---- */
+.vas-255-state {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 1em;
+    font-size: .8125em;
+    font-weight: 400;
+    color: #5F7283;
+    line-height: 1.35;
+    text-align: center;
+}
+
+.vas-255-hidden {
+    display: none !important;
+}
+
+/* ---- Financial year picker (body-mounted, so NOT scoped under .vas-255-root) ----
+   Fixed-position panel anchored to the pill by script. rem-based, not em: it lives on
+   <body> and has no widget root anchor to scale against. Identical in shape to the sibling
+   cards' popovers. */
+.vas-255-pp {
+    position: fixed;
+    /* Same narrow band the sibling popovers use: above the glass cards, below every
+       framework layer (jQuery UI .ui-front = 100, dialogs 101+). */
+    z-index: 95;
+    box-sizing: border-box;
+    min-width: 200px;
+    max-width: calc(100vw - 16px);
+    max-height: 60vh;
+    overflow: auto;
+    padding: 6px;
+    background: #FFFFFF;
+    border: 1px solid #E4EDF4;
+    border-radius: 12px;
+    box-shadow: 0 16px 40px rgba(8, 24, 38, .22);
+    color: #102C3F;
+}
+
+    .vas-255-pp * {
+        box-sizing: border-box;
+    }
+
+.vas-255-pp-h {
+    font-size: .6875rem;
+    font-weight: 700;
+    color: #748494;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    padding: 8px 10px 4px;
+}
+
+.vas-255-pp-empty {
+    padding: 8px 10px 10px;
+    font-size: .8125rem;
+    color: #748494;
+}
+
+.vas-255-pp-opt {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: .875rem;
+    color: #102C3F;
+    padding: 9px 10px;
+    border-radius: 8px;
+    text-align: left;
+}
+
+    .vas-255-pp-opt:hover {
+        background: #EAF8FF;
+    }
+
+    .vas-255-pp-opt[aria-selected="true"] {
+        background: #EAF8FF;
+        font-weight: 700;
+        color: #0083DA;
+    }
+
+    .vas-255-pp-opt:focus-visible {
+        outline: 2px solid #BFE4FF;
+        outline-offset: -2px;
+    }
+
+.vas-255-pp-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-255-pp-tick {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    width: 16px;
+    height: 16px;
+    color: #0083DA;
+    opacity: 0;
+}
+
+.vas-255-pp-opt[aria-selected="true"] .vas-255-pp-tick {
+    opacity: 1;
+}
+
+/* ==========================================================
+   RTL
+   The figures are NOT force-flipped: a column of numbers is read against its own edge in
+   both directions, and the grid tracks reverse with the document, so the account keeps the
+   leading edge and the figures the trailing one either way. Only the text alignment of the
+   body-mounted picker needs stating.
+   ========================================================== */
+[dir="rtl"] .vas-255-pp-opt {
+    text-align: right;
+}
+
+/* ==========================================================
+   Narrow cells
+   The Actual column folds first. Budget is what the warning is measured AGAINST and Used
+   is the warning itself, so both stay; actual is recoverable from the two of them and
+   lives in the row tooltip regardless. No horizontal scrollbar is ever introduced.
+   ========================================================== */
+@container vas-255 (max-width: 300px) {
+    .vas-255-row {
+        grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr) minmax(0, .7fr);
+    }
+
+    .vas-255-ghead > span:nth-child(3),
+    .vas-255-brow > span:nth-child(3) {
+        display: none;
+    }
+}
+
+/* ---- Narrow cells: step the card base font down so the em scale follows ----
+ *
+ * The sibling widgets' breakpoints and values. The overrides are ABSOLUTE px, never a
+ * relative `em` - an em override here would resolve against the inherited page font rather
+ * than the clamp and collapse the anchor unpredictably. */
+@container vas-255 (max-width: 300px) {
+    .vas-255-card {
+        font-size: 13px;
+    }
+}
+
+@container vas-255 (max-width: 220px) {
+    .vas-255-card {
+        font-size: 11px;
+    }
+}

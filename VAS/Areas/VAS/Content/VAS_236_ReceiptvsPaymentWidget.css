@@ -1,0 +1,438 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_236_ReceiptvsPaymentWidget.css
+ * Receipts vs Payments Trend (Banking dashboard, 5x2 composite chart).
+ *
+ * TWO SOURCES, EACH FOR WHAT IT OWNS.
+ *   design.md -> dashboard-widgets.md owns the SHELL: the glass card, the icon well,
+ *   the title / subtitle clamps, the header pill, the popover, §Content Fit Budget,
+ *   §No Inner Scrollbars and the widget-root em anchor. That is what makes this card
+ *   sit correctly beside VAS_231 / VAS_233 / VAS_234 / VAS_235 on the same dashboard.
+ *   The widget specification owns the CHART: the legend above the plot, the grid
+ *   rules, and its named series colours -
+ *     receipts #20A464 @ .92     payments #D14545 @ .88
+ *     net line #0083DA @ 2.4px   grid rgba(15,61,97,.08)
+ *   Those are the same tokens the Aging card uses, so a reader learns receipts-green
+ *   and payments-red once for the whole dashboard.
+ *
+ * All internal sizing is em-driven off the widget root anchor; borders, radii and
+ * shadows stay in px ("Not Scaled With em"). No native tag selector is styled -
+ * every rule is scoped to a vas-236- class.
+ *
+ * THE PLOT IS SIZED BY FLEX, NOT BY THIS FILE. The chart is drawn in JS at the plot's
+ * MEASURED pixel size - see drawChart - so the only thing asked of CSS here is to give
+ * that element a box: flex:1 with min-height:0, and an SVG that fills it. There is no
+ * fixed chart height to fight the cell with, and no aspect-ratio stretch to distort
+ * the stroke widths.
+ *
+ * Fit budget (§Content Fit Budget, 1280px laptop floor): a 5x2 cell is ~260px, ~232px
+ * of content after 14px padding. Header ~46px + legend ~18px + axis ~14px + gaps ~10px
+ * = ~88px of furniture, leaving ~144px of plot. That is the case that clips, and it is
+ * why the plot is flex:1 rather than a fixed height.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas-236-root {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    box-sizing: border-box;
+    /* Named query container so the base font can step with the CELL, not the viewport.
+       Also the positioning context for the busy overlay. */
+    container: vas-236 / inline-size;
+}
+
+    .vas-236-root,
+    .vas-236-root * {
+        box-sizing: border-box;
+    }
+
+/* Widget root anchor: clamp(16px, 1.2cqi, 20px) expressed against the widget's own
+   measured width when available, falling back to the shared --dash-inline-size
+   contract and finally to the viewport. Everything inside is em against this.
+
+   Width only - the plot is flex and simply takes whatever height is left, so unlike
+   the fixed-row cards this one has no height budget that the type could break. */
+.vas-236-card {
+    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 100vw)) * .012), 20px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: .85em;
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    backdrop-filter: blur(10px);
+    /* §No Inner Scrollbars - the chart reflows into the cell, it never scrolls. */
+    overflow: hidden;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---- Header: icon well + title/subtitle + period pill ---- */
+.vas-236-header {
+    display: flex;
+    align-items: flex-start;
+    gap: .5em;
+    min-width: 0;
+    flex: 0 0 auto;
+    margin-bottom: .5em;
+}
+
+/* Icon well: 1.75em on the card's em lever - the sibling widgets' well, so the icons
+   read identically side by side. Flat #EAF8FF tile, 9px radius, no inset ring. */
+.vas-236-icon {
+    width: 1.75em;
+    height: 1.75em;
+    flex: 0 0 auto;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #EAF8FF;
+    color: #0083DA;
+}
+
+    .vas-236-icon svg {
+        width: .95em;
+        height: .95em;
+        display: block;
+    }
+
+.vas-236-head-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+/* §Widget Header title verbatim: the --dash-inline-size clamp, Medium (500),
+   line-height 1.2, #102C3F - the sibling cards' title, so the headings match on a
+   shared row. */
+.vas-236-title {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .011375), 17px);
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Subtitle: the §Widget Header pattern verbatim - Roboto Regular, #717182,
+   line-height 1.3, FIXED 2px top margin. It carries the whole range in one line, so
+   the card answers "how much overall" without the reader summing the bars. */
+.vas-236-subtitle {
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .009625), 13px);
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.3;
+    margin-top: 2px;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-236-subtitle:empty {
+    display: none;
+}
+
+/* Period pill - the §Widget Header right-side slot, at the interactive pill tier of
+   the two-tier chip system (never a third tier). Absolute clamp rather than an em,
+   like the title: the card base drops in a short cell and an em control would follow
+   it down and stop being readable. */
+.vas-236-period {
+    flex: 0 0 auto;
+    align-self: center;
+    display: inline-flex;
+    align-items: center;
+    gap: .3em;
+    max-width: 42%;
+    font-family: inherit;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * .008125), 13px);
+    font-weight: 500;
+    line-height: 1.3;
+    color: #41576A;
+    background: rgba(255, 255, 255, .66);
+    border: 1px solid #D9E2EB;
+    border-radius: 999px;
+    padding: .3em .7em;
+    box-shadow: 0 4px 10px rgba(16, 47, 74, .05);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+    .vas-236-period:hover {
+        background: #FFFFFF;
+        border-color: #BFE4FF;
+    }
+
+    .vas-236-period:focus-visible {
+        outline: 2px solid #BFE4FF;
+        outline-offset: 1px;
+    }
+
+    .vas-236-period svg {
+        flex: 0 0 auto;
+        color: #0083DA;
+    }
+
+.vas-236-period-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---- Body: legend, plot, axis ---- */
+.vas-236-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Legend: names the three series ONCE, above the plot, so no bar or marker carries a
+   label of its own. */
+.vas-236-legend {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 1em;
+    margin-bottom: .25em;
+    font-size: .6875em;
+    color: #41576A;
+}
+
+.vas-236-lg {
+    display: inline-flex;
+    align-items: center;
+    gap: .45em;
+    white-space: nowrap;
+}
+
+.vas-236-sw {
+    flex: 0 0 auto;
+    width: .75em;
+    height: .75em;
+    border-radius: 3px;
+}
+
+.vas-236-sw-r {
+    background: #20A464;
+}
+
+.vas-236-sw-p {
+    background: #D14545;
+}
+
+/* The net swatch is a RULE, not a square - it stands for a line on the chart, and a
+   square would suggest a third bar series. */
+.vas-236-sw-n {
+    width: 1em;
+    height: 3px;
+    border-radius: 2px;
+    background: #0083DA;
+}
+
+/* The plot is a box for the SVG and nothing more: the geometry is computed in JS from
+   this element's MEASURED size, so the only requirement here is that it takes the
+   height the header, legend and axis leave and reports it honestly. */
+.vas-236-plot {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+}
+
+.vas-236-svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* The per-group hit areas exist only to carry a native <title> tooltip; a pointer
+   cursor would promise a click the chart does not implement. */
+.vas-236-hit {
+    cursor: default;
+}
+
+/* A range where nothing moved is a real answer, not an error - it is said across the
+   plot and the header keeps its (zero) totals above it. Only a load failure takes the
+   whole card over (.vas-236-state below). */
+.vas-236-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    font-size: .8125em;
+    color: #5F7283;
+    text-align: center;
+}
+
+/* The date axis. One cell per bucket, equal width, so a label always sits under the
+   group it names - the JS blanks the cells it cannot fit rather than dropping them,
+   which is what keeps that alignment. */
+.vas-236-axis {
+    flex: 0 0 auto;
+    display: flex;
+    margin-top: .25em;
+    padding: 0 2px;
+    font-size: .625em;
+    color: #5F7283;
+    line-height: 1.2;
+}
+
+.vas-236-tick {
+    flex: 1 1 0;
+    min-width: 0;
+    text-align: center;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+/* ---- State takeover: reserved for a load failure ---- */
+.vas-236-state {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .8125em;
+    font-weight: 400;
+    color: #5F7283;
+    line-height: 1.35;
+}
+
+.vas-236-hidden {
+    display: none !important;
+}
+
+/* ---- Grain / range picker (body-mounted, so NOT scoped under .vas-236-root) ----
+   Fixed-position panel anchored to the pill by script. rem-based, not em: it lives on
+   <body> and has no widget root anchor to scale against. Identical in shape to the
+   sibling Banking cards' popovers. */
+.vas-236-pp {
+    position: fixed;
+    /* Same narrow band the sibling popovers use: above the glass cards, below every
+       framework layer (jQuery UI .ui-front = 100, dialogs 101+). */
+    z-index: 95;
+    box-sizing: border-box;
+    min-width: 180px;
+    max-width: calc(100vw - 16px);
+    max-height: 60vh;
+    overflow: auto;
+    padding: 6px;
+    background: #FFFFFF;
+    border: 1px solid #E4EDF4;
+    border-radius: 12px;
+    box-shadow: 0 16px 40px rgba(8, 24, 38, .22);
+    color: #102C3F;
+}
+
+    .vas-236-pp * {
+        box-sizing: border-box;
+    }
+
+.vas-236-pp-h {
+    font-size: .6875rem;
+    font-weight: 700;
+    color: #748494;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    padding: 8px 10px 4px;
+}
+
+/* The two groups are one panel, so a rule separates them rather than a second popover
+   - grain and range are chosen together and reading them side by side is the point. */
+.vas-236-pp-sep {
+    height: 1px;
+    margin: 6px 4px 2px;
+    background: #E4EDF4;
+}
+
+.vas-236-pp-opt {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: .875rem;
+    color: #102C3F;
+    padding: 9px 10px;
+    border-radius: 8px;
+    text-align: left;
+}
+
+    .vas-236-pp-opt:hover {
+        background: #EAF8FF;
+    }
+
+    .vas-236-pp-opt[aria-selected="true"] {
+        background: #EAF8FF;
+        font-weight: 700;
+        color: #0083DA;
+    }
+
+    .vas-236-pp-opt:focus-visible {
+        outline: 2px solid #BFE4FF;
+        outline-offset: -2px;
+    }
+
+.vas-236-pp-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-236-pp-tick {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    width: 16px;
+    height: 16px;
+    color: #0083DA;
+    opacity: 0;
+}
+
+.vas-236-pp-opt[aria-selected="true"] .vas-236-pp-tick {
+    opacity: 1;
+}
+
+/* ---- Narrow cells: step the card base font down so the em scale follows ----
+ *
+ * The sibling widgets' breakpoints and values. The overrides are ABSOLUTE px, never a
+ * relative `em` - an em override here would resolve against the inherited page font
+ * rather than the clamp and collapse the anchor unpredictably. The PLOT needs no
+ * breakpoint of its own: it is measured and redrawn, so it adapts by construction. */
+@container vas-236 (max-width: 380px) {
+    .vas-236-legend {
+        gap: .625em;
+    }
+}
+
+@container vas-236 (max-width: 300px) {
+    .vas-236-card {
+        font-size: 13px;
+    }
+}
+
+@container vas-236 (max-width: 220px) {
+    .vas-236-card {
+        font-size: 11px;
+    }
+
+    /* Last resort: the legend is the most expendable thing on the card - the two bar
+       colours are the dashboard's shared vocabulary by this point, and the plot needs
+       every pixel it can get. */
+    .vas-236-legend {
+        display: none;
+    }
+}

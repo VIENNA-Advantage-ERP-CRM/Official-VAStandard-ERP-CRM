@@ -399,6 +399,32 @@
  *                        text, still naming the document, rather than opening the
  *                        wrong screen. Same treatment the VA075 / VAMFG chips
  *                        already had.
+ *   VAI163   2026-08-26  - Generated From names a referenced BLANKET order as one.
+ *                          A requisition raised against a C_Order carrying
+ *                          IsBlanketTrx = 'Y' read "Sales Order", which called a
+ *                          standing commitment an ordinary order. The chip follows
+ *                          data.RefOrderIsBlanket (refOrderLabel) and carries the
+ *                          blanket screen's window with it; an ordinary order is
+ *                          left on the client's own lookup, since passing a
+ *                          server-resolved 0 would take its link away. The model
+ *                          fixes the loader that should have claimed the record for
+ *                          the Blanket chip in the first place.
+ *                        - Progress: the Completed stage reads Pending while the
+ *                          document is Drafted or In Progress, where it read
+ *                          "In Progress" on both — a caption that claimed work had
+ *                          started on a record nobody had submitted, and that said
+ *                          the same thing either way. It is marked done by the
+ *                          DOCUMENT STATUS alone now (CO / CL), not also by
+ *                          IsConverted, and captions with the completion date; a
+ *                          converted requisition still lights it through the
+ *                          existing reach rule.
+ *   VAI163   2026-09-15  Notes is drawn when the header OR any line carries a
+ *                        description (renderNotesPanel). The header was the whole
+ *                        gate, so a requisition with line notes and no header
+ *                        description showed no Notes section at all.
+ *   VAI163   2026-09-15  Progress: a closed or voided requisition (StatusCode CL /
+ *                        VO) reads "Closed" / "Voided" under the Completed stage in
+ *                        place of the date or "Pending".
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -1002,14 +1028,31 @@
             // the trade, so the chip names the side the linked order is actually
             // on rather than assuming a sale, and opens it in that side's window.
             //
+            // A referenced order that is itself a BLANKET is named as one
+            // (RefOrderIsBlanket): a standing commitment is not an ordinary order,
+            // and the chip carries the blanket screen's window with it, since
+            // C_Order's own window cannot show a blanket. The model normally hands
+            // that record to the chip above and clears this one — this is what keeps
+            // the naming right on a schema where none of its routes can run.
+            //
             // The model clears this one when it turns out to be the same record as
             // the blanket above, so the strip never lists one document twice.
             if (data.RefOrderNo) {
-                var $order = originChip("doc",
-                    data.RefOrderIsSOTrx ? msg("SalesOrder", "Sales Order")
-                                         : msg("Order", "Order"),
-                    countedValue(data.RefOrderNo, data.RefOrderCount),
-                    "success", "C_Order", data.RefOrderId);
+                var refValue = countedValue(data.RefOrderNo, data.RefOrderCount);
+                var $order;
+                if (data.RefOrderIsBlanket) {
+                    $order = originChip("doc", refOrderLabel(), refValue,
+                        "success", "C_Order", data.RefOrderId, "",
+                        data.RefOrderWindowId,
+                        data.RefOrderIsSOTrx ? "VAS_BlanketSalesOrder"
+                                             : "VAS_BlanketPurchaseOrder");
+                } else {
+                    // No window argument at all: an ordinary order opens fine
+                    // through the client's own lookup, and a server-resolved 0
+                    // would strip the chip of its link instead.
+                    $order = originChip("doc", refOrderLabel(), refValue,
+                        "success", "C_Order", data.RefOrderId);
+                }
                 if (data.RefOrderIsSOTrx) $order.attr("data-open-sotrx", "Y");
                 $chips.append($order);
                 any = true;
@@ -1039,6 +1082,20 @@
 
             $strip.append($chips);
             $body.append($strip);
+        }
+
+        // What the referenced order chip calls itself. A blanket is named as one on
+        // both sides of the trade: the label is what tells a reader the requisition
+        // draws on a standing commitment rather than on a one-off order, and the
+        // two open different screens.
+        function refOrderLabel() {
+            if (data.RefOrderIsBlanket) {
+                return data.RefOrderIsSOTrx
+                    ? msg("BlanketSalesOrder", "Blanket Sales Order")
+                    : msg("BlanketOrder", "Blanket Purchase Order");
+            }
+            return data.RefOrderIsSOTrx ? msg("SalesOrder", "Sales Order")
+                                        : msg("Order", "Order");
         }
 
         // "REQ-1 +2" — the first document named, the rest counted, for an origin
@@ -1512,7 +1569,14 @@
         // back- or forward-dated).
         function progressStages() {
             var s = data.StatusCode;
-            var completed  = s === "CO" || s === "CL" || data.IsConverted;
+            // The DOCUMENT's own status decides this one, and only it: the stage
+            // reports whether the requisition has been completed, so it turns on the
+            // status turning Completed (or Closed) and shows the moment that
+            // happened. IsConverted used to count here too, which asked a second
+            // document's existence to answer a question about this one's status —
+            // and nothing is lost by dropping it, because a converted requisition
+            // already back-fills this stage through the reach rule below.
+            var completed  = s === "CO" || s === "CL";
             // Converted once ANYTHING has been raised from the requisition — a
             // purchase or blanket order, an RFQ, a material transfer, an inventory
             // use issue — and in fulfilment once one of those has been completed.
@@ -1610,6 +1674,14 @@
                 } else {
                     stateCls = "vas_098-pending"; showCheck = false; sub = msg("Pending");
                 }
+                // A closed or voided requisition says so under Completed. Closed
+                // is a completed document that was then shut, so the tick stays
+                // and the word replaces the date; voided never completed, so the
+                // stage stays unreached and the word replaces "Pending".
+                if (stg.key === "vas_098-c2") {
+                    if (data.StatusCode === "CL") sub = msg("Closed");
+                    else if (data.StatusCode === "VO") sub = msg("Voided");
+                }
                 $stepper.append(stepEntry(s + 1, stg, stateCls, showCheck, sub));
             }
             $body.append($stepper);
@@ -1618,6 +1690,16 @@
         // Caption for the stage being worked towards — forward-looking, since it
         // has not happened yet and therefore has no date to report.
         function activeSub(stg) {
+            // Completed reports the DOCUMENT's own status and nothing else. Until
+            // the document completes there is only one thing to say about it, and a
+            // requisition sitting in draft and one part-way through its workflow are
+            // the same thing here: Pending. It read "In Progress" on a drafted
+            // record, which claimed work had started on a document nobody had
+            // submitted, and it read the same on one that really was in progress —
+            // so the caption never distinguished anything. Once the status turns
+            // Completed the stage is reached, and the branch above captions it with
+            // the completion date instead of this.
+            if (stg.key === "vas_098-c2") return msg("Pending");
             if (stg.key === "vas_098-c3") return msg("ReadyToConvert");
             return msg("InProgressSub");
         }
@@ -1661,8 +1743,8 @@
             var $docs = renderDocuments();
             if ($docs) $body.append($docs);
 
-            // Notes only exists when the requisition carries a description of its
-            // own. Without one, no section: the heading goes with the card it heads.
+            // Notes exists when the header OR any line carries a description.
+            // With none anywhere, no section: the heading goes with the card.
             var $notes = renderNotesPanel();
             if ($notes) {
                 sectionHead(msg("Notes"), "");
@@ -2303,20 +2385,17 @@
         // written against, so a reader knows which row it annotates without
         // counting back to the table.
         //
-        // The section exists only when the REQUISITION ITSELF carries a
-        // description. With none, it is not drawn at all — heading included —
+        // The section exists when ANY description was entered — on the header or
+        // on a line. With none anywhere it is not drawn at all, heading included,
         // rather than standing as an empty card saying so.
         //
-        // The header's description is the whole gate, deliberately: a requisition
-        // with line notes but no description of its own shows no Notes section,
-        // and those line notes are not reachable from the panel. The alternative —
-        // opening the section for line notes alone — was considered and rejected;
-        // the header description is what decides whether this requisition has
-        // anything to say. Line notes remain a detail OF that section, not a
-        // reason to raise it.
+        // The header used to be the whole gate: a requisition with line notes but
+        // no description of its own showed no Notes section, and those line notes
+        // were reachable from nowhere on the panel. A note typed against a line
+        // is a note about the requisition whether or not the header has one, so
+        // each is shown on its own account — the same rule as every other
+        // overview panel.
         function renderNotesPanel() {
-            if (!data.Description || !String(data.Description).trim()) return null;
-
             var $notes = $('<div class="vas_098-notesbody"></div>');
             appendNoteText($notes, data.Description, null);
 
@@ -2324,6 +2403,7 @@
             for (var i = 0; i < lines.length; i++) {
                 appendNoteText($notes, lines[i].Description, lineNoteLabel(lines[i]));
             }
+            if (!$notes.children().length) return null;
 
             var $panel = $('<div class="vas_098-lowersec"></div>');
             var $card = $('<div class="vas_098-panelcard vas_098-notescard"></div>');

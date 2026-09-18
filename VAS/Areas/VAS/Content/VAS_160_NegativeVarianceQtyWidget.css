@@ -194,7 +194,7 @@
 
 .vas-neg-var-modal-grid-header {
     display: grid;
-    grid-template-columns: minmax(0,1.3fr) minmax(0,2fr) minmax(0,0.9fr) minmax(0,1fr) minmax(0,0.7fr) minmax(0,0.7fr);
+    grid-template-columns: minmax(0,1.2fr) minmax(0,1.8fr) minmax(0,1.1fr) minmax(0,1.4fr) minmax(0,1fr) minmax(0,0.7fr) minmax(0,0.7fr);
     gap: 12px;
     padding: 0.5em 1em;
     background: transparent;
@@ -219,7 +219,7 @@
 
 .vas-neg-var-row {
     display: grid;
-    grid-template-columns: minmax(0,1.3fr) minmax(0,2fr) minmax(0,0.9fr) minmax(0,1fr) minmax(0,0.7fr) minmax(0,0.7fr);
+    grid-template-columns: minmax(0,1.2fr) minmax(0,1.8fr) minmax(0,1.1fr) minmax(0,1.4fr) minmax(0,1fr) minmax(0,0.7fr) minmax(0,0.7fr);
     gap: 12px;
     align-items: center;
     padding: 0.625em 0;
@@ -250,6 +250,20 @@
     text-overflow: ellipsis;
 }
 
+
+.vas-neg-var-doclink {
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+    text-decoration-color: rgba(31, 131, 255, 0.45);
+}
+
+.vas-neg-var-doclink:hover,
+.vas-neg-var-doclink:focus-visible {
+    color: #1F83FF;
+    text-decoration-color: #1F83FF;
+    outline: none;
+}
 
 .vas-neg-var-cell {
     font-family: 'Roboto', sans-serif;

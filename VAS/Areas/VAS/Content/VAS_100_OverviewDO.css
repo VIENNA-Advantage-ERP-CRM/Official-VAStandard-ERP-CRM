@@ -127,6 +127,23 @@
  *                        break inside their word (overflow-wrap) so a shrunken
  *                        step cannot paint over its neighbour, and the header /
  *                        customer grids took the minmax floor.
+ *   VAI163   2026-09-15  Single-record (narrow) view:
+ *                        - The Activity row is a GRID: tag | headline | stamp
+ *                          [| caret] on the first line and the sub-lines
+ *                          (.vas_100-actSubs) on a second spanning to the row's
+ *                          right edge. As a wrapping flex row the sub-lines
+ *                          lived inside the headline's cell, which is only as
+ *                          wide as the stamp and caret leave it, so an e-mail's
+ *                          recipient list wrapped into a tall, narrow column
+ *                          beside an empty right half of the row. Under 620px
+ *                          the headline keeps a third of the row; under 440px
+ *                          the stamp drops to its own line.
+ *                        - The line table under 560px wraps its headings instead
+ *                          of ellipsising them ("ORDER…", "DELIVER…"), drops the
+ *                          Delivered mini bar, tightens its gaps and lets a value
+ *                          break at a space, and the Line Value track grows at
+ *                          the item column's expense — "₹ 3,000…" lost the one
+ *                          figure the row states.
  ***********************************************************/
 
 .vas_100-root {
@@ -799,18 +816,18 @@
     white-space: nowrap;
 }
 
-/* Line 4 — drop shipment. Muted while it reads "No", which is the ordinary
-   case and should not draw the eye; a drop-shipped line takes the accent, since
-   goods that never pass through our warehouse are the exception worth seeing. */
+/* Line 4 — drop shipment. Drawn only on a line that IS one, so it always takes
+   the accent: goods that never pass through our warehouse are the exception
+   worth seeing. The muted "No" state it used to carry no longer renders. */
 .vas_100-itDrop {
     font-size: 0.9231em;
-    color: var(--do-muted);
+    color: var(--do-action-dk);
+    font-weight: 700;
     margin-top: 0.125em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.vas_100-itDrop.vas_100-is-drop { color: var(--do-action-dk); font-weight: 700; }
 
 /* Delivered cell (mini bar + value) */
 .vas_100-recv {
@@ -872,7 +889,46 @@
    scrollbar — which hides the right-hand columns behind a control the reader
    has to find and drag. Every track is minmax(0, Nfr) and every cell carries
    min-width: 0 with an ellipsis, so the columns simply compress and a clipped
-   value stays readable through the row's tooltip. */
+   value stays readable through the row's tooltip.
+
+   Below 560px compressing alone is not enough: in the single-record view the
+   headings read "ORDER…", "DELIVER…", "LINE VAL…" and the line value itself
+   was cut to "₹ 3,000…" — the one figure the row is there to state. So the
+   table gives up what it can spare before it clips: the cell gap and padding
+   tighten, the Delivered mini bar goes (the figure and the status tag already
+   say how much went out), the headings wrap onto a second line instead of
+   ellipsising, and the value cells may break at a space ("₹" over "3,000.00")
+   rather than lose their digits. The Line Value track grows at the item
+   column's expense — the item column has three lines of tooltip-backed text
+   and ellipsises most gracefully. */
+@container (max-width: 560px) {
+    .vas_100-tRow {
+        gap: 0.375em;
+        padding: 0.625em 0.625em;
+        grid-template-columns:
+            minmax(0, 1.9fr) minmax(0, 0.7fr) minmax(0, 0.8fr)
+            minmax(0, 0.9fr) minmax(0, 1.4fr) minmax(0, 0.9fr);
+    }
+    .vas_100-table.vas_100-has-q .vas_100-tRow {
+        grid-template-columns:
+            minmax(0, 1.6fr) minmax(0, 0.7fr) minmax(0, 0.8fr) minmax(0, 0.9fr)
+            minmax(0, 1.4fr) minmax(0, 0.9fr) minmax(min-content, 0.6fr);
+    }
+    .vas_100-tHead { align-items: end; letter-spacing: 0; line-height: 1.2; }
+    /* Wrap at spaces only: "LINE VALUE" takes two lines, while a single word
+       the track still cannot hold ("DELIVERED") ellipsises on its line rather
+       than breaking as "DELIVER / ED". */
+    .vas_100-tHead > span,
+    .vas_100-tRow > span.vas_100-ta-r {
+        white-space: normal;
+        overflow-wrap: normal;
+    }
+    /* The tag stays one piece — "Partial" split over two lines is not a tag. */
+    .vas_100-tRow > span.vas_100-ta-c { white-space: nowrap; }
+    .vas_100-recvBar { display: none; }
+    .vas_100-recv { display: inline; }
+    .vas_100-tFoot { padding: 0.6875em 0.625em; }
+}
 
 /* ----------------------------------------------------------- */
 /*  Quality: the line marker and the per-line parameter drawer  */
@@ -1078,12 +1134,21 @@
     overflow: hidden;
 }
 
-/* tag | headline | right-aligned "when · by whom". The three wrap as a group on
-   a narrow panel rather than each clipping to nothing. */
+/* tag | headline | right-aligned "when · by whom" [| caret] on the first line,
+   and the row's sub-lines (recipients, the line an edit landed on, the delta)
+   on a second line that spans from under the headline to the row's right edge.
+
+   A grid, not a wrapping flex row. As a flex row the sub-lines lived inside
+   the headline's cell, which was only as wide as what the stamp and the caret
+   left it — so an e-mail's To / Cc / Bcc list wrapped into a tall, narrow
+   column beside an empty right half of the row. On the second grid line
+   nothing sits to their right, so they get the row's full width. The first
+   line's items centre on the tag pill, the tallest of them, so the headline
+   and the stamp sit level with it. */
 .vas_100-actRow {
-    display: flex;
-    align-items: flex-start;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
     gap: 0.25em 0.625em;
     padding: 0.625em 0.875em;
     border-bottom: 1px solid var(--do-row-div);
@@ -1091,9 +1156,16 @@
     color: var(--do-text);
 }
 .vas_100-actRow:last-child { border-bottom: none; }
+/* A note's headline wraps to three lines; its tag and stamp stay at the top
+   rather than floating beside the middle line. */
+.vas_100-actRow:has(.vas_100-multiline) { align-items: start; }
+/* A row with nothing to open has no caret, so it has no caret column either:
+   the stamp then ends at the same right edge as the headline. */
+.vas_100-actRow:not(.vas_100-is-openable) { grid-template-columns: auto minmax(0, 1fr) auto; }
 
 .vas_100-actTag {
-    flex: none;
+    grid-row: 1;
+    grid-column: 1;
     display: inline-flex;
     align-items: center;
     gap: 0.3125em;
@@ -1121,7 +1193,7 @@
 .vas_100-tag.vas_100-tone-purple  { background: var(--do-purple-bg);  color: var(--do-purple-tx); }
 .vas_100-tag.vas_100-tone-neutral { background: var(--do-neutral-bg); color: var(--do-neutral-tx); }
 
-.vas_100-actTitle { flex: 1; min-width: 0; }
+.vas_100-actTitle { grid-row: 1; grid-column: 2; min-width: 0; }
 
 /* The headline clips to one line — it has a tooltip carrying the whole of it —
    except a note, whose text IS what the reader came for and wraps to three. */
@@ -1130,6 +1202,17 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* The sub-lines, under the headline and spanning to the row's right edge. Only
+   rendered when the row has any, so a plain row stays a single line. */
+.vas_100-actSubs {
+    grid-row: 2;
+    grid-column: 2 / -1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125em;
 }
 .vas_100-actLead.vas_100-multiline {
     white-space: normal;
@@ -1143,9 +1226,9 @@
    because a single long address has no space to break at. */
 .vas_100-actSub {
     display: block;
+    min-width: 0;
     font-size: 0.8462em;
     color: var(--do-muted);
-    margin-top: 0.125em;
     white-space: normal;
     overflow-wrap: break-word;
     word-break: break-word;
@@ -1153,18 +1236,28 @@
 }
 
 .vas_100-actWhen {
-    flex: none;
-    margin-left: auto;
+    grid-row: 1;
+    grid-column: 3;
+    justify-self: end;
+    min-width: 0;
     max-width: 100%;
     font-size: 0.8462em;
     color: var(--do-muted);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* A row carrying an e-mail body opens it on click; the caret shows the state. */
 .vas_100-actRow.vas_100-is-openable { cursor: pointer; }
 .vas_100-actRow.vas_100-is-openable:hover { background: var(--do-info-bg); }
-.vas_100-actCaret { flex: none; color: var(--do-muted); transition: transform .15s ease; }
+.vas_100-actCaret {
+    grid-row: 1;
+    grid-column: 4;
+    display: inline-flex;
+    color: var(--do-muted);
+    transition: transform .15s ease;
+}
 .vas_100-actRow.vas_100-is-open .vas_100-actCaret { transform: rotate(90deg); }
 
 .vas_100-actBody {
@@ -1188,11 +1281,34 @@
     word-break: break-word;
 }
 
+/* Narrow: the headline keeps at least a third of the row, so a long subject
+   cannot be squeezed to a few characters by the stamp — the stamp ellipsises
+   instead (it carries its full text as a tooltip). The drawer's left inset
+   also shrinks; it was indenting the mail's own text past what a narrow panel
+   can spare. */
 @container (max-width: 620px) {
-    /* The Documents row compresses with everything else — it used to take a
-       floor width here and scroll. */
-    /* The stamp drops to its own line rather than squeezing the headline out. */
-    .vas_100-actWhen { margin-left: 0; }
+    .vas_100-actRow { grid-template-columns: auto minmax(35%, 1fr) auto auto; }
+    .vas_100-actRow:not(.vas_100-is-openable) { grid-template-columns: auto minmax(35%, 1fr) auto; }
+    .vas_100-actBody { padding-left: 0.875em; }
+}
+
+/* Narrower still: the stamp drops to its own line under the headline and the
+   sub-lines follow it on a third. The caret keeps the last column of the first
+   line, beside the headline whose body it opens; the stamp may wrap now that
+   nothing sits to its right. */
+@container (max-width: 440px) {
+    .vas_100-actRow { grid-template-columns: auto minmax(0, 1fr) auto; row-gap: 0.125em; }
+    .vas_100-actRow:not(.vas_100-is-openable) { grid-template-columns: auto minmax(0, 1fr); }
+    .vas_100-actCaret { grid-column: 3; }
+    .vas_100-actWhen {
+        grid-row: 2;
+        grid-column: 2 / -1;
+        justify-self: start;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+    }
+    .vas_100-actSubs { grid-row: 3; }
 }
 
 /* ----------------------------------------------------------- */
@@ -1211,6 +1327,9 @@
     white-space: pre-wrap;
     overflow-wrap: break-word;
 }
+/* One paragraph per note — the header's, then each line's. */
+.vas_100-noteCard p { margin: 0; }
+.vas_100-noteCard p + p { margin-top: 0.5em; }
 
 /* ----------------------------------------------------------- */
 /*  Toast (record-open fallback notice)                         */

@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -159,8 +159,16 @@ namespace VIS.Controllers
                     i.DocumentNo,
                     p.Name AS ProductName,
                     p.Value AS ProductCode,
-                    w.Value AS Warehouse,
-                    l.Value AS Locator,
+                    -- Attribute Set Instance description is what the application shows as the
+                    -- product Attribute (same expression as VAS_078_ProductSearchWidget).
+                    -- Left NULL when the line carries no attribute; the JS renders a dash.
+                    asi.Description AS AttributeValue,
+                    -- Warehouse NAME, not the Value/code - the column header now reads Warehouse.
+                    w.Name AS Warehouse,
+                    -- Locator NAME: LocatorCombination is the human readable X/Y/Z combination the
+                    -- application displays; Value is the fallback identifier when it is not set.
+                    -- Same expression as VAS_078 / VAS_148 / VAS_149.
+                    COALESCE(l.LocatorCombination, l.Value) AS Locator,
                     il.QtyCount,
                     -- Computed absolute shortfall, for the same reason as the summary query.
                     -- Keeping the alias means the JSON contract and the JS are unchanged, and
@@ -177,6 +185,8 @@ namespace VIS.Controllers
                     ON w.M_Warehouse_ID = i.M_Warehouse_ID
                 LEFT JOIN M_Locator l
                     ON l.M_Locator_ID = il.M_Locator_ID
+                LEFT JOIN M_AttributeSetInstance asi
+                    ON asi.M_AttributeSetInstance_ID = il.M_AttributeSetInstance_ID
                 WHERE i.IsActive = 'Y'
                   AND il.IsActive = 'Y'
                   AND COALESCE(i.IsInternalUse, 'N') = 'N'
@@ -215,6 +225,7 @@ namespace VIS.Controllers
                     DocumentNo,
                     ProductName,
                     ProductCode,
+                    AttributeValue,
                     Warehouse,
                     Locator,
                     QtyCount,
@@ -249,6 +260,7 @@ namespace VIS.Controllers
                         documentNo = Util.GetValueOfString(dr["DocumentNo"]),
                         productName = Util.GetValueOfString(dr["ProductName"]),
                         productCode = Util.GetValueOfString(dr["ProductCode"]),
+                        attributeValue = Util.GetValueOfString(dr["AttributeValue"]),
                         warehouse = Util.GetValueOfString(dr["Warehouse"]),
                         locator = Util.GetValueOfString(dr["Locator"]),
                         qtyCount = Util.GetValueOfDecimal(dr["QtyCount"]),

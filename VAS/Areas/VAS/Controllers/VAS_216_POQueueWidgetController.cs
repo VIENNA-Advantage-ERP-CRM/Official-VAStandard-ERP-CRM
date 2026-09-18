@@ -1,4 +1,4 @@
-/************************************************************
+﻿﻿﻿﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Controller for PO Queue Widget (Widget 14: VAS_216_POQueueWidget)
  *                  Main operational worklist of live purchase orders
@@ -125,7 +125,7 @@ namespace VIS.Controllers
                       AND o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
-                      AND o.DocStatus NOT IN ('CO', 'CL', 'VO', 'RE')
+                      AND o.DocStatus IN ('DR', 'IP', 'CO', 'CL') -- queue includes Completed and Closed per specification; only Voided/Reversed stay out
                       AND o.DatePromised >= @MonthStart
                       AND o.DatePromised < @MonthEndExclusive";
 
@@ -195,13 +195,22 @@ namespace VIS.Controllers
                       AND o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
-                      AND o.DocStatus NOT IN ('CO', 'CL', 'VO', 'RE')
+                      AND o.DocStatus IN ('DR', 'IP', 'CO', 'CL') -- queue includes Completed and Closed per specification; only Voided/Reversed stay out
+                      AND o.C_Order_ID IN (@P_ORDER_ACCESS@)
                       AND o.DatePromised >= @MonthStart
                       AND o.DatePromised < @MonthEndExclusive
                     ORDER BY o.DatePromised ASC, o.DocumentNo ASC
                     OFFSET " + offset + " ROWS FETCH NEXT " + pageSize + @" ROWS ONLY";
 
-                mainSql = MRole.GetDefault(ctx).AddAccessSQL(mainSql, "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                // MRole.AddAccessSQL cannot parse this statement (GROUP BY / derived tables /
+                // several JOIN..ON clauses). AccessSqlParser mis-locates the insertion point and
+                // appends the access predicates after GROUP BY / HAVING / ORDER BY, producing
+                // ORA-00933 / ORA-00979 / ORA-00904. Apply the same role access through a simple,
+                // parseable sub-query on C_Order instead.
+                string orderAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                    "SELECT accessOrd.C_Order_ID FROM C_Order accessOrd WHERE accessOrd.AD_Client_ID = " + clientId,
+                    "accessOrd", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                mainSql = mainSql.Replace("@P_ORDER_ACCESS@", orderAccessSql);
 
                 SqlParameter[] mainParams = {
                     new SqlParameter("@AD_Client_ID", clientId),
@@ -378,7 +387,7 @@ namespace VIS.Controllers
                         o.DateOrdered AS order_date,
                         o.DatePromised AS promised_date,
                         o.DocStatus AS document_status,
-                        COALESCE(o.GrandTotal, 0) AS po_value,
+                        COALESCE(o.TotalLines, 0) AS po_value, -- Sub total (excl. taxes) per specification
                         o.C_Currency_ID AS currency_id,
                         c.CurSymbol AS doc_cur_symbol,
                         c.ISO_Code AS doc_cur_iso,
@@ -386,6 +395,7 @@ namespace VIS.Controllers
                         bp.Name AS vendor_name,
                         w.Name AS warehouse_name,
                         rep.Name AS representative_name,
+                        rq.first_requisition_number,
                         o.Created AS created_date,
                         created_by.Name AS created_by_name,
                         o.POReference AS order_reference,
@@ -399,6 +409,21 @@ namespace VIS.Controllers
                     LEFT JOIN AD_User rep ON rep.AD_User_ID = o.SalesRep_ID
                     LEFT JOIN AD_User created_by ON created_by.AD_User_ID = o.CreatedBy
                     LEFT JOIN C_PaymentTerm pt ON pt.C_PaymentTerm_ID = o.C_PaymentTerm_ID
+                    LEFT JOIN (
+                        SELECT
+                            ol.C_Order_ID,
+                            MIN(r.DocumentNo) AS first_requisition_number
+                        FROM C_OrderLine ol
+                        INNER JOIN M_RequisitionLine rl
+                            ON rl.M_RequisitionLine_ID = ol.M_RequisitionLine_ID
+                        INNER JOIN M_Requisition r
+                            ON r.M_Requisition_ID = rl.M_Requisition_ID
+                        WHERE ol.IsActive = 'Y'
+                          AND rl.IsActive = 'Y'
+                          AND r.IsActive = 'Y'
+                        GROUP BY ol.C_Order_ID
+                    ) rq
+                        ON rq.C_Order_ID = o.C_Order_ID
                     WHERE o.C_Order_ID = @C_Order_ID
                       AND o.IsActive = 'Y'
                       AND o.AD_Client_ID = " + ctx.GetAD_Client_ID();
@@ -429,6 +454,7 @@ namespace VIS.Controllers
                             VendorName = Util.GetValueOfString(dr["vendor_name"]),
                             WarehouseName = Util.GetValueOfString(dr["warehouse_name"]),
                             RepresentativeName = Util.GetValueOfString(dr["representative_name"]),
+                            FirstRequisition = Util.GetValueOfString(dr["first_requisition_number"]),
                             CreatedDate = Util.GetValueOfDateTime(dr["created_date"]),
                             CreatedByName = Util.GetValueOfString(dr["created_by_name"]),
                             OrderReference = Util.GetValueOfString(dr["order_reference"]),
@@ -451,11 +477,13 @@ namespace VIS.Controllers
                 // Query summary lines delivery status for header
                 string delivSql = @"
                     SELECT
-                        SUM(COALESCE(QtyOrdered, 0)) AS total_ordered,
-                        SUM(COALESCE(QtyDelivered, 0)) AS total_delivered
-                    FROM C_OrderLine
-                    WHERE C_Order_ID = @C_Order_ID
-                      AND IsActive = 'Y'";
+                        SUM(COALESCE(ol.QtyOrdered, 0)) AS total_ordered,
+                        SUM(COALESCE(ol.QtyDelivered, 0)) AS total_delivered
+                    FROM C_OrderLine ol
+                    LEFT JOIN M_Product prod ON prod.M_Product_ID = ol.M_Product_ID
+                    WHERE ol.C_Order_ID = @C_Order_ID
+                      AND ol.IsActive = 'Y'
+                      AND prod.ProductType = 'I'";
 
                 decimal totalOrdered = 0;
                 decimal totalDelivered = 0;
@@ -534,11 +562,25 @@ namespace VIS.Controllers
                     SELECT
                         ol.C_OrderLine_ID AS purchase_order_line_id,
                         ol.Line AS line_no,
-                        p.Name AS product_name,
+                        -- A charge line, or a product that is not of Item type, carries no
+                        -- stock movement: the widget shows its name, UOM, ordered, rate and
+                        -- amount, and dashes for received / pending / line status.
+                        CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0
+                             THEN COALESCE(ch.Name, N'')
+                             ELSE p.Name END AS product_name,
+                        CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0 THEN 'Y'
+                             WHEN ol.M_Product_ID IS NOT NULL AND COALESCE(p.ProductType, 'I') <> 'I' THEN 'Y'
+                             ELSE 'N' END AS IsNonStock,
                         p.Value AS product_code,
-                        asi.Description AS attribute_description,
+                        CASE WHEN COALESCE(ol.M_AttributeSetInstance_ID, 0) > 0
+                             THEN COALESCE(asi.Description, N'')
+                             ELSE N'' END AS attribute_description,
                         COALESCE(u.UOMSymbol, u.Name) AS uom,
                         COALESCE(ol.QtyOrdered, 0) AS ordered_qty,
+                        -- QtyEntered is expressed in the line's own C_UOM_ID (the UOM the buyer
+                        -- picked); QtyOrdered / QtyDelivered are in the product's base UOM. The
+                        -- widget shows the selected UOM, so quantities are scaled to it.
+                        COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) AS QtyEntered,
                         COALESCE(ol.QtyDelivered, 0) AS received_qty,
                         COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) AS pending_qty,
                         COALESCE(ol.PriceActual, 0) AS rate,
@@ -548,6 +590,7 @@ namespace VIS.Controllers
                     FROM C_OrderLine ol
                     INNER JOIN C_Order o ON o.C_Order_ID = ol.C_Order_ID
                     LEFT JOIN M_Product p ON p.M_Product_ID = ol.M_Product_ID
+                    LEFT JOIN C_Charge ch ON (ch.C_Charge_ID = ol.C_Charge_ID)
                     LEFT JOIN M_AttributeSetInstance asi ON asi.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID
                     LEFT JOIN C_UOM u ON u.C_UOM_ID = ol.C_UOM_ID
                     WHERE ol.IsActive = 'Y'
@@ -568,6 +611,15 @@ namespace VIS.Controllers
                     {
                         decimal ordered = Util.GetValueOfDecimal(dr["ordered_qty"]);
                         decimal received = Util.GetValueOfDecimal(dr["received_qty"]);
+
+                        // Quantities are shown in the UOM the line was entered in. QtyEntered is in the
+                        // line's own C_UOM_ID; QtyOrdered / QtyDelivered are in the product's base UOM,
+                        // so delivered is scaled by this line's own entered/ordered ratio. Header
+                        // roll-ups above stay in the base UOM - summing mixed UOMs is meaningless.
+                        decimal enteredQtyUom = Util.GetValueOfDecimal(dr["QtyEntered"]);
+                        decimal uomRatio = (ordered != 0) ? (enteredQtyUom / ordered) : 1m;
+                        ordered = enteredQtyUom;
+                        received = received * uomRatio;
                         decimal pending = ordered - received;
                         if (pending < 0) { pending = 0; }
                         string docStatus = Util.GetValueOfString(dr["doc_status"]);
@@ -608,6 +660,9 @@ namespace VIS.Controllers
                             Rate = Util.GetValueOfDecimal(dr["rate"]),
                             LineAmount = Util.GetValueOfDecimal(dr["line_amount"]),
                             PromisedDate = Util.GetValueOfDateTime(dr["promised_date"]),
+                            // Charge / non-Item lines are never received - the client renders dashes
+                            // for received, pending and line status.
+                            IsNonStock = Util.GetValueOfString(dr["IsNonStock"]) == "Y",
                             LineStatus = lineStatus
                         });
                     }
@@ -659,6 +714,7 @@ namespace VIS.Controllers
 
         public class POLineRecord
         {
+            public bool IsNonStock { get; set; }
             public int OrderLineID { get; set; }
             public int LineNo { get; set; }
             public string ProductName { get; set; }

@@ -54,6 +54,12 @@
  *                        entity lists the right-hand value still holds its width
  *                        (the label gives way first) but clips rather than running
  *                        back over the label when even that is not enough.
+ *   VAI163   2026-08-26  .vas_190-colsTx runs FOUR tracks, not five: the Unit cost
+ *                        column is gone from Recent transactions. The width it
+ *                        gave up goes to the Document cell (2fr -> 2.9fr) rather
+ *                        than being shared out — that cell carries the document
+ *                        TYPE in front of the number on every row now, so it is
+ *                        the one that wanted the room.
  ***********************************************************/
 
 .vas_190-root {
@@ -103,6 +109,233 @@
     font-size: 0.875em;
     color: var(--p190-muted);
 }
+.vas_190-emptyTitle { font-weight: 700; color: var(--p190-secondary); }
+.vas_190-emptyHint { margin-top: 0.25em; }
+
+/* ----------------------------------------------------------- */
+/*  Activity detail sheet                                       */
+/* ----------------------------------------------------------- */
+/* One activity entry, opened over the whole panel: a labelled header, the
+   fields that entry actually carries, its content, and its actions pinned to
+   the bottom. It replaces the drawer that used to fold open under a mail row,
+   which could hold a message body and nothing else — an appointment's people,
+   its meeting link and its transcript had nowhere to go.
+
+   Positioned against .vas_190-root (position:relative) so it covers the panel
+   and nothing outside it, and it carries its own font-size anchor because the
+   body's container query does not reach it. */
+.vas_190-sheet {
+    position: absolute;
+    inset: 0;
+    z-index: 1000;
+    background: #FFFFFF;
+    font-size: clamp(16px, 1vw, 18px);
+    display: flex;
+    flex-direction: column;
+}
+
+.vas_190-sheetHead {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5em;
+    padding: 1em 0.875em 0.75em;
+    border-bottom: 1px solid var(--p190-divider);
+}
+.vas_190-sheetTitle {
+    flex: 1;
+    min-width: 0;
+    font-weight: 700;
+    font-size: 0.875em;
+    color: var(--p190-text);
+    /* The subject WRAPS here. The row it was opened from clipped it to one
+       line, and this is the place a reader comes to read the whole of it. */
+    overflow-wrap: anywhere;
+}
+.vas_190-sheetX {
+    flex-shrink: 0;
+    width: 1.5em;
+    height: 1.5em;
+    border: none;
+    background: none;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--p190-muted);
+    cursor: pointer;
+    padding: 0;
+}
+.vas_190-sheetX:hover { background: #F2F6FA; color: var(--p190-text); }
+.vas_190-sheetX:focus-visible { outline: 2px solid var(--p190-action); outline-offset: 1px; }
+.vas_190-sheetX .vas_190-ic svg { width: 1em; height: 1em; }
+
+.vas_190-sheetBody {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    overflow-x: hidden;
+    padding: 0.875em;
+}
+
+/* Label left, value right — the shape the engagement view on the customer
+   master uses, so a reader who knows one knows this. */
+.vas_190-sheetRow {
+    display: flex;
+    gap: 0.75em;
+    padding: 0.375em 0;
+    font-size: 0.75em;
+    border-bottom: 1px solid var(--p190-divider);
+}
+.vas_190-sheetRow:last-of-type { border-bottom: none; }
+.vas_190-sheetK {
+    width: 7em;
+    flex-shrink: 0;
+    color: var(--p190-muted);
+}
+.vas_190-sheetV {
+    flex: 1;
+    min-width: 0;
+    color: var(--p190-text);
+    overflow-wrap: anywhere;
+}
+.vas_190-sheetV a { color: var(--p190-action); }
+
+.vas_190-sheetLabel {
+    margin-top: 1em;
+    margin-bottom: 0.375em;
+    font-weight: 700;
+    font-size: 0.6875em;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--p190-muted);
+}
+/* The message, comment or note itself. Its own line breaks are the author's,
+   so they are kept. */
+.vas_190-sheetText {
+    font-size: 0.75em;
+    line-height: 1.55;
+    color: var(--p190-secondary);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+/* A mail body rendered as the sender wrote it. Everything here is containment:
+   the markup is somebody else's, it was authored for a full-width mail client,
+   and it is being shown in a narrow side panel.
+
+   pre-wrap is turned OFF — the sender's own block elements do the wrapping now,
+   and leaving it on would add a blank line for every newline between their
+   tags. */
+.vas_190-sheetHtml {
+    white-space: normal;
+    /* Long enough to read in, bounded so a newsletter cannot push the Close
+       button off the sheet. */
+    max-height: 22em;
+    overflow: auto;
+}
+/* A mail's own font sizes and colours are its own; only the extremes are
+   overridden, so the message still looks like itself inside the panel. */
+.vas_190-sheetHtml img { max-width: 100%; height: auto; }
+/* A fixed-width table is the usual way a mail is laid out, and it is usually
+   wider than this panel. It scrolls in its own right rather than widening the
+   sheet. */
+.vas_190-sheetHtml table { max-width: 100%; display: block; overflow-x: auto; }
+.vas_190-sheetHtml td, .vas_190-sheetHtml th { padding: 0.15em 0.35em; }
+.vas_190-sheetHtml a { color: var(--p190-link, #1D4ED8); }
+.vas_190-sheetHtml pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+/* A quoted reply chain arrives as nested blockquotes and can indent the text
+   off the panel after three or four rounds. */
+.vas_190-sheetHtml blockquote {
+    margin: 0.4em 0 0.4em 0.6em;
+    padding-left: 0.6em;
+    border-left: 2px solid var(--p190-border, #E5E7EB);
+}
+.vas_190-sheetHtml h1, .vas_190-sheetHtml h2, .vas_190-sheetHtml h3 { font-size: 1.15em; }
+
+.vas_190-sheetFoot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5em;
+    padding: 0.75em 0.875em;
+    border-top: 1px solid var(--p190-divider);
+    background: #FFFFFF;
+}
+.vas_190-sheetBtn {
+    font: inherit;
+    font-size: 0.75em;
+    padding: 0.5em 1em;
+    border: 1px solid var(--p190-card-bd);
+    border-radius: 8px;
+    background: #FFFFFF;
+    color: var(--p190-secondary);
+    cursor: pointer;
+}
+.vas_190-sheetBtn:hover { background: #F2F6FA; }
+.vas_190-sheetBtn:focus-visible { outline: 2px solid var(--p190-action); outline-offset: 1px; }
+.vas_190-sheetBtn--primary {
+    border-color: var(--p190-action);
+    background: var(--p190-action);
+    color: #FFFFFF;
+}
+.vas_190-sheetBtn--primary:hover { background: #0071BD; }
+.vas_190-sheetBtn--sm { padding: 0.25em 0.625em; font-size: 0.6875em; }
+
+/* A meeting's transcript, under its fields (18-Sep-2026): the heading and the
+   download side by side, the lines in a bounded box beneath so a long
+   recording never pushes the Close button off the sheet. */
+.vas_190-sheetTranscript { margin-top: 0.5em; }
+.vas_190-sheetTrHead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5em;
+}
+.vas_190-sheetTrHead .vas_190-sheetLabel { margin-bottom: 0; }
+.vas_190-sheetTrBox {
+    margin-top: 0.375em;
+    max-height: 18em;
+    overflow: auto;
+    padding: 0.5em 0.625em;
+    border: 1px solid var(--p190-divider);
+    border-radius: 8px;
+    background: #F8FAFC;
+    white-space: normal;
+}
+.vas_190-sheetTrLine { margin: 0 0 0.35em; }
+.vas_190-sheetTrLine:last-child { margin-bottom: 0; }
+.vas_190-sheetTrSpeaker { font-weight: 700; color: var(--p190-text, #0F172A); }
+
+/* ----------------------------------------------------------- */
+/*  Task priority badge                                         */
+/* ----------------------------------------------------------- */
+/* In front of a task's headline, in the colours the task screens use. It is
+   the first thing a reader sorts on and it was not on the row at all. */
+.vas_190-prio {
+    display: inline-block;
+    margin-right: 0.375em;
+    padding: 0 0.5em;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 0.8125em;
+    line-height: 1.5em;
+    vertical-align: baseline;
+}
+/* The task colour scheme, taken from VAS_105 (.vas_105_acct-prio--*) rather
+   than mixed here. A reader moves between the two panels and a task that is
+   amber on one and orange on the other reads as two different states; these are
+   now the same four values in both places, so "the same priority" looks the
+   same wherever it is shown.
+
+   The medium and low entries used the panel's own generic warn / info tokens,
+   which is why they drifted — those tokens answer to this panel's palette, not
+   to what the task screens call a priority. */
+.vas_190-prio-high     { background: #FAD7D7; color: #8F2D2D; }
+.vas_190-prio-medium   { background: #FAEEDA; color: #9A6500; }
+.vas_190-prio-low      { background: #D9ECFF; color: #0E5DA8; }
+/* A CLOSED task, whatever it was raised at. Its priority has stopped being the
+   thing to act on, so it stops competing for attention with the open ones —
+   VAS_105's fourth priority colour, used for exactly this. */
+.vas_190-prio-resolved { background: #CCEFDD; color: #0C5D38; }
 
 /* ----------------------------------------------------------- */
 /*  Section header                                              */
@@ -441,6 +674,13 @@
     overflow: hidden; text-overflow: ellipsis; }
 .vas_190-eS { font-weight: 400; font-size: 0.75em; color: var(--p190-muted); white-space: nowrap;
     overflow: hidden; text-overflow: ellipsis; }
+/* A BOM row whose right-hand slot carries the attribute set it is specified for.
+   The slot does not shrink by default — a quantity is short and must never be
+   clipped — but an attribute set runs to a sentence, and at flex-shrink 0 it
+   pushed the row wider than the panel and took the name on the left off the
+   screen with it. Capped at a share of the row and left to the ellipsis its own
+   lines already carry. */
+.vas_190-eVal.vas_190-eVal-attr { flex-shrink: 1; max-width: 45%; }
 
 /* ----------------------------------------------------------- */
 /*  Data grid (stock details, transactions)                     */
@@ -460,11 +700,13 @@
 .vas_190-colsStock .vas_190-gRow {
     grid-template-columns: 1.75em minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 1.2fr) minmax(0, 0.7fr);
 }
-/* The Document cell carries the document TYPE name in front of the number, so
-   it needs more of the row than the other three columns put together. */
+/* Icon, Document, Date, Qty — four tracks since the Unit cost column went. The
+   Document cell carries the document TYPE name in front of the number, so it
+   keeps more of the row than the other two put together, and the width the
+   money column gave up goes to it rather than being shared out. */
 .vas_190-colsTx .vas_190-gHead,
 .vas_190-colsTx .vas_190-gRow {
-    grid-template-columns: 1.75em minmax(0, 2fr) minmax(0, 0.9fr) minmax(0, 0.6fr) minmax(0, 0.9fr);
+    grid-template-columns: 1.75em minmax(0, 2.9fr) minmax(0, 0.9fr) minmax(0, 0.6fr);
 }
 
 .vas_190-gHead { padding: 0 0 0.375em; border-bottom: 1px solid var(--p190-card-bd); }
@@ -552,12 +794,30 @@
 /* ----------------------------------------------------------- */
 /* Centred beneath the section content. Never an inner scrollbar: the panel body
    owns scrolling, and a section that paginates does not grow its own. */
+/* What is on screen at the leading edge, the controls at the trailing one. The
+   three used to sit together in the middle: that said which page you were on
+   but never how much there was to page through. */
 .vas_190-pager {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
     gap: 0.5em;
     padding-top: 0.5em;
+}
+.vas_190-pgRange {
+    font-size: 0.6875em;
+    color: var(--p190-muted);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_190-pgRange b { font-weight: 700; color: var(--p190-text); }
+.vas_190-pgCtl {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-shrink: 0;
 }
 .vas_190-pgBtn {
     width: 1.5em;

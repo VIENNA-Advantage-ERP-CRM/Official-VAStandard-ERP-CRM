@@ -1,251 +1,184 @@
-/************************************************************
- * Stylesheet     : VAS_203_POGlobalSearchWidget.css
- * Module Name    : VAS_203_POGlobalSearchWidget
- * Purpose        : 100% Fluid dynamic responsive styles for Widget 01: Global Search
- * Design Tokens  : Primary Blue (#0083DA), Action Blue (#1F83FF), Navy (#002640),
- *                  Text (#102C3F), Text Muted (#5F7283), Dividers (#D9E2EB, #E2EAF1)
- * Rules          : 100% relative em/cqi units, clamp() root anchor, zero static px fonts.
- ************************************************************/
+/* ==========================================================
+   VAS_203_POGlobalSearchWidget
 
-.vas-203-posrch-root {
-    font-size: clamp(14px, 1.2cqi, 20px);
-    width: 100%;
-    height: 100%;
+   This widget uses the shared document-search design in
+   VAS_DocumentSearchWidgets.css (vas-dssrch-* namespace), the same one
+   VAS_067 / VAS_068 / VAS_069 / VAS_070 / VAS_091 use, so the bar, the
+   popover panel, the rows and all states come from there.
+
+   The only thing added here is the extra chip tones this widget needs:
+   the shared sheet ships order / invoice / payment / cash / gljournal /
+   receipt, and PO search additionally groups results by vendor, product,
+   representative, warehouse, requisition and description. Tones are drawn
+   from the same dashboard palette.
+   ========================================================== */
+
+.vas-dssrch-chip-vendor      { background: rgba(1, 157, 137, 0.12);  color: #019D89; }
+.vas-dssrch-chip-product     { background: rgba(215, 139, 16, 0.14); color: #B5740C; }
+.vas-dssrch-chip-rep         { background: rgba(123, 97, 255, 0.14); color: #6B4BE0; }
+.vas-dssrch-chip-warehouse   { background: rgba(65, 87, 106, 0.12);  color: #41576A; }
+.vas-dssrch-chip-requisition { background: rgba(46, 158, 91, 0.14);  color: #2E9E5B; }
+.vas-dssrch-chip-description { background: rgba(163, 63, 63, 0.12);  color: #A33F3F; }
+
+/* ==========================================================
+   PO Search detail modal (QA sheet #20) - self-contained,
+   independent of the shared document-search styles.
+   ========================================================== */
+/* ============ PO Search detail modal (result click) ============ */
+.vas-203-dtl-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 30, 48, 0.45);
     display: flex;
     align-items: center;
     justify-content: center;
-    background: transparent;
-    border: 0;
-    box-shadow: none;
-    padding: 0.85em 0;
-    overflow: visible;
-    position: relative;
-    box-sizing: border-box;
-    font-family: Roboto, 'Segoe UI', system-ui, -apple-system, sans-serif;
-    color: #102C3F;
+    padding: 1em;
+    z-index: 10000;
 }
-
-.vas-203-posrch-shell {
-    width: 80%;
-    position: relative;
-    box-sizing: border-box;
-}
-
-.vas-203-posrch-box {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
-    border: 2px solid #FFFFFF;
-    border-radius: 14px;
-    padding: 0.8em 1em;
-    box-shadow: 0 6px 14px rgba(16, 47, 74, 0.06);
-    display: flex;
-    align-items: center;
-    gap: 0.625em;
-    box-sizing: border-box;
-    transition: border-color 0.18s ease, box-shadow 0.18s ease;
-}
-
-.vas-203-posrch-box:hover {
-    box-shadow: 0 8px 18px rgba(16, 47, 74, 0.1);
-}
-
-.vas-203-posrch-box.vas-203-focus {
-    border-color: #1F83FF;
-    box-shadow: 0 8px 22px rgba(31, 131, 255, 0.16);
-}
-
-.vas-203-posrch-ico {
-    width: 1.125em;
-    height: 1.125em;
-    color: #0083DA;
-    flex: none;
-}
-
-.vas-203-posrch-input {
-    flex: 1;
-    min-width: 0;
-    border: 0;
-    outline: 0;
-    background: transparent;
-    font-family: inherit;
-    font-size: 0.85em;
-    color: #102C3F;
-    line-height: 1.3;
-    padding: 0;
-}
-
-.vas-203-posrch-input::placeholder {
-    color: #9F9F9F;
-}
-
-.vas-203-posrch-input::-webkit-search-cancel-button,
-.vas-203-posrch-input::-webkit-search-decoration {
-    -webkit-appearance: none;
-    appearance: none;
-    display: none;
-}
-
-.vas-203-posrch-spin {
-    width: 0.9em;
-    height: 0.9em;
-    border: 2px solid rgba(0, 131, 218, 0.25);
-    border-top-color: #0083DA;
-    border-radius: 999px;
-    flex: none;
-    display: none;
-    animation: vas-203-spin 0.75s infinite linear;
-}
-
-.vas-203-posrch-box.vas-203-busy .vas-203-posrch-spin {
-    display: inline-block;
-}
-
-@keyframes vas-203-spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-.vas-203-posrch-kbd {
-    font-size: 0.6875em;
-    color: #9F9F9F;
+.vas-203-dtl-card {
+    background: #fff;
     border: 1px solid #D9E2EB;
-    border-radius: 6px;
-    padding: 0.15em 0.45em;
-    flex: none;
-    cursor: pointer;
-    user-select: none;
-    transition: background 0.15s ease, color 0.15s ease;
-}
-
-.vas-203-posrch-kbd:hover {
-    background: #F1F4F8;
-    color: #41576A;
-}
-
-/* Results popover */
-.vas-203-posrch-results {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: calc(100% + 8px);
-    z-index: 1000;
-    display: none;
-    background: #FFFFFF;
-    border: 1px solid #D9E2EB;
-    border-radius: 14px;
-    box-shadow: 0 24px 48px rgba(15, 61, 97, 0.18);
-    overflow: hidden;
-    box-sizing: border-box;
-}
-
-.vas-203-posrch-results.vas-203-open {
-    display: block;
-}
-
-.vas-203-posrch-rgroup {
-    font-size: 0.625em;
-    font-weight: 600;
-    color: #41576A;
-    text-transform: capitalize;
-    padding: 0.5em 0.9em 0.35em;
-    border-bottom: 1px solid #E2EAF1;
-    background: #FBFDFF;
-    letter-spacing: 0.02em;
-}
-
-.vas-203-posrch-ritem {
-    display: flex;
-    align-items: center;
-    gap: 0.6em;
-    padding: 0.5em 0.9em;
-    border: 0;
-    border-bottom: 1px solid #E2EAF1;
-    cursor: pointer;
-    background: #FFFFFF;
-    width: 100%;
-    text-align: left;
-    font-family: inherit;
-    box-sizing: border-box;
-    transition: background 0.15s ease;
-    outline: none;
-}
-
-.vas-203-posrch-ritem:last-child {
-    border-bottom: 0;
-}
-
-.vas-203-posrch-ritem:hover,
-.vas-203-posrch-ritem.vas-203-active {
-    background: #F4FAFF;
-}
-
-.vas-203-posrch-ico-badge {
-    width: 1.6em;
-    height: 1.6em;
-    border-radius: 8px;
-    display: grid;
-    place-items: center;
-    flex: none;
-    font-size: 0.6875em;
-    font-weight: 700;
-    color: #41576A;
-    line-height: 1;
-}
-
-.vas-203-posrch-txt {
-    min-width: 0;
-    flex: 1;
+    border-radius: .75em;
+    box-shadow: 0 .9em 2.2em rgba(15, 61, 97, 0.18);
     display: flex;
     flex-direction: column;
-    gap: 0.1em;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: clamp(14px, 1.2vw, 20px);
+    max-height: clamp(420px, 85vh, 900px);
+    overflow: hidden;
+    width: clamp(340px, 85vw, 1200px);
 }
-
-.vas-203-posrch-t1 {
-    display: block;
-    font-size: 0.75em;
-    font-weight: 700;
+.vas-203-dtl-head {
+    align-items: center;
+    border-bottom: 1px solid #1F83FF;
+    display: flex;
+    flex: 0 0 auto;
+    gap: .75em;
+    justify-content: space-between;
+    min-height: 2.6em;
+    padding: .5em 1em;
+}
+.vas-203-dtl-headtxt { min-width: 0; }
+.vas-203-dtl-title {
     color: #102C3F;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    line-height: 1.25;
-}
-
-.vas-203-posrch-t2 {
-    display: block;
-    font-size: 0.6875em;
-    color: #5F7283;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    line-height: 1.2;
-}
-
-.vas-203-posrch-t3 {
-    font-size: 0.75em;
+    font-size: .85em;
     font-weight: 700;
-    color: #0083DA;
-    flex: none;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
 }
-
-.vas-203-posrch-rfooter {
-    padding: 0.5em 0.9em;
-    font-size: 0.6875em;
-    color: #748494;
-    background: #FBFDFF;
-    border-top: 1px solid #D9E2EB;
-    text-align: center;
-    line-height: 1.3;
-}
-
-.vas-203-posrch-rempty {
-    padding: 1em 0.9em;
-    font-size: 0.75em;
+.vas-203-dtl-sub {
     color: #5F7283;
-    line-height: 1.4;
+    font-size: .62em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas-203-dtl-close {
+    background: transparent;
+    border: 0;
+    border-radius: .35em;
+    color: #141414;
+    cursor: pointer;
+    flex: 0 0 auto;
+    font-size: 1em;
+    height: 1.6em;
+    line-height: 1;
+    width: 1.6em;
+}
+.vas-203-dtl-close:hover { background: #EEF6FF; }
+.vas-203-dtl-body {
+    display: flex;
+    flex-direction: column;
+    gap: .6em;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 1em;
+}
+.vas-203-dtl-msg {
+    color: #748494;
+    font-size: .7em;
+    padding: 1.5em 0;
     text-align: center;
 }
-
-.vas-203-posrch-rempty.vas-203-posrch-error {
-    color: #A33F3F;
+.vas-203-dtl-summary {
+    display: grid;
+    gap: .5em .9em;
+    grid-template-columns: repeat(auto-fit, minmax(9em, 1fr));
 }
+.vas-203-dtl-cell {
+    border-bottom: 1px solid #E2EAF1;
+    display: flex;
+    flex-direction: column;
+    gap: .15em;
+    min-width: 0;
+    padding-bottom: .3em;
+}
+.vas-203-dtl-lbl {
+    color: #748494;
+    font-size: .58em;
+}
+.vas-203-dtl-val {
+    color: #102C3F;
+    font-size: .68em;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas-203-dtl-sect {
+    color: #102C3F;
+    flex: 0 0 auto;
+    font-size: .66em;
+    font-weight: 700;
+    margin-top: .3em;
+}
+.vas-203-dtl-tblwrap { overflow-x: auto; }
+.vas-203-dtl-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: .62em;
+    table-layout: auto;
+    width: 100%;
+}
+.vas-203-dtl-table th {
+    border-bottom: 1px solid #C5D2DD;
+    color: #41576A;
+    font-weight: 500;
+    padding: .5em .6em;
+    text-align: left;
+    white-space: nowrap;
+}
+.vas-203-dtl-table td {
+    border-bottom: 1px solid #E2EAF1;
+    color: #5F7283;
+    max-width: 16em;
+    overflow: hidden;
+    padding: .5em .55em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas-203-dtl-table th.r, .vas-203-dtl-table td.r { text-align: right; }
+.vas-203-dtl-table tbody tr:hover td { background: #F5FBFF; }
+.vas-203-dtl-foot {
+    display: flex;
+    flex: 0 0 auto;
+    gap: .6em;
+    justify-content: flex-end;
+    padding-top: .4em;
+}
+.vas-203-dtl-openbtn, .vas-203-dtl-closebtn {
+    background: #fff;
+    border: 1px solid #D9E2EB;
+    border-radius: .4em;
+    color: #0083DA;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: .64em;
+    font-weight: 500;
+    padding: .4em .9em;
+}
+.vas-203-dtl-openbtn { background: #0083DA; border-color: #0083DA; color: #fff; }
+.vas-203-dtl-openbtn:hover { background: #0069AE; }
+.vas-203-dtl-closebtn:hover { background: #EEF6FF; }

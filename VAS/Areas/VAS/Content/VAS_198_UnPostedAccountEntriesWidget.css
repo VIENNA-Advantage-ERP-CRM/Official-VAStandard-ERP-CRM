@@ -214,8 +214,8 @@
 }
 
 .vas-198-cell-name {
-    font-size: .75em;
-    font-weight: 700;
+    font-size: .85em;
+    font-weight: 600;
     color: #102C3F;
     line-height: 1.3;
 }
@@ -228,13 +228,13 @@
 .vas-198-row .vas-198-cell-num {
     font-size: .75em;
     font-weight: 400;
-    color: #102C3F;
+    color: black;
 }
 
 /* The value reads as supporting the count, not competing with it. */
 .vas-198-row .vas-198-cell-value {
     font-weight: 400;
-    color: #5F7283;
+    color: black;
 }
 
 /* Tone carries the operational reading of the count. Unposted is work waiting,

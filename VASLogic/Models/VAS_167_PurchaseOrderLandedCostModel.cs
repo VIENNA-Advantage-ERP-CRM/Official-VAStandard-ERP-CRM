@@ -795,7 +795,7 @@ namespace VASLogic.Models
             try
             {
                 string rfqNoExpr = ColumnExists("C_RfQ", "DocumentNo")
-                    ? "NVL(rq.DocumentNo, rq.Name)"
+                    ? "COALESCE(rq.DocumentNo, rq.Name)"
                     : "rq.Name";
 
                 string sql = @"SELECT rq.C_RfQ_ID        AS RfqId,
@@ -803,8 +803,8 @@ namespace VASLogic.Models
                                  FROM C_RfQResponse rr
                                  INNER JOIN C_RfQ rq ON (rq.C_RfQ_ID = rr.C_RfQ_ID)
                                 WHERE rr.C_Order_ID = @C_Order_ID
-                                  AND NVL(rr.IsActive, 'Y') = 'Y'
-                                  AND NVL(rq.IsActive, 'Y') = 'Y'
+                                  AND COALESCE(rr.IsActive, 'Y') = 'Y'
+                                  AND COALESCE(rq.IsActive, 'Y') = 'Y'
                                 GROUP BY rq.C_RfQ_ID, " + rfqNoExpr + @"
                                 ORDER BY rq.C_RfQ_ID";
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
@@ -833,13 +833,13 @@ namespace VASLogic.Models
             try
             {
                 string sql = @"SELECT pj.C_Project_ID        AS ProjectId,
-                                      NVL(pj.Value, pj.Name) AS ProjectNo
+                                      COALESCE(pj.Value, pj.Name) AS ProjectNo
                                  FROM C_ProjectLine pl
                                  INNER JOIN C_Project pj ON (pj.C_Project_ID = pl.C_Project_ID)
                                 WHERE pl.C_OrderPO_ID = @C_Order_ID
-                                  AND NVL(pl.IsActive, 'Y') = 'Y'
-                                  AND NVL(pj.IsActive, 'Y') = 'Y'
-                                GROUP BY pj.C_Project_ID, NVL(pj.Value, pj.Name)
+                                  AND COALESCE(pl.IsActive, 'Y') = 'Y'
+                                  AND COALESCE(pj.IsActive, 'Y') = 'Y'
+                                GROUP BY pj.C_Project_ID, COALESCE(pj.Value, pj.Name)
                                 ORDER BY pj.C_Project_ID";
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
                 if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
@@ -887,8 +887,8 @@ namespace VASLogic.Models
                                  FROM C_Order o
                                  INNER JOIN C_Order so ON (so.C_Order_ID = o.Ref_Order_ID)
                                 WHERE o.C_Order_ID = @C_Order_ID
-                                  AND NVL(so.IsSOTrx, 'N') = 'Y'
-                                  AND NVL(so.IsActive, 'Y') = 'Y'";
+                                  AND COALESCE(so.IsSOTrx, 'N') = 'Y'
+                                  AND COALESCE(so.IsActive, 'Y') = 'Y'";
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
@@ -913,7 +913,7 @@ namespace VASLogic.Models
                                  INNER JOIN M_Requisition r ON (rl.M_Requisition_ID = r.M_Requisition_ID)
                                  INNER JOIN C_OrderLine ol  ON (rl.C_OrderLine_ID   = ol.C_OrderLine_ID)
                                 WHERE ol.C_Order_ID = @C_Order_ID
-                                  AND NVL(r.IsActive, 'Y') = 'Y'
+                                  AND COALESCE(r.IsActive, 'Y') = 'Y'
                                 GROUP BY r.M_Requisition_ID, r.DocumentNo
                                 ORDER BY r.M_Requisition_ID";
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
@@ -940,7 +940,7 @@ namespace VASLogic.Models
                                  INNER JOIN M_Requisition r
                                         ON (r.M_Requisition_ID = rq.M_Requisition_ID)
                                 WHERE rq.C_RfQ_ID = @C_RfQ_ID
-                                  AND NVL(r.IsActive, 'Y') = 'Y'";
+                                  AND COALESCE(r.IsActive, 'Y') = 'Y'";
                 SqlParameter[] param = new SqlParameter[]
                 {
                     new SqlParameter("@C_RfQ_ID", d.RfqId)
@@ -1132,12 +1132,12 @@ namespace VASLogic.Models
                     ? @"SELECT DISTINCT o.VAMRP_PlanRun_ID AS PlanRunId
                           FROM C_Order o
                          WHERE o.C_Order_ID = @C_Order_ID
-                           AND NVL(o.VAMRP_PlanRun_ID, 0) > 0"
+                           AND COALESCE(o.VAMRP_PlanRun_ID, 0) > 0"
                     : @"SELECT DISTINCT ol.VAMRP_PlanRun_ID AS PlanRunId
                           FROM C_OrderLine ol
                          WHERE ol.C_Order_ID = @C_Order_ID
-                           AND NVL(ol.IsActive, 'Y') = 'Y'
-                           AND NVL(ol.VAMRP_PlanRun_ID, 0) > 0";
+                           AND COALESCE(ol.IsActive, 'Y') = 'Y'
+                           AND COALESCE(ol.VAMRP_PlanRun_ID, 0) > 0";
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
                 if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
 

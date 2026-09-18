@@ -47,6 +47,15 @@
     --cil-shadow-pop: 0 0.625em 1.5em rgba(15, 61, 97, 0.12);
     --cil-shadow-dialog: 0 1.25em 3.125em rgba(15, 61, 97, 0.2);
     --cil-font: "Roboto", "Helvetica Neue", Arial, sans-serif;
+    /* Grid geometry of the line rows. The "..." track is the LAST column, so whatever
+       width it takes is pushed off the right edge of the Taxable Amount column - and
+       Taxable Amount is the figure a reader compares against the Grand Total below it.
+       So the track is sized to what it actually holds and nothing more: the row Undo
+       (1.5em) + gap (0.25em) + the "..." button (1.5em), all of which resolve in the
+       CELL's font-size (0.875em), i.e. 2.844em of row-em. 2.875em covers that exactly.
+       Every em trimmed here moves the Taxable Amount column that much further right. */
+    --cil-col-gap: 0.75em;
+    --cil-more-col: 2.575em;
 }
 
 .vas-cil-root {
@@ -93,8 +102,57 @@
     min-width: 0;
 }
 
+/* ---------------------------------------------------------------------------
+   Full-width host - survives browser zoom / window resize
+   ---------------------------------------------------------------------------
+   The panel itself is already fluid: .vas-cil-root is width:100% and the row grid
+   is built from fr tracks, which always fill their container. So when the lines
+   table renders narrower than the form above it, the container is the problem, not
+   the panel.
+
+   The framework's own stylesheet sizes the tab-panel host for a RIGHT-docked panel:
+
+       .vis-ad-w-p-ap-tp-outerwrap { display:flex; justify-content:flex-end; width:250px; }
+
+   and only releases that below 600px (@media (max-width:600px) -> width:auto). A
+   BOTTOM-docked panel like this one is therefore stretched to its real width by
+   framework JS, as an INLINE pixel width computed at layout time. Browser zoom
+   changes the CSS viewport but does not recompute that inline width, so the host
+   keeps its pre-zoom pixel width and the panel is left short of the window's right
+   edge - the reported gap.
+
+   Fixed here rather than in JS because an author !important declaration outranks an
+   inline style, so this keeps winning even when the framework re-asserts its own
+   width after a later relayout. Scoped with :has() to a host that actually contains
+   THIS panel, so right-docked panels keep the 250px the framework intends. (The JS
+   fitHostWidth() is the fallback for browsers without :has(), mirroring how
+   applyTabVisibility already pairs a :has() rule with a JS fallback.) */
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-cil-root) {
+    width: auto !important;
+    max-width: 100% !important;
+}
+
+/* The host's inner wrappers can carry their own computed widths; release them the
+   same way so the width actually reaches the panel root. */
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-cil-root) > .vis-ad-w-p-ap-tp-o-body,
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-cil-root) .vis-ad-w-p-ap-tp-o-b-content {
+    width: auto !important;
+    max-width: 100% !important;
+    min-width: 0;
+}
+
 .vas-cil-root * {
     box-sizing: border-box;
+}
+
+/* Lookup button of a read-only "..." field (locked document / read-only column).
+   The framework renders this button as an <a>/<span> in some builds, where the
+   `disabled` property is inert - so the click is killed at the CSS layer too, or the
+   Info window would still open on a completed invoice. Lives outside .vas-cil-root's
+   descendant scope because the modal is mounted on <body>. */
+.vas-cil-dyn-btn-off {
+    pointer-events: none;
+    opacity: 0.45;
 }
 
 /* Panel Foundation Rule 4: force nested form controls to inherit the anchor. Without this,
@@ -173,7 +231,7 @@
 
 .vas-cil-panel__title {
     margin: 0;
-    font-size: 1.1em;
+    font-size: 1em;
     font-weight: 700;
     color: var(--cil-text-strong);
 }
@@ -280,13 +338,13 @@
 
 /* ---------- table ---------- */
 .vas-cil-table {
-    padding: 0.5em 1.25em 1.125em;
+    padding: 0.5em 0.5em 0.5em;
 }
 
 .vas-cil-row {
     display: grid;
-    grid-template-columns: 2em minmax(0, 1.9fr) minmax(0, 2fr) minmax(0, 1fr) minmax(6em, 0.7fr) minmax(4.75em, 0.4fr) minmax(6.75em, 0.85fr) 3.5em;
-    gap: 0.75em;
+    grid-template-columns: 2em minmax(0, 1.9fr) minmax(0, 2fr) minmax(0, 1fr) minmax(6em, 0.7fr) minmax(4.75em, 0.4fr) minmax(6.75em, 0.85fr) var(--cil-more-col);
+    gap: var(--cil-col-gap);
     align-items: start;
     padding: 0.5em 0;
     border-bottom: 0.0625em solid var(--cil-divider);
@@ -437,6 +495,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.25em;
+    padding-right: 3em;
 }
 
 .vas-cil-summary-row {
@@ -497,10 +556,13 @@
     align-items: flex-end;
 }
 
+/* Buttons pinned to the RIGHT of their track (was centred), so the "..." sits hard
+   against the panel edge and every remaining pixel of the track belongs to the
+   Taxable Amount column beside it. */
 .vas-cil-cell--more {
     flex-direction: row;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-end;
     gap: 0.25em;
 }
 
@@ -2093,8 +2155,10 @@
 
 /* ---------- responsive ---------- */
 @media (max-width: 60em) {
+    /* Narrow layout drops Description + Tax, but the "..." is still the last track -
+       so the totals keep the same inset and stay aligned with Taxable Amount. */
     .vas-cil-row {
-        grid-template-columns: 1.75em minmax(0, 1.6fr) 7em 6em 6em 3.5em;
+        grid-template-columns: 1.75em minmax(0, 1.6fr) 7em 6em 6em var(--cil-more-col);
     }
 
     .vas-cil-row--head .vas-cil-cell:nth-child(3), .vas-cil-row--line .vas-cil-cell:nth-child(3),
