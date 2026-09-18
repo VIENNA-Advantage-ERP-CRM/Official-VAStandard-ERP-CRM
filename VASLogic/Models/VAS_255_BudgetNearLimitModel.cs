@@ -24,7 +24,9 @@ namespace VASLogic.Models
     ///               accounts that have consumed most of their approved budget but have NOT
     ///               yet passed it:
     ///
-    ///                 Budget    ABS(SUM(AmtAcctDr - AmtAcctCr)) over PostingType 'B'.
+    ///                 Budget    SUM of the natural-balance net over PostingType 'B':
+    ///                           AmtAcctCr - AmtAcctDr for Liability / Revenue accounts,
+    ///                           AmtAcctDr - AmtAcctCr for every other account type.
     ///                 Actual    the same over PostingType 'A'.
     ///                 Used      Actual / Budget * 100.
     ///                 Band      Used &gt;= threshold AND Used &lt; 100. The default
@@ -45,14 +47,17 @@ namespace VASLogic.Models
     ///               unbudgeted-actuals card's subject (VAS_256); one carrying a budget and
     ///               no actual is simply below the threshold and is dropped by the band.
     ///
-    ///               THE AMOUNT IS ABS(SUM(Dr - Cr)) PER POSTING TYPE, netted before the
-    ///               absolute is taken. Netting first is what stops the two sides of one
-    ///               journal being counted twice; the absolute afterwards is what lets a
-    ///               credit-natural account (revenue, liability, equity) be compared against
-    ///               its budget the same way round as a debit-natural one, with no
-    ///               account-type rule to maintain. Source amounts are never read -
-    ///               AmtAcctDr / AmtAcctCr are already stated in the accounting schema's
-    ///               currency, so no currencyConvert call belongs in this model.
+    ///               THE AMOUNT IS THE NET PER POSTING TYPE, SIGNED BY THE ACCOUNT'S NATURAL
+    ///               BALANCE. Netting is what stops the two sides of one journal being
+    ///               counted twice; the sign rule - Cr - Dr when C_ElementValue.AccountType
+    ///               is Liability ('L') or Revenue ('R'), Dr - Cr otherwise - is what lets a
+    ///               credit-natural account be compared against its budget the same way
+    ///               round as a debit-natural one. No ABS is taken, so a budget or actual
+    ///               posted against its nature stays negative and is dropped by the
+    ///               budget > 0 precondition rather than silently flipped. Source amounts
+    ///               are never read - AmtAcctDr / AmtAcctCr are already stated in the
+    ///               accounting schema's currency, so no currencyConvert call belongs in
+    ///               this model.
     ///
     ///               PRIMARY ACCOUNTING SCHEMA ONLY, on both sides. A budget posted in a
     ///               secondary schema must not be compared against an actual in the primary
@@ -89,6 +94,8 @@ namespace VASLogic.Models
     ///               meets a function call either. Compatible with PostgreSQL and Oracle.
     /// Chronological development:
     ///   VAI145      2026-09-09 Created
+    ///   VAI145      2026-09-18 Budget / Actual signed by account nature: Cr - Dr for
+    ///                          Liability and Revenue, Dr - Cr otherwise.
     /// </summary>
     public class VAS_255_BudgetNearLimitModel
     {
@@ -427,18 +434,22 @@ namespace VASLogic.Models
             parameters.Add(new SqlParameter("@DateFrom", year.StartDate));
             parameters.Add(new SqlParameter("@DateTo", year.EndDate));
 
-            /* ONE scan, both posting types, as a FLAT SUM(CASE WHEN ...) per side, with the
-               absolute taken over each NET so the two sides of one journal cancel instead of
-               being counted twice. C_ElementValue is joined for the account's name, its search
-               key and the summary flag; its ON is a plain equality so the access parser has
-               nothing to trip on. */
+            /* ONE scan, both posting types, as a FLAT SUM(CASE WHEN ...) per side, netted so
+               the two sides of one journal cancel instead of being counted twice. The NET
+               follows the account's natural balance (C_ElementValue.AccountType, a stored
+               code compared bare): Liability 'L' and Revenue 'R' are credit-natural, so
+               their figure is Cr - Dr; every other type is Dr - Cr. That is what lets a
+               revenue budget and a revenue actual both come out positive and be compared
+               the same way round as an expense. C_ElementValue is joined for the account's
+               name, its search key, its type and the summary flag; its ON is a plain
+               equality so the access parser has nothing to trip on. */
             StringBuilder sql = new StringBuilder();
             sql.Append(@"
                 SELECT fa.Account_ID AS Account_ID,
                        COALESCE(ev.Value,N'') AS Account_Value,
                        COALESCE(ev.Name,N'') AS Account_Name,
-                       (SUM(CASE WHEN fa.PostingType=@PostingType_Budget_Sel THEN COALESCE(fa.AmtAcctDr,0)-COALESCE(fa.AmtAcctCr,0) ELSE 0 END)) AS Budget_Amt,
-                       (SUM(CASE WHEN fa.PostingType=@PostingType_Actual_Sel THEN COALESCE(fa.AmtAcctDr,0)-COALESCE(fa.AmtAcctCr,0) ELSE 0 END)) AS Actual_Amt
+                       (SUM(CASE WHEN fa.PostingType=@PostingType_Budget_Sel THEN (CASE WHEN ev.AccountType IN ('L','R') THEN COALESCE(fa.AmtAcctCr,0)-COALESCE(fa.AmtAcctDr,0) ELSE COALESCE(fa.AmtAcctDr,0)-COALESCE(fa.AmtAcctCr,0) END) ELSE 0 END)) AS Budget_Amt,
+                       (SUM(CASE WHEN fa.PostingType=@PostingType_Actual_Sel THEN (CASE WHEN ev.AccountType IN ('L','R') THEN COALESCE(fa.AmtAcctCr,0)-COALESCE(fa.AmtAcctDr,0) ELSE COALESCE(fa.AmtAcctDr,0)-COALESCE(fa.AmtAcctCr,0) END) ELSE 0 END)) AS Actual_Amt
                 FROM Fact_Acct fa
                 INNER JOIN C_ElementValue ev ON (ev.C_ElementValue_ID=fa.Account_ID)
                 WHERE fa.AD_Client_ID=@AD_Client_ID
@@ -469,7 +480,7 @@ namespace VASLogic.Models
                The bind is added LAST because the clause is last: the adapters bind
                positionally, and every occurrence carries its own name. */
             rowSql += " GROUP BY fa.Account_ID,ev.Value,ev.Name"
-                + " HAVING (SUM(CASE WHEN fa.PostingType=@PostingType_Budget_Have THEN COALESCE(fa.AmtAcctDr,0)-COALESCE(fa.AmtAcctCr,0) ELSE 0 END))>0";
+                + " HAVING (SUM(CASE WHEN fa.PostingType=@PostingType_Budget_Have THEN (CASE WHEN ev.AccountType IN ('L','R') THEN COALESCE(fa.AmtAcctCr,0)-COALESCE(fa.AmtAcctDr,0) ELSE COALESCE(fa.AmtAcctDr,0)-COALESCE(fa.AmtAcctCr,0) END) ELSE 0 END))>0";
             parameters.Add(new SqlParameter("@PostingType_Budget_Have", POSTINGTYPE_Budget));
 
             DataSet ds = DB.ExecuteDataset(rowSql, parameters.ToArray(), null);
@@ -626,7 +637,8 @@ namespace VASLogic.Models
         /// <summary>
         /// One account inside the warning band. Both figures are in the PRIMARY accounting
         /// schema currency and are never converted - AmtAcctDr / AmtAcctCr are already stated
-        /// in it - and both are the ABSOLUTE of a net, so a credit-natural account reads the
+        /// in it - and both are netted by the account's natural balance (Cr - Dr for
+        /// Liability / Revenue, Dr - Cr otherwise), so a credit-natural account reads the
         /// same way round as a debit-natural one.
         /// </summary>
         public class NearLimitRow
@@ -640,11 +652,11 @@ namespace VASLogic.Models
             /// <summary>C_ElementValue.Name - the account description, and the row's label.</summary>
             public string AccountName { get; set; }
 
-            /// <summary>Approved budget for the year: PostingType 'B', netted then absolute.
+            /// <summary>Approved budget for the year: PostingType 'B', netted by account nature.
             /// Always greater than zero - an account without one is not on this card.</summary>
             public decimal Budget { get; set; }
 
-            /// <summary>Posted actual for the year: PostingType 'A', netted then absolute.</summary>
+            /// <summary>Posted actual for the year: PostingType 'A', netted by account nature.</summary>
             public decimal Actual { get; set; }
 
             /// <summary>Actual / Budget * 100, always inside [threshold, 100).</summary>

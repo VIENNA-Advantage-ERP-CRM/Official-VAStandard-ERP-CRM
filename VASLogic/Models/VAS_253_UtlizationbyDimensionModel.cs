@@ -1170,7 +1170,7 @@ namespace VASLogic.Models
             /* The dimension column is an identifier this model resolved from the whitelist in
                §4 and confirmed against AD_Column - it is never client text, and never a bind
                (a column name cannot be one). */
-            string amountExpr = "ABS(SUM(COALESCE(fa.AmtAcctDr,0)-COALESCE(fa.AmtAcctCr,0)))";
+            string amountExpr = "(SUM(COALESCE(fa.AmtAcctDr,0)-COALESCE(fa.AmtAcctCr,0)))";
 
             StringBuilder body = new StringBuilder();
             body.Append("SELECT fa.").Append(spec.FactColumn).Append(" AS DimensionValue_ID,")
