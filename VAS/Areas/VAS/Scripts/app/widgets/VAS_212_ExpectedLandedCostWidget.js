@@ -7,12 +7,12 @@
  * Summary Message Table
  *  # | Fallback Text                                    | Message Key
  * ---+--------------------------------------------------+-----------------------------------
- *  1 | Expected Landed Cost on PO                       | VAS_ExpectedLandedCostOnPO
- *  2 | Across {0} open POs                              | VAS_AcrossOpenPOs
- *  3 | Across {0} open PO                               | VAS_AcrossOpenPO
- *  4 | Showing {0}–{1} of {2} cost elements             | VAS_ShowingCostElements
- *  5 | No expected landed cost for the selected month.  | VAS_NoExpectedLandedCost
- *  6 | Couldn't load expected landed cost.              | VAS_CouldntLoadExpectedCost
+ *  1 | Expected Landed Cost on PO                       | VAS_212_ExpectedLandedCostOnPO
+ *  2 | Across {0} open POs                              | VAS_212_AcrossOpenPOs
+ *  3 | Across {0} open PO                               | VAS_212_AcrossOpenPO
+ *  4 | Showing {0}–{1} of {2} cost elements             | VAS_212_ShowingCostElements
+ *  5 | No expected landed cost for the selected month.  | VAS_212_NoExpectedLandedCost
+ *  6 | Couldn't load expected landed cost.              | VAS_212_CouldntLoadExpectedCost
  *  7 | Month                                            | VAS_Month
  *  8 | Year                                             | VAS_Year
  *  9 | Previous                                         | VAS_Previous
@@ -94,8 +94,7 @@
         var totalPages = 1;
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return (translated && translated !== key && translated !== '[' + key + ']' && translated.charAt(0) !== '[') ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -144,7 +143,7 @@
             // 1. Header with Title & Arrow-less Month / Year Filters
             $head = $('<div class="vas-elc-head">');
             var $titleWrap = $('<div class="vas-elc-head-txt">');
-            $titleWrap.append($('<p class="vas-elc-title">').text(label('VAS_ExpectedLandedCostOnPO', 'Expected Landed Cost on PO')));
+            $titleWrap.append($('<p class="vas-elc-title">').text(label('VAS_212_ExpectedLandedCostOnPO', 'Expected Landed Cost on PO')));
 
             var $filterWrap = $('<div class="vas-elc-mfilter">');
             $monthSelect = $('<select class="vas-elc-select vas-elc-select-month">').attr('aria-label', label('VAS_Month', 'Month'));
@@ -199,7 +198,7 @@
             $pagerEl = $('<span class="vas-elc-pager">');
             $prevBtn = $('<button type="button" class="vas-elc-pbtn" aria-label="' + label('VAS_Previous', 'Previous') + '">')
                 .html('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>');
-            $pageTxt = $('<span class="vas-elc-ptxt">').text('1 of 1');
+            $pageTxt = $('<span class="vas-elc-ptxt">').text('1 ' + label('VAS_Of', 'of') + ' 1');
             $nextBtn = $('<button type="button" class="vas-elc-pbtn" aria-label="' + label('VAS_Next', 'Next') + '">')
                 .html('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>');
 
@@ -272,8 +271,8 @@
             $totalEl.text(formattedTotal).attr('title', formattedTotal);
 
             var metaText = openPOCount === 1
-                ? label('VAS_AcrossOpenPO', 'Across {0} open PO').replace('{0}', openPOCount)
-                : label('VAS_AcrossOpenPOs', 'Across {0} open POs').replace('{0}', openPOCount);
+                ? label('VAS_212_AcrossOpenPO', 'Across {0} open PO').replace('{0}', openPOCount)
+                : label('VAS_212_AcrossOpenPOs', 'Across {0} open POs').replace('{0}', openPOCount);
             $metaEl.text(metaText).attr('title', metaText);
 
             renderList();
@@ -285,7 +284,7 @@
             if (!costElements || costElements.length === 0) {
                 $listContainer.addClass('vas-elc-hidden');
                 $emptyEl.removeClass('vas-elc-hidden')
-                    .text(label('VAS_NoExpectedLandedCost', 'No expected landed cost for the selected month.'));
+                    .text(label('VAS_212_NoExpectedLandedCost', 'No expected landed cost for the selected month.'));
                 $foot.addClass('vas-elc-hidden');
                 return;
             }
@@ -354,7 +353,7 @@
             // Footer Pager rendering
             if (costElements.length > pageSize) {
                 $foot.removeClass('vas-elc-hidden');
-                var helperTpl = label('VAS_ShowingCostElements', 'Showing {0}–{1} of {2} cost elements');
+                var helperTpl = label('VAS_212_ShowingCostElements', 'Showing {0}–{1} of {2} cost elements');
                 var helperText = helperTpl
                     .replace('{0}', startIndex + 1)
                     .replace('{1}', endIndex)
@@ -374,7 +373,7 @@
             $metaEl.text('—');
             $listContainer.empty().addClass('vas-elc-hidden');
             $emptyEl.removeClass('vas-elc-hidden')
-                .text(label('VAS_CouldntLoadExpectedCost', "Couldn't load expected landed cost."));
+                .text(label('VAS_212_CouldntLoadExpectedCost', "Couldn't load expected landed cost."));
             $foot.addClass('vas-elc-hidden');
         }
 
@@ -433,7 +432,7 @@
 
         function openCostModal(costElementId, costElementName) {
             ensureCostModal();
-            $elcMask.find('.vas-elc-mtitle').text(costElementName || label('VAS_LandedCost', 'Landed cost'));
+            $elcMask.find('.vas-elc-mtitle').text(costElementName || label('VAS_212_LandedCost', 'Landed cost'));
             $elcMask.find('.vas-elc-msub').text(label('VAS_Loading', 'Loading...'));
             $elcMask.find('.vas-elc-modal-body').empty();
             $elcMask.find('.vas-elc-mnote').text('');
@@ -449,11 +448,11 @@
                     if (typeof data === 'string') { try { data = JSON.parse(data); } catch (e) { } }
                     if (typeof data === 'string') { try { data = JSON.parse(data); } catch (e) { } }
                     data = data || {};
-                    if (!data.success) { renderCostModalState(label('VAS_FailedToLoad', 'Failed to load data')); return; }
+                    if (!data.success) { renderCostModalState(label('VAS_212_FailedToLoad', 'Failed to load data')); return; }
                     renderCostModalRows(data);
                 },
                 error: function () {
-                    renderCostModalState(label('VAS_FailedToLoad', 'Failed to load data'));
+                    renderCostModalState(label('VAS_212_FailedToLoad', 'Failed to load data'));
                 }
             });
         }
@@ -470,7 +469,7 @@
             var prec = (typeof data.stdPrecision === 'number') ? data.stdPrecision : 2;
 
             $elcMask.find('.vas-elc-msub').text(
-                label('VAS_ExpectedLandedCost', 'Expected landed cost') + ' · ' +
+                label('VAS_212_ExpectedLandedCost', 'Expected landed cost') + ' · ' +
                 formatCurrency(data.totalAmount, sym, prec));
 
             if (!rows.length) {

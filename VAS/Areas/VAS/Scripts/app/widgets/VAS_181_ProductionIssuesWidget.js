@@ -9,6 +9,19 @@
  *  1 | Production Issues               | VAS_181_ProductionIssues
  *  2 | Of issued value MTD             | VAS_181_OfIssuedValueMTD
  *  3 | Couldn't load                   | VAS_181_CouldntLoad
+ *
+ * NOTE (2026-09-18, Claude): setupResizeObserver()/--widget-inline-size removed from
+ * Initalize() to match VAS_180_IssuedMTDWidget's label/value/meta size. VAS_180 never
+ * scopes --widget-inline-size to its own card, so its font-size clamp() falls through
+ * to the dashboard-wide --dash-inline-size and lands near the clamp's midpoint
+ * (~18.4px); this widget's own --widget-inline-size was scoped to its ~300px card,
+ * which is small enough that the clamp always bottomed out at its 16px floor instead.
+ * Also found while here: the "OLD CODE (kept for rollback, do not delete)" Initalize
+ * block below this one is NOT actually commented out - it re-assigns this.Initalize
+ * and, being the later assignment, silently wins over the "NEW CODE" version above it
+ * (so loadCurrencyInfo() was never being called). Left as-is / out of scope for this
+ * change beyond removing setupResizeObserver() from both, since fixing it changes
+ * runtime behavior beyond what was asked here - flagged for a separate task.
  */
 ; VAS = window.VAS || {};
 
@@ -43,8 +56,7 @@
         var $busy;
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return (translated && translated.charAt(0) !== '[') ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -139,7 +151,6 @@
 
         this.Initalize = function () {
             createWidget();
-            setupResizeObserver();
             loadCurrencyInfo();
             loadKpi();
         };
@@ -147,7 +158,6 @@
 // ----- OLD CODE (kept for rollback, do not delete) -----
         this.Initalize = function () {
             createWidget();
-            setupResizeObserver();
             loadKpi();
         };
 // ----- END OLD CODE -----
@@ -207,7 +217,7 @@
                 $valueEl.attr('title', pct + '%');
             }
             if ($metaEl) {
-                $metaEl.text(label("VAS_OfIssuedValueMTD", "Of issued value MTD"));
+                $metaEl.text(label("VAS_181_OfIssuedValueMTD", "Of issued value MTD"));
             }
             if ($card) { $card.prop('disabled', false); }
         }

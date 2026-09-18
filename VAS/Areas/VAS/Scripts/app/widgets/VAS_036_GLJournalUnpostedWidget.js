@@ -9,7 +9,7 @@
  *  2  | Drafts waiting                       | VAS_036_DraftsWaiting
  *  3  | Unposted Journals                    | VAS_036_UnpostedJournals
  *  4  | Journals waiting to be posted        | VAS_036_UnpostedSub
- *  5  | Export                               | VAS_Export
+ *  5  | Export                               | VAS_036_Export
  *  6  | Close                                | VAS_Close
  *  7  | Approve                              | VAS_036_Approve
  *  8  | Post Journal                         | VAS_036_PostJournal
@@ -44,14 +44,7 @@
     }
 
     function lbl(key, fallback) {
-        var text = VIS.Msg.getMsg(key);
-
-        return (
-            text &&
-            text.charAt(0) !== "["
-        )
-            ? text
-            : fallback;
+        return VIS.Msg.getMsg(key);
     }
 
     function esc(value) {
@@ -522,7 +515,7 @@
                         "<span>" +
                         esc(
                             lbl(
-                                "VAS_Export",
+                                "VAS_036_Export",
                                 "Export"
                             )
                         ) +

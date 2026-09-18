@@ -3,8 +3,8 @@
  * Summary Message Table
  *  # | Current Text  | Message Key
  * ---+---------------+-----------------
- *  1 | Pending GRNs  | VAS_PendingGRNs
- *  2 | Awaiting GRN  | VAS_AwaitingGRN
+ *  1 | Pending GRNs  | VAS_074_PendingGRNs
+ *  2 | Awaiting GRN  | VAS_074_AwaitingGRN
  *  3 | Couldn't load | VAS_CouldntLoad
  */
 ; VAS = window.VAS || {};
@@ -21,13 +21,12 @@
         var $meta;
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return translated && translated.charAt(0) !== '[' ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function loadCount() {
             $value.text('\u2014');
-            $meta.text(label('VAS_AwaitingGRN', 'Awaiting GRN'));
+            $meta.text(label('VAS_074_AwaitingGRN', 'Awaiting GRN'));
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_074_PendingGRNsWidget/GetPendingGRNCount',
@@ -64,7 +63,7 @@
                 '</div>'
             );
 
-            $card.find('.MPC-pending-grns-label').text(label('VAS_PendingGRNs', 'Pending GRNs'));
+            $card.find('.MPC-pending-grns-label').text(label('VAS_074_PendingGRNs', 'Pending GRNs'));
             $value = $card.find('.MPC-pending-grns-value');
             $meta = $card.find('.MPC-pending-grns-meta');
             $root.append($card);

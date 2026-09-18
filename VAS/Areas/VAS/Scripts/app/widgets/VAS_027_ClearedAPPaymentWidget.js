@@ -88,12 +88,7 @@
         var adaptiveAdjustCount = 0;
 
         function lbl(key, fallback) {
-            var text = VIS.Msg.getMsg(key);
-
-            return text &&
-                text !== '[' + key + ']'
-                ? text
-                : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function normalizeResponse(response) {

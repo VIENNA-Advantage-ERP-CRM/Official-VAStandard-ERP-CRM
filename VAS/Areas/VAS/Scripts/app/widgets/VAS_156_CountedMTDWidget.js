@@ -44,8 +44,7 @@
         var modalTotalPages = 1;
 
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            return (t && t.charAt(0) !== '[') ? t : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function showBusy(show) {
@@ -269,11 +268,11 @@
                 '</div>' +
                 '<div class="vas-counted-mtd-modal-body">' +
                 '<div class="vas-counted-mtd-grid-row vas-counted-mtd-header-row">' +
-                '<div class="vas-counted-mtd-th">' + escapeHtml(lbl("VAS_DocNo", "Document No")) + '</div>' +
+                '<div class="vas-counted-mtd-th">' + escapeHtml(lbl("VAS_156_DocNo", "Document No")) + '</div>' +
                 '<div class="vas-counted-mtd-th">' + escapeHtml(lbl("VAS_Warehouse", "Warehouse")) + '</div>' +
                 '<div class="vas-counted-mtd-th">' + escapeHtml(lbl("VAS_Date", "Date")) + '</div>' +
                 '<div class="vas-counted-mtd-th vas-counted-mtd-th-right">' + escapeHtml(lbl("VAS_Lines", "Lines")) + '</div>' +
-                '<div class="vas-counted-mtd-th vas-counted-mtd-th-right">' + escapeHtml(lbl("VAS_Products", "Products")) + '</div>' +
+                '<div class="vas-counted-mtd-th vas-counted-mtd-th-right">' + escapeHtml(lbl("VAS_156_Products", "Products")) + '</div>' +
                 '<div class="vas-counted-mtd-th">' + escapeHtml(lbl("VAS_Status", "Status")) + '</div>' +
                 '</div>' +
                 '<div class="vas-counted-mtd-rows"></div>' +

@@ -57,12 +57,12 @@
  * 13 | Business Partner                         | C_BPartner_ID             (reuse)
  * 14 | Currency                                 | C_Currency_ID             (reuse)
  * 15 | Amount                                   | PayAmt                    (reuse)
- * 16 | Close                                    | VAS_018_Close             (reuse)
- * 17 | Couldn't load                            | VAS_192_CouldntLoad       (reuse)
- * 18 | Showing                                  | VAS_026_Showing           (reuse)
- * 19 | of                                       | VAS_026_Of                (reuse)
- * 20 | Previous                                 | VAS_026_Prev              (reuse)
- * 21 | Next                                     | VAS_026_Next              (reuse)
+ * 16 | Close                                    | VAS_199_Close
+ * 17 | Couldn't load                            | VAS_199_CouldntLoad
+ * 18 | Showing                                  | VAS_199_Showing
+ * 19 | of                                       | VAS_199_Of
+ * 20 | Previous                                 | VAS_199_Prev
+ * 21 | Next                                     | VAS_199_Next
  */
 ; VAS = window.VAS || {};
 
@@ -169,8 +169,7 @@
         // ── Small helpers ────────────────────────────────────────────────────
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return (translated && translated.charAt(0) !== '[' && translated !== key) ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         /* Column captions: prefer the framework's own translated element name so a
@@ -371,7 +370,7 @@
                 success: function (res) {
                     var data = null;
                     try { data = parseResponse(res); } catch (e) { }
-                    if (!data || data.error) { renderState(label('VAS_192_CouldntLoad', "Couldn't load"), true); return; }
+                    if (!data || data.error) { renderState(label('VAS_199_CouldntLoad', "Couldn't load"), true); return; }
 
                     _periods = data.Periods || [];
                     _periodId = data.C_Period_ID || 0;
@@ -387,7 +386,7 @@
 
                     paintList();
                 },
-                error: function () { renderState(label('VAS_192_CouldntLoad', "Couldn't load"), true); },
+                error: function () { renderState(label('VAS_199_CouldntLoad', "Couldn't load"), true); },
                 complete: function () { showBusy(false); }
             });
         }
@@ -402,7 +401,7 @@
                 success: function (res) {
                     var data = null;
                     try { data = parseResponse(res); } catch (e) { }
-                    if (!data || data.error) { renderState(label('VAS_192_CouldntLoad', "Couldn't load"), true); return; }
+                    if (!data || data.error) { renderState(label('VAS_199_CouldntLoad', "Couldn't load"), true); return; }
 
                     /* A late response for a period the user has already moved away
                        from must not overwrite the current counts. */
@@ -418,7 +417,7 @@
                     _counts = data;
                     paintList();
                 },
-                error: function () { renderState(label('VAS_192_CouldntLoad', "Couldn't load"), true); },
+                error: function () { renderState(label('VAS_199_CouldntLoad', "Couldn't load"), true); },
                 complete: function () { showBusy(false); }
             });
         }
@@ -733,7 +732,7 @@
                                 '<div class="vas-199-modal-sub"></div>' +
                             '</div>' +
                             '<button type="button" class="vas-199-modal-close" aria-label="' +
-                                escapeHtml(label('VAS_018_Close', 'Close')) + '">' + icon('close') + '</button>' +
+                                escapeHtml(label('VAS_199_Close', 'Close')) + '">' + icon('close') + '</button>' +
                         '</div>' +
                         '<div class="vas-199-modal-body"></div>' +
                         '<div class="vas-199-modal-foot"></div>' +
@@ -856,7 +855,7 @@
                     try { data = parseResponse(res); } catch (e) { }
 
                     if (!data || data.error || data.ErrorCode) {
-                        renderModalState(label('VAS_192_CouldntLoad', "Couldn't load"), true);
+                        renderModalState(label('VAS_199_CouldntLoad', "Couldn't load"), true);
                         return;
                     }
 
@@ -865,7 +864,7 @@
                 },
                 error: function () {
                     if (mySeq !== _detailSeq) { return; }
-                    renderModalState(label('VAS_192_CouldntLoad', "Couldn't load"), true);
+                    renderModalState(label('VAS_199_CouldntLoad', "Couldn't load"), true);
                 },
                 complete: function () {
                     /* Only the newest request may clear the indicator - an overtaken
@@ -992,8 +991,8 @@
             var from = rows > 0 ? ((pageNo - 1) * pageSize) + 1 : 0;
             var to = rows > 0 ? from + rows - 1 : 0;
 
-            var ofTxt = label('VAS_026_Of', 'of');
-            var showing = label('VAS_026_Showing', 'Showing') + ' ' + from + '–' + to + ' ' +
+            var ofTxt = label('VAS_199_Of', 'of');
+            var showing = label('VAS_199_Showing', 'Showing') + ' ' + from + '–' + to + ' ' +
                 ofTxt + ' ' + formatCount(total);
 
             var prevDis = pageNo <= 1 ? ' disabled' : '';
@@ -1004,10 +1003,10 @@
                     escapeHtml(showing) + '</span>' +
                 '<span class="vas-199-pager-nav">' +
                     '<button type="button" class="vas-199-pgbtn" data-dir="prev" aria-label="' +
-                        escapeHtml(label('VAS_026_Prev', 'Previous')) + '"' + prevDis + '>' + icon('chevL') + '</button>' +
+                        escapeHtml(label('VAS_199_Prev', 'Previous')) + '"' + prevDis + '>' + icon('chevL') + '</button>' +
                     '<span class="vas-199-pager-label">' + pageNo + ' ' + escapeHtml(ofTxt) + ' ' + totalPages + '</span>' +
                     '<button type="button" class="vas-199-pgbtn" data-dir="next" aria-label="' +
-                        escapeHtml(label('VAS_026_Next', 'Next')) + '"' + nextDis + '>' + icon('chevNext') + '</button>' +
+                        escapeHtml(label('VAS_199_Next', 'Next')) + '"' + nextDis + '>' + icon('chevNext') + '</button>' +
                 '</span>'
             );
         }
@@ -1027,7 +1026,7 @@
                     isReceipt ? '' : ZOOM_WINDOW_PAYMENT_OLD);
             } catch (e) {
                 if (window.console) { console.log(e); }
-                showError(label('VAS_192_CouldntLoad', "Couldn't load"));
+                showError(label('VAS_199_CouldntLoad', "Couldn't load"));
             }
         }
 

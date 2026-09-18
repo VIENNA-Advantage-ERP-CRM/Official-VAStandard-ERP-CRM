@@ -115,8 +115,7 @@
         };
 
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            return (t && t.charAt(0) !== '[') ? t : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function el(tag, className, text) {
@@ -219,7 +218,7 @@
 
             var $head = $('<div class="MPC-wc-m-head"></div>');
             $modalTitleGroup = $('<div class="MPC-wc-m-titlegroup"></div>');
-            $modalClose = $('<button type="button" class="MPC-wc-m-close" aria-label="Close"></button>');
+            $modalClose = $('<button type="button" class="MPC-wc-m-close"></button>').attr('aria-label', lbl('Close', 'Close'));
             $modalClose.append(svg('<path d="M18 6 6 18"/><path d="m6 6 12 12"/>'));
             $head.append($modalTitleGroup, $modalClose);
 

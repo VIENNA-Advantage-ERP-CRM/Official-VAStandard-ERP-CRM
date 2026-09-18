@@ -23,8 +23,7 @@
     }
 
     function lbl(key, fallback) {
-        var t = VIS.Msg.getMsg(key);
-        return (t && t.charAt(0) !== '[') ? t : fallback;
+        return VIS.Msg.getMsg(key);
     }
 
     function escapeHtml(v) {
@@ -74,9 +73,9 @@
     }
 
     function lineStatusPill(lineStatusStr) {
-        if (lineStatusStr === 'OK')      { return '<span class="vas-174-pill vas-174-pill--ok">OK</span>'; }
-        if (lineStatusStr === 'Short')   { return '<span class="vas-174-pill vas-174-pill--short">Short</span>'; }
-        return '<span class="vas-174-pill vas-174-pill--pending">Pending</span>';
+        if (lineStatusStr === 'OK')      { return '<span class="vas-174-pill vas-174-pill--ok">' + escapeHtml(lbl('VAS_174_LineStatusOK', 'OK')) + '</span>'; }
+        if (lineStatusStr === 'Short')   { return '<span class="vas-174-pill vas-174-pill--short">' + escapeHtml(lbl('VAS_174_LineStatusShort', 'Short')) + '</span>'; }
+        return '<span class="vas-174-pill vas-174-pill--pending">' + escapeHtml(lbl('VAS_174_LineStatusPending', 'Pending')) + '</span>';
     }
 
 // ===== NEW CODE START — currency format (agent C08, 2026-08-19) =====
@@ -181,7 +180,7 @@
                             '<div class="vas-174-subtitle">' + escapeHtml(lbl('VAS_174_OpenDocuments', 'Open documents only')) + '</div>' +
                         '</div>' +
                     '</div>' +
-                    '<span class="vas-174-count-pill" id="vas174-cnt">0 open</span>' +
+                    '<span class="vas-174-count-pill" id="vas174-cnt">0 ' + escapeHtml(lbl('VAS_174_Open', 'open')) + '</span>' +
                     '<div class="vas-174-filters">' +
                         '<div class="vas-174-dropdown" id="vas174-m-dd">' +
                             '<button type="button" class="vas-174-dropdown-btn" id="vas174-m-btn">' +
@@ -479,7 +478,7 @@
                                     '<span class="vas-174-form-val">' + escapeHtml((doc.FromWarehouse || '') + ' → ' + (doc.ToWarehouse || '')) + '</span>' +
                                 '</div>' +
                                 '<div class="vas-174-form-cell">' +
-                                    '<span class="vas-174-form-label">From Loc → To Loc</span>' +
+                                    '<span class="vas-174-form-label">' + escapeHtml(lbl('VAS_174_FromLocToLoc', 'From Loc → To Loc')) + '</span>' +
                                     '<span class="vas-174-form-val">' + escapeHtml((doc.FromLocator || '') + ' → ' + (doc.ToLocator || '')) + '</span>' +
                                 '</div>' +
                                 '<div class="vas-174-form-cell">' +
@@ -505,10 +504,10 @@
                                     '</colgroup>' +
                                     '<thead>' +
                                         '<tr>' +
-                                            '<th style="text-align:left;">Item & Attribute</th>' +
-                                            '<th style="text-align:right;">Sent</th>' +
-                                            '<th style="text-align:right;">Received</th>' +
-                                            '<th style="text-align:center;">Status</th>' +
+                                            '<th style="text-align:left;">' + escapeHtml(lbl('VAS_174_ItemAttribute', 'Item & Attribute')) + '</th>' +
+                                            '<th style="text-align:right;">' + escapeHtml(lbl('VAS_174_Sent', 'Sent')) + '</th>' +
+                                            '<th style="text-align:right;">' + escapeHtml(lbl('VAS_174_Received', 'Received')) + '</th>' +
+                                            '<th style="text-align:center;">' + escapeHtml(lbl('VAS_174_Status', 'Status')) + '</th>' +
                                         '</tr>' +
                                     '</thead>' +
                                     '<tbody>' + rowsHtml + '</tbody>' +

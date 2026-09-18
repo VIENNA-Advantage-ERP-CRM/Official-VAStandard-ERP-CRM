@@ -88,6 +88,7 @@
  * 57  | of                                                                    | VAS_280_Of
  * 58  | Showing                                                               | VAS_280_Showing
  * 59  | Search is unavailable right now. Try again in a moment.               | VAS_280_LoadError
+ * 60  | sales orders                                                          | VAS_280_SalesOrdersSuffix
  */
 ; VAS = window.VAS || {};
 
@@ -144,8 +145,7 @@
         var currentCfg = null;
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return (translated && translated.charAt(0) !== '[') ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -354,7 +354,7 @@
                     '<span class="vas280-cell right vas280-c-std" title="' + escapeHtml(qtyTitle(row.FreeStock)) + '">' + formatNum(row.FreeStock) + '</span>' +
                     '<span class="vas280-cell right vas280-c-short" title="' + escapeHtml(qtyTitle(row.ShortQty)) + '">' + formatNum(row.ShortQty) + '</span>' +
                     '<span class="vas280-cell right vas280-c-emph" title="' + escapeHtml(formatINR(row.ValueBlocked)) + '">' + escapeHtml(formatINR(row.ValueBlocked)) + '</span>' +
-                    '<span class="vas280-cell right vas280-c-dark" title="' + row.AffectedOrderCount + ' sales orders">' + row.AffectedOrderCount + '</span>' +
+                    '<span class="vas280-cell right vas280-c-dark" title="' + row.AffectedOrderCount + ' ' + escapeHtml(label('VAS_280_SalesOrdersSuffix', 'sales orders')) + '">' + row.AffectedOrderCount + '</span>' +
                 '</button>';
             }).join(''));
 

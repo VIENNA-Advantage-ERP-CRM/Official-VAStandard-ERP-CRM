@@ -17,6 +17,11 @@ namespace VIS.Controllers
     /// Chronological development:
     ///   AI-Dev      2026-08-02 Created
     ///   Agent A04   2026-08-19 Added GetCurrencyInfo endpoint & currency formatting support
+    ///   Claude      2026-09-18 Reclassified Spares/Consumables via Product Category
+    ///                          (M_Product_Category.ProductGroup = 'C') instead of the
+    ///                          "not linked to a work order" complement of VAS_181 -- that
+    ///                          heuristic pushed this KPI to ~99% on installs where few
+    ///                          internal-use lines carry a work order link at all.
     /// </summary>
     public class VAS_182_SparesConsumablesIssuesWidgetController : Controller
     {
@@ -178,14 +183,19 @@ namespace VIS.Controllers
             string nmsl = ToSqlDate(nextMonthStart);
 
             // Same population as GetSparesConsumablesPercentageData's SparesValue
-            // branch (line-level NOT-work-order classification), just DISTINCT
-            // header ids instead of a SUM.
+            // branch (Product Category group 'C' + line-level NOT-work-order
+            // classification), just DISTINCT header ids instead of a SUM.
             string sql = @"
                 SELECT DISTINCT inv.M_Inventory_ID
                   FROM M_Inventory inv
                   INNER JOIN M_InventoryLine line ON ( line.M_Inventory_ID = inv.M_Inventory_ID )
+                  INNER JOIN M_Product mp ON ( mp.M_Product_ID = line.M_Product_ID )
+                  INNER JOIN M_Product_Category mpc ON ( mpc.M_Product_Category_ID = mp.M_Product_Category_ID )
                  WHERE inv.IsActive = 'Y'
+                   AND mpc.ProductGroup = 'C'
                    AND line.IsActive = 'Y'
+                   AND mp.IsActive = 'Y'
+                   AND mpc.IsActive = 'Y'
                    AND COALESCE(inv.IsInternalUse, 'N') = 'Y'
                    AND inv.DocStatus IN ('CO', 'CL')
                    AND COALESCE(line.QtyInternalUse, 0) > 0
@@ -215,13 +225,16 @@ namespace VIS.Controllers
             string msl = ToSqlDate(monthStart);
             string nmsl = ToSqlDate(nextMonthStart);
 
-            // Spares / consumables share = value of issue lines NOT raised against a work order.
-            // Exact complement of VAS_181_ProductionIssuesWidget, so the two KPIs sum to 100%
-            // (as the source spec intends: 61% production + 39% spares).
+            // Spares / consumables share = value of issue lines for products whose Product
+            // Category is in the "Consumables/Spares" group (M_Product_Category.ProductGroup
+            // = 'C'), as a share of the SAME group's total issued value for the period.
             //
-            // The previous classification (C_Charge_ID IS NULL AND M_RequisitionLine_ID IS NULL)
-            // could never be true: an internal-use line always carries a charge account, so on
-            // FSMTesting6 this KPI returned a hard 0% for every period.
+            // Previously this widget classified "spares" as "any line NOT raised against a
+            // work order" -- an exact complement of VAS_181_ProductionIssuesWidget with no
+            // actual product classification behind it. On installs where few internal-use
+            // lines carry a work order link at all, that heuristic pushed this KPI to ~99-100%
+            // regardless of what was actually issued. Product Category is the real source of
+            // truth for what counts as a spare/consumable part.
             //
             // Cost fallback must end in 0: NVL(CurrentCostPrice, PriceCost) yields NULL when both
             // are null, and SUM() silently drops those lines from the total.
@@ -234,10 +247,15 @@ namespace VIS.Controllers
                   COALESCE(SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0)), 0) AS TotalValue
                 FROM M_Inventory inv
                 INNER JOIN M_InventoryLine line ON ( line.M_Inventory_ID = inv.M_Inventory_ID )
+                INNER JOIN M_Product mp ON ( mp.M_Product_ID = line.M_Product_ID )
+                INNER JOIN M_Product_Category mpc ON ( mpc.M_Product_Category_ID = mp.M_Product_Category_ID )
                 WHERE inv.IsActive = 'Y'
+                  AND mpc.ProductGroup = 'C'
                   AND inv.DocStatus IN ('CO', 'CL')
                   AND COALESCE(inv.IsInternalUse, 'N') = 'Y'
                   AND line.IsActive = 'Y'
+                  AND mp.IsActive = 'Y'
+                  AND mpc.IsActive = 'Y'
                   AND COALESCE(line.QtyInternalUse, 0) > 0
                   AND inv.MovementDate >= " + msl + @"
                   AND inv.MovementDate < " + nmsl;

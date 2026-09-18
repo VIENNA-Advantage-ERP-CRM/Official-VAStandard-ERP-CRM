@@ -8,25 +8,25 @@
  * Summary Message Table
  *  # | Current Text                                            | Message Key
  * ---+---------------------------------------------------------+-----------------------------------
- *  1 | PO Pending for Payment                                  | VAS_POPendingForPayment
- *  2 | Received against PO, payment not yet released           | VAS_POPendingForPaymentSub
- *  3 | due                                                     | VAS_Due
- *  4 | PO No                                                   | VAS_PONumber
+ *  1 | PO Pending for Payment                                  | VAS_214_POPendingForPayment
+ *  2 | Received against PO, payment not yet released           | VAS_214_POPendingForPaymentSub
+ *  3 | due                                                     | VAS_214_Due
+ *  4 | PO No                                                   | VAS_214_PONumber
  *  5 | PO date                                                 | VAS_PODate
  *  6 | Vendor                                                  | VAS_Vendor
  *  7 | Warehouse                                               | VAS_Warehouse
- *  8 | Received on                                             | VAS_ReceivedOn
- *  9 | Payment due                                             | VAS_PaymentDue
+ *  8 | Received on                                             | VAS_214_ReceivedOn
+ *  9 | Payment due                                             | VAS_214_PaymentDue
  * 10 | Amount                                                  | VAS_Amount
- * 11 | Balance                                                 | VAS_Balance
- * 12 | Paid                                                    | VAS_Paid
- * 13 | Total payable                                           | VAS_TotalPayable
- * 14 | Overdue                                                 | VAS_Overdue
- * 15 | oldest due first                                        | VAS_OldestDueFirst
+ * 11 | Balance                                                 | VAS_214_Balance
+ * 12 | Paid                                                    | VAS_214_Paid
+ * 13 | Total payable                                           | VAS_214_TotalPayable
+ * 14 | Overdue                                                 | VAS_214_Overdue
+ * 15 | oldest due first                                        | VAS_214_OldestDueFirst
  * 16 | select a PO number to open the record                   | VAS_SelectPOToOpen
  * 17 | Showing                                                 | VAS_Showing
  * 18 | of                                                      | VAS_Of
- * 19 | No POs pending for payment found                        | VAS_NoPOsPendingPayment
+ * 19 | No POs pending for payment found                        | VAS_214_NoPOsPendingPayment
  * 20 | Loading...                                              | VAS_Loading
  * 21 | Couldn't load data                                      | VAS_CouldntLoad
  * 22 | Retry                                                   | VAS_Retry
@@ -87,16 +87,7 @@
     }
 
     function lbl(key, fallback) {
-        if (window.VIS && VIS.Msg && VIS.Msg.getMsg) {
-            var msg = VIS.Msg.getMsg(key);
-            // VIS.Msg.getMsg returns "[KEY]" when the AD_Message row is missing;
-            // that must fall through to the English fallback, not render as-is.
-            if (msg && msg !== key && msg !== '[' + key + ']' && msg.charAt(0) !== '['
-                && msg.indexOf('**') === -1) {
-                return msg;
-            }
-        }
-        return fallback;
+        return VIS.Msg.getMsg(key);
     }
 
     function getDocStatusDisplay(status) {
@@ -266,8 +257,8 @@
         }
 
         function createWidgetHtml() {
-            var title = lbl('VAS_POPendingForPayment', 'PO Pending for Payment');
-            var subtitle = lbl('VAS_POPendingForPaymentSub', 'Received against PO, payment not yet released');
+            var title = lbl('VAS_214_POPendingForPayment', 'PO Pending for Payment');
+            var subtitle = lbl('VAS_214_POPendingForPaymentSub', 'Received against PO, payment not yet released');
 
             $card = $('<div class="vas-214-card"></div>');
 
@@ -351,13 +342,13 @@
 
         function renderTableHeaders() {
             var colHeaders = [
-                { label: lbl('VAS_PONumber', 'PO No'), align: 'left' },
+                { label: lbl('VAS_214_PONumber', 'PO No'), align: 'left' },
                 { label: lbl('VAS_PODate', 'PO date'), align: 'left' },
                 { label: lbl('VAS_Vendor', 'Vendor'), align: 'left' },
                 { label: lbl('VAS_Warehouse', 'Warehouse'), align: 'left' },
-                { label: lbl('VAS_ReceivedOn', 'Received on'), align: 'left' },
-                { label: lbl('VAS_PaymentDue', 'Payment due'), align: 'left' },
-                { label: lbl('VAS_Balance', 'Balance'), align: 'right' }
+                { label: lbl('VAS_214_ReceivedOn', 'Received on'), align: 'left' },
+                { label: lbl('VAS_214_PaymentDue', 'Payment due'), align: 'left' },
+                { label: lbl('VAS_214_Balance', 'Balance'), align: 'right' }
             ];
 
             var h = '';
@@ -399,7 +390,7 @@
         function updateWidgetSummary() {
             var cur = queueData.baseCurrency || {};
             var totalDueFormatted = formatMoney(queueData.totalDue, cur.CurSymbol, cur.ISO_Code, cur.StdPrecision);
-            $payPill.text(totalDueFormatted + ' ' + lbl('VAS_Due', 'due'));
+            $payPill.text(totalDueFormatted + ' ' + lbl('VAS_214_Due', 'due'));
         }
 
         function renderWidgetPage() {
@@ -415,8 +406,8 @@
             }
 
             if (total === 0) {
-                $payBody.html('<div class="vas-214-empty-state">' + esc(lbl('VAS_NoPOsPendingPayment', 'No POs pending for payment found')) + '</div>');
-                $payHelper.text(lbl('VAS_NoPOsPendingPayment', 'No POs pending for payment found'));
+                $payBody.html('<div class="vas-214-empty-state">' + esc(lbl('VAS_214_NoPOsPendingPayment', 'No POs pending for payment found')) + '</div>');
+                $payHelper.text(lbl('VAS_214_NoPOsPendingPayment', 'No POs pending for payment found'));
                 $payPage.text('1 of 1');
                 $prevBtn.prop('disabled', true);
                 $nextBtn.prop('disabled', true);
@@ -438,7 +429,7 @@
 
                 var dueCellHtml = '';
                 if (p.IsOverdue) {
-                    var overdueLabel = lbl('VAS_Overdue', 'Overdue') + ' ' + p.OverdueDays + 'd';
+                    var overdueLabel = lbl('VAS_214_Overdue', 'Overdue') + ' ' + p.OverdueDays + 'd';
                     dueCellHtml = '<span class="vas-214-chip vas-214-chip-risk" title="' + esc(overdueLabel) + '">' + esc(overdueLabel) + '</span>';
                 } else {
                     var dueText = p.PaymentDueShort || p.PaymentDueDisplay || p.PaymentDue || '—';
@@ -447,7 +438,7 @@
 
                 var balFormatted = formatMoney(p.BalanceDue, p.CurrencySymbol, p.CurrencyISO, p.StdPrecision);
                 var paidFormatted = formatMoney(p.PaidAmount, p.CurrencySymbol, p.CurrencyISO, p.StdPrecision);
-                var paidText = lbl('VAS_Paid', 'Paid') + ' ' + paidFormatted;
+                var paidText = lbl('VAS_214_Paid', 'Paid') + ' ' + paidFormatted;
 
                 rowsHtml +=
                     '<div class="vas-214-trow" data-po-id="' + p.PurchaseOrderID + '" data-po-no="' + esc(poNo) + '" style="grid-template-columns:' + GRID_COLUMNS + ';">' +
@@ -472,7 +463,7 @@
 
             var showingFrom = startIdx + 1;
             var showingTo = endIdx;
-            var helperString = lbl('VAS_Showing', 'Showing') + ' ' + showingFrom + '–' + showingTo + ' ' + lbl('VAS_Of', 'of') + ' ' + total + ' · ' + lbl('VAS_OldestDueFirst', 'oldest due first') + ' · ' + lbl('VAS_SelectPOToOpen', 'select a PO number to open the record');
+            var helperString = lbl('VAS_Showing', 'Showing') + ' ' + showingFrom + '–' + showingTo + ' ' + lbl('VAS_Of', 'of') + ' ' + total + ' · ' + lbl('VAS_214_OldestDueFirst', 'oldest due first') + ' · ' + lbl('VAS_SelectPOToOpen', 'select a PO number to open the record');
             $payHelper.text(helperString);
 
             $payPage.text((currentPage + 1) + ' ' + lbl('VAS_Of', 'of') + ' ' + totalPages);
@@ -724,7 +715,7 @@
                  '<div class="vas-214-mbody">';
 
             if (slice.length === 0) {
-                h += '<div class="vas-214-empty-state">' + esc(lbl('VAS_NoPOsPendingPayment', 'No records found')) + '</div>';
+                h += '<div class="vas-214-empty-state">' + esc(lbl('VAS_214_NoPOsPendingPayment', 'No records found')) + '</div>';
             } else {
                 for (var ri = 0; ri < slice.length; ri++) {
                     var r = slice[ri];
@@ -837,10 +828,10 @@
                             var delivStatusTxt = getDeliveryStatusDisplay(rawDocStatus, totalOrderedQty, totalDeliveredQty);
 
                             var headerStatsHtml = mstatsHtml([
-                                { l: lbl('VAS_TotalPayable', 'Total payable'), v: totalPayableFmt },
-                                { l: lbl('VAS_Paid', 'Paid'), v: paidFmt },
-                                { l: lbl('VAS_Balance', 'Balance'), v: balFmt },
-                                { l: lbl('VAS_PaymentDue', 'Payment due'), v: dueDisplay },
+                                { l: lbl('VAS_214_TotalPayable', 'Total payable'), v: totalPayableFmt },
+                                { l: lbl('VAS_214_Paid', 'Paid'), v: paidFmt },
+                                { l: lbl('VAS_214_Balance', 'Balance'), v: balFmt },
+                                { l: lbl('VAS_214_PaymentDue', 'Payment due'), v: dueDisplay },
                                 { l: lbl('VAS_Vendor', 'Vendor'), v: vendor },
                                 { l: lbl('VAS_PODate', 'PO date'), v: dateDisplay },
                                 { l: lbl('VAS_Warehouse', 'Warehouse'), v: whName },

@@ -207,8 +207,7 @@
         var dialogLoading = false;
 
         function lbl(key, fallback) {
-            var t = (window.VIS && VIS.Msg) ? VIS.Msg.getMsg(key) : null;
-            return (t && t.charAt(0) !== '[') ? t : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function showBusy(show) {

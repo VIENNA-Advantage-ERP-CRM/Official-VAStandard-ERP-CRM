@@ -30,6 +30,8 @@
  * 20 | categories shown                       | VAS_186_CategoriesShown
  * 21 | Others                                 | VAS_186_Others
  * 22 | All                                    | VAS_186_All
+ * 23 | No usage recorded for                  | VAS_186_NoUsageRecordedFor
+ * 24 | Jan,Feb,Mar,...                        | VAS_186_Months
  */
 ; VAS = window.VAS || {};
 
@@ -92,8 +94,7 @@
         function DateTimeNowYear() { return new Date().getFullYear(); }
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return (translated && translated.charAt(0) !== '[') ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -196,7 +197,7 @@
 // ----- END OLD CODE -----
 
         function formatMonthName(m) {
-            var monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            var monthNames = label("VAS_186_Months", "Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec").split(',');
             return monthNames[Math.max(0, Math.min(11, m - 1))];
         }
 
@@ -291,7 +292,7 @@
             if (!$body) { return; }
 
             if (categoriesData.length === 0) {
-                $body.html('<div class="vas-pcu-empty">No usage recorded for ' + escapeHtml(formatMonthName(selectedMonth) + ' ' + selectedYear) + '.</div>');
+                $body.html('<div class="vas-pcu-empty">' + escapeHtml(label("VAS_186_NoUsageRecordedFor", "No usage recorded for") + ' ' + formatMonthName(selectedMonth) + ' ' + selectedYear + '.') + '</div>');
                 if ($footnote) { $footnote.addClass('vas-pcu-hidden'); }
                 if ($pager) { $pager.addClass('vas-pcu-hidden'); }
                 return;
@@ -680,8 +681,8 @@
                 '<select class="vas-pcu-select vas-pcu-y-sel"></select>' +
                 '<div class="vas-pcu-divider"></div>' +
                 '<div class="vas-pcu-toggle-grp">' +
-                '<button type="button" class="vas-pcu-pill vas-pcu-qty-pill active">Qty</button>' +
-                '<button type="button" class="vas-pcu-pill vas-pcu-val-pill">Value</button>' +
+                '<button type="button" class="vas-pcu-pill vas-pcu-qty-pill active">' + escapeHtml(label("VAS_186_Qty", "Qty")) + '</button>' +
+                '<button type="button" class="vas-pcu-pill vas-pcu-val-pill">' + escapeHtml(label("VAS_186_Value", "Value")) + '</button>' +
                 '</div>' +
                 '</div>' +
                 '</div>' +
@@ -717,9 +718,9 @@
             $qtyPill = $card.find('.vas-pcu-qty-pill');
             $valPill = $card.find('.vas-pcu-val-pill');
 
-            var monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            var monthNames = label("VAS_186_Months", "Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec").split(',');
             for (var m = 1; m <= 12; m++) {
-                $monthSelect.append('<option value="' + m + '" ' + (m === selectedMonth ? 'selected' : '') + '>' + monthNames[m - 1] + '</option>');
+                $monthSelect.append('<option value="' + m + '" ' + (m === selectedMonth ? 'selected' : '') + '>' + escapeHtml(monthNames[m - 1]) + '</option>');
             }
 
             var currentYear = DateTimeNowYear();

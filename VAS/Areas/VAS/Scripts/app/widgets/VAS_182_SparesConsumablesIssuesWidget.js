@@ -9,6 +9,13 @@
  *  1 | Spares / Consumables            | VAS_182_SparesConsumables
  *  2 | Of issued value MTD             | VAS_182_OfIssuedValueMTD
  *  3 | Couldn't load                   | VAS_182_CouldntLoad
+ *
+ * NOTE (2026-09-18, Claude): setupResizeObserver()/--widget-inline-size removed from
+ * Initalize() to match VAS_180_IssuedMTDWidget's label/value/meta size. VAS_180 never
+ * scopes --widget-inline-size to its own card, so its font-size clamp() falls through
+ * to the dashboard-wide --dash-inline-size and lands near the clamp's midpoint
+ * (~18.4px); this widget's own --widget-inline-size was scoped to its ~300px card,
+ * which is small enough that the clamp always bottomed out at its 16px floor instead.
  */
 ; VAS = window.VAS || {};
 
@@ -112,8 +119,7 @@
 // ===== NEW CODE END — currency format =====
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return (translated && translated.charAt(0) !== '[') ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -139,7 +145,6 @@
 
         this.Initalize = function () {
             createWidget();
-            setupResizeObserver();
             loadKpi();
         };
 
@@ -232,7 +237,7 @@
                 $valueEl.attr('title', pct + '%');
             }
             if ($metaEl) {
-                $metaEl.text(label("VAS_OfIssuedValueMTD", "Of issued value MTD"));
+                $metaEl.text(label("VAS_182_OfIssuedValueMTD", "Of issued value MTD"));
             }
             if ($card) { $card.prop('disabled', false); }
         }

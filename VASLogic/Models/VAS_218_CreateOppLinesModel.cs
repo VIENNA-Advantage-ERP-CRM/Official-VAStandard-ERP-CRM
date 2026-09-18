@@ -11,6 +11,7 @@
  *   VAI154         Created  21-Aug-2026
  ******************************************************/
 
+using ModelLibrary.Model;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -1707,7 +1708,14 @@ namespace VASLogic.Models
                     if (input.M_Product_ID <= 0 && input.C_Charge_ID <= 0)
                         continue;
 
-                    PO line = MTable.GetPO(ctx, "VAS_OppLines", input.VAS_OppLines_ID, trx);
+                    // Constructed directly rather than via MTable.GetPO(ctx, "VAS_OppLines", ...):
+                    // that reflection-based factory was not resolving to VAdvantage.Model.MVASOppLines
+                    // (silently falling back to a generic PO), so line.Save() below never ran
+                    // MVASOppLines.BeforeSave/AfterSave - UpdateHeader() never fired and the
+                    // opportunity's PlannedAmt total never updated. Direct construction uses
+                    // ordinary C# virtual dispatch, so this can't happen again regardless of
+                    // whatever AD_Table.ClassName / naming-convention state GetPO relies on.
+                    MVASOppLines line = new MVASOppLines(ctx, input.VAS_OppLines_ID, trx);
 
                     if (input.VAS_OppLines_ID <= 0)
                     {
@@ -1837,7 +1845,10 @@ namespace VASLogic.Models
                 foreach (int id in lineIds)
                 {
                     if (id <= 0) continue;
-                    PO line = MTable.GetPO(ctx, "VAS_OppLines", id, trx);
+                    // Same fix as SaveLines above: construct MVASOppLines directly so
+                    // AfterDelete()/UpdateHeader() actually run instead of relying on
+                    // MTable.GetPO's reflection to find the right class.
+                    MVASOppLines line = new MVASOppLines(ctx, id, trx);
                     if (line.Get_ID() != id) continue;
                     if (Util.GetValueOfInt(line.Get_Value("VAS_Opportunity_ID")) != VAS_Opportunity_ID) continue;
                     if (!line.Delete(true, trx))

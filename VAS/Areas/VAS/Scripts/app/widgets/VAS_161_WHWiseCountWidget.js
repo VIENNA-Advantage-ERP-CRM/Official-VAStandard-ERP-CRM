@@ -22,6 +22,24 @@
  * 13  | Close                                            | VAS_161_Close
  * 14  | No warehouse count records found                 | VAS_161_NoWHCountRecords
  * 15  | Unable to load warehouse count summary           | VAS_161_UnableToLoadWHSummary
+ * 16  | Warehouses with active count locators            | VAS_161_WarehousesActiveLocators
+ * 17  | Counts                                            | VAS_161_Counts
+ * 18  | Previous page                                    | VAS_161_PreviousPage
+ * 19  | Next page                                        | VAS_161_NextPage
+ * 20  | No inventory counts recorded for this period.    | VAS_161_NoCountsRecordedPeriod
+ *      Pick another month to review earlier counts.      |
+ * 21  | Showing                                          | VAS_161_Showing
+ * 22  | Open count details for                           | VAS_161_OpenCountDetailsFor
+ * 23  | Close modal                                      | VAS_161_CloseModal
+ * 24  | Loading warehouse details...                     | VAS_161_LoadingWarehouseDetails
+ * 25  | No count lines found for this warehouse.         | VAS_161_NoCountLinesFoundWarehouse
+ * 26  | Unable to load count lines.                      | VAS_161_UnableToLoadCountLines
+ * 27  | Locator                                           | VAS_161_Locator
+ * 28  | Product / Attribute                              | VAS_161_ProductAttribute
+ * 29  | Qty                                               | VAS_161_Qty
+ * 30  | Total qty                                         | VAS_161_TotalQty
+ * 31  | count sessions                                    | VAS_161_CountSessionsSuffix
+ * 32  | locators                                          | VAS_161_LocatorsSuffix
  */
 ; VAS = window.VAS || {};
 
@@ -30,8 +48,7 @@
     // Message-key lookup with a fallback, matching the other VAS widgets. This file had none, which
     // is why its title was a hardcoded literal.
     function lbl(key, fallback) {
-        var t = VIS.Msg.getMsg(key);
-        return (t && t.charAt(0) !== '[') ? t : fallback;
+        return VIS.Msg.getMsg(key);
     }
 
     function ensureDashInlineSizeVar($el) {
@@ -107,7 +124,7 @@
             // Renamed "WH wise Count" -> "Warehouse wise count" (2026-08-16, user request).
             // Routed through the message key instead of a hardcoded literal (Rule 8).
             var $title = $('<h3 class="vas-whwisecount-title"></h3>').text(lbl("VAS_161_WarehouseWiseCount", "Warehouse wise count"));
-            $subtitle = $('<span class="vas-whwisecount-subtitle">Warehouses with active count locators</span>');
+            $subtitle = $('<span class="vas-whwisecount-subtitle">' + lbl("VAS_161_WarehousesActiveLocators") + '</span>');
             $titleBlock.append($title).append($subtitle);
             $leftCluster.append($iconWell).append($titleBlock);
 
@@ -132,9 +149,9 @@
             var $body = $('<div class="vas-whwisecount-body">');
             var $headerGrid = $(
                 '<div class="vas-whwisecount-grid-template vas-whwisecount-header-row">' +
-                '<div class="vas-whwisecount-th">Warehouse</div>' +
-                '<div class="vas-whwisecount-th vas-whwisecount-th-right">Counts</div>' +
-                '<div class="vas-whwisecount-th vas-whwisecount-th-right">Qty Counted</div>' +
+                '<div class="vas-whwisecount-th">' + lbl("VAS_161_Warehouse") + '</div>' +
+                '<div class="vas-whwisecount-th vas-whwisecount-th-right">' + lbl("VAS_161_Counts") + '</div>' +
+                '<div class="vas-whwisecount-th vas-whwisecount-th-right">' + lbl("VAS_161_QtyCounted") + '</div>' +
                 '</div>'
             );
             $body.append($headerGrid);
@@ -147,9 +164,9 @@
                 '<div class="vas-whwisecount-footer">' +
                 '<div class="vas-whwisecount-footer-text"></div>' +
                 '<div class="vas-whwisecount-pager">' +
-                '<button type="button" class="vas-whwisecount-pager-btn vas-prev" aria-label="Previous page">&lsaquo;</button>' +
+                '<button type="button" class="vas-whwisecount-pager-btn vas-prev" aria-label="' + lbl("VAS_161_PreviousPage") + '">&lsaquo;</button>' +
                 '<span class="vas-whwisecount-pager-info"></span>' +
-                '<button type="button" class="vas-whwisecount-pager-btn vas-next" aria-label="Next page">&rsaquo;</button>' +
+                '<button type="button" class="vas-whwisecount-pager-btn vas-next" aria-label="' + lbl("VAS_161_NextPage") + '">&rsaquo;</button>' +
                 '</div>' +
                 '</div>'
             );
@@ -229,7 +246,7 @@
         function loadSummary() {
             var monthsFull = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
             var mName = monthsFull[selectedMonth - 1] || "";
-            $subtitle.text("Warehouses with active count locators · " + mName + " " + selectedYear);
+            $subtitle.text(lbl("VAS_161_WarehousesActiveLocators") + " · " + mName + " " + selectedYear);
 
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_161_WHWiseCountWidget/GetWarehouseSummary?month=" + selectedMonth + "&year=" + selectedYear,
@@ -310,10 +327,10 @@
             $rowsContainer.empty();
 
             if (!summaryData || summaryData.length === 0) {
-                $rowsContainer.html('<div class="vas-whwisecount-message">No inventory counts recorded for this period. Pick another month to review earlier counts.</div>');
+                $rowsContainer.html('<div class="vas-whwisecount-message">' + lbl("VAS_161_NoCountsRecordedPeriod") + '</div>');
                 // Hold the dialog's full height even with nothing to show (global standard).
                 appendFillerRows($rowsContainer, Math.max(0, pageSize - 1));
-                $footer.find('.vas-whwisecount-footer-text').text('Showing 0 of 0');
+                $footer.find('.vas-whwisecount-footer-text').text(lbl("VAS_161_Showing") + ' 0 ' + lbl("VAS_161_Of") + ' 0');
                 $footer.find('.vas-whwisecount-pager').hide();
                 return;
             }
@@ -333,7 +350,7 @@
                 var formattedQty = Number(item.totalQtyCounted || 0).toLocaleString();
 
                 var $row = $(
-                    '<button type="button" class="vas-whwisecount-row-btn vas-whwisecount-grid-template" aria-label="Open count details for ' + item.warehouseName + '">' +
+                    '<button type="button" class="vas-whwisecount-row-btn vas-whwisecount-grid-template" aria-label="' + lbl("VAS_161_OpenCountDetailsFor") + ' ' + item.warehouseName + '">' +
                     '<div class="vas-whwisecount-cell">' +
                     '<div class="vas-whwisecount-wh-title" title="' + item.warehouseName + '">' + item.warehouseName + '</div>' +
                     '<div class="vas-whwisecount-wh-code" title="' + item.warehouseCode + '">' + item.warehouseCode + '</div>' +
@@ -374,8 +391,8 @@
             var $btnPrev = $footer.find('.vas-prev');
             var $btnNext = $footer.find('.vas-next');
 
-            $footerText.text('Showing ' + (startIndex + 1) + '–' + endIndex + ' of ' + totalItems);
-            $pagerInfo.text(currentPage + ' of ' + totalPages);
+            $footerText.text(lbl("VAS_161_Showing") + ' ' + (startIndex + 1) + '–' + endIndex + ' ' + lbl("VAS_161_Of") + ' ' + totalItems);
+            $pagerInfo.text(currentPage + ' ' + lbl("VAS_161_Of") + ' ' + totalPages);
 
             $btnPrev.prop('disabled', currentPage === 1);
             $btnNext.prop('disabled', currentPage === totalPages);
@@ -419,13 +436,13 @@
             var $subtitle = $('<span class="vas-whwisecount-modal-subtitle">' + whItem.warehouseCode + ' · ' + monthName + ' ' + selectedYear + '</span>');
             $headerLeft.append($title).append($subtitle);
 
-            var $closeBtn = $('<button type="button" class="vas-whwisecount-modal-close" aria-label="Close modal">&times;</button>');
+            var $closeBtn = $('<button type="button" class="vas-whwisecount-modal-close" aria-label="' + lbl("VAS_161_CloseModal") + '">&times;</button>');
             $header.append($headerLeft).append($closeBtn);
             $dialog.append($header);
 
             // Modal Body
             var $body = $('<div class="vas-whwisecount-modal-body">');
-            $body.html('<div class="vas-whwisecount-message">Loading warehouse details...</div>');
+            $body.html('<div class="vas-whwisecount-message">' + lbl("VAS_161_LoadingWarehouseDetails") + '</div>');
             $dialog.append($body);
 
             $overlay.append($dialog);
@@ -451,15 +468,15 @@
                 dataType: "json",
                 success: function (res) {
                     if (res && res.lines && res.lines.length > 0) {
-                        $subtitle.text(whItem.warehouseCode + ' · ' + monthName + ' ' + selectedYear + ' · ' + (res.locatorCount || 0) + ' locators');
+                        $subtitle.text(whItem.warehouseCode + ' · ' + monthName + ' ' + selectedYear + ' · ' + (res.locatorCount || 0) + ' ' + lbl("VAS_161_LocatorsSuffix"));
                         renderModalGrid($body, res);
                     } else {
-                        $body.html('<div class="vas-whwisecount-message">No count lines found for this warehouse.</div>');
+                        $body.html('<div class="vas-whwisecount-message">' + lbl("VAS_161_NoCountLinesFoundWarehouse") + '</div>');
                     }
                 },
                 error: function (err) {
                     console.error("VAS_161_WHWiseCountWidget: Error loading detail", err);
-                    $body.html('<div class="vas-whwisecount-message">Unable to load count lines.</div>');
+                    $body.html('<div class="vas-whwisecount-message">' + lbl("VAS_161_UnableToLoadCountLines") + '</div>');
                 }
             });
         }
@@ -480,10 +497,10 @@
 
             var $headerGrid = $(
                 '<div class="vas-whwisecount-modal-grid-template vas-whwisecount-header-row">' +
-                '<div class="vas-whwisecount-th">Product / Attribute</div>' +
-                '<div class="vas-whwisecount-th">Locator</div>' +
-                '<div class="vas-whwisecount-th">Inventory Type</div>' +
-                '<div class="vas-whwisecount-th vas-whwisecount-th-right">Qty</div>' +
+                '<div class="vas-whwisecount-th">' + lbl("VAS_161_ProductAttribute") + '</div>' +
+                '<div class="vas-whwisecount-th">' + lbl("VAS_161_Locator") + '</div>' +
+                '<div class="vas-whwisecount-th">' + lbl("VAS_161_InventoryType") + '</div>' +
+                '<div class="vas-whwisecount-th vas-whwisecount-th-right">' + lbl("VAS_161_Qty") + '</div>' +
                 '</div>'
             );
             $body.append($headerGrid);
@@ -495,12 +512,12 @@
                 '<div class="vas-whwisecount-modal-footer">' +
                 '<div class="vas-whwisecount-modal-footer-left">' +
                 '<span class="vas-whwisecount-footer-text vas-modal-helper"></span>' +
-                '<span class="vas-whwisecount-modal-total-qty">Total qty ' + Number(totalQty).toLocaleString() + '</span>' +
+                '<span class="vas-whwisecount-modal-total-qty">' + lbl("VAS_161_TotalQty") + ' ' + Number(totalQty).toLocaleString() + '</span>' +
                 '</div>' +
                 '<div class="vas-whwisecount-pager">' +
-                '<button type="button" class="vas-whwisecount-pager-btn vas-m-prev" aria-label="Previous page">&lsaquo;</button>' +
+                '<button type="button" class="vas-whwisecount-pager-btn vas-m-prev" aria-label="' + lbl("VAS_161_PreviousPage") + '">&lsaquo;</button>' +
                 '<span class="vas-whwisecount-pager-info vas-m-info"></span>' +
-                '<button type="button" class="vas-whwisecount-pager-btn vas-m-next" aria-label="Next page">&rsaquo;</button>' +
+                '<button type="button" class="vas-whwisecount-pager-btn vas-m-next" aria-label="' + lbl("VAS_161_NextPage") + '">&rsaquo;</button>' +
                 '</div>' +
                 '</div>'
             );
@@ -554,8 +571,8 @@
                 // Hold the popup at MODAL_PAGE_ROWS lines regardless of how many this page has.
                 appendModalFillerRows($modalRowsContainer, Math.max(0, modalPageSize - paged.length));
 
-                $footer.find('.vas-modal-helper').text('Showing ' + (start + 1) + '–' + end + ' of ' + totalLines + ' · ' + sessionCount + ' count sessions');
-                $footer.find('.vas-m-info').text(modalPage + ' of ' + totalPages);
+                $footer.find('.vas-modal-helper').text(lbl("VAS_161_Showing") + ' ' + (start + 1) + '–' + end + ' ' + lbl("VAS_161_Of") + ' ' + totalLines + ' · ' + sessionCount + ' ' + lbl("VAS_161_CountSessionsSuffix"));
+                $footer.find('.vas-m-info').text(modalPage + ' ' + lbl("VAS_161_Of") + ' ' + totalPages);
 
                 var $mPrev = $footer.find('.vas-m-prev');
                 var $mNext = $footer.find('.vas-m-next');

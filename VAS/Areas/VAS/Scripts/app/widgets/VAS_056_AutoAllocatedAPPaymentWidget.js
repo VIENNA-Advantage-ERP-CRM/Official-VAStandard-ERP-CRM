@@ -24,10 +24,10 @@
  * 18  | Next                                              | VAS_Next
  * 19  | Auto-allocated AP                                 | VAS_056_AutoAllocatedAPPayments
  * 20  | Payment Match to Invoice                          | VAS_056_PaymentMatchToInvoice
- * 21  | Un Allocated                               | VAS_UnAllocatedAmount
+ * 21  | Un Allocated                               | VAS_056_UnAllocatedAmount
  * 22  | Could not load data                               | VAS_ErrorLoading
- * 23  | day                                               | VAS_Day
- * 24  | days                                              | VAS_Days
+ * 23  | day                                               | VAS_056_Day
+ * 24  | days                                              | VAS_056_Days
  * ──────────────────────────────────────────────────────────────────────────────
  *
  * The card header subtitle names the period the percentage covers (periodName,
@@ -60,7 +60,7 @@
  * 19 | Auto-allocated AP                                 | VAS_056_AutoAllocatedAPPayments
  * 20 | Payment Match to Invoice                          | VAS_056_PaymentMatchToInvoice
  * 21 | Last 30 days                                      | VAS_Last30Days
- * 22 | Partially allocated                               | VAS_UnAllocatedAmount
+ * 22 | Partially allocated                               | VAS_056_UnAllocatedAmount
  * 23 | Could not load data                               | VAS_ErrorLoading
  */
 
@@ -137,11 +137,7 @@
         var adaptivePaginationReady = false;
 
         function lbl(key, fallback) {
-            var text = VIS.Msg.getMsg(key);
-
-            return text && text !== "[" + key + "]"
-                ? text
-                : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -1334,8 +1330,8 @@
                     " " +
                     lbl(
                         dayCount === 1
-                            ? "VAS_Day"
-                            : "VAS_Days",
+                            ? "VAS_056_Day"
+                            : "VAS_056_Days",
                         dayCount === 1
                             ? "day"
                             : "days"
@@ -1645,7 +1641,7 @@
                 'th-partial">' +
                 escapeHtml(
                     lbl(
-                        "VAS_UnAllocatedAmount",
+                        "VAS_056_UnAllocatedAmount",
                         "Un Allocated"
                     )
                 ) +

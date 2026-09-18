@@ -11,19 +11,19 @@
  * Message Table:
  *   # | Fallback Text                                    | Message Key
  *  ---+--------------------------------------------------+-----------------------------------
- *   1 | Representative wise PO                           | VAS_RepresentativeWisePO
+ *   1 | Representative wise PO                           | VAS_215_RepresentativeWisePO
  *   2 | Month                                            | VAS_Month
  *   3 | Year                                             | VAS_Year
- *   4 | Ranked by PO value                               | VAS_RankedByPOValue
+ *   4 | Ranked by PO value                               | VAS_215_RankedByPOValue
  *   5 | Showing                                          | VAS_Showing
  *   6 | of                                               | VAS_Of
  *   7 | PO value                                         | VAS_POValue
- *   8 | POs raised                                       | VAS_POsRaised
- *   9 | Share of month                                   | VAS_ShareOfMonth
- *  10 | Avg cycle                                        | VAS_AvgCycle
+ *   8 | POs raised                                       | VAS_215_POsRaised
+ *   9 | Share of month                                   | VAS_215_ShareOfMonth
+ *  10 | Avg cycle                                        | VAS_215_AvgCycle
  *  11 | Purchase orders                                  | VAS_PurchaseOrders
  *  12 | Purchase order lines                             | VAS_PurchaseOrderLines
- *  13 | Purchase orders raised by this representative    | VAS_PurchaseOrdersRaisedByRep
+ *  13 | Purchase orders raised by this representative    | VAS_215_PurchaseOrdersRaisedByRep
  *  14 | PO No                                            | VAS_PONo
  *  15 | PO date                                          | VAS_PODate
  *  16 | Vendor                                           | VAS_Vendor
@@ -48,8 +48,8 @@
  *  35 | Close                                            | VAS_Close
  *  36 | select a PO number to open the record            | VAS_SelectPOToOpen
  *  37 | Lines of                                         | VAS_LinesOf
- *  38 | No representatives found for this period         | VAS_NoRepresentativesFound
- *  39 | Failed to load representative data               | VAS_FailedToLoadRepresentativeData
+ *  38 | No representatives found for this period         | VAS_215_NoRepresentativesFound
+ *  39 | Failed to load representative data               | VAS_215_FailedToLoadRepresentativeData
  *  40 | Retry                                            | VAS_Retry
  *  41 | Loading...                                       | VAS_Loading
  *  42 | No purchase orders found                         | VAS_NoPOsFound
@@ -62,13 +62,13 @@
  *  49 | Completed                                        | VAS_Completed
  *  50 | Closed                                           | VAS_Closed
  *  51 | Voided                                           | VAS_Voided
- *  52 | Reversed                                         | VAS_Reversed
+ *  52 | Reversed                                         | VAS_215_Reversed
  *  53 | Fully delivered                                  | VAS_FullyDelivered
  *  54 | Partial                                          | VAS_Partial
  *  55 | Not applicable                                   | VAS_NotApplicable
  *  56 | Partial received                                 | VAS_PartialReceived
- *  57 | Day                                              | VAS_Day
- *  58 | Days                                             | VAS_Days
+ *  57 | Day                                              | VAS_215_Day
+ *  58 | Days                                             | VAS_215_Days
  *  59 | Purchase order                                   | VAS_PurchaseOrder
  */
 
@@ -136,16 +136,7 @@
         var $modalHost = null;
 
         function lbl(key, fallback) {
-            if (window.VIS && VIS.Msg && VIS.Msg.getMsg) {
-                var msg = VIS.Msg.getMsg(key);
-                // VIS.Msg.getMsg returns "[KEY]" when the AD_Message row is missing;
-                // that must fall through to the English fallback, not render as-is.
-                if (msg && msg !== key && msg !== '[' + key + ']' && msg.charAt(0) !== '['
-                    && msg.indexOf('**') === -1) {
-                    return msg;
-                }
-            }
-            return fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function getStatusLabel(text) {
@@ -156,7 +147,7 @@
                 case 'Completed': return lbl('VAS_Completed', 'Completed');
                 case 'Closed': return lbl('VAS_Closed', 'Closed');
                 case 'Voided': return lbl('VAS_Voided', 'Voided');
-                case 'Reversed': return lbl('VAS_Reversed', 'Reversed');
+                case 'Reversed': return lbl('VAS_215_Reversed', 'Reversed');
                 case 'Fully delivered': return lbl('VAS_FullyDelivered', 'Fully delivered');
                 case 'Partial': return lbl('VAS_Partial', 'Partial');
                 case 'Not applicable': return lbl('VAS_NotApplicable', 'Not applicable');
@@ -169,12 +160,12 @@
 
         function formatCycleText(avgCycleDays, serverText) {
             if (avgCycleDays != null && avgCycleDays >= 0) {
-                return avgCycleDays === 1 ? ('1 ' + lbl('VAS_Day', 'day')) : (avgCycleDays + ' ' + lbl('VAS_Days', 'days'));
+                return avgCycleDays === 1 ? ('1 ' + lbl('VAS_215_Day', 'day')) : (avgCycleDays + ' ' + lbl('VAS_215_Days', 'days'));
             }
             if (serverText && serverText.indexOf('day') !== -1) {
                 var numVal = parseInt(serverText, 10);
                 if (!isNaN(numVal)) {
-                    return numVal === 1 ? ('1 ' + lbl('VAS_Day', 'day')) : (numVal + ' ' + lbl('VAS_Days', 'days'));
+                    return numVal === 1 ? ('1 ' + lbl('VAS_215_Day', 'day')) : (numVal + ' ' + lbl('VAS_215_Days', 'days'));
                 }
             }
             return serverText || '—';
@@ -254,7 +245,7 @@
 
             // 1. Header with Title and Month/Year Dropdown filters (Rule 13 Arrow-less Standard)
             $header = $('<div class="vas-rwpo-head"></div>');
-            var $headTxt = $('<div class="vas-rwpo-head-txt"><p class="vas-rwpo-title" title="' + esc(lbl('VAS_RepresentativeWisePO', 'Representative wise PO')) + '">' + esc(lbl('VAS_RepresentativeWisePO', 'Representative wise PO')) + '</p></div>');
+            var $headTxt = $('<div class="vas-rwpo-head-txt"><p class="vas-rwpo-title" title="' + esc(lbl('VAS_215_RepresentativeWisePO', 'Representative wise PO')) + '">' + esc(lbl('VAS_215_RepresentativeWisePO', 'Representative wise PO')) + '</p></div>');
 
             var $mfilter = $('<div class="vas-rwpo-mfilter"></div>');
             $monthSelect = $('<select class="vas-rwpo-sel vas-rwpo-sel-month" aria-label="' + esc(lbl('VAS_Month', 'Month')) + '"></select>');
@@ -418,7 +409,7 @@
         function renderErrorState() {
             $listContainer.empty();
             var errHtml = $('<div class="vas-rwpo-empty-box">' +
-                '<p class="vas-rwpo-empty-msg">' + esc(lbl('VAS_FailedToLoadRepresentativeData', 'Failed to load representative data')) + '</p>' +
+                '<p class="vas-rwpo-empty-msg">' + esc(lbl('VAS_215_FailedToLoadRepresentativeData', 'Failed to load representative data')) + '</p>' +
                 '<button type="button" class="vas-rwpo-retry-btn">' + esc(lbl('VAS_Retry', 'Retry')) + '</button>' +
                 '</div>');
             errHtml.find('.vas-rwpo-retry-btn').on('click', function () {
@@ -437,7 +428,7 @@
 
             if (count === 0) {
                 var emptyHtml = '<div class="vas-rwpo-empty-box">' +
-                    '<p class="vas-rwpo-empty-msg">' + esc(lbl('VAS_NoRepresentativesFound', 'No representatives found for this period')) + '</p>' +
+                    '<p class="vas-rwpo-empty-msg">' + esc(lbl('VAS_215_NoRepresentativesFound', 'No representatives found for this period')) + '</p>' +
                     '</div>';
                 $listContainer.html(emptyHtml);
                 $helperText.text('0 ' + lbl('VAS_Of', 'of') + ' 0');
@@ -479,7 +470,7 @@
 
             // Update footer helper and pager
             var helperString = lbl('VAS_Showing', 'Showing') + ' ' + (startIdx + 1) + '–' + endIdx + ' ' +
-                lbl('VAS_Of', 'of') + ' ' + count + ' · ' + lbl('VAS_RankedByPOValue', 'ranked by PO value');
+                lbl('VAS_Of', 'of') + ' ' + count + ' · ' + lbl('VAS_215_RankedByPOValue', 'ranked by PO value');
             $helperText.text(helperString);
             $pageText.text((currentPage + 1) + ' ' + lbl('VAS_Of', 'of') + ' ' + totalPages);
 
@@ -615,7 +606,7 @@
 
             var periodStr = getPeriodLabel();
             var title = repName || (rObj ? rObj.name : lbl('VAS_Representative', 'Representative'));
-            var subtitle = lbl('VAS_PurchaseOrdersRaisedByRep', 'Purchase orders raised by this representative') + ' · ' + periodStr;
+            var subtitle = lbl('VAS_215_PurchaseOrdersRaisedByRep', 'Purchase orders raised by this representative') + ' · ' + periodStr;
 
             var rSpend = rObj ? rObj.value : 0;
             var rPOs = rObj ? rObj.pos : 0;
@@ -624,9 +615,9 @@
 
             var statStripHtml = '<div class="vas-rwpo-mstats">' +
                 '  <div class="vas-rwpo-mstat"><div class="l">' + esc(lbl('VAS_POValue', 'PO value')) + '</div><div class="v" id="vas_rwpo_stat_val" title="' + esc(fmtMoney(rSpend)) + '">' + esc(fmtMoney(rSpend)) + '</div></div>' +
-                '  <div class="vas-rwpo-mstat"><div class="l">' + esc(lbl('VAS_POsRaised', 'POs raised')) + '</div><div class="v" id="vas_rwpo_stat_pos">' + num(rPOs) + '</div></div>' +
-                '  <div class="vas-rwpo-mstat"><div class="l">' + esc(lbl('VAS_ShareOfMonth', 'Share of month')) + '</div><div class="v" id="vas_rwpo_stat_share">' + esc(rShare) + '</div></div>' +
-                '  <div class="vas-rwpo-mstat"><div class="l">' + esc(lbl('VAS_AvgCycle', 'Avg cycle')) + '</div><div class="v" id="vas_rwpo_stat_cycle">' + esc(rAvgCycle) + '</div></div>' +
+                '  <div class="vas-rwpo-mstat"><div class="l">' + esc(lbl('VAS_215_POsRaised', 'POs raised')) + '</div><div class="v" id="vas_rwpo_stat_pos">' + num(rPOs) + '</div></div>' +
+                '  <div class="vas-rwpo-mstat"><div class="l">' + esc(lbl('VAS_215_ShareOfMonth', 'Share of month')) + '</div><div class="v" id="vas_rwpo_stat_share">' + esc(rShare) + '</div></div>' +
+                '  <div class="vas-rwpo-mstat"><div class="l">' + esc(lbl('VAS_215_AvgCycle', 'Avg cycle')) + '</div><div class="v" id="vas_rwpo_stat_cycle">' + esc(rAvgCycle) + '</div></div>' +
                 '</div>' +
                 '<div class="vas-rwpo-msec">' + esc(lbl('VAS_PurchaseOrders', 'Purchase orders')) + '</div>' +
                 '<div class="vas-rwpo-mtbl-wrap" id="vas_rwpo_po_table_wrap"></div>';
@@ -677,7 +668,7 @@
                     renderPagedPOTable($container, orders, repName);
                 },
                 error: function () {
-                    $container.html('<div class="vas-rwpo-empty-box"><p class="vas-rwpo-empty-msg">' + esc(lbl('VAS_FailedToLoadRepresentativeData', 'Failed to load representative data')) + '</p></div>');
+                    $container.html('<div class="vas-rwpo-empty-box"><p class="vas-rwpo-empty-msg">' + esc(lbl('VAS_215_FailedToLoadRepresentativeData', 'Failed to load representative data')) + '</p></div>');
                 }
             });
         }

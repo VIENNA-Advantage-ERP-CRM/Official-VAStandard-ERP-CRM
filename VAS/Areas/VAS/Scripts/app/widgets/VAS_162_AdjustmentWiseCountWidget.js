@@ -19,6 +19,17 @@
  * 11  | Close                                            | VAS_162_Close
  * 12  | No adjustment records available                  | VAS_162_NoAdjustmentRecords
  * 13  | Unable to load adjustment summary                | VAS_162_UnableToLoadAdjSummary
+ * 14  | As on Date Count Tile                            | VAS_162_AsOnDateCountTileAria
+ * 15  | As on Date Count                                 | VAS_162_AsOnDateCountLabel
+ * 16  | Loading...                                       | VAS_162_Loading
+ * 17  | Quantity Difference Tile                         | VAS_162_QuantityDifferenceTileAria
+ * 18  | No adjustments this period                       | VAS_162_NoAdjustmentsThisPeriod
+ * 19  | adjustments recorded                             | VAS_162_AdjustmentsRecorded
+ * 20  | Net diff qty:                                    | VAS_162_NetDiffQtyLabel
+ * 21  | Close modal                                      | VAS_162_CloseModal
+ * 22  | Loading details...                               | VAS_162_LoadingDetails
+ * 23  | records                                          | VAS_162_RecordsSuffix
+ * 24  | Unable to load details.                          | VAS_162_UnableToLoadDetails
  */
 ; VAS = window.VAS || {};
 
@@ -51,8 +62,7 @@
     }
 
     function lbl(key, fallback) {
-        var t = VIS.Msg.getMsg(key);
-        return (t && t.charAt(0) !== '[') ? t : fallback;
+        return VIS.Msg.getMsg(key);
     }
 
     function ensureDashInlineSizeVar($el) {
@@ -106,7 +116,7 @@
 
             var $leftCluster = $('<div class="vas-adjwisecount-left-cluster">');
             var $iconWell = $('<div class="vas-adjwisecount-icon-well"><i class="fa fa-list-alt"></i></div>');
-            var $title = $('<h3 class="vas-adjwisecount-title">Adjustment Wise Count</h3>');
+            var $title = $('<h3 class="vas-adjwisecount-title">' + lbl("VAS_162_AdjustmentWiseCount") + '</h3>');
             $leftCluster.append($iconWell).append($title);
 
             var $filterCluster = $('<div class="vas-adjwisecount-filter-cluster">');
@@ -130,19 +140,19 @@
             var $body = $('<div class="vas-adjwisecount-body">');
 
             // Tile 1 — As on Date Count
-            var $tile1 = $('<div class="vas-adjwisecount-tile" role="button" tabindex="0" aria-label="As on Date Count Tile">');
+            var $tile1 = $('<div class="vas-adjwisecount-tile" role="button" tabindex="0" aria-label="' + lbl("VAS_162_AsOnDateCountTileAria") + '">');
             var $tile1Left = $('<div class="vas-adjwisecount-tile-left">');
-            var $tile1Label = $('<div class="vas-adjwisecount-tile-label">As on Date Count</div>');
-            $asOnCountMeta = $('<div class="vas-adjwisecount-tile-meta">Loading...</div>');
+            var $tile1Label = $('<div class="vas-adjwisecount-tile-label">' + lbl("VAS_162_AsOnDateCountLabel") + '</div>');
+            $asOnCountMeta = $('<div class="vas-adjwisecount-tile-meta">' + lbl("VAS_162_Loading") + '</div>');
             $tile1Left.append($tile1Label).append($asOnCountMeta);
             $asOnCountVal = $('<div class="vas-adjwisecount-tile-val-blue">--</div>');
             $tile1.append($tile1Left).append($asOnCountVal);
 
             // Tile 2 — Quantity Difference
-            var $tile2 = $('<div class="vas-adjwisecount-tile" role="button" tabindex="0" aria-label="Quantity Difference Tile">');
+            var $tile2 = $('<div class="vas-adjwisecount-tile" role="button" tabindex="0" aria-label="' + lbl("VAS_162_QuantityDifferenceTileAria") + '">');
             var $tile2Left = $('<div class="vas-adjwisecount-tile-left">');
-            var $tile2Label = $('<div class="vas-adjwisecount-tile-label">Quantity Difference</div>');
-            $qtyDiffMeta = $('<div class="vas-adjwisecount-tile-meta">Loading...</div>');
+            var $tile2Label = $('<div class="vas-adjwisecount-tile-label">' + lbl("VAS_162_QuantityDifference") + '</div>');
+            $qtyDiffMeta = $('<div class="vas-adjwisecount-tile-meta">' + lbl("VAS_162_Loading") + '</div>');
             $tile2Left.append($tile2Label).append($qtyDiffMeta);
             $qtyDiffVal = $('<div class="vas-adjwisecount-tile-val-amber">--</div>');
             $tile2.append($tile2Left).append($qtyDiffVal);
@@ -177,24 +187,24 @@
 
             // Tile Click Handlers
             $tile1.on('click', function () {
-                openDetailModal('AS_ON_DATE', 'As on Date Count', $tile1);
+                openDetailModal('AS_ON_DATE', lbl("VAS_162_AsOnDateCountLabel"), $tile1);
             });
 
             $tile1.on('keydown', function (e) {
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    openDetailModal('AS_ON_DATE', 'As on Date Count', $tile1);
+                    openDetailModal('AS_ON_DATE', lbl("VAS_162_AsOnDateCountLabel"), $tile1);
                 }
             });
 
             $tile2.on('click', function () {
-                openDetailModal('QTY_DIFF', 'Quantity Difference', $tile2);
+                openDetailModal('QTY_DIFF', lbl("VAS_162_QuantityDifference"), $tile2);
             });
 
             $tile2.on('keydown', function (e) {
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    openDetailModal('QTY_DIFF', 'Quantity Difference', $tile2);
+                    openDetailModal('QTY_DIFF', lbl("VAS_162_QuantityDifference"), $tile2);
                 }
             });
         }
@@ -238,26 +248,26 @@
 
                         $asOnCountVal.text(asOnCount);
                         if (asOnCount === 0) {
-                            $asOnCountMeta.text("No adjustments this period");
+                            $asOnCountMeta.text(lbl("VAS_162_NoAdjustmentsThisPeriod"));
                         } else {
-                            $asOnCountMeta.text(asOnCount + " adjustments recorded");
+                            $asOnCountMeta.text(asOnCount + " " + lbl("VAS_162_AdjustmentsRecorded"));
                         }
 
                         $qtyDiffVal.text(qtyDiffCount);
                         if (qtyDiffCount === 0) {
-                            $qtyDiffMeta.text("No adjustments this period");
+                            $qtyDiffMeta.text(lbl("VAS_162_NoAdjustmentsThisPeriod"));
                         } else {
                             var signPrefix = netDiff > 0 ? "+" : "";
-                            $qtyDiffMeta.text("Net diff qty: " + signPrefix + netDiff);
+                            $qtyDiffMeta.text(lbl("VAS_162_NetDiffQtyLabel") + " " + signPrefix + netDiff);
                         }
                     }
                 },
                 error: function (err) {
                     console.error("VAS_162_AdjustmentWiseCountWidget: Error loading summary", err);
                     $asOnCountVal.text("0");
-                    $asOnCountMeta.text("No adjustments this period");
+                    $asOnCountMeta.text(lbl("VAS_162_NoAdjustmentsThisPeriod"));
                     $qtyDiffVal.text("0");
-                    $qtyDiffMeta.text("No adjustments this period");
+                    $qtyDiffMeta.text(lbl("VAS_162_NoAdjustmentsThisPeriod"));
                 }
             });
         }
@@ -349,13 +359,13 @@
             var $subtitle = $('<span class="vas-adjwisecount-modal-subtitle">' + monthName + ' ' + selectedYear + '</span>');
             $headerLeft.append($title).append($subtitle);
 
-            var $closeBtn = $('<button type="button" class="vas-adjwisecount-modal-close" aria-label="Close modal">&times;</button>');
+            var $closeBtn = $('<button type="button" class="vas-adjwisecount-modal-close" aria-label="' + lbl("VAS_162_CloseModal") + '">&times;</button>');
             $header.append($headerLeft).append($closeBtn);
             $dialog.append($header);
 
             // Modal Body
             var $body = $('<div class="vas-adjwisecount-modal-body">');
-            $body.html('<div class="vas-adjwisecount-message">Loading details...</div>');
+            $body.html('<div class="vas-adjwisecount-message">' + lbl("VAS_162_LoadingDetails") + '</div>');
             $dialog.append($body);
 
             $overlay.append($dialog);
@@ -378,7 +388,7 @@
                 dataType: "json",
                 success: function (res) {
                     if (res && res.details && res.details.length > 0) {
-                        $subtitle.text(monthName + ' ' + selectedYear + ' · ' + res.details.length + ' records');
+                        $subtitle.text(monthName + ' ' + selectedYear + ' · ' + res.details.length + ' ' + lbl("VAS_162_RecordsSuffix"));
                         renderDetailGrid($body, res.details);
                     } else {
                         // Render the grid with no rows rather than replacing the body: the popup
@@ -388,7 +398,7 @@
                 },
                 error: function (err) {
                     console.error("VAS_162_AdjustmentWiseCountWidget: Error loading details", err);
-                    $body.html('<div class="vas-adjwisecount-message">Unable to load details.</div>');
+                    $body.html('<div class="vas-adjwisecount-message">' + lbl("VAS_162_UnableToLoadDetails") + '</div>');
                 }
             });
         }
@@ -412,12 +422,12 @@
             var $grid = $('<div class="vas-adjwisecount-grid">');
             var $headerRow = $(
                 '<div class="vas-adjwisecount-grid-row vas-adjwisecount-header-row">' +
-                '<div class="vas-adjwisecount-th">' + esc(lbl("VAS_DocNo", "Document No")) + '</div>' +
+                '<div class="vas-adjwisecount-th">' + esc(lbl("VAS_162_DocNo", "Document No")) + '</div>' +
                 '<div class="vas-adjwisecount-th">' + esc(lbl("VAS_Product", "Product")) + '</div>' +
                 '<div class="vas-adjwisecount-th">' + esc(lbl("VAS_Attribute", "Attribute")) + '</div>' +
                 '<div class="vas-adjwisecount-th">' + esc(lbl("VAS_Qty", "Qty")) + '</div>' +
-                '<div class="vas-adjwisecount-th">' + esc(lbl("VAS_DiffQty", "Diff Qty")) + '</div>' +
-                '<div class="vas-adjwisecount-th">' + esc(lbl("VAS_AsOnDateCount", "As on Date Count")) + '</div>' +
+                '<div class="vas-adjwisecount-th">' + esc(lbl("VAS_162_DiffQty", "Diff Qty")) + '</div>' +
+                '<div class="vas-adjwisecount-th">' + esc(lbl("VAS_162_AsOnDateCount", "As on Date Count")) + '</div>' +
                 '</div>'
             );
             var $rows = $('<div class="vas-adjwisecount-rows">');

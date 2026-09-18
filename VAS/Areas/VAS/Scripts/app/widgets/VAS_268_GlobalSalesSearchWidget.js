@@ -86,6 +86,7 @@
  * 43  | Next page                                                             | VAS_268_NextPage
  * 44  | of                                                                    | VAS_268_Of
  * 45  | Showing                                                               | VAS_268_Showing
+ * 46  | Esc                                                                   | VAS_268_EscHint
  */
 ; VAS = window.VAS || {};
 
@@ -127,8 +128,7 @@
         var zoomWindowId = 0;
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return (translated && translated.charAt(0) !== '[') ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -201,7 +201,7 @@
                     '<div class="vas268-box">' +
                         '<span class="vas268-icon">' + icon('search') + '</span>' +
                         '<input class="vas268-input" type="text" autocomplete="off" aria-label="' + escapeHtml(placeholder) + '" placeholder="' + escapeHtml(placeholder) + '">' +
-                        '<span class="vas268-kbd">Esc</span>' +
+                        '<span class="vas268-kbd">' + escapeHtml(label('VAS_268_EscHint', 'Esc')) + '</span>' +
                     '</div>' +
                     '<div class="vas268-results" role="listbox"></div>' +
                 '</div>'

@@ -118,8 +118,7 @@
         var ZOOM_TABLE = 'C_Order';
 
         function lbl(key, fallback) {
-            var msg = VIS.Msg.getMsg(key);
-            return (msg && msg !== key && msg !== '[' + key + ']' && msg.charAt(0) !== '[') ? msg : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {

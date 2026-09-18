@@ -31,6 +31,25 @@
  * 22  | Bounced                              | VAS_032_MessageBounced
  * 23  | In transit                           | VAS_032_MessageInTransit
  * 24  | Cleared                              | VAS_032_MessageCleared
+ * 25  | No allocation lines found.           | VAS_032_NoAllocationLinesFound
+ * 26  | INVOICE NO.                          | VAS_032_HeaderInvoiceNo
+ * 27  | VENDOR                               | VAS_032_HeaderVendor
+ * 28  | INVOICE DATE                         | VAS_032_HeaderInvoiceDate
+ * 29  | DUE DATE                             | VAS_032_HeaderDueDate
+ * 30  | AMOUNT                               | VAS_032_HeaderAmount
+ * 31  | DISCOUNT                             | VAS_032_HeaderDiscount
+ * 32  | WRITEOFF                             | VAS_032_HeaderWriteoff
+ * 33  | TOTAL ALLOCATED                      | VAS_032_HeaderTotalAllocated
+ * 34  | Posted                               | VAS_032_Posted
+ * 35  | PAYMENT NO.                          | VAS_032_SummaryPaymentNo
+ * 36  | DATE                                 | VAS_032_SummaryDate
+ * 37  | STATUS                               | VAS_032_SummaryStatus
+ * 38  | ORGANIZATION                         | VAS_032_SummaryOrganization
+ * 39  | PAYMENT AMOUNT                       | VAS_032_SummaryPaymentAmount
+ * 40  | ALLOCATED                            | VAS_032_SummaryAllocated
+ * 41  | DESCRIPTION                          | VAS_032_SummaryDescription
+ * 42  | ALLOCATION LINES                     | VAS_032_AllocationLinesTitle
+ * 43  | Allocation Details                   | VAS_032_AllocationDetailsTitle
  * ─────────────────────────────────────────────────────────────────────
  */
 
@@ -83,8 +102,7 @@
         var adaptiveAdjustCount = 0;
 
         function lbl(key, fallback) {
-            var text = VIS.Msg.getMsg(key);
-            return text && text !== '[' + key + ']' ? text : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -995,7 +1013,7 @@
             html +=
                 '</tbody>' +
                 '<tfoot><tr class="vas-recent-ap-payments-alloc-foot">' +
-                '<td colspan="2"><strong>' + escapeHtml(lbl('VAS_Total', 'Total')) + '</strong></td>' +
+                '<td colspan="2"><strong>' + escapeHtml(lbl('VAS_032_Total', 'Total')) + '</strong></td>' +
                 '<td class="vas-recent-ap-payments-alloc-num"><strong>' + formatAllocAmount(totalAllocated, currencySymbol, stdPrecision) + '</strong></td>' +
                 '<td class="vas-recent-ap-payments-alloc-num"><strong>' +
                 (totalDiscount !== 0
@@ -1197,7 +1215,7 @@
             if (!lines || lines.length === 0) {
                 return (
                     '<div class="vas-allocation-empty">' +
-                    'No allocation lines found.' +
+                    lbl('VAS_032_NoAllocationLinesFound', 'No allocation lines found.') +
                     '</div>'
                 );
             }
@@ -1207,14 +1225,14 @@
                 '<table class="vas-allocation-lines-table">' +
                 '<thead>' +
                 '<tr>' +
-                '<th>INVOICE NO.</th>' +
-                '<th>VENDOR</th>' +
-                '<th>INVOICE DATE</th>' +
-                '<th>DUE DATE</th>' +
-                '<th>AMOUNT</th>' +
-                '<th>DISCOUNT</th>' +
-                '<th>WRITEOFF</th>' +
-                '<th>TOTAL ALLOCATED</th>' +
+                '<th>' + escapeHtml(lbl('VAS_032_HeaderInvoiceNo', 'INVOICE NO.')) + '</th>' +
+                '<th>' + escapeHtml(lbl('VAS_032_HeaderVendor', 'VENDOR')) + '</th>' +
+                '<th>' + escapeHtml(lbl('VAS_032_HeaderInvoiceDate', 'INVOICE DATE')) + '</th>' +
+                '<th>' + escapeHtml(lbl('VAS_032_HeaderDueDate', 'DUE DATE')) + '</th>' +
+                '<th>' + escapeHtml(lbl('VAS_032_HeaderAmount', 'AMOUNT')) + '</th>' +
+                '<th>' + escapeHtml(lbl('VAS_032_HeaderDiscount', 'DISCOUNT')) + '</th>' +
+                '<th>' + escapeHtml(lbl('VAS_032_HeaderWriteoff', 'WRITEOFF')) + '</th>' +
+                '<th>' + escapeHtml(lbl('VAS_032_HeaderTotalAllocated', 'TOTAL ALLOCATED')) + '</th>' +
                 '</tr>' +
                 '</thead>' +
                 '<tbody>';
@@ -1412,7 +1430,7 @@
                 escapeHtml(
                     firstValue(
                         header.documentNo,
-                        'Payment'
+                        lbl('VAS_032_MessagePayment', 'Payment')
                     )
                 ) +
                 ' · ' +
@@ -1426,7 +1444,7 @@
                 '</div>' +
 
                 '<div class="vas-allocation-popup-subtitle">' +
-                'Posted · ' +
+                escapeHtml(lbl('VAS_032_Posted', 'Posted')) + ' · ' +
                 escapeHtml(
                     firstValue(
                         header.postedDate,
@@ -1442,7 +1460,7 @@
                 '<div class="vas-allocation-summary-grid">' +
 
                 '<div class="vas-summary-item">' +
-                '<div class="vas-summary-label">PAYMENT NO.</div>' +
+                '<div class="vas-summary-label">' + escapeHtml(lbl('VAS_032_SummaryPaymentNo', 'PAYMENT NO.')) + '</div>' +
                 '<div class="vas-summary-value">' +
                 escapeHtml(
                     firstValue(
@@ -1454,7 +1472,7 @@
                 '</div>' +
 
                 '<div class="vas-summary-item">' +
-                '<div class="vas-summary-label">DATE</div>' +
+                '<div class="vas-summary-label">' + escapeHtml(lbl('VAS_032_SummaryDate', 'DATE')) + '</div>' +
                 '<div class="vas-summary-value">' +
                 escapeHtml(
                     firstValue(
@@ -1466,7 +1484,7 @@
                 '</div>' +
 
                 '<div class="vas-summary-item">' +
-                '<div class="vas-summary-label">STATUS</div>' +
+                '<div class="vas-summary-label">' + escapeHtml(lbl('VAS_032_SummaryStatus', 'STATUS')) + '</div>' +
                 '<div class="vas-summary-value">' +
                 escapeHtml(
                     firstValue(
@@ -1479,7 +1497,7 @@
                 '</div>' +
 
                 '<div class="vas-summary-item">' +
-                '<div class="vas-summary-label">ORGANIZATION</div>' +
+                '<div class="vas-summary-label">' + escapeHtml(lbl('VAS_032_SummaryOrganization', 'ORGANIZATION')) + '</div>' +
                 '<div class="vas-summary-value">' +
                 escapeHtml(
                     firstValue(
@@ -1491,21 +1509,21 @@
                 '</div>' +
 
                 '<div class="vas-summary-item">' +
-                '<div class="vas-summary-label">PAYMENT AMOUNT</div>' +
+                '<div class="vas-summary-label">' + escapeHtml(lbl('VAS_032_SummaryPaymentAmount', 'PAYMENT AMOUNT')) + '</div>' +
                 '<div class="vas-summary-value">' +
                 escapeHtml(payAmtText) +
                 '</div>' +
                 '</div>' +
 
                 '<div class="vas-summary-item">' +
-                '<div class="vas-summary-label">ALLOCATED</div>' +
+                '<div class="vas-summary-label">' + escapeHtml(lbl('VAS_032_SummaryAllocated', 'ALLOCATED')) + '</div>' +
                 '<div class="vas-summary-value">' +
                 escapeHtml(allocatedAmtText) +
                 '</div>' +
                 '</div>' +
 
                 '<div class="vas-summary-item vas-summary-wide">' +
-                '<div class="vas-summary-label">DESCRIPTION</div>' +
+                '<div class="vas-summary-label">' + escapeHtml(lbl('VAS_032_SummaryDescription', 'DESCRIPTION')) + '</div>' +
                 '<div class="vas-summary-value">' +
                 escapeHtml(
                     firstValue(
@@ -1521,7 +1539,7 @@
                 '</div>' +
 
                 '<div class="vas-allocation-lines-title">' +
-                'ALLOCATION LINES' +
+                escapeHtml(lbl('VAS_032_AllocationLinesTitle', 'ALLOCATION LINES')) +
                 '</div>' +
 
                 renderAllocationLinesTable(
@@ -1534,7 +1552,7 @@
             VIS.ADialog.info(
                 html,
                 true,
-                'Allocation Details'
+                lbl('VAS_032_AllocationDetailsTitle', 'Allocation Details')
             );
         }
 

@@ -66,8 +66,7 @@
         };
 
         function msg(key, fallback) {
-            var m = VIS.Msg.getMsg(key);
-            return (m && m !== key && m !== '[' + key + ']' && m.charAt(0) !== '[') ? m : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function dsEsc(str) {

@@ -96,8 +96,7 @@
         var state = { months: [], years: [], month: 0, year: 0, rows: [], page: 0, hasAnyDates: false };
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return translated && translated.charAt(0) !== '[' ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {

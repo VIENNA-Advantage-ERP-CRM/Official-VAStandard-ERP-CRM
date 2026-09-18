@@ -85,18 +85,18 @@
  *                  13 | No primary calendar is configured  | VAS_256_NoCalendar
  *                  14 | No primary accounting schema is    | VAS_256_NoAcctSchema
  *                     |   configured                       |
- *                  15 | Account                            | VAS_234_Account   (reuse)
+ *                  15 | Account                            | VAS_256_Account   (reuse)
  *                  16 | Amount                             | Amount            (reuse)
  *                  17 | Date                               | Date              (reuse)
- *                  18 | Screen                             | VAS_202_Screen    (reuse)
- *                  19 | Debit                              | VAS_202_Debit     (reuse)
- *                  20 | Credit                             | VAS_202_Credit    (reuse)
- *                  21 | Close                              | VAS_018_Close     (reuse)
- *                  22 | Showing                            | VAS_020_Showing   (reuse)
- *                  23 | of                                 | VAS_020_Of        (reuse)
- *                  24 | Previous                           | VAS_020_Prev      (reuse)
- *                  25 | Next                               | VAS_020_Next      (reuse)
- *                  26 | Couldn't load                      | VAS_192_CouldntLoad (reuse)
+ *                  18 | Screen                             | VAS_256_Screen    (reuse)
+ *                  19 | Debit                              | VAS_256_Debit     (reuse)
+ *                  20 | Credit                             | VAS_256_Credit    (reuse)
+ *                  21 | Close                              | VAS_256_Close     (reuse)
+ *                  22 | Showing                            | VAS_256_Showing   (reuse)
+ *                  23 | of                                 | VAS_256_Of        (reuse)
+ *                  24 | Previous                           | VAS_256_Prev      (reuse)
+ *                  25 | Next                               | VAS_256_Next      (reuse)
+ *                  26 | Couldn't load                      | VAS_256_CouldntLoad (reuse)
  *
  *                  The missing-value dash is a GLYPH, not a message: it carries no
  *                  language and therefore needs no AD_Message key.
@@ -396,7 +396,7 @@
 
                     var data = parseResponse(raw);
                     if (!data || data.error) {
-                        renderState(label('VAS_192_CouldntLoad', "Couldn't load"));
+                        renderState(label('VAS_256_CouldntLoad', "Couldn't load"));
                         return;
                     }
 
@@ -408,7 +408,7 @@
                     }
 
                     if (!data.Loaded) {
-                        renderState(label('VAS_192_CouldntLoad', "Couldn't load"));
+                        renderState(label('VAS_256_CouldntLoad', "Couldn't load"));
                         return;
                     }
 
@@ -438,7 +438,7 @@
                     /* The overlay comes down on failure too - a spinner left running over
                        an error the user cannot see is the worst of both. */
                     hideBusyIndicator();
-                    renderState(label('VAS_192_CouldntLoad', "Couldn't load"));
+                    renderState(label('VAS_256_CouldntLoad', "Couldn't load"));
                 }
             });
         }
@@ -473,7 +473,7 @@
             if (code === 'NOYEAR') {
                 return label('VAS_256_NoYears', 'No financial years available');
             }
-            return label('VAS_192_CouldntLoad', "Couldn't load");
+            return label('VAS_256_CouldntLoad', "Couldn't load");
         }
 
         /* "$412K posted to expense accounts with no budget line".
@@ -518,7 +518,7 @@
            every label would sit over the wrong column. */
         function paintHead() {
             $card.find('.vas-256-ghead').html(
-                '<span role="columnheader">' + escapeHtml(label('VAS_234_Account', 'Account')) + '</span>' +
+                '<span role="columnheader">' + escapeHtml(label('VAS_256_Account', 'Account')) + '</span>' +
                 '<span role="columnheader">' +
                     escapeHtml(label('VAS_256_OrganizationUnit', 'Organization Unit')) + '</span>' +
                 /* Amount is right-aligned - the one column a reader scans vertically. */
@@ -635,8 +635,8 @@
             var from = (_page - 1) * _pageSize + 1;
             var to = Math.min(_page * _pageSize, _totalRows);
 
-            var showing = label('VAS_020_Showing', 'Showing') + ' ' + from + '–' + to + ' ' +
-                label('VAS_020_Of', 'of') + ' ' + _totalRows;
+            var showing = label('VAS_256_Showing', 'Showing') + ' ' + from + '–' + to + ' ' +
+                label('VAS_256_Of', 'of') + ' ' + _totalRows;
 
             var prevDis = _page <= 1 ? ' disabled' : '';
             var nextDis = _page >= _totalPages ? ' disabled' : '';
@@ -647,11 +647,11 @@
                         escapeHtml(showing) + '</span>' +
                     '<div class="vas-256-pager-nav">' +
                         '<button type="button" class="vas-256-pgbtn vas-256-pg-prev" aria-label="' +
-                            escapeHtml(label('VAS_020_Prev', 'Previous')) + '"' + prevDis + '>' + ICONS.prev + '</button>' +
+                            escapeHtml(label('VAS_256_Prev', 'Previous')) + '"' + prevDis + '>' + ICONS.prev + '</button>' +
                         '<span class="vas-256-pager-label">' + _page + ' ' +
-                            escapeHtml(label('VAS_020_Of', 'of')) + ' ' + _totalPages + '</span>' +
+                            escapeHtml(label('VAS_256_Of', 'of')) + ' ' + _totalPages + '</span>' +
                         '<button type="button" class="vas-256-pgbtn vas-256-pg-next" aria-label="' +
-                            escapeHtml(label('VAS_020_Next', 'Next')) + '"' + nextDis + '>' + ICONS.next + '</button>' +
+                            escapeHtml(label('VAS_256_Next', 'Next')) + '"' + nextDis + '>' + ICONS.next + '</button>' +
                     '</div>' +
                 '</div>'
             );
@@ -880,7 +880,7 @@
                                 '<div class="vas-256-modal-sub"></div>' +
                             '</div>' +
                             '<button type="button" class="vas-256-modal-close" aria-label="' +
-                                escapeHtml(label('VAS_018_Close', 'Close')) + '">' + ICONS.close + '</button>' +
+                                escapeHtml(label('VAS_256_Close', 'Close')) + '">' + ICONS.close + '</button>' +
                         '</div>' +
                         '<div class="vas-256-modal-body"></div>' +
                         '<div class="vas-256-modal-foot"></div>' +
@@ -1038,7 +1038,7 @@
                     var data = parseResponse(raw);
 
                     if (!data || data.error) {
-                        renderModalState(label('VAS_192_CouldntLoad', "Couldn't load"), true);
+                        renderModalState(label('VAS_256_CouldntLoad', "Couldn't load"), true);
                         return;
                     }
 
@@ -1054,7 +1054,7 @@
                 },
                 error: function () {
                     if (mySeq !== _detailSeq) { return; }
-                    renderModalState(label('VAS_192_CouldntLoad', "Couldn't load"), true);
+                    renderModalState(label('VAS_256_CouldntLoad', "Couldn't load"), true);
                 },
                 complete: function () {
                     /* Only the newest request may clear the indicator - an overtaken
@@ -1087,11 +1087,11 @@
         function modalColumns() {
             return [
                 [label('Date', 'Date'), false],
-                [label('VAS_202_Screen', 'Screen'), false],
+                [label('VAS_256_Screen', 'Screen'), false],
                 [label('VAS_256_Description', 'Description'), false],
                 [label('VAS_256_BusinessPartner', 'Business partner'), false],
-                [label('VAS_202_Debit', 'Debit'), true],
-                [label('VAS_202_Credit', 'Credit'), true],
+                [label('VAS_256_Debit', 'Debit'), true],
+                [label('VAS_256_Credit', 'Credit'), true],
                 [label('VAS_256_NetAmount', 'Net amount'), true]
             ];
         }
@@ -1219,8 +1219,8 @@
             var from = rows > 0 ? ((pageNo - 1) * pageSize) + 1 : 0;
             var to = rows > 0 ? from + rows - 1 : 0;
 
-            var ofTxt = label('VAS_020_Of', 'of');
-            var showing = label('VAS_020_Showing', 'Showing') + ' ' + from + '–' + to + ' ' +
+            var ofTxt = label('VAS_256_Of', 'of');
+            var showing = label('VAS_256_Showing', 'Showing') + ' ' + from + '–' + to + ' ' +
                 ofTxt + ' ' + total;
 
             var prevDis = pageNo <= 1 ? ' disabled' : '';
@@ -1231,10 +1231,10 @@
                     escapeHtml(showing) + '</span>' +
                 '<span class="vas-256-pager-nav">' +
                     '<button type="button" class="vas-256-pgbtn" data-dir="prev" aria-label="' +
-                        escapeHtml(label('VAS_020_Prev', 'Previous')) + '"' + prevDis + '>' + ICONS.prev + '</button>' +
+                        escapeHtml(label('VAS_256_Prev', 'Previous')) + '"' + prevDis + '>' + ICONS.prev + '</button>' +
                     '<span class="vas-256-pager-label">' + pageNo + ' ' + escapeHtml(ofTxt) + ' ' + totalPages + '</span>' +
                     '<button type="button" class="vas-256-pgbtn" data-dir="next" aria-label="' +
-                        escapeHtml(label('VAS_020_Next', 'Next')) + '"' + nextDis + '>' + ICONS.next + '</button>' +
+                        escapeHtml(label('VAS_256_Next', 'Next')) + '"' + nextDis + '>' + ICONS.next + '</button>' +
                 '</span>'
             );
         }
@@ -1375,14 +1375,7 @@
         /* Every user-facing string goes through AD_Message; the fallback keeps the card
            readable when a key has not been seeded yet. */
         function label(key, fallback) {
-            try {
-                if (VIS.Msg && typeof VIS.Msg.getMsg === 'function') {
-                    var v = VIS.Msg.getMsg(key);
-                    if (v && v !== key && v.charAt(0) !== '[') { return v; }
-                }
-            }
-            catch (e) { /* ignore */ }
-            return fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         this.getRoot = function () { return $root; };

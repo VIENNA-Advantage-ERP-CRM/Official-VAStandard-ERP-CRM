@@ -27,6 +27,7 @@
  * 17 | Stock Value                           | VAS_113_StockValue
  * 18 | Previous page / Next page             | VAS_PreviousPage / VAS_NextPage
  * 19 | Close                                 | Close
+ * 20 | Render error:                         | VAS_113_RenderError
  */
 ; VAS = window.VAS || {};
 
@@ -69,8 +70,7 @@
         var stdPrecision = 0;
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return translated && translated.charAt(0) !== '[' ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -305,7 +305,7 @@
                     try {
                         renderModalPage();
                     } catch (e) {
-                        $modalBody.html('<div class="MPC-cm-modal-state">' + escapeHtml('Render error: ' + (e && e.message ? e.message : e)) + '</div>');
+                        $modalBody.html('<div class="MPC-cm-modal-state">' + escapeHtml(label('VAS_113_RenderError', 'Render error: ') + (e && e.message ? e.message : e)) + '</div>');
                     }
                 },
                 error: function (xhr, status) {
@@ -379,7 +379,7 @@
             }
 
             var thead = '<thead><tr>' +
-                '<th style="width:' + (showStockColumns ? '22%' : '30%') + '">' + escapeHtml(label('Code', 'Code')) + '</th>' +
+                '<th style="width:' + (showStockColumns ? '22%' : '30%') + '">' + escapeHtml(label('VAS_113_Code', 'Code')) + '</th>' +
                 '<th style="width:' + (showStockColumns ? '44%' : '70%') + '">' + escapeHtml(label('VAS_113_Name', 'Name')) + '</th>';
             if (showStockColumns) {
                 thead +=

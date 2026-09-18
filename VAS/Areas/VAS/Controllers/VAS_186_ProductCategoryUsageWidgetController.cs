@@ -17,6 +17,8 @@ namespace VIS.Controllers
     /// Purpose     : Supplies category-wise consumption data (quantity and value) and category drill-down issue lines.
     /// Chronological development:
     ///   AI-Dev      2026-08-02 Created
+    ///   Claude      2026-09-18 GetCategoryIssueLines Qty column now sources
+    ///                          M_InventoryLine.QtyEntered instead of QtyInternalUse.
     /// </summary>
     public class VAS_186_ProductCategoryUsageWidgetController : Controller
     {
@@ -278,7 +280,7 @@ namespace VIS.Controllers
                       uom.Name AS UomName,
                       wh.Name AS WarehouseName,
                       " + locatorSql + @" AS LocatorCode,
-                      line.QtyInternalUse,
+                      line.QtyEntered,
                       ai.MovementDate
                     FROM M_InventoryLine line
                     INNER JOIN (" + invAccessSql + @") ai ON ai.M_Inventory_ID = line.M_Inventory_ID
@@ -304,7 +306,7 @@ namespace VIS.Controllers
                             attribute = NormalizeAttributes(Util.GetValueOfString(dr["Attribute"])),
                             uomName = Util.GetValueOfString(dr["UomName"]),
                             whLoc = BuildWarehouseLocator(Util.GetValueOfString(dr["WarehouseName"]), Util.GetValueOfString(dr["LocatorCode"])),
-                            qty = Util.GetValueOfDecimal(dr["QtyInternalUse"]),
+                            qty = Util.GetValueOfDecimal(dr["QtyEntered"]),
                             movementDate = Convert.ToDateTime(dr["MovementDate"]).ToString("dd MMM")
                         });
                     }

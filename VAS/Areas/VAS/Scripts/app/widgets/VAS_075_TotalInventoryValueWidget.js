@@ -3,8 +3,8 @@
  * Summary Message Table
  *  # | Current Text          | Message Key
  * ---+-----------------------+-------------------------
- *  1 | Total Inventory Value | VAS_TotalInventoryValue
- *  2 | On-hand valuation     | VAS_OnHandValuation
+ *  1 | Total Inventory Value | VAS_075_TotalInventoryValue
+ *  2 | On-hand valuation     | VAS_075_OnHandValuation
  *  3 | Couldn't load         | VAS_CouldntLoad
  */
 ; VAS = window.VAS || {};
@@ -21,8 +21,7 @@
         var $meta;
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return translated && translated.charAt(0) !== '[' ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function getPrecision(value) {
@@ -81,7 +80,7 @@
 
         function loadValue() {
             $value.text('\u2014');
-            $meta.text(label('VAS_OnHandValuation', 'On-hand valuation'));
+            $meta.text(label('VAS_075_OnHandValuation', 'On-hand valuation'));
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_075_TotalInventoryValueWidget/GetTotalInventoryValue',
@@ -127,7 +126,7 @@
                 '</div>'
             );
 
-            $card.find('.MPC-inventory-value-label').text(label('VAS_TotalInventoryValue', 'Total Inventory Value'));
+            $card.find('.MPC-inventory-value-label').text(label('VAS_075_TotalInventoryValue', 'Total Inventory Value'));
             $value = $card.find('.MPC-inventory-value-value');
             $meta = $card.find('.MPC-inventory-value-meta');
             $root.append($card);

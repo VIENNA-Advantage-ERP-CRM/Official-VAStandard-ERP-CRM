@@ -109,11 +109,11 @@
  *                  31 | No unreconciled payments      | VAS_235_NoDetail
  *                     |   found for this aging bucket |
  *                  32 | Close                         | VAS_235_Close
- *                  33 | Showing                       | VAS_020_Showing     (reuse)
- *                  34 | of                            | VAS_020_Of          (reuse)
- *                  35 | Previous                      | VAS_020_Prev        (reuse)
- *                  36 | Next                          | VAS_020_Next        (reuse)
- *                  37 | Couldn't load                 | VAS_192_CouldntLoad (reuse)
+ *                  33 | Showing                       | VAS_235_Showing
+ *                  34 | of                            | VAS_235_Of
+ *                  35 | Previous                      | VAS_235_Prev
+ *                  36 | Next                          | VAS_235_Next
+ *                  37 | Couldn't load                 | VAS_235_CouldntLoad
  *
  *                  VAS_235_NothingOpen ("Nothing unreconciled") is RETIRED - a clean
  *                  book now draws the five buckets at zero instead of replacing the
@@ -445,7 +445,7 @@
 
                     var data = parseResponse(raw);
                     if (!data || data.error || !data.Loaded) {
-                        renderState(label('VAS_192_CouldntLoad', "Couldn't load"));
+                        renderState(label('VAS_235_CouldntLoad', "Couldn't load"));
                         return;
                     }
 
@@ -472,7 +472,7 @@
                     /* The overlay comes down on failure too - leaving a spinner spinning
                        over an error the user cannot see is the worst of both. */
                     hideBusyIndicator();
-                    renderState(label('VAS_192_CouldntLoad', "Couldn't load"));
+                    renderState(label('VAS_235_CouldntLoad', "Couldn't load"));
                 }
             });
         }
@@ -1002,7 +1002,7 @@
 
                     var data = parseResponse(raw);
                     if (!data || data.error || !data.Loaded) {
-                        renderDetailMessage(label('VAS_192_CouldntLoad', "Couldn't load"));
+                        renderDetailMessage(label('VAS_235_CouldntLoad', "Couldn't load"));
                         return;
                     }
 
@@ -1020,7 +1020,7 @@
                     /* The overlay comes down on failure too - a spinner left running over
                        an error the user cannot see is the worst of both. */
                     hideDetailBusy();
-                    renderDetailMessage(label('VAS_192_CouldntLoad', "Couldn't load"));
+                    renderDetailMessage(label('VAS_235_CouldntLoad', "Couldn't load"));
                 }
             });
         }
@@ -1175,8 +1175,8 @@
             var to = Math.min(_dlgPage * DETAIL_PAGE_SIZE, _dlgTotalRows);
 
             $dlg.find('.vas-235-dlg-note').text(
-                label('VAS_020_Showing', 'Showing') + ' ' + from + '–' + to + ' ' +
-                label('VAS_020_Of', 'of') + ' ' + _dlgTotalRows + ' ' +
+                label('VAS_235_Showing', 'Showing') + ' ' + from + '–' + to + ' ' +
+                label('VAS_235_Of', 'of') + ' ' + _dlgTotalRows + ' ' +
                 label('VAS_235_Lines', 'lines'));
 
             /* The pager is rendered even on a single page - "Page 1 of 1" with both arrows
@@ -1191,11 +1191,11 @@
 
             $pager.html(
                 '<button type="button" class="vas-235-dpg vas-235-dprev" aria-label="' +
-                    escapeHtml(label('VAS_020_Prev', 'Previous')) + '"' + prevDis + '>' + ICONS.prev + '</button>' +
+                    escapeHtml(label('VAS_235_Prev', 'Previous')) + '"' + prevDis + '>' + ICONS.prev + '</button>' +
                 '<span class="vas-235-dpage">' + _dlgPage + ' ' +
-                    escapeHtml(label('VAS_020_Of', 'of')) + ' ' + _dlgTotalPages + '</span>' +
+                    escapeHtml(label('VAS_235_Of', 'of')) + ' ' + _dlgTotalPages + '</span>' +
                 '<button type="button" class="vas-235-dpg vas-235-dnext" aria-label="' +
-                    escapeHtml(label('VAS_020_Next', 'Next')) + '"' + nextDis + '>' + ICONS.next + '</button>'
+                    escapeHtml(label('VAS_235_Next', 'Next')) + '"' + nextDis + '>' + ICONS.next + '</button>'
             );
 
             /* Paging keeps the bucket and the as-of date - only the page number moves. */
@@ -1298,14 +1298,7 @@
         /* Every user-facing string goes through AD_Message; the fallback keeps the card
            readable when a key has not been seeded yet. */
         function label(key, fallback) {
-            try {
-                if (VIS.Msg && typeof VIS.Msg.getMsg === 'function') {
-                    var v = VIS.Msg.getMsg(key);
-                    if (v && v !== key && v.charAt(0) !== '[') { return v; }
-                }
-            }
-            catch (e) { /* ignore */ }
-            return fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         this.getRoot = function () { return $root; };

@@ -25,6 +25,23 @@
  * 14 | Reversed                               | VAS_187_Reversed
  * 15 | Voided                                 | VAS_187_Voided
  * 16 | Unknown                                | VAS_187_Unknown
+ * 17 | No recent inventory use transactions.  | VAS_187_NoRecentTransactions
+ * 18 | of                                     | VAS_187_Of
+ * 19 | Warehouse                              | VAS_187_WarehouseFallback
+ * 20 | lines                                  | VAS_187_Lines
+ * 21 | Filter                                 | VAS_187_Filter
+ * 22 | Amount                                 | VAS_187_Amount
+ * 23 | Previous                               | VAS_187_Previous
+ * 24 | Next                                   | VAS_187_Next
+ *
+ * NOTE (2026-09-18, Claude): redesigned to match the reference mock - status badges now
+ * carry a small tone icon (check/pencil/clock), the meta line gets a calendar icon and
+ * drops the org-name segment, the right side is two "Lines"/"Amount" stat columns with a
+ * divider (replacing the old single "N lines · qty" line), the status <select> became a
+ * "Filter" button that opens a small dropdown menu, and the pager buttons use chevron SVGs.
+ * Also fixed in passing: formattedCompactVal/formattedFullVal were already being computed
+ * every row but the Amount value rendered formatINR() (full precision) instead - the
+ * compact one is now what's shown, with the full value as the title tooltip.
  */
 ; VAS = window.VAS || {};
 
@@ -59,8 +76,8 @@
         var $pagerText;
         var $prevBtn;
         var $nextBtn;
-        var $statusSelect;
         var $busy;
+        var docClickNs;
 
         var selectedStatus = "ALL";
         var pageNo = 1;
@@ -75,8 +92,7 @@
 // ===== NEW CODE END — currency format =====
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return (translated && translated.charAt(0) !== '[') ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -155,6 +171,13 @@
             return symbol ? (symbol + ' ' + fullStr) : fullStr;
         }
 
+        // NOTE (2026-09-17): formatINR is called below but was never defined anywhere in this
+        // file - a pre-existing bug that threw ReferenceError while rendering every row. Aliased
+        // to the exact-value currency formatter already defined above.
+        function formatINR(value) {
+            return formatFullCurrency(value, currencyIso, currencySymbol);
+        }
+
         function formatIndianGrouping(num) {
             var parts = num.toString().split('.');
             var integerPart = parts[0];
@@ -205,14 +228,25 @@
             '??': ['ip', 'VAS_187_Unknown', 'Unknown']
         };
 
+        // One small icon per badge tone (co/dr/ip) rather than per status code - the tone is
+        // already the visual grouping (STATUS_LABELS maps every code to one of the three), so
+        // this keeps the icon set fixed at three instead of growing per status.
+        var STATUS_ICONS = {
+            co: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1.999 14.413-3.713-3.713 1.414-1.414 2.299 2.298 5.586-5.586 1.414 1.414-7 7.001z"/></svg>',
+            dr: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>',
+            ip: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>'
+        };
+
         function getStatusBadge(status) {
             var entry = STATUS_LABELS[status];
-            if (!entry) {
-                // Genuinely unmapped code: show it rather than an empty chip, but keep it visible
-                // as an anomaly instead of pretending it is a known status.
-                return '<span class="vas-riu-badge ip">' + escapeHtml(status) + '</span>';
-            }
-            return '<span class="vas-riu-badge ' + entry[0] + '">' + escapeHtml(label(entry[1], entry[2])) + '</span>';
+            var tone = entry ? entry[0] : 'ip';
+            // Genuinely unmapped code: show it rather than an empty chip, but keep it visible
+            // as an anomaly instead of pretending it is a known status.
+            var text = entry ? label(entry[1], entry[2]) : status;
+            return '<span class="vas-riu-badge ' + tone + '">' +
+                '<span class="vas-riu-badge-ico" aria-hidden="true">' + (STATUS_ICONS[tone] || '') + '</span>' +
+                escapeHtml(text) +
+                '</span>';
         }
 
         function showBusy(show) {
@@ -301,9 +335,9 @@
             if (pageNo > totalPages) { pageNo = totalPages; }
 
             if (recordsData.length === 0) {
-                $body.html('<div class="vas-riu-empty">No recent inventory use transactions.</div>');
-                if ($footHelper) { $footHelper.text('0 of 0'); }
-                if ($pagerText) { $pagerText.text('1 of 1'); }
+                $body.html('<div class="vas-riu-empty">' + escapeHtml(label("VAS_187_NoRecentTransactions", "No recent inventory use transactions.")) + '</div>');
+                if ($footHelper) { $footHelper.text('0 ' + label("VAS_187_Of", "of") + ' 0'); }
+                if ($pagerText) { $pagerText.text('1 ' + label("VAS_187_Of", "of") + ' 1'); }
                 if ($prevBtn) { $prevBtn.prop('disabled', true); }
                 if ($nextBtn) { $nextBtn.prop('disabled', true); }
                 return;
@@ -316,7 +350,7 @@
 // ===== NEW CODE START — currency format (agent A09, 2026-08-19) =====
             for (var i = 0; i < recordsData.length; i++) {
                 var item = recordsData[i];
-                var metaStr = item.orgName + ' · ' + (item.warehouseName || 'Warehouse') + ' · ' + item.movementDate;
+                var metaStr = (item.warehouseName || label("VAS_187_WarehouseFallback", "Warehouse")) + ' · ' + item.movementDate;
                 var formattedCompactVal = formatCurrencyAmount(item.totalValue, currencyIso, currencySymbol);
                 var formattedFullVal = formatFullCurrency(item.totalValue, currencyIso, currencySymbol);
 
@@ -327,11 +361,21 @@
                     '<span class="vas-riu-doc-no">' + escapeHtml(item.documentNo) + '</span>' +
                     getStatusBadge(item.docStatus) +
                     '</div>' +
-                    '<div class="vas-riu-doc-meta" title="' + escapeHtml(metaStr) + '">' + escapeHtml(metaStr) + '</div>' +
+                    '<div class="vas-riu-doc-meta" title="' + escapeHtml(metaStr) + '">' +
+                    '<svg class="vas-riu-cal-ico" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>' +
+                    '<span>' + escapeHtml(metaStr) + '</span>' +
+                    '</div>' +
                     '</div>' +
                     '<div class="vas-riu-row-right">' +
-                    '<div class="vas-riu-lines-qty">' + item.lineCount + ' ' + escapeHtml(label("VAS_187_Lines", "lines")) + ' · ' + formatQty(item.totalQty) + '</div>' +
-                    '<div class="vas-riu-val">' + formatINR(item.totalValue) + '</div>' +
+                    '<div class="vas-riu-stat">' +
+                    '<div class="vas-riu-stat-lbl">' + escapeHtml(label("VAS_187_Lines", "Lines")) + '</div>' +
+                    '<div class="vas-riu-stat-val">' + formatQty(item.lineCount) + '</div>' +
+                    '</div>' +
+                    '<div class="vas-riu-divider" aria-hidden="true"></div>' +
+                    '<div class="vas-riu-stat">' +
+                    '<div class="vas-riu-stat-lbl">' + escapeHtml(label("VAS_187_Amount", "Amount")) + '</div>' +
+                    '<div class="vas-riu-stat-val" title="' + escapeHtml(formattedFullVal) + '">' + escapeHtml(formattedCompactVal) + '</div>' +
+                    '</div>' +
                     '</div>' +
                     '</button>';
             }
@@ -361,10 +405,10 @@
             $body.html(rowsHtml);
 
             if ($footHelper) {
-                $footHelper.text((startIndex + 1) + '–' + endIndex + ' of ' + totalRecords);
+                $footHelper.text((startIndex + 1) + '–' + endIndex + ' ' + label("VAS_187_Of", "of") + ' ' + totalRecords);
             }
             if ($pagerText) {
-                $pagerText.text(pageNo + ' of ' + totalPages);
+                $pagerText.text(pageNo + ' ' + label("VAS_187_Of", "of") + ' ' + totalPages);
             }
             if ($prevBtn) { $prevBtn.prop('disabled', pageNo <= 1); }
             if ($nextBtn) { $nextBtn.prop('disabled', pageNo >= totalPages); }
@@ -394,19 +438,29 @@
                 '<div class="vas-riu-sub">' + escapeHtml(sub) + '</div>' +
                 '</div>' +
                 '</div>' +
-                '<select class="vas-riu-select vas-riu-status-sel">' +
-                '<option value="ALL">' + escapeHtml(label("VAS_187_AllStatuses", "All Statuses")) + '</option>' +
-                '<option value="CO">' + escapeHtml(label("VAS_187_Completed", "Completed")) + '</option>' +
-                '<option value="DR">' + escapeHtml(label("VAS_187_Drafted", "Drafted")) + '</option>' +
-                '</select>' +
+                '<div class="vas-riu-filter-wrap">' +
+                '<button type="button" class="vas-riu-filter-btn">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>' +
+                '<span>' + escapeHtml(label("VAS_187_Filter", "Filter")) + '</span>' +
+                '</button>' +
+                '<div class="vas-riu-filter-menu vas-riu-hidden">' +
+                '<button type="button" class="vas-riu-filter-opt active" data-status="ALL">' + escapeHtml(label("VAS_187_AllStatuses", "All Statuses")) + '</button>' +
+                '<button type="button" class="vas-riu-filter-opt" data-status="CO">' + escapeHtml(label("VAS_187_Completed", "Completed")) + '</button>' +
+                '<button type="button" class="vas-riu-filter-opt" data-status="DR">' + escapeHtml(label("VAS_187_Drafted", "Drafted")) + '</button>' +
+                '</div>' +
+                '</div>' +
                 '</div>' +
                 '<div class="vas-riu-body"></div>' +
                 '<div class="vas-riu-foot">' +
-                '<div class="vas-riu-foot-helper">0 of 0</div>' +
+                '<div class="vas-riu-foot-helper">0 ' + escapeHtml(label("VAS_187_Of", "of")) + ' 0</div>' +
                 '<div class="vas-riu-pager">' +
-                '<button type="button" class="vas-riu-pager-btn vas-riu-prev">&lsaquo;</button>' +
-                '<span class="vas-riu-pager-txt">1 of 1</span>' +
-                '<button type="button" class="vas-riu-pager-btn vas-riu-next">&rsaquo;</button>' +
+                '<button type="button" class="vas-riu-pager-btn vas-riu-prev" aria-label="' + escapeHtml(label("VAS_187_Previous", "Previous")) + '">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>' +
+                '</button>' +
+                '<span class="vas-riu-pager-txt">1 ' + escapeHtml(label("VAS_187_Of", "of")) + ' 1</span>' +
+                '<button type="button" class="vas-riu-pager-btn vas-riu-next" aria-label="' + escapeHtml(label("VAS_187_Next", "Next")) + '">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>' +
+                '</button>' +
                 '</div>' +
                 '</div>' +
                 '</div>'
@@ -417,12 +471,34 @@
             $pagerText = $card.find('.vas-riu-pager-txt');
             $prevBtn = $card.find('.vas-riu-prev');
             $nextBtn = $card.find('.vas-riu-next');
-            $statusSelect = $card.find('.vas-riu-status-sel');
 
-            $statusSelect.on('change', function () {
-                selectedStatus = $(this).val();
+            var $filterWrap = $card.find('.vas-riu-filter-wrap');
+            var $filterBtn = $card.find('.vas-riu-filter-btn');
+            var $filterMenu = $card.find('.vas-riu-filter-menu');
+            var $filterOpts = $card.find('.vas-riu-filter-opt');
+
+            $filterBtn.on('click', function (e) {
+                e.stopPropagation();
+                $filterMenu.toggleClass('vas-riu-hidden');
+            });
+
+            $filterOpts.on('click', function () {
+                selectedStatus = $(this).data('status');
+                $filterOpts.removeClass('active');
+                $(this).addClass('active');
+                $filterMenu.addClass('vas-riu-hidden');
                 pageNo = 1;
                 loadRecentIssues();
+            });
+
+            // Close the menu on any click outside the filter control. Namespaced so
+            // disposeComponent() can remove exactly this handler and nothing else bound to
+            // document by another widget instance or another widget entirely.
+            docClickNs = 'click.vas-riu-' + (Math.random().toString(36).slice(2));
+            $(document).on(docClickNs, function (e) {
+                if (!$(e.target).closest($filterWrap).length) {
+                    $filterMenu.addClass('vas-riu-hidden');
+                }
             });
 
             $prevBtn.on('click', function () {
@@ -451,6 +527,7 @@
         this.getRoot = function () { return $root; };
 
         this.disposeComponent = function () {
+            if (docClickNs) { $(document).off(docClickNs); }
             $root.remove();
         };
     };

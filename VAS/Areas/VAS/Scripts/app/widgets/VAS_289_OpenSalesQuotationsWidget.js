@@ -153,6 +153,9 @@
  * 81  | Page 2 of 2                                                         | VAS_289_Page2Of2
  * 82  | line / lines                                                        | VAS_289_LineWordSuffix
  * 83  | Back to details                                                     | VAS_289_BackToDetails
+ * 84  | Rate                                                                | VAS_289_ColRate
+ * 85  | Print Description                                                   | VAS_289_FieldPrintDescription
+ * 86  | line(s) affected                                                    | VAS_289_ConflictLinesAffected
  */
 ; VAS = window.VAS || {};
 
@@ -206,8 +209,7 @@
         var currentCfg = null;
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return (translated && translated.charAt(0) !== '[') ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -1092,7 +1094,7 @@
             { key: 'product', label: label('VAS_289_ColProduct', 'Product'), w: 1.6 },
             { key: 'uom', label: label('VAS_289_ColUom', 'UoM'), w: .5 },
             { key: 'qty', label: label('VAS_289_ColQtyToOrder', 'Qty to order'), w: .8, align: 'right' },
-            { key: 'rate', label: 'Rate', w: .8, align: 'right' },
+            { key: 'rate', label: label('VAS_289_ColRate', 'Rate'), w: .8, align: 'right' },
             { key: 'tax', label: label('VAS_289_ColTax', 'Tax'), w: 1 },
             { key: 'promised', label: label('VAS_289_FieldDatePromised', 'Date Promised'), w: 1 },
             { key: 'stock', label: label('VAS_289_ColFreeStock', 'Free stock'), w: .8, align: 'right' },
@@ -1123,7 +1125,7 @@
                 var descRow = wizard.descOpen[idx] ? (
                     '<div class="vas289-linedesc" style="grid-column:1/-1">' +
                         '<div class="vas289-field"><label>' + escapeHtml(label('VAS_289_GroupDescription', 'Description')) + '</label><input type="text" class="vas289-fctl vas289-line-desc" data-line-idx="' + idx + '" value="' + escapeHtml(line.description) + '"></div>' +
-                        '<div class="vas289-field"><label>Print Description</label><input type="text" class="vas289-fctl vas289-line-printdesc" data-line-idx="' + idx + '" value="' + escapeHtml(line.printDescription) + '"></div>' +
+                        '<div class="vas289-field"><label>' + escapeHtml(label('VAS_289_FieldPrintDescription', 'Print Description')) + '</label><input type="text" class="vas289-fctl vas289-line-printdesc" data-line-idx="' + idx + '" value="' + escapeHtml(line.printDescription) + '"></div>' +
                     '</div>'
                 ) : '';
                 return '<div class="vas289-mrow" style="grid-template-columns:' + tpl + '">' +
@@ -1134,7 +1136,7 @@
                     '<span class="vas289-cell"><select class="vas289-fctl vas289-line-tax" data-line-idx="' + idx + '">' + taxOptions + '</select></span>' +
                     '<span class="vas289-cell"><input type="date" class="vas289-fctl vas289-line-promised" data-line-idx="' + idx + '" value="' + escapeHtml(line.datePromised || wizard.header.datePromised) + '"></span>' +
                     stockCell +
-                    '<span class="vas289-cell center"><button type="button" class="vas289-iconbtn vas289-line-desc-toggle" data-line-idx="' + idx + '" title="Description">' + icon('desc') + '</button></span>' +
+                    '<span class="vas289-cell center"><button type="button" class="vas289-iconbtn vas289-line-desc-toggle" data-line-idx="' + idx + '" title="' + escapeHtml(label('VAS_289_FieldDescription', 'Description')) + '">' + icon('desc') + '</button></span>' +
                 '</div>' + descRow;
             }).join('');
 
@@ -1258,7 +1260,7 @@
                     if (parsed.Error) {
                         var noteText = parsed.Error;
                         if (parsed.Conflicts && parsed.Conflicts.length) {
-                            noteText += ' (' + parsed.Conflicts.length + ' line' + (parsed.Conflicts.length > 1 ? 's' : '') + ' affected)';
+                            noteText += ' (' + parsed.Conflicts.length + ' ' + label('VAS_289_ConflictLinesAffected', 'line' + (parsed.Conflicts.length > 1 ? 's' : '') + ' affected') + ')';
                             // Re-sync the affected lines' pending quantity so the user sees the real current state.
                             parsed.Conflicts.forEach(function (c) {
                                 var line = wizard.lines.filter(function (l) { return l.lineId === c.QuotationLineId; })[0];

@@ -97,8 +97,7 @@
         var leadWindowId = 0;
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return translated && translated.charAt(0) !== '[' ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function usesIndianNumbering(isoCode) {

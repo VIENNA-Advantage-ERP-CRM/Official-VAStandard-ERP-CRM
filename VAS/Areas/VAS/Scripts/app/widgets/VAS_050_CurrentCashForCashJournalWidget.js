@@ -94,8 +94,7 @@
         var resizeDebounce = null;
 
         function lbl(key, fallback) {
-            var text = VIS.Msg.getMsg(key);
-            return text && text !== key && text !== '[' + key + ']' ? text : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -732,7 +731,7 @@
 
                     if (response.hasData === false) {
                         renderCashBookOptions(response.cashBooks || []);
-                        setState('No data');
+                        setState(lbl('VAS_050_NoData', 'No Data Found'));
                         return;
                     }
 

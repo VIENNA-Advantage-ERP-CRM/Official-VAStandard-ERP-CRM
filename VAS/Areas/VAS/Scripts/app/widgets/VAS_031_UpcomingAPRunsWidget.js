@@ -39,7 +39,7 @@
  * 31  | Review and save.                     | VAS_031_MessageReviewAndSave
  * 32  | Saving                               | VAS_031_MessageSaving
  * 33  | Save and Complete Payment            | VAS_031_MessageSavePayment
- * 34  | Cancel                               | VAS_Cancel
+ * 34  | Cancel                               | VAS_031_Cancel
  * 35  | Close                                | VAS_Close
  * 36  | Could not load data                  | VAS_ErrorLoading
  * 37  | Could not save AP payment            | VAS_031_CouldNotSaveAPPayment
@@ -114,15 +114,7 @@
         var adaptiveAdjustCount = 0;
 
         function lbl(key, fallback) {
-            var text = VIS.Msg.getMsg(key);
-
-            return (
-                text &&
-                text !== key &&
-                text !== '[' + key + ']'
-            )
-                ? text
-                : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -4451,7 +4443,7 @@
 
                 escapeHtml(
                     lbl(
-                        'VAS_Cancel',
+                        'VAS_031_Cancel',
                         'Cancel'
                     )
                 ) +

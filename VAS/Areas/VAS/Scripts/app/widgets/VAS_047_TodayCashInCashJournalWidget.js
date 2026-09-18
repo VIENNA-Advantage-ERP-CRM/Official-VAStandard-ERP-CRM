@@ -101,8 +101,7 @@
 
         /* ── Label helper ───────────────────────────────────────────── */
         function lbl(key, fallback) {
-            var text = VIS.Msg.getMsg(key);
-            return text && text !== '[' + key + ']' ? text : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function getPrecision(precision) {
@@ -234,7 +233,7 @@
             $dialogTbody.empty();
 
             if (!rows || rows.length === 0) {
-                renderDialogMessage('No data');
+                renderDialogMessage(lbl('VAS_047_NoData', 'No data available'));
                 return;
             }
 
@@ -731,7 +730,7 @@
                     }
 
                     if (!response.hasData) {
-                        showState(true, 'No data');
+                        showState(true, lbl('VAS_047_NoData', 'No data available'));
                         return;
                     }
 

@@ -25,9 +25,9 @@
  *  9 | Rank                                  | VAS_116_Rank
  * 10 | Previous page / Next page             | VAS_PreviousPage / VAS_NextPage
  * 11 | Close                                 | Close
- * 12 | Product Performance modal texts       | reused VAS_094_* keys (see the
- *    |                                       | VAS_094 widget's message table)
- *    |                                       | + VAS_017_LastYear /
+ * 12 | Product Performance modal texts       | VAS_116_* keys (own copies of
+ *    |                                       | the VAS_094 widget's message
+ *    |                                       | set, incl. VAS_116_LastYear) +
  *    |                                       | VAS_CurrentYear
  */
 ; VAS = window.VAS || {};
@@ -74,8 +74,7 @@
         var MODAL_STOCK_PER_PAGE = 5;
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return translated && translated.charAt(0) !== '[' ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -309,7 +308,7 @@
             $modalTitle.text(row.product_name || '');
             $modalBadge.html(low
                 ? '<span class="MPC-hsp-pill MPC-hsp-pill-warn">' + escapeHtml(label('VAS_116_Rank', 'Rank') + ' #' + rank) + '</span>'
-                : '<span class="MPC-hsp-pill MPC-hsp-pill-ok">' + escapeHtml(label('VAS_094_TopSeller', 'Top Seller') + ' · #' + rank) + '</span>');
+                : '<span class="MPC-hsp-pill MPC-hsp-pill-ok">' + escapeHtml(label('VAS_116_TopSeller', 'Top Seller') + ' · #' + rank) + '</span>');
             $modalBody.empty();
             $modalBusy.removeClass('MPC-hsp-hidden');
             $modal.addClass('MPC-hsp-modal-open').attr('aria-hidden', 'false');
@@ -350,7 +349,7 @@
             var lastRevenue = Number(data.last_year_revenue || 0);
             var currentRevenue = Number(data.current_year_revenue || 0);
             if (lastRevenue === 0 && currentRevenue > 0) {
-                return { text: label('VAS_094_New', 'New'), tone: 'info' };
+                return { text: label('VAS_116_New', 'New'), tone: 'info' };
             }
             if (lastRevenue === 0) {
                 return { text: '0%', tone: 'ok' };
@@ -361,12 +360,12 @@
 
         function performanceSourcingChip(data) {
             if (data.product_type === 'S' || data.is_stocked !== 'Y') {
-                return label('VAS_094_NonStockService', 'Non-Stock Service');
+                return label('VAS_116_NonStockService', 'Non-Stock Service');
             }
             if (data.has_bom === 'Y') {
-                return label('VAS_094_ManufacturedHasBOM', 'Manufactured · Has BOM');
+                return label('VAS_116_ManufacturedHasBOM', 'Manufactured · Has BOM');
             }
-            return label('VAS_094_PurchasedItem', 'Purchased Item');
+            return label('VAS_116_PurchasedItem', 'Purchased Item');
         }
 
         function performanceStockRowHtml(row, uomName) {
@@ -398,20 +397,20 @@
         }
 
         function renderPerformanceModal(data) {
-            var uomName = data.uom_name || label('VAS_094_Unit', 'Unit');
+            var uomName = data.uom_name || label('VAS_116_Unit', 'Unit');
             var growth = performanceGrowth(data);
             var averagePrice = Number(data.current_year_units || 0) !== 0 ? formatFullAmount(data.avg_selling_price) : '-';
 
             var chips =
-                '<span class="MPC-hsp-chip">' + escapeHtml(label('VAS_094_StrongPerformer', 'Strong performer')) + '</span>' +
-                '<span class="MPC-hsp-chip">' + escapeHtml(label('VAS_094_UoM', 'UoM') + ' · ' + uomName) + '</span>' +
+                '<span class="MPC-hsp-chip">' + escapeHtml(label('VAS_116_StrongPerformer', 'Strong performer')) + '</span>' +
+                '<span class="MPC-hsp-chip">' + escapeHtml(label('VAS_116_UoM', 'UoM') + ' · ' + uomName) + '</span>' +
                 '<span class="MPC-hsp-chip">' + escapeHtml(performanceSourcingChip(data)) + '</span>';
 
             var stats =
-                '<div class="MPC-hsp-pstat"><span class="MPC-hsp-pstat-label">' + escapeHtml(label('VAS_094_RevenueThisYear', 'Revenue (This Year)')) + '</span><span class="MPC-hsp-pstat-value" title="' + escapeHtml(formatFullAmount(data.current_year_revenue)) + '">' + escapeHtml(formatCompactAmount(data.current_year_revenue)) + '</span></div>' +
-                '<div class="MPC-hsp-pstat"><span class="MPC-hsp-pstat-label">' + escapeHtml(label('VAS_094_UnitsSold', 'Units Sold')) + '</span><span class="MPC-hsp-pstat-value">' + escapeHtml(formatUnits(data.current_year_units) + ' ' + uomName) + '</span></div>' +
-                '<div class="MPC-hsp-pstat"><span class="MPC-hsp-pstat-label">' + escapeHtml(label('VAS_094_AvgSellingPrice', 'Avg Selling Price')) + '</span><span class="MPC-hsp-pstat-value">' + escapeHtml(averagePrice) + '</span></div>' +
-                '<div class="MPC-hsp-pstat"><span class="MPC-hsp-pstat-label">' + escapeHtml(label('VAS_094_YoYGrowth', 'YoY Growth')) + '</span><span class="MPC-hsp-pstat-value MPC-hsp-tone-' + growth.tone + '">' + escapeHtml(growth.text) + '</span></div>';
+                '<div class="MPC-hsp-pstat"><span class="MPC-hsp-pstat-label">' + escapeHtml(label('VAS_116_RevenueThisYear', 'Revenue (This Year)')) + '</span><span class="MPC-hsp-pstat-value" title="' + escapeHtml(formatFullAmount(data.current_year_revenue)) + '">' + escapeHtml(formatCompactAmount(data.current_year_revenue)) + '</span></div>' +
+                '<div class="MPC-hsp-pstat"><span class="MPC-hsp-pstat-label">' + escapeHtml(label('VAS_116_UnitsSold', 'Units Sold')) + '</span><span class="MPC-hsp-pstat-value">' + escapeHtml(formatUnits(data.current_year_units) + ' ' + uomName) + '</span></div>' +
+                '<div class="MPC-hsp-pstat"><span class="MPC-hsp-pstat-label">' + escapeHtml(label('VAS_116_AvgSellingPrice', 'Avg Selling Price')) + '</span><span class="MPC-hsp-pstat-value">' + escapeHtml(averagePrice) + '</span></div>' +
+                '<div class="MPC-hsp-pstat"><span class="MPC-hsp-pstat-label">' + escapeHtml(label('VAS_116_YoYGrowth', 'YoY Growth')) + '</span><span class="MPC-hsp-pstat-value MPC-hsp-tone-' + growth.tone + '">' + escapeHtml(growth.text) + '</span></div>';
 
             var hero =
                 '<div class="MPC-hsp-phero">' +
@@ -432,7 +431,7 @@
                 });
                 attributesBlock =
                     '<div class="MPC-hsp-msection">' +
-                        '<div class="MPC-hsp-msection-title">' + escapeHtml(label('VAS_094_Attributes', 'Attributes')) + '</div>' +
+                        '<div class="MPC-hsp-msection-title">' + escapeHtml(label('VAS_116_Attributes', 'Attributes')) + '</div>' +
                         '<div class="MPC-hsp-attr-wrap">' + attributeChips + '</div>' +
                     '</div>';
             }
@@ -453,8 +452,8 @@
 
             var yoyBlock =
                 '<div class="MPC-hsp-msection">' +
-                    '<div class="MPC-hsp-msection-title">' + escapeHtml(label('VAS_094_YearOverYear', 'Year Over Year')) + '</div>' +
-                    yoyBarHtml(label('VAS_017_LastYear', 'Last Year'), lastWidth, 'MPC-hsp-yoy-last', data.last_year_revenue, data.last_year_units) +
+                    '<div class="MPC-hsp-msection-title">' + escapeHtml(label('VAS_116_YearOverYear', 'Year Over Year')) + '</div>' +
+                    yoyBarHtml(label('VAS_116_LastYear', 'Last Year'), lastWidth, 'MPC-hsp-yoy-last', data.last_year_revenue, data.last_year_units) +
                     yoyBarHtml(label('VAS_CurrentYear', 'Current Year'), currentWidth, 'MPC-hsp-yoy-current', data.current_year_revenue, data.current_year_units) +
                 '</div>';
 
@@ -465,17 +464,17 @@
             if (!isStockedProduct || !modalStockRows.length) {
                 stockBlock =
                     '<div class="MPC-hsp-msection">' +
-                        '<div class="MPC-hsp-msection-title">' + escapeHtml(label('VAS_094_StockOnHand', 'Stock On Hand')) + '</div>' +
+                        '<div class="MPC-hsp-msection-title">' + escapeHtml(label('VAS_116_StockOnHand', 'Stock On Hand')) + '</div>' +
                         '<div class="MPC-hsp-stock-empty">' + escapeHtml(!isStockedProduct
-                            ? label('VAS_094_NonStockNoInventory', 'Non-stock item — no inventory held.')
-                            : label('VAS_094_NoStockOnHand', 'No stock on hand.')) + '</div>' +
+                            ? label('VAS_116_NonStockNoInventory', 'Non-stock item — no inventory held.')
+                            : label('VAS_116_NoStockOnHand', 'No stock on hand.')) + '</div>' +
                     '</div>';
             } else {
                 var totalQty = 0;
                 modalStockRows.forEach(function (stockRow) { totalQty += Number(stockRow.qty_on_hand || 0); });
 
-                var locationsText = label('VAS_094_StockOnHand', 'Stock On Hand') + ' · ' + modalStockRows.length + ' ' +
-                    (modalStockRows.length === 1 ? label('VAS_094_Location', 'Location') : label('VAS_094_Locations', 'Locations'));
+                var locationsText = label('VAS_116_StockOnHand', 'Stock On Hand') + ' · ' + modalStockRows.length + ' ' +
+                    (modalStockRows.length === 1 ? label('VAS_116_Location', 'Location') : label('VAS_116_Locations', 'Locations'));
                 var pagerBlock = '';
                 if (modalStockRows.length > MODAL_STOCK_PER_PAGE) {
                     pagerBlock =
@@ -494,7 +493,7 @@
                         '<div class="MPC-hsp-msection-title">' + escapeHtml(locationsText) + '</div>' +
                         '<div class="MPC-hsp-stock-rows"></div>' +
                         '<div class="MPC-hsp-stock-row MPC-hsp-stock-total">' +
-                            '<span class="MPC-hsp-stock-name">' + escapeHtml(label('VAS_094_TotalOnHand', 'Total On Hand')) + '</span>' +
+                            '<span class="MPC-hsp-stock-name">' + escapeHtml(label('VAS_116_TotalOnHand', 'Total On Hand')) + '</span>' +
                             '<span class="MPC-hsp-stock-qty MPC-hsp-stock-qty-total">' + escapeHtml(formatUnits(totalQty) + ' ' + uomName) + '</span>' +
                         '</div>' +
                         pagerBlock +
@@ -503,7 +502,7 @@
 
             var note =
                 '<div class="MPC-hsp-mnote">' + modalIcon('clock') +
-                    '<span>' + escapeHtml(label('VAS_094_TopSellerNote', 'Consider raising stock levels to avoid missed sales during peak demand.')) + '</span>' +
+                    '<span>' + escapeHtml(label('VAS_116_TopSellerNote', 'Consider raising stock levels to avoid missed sales during peak demand.')) + '</span>' +
                 '</div>';
 
             $modalBody.html(

@@ -68,14 +68,14 @@
  * 19 | Nothing to show for this check      | VAS_195_NoDetail
  * 20 | Primary calendar not configured    | VAS_195_NoCalendar
  * 21 | Primary accounting schema not configured | VAS_195_NoAcctSchema
- * 22 | No open accounting period          | VAS_201_NoOpenPeriod    (reuse)
- * 23 | Dashboard period                   | VAS_201_DashboardPeriod (reuse)
- * 24 | Close                              | VAS_018_Close           (reuse)
- * 25 | Couldn't load                      | VAS_192_CouldntLoad     (reuse)
- * 26 | Showing                            | VAS_026_Showing         (reuse)
- * 27 | of                                 | VAS_026_Of              (reuse)
- * 28 | Previous                           | VAS_026_Prev            (reuse)
- * 29 | Next                               | VAS_026_Next            (reuse)
+ * 22 | No open accounting period          | VAS_195_NoOpenPeriod    (reuse)
+ * 23 | Dashboard period                   | VAS_195_DashboardPeriod (reuse)
+ * 24 | Close                              | VAS_195_Close           (reuse)
+ * 25 | Couldn't load                      | VAS_195_CouldntLoad     (reuse)
+ * 26 | Showing                            | VAS_195_Showing         (reuse)
+ * 27 | of                                 | VAS_195_Of              (reuse)
+ * 28 | Previous                           | VAS_195_Prev            (reuse)
+ * 29 | Next                               | VAS_195_Next            (reuse)
  * 30 | Debit                              | VAS_195_Debit
  * 31 | Credit                             | VAS_195_Credit
  *
@@ -129,9 +129,9 @@
     var ERROR_LABELS = {
         NOCALENDAR: { key: 'VAS_195_NoCalendar', text: 'Primary calendar not configured.' },
         NOACCTSCHEMA: { key: 'VAS_195_NoAcctSchema', text: 'Primary accounting schema not configured.' },
-        NOPERIOD: { key: 'VAS_201_NoOpenPeriod', text: 'No open accounting period.' },
+        NOPERIOD: { key: 'VAS_195_NoOpenPeriod', text: 'No open accounting period.' },
         NODETAIL: { key: 'VAS_195_NoDetail', text: 'Nothing to show for this check.' },
-        INVALID: { key: 'VAS_192_CouldntLoad', text: "Couldn't load" }
+        INVALID: { key: 'VAS_195_CouldntLoad', text: "Couldn't load" }
     };
 
     /* Card page size is ADAPTIVE: seven is the reference design's count at its own
@@ -219,8 +219,7 @@
         // ── Small helpers ────────────────────────────────────────────────────
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return (translated && translated.charAt(0) !== '[' && translated !== key) ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         /* Column captions: prefer the framework's own translated element name so a
@@ -234,7 +233,7 @@
 
         function errorLabel(code) {
             var def = ERROR_LABELS[code];
-            if (!def) { return label('VAS_192_CouldntLoad', "Couldn't load"); }
+            if (!def) { return label('VAS_195_CouldntLoad', "Couldn't load"); }
             return label(def.key, def.text);
         }
 
@@ -457,7 +456,7 @@
                 success: function (res) {
                     var data = null;
                     try { data = parseResponse(res); } catch (e) { }
-                    if (!data || data.error) { renderState(label('VAS_192_CouldntLoad', "Couldn't load"), true); return; }
+                    if (!data || data.error) { renderState(label('VAS_195_CouldntLoad', "Couldn't load"), true); return; }
 
                     _schema = data.Schema || null;
                     _periods = data.Periods || [];
@@ -471,13 +470,13 @@
                     if (data.ErrorCode) { renderState(errorLabel(data.ErrorCode), false); return; }
 
                     if (_periods.length === 0 || _periodId <= 0) {
-                        renderState(label('VAS_201_NoOpenPeriod', 'No open accounting period.'), false);
+                        renderState(label('VAS_195_NoOpenPeriod', 'No open accounting period.'), false);
                         return;
                     }
 
                     applyData(data.Data);
                 },
-                error: function () { renderState(label('VAS_192_CouldntLoad', "Couldn't load"), true); },
+                error: function () { renderState(label('VAS_195_CouldntLoad', "Couldn't load"), true); },
                 complete: function () { showBusy(false); _periodBusy = false; }
             });
         }
@@ -494,7 +493,7 @@
                 success: function (res) {
                     var data = null;
                     try { data = parseResponse(res); } catch (e) { }
-                    if (!data || data.error) { renderState(label('VAS_192_CouldntLoad', "Couldn't load"), true); return; }
+                    if (!data || data.error) { renderState(label('VAS_195_CouldntLoad', "Couldn't load"), true); return; }
 
                     /* A late response for a period the user has already moved away from
                        must not overwrite the current card. */
@@ -511,7 +510,7 @@
 
                     applyData(data);
                 },
-                error: function () { renderState(label('VAS_192_CouldntLoad', "Couldn't load"), true); },
+                error: function () { renderState(label('VAS_195_CouldntLoad', "Couldn't load"), true); },
                 complete: function () { showBusy(false); _periodBusy = false; }
             });
         }
@@ -552,7 +551,7 @@
             if (!$list) { return; }
 
             var items = (_data && _data.Items) ? _data.Items : [];
-            if (items.length === 0) { renderState(label('VAS_192_CouldntLoad', "Couldn't load"), true); return; }
+            if (items.length === 0) { renderState(label('VAS_195_CouldntLoad', "Couldn't load"), true); return; }
 
             var totalPages = Math.max(1, Math.ceil(items.length / _cardPageSize));
             if (_cardPage > totalPages) { _cardPage = totalPages; }
@@ -692,8 +691,8 @@
                       escapeHtml(label('VAS_195_CloseBlocked', 'Period close is blocked')) + '">' +
                       escapeHtml(label('VAS_195_CloseBlocked', 'Period close is blocked')) + '</span>';
 
-            var ofTxt = label('VAS_026_Of', 'of');
-            var showing = label('VAS_026_Showing', 'Showing') + ' ' + (from + 1) + '–' + to + ' ' +
+            var ofTxt = label('VAS_195_Of', 'of');
+            var showing = label('VAS_195_Showing', 'Showing') + ' ' + (from + 1) + '–' + to + ' ' +
                 ofTxt + ' ' + formatCount(total) + ' · ' + label('VAS_195_SortedBy', 'sorted by close priority');
 
             var prevDis = _cardPage <= 1 ? ' disabled' : '';
@@ -706,10 +705,10 @@
                 '</span>' +
                 '<span class="vas-195-pager-nav">' +
                     '<button type="button" class="vas-195-pgbtn" data-dir="prev" aria-label="' +
-                        escapeHtml(label('VAS_026_Prev', 'Previous')) + '"' + prevDis + '>' + icon('chevL') + '</button>' +
+                        escapeHtml(label('VAS_195_Prev', 'Previous')) + '"' + prevDis + '>' + icon('chevL') + '</button>' +
                     '<span class="vas-195-pager-label">' + _cardPage + ' ' + escapeHtml(ofTxt) + ' ' + totalPages + '</span>' +
                     '<button type="button" class="vas-195-pgbtn" data-dir="next" aria-label="' +
-                        escapeHtml(label('VAS_026_Next', 'Next')) + '"' + nextDis + '>' + icon('chevNext') + '</button>' +
+                        escapeHtml(label('VAS_195_Next', 'Next')) + '"' + nextDis + '>' + icon('chevNext') + '</button>' +
                 '</span>'
             );
         }
@@ -718,7 +717,7 @@
 
         function buildPicker() {
             $picker = $('<div class="vas-195-pp vas-195-hidden" role="listbox" aria-label="' +
-                escapeHtml(label('VAS_201_DashboardPeriod', 'Dashboard period')) + '">');
+                escapeHtml(label('VAS_195_DashboardPeriod', 'Dashboard period')) + '">');
             $('body').append($picker);
 
             $picker.on('click', '.vas-195-pp-opt', function () {
@@ -730,7 +729,7 @@
 
         function fillPicker() {
             var html = '<div class="vas-195-pp-h">' +
-                escapeHtml(label('VAS_201_DashboardPeriod', 'Dashboard period')) + '</div>';
+                escapeHtml(label('VAS_195_DashboardPeriod', 'Dashboard period')) + '</div>';
 
             for (var i = 0; i < _periods.length; i++) {
                 var p = _periods[i];
@@ -883,7 +882,7 @@
                                 '<div class="vas-195-modal-sub"></div>' +
                             '</div>' +
                             '<button type="button" class="vas-195-modal-close" aria-label="' +
-                                escapeHtml(label('VAS_018_Close', 'Close')) + '">' + icon('close') + '</button>' +
+                                escapeHtml(label('VAS_195_Close', 'Close')) + '">' + icon('close') + '</button>' +
                         '</div>' +
                         '<div class="vas-195-modal-body"></div>' +
                         '<div class="vas-195-modal-foot"></div>' +
@@ -1030,7 +1029,7 @@
                     try { data = parseResponse(res); } catch (e) { }
 
                     if (!data || data.error) {
-                        renderModalState(label('VAS_192_CouldntLoad', "Couldn't load"), true);
+                        renderModalState(label('VAS_195_CouldntLoad', "Couldn't load"), true);
                         return;
                     }
 
@@ -1052,7 +1051,7 @@
                 },
                 error: function () {
                     if (mySeq !== _detailSeq) { return; }
-                    renderModalState(label('VAS_192_CouldntLoad', "Couldn't load"), true);
+                    renderModalState(label('VAS_195_CouldntLoad', "Couldn't load"), true);
                 },
                 complete: function () {
                     if (mySeq === _detailSeq) { showModalBusy(false); }
@@ -1274,8 +1273,8 @@
             var from = rows > 0 ? ((pageNo - 1) * pageSize) + 1 : 0;
             var to = rows > 0 ? from + rows - 1 : 0;
 
-            var ofTxt = label('VAS_026_Of', 'of');
-            var showing = label('VAS_026_Showing', 'Showing') + ' ' + from + '–' + to + ' ' +
+            var ofTxt = label('VAS_195_Of', 'of');
+            var showing = label('VAS_195_Showing', 'Showing') + ' ' + from + '–' + to + ' ' +
                 ofTxt + ' ' + formatCount(total);
 
             var prevDis = pageNo <= 1 ? ' disabled' : '';
@@ -1286,10 +1285,10 @@
                     escapeHtml(showing) + '</span>' +
                 '<span class="vas-195-pager-nav">' +
                     '<button type="button" class="vas-195-pgbtn" data-dir="prev" aria-label="' +
-                        escapeHtml(label('VAS_026_Prev', 'Previous')) + '"' + prevDis + '>' + icon('chevL') + '</button>' +
+                        escapeHtml(label('VAS_195_Prev', 'Previous')) + '"' + prevDis + '>' + icon('chevL') + '</button>' +
                     '<span class="vas-195-pager-label">' + pageNo + ' ' + escapeHtml(ofTxt) + ' ' + totalPages + '</span>' +
                     '<button type="button" class="vas-195-pgbtn" data-dir="next" aria-label="' +
-                        escapeHtml(label('VAS_026_Next', 'Next')) + '"' + nextDis + '>' + icon('chevNext') + '</button>' +
+                        escapeHtml(label('VAS_195_Next', 'Next')) + '"' + nextDis + '>' + icon('chevNext') + '</button>' +
                 '</span>'
             );
         }
@@ -1309,7 +1308,7 @@
                 VAS.ZoomUtil.zoomToRecord(keyColumnName, recordId, windowId, '', '');
             } catch (e) {
                 if (window.console) { console.log(e); }
-                showError(label('VAS_192_CouldntLoad', "Couldn't load"));
+                showError(label('VAS_195_CouldntLoad', "Couldn't load"));
             }
         }
 

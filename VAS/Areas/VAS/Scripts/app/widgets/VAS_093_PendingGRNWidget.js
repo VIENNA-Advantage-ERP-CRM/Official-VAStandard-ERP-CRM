@@ -21,24 +21,24 @@
  * Labels / Message Keys
  *  #  | Current Text                                     | Message Key
  * ----+--------------------------------------------------+---------------------------
- *  1  | Pending GRN                                      | VAS_PendingGRN
- *  2  | GRN Count                                        | VAS_GRNCount
- *  3  | Purchase Order                                   | PurchaseOrder
+ *  1  | Pending GRN                                      | VAS_093_PendingGRN
+ *  2  | GRN Count                                        | VAS_093_GRNCount
+ *  3  | Purchase Order                                   | VAS_093_PurchaseOrder
  *  4  | Vendor                                           | Vendor
  *  5  | Vendor Location                                  | VAS_VendorLocation
- *  6  | No of Lines                                      | VAS_NoOfLines
- *  7  | Item                                             | VAS_Item
+ *  6  | No of Lines                                      | VAS_093_NoOfLines
+ *  7  | Item                                             | VAS_093_Item
  *  8  | Attribute                                        | VAS_Attribute
- *  9  | Remaining Qty                                    | VAS_RemianingQty
+ *  9  | Remaining Qty                                    | VAS_093_RemianingQty
  * 10  | UOM                                              | VAS_Uom
- * 11  | Select the order lines to receive, then create.. | VAS_SelectLinesThenGRN
- * 12  | Generate GRN                                     | VAS_GenerateGRN
+ * 11  | Select the order lines to receive, then create.. | VAS_093_SelectLinesThenGRN
+ * 12  | Generate GRN                                     | VAS_093_GenerateGRN
  * 13  | Showing / of                                     | VAS_Showing / VAS_Of
- * 14  | No data available                                | VAS_NoDataAvailable
+ * 14  | No data available                                | VAS_093_NoDataAvailable
  * 15  | Back / Close                                     | VAS_Back / VAS_Close
- * 16  | Document No / Total Amount / Product Location    | Document_No / TotalAmount / VAS_ProductLocation
- * 17  | Received quantity must be between 0 and the ...  | VAS_ReceivedQtyInvalid
- * 18  | GRN could not be generated.                      | VAS_DeliveryOrderNotGenerated
+ * 16  | Document No / Total Amount / Product Location    | VAS_093_Document_No / VAS_093_TotalAmount / VAS_093_ProductLocation
+ * 17  | Received quantity must be between 0 and the ...  | VAS_093_ReceivedQtyInvalid
+ * 18  | GRN could not be generated.                      | VAS_093_DeliveryOrderNotGenerated
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -95,8 +95,7 @@
         var currentChildRecords = [];
 
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            return (t && t.charAt(0) !== '[') ? t : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -153,9 +152,9 @@
                 '            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg>' +
                 '        </span>' +
                 '        <div class="vas-egrn-titles">' +
-                '            <div class="vas-egrn-title">' + VIS.Msg.getMsg("VAS_PendingGRN") + '</div>' +
+                '            <div class="vas-egrn-title">' + VIS.Msg.getMsg("VAS_093_PendingGRN") + '</div>' +
                 '        </div>' +
-                '        <span class="vas-egrn-count">' + VIS.Msg.getMsg("VAS_GRNCount") + ' <span id="VAS_DeliveryCount_' + widgetID + '">0</span></span>' +
+                '        <span class="vas-egrn-count">' + VIS.Msg.getMsg("VAS_093_GRNCount") + ' <span id="VAS_DeliveryCount_' + widgetID + '">0</span></span>' +
                 '    </div>' +
                 '    <div class="vas-egrn-body">' +
                 '        <div id="VAS_DeliveryBox_' + widgetID + '" class="vas-egrn-rows"></div>' +
@@ -216,16 +215,16 @@
                                 '</span>' +
                                 '<div class="vas-egrn-main">' +
                                 '<div class="vas-egrn-top">' +
-                                '<span class="vas-egrn-no" title="' + escapeHtml(VIS.Msg.getMsg("Document_No")) + '">' + escapeHtml(order.poNo) + '</span>' +
-                                '<span class="vas-egrn-qty" title="' + escapeHtml(VIS.Msg.getMsg("VAS_NoOfLines")) + '">' + escapeHtml(order.lineCount) + '</span>' +
+                                '<span class="vas-egrn-no" title="' + escapeHtml(VIS.Msg.getMsg("VAS_093_Document_No")) + '">' + escapeHtml(order.poNo) + '</span>' +
+                                '<span class="vas-egrn-qty" title="' + escapeHtml(VIS.Msg.getMsg("VAS_093_NoOfLines")) + '">' + escapeHtml(order.lineCount) + '</span>' +
                                 '</div>' +
                                 '<div class="vas-egrn-mid">' +
                                 '<span class="vas-egrn-party" title="' + escapeHtml(VIS.Msg.getMsg("Vendor")) + '">' + escapeHtml(order.supplier) + '</span>' +
-                                '<span class="vas-egrn-val" title="' + escapeHtml(VIS.Msg.getMsg("TotalAmount")) + '">' + escapeHtml(amountText) + '</span>' +
+                                '<span class="vas-egrn-val" title="' + escapeHtml(VIS.Msg.getMsg("VAS_093_TotalAmount")) + '">' + escapeHtml(amountText) + '</span>' +
                                 '</div>' +
                                 '<div class="vas-egrn-sub">' +
                                 '<span class="vas-egrn-addr" title="' + escapeHtml(VIS.Msg.getMsg("VAS_VendorLocation")) + '">' + escapeHtml(order.addressLine || '-') + '</span>' +
-                                '<span class="vas-egrn-wh" title="' + escapeHtml(VIS.Msg.getMsg("VAS_ProductLocation")) + '">' + escapeHtml(order.warehouseName || '-') + '</span>' +
+                                '<span class="vas-egrn-wh" title="' + escapeHtml(VIS.Msg.getMsg("VAS_093_ProductLocation")) + '">' + escapeHtml(order.warehouseName || '-') + '</span>' +
                                 '</div>' +
                                 '</div>' +
                                 '</button>');
@@ -244,7 +243,7 @@
                     }
                     else {
                         $box.html(
-                            '<div class="vas-egrn-empty">' + VIS.Msg.getMsg("VAS_NoDataAvailable") + '</div>'
+                            '<div class="vas-egrn-empty">' + VIS.Msg.getMsg("VAS_093_NoDataAvailable") + '</div>'
                         );
                         $root.find('#VAS_DeliveryCount_' + widgetID).text('0');
                         $root.find('#VAS_FootInfo_' + widgetID).text('');
@@ -469,7 +468,7 @@
             $dialogTitle.text(order.poNo || '');
             $dialogBadge
                 .removeClass('vas-egrn-hidden')
-                .html('<span class="vas-egrn-pill info">' + escapeHtml(lbl("VAS_NoOfLines", "No of Lines") + ' ' + order.lineCount) + '</span>');
+                .html('<span class="vas-egrn-pill info">' + escapeHtml(lbl("VAS_093_NoOfLines", "No of Lines") + ' ' + order.lineCount) + '</span>');
 
             $dialog.removeClass('vas-egrn-hidden');
             $('body').addClass('vas-egrn-body-lock');
@@ -488,7 +487,7 @@
                     for (var i = 0; i < currentChildRecords.length; i++) {
                         lineQtyById[currentChildRecords[i].poLineId] = toInputValue(currentChildRecords[i].openQty);
                     }
-                    $dialogBadge.html('<span class="vas-egrn-pill info">' + escapeHtml(lbl("VAS_NoOfLines", "No of Lines") + ' ' + currentChildRecords.length) + '</span>');
+                    $dialogBadge.html('<span class="vas-egrn-pill info">' + escapeHtml(lbl("VAS_093_NoOfLines", "No of Lines") + ' ' + currentChildRecords.length) + '</span>');
                     renderOrderLines();
                 },
                 error: function () {
@@ -508,7 +507,7 @@
             var order = currentOrder;
 
             if (childRecords.length === 0) {
-                $dialogBody.html('<div class="vas-egrn-empty">' + escapeHtml(lbl("VAS_NoDataAvailable", "No data available")) + '</div>');
+                $dialogBody.html('<div class="vas-egrn-empty">' + escapeHtml(lbl("VAS_093_NoDataAvailable", "No data available")) + '</div>');
                 return;
             }
 
@@ -516,10 +515,10 @@
                Order" (core message key), not "Pending GRN". */
             var fields =
                 '<div class="vas-egrn-form-grid">' +
-                fieldHtml(lbl("PurchaseOrder", "Purchase Order"), order.poNo, true) +
+                fieldHtml(lbl("VAS_093_PurchaseOrder", "Purchase Order"), order.poNo, true) +
                 fieldHtml(lbl("Vendor", "Vendor"), order.supplier) +
                 fieldHtml(lbl("VAS_VendorLocation", "Vendor Location"), order.addressLine) +
-                fieldHtml(lbl("VAS_NoOfLines", "No of Lines"), String(childRecords.length)) +
+                fieldHtml(lbl("VAS_093_NoOfLines", "No of Lines"), String(childRecords.length)) +
                 '</div>';
 
             var totalPages = Math.max(1, Math.ceil(childRecords.length / linePageSize));
@@ -541,7 +540,7 @@
                     '</label>' +
                     attrCellHtml(line.attributeName) +
                     /* Editable received quantity, defaulting to the remaining qty. */
-                    '<input class="vas-egrn-rcv-in vas-pgrn-qty" type="number" min="0" max="' + escapeHtml(line.openQty) + '" step="any" value="' + escapeHtml(qtyValue) + '" data-orderlineid="' + escapeHtml(line.poLineId) + '" aria-label="' + escapeHtml(lbl("VAS_RemianingQty", "Remaining Qty")) + '"/>' +
+                    '<input class="vas-egrn-rcv-in vas-pgrn-qty" type="number" min="0" max="' + escapeHtml(line.openQty) + '" step="any" value="' + escapeHtml(qtyValue) + '" data-orderlineid="' + escapeHtml(line.poLineId) + '" aria-label="' + escapeHtml(lbl("VAS_093_RemianingQty", "Remaining Qty")) + '"/>' +
                     '<div class="vas-egrn-rcv-uom" title="' + escapeHtml(line.uom) + '">' + escapeHtml(line.uom) + '</div>' +
                     '</div>';
             }
@@ -550,12 +549,12 @@
                 fields +
                 '<div class="vas-egrn-note">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' +
-                '<span>' + escapeHtml(lbl("VAS_SelectLinesThenGRN", "Select the order lines to receive, then create the GRN.")) + '</span>' +
+                '<span>' + escapeHtml(lbl("VAS_093_SelectLinesThenGRN", "Select the order lines to receive, then create the GRN.")) + '</span>' +
                 '</div>' +
                 '<div class="vas-egrn-rcv-line vas-pgrn-line vas-egrn-rcv-head">' +
-                '<div>' + escapeHtml(lbl("VAS_Item", "Item")) + '</div>' +
+                '<div>' + escapeHtml(lbl("VAS_093_Item", "Item")) + '</div>' +
                 '<div>' + escapeHtml(lbl("VAS_Attribute", "Attribute")) + '</div>' +
-                '<div>' + escapeHtml(lbl("VAS_RemianingQty", "Remaining Qty")) + '</div>' +
+                '<div>' + escapeHtml(lbl("VAS_093_RemianingQty", "Remaining Qty")) + '</div>' +
                 '<div>' + escapeHtml(lbl("VAS_Uom", "UOM")) + '</div>' +
                 '</div>' +
                 '<div class="vas-egrn-rcv-viewport"><div class="vas-egrn-lines">' + rows + '</div></div>' +
@@ -563,7 +562,7 @@
                 '<div class="vas-egrn-error vas-egrn-hidden"></div>' +
                 '<div class="vas-egrn-action"><button type="button" class="vas-egrn-create-btn" disabled>' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' +
-                '<span>' + escapeHtml(lbl("VAS_GenerateGRN", "Generate GRN")) + '</span>' +
+                '<span>' + escapeHtml(lbl("VAS_093_GenerateGRN", "Generate GRN")) + '</span>' +
                 '</button></div>'
             );
 
@@ -619,7 +618,7 @@
             for (var i = 0; i < selectedOrderLineIDs.length; i++) {
                 var qty = selectedLineQty(selectedOrderLineIDs[i]);
                 if (qty == null) {
-                    setDialogError(lbl("VAS_ReceivedQtyInvalid", "Received quantity must be between 0 and the remaining quantity."));
+                    setDialogError(lbl("VAS_093_ReceivedQtyInvalid", "Received quantity must be between 0 and the remaining quantity."));
                     return;
                 }
                 lines.push({ poLineId: selectedOrderLineIDs[i], receivedQty: qty });
@@ -653,14 +652,14 @@
                     else {
                         setDialogError(data.message != null && data.message !== ""
                             ? data.message
-                            : lbl("VAS_DeliveryOrderNotGenerated", "GRN could not be generated."));
+                            : lbl("VAS_093_DeliveryOrderNotGenerated", "GRN could not be generated."));
                         updateGenerateState();
                     }
                 },
                 error: function (xhr, status, error) {
                     console.log('Failed to fetch data:', status, error);
                     showDialogBusy(false);
-                    setDialogError(lbl("VAS_DeliveryOrderNotGenerated", "GRN could not be generated."));
+                    setDialogError(lbl("VAS_093_DeliveryOrderNotGenerated", "GRN could not be generated."));
                     updateGenerateState();
                 }
             });

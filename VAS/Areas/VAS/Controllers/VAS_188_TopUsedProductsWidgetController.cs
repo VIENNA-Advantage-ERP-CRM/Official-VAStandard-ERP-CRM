@@ -17,6 +17,16 @@ namespace VIS.Controllers
     /// Purpose     : Ranks top 10 products consumed by volume (quantity or value) with detail usage breakdown modal.
     /// Chronological development:
     ///   AI-Dev      2026-08-02 Created
+    ///   Claude      2026-09-18 Usage-breakdown modal Qty column now sources
+    ///                          M_InventoryLine.QtyEntered instead of QtyInternalUse.
+    ///   Claude      2026-09-18 GetProductUsageDetails now also returns each line's UOM
+    ///                          (C_UOM.Name) and its base-UOM quantity (QtyInternalUse, as
+    ///                          qtyBaseUom) alongside the selected-UOM QtyEntered, so the
+    ///                          modal can show both scales per line.
+    ///   Claude      2026-09-18 GetProductUsageDetails also returns the PRODUCT's base UOM
+    ///                          name (M_Product.C_UOM_ID, as baseUomName) - not a per-line
+    ///                          entered UOM, which can vary line to line - for the "Consumed
+    ///                          Qty (In Base UOM)" summary field to display alongside its number.
     /// </summary>
     public class VAS_188_TopUsedProductsWidgetController : Controller
     {
@@ -166,43 +176,57 @@ namespace VIS.Controllers
                       ai.MovementDate,
                       wh.Name AS WarehouseName,
                       " + locatorSql + @" AS LocatorCode,
-                      line.QtyInternalUse,
+                      line.QtyEntered,
+                      uom.Name AS UomName,
+                      line.QtyInternalUse AS QtyBaseUOM,
+                      baseUom.Name AS BaseUomName,
                       (line.QtyInternalUse * " + LineUnitCostSql + @") AS LineValue
                     FROM M_InventoryLine line
                     INNER JOIN (" + invAccessSql + @") ai ON ai.M_Inventory_ID = line.M_Inventory_ID
+                    INNER JOIN M_Product prod ON prod.M_Product_ID = line.M_Product_ID
                     LEFT JOIN M_Locator loc ON loc.M_Locator_ID = line.M_Locator_ID
                     LEFT JOIN M_Warehouse wh ON wh.M_Warehouse_ID = loc.M_Warehouse_ID
+                    LEFT JOIN C_UOM uom ON uom.C_UOM_ID = line.C_UOM_ID
+                    LEFT JOIN C_UOM baseUom ON baseUom.C_UOM_ID = prod.C_UOM_ID
                     LEFT JOIN (" + ProductCurrentCostSql + @") pc ON pc.M_Product_ID = line.M_Product_ID
                     WHERE line.IsActive = 'Y'
                       AND COALESCE(line.QtyInternalUse, 0) > 0
                       AND line.M_Product_ID = " + productId + @"
                     ORDER BY ai.MovementDate DESC, ai.DocumentNo DESC";
 
+                string baseUomName = "";
+
                 using (IDataReader dr = DB.ExecuteReader(sql, null, null))
                 {
                     while (dr != null && dr.Read())
                     {
+                        if (string.IsNullOrEmpty(baseUomName))
+                        {
+                            baseUomName = Util.GetValueOfString(dr["BaseUomName"]);
+                        }
                         lines.Add(new
                         {
                             inventoryId = Util.GetValueOfInt(dr["InventoryId"]),
                             documentNo = Util.GetValueOfString(dr["DocumentNo"]),
                             movementDate = Convert.ToDateTime(dr["MovementDate"]).ToString("dd MMM yyyy"),
                             whLoc = BuildWarehouseLocator(Util.GetValueOfString(dr["WarehouseName"]), Util.GetValueOfString(dr["LocatorCode"])),
-                            qty = Util.GetValueOfDecimal(dr["QtyInternalUse"]),
+                            qty = Util.GetValueOfDecimal(dr["QtyEntered"]),
+                            uomName = Util.GetValueOfString(dr["UomName"]),
+                            qtyBaseUom = Util.GetValueOfDecimal(dr["QtyBaseUOM"]),
                             value = Util.GetValueOfDecimal(dr["LineValue"])
                         });
                     }
                 }
 
+// ===== NEW CODE START — currency format (agent A10, 2026-08-19) =====
+                return Json(JsonConvert.SerializeObject(new { lines = lines, baseUomName = baseUomName, currency = GetCurrencyInfo(ctx), success = true }), JsonRequestBehavior.AllowGet);
+// ===== NEW CODE END — currency format =====
             }
             catch (Exception ex)
             {
                 Log.Log(Level.SEVERE, "VAS_188_TopUsedProductsWidget.GetProductUsageDetails", ex);
                 return Json(JsonConvert.SerializeObject(new { error = Msg.GetMsg(ctx, "Error") ?? "Error" }), JsonRequestBehavior.AllowGet);
             }
-// ===== NEW CODE START — currency format (agent A10, 2026-08-19) =====
-            return Json(JsonConvert.SerializeObject(new { lines = lines, currency = GetCurrencyInfo(ctx), success = true }), JsonRequestBehavior.AllowGet);
-// ===== NEW CODE END — currency format =====
 // ----- OLD CODE (kept for rollback, do not delete) -----
 //          return Json(JsonConvert.SerializeObject(new { lines = lines, success = true }), JsonRequestBehavior.AllowGet);
 // ----- END OLD CODE -----

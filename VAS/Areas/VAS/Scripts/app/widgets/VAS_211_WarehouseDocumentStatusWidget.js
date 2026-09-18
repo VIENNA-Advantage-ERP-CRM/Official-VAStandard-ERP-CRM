@@ -87,8 +87,7 @@
     }
 
     function lbl(key, fallback) {
-        var t = VIS.Msg.getMsg(key);
-        return (t && t !== key && t !== '[' + key + ']') ? t : fallback;
+        return VIS.Msg.getMsg(key);
     }
 
     function escapeHtml(value) {
@@ -174,7 +173,7 @@
             var lang = (VIS && VIS.Env) ? VIS.Env.getLanguage() : (window.navigator.language || 'en-US');
             return d.toLocaleString(lang, { month: 'long' });
         } catch (e) {
-            return MONTH_NAMES[monthIndex] || ('Month ' + (monthIndex + 1));
+            return MONTH_NAMES[monthIndex] || (lbl('Month', 'Month') + ' ' + (monthIndex + 1));
         }
     }
 

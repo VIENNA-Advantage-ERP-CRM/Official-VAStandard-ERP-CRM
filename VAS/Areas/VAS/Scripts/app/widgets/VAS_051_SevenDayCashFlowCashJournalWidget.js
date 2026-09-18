@@ -52,8 +52,7 @@
         var ajaxRequest = null;
 
         function lbl(key, fallback) {
-            var text = VIS.Msg.getMsg(key);
-            return text && text !== key && text !== '[' + key + ']' ? text : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function safeNumber(value) {
@@ -265,7 +264,7 @@
             $body.empty();
 
             if (data.hasData === false || items.length === 0) {
-                setState('No data');
+                setState(lbl('VAS_051_NoData', 'No data'));
                 return;
             }
 

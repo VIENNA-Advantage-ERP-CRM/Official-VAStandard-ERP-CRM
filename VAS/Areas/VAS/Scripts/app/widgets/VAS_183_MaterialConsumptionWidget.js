@@ -26,6 +26,9 @@
  * 17 | of                                     | VAS_183_Of
  * 18 | Page                                   | VAS_183_Page
  * 19 | lines                                  | VAS_183_Lines
+ * 20 | Warehouse                               | VAS_183_WarehouseFallback
+ * 21 | locators                                | VAS_183_Locators
+ * 22 | Jan,Feb,Mar,...                         | VAS_183_Months
  */
 ; VAS = window.VAS || {};
 
@@ -84,8 +87,7 @@
         function DateTimeNowYear() { return new Date().getFullYear(); }
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return (translated && translated.charAt(0) !== '[') ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -174,7 +176,7 @@
 // ----- END OLD CODE -----
 
         function formatMonthLabel(m, y) {
-            var monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            var monthNames = label("VAS_183_Months", "Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec").split(',');
             var name = monthNames[Math.max(0, Math.min(11, m - 1))];
             return name + ' ' + y;
         }
@@ -364,7 +366,7 @@
             if ($whLbl) {
                 $whLbl.text(selectedWarehouse
                     ? (selectedWarehouse.fullName || selectedWarehouse.shortName || '')
-                    : label("VAS_NoWarehouse", "No warehouse"));
+                    : label("VAS_183_NoWarehouse", "No warehouse"));
             }
             if (!$whMenu) { return; }
 
@@ -424,8 +426,8 @@
 
             if (locatorsData.length === 0) {
                 $body.html('<div class="vas-mcw-empty">' + escapeHtml(label("VAS_183_NoConsumptionRecords", "No consumption records")) + '</div>');
-                if ($footHelper) { $footHelper.text(formatMonthLabel(selectedMonth, selectedYear) + ' - 0 locators'); }
-                if ($pagerText) { $pagerText.text('1 of 1'); }
+                if ($footHelper) { $footHelper.text(formatMonthLabel(selectedMonth, selectedYear) + ' - 0 ' + label("VAS_183_Locators", "locators")); }
+                if ($pagerText) { $pagerText.text('1 ' + label("VAS_183_Of", "of") + ' 1'); }
                 if ($prevBtn) { $prevBtn.prop('disabled', true); }
                 if ($nextBtn) { $nextBtn.prop('disabled', true); }
                 return;
@@ -478,17 +480,17 @@
             $body.html(rowsHtml);
 
             if ($footHelper) {
-                $footHelper.text(formatMonthLabel(selectedMonth, selectedYear) + ' - ' + locatorsData.length + ' locators');
+                $footHelper.text(formatMonthLabel(selectedMonth, selectedYear) + ' - ' + locatorsData.length + ' ' + label("VAS_183_Locators", "locators"));
             }
             if ($pagerText) {
-                $pagerText.text(pageNo + ' of ' + totalPages);
+                $pagerText.text(pageNo + ' ' + label("VAS_183_Of", "of") + ' ' + totalPages);
             }
             if ($prevBtn) { $prevBtn.prop('disabled', pageNo <= 1); }
             if ($nextBtn) { $nextBtn.prop('disabled', pageNo >= totalPages); }
         }
 
         function openLocatorDetailModal(locatorId, locatorCode, locatorName) {
-            var whName = selectedWarehouse ? selectedWarehouse.fullName : "Warehouse";
+            var whName = selectedWarehouse ? selectedWarehouse.fullName : label("VAS_183_WarehouseFallback", "Warehouse");
             var whId = selectedWarehouse ? selectedWarehouse.warehouseId : 0;
             var monthLabel = formatMonthLabel(selectedMonth, selectedYear);
 
@@ -692,7 +694,7 @@
                 '</button>' +
                 '</div>' +
                 '<div class="vas-mcw-dd">' +
-                '<button type="button" class="vas-mcw-pill-btn vas-mcw-month-btn" aria-haspopup="true" aria-expanded="false" title="' + escapeHtml(label("VAS_Month", "Month")) + '">' +
+                '<button type="button" class="vas-mcw-pill-btn vas-mcw-month-btn" aria-haspopup="true" aria-expanded="false" title="' + escapeHtml(label("VAS_183_Month", "Month")) + '">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>' +
                 '<span class="vas-mcw-month-lbl">' + escapeHtml(formatMonthLabel(selectedMonth, selectedYear)) + '</span>' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>' +
@@ -705,7 +707,7 @@
                 '<div class="vas-mcw-foot-helper"></div>' +
                 '<div class="vas-mcw-pager">' +
                 '<button type="button" class="vas-mcw-pager-btn vas-mcw-prev">&lsaquo;</button>' +
-                '<span class="vas-mcw-pager-txt">1 of 1</span>' +
+                '<span class="vas-mcw-pager-txt">1 ' + escapeHtml(label("VAS_183_Of", "of")) + ' 1</span>' +
                 '<button type="button" class="vas-mcw-pager-btn vas-mcw-next">&rsaquo;</button>' +
                 '</div>' +
                 '</div>' +

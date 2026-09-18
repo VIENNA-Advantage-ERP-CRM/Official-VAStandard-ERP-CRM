@@ -3,8 +3,8 @@
  * Summary Message Table
  *  # | Current Text                         | Message Key
  * ---+--------------------------------------+--------------------------------
- *  1 | Highest Selling Products             | VAS_HighestSellingProduct
- *  2 | Last Year                            | VAS_017_LastYear
+ *  1 | Highest Selling Products             | VAS_094_HighestSellingProduct
+ *  2 | Last Year                            | VAS_094_LastYear
  *  3 | Current Year                         | VAS_CurrentYear
  *  4 | units                                | VAS_094_Units
  *  5 | No completed AR invoice sales found. | VAS_094_NoCompletedARSales
@@ -79,8 +79,7 @@
         var stdPrecision = 0;
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return translated && translated.charAt(0) !== '[' ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         // Joins a backend-relative image URL (e.g. "Images/1004162.png") with the
@@ -481,7 +480,7 @@
             var yoyBlock =
                 '<div class="MPC-hsp-msection">' +
                     '<div class="MPC-hsp-msection-title">' + escapeHtml(label('VAS_094_YearOverYear', 'Year Over Year')) + '</div>' +
-                    yoyBarHtml(label('VAS_017_LastYear', 'Last Year'), lastWidth, 'MPC-hsp-yoy-last', data.last_year_revenue, data.last_year_units) +
+                    yoyBarHtml(label('VAS_094_LastYear', 'Last Year'), lastWidth, 'MPC-hsp-yoy-last', data.last_year_revenue, data.last_year_units) +
                     yoyBarHtml(label('VAS_CurrentYear', 'Current Year'), currentWidth, 'MPC-hsp-yoy-current', data.current_year_revenue, data.current_year_units) +
                 '</div>';
 
@@ -614,8 +613,8 @@
                 '</div>'
             );
 
-            $card.find('.MPC-hsp-title').text(label('VAS_HighestSellingProduct', 'Highest Selling Products'));
-            $card.find('.MPC-hsp-previous-label').text(label('VAS_017_LastYear', 'Last Year'));
+            $card.find('.MPC-hsp-title').text(label('VAS_094_HighestSellingProduct', 'Highest Selling Products'));
+            $card.find('.MPC-hsp-previous-label').text(label('VAS_094_LastYear', 'Last Year'));
             $card.find('.MPC-hsp-current-label').text(label('VAS_CurrentYear', 'Current Year'));
             $content = $card.find('.MPC-hsp-content');
             $empty = $card.find('.MPC-hsp-empty');

@@ -17,6 +17,8 @@ namespace VIS.Controllers
     /// Purpose     : Supplies top 10 high-value consumed products and their issue history modal data.
     /// Chronological development:
     ///   AI-Dev      2026-08-02 Created
+    ///   Claude      2026-09-18 Issue-history modal Qty column now sources
+    ///                          M_InventoryLine.QtyEntered instead of QtyInternalUse.
     /// </summary>
     public class VAS_184_HighValueUsageWidgetController : Controller
     {
@@ -216,7 +218,7 @@ namespace VIS.Controllers
                       ai.MovementDate,
                       wh.Name AS WarehouseName,
                       " + locatorSql + @" AS LocatorCode,
-                      line.QtyInternalUse,
+                      line.QtyEntered,
                       (line.QtyInternalUse * COALESCE(NULLIF(line.CurrentCostPrice, 0), NULLIF(line.PriceCost, 0), NULLIF(line.VA024_CostPrice, 0), pc.CurrentCostPrice, 0)) AS LineValue
                     FROM M_InventoryLine line
                     INNER JOIN (" + invAccessSql + @") ai ON ai.M_Inventory_ID = line.M_Inventory_ID
@@ -238,7 +240,7 @@ namespace VIS.Controllers
                             documentNo = Util.GetValueOfString(dr["DocumentNo"]),
                             movementDate = Convert.ToDateTime(dr["MovementDate"]).ToString("dd MMM yyyy"),
                             warehouseLoc = Util.GetValueOfString(dr["WarehouseName"]) + " / " + Util.GetValueOfString(dr["LocatorCode"]),
-                            qty = Util.GetValueOfDecimal(dr["QtyInternalUse"]),
+                            qty = Util.GetValueOfDecimal(dr["QtyEntered"]),
                             value = Util.GetValueOfDecimal(dr["LineValue"])
                         });
                     }

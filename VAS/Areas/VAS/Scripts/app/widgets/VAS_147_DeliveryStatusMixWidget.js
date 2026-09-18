@@ -33,6 +33,9 @@
  * 18  | Total value                     | VAS_147_DSM_TotalValue
  * 19  | Data unavailable                | VAS_147_DSM_DataUnavailable
  * 20  | Jan,Feb,...,Dec (comma list)    | VAS_147_DSM_Months
+ * 21  | Filter by month                 | VAS_147_DSM_FilterByMonth
+ * 22  | Filter by year                  | VAS_147_DSM_FilterByYear
+ * 23  | View delivery orders for        | VAS_147_DSM_ViewOrdersFor (prefix, name appended in code)
  */
 ; VAS = window.VAS || {};
 
@@ -87,8 +90,7 @@
         };
 
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            return (t && t.charAt(0) !== '[') ? t : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -157,8 +159,8 @@
                 '</div>' +
                 '</div>' +
                 '<div class="vas-dsm-filters">' +
-                '<span class="vas-dsm-sel"><select class="vas-dsm-month vas-dsm-month-sel" aria-label="Filter by month"></select></span>' +
-                '<span class="vas-dsm-sel"><select class="vas-dsm-year vas-dsm-year-sel" aria-label="Filter by year"></select></span>' +
+                '<span class="vas-dsm-sel"><select class="vas-dsm-month vas-dsm-month-sel" aria-label="' + escapeHtml(lbl('VAS_147_DSM_FilterByMonth')) + '"></select></span>' +
+                '<span class="vas-dsm-sel"><select class="vas-dsm-year vas-dsm-year-sel" aria-label="' + escapeHtml(lbl('VAS_147_DSM_FilterByYear')) + '"></select></span>' +
                 '</div>' +
                 '</div>' +
                 '<div class="vas-dsm-body"></div>' +
@@ -236,7 +238,7 @@
             for (var i = 0; i < slice.length; i++) {
                 var r = slice[i];
                 html +=
-                    '<button type="button" class="vas-dsm-row" data-index="' + (start + i) + '" aria-label="View delivery orders for ' + escapeHtml(repLabel(r)) + '">' +
+                    '<button type="button" class="vas-dsm-row" data-index="' + (start + i) + '" aria-label="' + escapeHtml(lbl('VAS_147_DSM_ViewOrdersFor') + ' ' + repLabel(r)) + '">' +
                     '<span class="vas-dsm-rep">' + escapeHtml(repLabel(r)) + '</span>' +
                     '<span class="vas-dsm-track">' +
                     seg('inprogress', r.inProgress, r.total) +

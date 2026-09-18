@@ -168,10 +168,7 @@
         /* Resolves an AD_Message, falling back to English. VIS.Msg.getMsg returns
            "[key]" for a missing row, which must never reach the screen. */
         function lbl(key, fallback) {
-            var t;
-            try { t = VIS.Msg.getMsg(key); } catch (e) { t = null; }
-            if (t && t.charAt(0) !== "[") return t;
-            return (fallback !== undefined) ? fallback : t;
+            return VIS.Msg.getMsg(key);
         }
 
         /* Quantities are stated to two decimals, as the framework's own receipt grid
@@ -2938,7 +2935,7 @@
                 '<p class="vas-grn-dialog__error vas-grn-is-hidden" id="vasGrnScanError"></p></header>' +
                 '<div class="vas-grn-dialog__body vas-grn-dialog__body--fixed">' +
                 '<div class="vas-grn-scan-empty" id="vasGrnScanEmpty"><div class="vas-grn-scan-empty__badge">' + icon("scan-line", "▭") + "</div>" +
-                '<p class="vas-grn-scan-empty__title">' + esc(lbl("VAS_249_ScanToBegin", "Scan a barcode to begin")) + '</p><p class="vas-grn-scan-empty__hint">e.g. PRD-BLW-001</p></div>' +
+                '<p class="vas-grn-scan-empty__title">' + esc(lbl("VAS_249_ScanToBegin", "Scan a barcode to begin")) + '</p><p class="vas-grn-scan-empty__hint">' + esc(lbl("VAS_249_ScanExampleCode", "e.g. PRD-BLW-001")) + '</p></div>' +
                 '<div class="vas-grn-scan-grid vas-grn-is-hidden" id="vasGrnScanGrid"><div class="vas-grn-scan-grid__head"><div>' + esc(lbl("VAS_249_Code", "Code")) + "</div><div>" + esc(lbl("VAS_249_Product", "Product")) +
                 "</div><div>" + esc(lbl("VAS_249_Status", "Status")) + "</div><div>" + esc(lbl("VAS_249_Qty", "Qty")) + '</div><div></div></div><div class="vas-grn-scan-grid__body" id="vasGrnScanRows"></div></div></div>' +
                 '<footer class="vas-grn-dialog__footer"><p class="vas-grn-dialog__summary" id="vasGrnScanSummary">' + esc(lbl("VAS_249_NoScans", "No scans yet")) + "</p>" +

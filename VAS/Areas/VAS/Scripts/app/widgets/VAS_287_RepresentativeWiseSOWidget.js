@@ -94,6 +94,7 @@
  * 54  | of                                                                   | VAS_287_Of
  * 55  | Showing                                                              | VAS_287_Showing
  * 56  | Search is unavailable right now. Try again in a moment.              | VAS_287_LoadError
+ * 57  | SOs                                                                   | VAS_287_SosSuffix
  */
 ; VAS = window.VAS || {};
 
@@ -157,8 +158,7 @@
         var currentCfg = null;
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return (translated && translated.charAt(0) !== '[') ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -381,7 +381,7 @@
                 var pct = topValue > 0 ? Math.max(2, Math.round((Number(r.OrderValue || 0) / topValue) * 100)) : 0;
                 var color = BAR_COLORS[(start + i) % BAR_COLORS.length];
                 var compactValue = formatINR(r.OrderValue) + ' · ' + formatNum(r.OrderCount);
-                var fullValue = formatINR(r.OrderValue) + ' · ' + formatNum(r.OrderCount) + ' SOs';
+                var fullValue = formatINR(r.OrderValue) + ' · ' + formatNum(r.OrderCount) + ' ' + label('VAS_287_SosSuffix', 'SOs');
                 return '<button type="button" class="vas287-hrow" data-rid="' + r.RepId + '" data-rname="' + escapeHtml(r.RepName) + '">' +
                     '<span class="vas287-line"><span class="vas287-nm" title="' + escapeHtml(r.RepName) + '">' + escapeHtml(r.RepName) + '</span>' +
                     '<span class="vas287-vl" title="' + escapeHtml(fullValue) + '">' + escapeHtml(compactValue) + '</span></span>' +

@@ -17,10 +17,10 @@
 * 8  | Showing                              | VAS_Showing
 * 9  | Of                                   | VAS_Of
 * 10  | Close                                | VAS_Close
-* 14  | Invoice No.                          | VIS_InvoiceNo
-* 15  | Invoice date                         | VIS_InvoiceDate
+* 14  | Invoice No.                          | VAS_029_InvoiceNo
+* 15  | Invoice date                         | VAS_029_InvoiceDate
 * 16  | Vendor                               | VAS_029_MessageVendor
-* 17  | Due date                             | VIS_DueDate
+* 17  | Due date                             | VAS_029_DueDate
 * 18  | Currency                             | VAS_PaymentCurrency
 * 19  | Amount                               | VAS_029_MessageAmount
 * 20  | Payment Method                       | VAS_029_MessageMethod
@@ -86,8 +86,7 @@
         var adaptiveAdjustCount = 0;
 
         function lbl(key, fallback) {
-            var text = VIS.Msg.getMsg(key);
-            return text && text !== '[' + key + ']' ? text : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         this.Initalize = function () {
@@ -673,10 +672,10 @@
                 '<table class="vas-scheduled-ap-payment-dialog-table">' +
                 '<thead>' +
                 '<tr>' +
-                '<th class="vas-scheduled-ap-payment-th-doc">' + escapeHtml(lbl('VIS_InvoiceNo', 'Invoice No.')) + '</th>' +
-                '<th class="vas-scheduled-ap-payment-th-invdate">' + escapeHtml(lbl('VIS_InvoiceDate', 'Invoice date')) + '</th>' +
+                '<th class="vas-scheduled-ap-payment-th-doc">' + escapeHtml(lbl('VAS_029_InvoiceNo', 'Invoice No.')) + '</th>' +
+                '<th class="vas-scheduled-ap-payment-th-invdate">' + escapeHtml(lbl('VAS_029_InvoiceDate', 'Invoice date')) + '</th>' +
                 '<th class="vas-scheduled-ap-payment-th-vendor">' + escapeHtml(lbl('VAS_029_MessageVendor', 'Vendor')) + '</th>' +
-                '<th class="vas-scheduled-ap-payment-th-duedate">' + escapeHtml(lbl('VIS_DueDate', 'Due date')) + '</th>' +
+                '<th class="vas-scheduled-ap-payment-th-duedate">' + escapeHtml(lbl('VAS_029_DueDate', 'Due date')) + '</th>' +
                 '<th class="vas-scheduled-ap-payment-th-currency">' + escapeHtml(lbl('VAS_PaymentCurrency', 'Currency')) + '</th>' +
                 '<th class="vas-scheduled-ap-payment-th-method">' + escapeHtml(lbl('VAS_029_MessageMethod', 'Payment Method')) + '</th>' +
                 '<th class="vas-scheduled-ap-payment-th-amount">' + escapeHtml(lbl('VAS_029_MessageAmount', 'Amount')) + '</th>' +
