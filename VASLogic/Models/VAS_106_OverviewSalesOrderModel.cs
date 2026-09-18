@@ -339,6 +339,23 @@
 ///                        went green on a delivery order that was merely In Process.
 ///                        A target type whose flag is unset means 'N'; the completed
 ///                        type answers only where C_DocTypeTarget_ID is unset.
+///   VAI163   2026-09-16  Deliveries carry InProgressDate: the shipment's FIRST
+///                        DocComplete workflow stamp (LoadCompletionStamps gained
+///                        an `earliest` switch). Under ship confirmation a shipment
+///                        completes twice — once into In Progress, once more when
+///                        the confirmation completes it — so the first stamp is
+///                        when it reached In Progress, which the panel's Shipped
+///                        stage dates itself by when IsShipConfirm = Y.
+///   VAI163   2026-09-17  Delivery Readiness read a CLOSED order's undelivered line
+///                        as "Fully delivered". MOrder.CloseIt moves the balance
+///                        still to deliver into QtyLostSales and sets QtyOrdered
+///                        down to QtyDelivered, so PendingQty was zero on a line
+///                        nothing had shipped against. LoadDeliveryReadiness now
+///                        carries QtyLostSales and classifies a closed line with a
+///                        written-off balance as "closed" ahead of the pending
+///                        test; the panel captions it Closed, naming the quantity
+///                        not delivered. A closed line delivered in full has
+///                        nothing written off and still reads Fully delivered.
 /// </summary>
 
 using System;
@@ -872,11 +889,22 @@ namespace VASLogic.Models
             {
                 try
                 {
+                    // C_Order_Quotation is a VARCHAR2(22) / character varying column
+                    // holding the quotation's C_Order_ID as text, and C_Order_ID is a
+                    // NUMBER / numeric. The join casts the NUMBER side to text
+                    // (18-Sep-2026): compared raw, PostgreSQL refuses the statement
+                    // outright ("operator does not exist: numeric = character
+                    // varying") - which tripped the usable flag and hid the chip on
+                    // every order - and Oracle converts the text to a number
+                    // implicitly, raising ORA-01722 the moment any row holds a
+                    // non-numeric value. Casting the id, not the text, is safe on
+                    // both whatever the column holds. CAST ... AS VARCHAR(22) is
+                    // accepted by both databases (Oracle reads VARCHAR as VARCHAR2).
                     string sql = @"SELECT q.C_Order_ID AS QuotationId,
                                           q.DocumentNo AS QuotationNo
                                      FROM C_Order o
                                     INNER JOIN C_Order q
-                                            ON (q.C_Order_ID = o.C_Order_Quotation)
+                                            ON (CAST(q.C_Order_ID AS VARCHAR(22)) = TRIM(o.C_Order_Quotation))
                                     WHERE o.C_Order_ID = @C_Order_ID
                                       AND COALESCE(q.IsActive, 'Y') = 'Y'";
                     DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
@@ -925,12 +953,14 @@ namespace VASLogic.Models
         {
             if (_quotationLineLookupUsable == false) return;
 
-            // C_OrderLine.C_Order_Quotation -> the quotation order itself.
+            // C_OrderLine.C_Order_Quotation -> the quotation order itself. The
+            // line column is text like the header one; same cast, same reason
+            // (see LoadQuotationOrigin).
             if (TryQuotationFromLines(C_Order_ID, d,
                     @"SELECT q.C_Order_ID AS QuotationId,
                              MAX(q.DocumentNo) AS QuotationNo
                         FROM C_OrderLine ol
-                       INNER JOIN C_Order q ON (q.C_Order_ID = ol.C_Order_Quotation)
+                       INNER JOIN C_Order q ON (CAST(q.C_Order_ID AS VARCHAR(22)) = TRIM(ol.C_Order_Quotation))
                        WHERE ol.C_Order_ID = @C_Order_ID
                          AND COALESCE(ol.IsActive, 'Y') = 'Y'
                          AND COALESCE(q.IsActive, 'Y')  = 'Y'
@@ -1533,6 +1563,12 @@ namespace VASLogic.Models
                                   COALESCE(ol.QtyOrdered, 0)   AS QtyOrdered,
                                   COALESCE(ol.QtyDelivered, 0) AS QtyDelivered,
                                   COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) AS PendingQty,
+                                  -- What CLOSING the order wrote off: MOrder.CloseIt moves
+                                  -- the undelivered balance here and sets QtyOrdered down
+                                  -- to QtyDelivered, so PendingQty alone reads a closed
+                                  -- line as delivered in full.
+                                  COALESCE(ol.QtyLostSales, 0) AS QtyLostSales,
+                                  o.DocStatus AS OrderStatus,
                                   COALESCE(SUM(COALESCE(s.QtyOnHand, 0)), 0) AS QtyOnHand
                                 FROM C_Order o
                                 INNER JOIN C_OrderLine ol ON (ol.C_Order_ID = o.C_Order_ID)
@@ -1560,7 +1596,9 @@ namespace VASLogic.Models
                                 GROUP BY ol.C_OrderLine_ID, p.M_Product_ID, p.Value, p.Name,
                                          uom.Name, asi.Description, wh.Name,
                                          COALESCE(ol.QtyOrdered, 0),
-                                         COALESCE(ol.QtyDelivered, 0)
+                                         COALESCE(ol.QtyDelivered, 0),
+                                         COALESCE(ol.QtyLostSales, 0),
+                                         o.DocStatus
                                 ORDER BY ol.C_OrderLine_ID";
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
                 if (ds == null || ds.Tables.Count == 0) return rows;
@@ -1589,9 +1627,20 @@ namespace VASLogic.Models
                     // quantities behind it.
                     rd.QtyOrdered     = Util.GetValueOfDecimal(r["QtyOrdered"]);
                     rd.QtyDelivered   = Util.GetValueOfDecimal(r["QtyDelivered"]);
+                    rd.QtyLostSales   = Util.GetValueOfDecimal(r["QtyLostSales"]);
+                    bool orderClosed  = Util.GetValueOfString(r["OrderStatus"]) == "CL";
 
-                    // Delivered in full, delivered in PART, or not delivered at all —
-                    // and only that last case is a question about stock.
+                    // Closed with a balance written off, delivered in full, delivered
+                    // in PART, or not delivered at all — and only that last case is a
+                    // question about stock.
+                    //
+                    // A CLOSED order's line is asked first. Closing moves whatever was
+                    // still to deliver into QtyLostSales and sets QtyOrdered down to
+                    // QtyDelivered, so from then on PendingQty is zero — and the line
+                    // read "Fully delivered" on an order nothing had shipped against.
+                    // The written-off balance is the line's news now: it was closed
+                    // short, by that much. A closed line that had delivered in full
+                    // has nothing written off and falls through to "ready" as before.
                     //
                     // A line the warehouse has already shipped something against is
                     // reported as partially delivered whatever it still holds: the
@@ -1599,7 +1648,8 @@ namespace VASLogic.Models
                     // which "Ready to ship" and "Short by n" both hide. The stock
                     // states stay exactly as they were for a line nothing has gone
                     // out against.
-                    if (rd.PendingQty <= 0)                 rd.Readiness = "ready";     // fully delivered
+                    if (orderClosed && rd.QtyLostSales > 0) rd.Readiness = "closed";    // closed short
+                    else if (rd.PendingQty <= 0)            rd.Readiness = "ready";     // fully delivered
                     else if (rd.QtyDelivered > 0)           rd.Readiness = "partial";   // some of it has shipped
                     else if (rd.QtyOnHand >= rd.PendingQty) rd.Readiness = "instock";   // can ship now
                     else                                    rd.Readiness = "short";     // not enough on hand
@@ -1664,9 +1714,12 @@ namespace VASLogic.Models
 
                 // When each shipment COMPLETED, for the progress line's Shipped and
                 // Delivered stages. Read for the whole set in one statement.
-                Dictionary<int, DateTime> stamps = LoadCompletionStamps("M_InOut",
-                    "SELECT dio.M_InOut_ID FROM M_InOut dio WHERE dio.C_Order_ID = "
-                    + C_Order_ID + " AND dio.IsSOTrx = 'Y'");
+                string idSource = "SELECT dio.M_InOut_ID FROM M_InOut dio WHERE dio.C_Order_ID = "
+                                + C_Order_ID + " AND dio.IsSOTrx = 'Y'";
+                Dictionary<int, DateTime> stamps = LoadCompletionStamps("M_InOut", idSource);
+                // ...and when each first reached In Progress, for the Shipped stage
+                // under ship confirmation (see DeliveryData.InProgressDate).
+                Dictionary<int, DateTime> firstStamps = LoadCompletionStamps("M_InOut", idSource, true);
 
                 foreach (DataRow r in ds.Tables[0].Rows)
                 {
@@ -1689,6 +1742,15 @@ namespace VASLogic.Models
                     // dates itself with this, and an open shipment has no such date.
                     dv.CompletedDate = CompletedOn(stamps, dv.M_InOut_ID, dv.DocStatus,
                                                    Stamp(r["Updated"]));
+                    // Null while drafted; the first DocComplete stamp once the
+                    // shipment has left draft, else the closest thing there is.
+                    if (dv.DocStatus != "DR")
+                    {
+                        if (firstStamps.ContainsKey(dv.M_InOut_ID))
+                            dv.InProgressDate = firstStamps[dv.M_InOut_ID];
+                        else
+                            dv.InProgressDate = dv.CompletedDate ?? Stamp(r["Updated"]);
+                    }
                     rows.Add(dv);
                 }
             }
@@ -3066,13 +3128,19 @@ namespace VASLogic.Models
         /// </summary>
         /// <param name="tableName">AD_Table.TableName of the documents' table.</param>
         /// <param name="recordIdSource">SELECT yielding the record ids to look up.</param>
+        /// <param name="earliest">True for the FIRST DocComplete stamp instead of
+        /// the last. A shipment under ship confirmation runs DocComplete twice —
+        /// once when the user completes it and it parks In Progress, once more
+        /// when the confirmation completes it — so the first stamp is when it
+        /// reached In Progress and the last is when it completed.</param>
         /// <returns>Record id -> completion moment; empty when none has completed.</returns>
-        private Dictionary<int, DateTime> LoadCompletionStamps(string tableName, string recordIdSource)
+        private Dictionary<int, DateTime> LoadCompletionStamps(string tableName, string recordIdSource,
+                                                               bool earliest = false)
         {
             Dictionary<int, DateTime> map = new Dictionary<int, DateTime>();
             try
             {
-                string sql = @"SELECT wfp.Record_ID, MAX(wfa.Created) AS CompletedOn
+                string sql = @"SELECT wfp.Record_ID, " + (earliest ? "MIN" : "MAX") + @"(wfa.Created) AS CompletedOn
                                  FROM AD_WF_Process wfp
                                 INNER JOIN AD_WF_Activity wfa
                                         ON (wfa.AD_WF_Process_ID = wfp.AD_WF_Process_ID)
@@ -3248,7 +3316,11 @@ namespace VASLogic.Models
             // names beside it.
             public decimal QtyOrdered     { get; set; }   // base unit, like every figure here
             public decimal QtyDelivered   { get; set; }
-            public string  Readiness      { get; set; }   // ready | partial | instock | short
+            // What closing the order wrote off (C_OrderLine.QtyLostSales): the
+            // balance that was still to deliver when the order was closed. Zero on
+            // an open order and on a closed line that had delivered in full.
+            public decimal QtyLostSales   { get; set; }
+            public string  Readiness      { get; set; }   // closed | ready | partial | instock | short
         }
 
         /// <summary>
@@ -3294,6 +3366,14 @@ namespace VASLogic.Models
             /// open. The Delivered stage dates itself by this, where Shipped reports
             /// when the shipment was RAISED.</summary>
             public DateTime? CompletedDate { get; set; }
+            /// <summary>When the shipment reached IN PROGRESS — its FIRST workflow
+            /// DocComplete stamp. Under ship confirmation that is the moment the
+            /// document was completed by the user and parked waiting on its
+            /// confirmation, which is what the Shipped stage dates itself by
+            /// there. Falls back to the last-updated stamp for a shipment still
+            /// In Progress, and to CompletedDate once it has completed; null
+            /// while drafted.</summary>
+            public DateTime? InProgressDate { get; set; }
             public string   TrackingNo    { get; set; }
             public string   WarehouseName { get; set; }
             public decimal  DeliveredQty  { get; set; }

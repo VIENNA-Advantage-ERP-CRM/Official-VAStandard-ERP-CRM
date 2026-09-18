@@ -16,6 +16,27 @@
  * All sizing in em (no px), classes namespaced vas-mtl-* so nothing
  * leaks into the host page. Tokens are shared with the body-level
  * dialogs / toast (which mount outside .vas-mtl-root).
+ * Chronological development:
+ *   VAI163   2026-09-17  Responsive under zoom (same fix as VAS_249 / VAS_248). The
+ *                        panel's type anchor follows the panel's own width (cqw
+ *                        clamp on .vas-mtl-panel, 16px down to 12.5px) instead of a
+ *                        constant 16px, so a zoomed-in panel scales into the room it
+ *                        has rather than crushing its columns and stacking its
+ *                        toolbar; the dialogs take a vw clamp of their own. Header
+ *                        chrome and radii moved from px to em; the title truncates
+ *                        before the toolbar wraps; the pager wraps; the catalog
+ *                        list and the dialogs are capped to the panel / viewport
+ *                        width; the Additional Info grid goes single-column in a
+ *                        narrow window. NO column is dropped at any width / zoom:
+ *                        the container queries tighten the tracks and gaps
+ *                        instead, and cells clip their own overflow so head and
+ *                        body rows stay in step.
+ *   VAI163   2026-09-17  Material-transfer round: the root carries its own white
+ *                        surface (no host blue on New Record); the locator / UOM
+ *                        <select> gets side padding; the "..." button is white
+ *                        with nothing inside and blue once the line carries
+ *                        Additional Info values, and stays live on a locked
+ *                        movement (the modal opens read-only).
  * ============================================================ */
 
 .vas-mtl-root,
@@ -77,14 +98,37 @@
     overscroll-behavior: auto;
     font-family: var(--mtl-font);
     color: var(--mtl-text);
-    /* Query container for the responsive rules at the foot of this file. */
+    /* The panel's own surface. With no background of its own, a cleared panel (New
+       Record hides the grid) let the framework host's blue show through the root. */
+    background: var(--mtl-surface);
+    /* Query container for the responsive rules at the foot of this file, and for the
+       fluid type anchor on .vas-mtl-panel (cqw resolves against THIS box). */
     container-type: inline-size;
-    /* Canonical panel anchor, deliberately a CONSTANT rather than a vw-derived clamp.
-       Browser zoom shrinks the viewport measured in CSS pixels, so a vw anchor SHRINKS as
-       the user zooms in and the whole panel contracts against framework chrome that is
-       sized in fixed px. A constant makes zoom do only what was asked - magnify. */
+    /* The maximum anchor. The working anchor is set on .vas-mtl-panel from the
+       container's own width - see there. */
     --panel-anchor: 16px;
     font-size: var(--panel-anchor);
+}
+
+/* ---------------------------------------------------------------------------
+   Fluid type anchor - what makes the panel keep its proportions under zoom
+   ---------------------------------------------------------------------------
+   Everything inside the panel is sized in em, so ONE font-size decides how big the whole
+   panel is. It used to be a constant 16px: fine at 100%, but browser zoom shrinks the
+   room the panel has (measured in CSS px) while the panel kept its 16px design size, so
+   at 125-175% the seven columns, the toolbar and the pager were being crushed into a box
+   that had lost a third of its width. Zooming OUT had the opposite look: a small panel
+   lost in a wide host.
+
+   The anchor now follows the panel's own width (cqw = 1% of the root, the query
+   container): 16px on a wide panel, easing down to a 12.5px floor as the panel narrows,
+   whether the narrowing comes from the splitter, the window or a zoom. The container
+   queries at the foot of this file then only have to trim gaps and minimums. Zooming in
+   still magnifies (the floor is in px), it just stops the panel outgrowing its box. */
+.vas-mtl-panel,
+.vas-mtl-empty,
+.vas-mtl-linepager {
+    font-size: clamp(12.5px, calc(9.5px + 0.65cqw), var(--panel-anchor));
 }
 
 /* Same guard down the wrapper chain in case the host stretches an inner block as the
@@ -137,6 +181,10 @@
 .vas-mtl-empty {
     display: flex;
     height: 100%;
+    min-height: 4em;
+    padding: 1em;
+    text-align: center;
+    background: var(--mtl-surface);
     align-items: center;
     justify-content: center;
     color: var(--mtl-text-muted);
@@ -160,20 +208,27 @@
    lines + totals) as one unit. */
 .vas-mtl-panel {
     background: #FFFFFF;
-    border-radius: 16px;
-    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    border-radius: 1em;
+    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
 }
 
-/* Panel Foundation Rule 2 — header chrome */
+/* Panel Foundation Rule 2 — header chrome. Sized in em (it was 56px / 16px) so it
+   follows the fluid anchor like everything else; the title yields (min-width:0 +
+   ellipsis) before the toolbar wraps. */
 .vas-mtl-panel__header {
-    min-height: 56px;
-    padding: 0 16px;
+    min-height: 3.5em;
+    padding: 0.375em 1em;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 0.75em;
+    gap: 0.5em 0.75em;
 }
+
+    .vas-mtl-panel__header > div:first-child {
+        flex: 1 1 12em;
+        min-width: 0;
+    }
 
 .vas-mtl-panel__title {
     margin: 0;
@@ -181,6 +236,9 @@
     font-weight: 700;
     letter-spacing: -0.01em;
     color: var(--mtl-text-strong);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .vas-mtl-panel__subtitle {
@@ -193,8 +251,17 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.625em;
+    justify-content: flex-end;
+    gap: 0.5em 0.625em;
+    /* Never wider than the header: the buttons wrap onto a second row instead of pushing
+       the panel past its box. */
+    max-width: 100%;
+    min-width: 0;
 }
+
+    .vas-mtl-panel__actions .vas-mtl-btn {
+        white-space: nowrap;
+    }
 
 /* ---------- buttons ---------- */
 .vas-mtl-btn {
@@ -489,6 +556,10 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
+    /* A cell clips its own overflow. With the keep-every-column tracks (minmax(0, Nfr),
+       see the container queries at the foot) the head and body rows - separate grids -
+       can only stay in step if no cell can grow past its track. */
+    overflow: hidden;
     font-size: 0.875em;
     color: var(--mtl-text);
 }
@@ -526,10 +597,11 @@
    button are disabled -> not-allowed. A disabled control IGNORES its own `cursor` in
    Chromium, so put the cursor on the (enabled) parent cell and let the disabled control
    pass pointer events through to it. */
-.vas-mtl-locked .vas-mtl-cell--check,
-.vas-mtl-locked .vas-mtl-cell--more {
+.vas-mtl-locked .vas-mtl-cell--check {
     cursor: not-allowed;
 }
+/* The "..." cell is NOT in that set: on a locked movement the button stays live and opens
+   the Additional Info modal for reading (17-Sep-2026). */
 
     .vas-mtl-locked .vas-mtl-cell--check input[type="checkbox"]:disabled,
     .vas-mtl-locked .vas-mtl-more-btn:disabled {
@@ -639,6 +711,11 @@
 
 .vas-mtl-cell-edit select.vas-mtl-cell-edit__select {
     color: var(--mtl-text-secondary);
+    /* Room between the chosen option's text and the cell's edge on either side (the
+       From / To locator and UOM dropdowns) - with appearance:none the browser draws no
+       arrow, so the text sat flush against the border. */
+    padding-left: 0.5em;
+    padding-right: 0.5em;
 }
 
 .vas-mtl-cell-edit input.vas-mtl-cell-edit__input::placeholder {
@@ -709,7 +786,10 @@
     top: 100%;
     margin-top: 0;
     z-index: 30;
-    min-width: 22.5em;
+    /* Wide enough to read, but never wider than most of the panel: on a narrow (zoomed)
+       panel a fixed 22.5em pushed the list past the root's edge and clipped it. */
+    min-width: min(22.5em, 80cqw);
+    max-width: 92cqw;
     background: #ffffff;
     border: 1px solid var(--mtl-divider-strong);
     border-top: none;
@@ -808,38 +888,46 @@
 }
 
 /* ---------- row action buttons ---------- */
+/* The "..." (More) button reads its state by colour (17-Sep-2026): WHITE while the
+   line holds nothing in Additional Info, BLUE once it does (.has-values, re-evaluated
+   on every render). */
 .vas-mtl-more-btn {
     width: 1.5em;
     height: 1.5em;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border: none;
-    background: transparent;
+    border: 1px solid var(--mtl-border-default);
+    background: var(--mtl-surface);
     border-radius: var(--mtl-r-sm);
     color: var(--mtl-text-muted);
     cursor: pointer;
-    transition: background .12s, color .12s;
+    transition: background .12s, color .12s, border-color .12s;
 }
 
     .vas-mtl-more-btn:hover {
         background: #f1f8ff;
+        border-color: var(--mtl-action-blue);
         color: var(--mtl-action-blue);
     }
 
     .vas-mtl-more-btn.is-open {
         background: var(--mtl-blue-soft);
+        border-color: var(--mtl-action-blue);
         color: var(--mtl-action-blue);
     }
-    /* The line already holds Additional-Info values: tint the button so the user can see
-       there is something inside without opening it. */
+    /* The line already holds Additional-Info values: blue, so the user can see there is
+       something inside without opening it. */
     .vas-mtl-more-btn.has-values {
-        background: var(--mtl-blue-soft);
-        color: var(--mtl-action-blue);
+        background: var(--mtl-action-blue);
+        border-color: var(--mtl-action-blue);
+        color: #fff;
     }
 
         .vas-mtl-more-btn.has-values:hover {
-            background: #d9eeff;
+            background: var(--mtl-action-blue-hover);
+            border-color: var(--mtl-action-blue-hover);
+            color: #fff;
         }
     /* Read-only movement, or no visible additional field: not-allowed, no hover tint. */
     .vas-mtl-more-btn:disabled {
@@ -1200,6 +1288,10 @@
     z-index: 99;
     font-family: var(--mtl-font);
     color: var(--mtl-text);
+    /* The dialogs mount on <body>, outside the root, so they carry their own anchor:
+       the viewport's, eased down under zoom the same way the panel's is, so a modal
+       never opens larger than the window it sits in. */
+    font-size: clamp(12.5px, calc(9.5px + 0.5vw), 16px);
 }
 
     .vas-mtl-dialog-backdrop * {
@@ -1221,9 +1313,9 @@
 
 .vas-mtl-dialog {
     background: var(--mtl-surface);
-    border-radius: 14px;
+    border-radius: 0.875em;
     box-shadow: var(--mtl-shadow-dialog);
-    width: 45em;
+    width: min(45em, 96vw);
     max-width: 100%;
     max-height: 90vh;
     overflow: hidden;
@@ -1232,8 +1324,18 @@
 }
 
 .vas-mtl-dialog--wide {
-    width: 56em;
-    height: 30em;
+    width: min(56em, 96vw);
+    height: min(30em, 90vh);
+}
+
+/* Additional Info: the 2-up field grid goes single-column once the dialog is narrow
+   (a zoomed or small window), instead of squeezing two framework fields into a width
+   neither can render in. */
+@media (max-width: 52em) {
+    .vas-mtl-more-grid {
+        grid-template-columns: 1fr;
+        gap: 0.25em 0;
+    }
 }
 
 .vas-mtl-dialog__header {
@@ -1549,6 +1651,7 @@
    "‹ P of Q ›" nav on the right. */
 .vas-mtl-linepager {
     display: flex;
+    flex-wrap: wrap;           /* "Showing…" and the nav stack on a narrow panel */
     align-items: center;
     justify-content: space-between;
     gap: 0.5em;
@@ -1678,37 +1781,43 @@
    of crushing them.
 
    `em` inside a container query resolves against the QUERY CONTAINER's font size - the
-   constant 16px anchor - so these thresholds are fixed real widths. */
+   root's constant 16px - so these thresholds are fixed real widths, whatever the fluid
+   anchor on .vas-mtl-panel is doing to the type at the time. That anchor does the bulk
+   of the work (the whole panel scales with its width); these steps only trim what
+   scaling cannot: the gaps and the fixed minimums.
+
+   NO column is ever dropped (17-Sep-2026, ported from VAS_249). The earlier steps hid
+   Description below 60em and the source bin below 44em, and with the host width the
+   framework leaves behind after a zoom (see "Full-width host" above) the first threshold
+   was being crossed at 100% on an ordinary screen - the user lost the Description column
+   they were about to fill in. Every column stays; what gives instead is the room between
+   and inside them: the gap shrinks, the fixed em minimum on the quantity column comes
+   down so all seven tracks can share a narrow row, and the type steps down a little at
+   the narrowest widths. Text in a crushed cell truncates with an ellipsis (the cells
+   carry min-width:0 + overflow:hidden), which is recoverable - a hidden column is not. */
 @container (max-width: 60em) {
-    /* Description (3rd cell) is the first to go: every other cell carries something the
-       row is actually read for - the product, the two bins, the quantity. */
     .vas-mtl-row {
-        grid-template-columns: 1.75em minmax(0, 1.8fr) minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(6em, 0.9fr) 3.5em;
+        grid-template-columns: 1.5em minmax(0, 1.7fr) minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(5em, 0.8fr) 3.25em;
+        gap: 0.5em;
     }
 
-    .vas-mtl-row--head .vas-mtl-cell:nth-child(3),
-    .vas-mtl-row--line .vas-mtl-cell:nth-child(3) {
-        display: none;
+    .vas-mtl-row--head .vas-mtl-cell {
+        font-size: 0.85em;
     }
 }
 
 @container (max-width: 44em) {
-    /* Narrower still: keep the product, the DESTINATION bin and the quantity. The source
-       bin goes before the destination one because a transfer is read as "what is going
-       where" - the destination is the answer the reader wants. */
     .vas-mtl-row {
-        grid-template-columns: 1.75em minmax(0, 2fr) minmax(0, 1.2fr) minmax(5.5em, 0.9fr) 3.5em;
-    }
-
-    .vas-mtl-row--head .vas-mtl-cell:nth-child(4),
-    .vas-mtl-row--line .vas-mtl-cell:nth-child(4) {
-        display: none;
+        grid-template-columns: 1.4em minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(4.25em, 0.8fr) 3em;
+        gap: 0.35em;
+        font-size: 0.9em;
     }
 }
 
 @container (max-width: 30em) {
     .vas-mtl-row {
-        gap: 0.5em;
+        gap: 0.3em;
+        font-size: 0.85em;
     }
 
     .vas-mtl-panel__header {

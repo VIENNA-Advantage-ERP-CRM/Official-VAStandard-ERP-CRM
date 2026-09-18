@@ -16,9 +16,50 @@
  *                  than something buried in the modal.
  * Employee Code  : VAI154
  * Date           : 09-Sep-2026
+ *
+ * Chronological development:
+ *   VAI163   2026-09-17  One panel per window (ported from VAS_249): a second
+ *                        instance started for the same windowNo parks itself
+ *                        (hidden, no shortcuts, no fetch) and takes over only if
+ *                        the first is disposed; a repeat startPanel on one
+ *                        instance rebuilds in place; shortcuts are registered
+ *                        from init, never twice. This is what stopped the
+ *                        "Nothing to undo" / "Select a row to delete" toasts
+ *                        after a shortcut that had in fact worked - the second,
+ *                        idle instance was answering too. (The shared shortcut
+ *                        util also swallows auto-repeated keydown now.)
+ *   VAI163   2026-09-17  Material-transfer round of corrections:
+ *                        - New Record: a white panel with a "save the header" hint -
+ *                          never the host's blue, no line details until the header
+ *                          is saved (the tab's data-status is watched for the insert).
+ *                        - Heading fixed as "Material Transfer Lines & Summary"; no
+ *                          document type / number under it.
+ *                        - Locator messages: "Select the locator from which the stock
+ *                          is transferred" / "Select the locator where the stock will
+ *                          be transferred"; no blank row in either dropdown; the
+ *                          resting cell always names the locator, never its id.
+ *                        - UOM shown by its full name ("Each"), before and after save.
+ *                        - Additional Info: Attribute Set Instance To, Target /
+ *                          Scrapped / Confirmed Quantity gone; Requisition Line, Asset
+ *                          and Business Partner under References; the "..." stays live
+ *                          and opens read-only on a completed / closed movement, and is
+ *                          blue only while the line carries additional-info values.
+ *                        - No product code under the name; catalog rows carry a
+ *                          Product badge (as the order panels do), not the unit.
+ *                        - No totals block; 20 lines per page; newest line first.
+ *                        - Add / Save / Delete (and every cell) lock the moment the
+ *                          movement is completed / closed from the header.
+ *                        - Attribute picker opens with "Show All" ticked.
+ *                        - Quantity is held to the requisition line's quantity where
+ *                          the line has one (client check as typed + server check).
  ************************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
+
+    /* Live panel per windowNo, so a second instance the host starts for the same window
+       does not paint a second copy of the grid (and answer every shortcut a second time).
+       See startPanel / dispose. */
+    var LIVE_BY_WINDOW = {};
 
     VAS.VAS_247_MaterialTransferBottomPanel = function () {
         this.record_ID = 0;
@@ -36,8 +77,8 @@
 
         /* parent movement context returned by GetPanelData */
         var parent = null;
-        /* server-side line paging (10/page): current 0-based page, total saved lines, size */
-        var linePage = 0, linesTotal = 0, linePageSize = 10;
+        /* server-side line paging (20/page): current 0-based page, total saved lines, size */
+        var linePage = 0, linesTotal = 0, linePageSize = 20;
         /* summed MovementQty across EVERY saved line, from the server. The totals strip
            states this rather than the loaded page, so the figure describes the whole
            movement; it is refreshed on every load / save / delete. */
@@ -189,6 +230,15 @@
 
         /* ---------- lifecycle ---------- */
         this.init = function () {
+            // A repeat startPanel on this same instance rebuilds IN PLACE: the root the
+            // host already holds is taken out of the document first, so the window never
+            // shows the old grid beside the new one.
+            if ($root && $root.length) {
+                closeCatalog(); closeDialogs();
+                $(document).off("mousedown.vasmtl");
+                $(window).off("resize.vasmtl");
+                $root.remove();
+            }
             $root = $('<div class="vas-mtl-root"></div>');
             $body = $('<div class="vas-mtl-body"></div>');
             $emptyState = $('<div class="vas-mtl-empty" style="display:none;"></div>');
@@ -197,6 +247,7 @@
             createBusyIndicator();
             buildShell();
             $(document).on("mousedown.vasmtl", onDocMouseDown);
+            registerShortcuts();
             fitHostWidth();
             /* Browser zoom fires resize, which is where a stale host width is released.
                Debounced through rAF - a zoom or a splitter drag emits a burst of events
@@ -243,6 +294,9 @@
         function showBusy(show) { if ($busy && $busy[0]) $busy[0].style.visibility = show ? "visible" : "hidden"; }
 
         this.fetchData = function (recordID, page) {
+            // A parked duplicate (see startPanel) only remembers what it was asked for, so
+            // it can pick up where the live panel left off if it ever takes over.
+            if ($self._parked) { $self._parkedRecord = recordID; return; }
             // Framework calls fetchData(recordID) on record load -> reset to page 0; the
             // pager calls it with an explicit page. Server returns LinePageSize (10) rows.
             var reqPage = (typeof page === "number" && page >= 0) ? page : 0;
@@ -272,7 +326,7 @@
                     parent = data || null;
                     linesTotal = (parent && parent.LinesTotal) || 0;
                     linePage = (parent && +parent.LinePage) || 0;
-                    linePageSize = (parent && +parent.LinePageSize) || 10;
+                    linePageSize = (parent && +parent.LinePageSize) || 20;
                     totalQty = (parent && +parent.TotalQty) || 0;
                     uomList = (parent && parent.UomList) || [];
                     locatorList = (parent && parent.LocatorList) || [];
@@ -302,9 +356,9 @@
                     lines = [];
                     if (parent && parent.Lines) for (var j = 0; j < parent.Lines.length; j++) lines.push(fromServerRow(parent.Lines[j]));
                     editing = null; morePopoverFor = null;
+                    lastLockState = null;   // the first data-status event after a load re-baselines
                     render();
                     if ($root && $root[0]) $root.scrollTop(0);
-                    refreshSummary();
                 },
                 error: function (err) {
                     console.log(err);
@@ -319,11 +373,14 @@
             fetchSeq++;
             closeDialogs();
             try { if (window.VIS && VIS.AttributeControl && VIS.AttributeControl.close) VIS.AttributeControl.close(); } catch (e) { }
-            parent = null; lines = [];
+            parent = null; lines = []; lastLockState = null;
             if (isNewRecord) {
-                // New unsaved record — show a blank panel (no message).
+                // New, unsaved header: no line details until it has been saved - a line
+                // cannot attach to a record that does not exist yet. The root keeps its
+                // own white surface (CSS) and says what to do next, rather than going
+                // blank and letting the host's blue show through.
                 if ($body) $body.hide();
-                if ($emptyState) $emptyState.hide();
+                if ($emptyState) $emptyState.text(docMsg("VAS_247_SaveHeaderForLines", "Save the {0} header to add lines")).show();
             } else {
                 if ($emptyState) $emptyState.text(lbl("VAS_247_NoMovement", "Select a record to add lines"));
                 // parent is already null here, so this reverts the heading to the neutral
@@ -439,7 +496,10 @@
            Lines & Summary". Both come from ONE message so a translation can put the
            document name wherever its language needs it. */
         function docTitle() {
-            return docMsg("VAS_247_LinesSummaryFor", "{0} Lines & Summary");
+            // Its own key (17-Sep-2026): the heading must read "Material Transfer Lines &
+            // Summary" whatever a site seeded for the document noun, so it no longer
+            // goes through the {0} substitution.
+            return lbl("VAS_247_LinesSummaryTitle", "Material Transfer Lines & Summary");
         }
 
         /* Re-label everything that names the document, and restate the subtitle from the
@@ -451,12 +511,8 @@
             var title = docTitle();
             $body.find(".vas-mtl-panel__title").text(title);
             $body.find(".vas-mtl-panel").attr("aria-label", title);
-            var sub = [];
-            if (parent && parent.DocTypeName) sub.push(parent.DocTypeName);
-            if (parent && parent.DocumentNo) sub.push(parent.DocumentNo);
-            $body.find(".vas-mtl-panel__subtitle").text(sub.join(" · "));
-            // The empty state is deliberately NOT document-flavoured: render() shows it
-            // precisely when there is no record selected, so there is no kind to name.
+            // No document type / number under the heading any more (17-Sep-2026): the
+            // record above already states both.
         }
 
         /* ---------- shell ---------- */
@@ -465,8 +521,7 @@
             var $panel = $('<section class="vas-mtl-panel" aria-label="' + esc(docTitle()) + '"></section>');
 
             var $header = $('<header class="vas-mtl-panel__header"></header>');
-            $header.append('<div><h2 class="vas-mtl-panel__title">' + esc(docTitle()) + '</h2>'
-                + '<p class="vas-mtl-panel__subtitle"></p></div>');
+            $header.append('<div><h2 class="vas-mtl-panel__title">' + esc(docTitle()) + '</h2></div>');
 
             var $actions = $('<div class="vas-mtl-panel__actions"></div>');
             // Scan hidden for now (handler/markup kept so it can be re-enabled by
@@ -488,10 +543,10 @@
             $table.append(buildHeadRow());
             $linesBody = $('<div class="vas-mtl-tbody"></div>');
             $table.append($linesBody);
-            $totalsRow = $('<div class="vas-mtl-totals-block"></div>');
-            $table.append($totalsRow);
+            // No totals block (17-Sep-2026): the line count and total quantity are not
+            // asked for on a movement, and the strip took the space of a line.
             $panel.append($table);
-            // Server-side line pager (10/page): "X-Y of N" + prev/next.
+            // Server-side line pager (20/page): "X-Y of N" + prev/next.
             $pager = $('<div class="vas-mtl-linepager" style="display:none;"></div>');
             $pager.on("click", "[data-act=lp-prev]", function () { gotoLinePage(linePage - 1); });
             $pager.on("click", "[data-act=lp-next]", function () { gotoLinePage(linePage + 1); });
@@ -522,7 +577,7 @@
                 render();
             });
             $row.append('<div class="vas-mtl-cell" role="columnheader">' + esc(lbl("VAS_247_Product", "Product")) + "</div>");
-            $row.append('<div class="vas-mtl-cell" role="columnheader">' + esc(lbl("Description", "Description")) + "</div>");
+            $row.append('<div class="vas-mtl-cell" role="columnheader">' + esc(lbl("VAS_247_Description", "Description")) + "</div>");
             $row.append('<div class="vas-mtl-cell" role="columnheader">' + esc(lbl("VAS_247_LocatorFrom", "From Locator")) + "</div>");
             $row.append('<div class="vas-mtl-cell" role="columnheader">' + esc(lbl("VAS_247_LocatorTo", "To Locator")) + "</div>");
             $row.append('<div class="vas-mtl-cell vas-mtl-cell--right" role="columnheader">' + esc(lbl("VAS_247_QtyUom", "Quantity / UOM")) + "</div>");
@@ -532,12 +587,16 @@
 
         /* ---------- render ---------- */
         function render() {
-            if (!parent || !parent.M_Movement_ID) { $body.hide(); $emptyState.show(); return; }
+            // The catalog dropdown must not outlive the primary cell that opened it.
+            if (!(editing && editing.field === "product")) closeCatalog();
+            if (!parent || !parent.M_Movement_ID) { lastLockState = null; $body.hide(); $emptyState.show(); return; }
             $emptyState.hide(); $body.show();
             // Read-only movement (completed/void/closed): mark the panel so disabled
             // controls (checkbox, "...") show a not-allowed cursor via their (enabled)
             // parent cell - a disabled control ignores its own `cursor` in Chromium.
-            $body.toggleClass("vas-mtl-locked", !panelEditable());
+            var locked = !panelEditable();
+            lastLockState = locked;   // what this paint reflects - see onTabDataStatus
+            $body.toggleClass("vas-mtl-locked", locked);
             // The heading is built before the movement data arrives, so it is written
             // once the header is known.
             updateDocTypeLabels();
@@ -548,7 +607,6 @@
             } else {
                 for (var i = 0; i < lines.length; i++) $linesBody.append(renderRow(lines[i]));
             }
-            renderTotals();
             renderHeaderButtons();
             renderPager();
         }
@@ -557,7 +615,7 @@
            right. Shown whenever the movement has saved lines (even a single page). */
         function renderPager() {
             if (!$pager) return;
-            var total = linesTotal || 0, size = linePageSize || 10;
+            var total = linesTotal || 0, size = linePageSize || 20;
             if (!total) { $pager.hide().empty(); return; }
             var pageCount = Math.max(1, Math.ceil(total / size));
             var start = linePage * size + 1;
@@ -590,30 +648,18 @@
            silently discards a new/edited row. */
         function gotoLinePage(p) {
             if (!parent || !parent.M_Movement_ID) return;
-            var pageCount = Math.max(1, Math.ceil((linesTotal || 0) / (linePageSize || 10)));
+            var pageCount = Math.max(1, Math.ceil((linesTotal || 0) / (linePageSize || 20)));
             if (p < 0) p = 0; if (p > pageCount - 1) p = pageCount - 1;
             if (p === linePage) return;
             if (unsavedLines().length) { showToast(lbl("VAS_247_SavePageFirst", "Save or discard your changes before changing page")); return; }
             $self.fetchData(parent.M_Movement_ID, p);
         }
 
-        /* The totals block. A movement has no money on it, so what it totals is what it
-           actually moves: how many lines, and how much stock. The line count comes from
-           the server (every page, not just the loaded one) and the quantity is the
-           server's summed MovementQty plus the live delta of anything edited on this page
-           but not yet saved, so the figure tracks an edit before it is committed. */
-        function renderTotals() {
-            $totalsRow.empty();
-            var count = Math.max(linesTotal || 0, 0);
-            var qty = totalQty;
-            for (var i = 0; i < lines.length; i++) {
-                var l = lines[i];
-                if (l.status === "new") { count++; qty += liveBaseQty(l); }
-                else if (l.dirty) qty += (liveBaseQty(l) - (+savedBaseQty(l) || 0));
-            }
-            $totalsRow.append(totalsRow(lbl("VAS_247_TotalLines", "Total Lines") + ":", String(count), false));
-            $totalsRow.append(totalsRow(lbl("VAS_247_TotalQty", "Total Quantity") + ":", fmtQty(qty), true));
-        }
+        /* The totals block is gone (17-Sep-2026). renderTotals / refreshSummary stay as
+           no-op entry points so the load / save / delete / callout paths that call them
+           need no change; the server still sends TotalQty, which nothing reads now. */
+        function renderTotals() { }
+        function refreshSummary() { }
 
         /* The base-unit quantity a line currently stands for. A callout writes MovementQty
            whenever it runs; until then (a quantity typed but not yet tabbed out) the
@@ -622,25 +668,6 @@
             var mq = +lineVal(line, "MovementQty");
             if (mq) return mq;
             return +line.values.QtyEntered || 0;
-        }
-        /* The base-unit quantity this line was last SAVED with, so a dirty row contributes
-           only its delta to the document total. */
-        function savedBaseQty(line) {
-            if (!line._saved || !line._saved.values) return 0;
-            var v = line._saved.values;
-            return (+VAS.PanelUtil.lineVal(v, "MovementQty")) || (+v.QtyEntered) || 0;
-        }
-
-        function totalsRow(label, value, grand) {
-            return '<div class="vas-mtl-totals-row' + (grand ? " vas-mtl-totals-row--grand" : "") + '">' +
-                '<span class="vas-mtl-totals-row__label">' + label + '</span>' +
-                '<span class="vas-mtl-totals-row__value">' + esc(value) + '</span></div>';
-        }
-
-        /* Kept as the single "totals changed" entry point so load / save / delete all call
-           the same thing. */
-        function refreshSummary() {
-            renderTotals();
         }
 
         /* Re-reads the M_Movement header record from the DB so the VIS framework status
@@ -658,7 +685,71 @@
         /* The panel is editable only while the movement can still take line changes -
            server-computed IsEditable = !Processed && DocStatus NOT IN (CO, CL, VO, RE).
            When false the whole panel is read-only: no Add / Save / Delete and no cell edit. */
-        function panelEditable() { return !!(parent && parent.IsEditable); }
+        /* Doc statuses that end the movement's editable life - the same set the server uses
+           for IsEditable (DocStatus NOT IN (CO, CL, VO, RE)). */
+        var LOCKED_DOC_STATUS = { CO: 1, CL: 1, VO: 1, RE: 1 };
+
+        /* Whether the movement the panel is showing is locked RIGHT NOW, read off the
+           hosting GridTab: true / false, or null when the tab cannot say. parent.IsEditable
+           is only a SNAPSHOT taken when the panel last fetched; completing / closing the
+           movement from the tab's own toolbar changes DocStatus without the panel
+           reloading. Mirrors VAS_074 / VAS_249. */
+        function liveDocLocked() {
+            var t = $self.curTab;
+            if (!t) return null;
+            try {
+                var tabId = (typeof t.getRecord_ID === "function") ? (+t.getRecord_ID() || 0) : 0;
+                var panelId = +(parent && parent.M_Movement_ID) || 0;
+                if (tabId > 0 && panelId > 0 && tabId !== panelId) return null;
+                if (typeof t.getIsProcessed === "function" && t.getIsProcessed()) return true;
+                if (typeof t.getValueAsString !== "function") return null;
+                var st = $.trim(t.getValueAsString("DocStatus") || "");
+                if (!st) return null;
+                return !!LOCKED_DOC_STATUS[st.toUpperCase()];
+            } catch (e) { if (window.console) console.log(e); return null; }
+        }
+
+        /* The panel is editable only while the movement can still take line changes -
+           server-computed IsEditable, overridden by the tab's live status when it has one.
+           When false the whole panel is read-only: no Add / Save / Delete and no cell edit. */
+        function panelEditable() {
+            if (!parent) return false;
+            var locked = liveDocLocked();
+            if (locked !== null) return !locked;
+            return !!parent.IsEditable;
+        }
+
+        /* Lock state the panel was last PAINTED for (set by render). */
+        var lastLockState = null;
+
+        function isTabInserting() {
+            var t = $self.curTab, gt = t && t.gridTable;
+            try { return !!(gt && typeof gt.getIsInserting === "function" && gt.getIsInserting()); }
+            catch (e) { return false; }
+        }
+
+        /* The hosting tab's data status changed: New Record clears the panel (the framework
+           never tells a tab panel about it); a doc action run from the header flips the lock
+           and the panel repaints on that transition only. */
+        function onTabDataStatus() {
+            if (isTabInserting()) {
+                if (parent || ($body && $body.is(":visible"))) $self.clear(true);
+                return;
+            }
+            if (!parent) return;
+            var locked = !panelEditable();
+            if (lastLockState === null || locked === lastLockState) return;
+            closeDialogs();
+            try { if (window.VIS && VIS.AttributeControl && VIS.AttributeControl.close) VIS.AttributeControl.close(); } catch (e) { }
+            editing = null;
+            render();
+            if (locked) {
+                showToast(docMsg("VAS_247_DocLockedNow",
+                    "This {0} is no longer editable - the lines are now read-only"));
+            }
+        }
+        /* Registered on the GridTab by startPanel, released by dispose. */
+        this.tabDataListener = { dataStatusChanged: function (e) { onTabDataStatus(e); } };
 
         /* Returns true when the parent header tab has unsaved changes — the user has
            edited a header field without saving, or the header record is brand-new.
@@ -754,7 +845,7 @@
            edit mode exactly like the old <p> did. */
         function dispInput(line, field, text, opts) {
             opts = opts || {};
-            var editable = parent && parent.IsEditable;
+            var editable = panelEditable();   // live tab status first, then the snapshot
             // draggable=false stops the browser starting a text-drag on the readonly input
             // (which flashes the "not-allowed" / no-drop cursor while dragging).
             var $i = $('<input type="text" readonly tabindex="-1" draggable="false" class="vas-mtl-cell-edit__input vas-mtl-cell-disp" />');
@@ -777,7 +868,7 @@
         }
 
         function renderPrimaryCell(line) {
-            var editable = parent && parent.IsEditable;
+            var editable = panelEditable();   // live tab status first, then the snapshot
             var isEditing = editing && editing.rowId === line.rowId && editing.field === "product";
             var cell = $('<div class="vas-mtl-cell vas-mtl-cell--product" role="cell"></div>');
             var wrap = $('<div class="vas-mtl-cell-edit"></div>');
@@ -811,11 +902,8 @@
                 setTimeout(function () { $inp.focus(); }, 0);
             } else {
                 wrap.append(dispInput(line, "product", primaryValue(line), { placeholder: lbl("VAS_247_AddProduct", "Add product…") }));
-                // The product's search key under its name, so two similarly-named items are
-                // still tellable apart at a glance.
-                if (line.values.M_Product_ID > 0 && line.display.productValue) {
-                    wrap.append($('<span class="vas-mtl-cell-edit__sub"></span>').text(line.display.productValue));
-                }
+                // No product code under the name (17-Sep-2026): the full "name (key)"
+                // stays in the catalog row's tooltip for telling look-alikes apart.
                 // For a product carrying (or able to carry) an attribute set, show the
                 // attribute-set-instance description as a clickable sub-line. Clicking it
                 // opens the attribute control instead of editing the product name, so the
@@ -839,7 +927,7 @@
 
         function renderEditableCell(line, field, value, placeholder, opts) {
             opts = opts || {};
-            var editable = parent && parent.IsEditable;
+            var editable = panelEditable();   // live tab status first, then the snapshot
             var cell = $('<div class="vas-mtl-cell' + (opts.align === "right" ? " vas-mtl-cell--right" : "") + '" role="cell"></div>');
             var wrap = $('<div class="vas-mtl-cell-edit"></div>');
             var isEditing = editing && editing.rowId === line.rowId && editing.field === field;
@@ -876,7 +964,7 @@
            warehouses, and the destination bin usually belongs to a different one - which
            is why each option is labelled "WAREHOUSE - VALUE" by the server. */
         function renderLocatorCell(line, field, valueKey, displayKey) {
-            var editable = parent && parent.IsEditable;
+            var editable = panelEditable();   // live tab status first, then the snapshot
             var ro = isColumnReadOnly(line, valueKey);
             var cell = $('<div class="vas-mtl-cell" role="cell"></div>');
             var wrap = $('<div class="vas-mtl-cell-edit"></div>');
@@ -892,7 +980,12 @@
                         fillLocatorOptions($sel, line, valueKey, displayKey);
                 });
                 $sel.on("change", function () {
-                    setLocator(line, valueKey, displayKey, parseInt($sel.val(), 10) || 0, $sel.find("option:selected").text());
+                    var id = parseInt($sel.val(), 10) || 0;
+                    // The cell names the bin by its VALUE (as a loaded line does), not by the
+                    // option's warehouse-prefixed label.
+                    var list = rowLocatorList(line, valueKey), nm = "";
+                    for (var i = 0; i < list.length; i++) if (list[i].M_Locator_ID === id) { nm = list[i].Value || list[i].Name; break; }
+                    setLocator(line, valueKey, displayKey, id, nm || $sel.find("option:selected").text());
                 });
                 $sel.on("blur", function () { editing = null; render(); });
                 $sel.on("keydown", function (e) {
@@ -904,15 +997,30 @@
                 wrap.append($sel);
                 setTimeout(function () { $sel.focus(); }, 0);
             } else {
-                wrap.append(dispInput(line, field, line.display[displayKey] || "",
+                wrap.append(dispInput(line, field, locatorLabel(line, valueKey, displayKey),
                     { placeholder: lbl("VAS_247_PickLocator", "Locator…"), readOnly: ro }));
             }
             return cell;
         }
 
+        /* What a resting locator cell says: the locator's VALUE, never its id. The display
+           name is what was loaded or picked; a locator that reached the line by another
+           route (a callout, the Additional Info modal, a patch) is named from the row's
+           own filtered list, then the panel list. One the lists cannot name reads blank
+           rather than as a number. */
+        function locatorLabel(line, valueKey, displayKey) {
+            var name = line.display[displayKey];
+            if (name && !/^\d+$/.test(String(name).trim())) return name;
+            var id = +line.values[valueKey] || 0;
+            if (!(id > 0)) return "";
+            var list = rowLocatorList(line, valueKey);
+            for (var i = 0; i < list.length; i++) if (list[i].M_Locator_ID === id) return list[i].Value || list[i].Name || "";
+            return locatorName(id) || "";
+        }
+
         function renderQtyUomCell(line) {
             var v = line.values;
-            var editable = parent && parent.IsEditable;
+            var editable = panelEditable();   // live tab status first, then the snapshot
             var cell = $('<div class="vas-mtl-cell vas-mtl-cell--right" role="cell"></div>');
             var wrap = $('<div class="vas-mtl-cell-edit"></div>');
             var editQty = editing && editing.rowId === line.rowId && editing.field === "quantity";
@@ -970,7 +1078,7 @@
         }
 
         function renderMoreCell(line) {
-            var editable = parent && parent.IsEditable;
+            var editable = panelEditable();   // live tab status first, then the snapshot
             var cell = $('<div class="vas-mtl-cell vas-mtl-cell--more" role="cell" style="position:relative"></div>');
             // Undo affordance (↺). On a SAVED row with unsaved edits it reverts the row to
             // its last pristine snapshot; on a NEW (never-saved) row it removes the row
@@ -997,10 +1105,15 @@
                 : esc(lbl("VAS_247_NoAdditionalInfo", "No additional info for this line"));
             var $btn = $('<button type="button" class="vas-mtl-more-btn" title="' + _btnTitle + '">' + icon("more-horizontal", "⋯") + "</button>");
             if (morePopoverFor === line.rowId) $btn.addClass("is-open");
+            // Blue while the line carries a value in any Additional Info field, white
+            // otherwise (has-values, see CSS) - re-evaluated on every render, so it
+            // follows what the modal holds.
             if (hasAdditionalValues(line, _addlCols)) $btn.addClass("has-values");
-            // Disable when read-only OR when no additional-info field is visible for this
-            // line (the same DisplayLogic check the modal runs).
-            $btn.prop("disabled", !editable || !_hasVisible);
+            // Disabled only when no additional-info field is visible for this line (the
+            // same DisplayLogic check the modal runs). On a completed / closed movement
+            // the button stays live (17-Sep-2026): the modal opens for READING, every
+            // field read-only (buildDynField).
+            $btn.prop("disabled", !_hasVisible);
             $btn.on("click", function (e) { e.stopPropagation(); openMoreDialog(line); });
             // Keyboard: Tab continues the row's tab chain. Enter / Space open the modal
             // explicitly - relying on the button's native click-on-Enter was unreliable
@@ -1125,10 +1238,29 @@
             return (a == null ? "" : String(a)) === (b == null ? "" : String(b));
         }
 
+        /* The requisition line's quantity this movement line was raised against (0 where it
+           has none). Read off the loaded row (VASMTLDISP_ReqQty, model side); a requisition
+           line picked in the Additional Info modal is checked by the server on save. */
+        function requisitionQty(line) {
+            if (!(+lineVal(line, "M_RequisitionLine_ID") > 0)) return 0;
+            return +lineVal(line, "VASMTLDISP_ReqQty") || 0;
+        }
+        function qtyExceedsMsg() {
+            return lbl("VAS_247_QtyExceedsRequisition", "Movement quantity should be less than or equal to requisition quantity.");
+        }
+
         function commitField(line, field, value) {
             var v = line.values, changed = false;
             if (field === "description") { if (!sameVal(v.Description, value)) { v.Description = value; changed = true; } }
-            else if (field === "quantity") { var nq = value > 0 ? value : 0; if (!sameVal(v.QtyEntered, nq)) { v.QtyEntered = nq; changed = true; } }
+            else if (field === "quantity") {
+                var nq = value > 0 ? value : 0;
+                // Held to the requisition line's quantity (17-Sep-2026): a larger figure is
+                // refused on the spot, the line keeps the quantity it had, and the user is
+                // told why. (Compared in the entered unit; the server compares base units.)
+                var cap = requisitionQty(line);
+                if (cap > 0 && nq > cap) { showToast(qtyExceedsMsg()); line._error = qtyExceedsMsg(); return; }
+                if (!sameVal(v.QtyEntered, nq)) { v.QtyEntered = nq; changed = true; }
+            }
             if (changed) markDirty(line);
             // A quantity change re-runs the line callout: MovementQty is the entered figure
             // converted into the product's base unit, so it is stale the moment the
@@ -1203,7 +1335,8 @@
             var v = line.values, list = rowUomList(line), found = false;
             $sel.empty();
             for (var i = 0; i < list.length; i++) {
-                var o = $("<option></option>").attr("value", list[i].C_UOM_ID).text(list[i].Symbol || list[i].Name);
+                // Full name ("Each"), not the symbol ("Ea") - 17-Sep-2026.
+                var o = $("<option></option>").attr("value", list[i].C_UOM_ID).text(list[i].Name || list[i].Symbol);
                 if (list[i].C_UOM_ID === v.C_UOM_ID) { o.prop("selected", true); found = true; }
                 $sel.append(o);
             }
@@ -1214,14 +1347,27 @@
         function fillLocatorOptions($sel, line, valueKey, displayKey) {
             var v = line.values, list = rowLocatorList(line, valueKey), found = false;
             $sel.empty();
-            // A blank first option so a locator can be cleared back to "not chosen".
-            $sel.append($('<option value="0"></option>'));
             for (var i = 0; i < list.length; i++) {
+                // A locator with no label would render as an empty row; nothing to pick.
+                if (!list[i].Name || !String(list[i].Name).trim()) continue;
                 var o = $("<option></option>").attr("value", list[i].M_Locator_ID).text(list[i].Name);
                 if (list[i].M_Locator_ID === v[valueKey]) { o.prop("selected", true); found = true; }
                 $sel.append(o);
             }
-            if (!found && v[valueKey] > 0) $sel.append($("<option></option>").attr("value", v[valueKey]).text(line.display[displayKey] || "").prop("selected", true));
+            // No blank row (17-Sep-2026): both locators are mandatory on a line, and an
+            // empty option read as a blank value in the list. A line that has no locator
+            // yet opens on a disabled prompt so the first real bin is never shown as
+            // though it were already chosen; a locator already on the line that the val
+            // rule no longer returns is still shown, so the cell states what is stored.
+            if (!found) {
+                var has = v[valueKey] > 0;
+                var prompt = valueKey === "M_LocatorTo_ID"
+                    ? lbl("VAS_247_SelectLocatorToPrompt", "Select to locator…")
+                    : lbl("VAS_247_SelectLocatorFromPrompt", "Select from locator…");
+                $sel.prepend($("<option></option>").attr("value", has ? v[valueKey] : 0)
+                    .text(has ? locatorLabel(line, valueKey, displayKey) : prompt)
+                    .prop("disabled", !has).prop("selected", true));
+            }
         }
 
         /* Fetch (once, then cache) the UOM + locator lists valid for THIS line's context.
@@ -1304,7 +1450,7 @@
 
         /* ---------- line operations ---------- */
         function addLine() {
-            if (!parent || !parent.IsEditable) { showToast(docMsg("VAS_247_NotEditable", "This {0} cannot take new lines")); return; }
+            if (!panelEditable()) { showToast(docMsg("VAS_247_NotEditable", "This {0} cannot take new lines")); return; }
             if (blockedByDirtyHeader()) return;
             var maxLine = 0;
             for (var i = 0; i < lines.length; i++) maxLine = Math.max(maxLine, lines[i].values.Line || 0);
@@ -1323,10 +1469,31 @@
                 }
             };
             seedAllColumns(line.values);
+            seedHeaderDateRequired(line);
             lines.unshift(line);
             editing = { rowId: line.rowId, field: "product" };
             catalog.term = ""; catalog.highlight = 0;
             render();
+        }
+
+        /* The line's Date Required from the header (17-Sep-2026, as VAS_240): the header's
+           own date arrives as an ISO date (parent.DateRequired, model side) and is seeded
+           under both names a line table may carry - DTD001_DateRequired (the DTD001
+           module's) and a plain DateRequired. A name the table does not carry is dropped
+           by the server; SaveLines applies the same default for a line that reaches it
+           without one. Marked touched so the value is persisted exactly. */
+        function seedHeaderDateRequired(line) {
+            var iso = parent && parent.DateRequired;
+            if (!iso || !/^\d{4}-\d{2}-\d{2}/.test(String(iso))) return;
+            var hdrDate = String(iso).slice(0, 10);
+            var dateCols = ["DTD001_DateRequired", "DateRequired"];
+            for (var dc = 0; dc < dateCols.length; dc++) {
+                var dcol = dateCols[dc];
+                if (line.values[dcol] != null && line.values[dcol] !== "") continue;
+                line.values[dcol] = hdrDate;
+                if (!line._dynTouched) line._dynTouched = {};
+                line._dynTouched[dcol] = true;
+            }
         }
 
         function lineById(id) { for (var i = 0; i < lines.length; i++) if (lines[i].rowId === id) return lines[i]; return null; }
@@ -1466,13 +1633,14 @@
         }
 
         function catalogRowHtml(it, idx) {
-            // Name + unit only (the key line is intentionally omitted to keep the dropdown
-            // rows compact). Full "name (key)" stays in the tooltip. Every row is a product:
-            // a movement line has no charge alternative, so there is no kind badge to draw.
-            var meta = it.UomName ? '<span class="vas-mtl-catalog-popover__meta">' + esc(it.UomName) + "</span>" : "";
+            // Name + a "Product" kind badge, as the order panels draw their rows (the key
+            // line is intentionally omitted to keep the dropdown rows compact; the full
+            // "name (key)" stays in the tooltip). The row used to print the unit ("Ea")
+            // where the badge sits on every other panel - 17-Sep-2026.
             return '<button type="button" class="vas-mtl-catalog-popover__item" data-catalog-item="true" data-idx="' + idx +
                 '" title="' + esc(it.DisplayName + (it.SearchKey ? " (" + it.SearchKey + ")" : "")) + '">' +
-                '<span class="vas-mtl-catalog-popover__name">' + esc(it.DisplayName) + "</span>" + meta + "</button>";
+                '<span class="vas-mtl-catalog-popover__name">' + esc(it.DisplayName) + "</span>" +
+                '<span class="vas-mtl-badge vas-mtl-badge--product">' + esc(lbl("VAS_247_Product", "Product")) + "</span></button>";
         }
 
         /* Move the highlight by class only (no rebuild) and keep it in view. */
@@ -1498,9 +1666,12 @@
             v.M_AttributeSetInstance_ID = 0; d.attrName = "";
             // Default the unit from the product, but never overwrite a unit the user has
             // already chosen on this line.
-            if (item.C_UOM_ID > 0 && !v.C_UOM_ID) {
+            // The product's own unit goes on the line the moment the product is picked. A
+            // NEW product means a new unit: the one the previous product left on the line
+            // is not kept (the user can still change it after) - 17-Sep-2026.
+            if (item.C_UOM_ID > 0) {
                 v.C_UOM_ID = item.C_UOM_ID;
-                d.uomName = item.UomName || "";
+                d.uomName = item.UomName || uomName(item.C_UOM_ID) || "";
             }
             if (!(+v.QtyEntered > 0)) v.QtyEntered = 1;
             line._productType = item.ProductType || "";
@@ -1789,19 +1960,22 @@
             d.locatorToName = locatorName(v.M_LocatorTo_ID) || d.locatorToName;
             line.dirty = true;
         }
+        /* The unit's full NAME ("Each"), never its symbol ("Ea") - 17-Sep-2026. */
         function uomName(id) {
             if (!(id > 0)) return "";
-            for (var i = 0; i < uomList.length; i++) if (uomList[i].C_UOM_ID === id) return uomList[i].Symbol || uomList[i].Name;
+            for (var i = 0; i < uomList.length; i++) if (uomList[i].C_UOM_ID === id) return uomList[i].Name || uomList[i].Symbol;
             return "";
         }
-        /* Label for a locator id. Both lists are searched: the same bin can be the source
-           on one line and the destination on another, and the two lists may not overlap
-           once their val rules have been applied. */
+        /* The locator's VALUE (the bin code the resting cell shows), by id. Both lists are
+           searched: the same bin can be the source on one line and the destination on
+           another, and the two lists may not overlap once their val rules have been
+           applied. The dropdown labels its options "WAREHOUSE - VALUE"; the cell states
+           the bin alone, as a loaded line does. */
         function locatorName(id) {
             if (!(id > 0)) return "";
             var i;
-            for (i = 0; i < locatorList.length; i++) if (locatorList[i].M_Locator_ID === id) return locatorList[i].Name;
-            for (i = 0; i < locatorToList.length; i++) if (locatorToList[i].M_Locator_ID === id) return locatorToList[i].Name;
+            for (i = 0; i < locatorList.length; i++) if (locatorList[i].M_Locator_ID === id) return locatorList[i].Value || locatorList[i].Name;
+            for (i = 0; i < locatorToList.length; i++) if (locatorToList[i].M_Locator_ID === id) return locatorToList[i].Value || locatorToList[i].Name;
             return "";
         }
 
@@ -1834,12 +2008,16 @@
             var vals = res.Values || {}, disp = res.Display || {};
             for (var col in vals) {
                 if (!vals.hasOwnProperty(col)) continue;
+                // A unit the server could not state (0) never clears the one the line
+                // already holds - the product's own, put there as it was picked.
+                if (col === "C_UOM_ID" && !(+vals[col] > 0) && (+v.C_UOM_ID > 0)) continue;
                 // Case-insensitive write: a saved line keys columns in DB case, which won't
                 // match the dictionary-cased name the callout returns, so a direct v[col]=
                 // would silently write a second key.
                 setLineVal(line, col, vals[col]);
             }
-            if (disp.uomName != null) d.uomName = disp.uomName;
+            if (disp.uomName != null && disp.uomName !== "") d.uomName = disp.uomName;
+            else if (!d.uomName && +v.C_UOM_ID > 0) d.uomName = uomName(+v.C_UOM_ID) || d.uomName;
             markDirty(line);
         }
 
@@ -1983,22 +2161,18 @@
             { col: "C_ProjectLine_ID" },
             { col: "C_Campaign_ID" },
             { col: "C_Activity_ID" },
-            // --- Movement group: what arrives at the far end of the transfer ---
-            // The DESTINATION attribute-set instance. The source instance is set from the
-            // grid's attribute link; this one has no grid affordance, because on most
-            // movements the goods keep their instance and only a few (repackaging,
-            // re-lotting) restate it.
-            { col: "M_AttributeSetInstanceTo_ID" },
             // --- References group ---
-            // Quantities the warehouse maintains against the line, and the reversal that
-            // undid it. All read-only: each is stamped by the process that produced it,
-            // never entered by hand (see FORCED_READONLY_COLS).
-            { col: "TargetQty" },
-            { col: "ConfirmedQty" },
-            { col: "ScrappedQty" },
+            // (The Movement group - Attribute Set Instance To - and the Target / Confirmed /
+            // Scrapped quantities were dropped on 17-Sep-2026.)
+            // The requisition line the movement was raised for, the asset and the business
+            // partner it concerns (each as the dictionary offers it), the reversal that
+            // undid the line (read-only: stamped by the process that produced it, see
+            // FORCED_READONLY_COLS), and the work-order component (VAMFG module; skipped
+            // silently wherever that module is not installed).
+            { col: "M_RequisitionLine_ID" },
+            { col: "A_Asset_ID" },
+            { col: "C_BPartner_ID" },
             { col: "ReversalLine_ID" },
-            // The work-order component this movement was raised for (VAMFG module);
-            // skipped silently wherever that module is not installed.
             { col: "VAMFG_M_WorkOrderComponent_ID", when: "vamfg_" }
         ];
 
@@ -2020,8 +2194,7 @@
            English fallback, `collapsed` = initial collapsed state. */
         var MORE_FIELD_GROUPS = [
             { anchor: "AD_OrgTrx_ID", key: "VAS_247_GrpDimension", def: "Dimension", collapsed: false },
-            { anchor: "M_AttributeSetInstanceTo_ID", key: "VAS_247_GrpMovement", def: "Movement", collapsed: false },
-            { anchor: "TargetQty", key: "VAS_247_GrpReferences", def: "References", collapsed: false }
+            { anchor: "M_RequisitionLine_ID", key: "VAS_247_GrpReferences", def: "References", collapsed: false }
         ];
         // Per-anchor collapsed state; persists across modal re-opens in the same session.
         var moreGroupCollapsed = {};
@@ -2219,7 +2392,9 @@
         }
 
         function buildDynField(line, m) {
-            var ro = isColumnReadOnly(line, m.ColumnName);
+            // Read-only when the column says so, or when the whole movement can no longer
+            // be edited (the modal opens for reading on a completed / closed one).
+            var ro = isColumnReadOnly(line, m.ColumnName) || !panelEditable();
             var kind = dynFieldKind(m);
             // Caption only - the framework renders the mandatory red asterisk itself.
             var caption = m.Name || m.ColumnName;
@@ -2561,6 +2736,7 @@
            callout when its class is loaded and otherwise falls back to the server path - so
            a modal field's callout fires even when its client class isn't on the page. */
         function setDyn(line, col, value, refresh) {
+            if (!panelEditable()) return;   // the modal is read-only on a locked movement
             var prev = lineVal(line, col);
             setLineVal(line, col, value);
             // Keep the window context current so a dependent FK's val rule (and any control
@@ -2793,9 +2969,16 @@
             // MMovementLine.BeforeSave would reject it anyway. Checking here means the user
             // is told on the row instead of by a framework error after the round trip.
             if (!(v.M_Locator_ID > 0))
-                return { col: "M_Locator_ID", msg: lbl("VAS_247_LocatorRequired", "Pick the locator the stock moves from") };
+                // Own keys (17-Sep-2026), so a site that seeded the earlier wording is not
+                // left showing it.
+                return { col: "M_Locator_ID", msg: lbl("VAS_247_SelectLocatorFrom", "Select the locator from which the stock is transferred.") };
             if (!(v.M_LocatorTo_ID > 0))
-                return { col: "M_LocatorTo_ID", msg: lbl("VAS_247_LocatorToRequired", "Pick the locator the stock moves to") };
+                return { col: "M_LocatorTo_ID", msg: lbl("VAS_247_SelectLocatorTo", "Select the locator where the stock will be transferred.") };
+            // A line raised against a requisition line may not move more than it asked
+            // for (17-Sep-2026); the server re-checks with the same wording.
+            var reqQty = requisitionQty(line);
+            if (reqQty > 0 && liveBaseQty(line) > reqQty)
+                return { col: "QtyEntered", msg: qtyExceedsMsg() };
             // Moving stock from a bin to itself is a no-op the warehouse cannot act on.
             if (v.M_Locator_ID === v.M_LocatorTo_ID)
                 return { col: "M_LocatorTo_ID", msg: lbl("VAS_247_LocatorSame", "The source and destination locators must differ") };
@@ -2878,7 +3061,9 @@
                 // Default to hiding zero / negative qty instances; the user can toggle via
                 // the control's own checkbox. Moving stock that is not there is the one
                 // mistake this list should not invite.
-                showAll: false,
+                // "Show All (include zero and (-ve) qty)" starts TICKED (17-Sep-2026); the
+                // user can untick it to see stock-on-hand instances only.
+                showAll: true,
                 lbl: lbl, esc: esc, icon: icon,
                 showBusy: showBusy, showToast: showToast,
                 dateStr: dateStr, fmtMoney: fmtQty, parseNum: parseNum,
@@ -3032,7 +3217,7 @@
            auto-created - the user adds the next line manually via the Add button. A
            blank/invalid row blocks with the same message the Save button shows. */
         function saveThenAddLine() {
-            if (!parent || !parent.IsEditable) { showToast(docMsg("VAS_247_NotEditable", "This {0} cannot take new lines")); return; }
+            if (!panelEditable()) { showToast(docMsg("VAS_247_NotEditable", "This {0} cannot take new lines")); return; }
             if (unsavedLines().length) afterCallouts(function () { saveRows(); });   // wait for in-flight callout first
             editing = null; render();
         }
@@ -3292,8 +3477,16 @@
             // The Additional-Info modal closes ONLY via its Done button (Escape ignored).
         });
 
-        // Alt+Ctrl+N/S/D/Z/Q keyboard shortcuts via the shared utility.
-        $self._shortcuts = VAS.PanelShortcuts.register({
+        // Alt+Ctrl+N/S/D/Z/Q keyboard shortcuts via the shared utility. Registered from
+        // init (not the constructor), so a parked duplicate never listens and a rebuilt
+        // panel never listens twice - a second listener was what answered a shortcut
+        // that had already worked with "Nothing to undo" / "Select a row to delete".
+        function registerShortcuts() {
+            if ($self._shortcuts) { $self._shortcuts.dispose(); $self._shortcuts = null; }
+            if ($self._parked) return;
+            $self._shortcuts = VAS.PanelShortcuts.register(shortcutHandlers());
+        }
+        function shortcutHandlers() { return {
             /**
              * Panel is active when it is visible in the DOM and a movement is loaded.
              * Both conditions must hold; the shortcut is silently ignored otherwise.
@@ -3357,9 +3550,22 @@
             onRefresh: function () {
                 if (parent && parent.M_Movement_ID) $self.fetchData(parent.M_Movement_ID, linePage);
             }
-        });
+        }; }
 
         this.getRoot = function () { return $root; };
+
+        /* A parked duplicate takes over from the panel that was live for its window (that
+           one has been disposed): shown, listening, and loaded with whatever record it was
+           last asked for. */
+        this.unpark = function () {
+            if (!$self._parked) return;
+            $self._parked = false;
+            if ($root) $root.removeClass("vas-mtl-is-hidden");
+            registerShortcuts();
+            var rec = $self._parkedRecord;
+            $self._parkedRecord = null;
+            if (rec > 0) $self.fetchData(rec); else $self.clear(rec === 0);
+        };
         this.dispose_ = function () {
             if (fitRaf) {
                 if (window.cancelAnimationFrame) window.cancelAnimationFrame(fitRaf);
@@ -3379,10 +3585,49 @@
         this.curTab = curTab;
         if (curTab && typeof curTab.getAD_Table_ID === "function") this.table_ID = curTab.getAD_Table_ID();
         if (curTab && typeof curTab.getAD_Window_ID === "function") this.AD_Window_ID = curTab.getAD_Window_ID();
+        // ONE live panel per window. When the host starts a second instance for a window
+        // that already has one, this one parks: hidden, no shortcuts, no fetch - so the
+        // window never shows two copies of the grid, and a shortcut is never answered
+        // twice. It takes over if the live one is disposed (see dispose / unpark). A
+        // repeat startPanel on the SAME instance simply rebuilds in place (init).
+        var key = String(windowNo || 0);
+        var live = LIVE_BY_WINDOW[key];
+        if (live === this || (live && live._disposed)) live = null;
+        if (live) {
+            // Is that entry STALE - a panel whose window was closed without dispose being
+            // called? Only a panel that has been SHOWN (the host called refreshPanelData
+            // on it) and whose root has since left the document counts as stale. A panel
+            // that has merely not been appended yet is NOT stale: the host builds every
+            // instance for a window before it appends any root.
+            var attached = false;
+            try { attached = !!(live.getRoot && live.getRoot() && live.getRoot().closest("body").length); } catch (e) { attached = false; }
+            if (live._everRefreshed && !attached) live = null;
+        }
+        this._parked = !!live;
+        this._disposed = false;
         this.init();
+        if (this._parked) {
+            this.getRoot().addClass("vas-mtl-is-hidden");
+            if (!live._parkedTwins) live._parkedTwins = [];
+            live._parkedTwins.push(this);
+        } else {
+            LIVE_BY_WINDOW[key] = this;
+        }
+        // Watch the tab's data status: New Record (which the framework never reports to
+        // a tab panel) clears the panel, and a doc action (Complete / Close / ...) run
+        // from the header locks it at once - see onTabDataStatus.
+        if (curTab && typeof curTab.addDataStatusListener === "function") {
+            try { curTab.addDataStatusListener(this.tabDataListener); } catch (e) { }
+        }
     };
 
     VAS.VAS_247_MaterialTransferBottomPanel.prototype.refreshPanelData = function (recordID, selectedRow) {
+        this._everRefreshed = true;   // the host has shown this panel (see startPanel's stale test)
+        if (this._parked) {
+            // Remember only, for a take-over: > 0 a record, 0 a new unsaved row, -1 none.
+            this._parkedRecord = (recordID > 0) ? recordID : (selectedRow !== undefined ? 0 : -1);
+            return;
+        }
         if (selectedRow == undefined || recordID <= 0) {
             // Pass true when a row exists in the grid but the movement has no DB ID yet
             // (new unsaved record), so the panel shows a blank body rather than the
@@ -3405,9 +3650,28 @@
     };
 
     VAS.VAS_247_MaterialTransferBottomPanel.prototype.dispose = function () {
+        this._disposed = true;
         // Remove the capture-phase shortcut listener registered during init.
         if (this._shortcuts) { this._shortcuts.dispose(); this._shortcuts = null; }
+        // Release the tab watcher before curTab is dropped, or the GridTab keeps a
+        // reference to this disposed panel and goes on calling into it.
+        if (this.curTab && typeof this.curTab.removeDataStatusListener === "function") {
+            try { this.curTab.removeDataStatusListener(this.tabDataListener); } catch (e) { }
+        }
         if (typeof this.dispose_ === "function") this.dispose_();
+        // Hand the window to a parked twin, if one is waiting; otherwise the entry goes.
+        var key = String(this.windowNo || 0);
+        if (LIVE_BY_WINDOW[key] === this) {
+            delete LIVE_BY_WINDOW[key];
+            var twins = this._parkedTwins || [], next = null;
+            for (var i = 0; i < twins.length; i++) if (twins[i] && !twins[i]._disposed) { next = twins[i]; break; }
+            if (next) {
+                LIVE_BY_WINDOW[key] = next;
+                next._parkedTwins = twins.filter(function (t) { return t !== next && t && !t._disposed; });
+                try { next.unpark(); } catch (e) { if (window.console) console.log(e); }
+            }
+        }
+        this._parkedTwins = null;
         $("#vasMtlAttr, #vasMtlScan, #vasMtlMore, .vas-mtl-toast").remove();
         this.record_ID = 0; this.table_ID = 0; this.windowNo = 0;
         this.curTab = null; this.selectedRow = null;

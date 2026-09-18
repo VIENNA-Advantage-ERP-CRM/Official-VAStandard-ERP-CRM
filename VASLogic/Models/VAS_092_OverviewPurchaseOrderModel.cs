@@ -370,6 +370,10 @@
 ///                        appointment / task / call / letter sources in
 ///                        VAS_ActivitySourcesModel, where the helper lives. A no-op
 ///                        on Oracle.
+///   VAI163   2026-09-16  ComputeCurrentStage puts a prepared order (DocStatus IP)
+///                        on stage 2, so the panel captions the Completed stage
+///                        "In progress" instead of "Pending" while the window says
+///                        In Progress.
 /// </summary>
 
 using System;
@@ -762,6 +766,10 @@ namespace VASLogic.Models
         private int ComputeCurrentStage(PurchaseOrderOverviewData d)
         {
             int stage = 1;                              // Drafted (always reached)
+            // A prepared order (IP) is on its way to Completed: the stage is
+            // current but not reached, so the panel captions it "In progress"
+            // rather than "Pending" and the badge stops reading "Drafted".
+            if (d.DocStatus == "IP")  stage = 2;        // Completed under way
             if (d.IsCompleted)        stage = 3;        // Completed + With Vendor
             if (d.IsExpectedDelivery) stage = 4;        // Expected Delivery scheduled
             if (d.IsPartialDelivered) stage = 5;        // Partial / received

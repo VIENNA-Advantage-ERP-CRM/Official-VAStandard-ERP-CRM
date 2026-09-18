@@ -28,6 +28,7 @@
  *  4  | Partially delivered   | VAS_106_PartiallyDelivered  | Partially delivered
  *  5  | Ready to ship         | VAS_106_ReadyToShip         | Ready to ship
  *  6  | Short by              | VAS_106_ShortBy             | Short by
+ *  7  | not delivered         | VAS_106_NotDelivered        | not delivered   (2026-09-17)
  *
  *  (1) and (6) already existed and are unchanged — listed because the Order
  *  Total card and the Readiness column are what these keys now caption together.
@@ -489,6 +490,26 @@
  *                          "Closed" / "Voided" under the Completed stage: Closed
  *                          keeps the tick and replaces the date, Voided replaces
  *                          "In Process" on a stage that stays unreached.
+ *   VAI163   2026-09-16  - The header pill reads "In Progress" for DocStatus IP;
+ *                          it lumped IP in with Draft.
+ *                        - Shipped under ship confirmation (IsShipConfirm = Y on
+ *                          the target document type) is dated by when the first
+ *                          delivery order REACHED In Progress — its first
+ *                          DocComplete stamp (DeliveryData.InProgressDate, model
+ *                          side) — not by its MovementDate. With IsShipConfirm =
+ *                          N it stays the first completed delivery order's
+ *                          completion; drafted or none is still Pending.
+ *                        - The progress line's "In Process" caption (Completed
+ *                          and Delivered stages) now reads "In Progress" through
+ *                          VAS_106_InProgressShort, the key the pills use, so the
+ *                          state is named the same way everywhere.
+ *   VAI163   2026-09-17  - Delivery Readiness names a CLOSED order's undelivered
+ *                          line "Closed · n <uom> not delivered" (state "closed",
+ *                          model side, grey) instead of "Fully delivered". Closing
+ *                          the order zeroes the pending quantity by writing it off
+ *                          to QtyLostSales, so the pending test alone read the
+ *                          line as delivered in full. A closed line that had
+ *                          delivered in full still reads Fully delivered.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -870,8 +891,12 @@
             var f = fulfilment();
             if (data.DocStatus === "VO") return { label: getMsg("VAS_106_Voided", "Voided"), tone: "risk" };
             if (data.DocStatus === "CL") return { label: getMsg("VAS_106_Closed", "Closed"), tone: "neutral" };
-            if (data.DocStatus === "DR" || data.DocStatus === "IP")
+            if (data.DocStatus === "DR")
                 return { label: getMsg("VAS_106_Draft", "Draft"), tone: "neutral" };
+            // Past draft but not completed: the window says In Progress, so the
+            // pill does too — it used to lump IP in with Draft.
+            if (data.DocStatus === "IP")
+                return { label: getMsg("VAS_106_InProgress", "In Progress"), tone: "info" };
             // Completed family. Reaching Completed is what the pill reports, so it
             // says so — in green. It used to read "Confirmed" in blue until every
             // line had shipped, which named the same state twice and gave an
@@ -1306,6 +1331,7 @@
         function deliveryState() {
             var dv = data.Deliveries || [];
             var raised = null, completed = null, firstCompleted = null, inProcessDate = null;
+            var firstInProgress = null;
             var inProcess = false, open = 0;
             for (var i = 0; i < dv.length; i++) {
                 var st = dv[i].DocStatus;
@@ -1336,11 +1362,17 @@
                     // waits on its confirmation the stage names the day of the most
                     // recent one to be waiting.
                     if (!isDone && r && (!inProcessDate || r > inProcessDate)) inProcessDate = r;
+                    // When the delivery order REACHED In Progress (its first
+                    // DocComplete stamp, model side) — the EARLIEST across the
+                    // set, which is the Shipped date under ship confirmation.
+                    var ip = parseDbDate(dv[i].InProgressDate, true);
+                    if (ip && (!firstInProgress || ip < firstInProgress)) firstInProgress = ip;
                 }
             }
             return {
                 exists: dv.length > 0,
                 raisedDate: raised,
+                firstInProgressDate: firstInProgress,
                 completedDate: completed,
                 firstCompletedDate: firstCompleted,
                 inProcessDate: inProcessDate,
@@ -1402,7 +1434,11 @@
             var drafted = !data.DocStatus || data.DocStatus === "DR";
             var shipConfirm = !!data.IsShipConfirmTarget;
             var dl = deliveryState();
-            var inProcess = getMsg("VAS_106_InProcess", "In Process");
+            // "In Progress" — the same word as the header pill and the document
+            // status pill, read through the same key. It was "In Process"
+            // (VAS_106_InProcess), which named the state differently from the
+            // window and from every other place in this panel.
+            var inProcess = getMsg("VAS_106_InProgress", "In Progress");
 
             // Shipped, and which question it asks turns on IsShipConfirm of the
             // order's TARGET document type (data.IsShipConfirmTarget, model side).
@@ -1410,11 +1446,14 @@
             // With confirmation ON the delivery order sits In Process awaiting its
             // confirmation and may never complete on its own, so REACHING THAT STATE
             // is the shipment: the stage goes done as soon as a delivery order has
-            // left draft, and it shows that delivery order's own date — MovementDate,
-            // the date the DO screen shows — taken from the first one to leave draft
-            // (raisedDate). A delivery order that has since been confirmed and
-            // completed still counts, and still dates the stage by the day it moved
-            // the stock rather than by the day it was confirmed.
+            // left draft, and it is dated by WHEN the first one reached In Progress
+            // (firstInProgressDate: the delivery order's first DocComplete stamp,
+            // model side). It used to show the delivery order's MovementDate, which
+            // is a document field the user can set to any day and says nothing
+            // about when the document actually moved. A delivery order that has
+            // since been confirmed and completed still counts, and still dates the
+            // stage by the day it went In Progress rather than by the day it was
+            // confirmed.
             //
             // With it OFF, completion is the milestone and the stage dates itself by
             // the EARLIEST completed delivery order. It read the latest before, which
@@ -1427,10 +1466,11 @@
             var shipDone = shipConfirm ? (dl.inProcess || dl.completed) : dl.completed;
             // No fallback on the OFF path: the stage is done only where a delivery
             // order has completed, so firstCompletedDate is set exactly when there is
-            // a date to show, and reaching for raisedDate here would hand a date to a
-            // stage that has not been reached.
+            // a date to show, and reaching for another date here would hand one to a
+            // stage that has not been reached. The ON path keeps raisedDate behind
+            // the stamp for a row the model could not date.
             var shipDate = shipConfirm
-                         ? (dl.raisedDate || dl.firstCompletedDate)
+                         ? (dl.firstInProgressDate || dl.raisedDate || dl.firstCompletedDate)
                          : dl.firstCompletedDate;
 
             // Delivered. Nothing raised, or nothing out of draft, is Pending. Once a
@@ -2081,7 +2121,7 @@
             // stands out: amber for short, blue for a delivery under way, green for
             // one that can ship now or is already out.
             //
-            // The model classifies all four (ready | partial | instock | short);
+            // The model classifies all five (closed | ready | partial | instock | short);
             // the Delivery Readiness KPI card is derived from the same rows.
             $tr.append($('<span class="vas_106-ta-r"></span>').append(readinessTag(rd, ruom)));
             return $tr;
@@ -2094,7 +2134,17 @@
         function readinessTag(rd, ruom) {
             var state = rd.Readiness, tone, label;
 
-            if (state === "short") {
+            if (state === "closed") {
+                // The order was closed with this much still to deliver (the
+                // written-off QtyLostSales, model side). Nothing is pending any
+                // more, but the line did NOT go out in full — grey, since the
+                // question is settled rather than answered either way.
+                var lost = +rd.QtyLostSales || 0;
+                tone  = "vas_106-closed";
+                label = getMsg("VAS_106_Closed", "Closed") + " · " +
+                    formatNumber(lost, 0) + (ruom ? " " + ruom : "") + " " +
+                    getMsg("VAS_106_NotDelivered", "not delivered");
+            } else if (state === "short") {
                 var shortBy = (+rd.PendingQty || 0) - (+rd.QtyOnHand || 0);
                 tone  = "vas_106-short";
                 label = getMsg("VAS_106_ShortBy", "Short by") + " " +
@@ -2640,7 +2690,7 @@
                 "CO": { tone: "vas_106-approved", label: getMsg("VAS_106_Completed", "Completed") },
                 "CL": { tone: "vas_106-approved", label: getMsg("VAS_106_Closed", "Closed") },
                 "DR": { tone: "vas_106-draft",    label: getMsg("VAS_106_Draft", "Draft") },
-                "IP": { tone: "vas_106-partial",  label: getMsg("VAS_106_InProgressShort", "In Progress") },
+                "IP": { tone: "vas_106-partial", label: getMsg("VAS_106_InProgress", "In Progress") },
                 "IN": { tone: "vas_106-partial",  label: getMsg("VAS_106_InTransit", "Scheduled") }
             };
             var m = map[docStatus] || { tone: "vas_106-draft", label: docStatus || "" };

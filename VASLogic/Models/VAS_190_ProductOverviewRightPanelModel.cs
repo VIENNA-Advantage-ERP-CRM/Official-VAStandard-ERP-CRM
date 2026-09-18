@@ -584,8 +584,13 @@ namespace VASLogic.Models
             result.UomConversions = LoadUomConversions(ctx, M_Product_ID, result.Product.BaseUomName);
             result.Pricing        = LoadPricing(ctx, M_Product_ID);
             result.Suppliers      = LoadSuppliers(ctx, M_Product_ID);
-            result.SalesOrders    = LoadOrders(ctx, M_Product_ID, true);
-            result.PurchaseOrders = LoadOrders(ctx, M_Product_ID, false);
+            // A NON-ITEM product on a tenant that does not allow non-items on a
+            // shipment / receipt is never delivered - it is fulfilled by being
+            // INVOICED (18-Sep-2026). Its order status is then judged on the
+            // invoiced quantity as well as the delivered one; see LoadOrders.
+            bool fulfilByInvoice = !isItem && !AllowNonItemOnShipment(ctx);
+            result.SalesOrders    = LoadOrders(ctx, M_Product_ID, true, fulfilByInvoice);
+            result.PurchaseOrders = LoadOrders(ctx, M_Product_ID, false, fulfilByInvoice);
 
             // ----- Item-only sections -----
             if (isItem)
@@ -1904,6 +1909,41 @@ namespace VASLogic.Models
         /// <summary>The BOMs this product is the output of, with component counts.</summary>
         private void LoadOwnBoms(Ctx ctx, int M_Product_ID, List<BomRowData> rows)
         {
+            // The BOM HEADER's own attribute set instance (18-Sep-2026). In this
+            // application a BOM is defined FOR an attribute set instance
+            // (M_BOM.M_AttributeSetInstance_ID - MBOM keys its "one current
+            // active" rule on it), and that is the attribute set the reader means
+            // when they ask which one the BOM is for. Only the detail lines' were
+            // read before, so a BOM whose header names one and whose lines name
+            // none showed nothing. Optional between revisions, hence guarded, and
+            // resolved by the same chain as every other instance on the panel:
+            // description, lot / serial / guarantee, the attribute values, and -
+            // last - the attribute SET's name, for an instance that carries the
+            // set and nothing else.
+            bool hasHeaderAsi = ColumnExists("M_BOM", "M_AttributeSetInstance_ID");
+            bool hasSetName   = TableExists("M_AttributeSet")
+                             && ColumnExists("M_AttributeSetInstance", "M_AttributeSet_ID");
+            string asiCols = hasHeaderAsi
+                ? @"COALESCE(b.M_AttributeSetInstance_ID, 0) AS AsiId,
+                    asi.Description AS AsiDescription,
+                    asi.Lot AS AsiLot,
+                    asi.SerNo AS AsiSerNo,
+                    asi.GuaranteeDate AS AsiGuarantee,
+                    " + (hasSetName ? "aset.Name" : "CAST(NULL AS VARCHAR(60))") + " AS AsiSetName,"
+                : @"0 AS AsiId,
+                    CAST(NULL AS VARCHAR(255)) AS AsiDescription,
+                    CAST(NULL AS VARCHAR(255)) AS AsiLot,
+                    CAST(NULL AS VARCHAR(255)) AS AsiSerNo,
+                    CAST(NULL AS TIMESTAMP) AS AsiGuarantee,
+                    CAST(NULL AS VARCHAR(60)) AS AsiSetName,";
+            string asiJoin = hasHeaderAsi
+                ? @" LEFT OUTER JOIN M_AttributeSetInstance asi
+                        ON (asi.M_AttributeSetInstance_ID=b.M_AttributeSetInstance_ID)"
+                  + (hasSetName
+                     ? @" LEFT OUTER JOIN M_AttributeSet aset
+                            ON (aset.M_AttributeSet_ID=asi.M_AttributeSet_ID)" : "")
+                : "";
+
             // The component count is a correlated scalar subquery so a BOM is
             // listed once however many components it has.
             string sql = @"SELECT b.M_BOM_ID,
@@ -1911,11 +1951,13 @@ namespace VASLogic.Models
                                   b.Description AS BomDescription,
                                   b.Created,
                                   COALESCE(p.IsVerified, 'N') AS IsVerified,
+                                  " + asiCols + @"
                                   (SELECT COUNT(1) FROM M_BOMProduct bp
                                     WHERE bp.M_BOM_ID=b.M_BOM_ID
                                       AND bp.IsActive='Y') AS ComponentCount
                            FROM M_BOM b
-                           INNER JOIN M_Product p ON (p.M_Product_ID=b.M_Product_ID)
+                           INNER JOIN M_Product p ON (p.M_Product_ID=b.M_Product_ID)"
+                           + asiJoin + @"
                            WHERE b.M_Product_ID=@M_Product_ID
                              AND b.IsActive='Y'";
             sql = MRole.GetDefault(ctx).AddAccessSQL(
@@ -1925,9 +1967,15 @@ namespace VASLogic.Models
             DataSet ds = Query(sql, ProductParam(M_Product_ID), "LoadOwnBoms");
             if (ds == null || ds.Tables.Count == 0) return;
 
+            // Header instances that named nothing on their own row, resolved from
+            // their attribute values in one statement below.
+            Dictionary<int, List<BomRowData>> rowsByUnnamedAsi = new Dictionary<int, List<BomRowData>>();
+            Dictionary<BomRowData, string> setNameByRow = new Dictionary<BomRowData, string>();
+            List<int> unnamedAsiIds = new List<int>();
+
             foreach (DataRow r in ds.Tables[0].Rows)
             {
-                rows.Add(new BomRowData
+                BomRowData row = new BomRowData
                 {
                     Kind           = "own",
                     M_BOM_ID       = Util.GetValueOfInt(r["M_BOM_ID"]),
@@ -1937,7 +1985,38 @@ namespace VASLogic.Models
                     ComponentCount = Util.GetValueOfInt(r["ComponentCount"]),
                     Created        = Stamp(r["Created"]),
                     IsVerified     = Util.GetValueOfString(r["IsVerified"]) == "Y"
-                });
+                };
+                rows.Add(row);
+
+                int asiId = Util.GetValueOfInt(r["AsiId"]);
+                if (asiId <= 0) continue;
+                string text = BuildAsiText(
+                    Util.GetValueOfString(r["AsiDescription"]),
+                    Util.GetValueOfString(r["AsiLot"]),
+                    Util.GetValueOfString(r["AsiSerNo"]),
+                    Stamp(r["AsiGuarantee"]));
+                if (text.Length > 0) { row.Attributes = text; continue; }
+
+                string setName = Util.GetValueOfString(r["AsiSetName"]).Trim();
+                if (setName.Length > 0) setNameByRow[row] = setName;
+                if (!rowsByUnnamedAsi.ContainsKey(asiId))
+                {
+                    rowsByUnnamedAsi[asiId] = new List<BomRowData>();
+                    unnamedAsiIds.Add(asiId);
+                }
+                rowsByUnnamedAsi[asiId].Add(row);
+            }
+
+            Dictionary<int, string> asiTexts = FillAsiTexts(unnamedAsiIds);
+            foreach (KeyValuePair<int, List<BomRowData>> pair in rowsByUnnamedAsi)
+            {
+                string text;
+                bool named = asiTexts.TryGetValue(pair.Key, out text) && !string.IsNullOrEmpty(text);
+                foreach (BomRowData row in pair.Value)
+                {
+                    if (named) row.Attributes = text;
+                    else if (setNameByRow.ContainsKey(row)) row.Attributes = setNameByRow[row];
+                }
             }
         }
 
@@ -1967,6 +2046,9 @@ namespace VASLogic.Models
             for (int i = 0; i < rows.Count; i++)
             {
                 if (rows[i].Kind != "own" || rows[i].M_BOM_ID <= 0) continue;
+                // The header named its own attribute set (LoadOwnBoms): that is
+                // the BOM's answer, and its lines are not asked.
+                if (!string.IsNullOrEmpty(rows[i].Attributes)) continue;
                 if (byBom.ContainsKey(rows[i].M_BOM_ID)) continue;
                 byBom[rows[i].M_BOM_ID] = rows[i];
                 bomIds.Add(rows[i].M_BOM_ID);
@@ -2950,10 +3032,17 @@ namespace VASLogic.Models
         /// <param name="M_Product_ID">Selected product id.</param>
         /// <param name="isSalesOrder">True for sales orders, false for purchase orders.</param>
         /// <returns>Up to <see cref="MAX_ORDERS"/> rows, newest first.</returns>
-        private List<OrderRowData> LoadOrders(Ctx ctx, int M_Product_ID, bool isSalesOrder)
+        /// <param name="fulfilByInvoice">True for a non-item product on a tenant
+        /// that does not allow non-items on a shipment / receipt: the order is
+        /// then fulfilled by invoicing, so the status reads the invoiced quantity
+        /// alongside the delivered one and takes whichever has gone further.</param>
+        private List<OrderRowData> LoadOrders(Ctx ctx, int M_Product_ID, bool isSalesOrder,
+                                              bool fulfilByInvoice)
         {
             List<OrderRowData> rows = new List<OrderRowData>();
             string soTrx = isSalesOrder ? "Y" : "N";
+            string invoicedExpr = ColumnExists("C_OrderLine", "QtyInvoiced")
+                ? "SUM(COALESCE(ol.QtyInvoiced, 0))" : "0";
 
             // The quantity is the ENTERED one, which is stated in the line's own
             // unit — the unit this row names. QtyOrdered is the base-unit figure
@@ -2969,6 +3058,7 @@ namespace VASLogic.Models
                                     SUM(COALESCE(ol.QtyEntered, ol.QtyOrdered, 0)) AS Qty,
                                     SUM(COALESCE(ol.QtyOrdered, 0)) AS QtyOrderedBase,
                                     SUM(COALESCE(ol.QtyDelivered, 0)) AS QtyDeliveredBase,
+                                    " + invoicedExpr + @" AS QtyInvoicedBase,
                                     SUM(COALESCE(ol.LineNetAmt, 0)) AS LineNetAmt,
                                     MIN(uom.Name) AS UomName,
                                     MIN(cur.CurSymbol) AS CurSymbol,
@@ -3003,6 +3093,7 @@ namespace VASLogic.Models
                                   x.Qty,
                                   x.QtyOrderedBase,
                                   x.QtyDeliveredBase,
+                                  x.QtyInvoicedBase,
                                   x.LineNetAmt,
                                   x.UomName,
                                   x.CurSymbol,
@@ -3017,6 +3108,7 @@ namespace VASLogic.Models
                                         g.Qty,
                                         g.QtyOrderedBase,
                                         g.QtyDeliveredBase,
+                                        g.QtyInvoicedBase,
                                         g.LineNetAmt,
                                         g.UomName,
                                         g.CurSymbol,
@@ -3035,6 +3127,13 @@ namespace VASLogic.Models
             {
                 decimal ordered   = Util.GetValueOfDecimal(r["QtyOrderedBase"]);
                 decimal delivered = Util.GetValueOfDecimal(r["QtyDeliveredBase"]);
+                // Fulfilled by invoicing: whichever of delivered / invoiced has
+                // gone further is what the status is judged on (delivered OR
+                // invoiced), so a service that was invoiced in full reads FULL
+                // even though nothing was ever shipped.
+                decimal moved = fulfilByInvoice
+                    ? Math.Max(delivered, Util.GetValueOfDecimal(r["QtyInvoicedBase"]))
+                    : delivered;
 
                 rows.Add(new OrderRowData
                 {
@@ -3046,8 +3145,8 @@ namespace VASLogic.Models
                     BPartnerName   = Util.GetValueOfString(r["BPartnerName"]),
                     Qty            = Util.GetValueOfDecimal(r["Qty"]),
                     QtyOrderedBase = ordered,
-                    QtyDeliveredBase = delivered,
-                    FulfilStatus   = FulfilStatusOf(ordered, delivered),
+                    QtyDeliveredBase = moved,
+                    FulfilStatus   = FulfilStatusOf(ordered, moved),
                     LineNetAmt     = Util.GetValueOfDecimal(r["LineNetAmt"]),
                     UomName        = Util.GetValueOfString(r["UomName"]),
                     CurSymbol      = Util.GetValueOfString(r["CurSymbol"]),
@@ -3743,9 +3842,14 @@ namespace VASLogic.Models
         private void FillCostingMethod(Ctx ctx, AccountingData acct,
                                        AcctSchemaInfo schema, int M_Product_Category_ID)
         {
+            int costElementId;
             string code = CategoryCostingMethod(ctx, M_Product_Category_ID,
-                                                schema.C_AcctSchema_ID);
-            if (string.IsNullOrEmpty(code)) code = schema.CostingMethod;
+                                                schema.C_AcctSchema_ID, out costElementId);
+            if (string.IsNullOrEmpty(code))
+            {
+                code = schema.CostingMethod;
+                costElementId = schema.M_CostElement_ID;
+            }
 
             acct.CostingMethod = code;
             acct.CostingMethodName = "";
@@ -3754,6 +3858,26 @@ namespace VASLogic.Models
             Dictionary<string, string> labels =
                 LoadRefListLabels(ctx, "C_AcctSchema", "CostingMethod");
             if (labels.ContainsKey(code)) acct.CostingMethodName = labels[code];
+
+            // 'C' is a COST COMBINATION: the method is the cost element the
+            // category (or, failing that, the schema) names, so the panel states
+            // that element's own name - "Cost Combination" alone says nothing
+            // about how the product is valued.
+            if (code == "C" && costElementId > 0)
+            {
+                string element = CostElementName(costElementId);
+                if (element.Length > 0) acct.CostingMethodName = element;
+            }
+        }
+
+        /// <summary>The name of one cost element, or "" when it cannot be read.</summary>
+        private string CostElementName(int M_CostElement_ID)
+        {
+            if (M_CostElement_ID <= 0 || !TableExists("M_CostElement")) return "";
+            DataSet ds = Query("SELECT ce.Name FROM M_CostElement ce WHERE ce.M_CostElement_ID="
+                               + M_CostElement_ID, null, "CostElementName");
+            if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return "";
+            return Util.GetValueOfString(ds.Tables[0].Rows[0]["Name"]).Trim();
         }
 
         /// <summary>
@@ -3773,9 +3897,41 @@ namespace VASLogic.Models
         /// rewriter to reach for, and the client is scoped explicitly.
         /// </summary>
         private string CategoryCostingMethod(Ctx ctx, int M_Product_Category_ID,
-                                             int C_AcctSchema_ID)
+                                             int C_AcctSchema_ID, out int costElementId)
         {
+            costElementId = 0;
             if (M_Product_Category_ID <= 0 || C_AcctSchema_ID <= 0) return "";
+
+            // THE PRODUCT CATEGORY ITSELF, first (18-Sep-2026). In this
+            // application the override is a column of M_Product_Category -
+            // CostingMethod, with M_CostElement_ID beside it for a cost
+            // combination - which is exactly what the costing processes read
+            // (ReCostingCalculationTransaction: M_Product_Category.CostingMethod,
+            // then C_AcctSchema.CostingMethod). Reading only the per-schema
+            // accounting tables below missed it, so a category valued at Average
+            // Invoice was reported under the schema's Standard Costing.
+            if (ColumnExists("M_Product_Category", "CostingMethod"))
+            {
+                string elementCol = ColumnExists("M_Product_Category", "M_CostElement_ID")
+                    ? "COALESCE(pc.M_CostElement_ID, 0)" : "0";
+                string catSql = "SELECT pc.CostingMethod, " + elementCol + @" AS M_CostElement_ID
+                                 FROM M_Product_Category pc
+                                 WHERE pc.M_Product_Category_ID=@M_Product_Category_ID";
+                DataSet cds = Query(catSql,
+                    new SqlParameter[] { new SqlParameter("@M_Product_Category_ID",
+                                                          M_Product_Category_ID) },
+                    "CategoryCostingMethod(M_Product_Category)");
+                if (cds != null && cds.Tables.Count > 0 && cds.Tables[0].Rows.Count > 0)
+                {
+                    DataRow cr = cds.Tables[0].Rows[0];
+                    string catCode = Util.GetValueOfString(cr["CostingMethod"]).Trim();
+                    if (catCode.Length > 0)
+                    {
+                        costElementId = Util.GetValueOfInt(cr["M_CostElement_ID"]);
+                        return catCode;
+                    }
+                }
+            }
 
             string[] tables = new string[] { "FRPT_Product_Category_Acct",
                                              "M_Product_Category_Acct" };
@@ -3840,6 +3996,14 @@ namespace VASLogic.Models
             string labelColumn = FindDisplayColumn("FRPT_AcctDefault",
                 new string[] { "Name", "Value", "FRPT_RecognizeType" });
             if (string.IsNullOrEmpty(labelColumn)) return rows;
+            // The accounting default's SEARCH KEY travels beside its name
+            // (18-Sep-2026): the row leads with the name in bold and the key next
+            // to it, which is how the accounting defaults window identifies the
+            // record. Empty where the revision has no Value column, or where the
+            // key IS the label already.
+            string keyExpr = (ColumnExists("FRPT_AcctDefault", "Value")
+                              && !string.Equals(labelColumn, "Value", StringComparison.OrdinalIgnoreCase))
+                ? "ad.Value" : "CAST(NULL AS VARCHAR(60))";
 
             // SeqNo is the order the accounting tab itself lists them in, and it
             // is optional on the row table.
@@ -3867,6 +4031,7 @@ namespace VASLogic.Models
             // access filter, and FRPT_Product_Acct's key is the triple, not a
             // FRPT_Product_Acct_ID the rewriter could reach for — see LoadAcctRow.
             string sql = @"SELECT ad." + labelColumn + @" AS AccountRole,
+                                  " + keyExpr + @" AS AccountKey,
                                   vc.Combination,
                                   vc.Description"
                                   + detailSelect + @"
@@ -3890,6 +4055,7 @@ namespace VASLogic.Models
                 rows.Add(new AccountRowData
                 {
                     AccountRole = Util.GetValueOfString(r["AccountRole"]),
+                    AccountKey  = Util.GetValueOfString(r["AccountKey"]),
                     Combination = Util.GetValueOfString(r["Combination"]),
                     Description = Util.GetValueOfString(r["Description"]),
                     Details     = ReadAcctDefaultDetails(ctx, r, detailFields)
@@ -4183,9 +4349,14 @@ namespace VASLogic.Models
 
             List<AcctSchemaInfo> schemas = new List<AcctSchemaInfo>();
 
+            // The schema's cost element, for a 'C' (cost combination) method;
+            // optional between revisions.
+            string elementExpr = ColumnExists("C_AcctSchema", "M_CostElement_ID")
+                ? "COALESCE(acs.M_CostElement_ID, 0)" : "0";
             string sql = @"SELECT acs.C_AcctSchema_ID,
                                   acs.Name AS SchemaName,
                                   acs.CostingMethod,
+                                  " + elementExpr + @" AS M_CostElement_ID,
                                   cur.ISO_Code,
                                   CASE WHEN cur.CurSymbol IS NOT NULL THEN cur.CurSymbol
                                        ELSE cur.ISO_Code END AS CurrencySymbol,
@@ -4221,6 +4392,7 @@ namespace VASLogic.Models
                     C_AcctSchema_ID = Util.GetValueOfInt(r["C_AcctSchema_ID"]),
                     Name            = Util.GetValueOfString(r["SchemaName"]),
                     CostingMethod   = Util.GetValueOfString(r["CostingMethod"]),
+                    M_CostElement_ID = Util.GetValueOfInt(r["M_CostElement_ID"]),
                     CurrencyISO     = Util.GetValueOfString(r["ISO_Code"]),
                     CurSymbol       = Util.GetValueOfString(r["CurrencySymbol"]),
                     StdPrecision    = Util.GetValueOfInt(r["StdPrecision"])
@@ -4838,37 +5010,39 @@ namespace VASLogic.Models
             DataSet ds = Query(sql, ProductParam(M_Product_ID), "LoadMailActivity");
             if (ds == null || ds.Tables.Count == 0) return;
 
+            List<ActivityData> mails = new List<ActivityData>();
             foreach (DataRow r in ds.Tables[0].Rows)
             {
                 DateTime? received = Stamp(r["DateMailReceived"]);
                 string mailFrom = Util.GetValueOfString(r["MailAddressFrom"]);
                 ActivityData a = new ActivityData();
                 a.Id        = Util.GetValueOfInt(r["MailAttachment1_ID"]);
-                // AttachmentType 'I' is a LETTER — an attached letter document
-                // filed against the product — and anything else is an e-mail.
-                //
-                // This panel briefly read the column as a DIRECTION instead, on
-                // the reasoning that the inbox reader (AttachMailToBP) files a
-                // received message under 'I'; every row was typed "mail" and the
-                // 'I' ones marked received. It is the reading the rest of the
-                // application does not make: VAS_105, VAS_123 and the shared
-                // VAS_ActivitySourcesModel all split MailAttachment1 into letters
-                // ('I') and mails (not 'I'), and this panel showed a letter under
-                // an envelope captioned "Mail — Received". Reverted so the feed
-                // agrees with every other panel that reads the same table.
-                string attachmentType = Util.GetValueOfString(r["AttachmentType"]).Trim();
-                bool isLetter = attachmentType == "I";
+                // AttachmentType, as the FRAMEWORK writes and reads it (18-Sep-2026).
+                // The platform's own history panel (VIS.dll) is the authority:
+                //   'L' -> 'LETTER'   (its letter list:  WHERE ATTACHMENTTYPE='L')
+                //   'M' -> 'EMAIL'    (its mail list:    CASE WHEN ATTACHMENTTYPE='M'
+                //   'I' -> 'INBOX'                             THEN 'EMAIL' ELSE 'INBOX')
+                // and AttachMailToBP files every message it pulls from the INBOX
+                // under 'I' and sent mail under 'M' / 'S'. So 'I' is a RECEIVED
+                // MAIL, not a letter; a letter is 'L'. Reading 'I' as the letter
+                // (the reading this panel and the shared reader carried until now)
+                // put every attached letter under the envelope as a mail, every
+                // received mail under the document icon as a letter, and left the
+                // reply to a product mail with no mail row at all.
+                string attachmentType = Util.GetValueOfString(r["AttachmentType"]).Trim().ToUpperInvariant();
+                bool isLetter = attachmentType == "L";
                 a.Type      = isLetter ? "letter" : "mail";
                 // A letter carries no direction: it is a document attached to the
                 // product, not a message that went one way or the other, and the
-                // panel states only its heading. Direction is a MAIL's property,
-                // and there DateMailReceived stands in only for a row the tenant
-                // left untyped — a sent mail carries MailAddressFrom too (it is
-                // the address it went out from), so a sender is no evidence of an
-                // inbound message.
+                // panel states only its heading. Direction is a MAIL's property:
+                // 'I' came in; anything else went out. DateMailReceived stands in
+                // only for a row the tenant left untyped. IsMailSent is NOT the
+                // test - it records whether the SMTP send succeeded, and an
+                // outbound mail the server has not (yet) marked read as received.
                 a.IsReceived = !isLetter
-                             && attachmentType.Length == 0
-                             && received.HasValue;
+                             && (attachmentType == "I"
+                                 || (attachmentType.Length == 0 && received.HasValue));
+                a.IsSent    = !isLetter && !a.IsReceived;
                 a.Title     = PlainText(Util.GetValueOfString(r["Title"]));
                 // BOTH forms of the body travel, and they answer different
                 // questions. The flattened text is what the row's own sub-line
@@ -4883,10 +5057,103 @@ namespace VASLogic.Models
                 a.MailFrom  = mailFrom;
                 a.MailCc    = Util.GetValueOfString(r["MailAddressCc"]);
                 a.MailBcc   = Util.GetValueOfString(r["MailAddressBcc"]);
-                a.IsSent    = Util.GetValueOfString(r["IsMailSent"]) == "Y";
                 a.Actor     = Util.GetValueOfString(r["ActorName"]);
                 a.EventDate = received.HasValue ? received : Stamp(r["Created"]);
                 list.Add(a);
+                if (!isLetter) mails.Add(a);
+            }
+
+            // The PEOPLE on a mail: the users whose addresses are on its To and
+            // Cc lists, by name - one lookup for the whole feed.
+            ResolveMailPeople(mails);
+        }
+
+        /// <summary>
+        /// Fills each mail's People line with the NAMES of the users whose e-mail
+        /// addresses stand on its To and Cc lists (18-Sep-2026). The detail sheet
+        /// used to print the sender's user there, which is not who the mail was
+        /// between. Every address across the feed is gathered first and resolved
+        /// against AD_User.EMail in ONE statement; an address that is nobody's is
+        /// left out rather than printed as the raw address, since the To / Cc
+        /// lines already state it. Bcc is deliberately not read: it is hidden by
+        /// definition.
+        /// </summary>
+        private void ResolveMailPeople(List<ActivityData> mails)
+        {
+            if (mails == null || mails.Count == 0) return;
+            if (!ColumnExists("AD_User", "EMail")) return;
+
+            // Every distinct address, lower-cased, across every mail.
+            List<string> addresses = new List<string>();
+            Dictionary<ActivityData, List<string>> byMail = new Dictionary<ActivityData, List<string>>();
+            foreach (ActivityData a in mails)
+            {
+                List<string> own = new List<string>();
+                SplitAddresses(a.MailTo, own);
+                SplitAddresses(a.MailCc, own);
+                if (own.Count == 0) continue;
+                byMail[a] = own;
+                foreach (string addr in own)
+                    if (!addresses.Contains(addr)) addresses.Add(addr);
+            }
+            if (addresses.Count == 0) return;
+
+            // The list is inlined: every address is quoted with its single quotes
+            // doubled, and the statement then carries no bind at all - which is
+            // what an IN list of unknown length needs under positional binding.
+            StringBuilder inList = new StringBuilder();
+            foreach (string addr in addresses)
+            {
+                if (inList.Length > 0) inList.Append(", ");
+                inList.Append('\'').Append(addr.Replace("'", "''")).Append('\'');
+            }
+            string sql = @"SELECT LOWER(u.EMail) AS EMail, u.Name
+                           FROM AD_User u
+                           WHERE u.IsActive='Y'
+                             AND LOWER(u.EMail) IN (" + inList + ")";
+            DataSet ds = Query(sql, null, "ResolveMailPeople");
+            if (ds == null || ds.Tables.Count == 0) return;
+
+            Dictionary<string, string> nameByAddress = new Dictionary<string, string>();
+            foreach (DataRow r in ds.Tables[0].Rows)
+            {
+                string addr = Util.GetValueOfString(r["EMail"]).Trim().ToLowerInvariant();
+                string name = Util.GetValueOfString(r["Name"]).Trim();
+                if (addr.Length > 0 && name.Length > 0 && !nameByAddress.ContainsKey(addr))
+                    nameByAddress[addr] = name;
+            }
+
+            foreach (KeyValuePair<ActivityData, List<string>> pair in byMail)
+            {
+                List<string> names = new List<string>();
+                foreach (string addr in pair.Value)
+                {
+                    string name;
+                    if (nameByAddress.TryGetValue(addr, out name) && !names.Contains(name))
+                        names.Add(name);
+                }
+                pair.Key.People = string.Join(", ", names.ToArray());
+            }
+        }
+
+        /// <summary>
+        /// Splits one address list - "a@x.com; Name &lt;b@y.com&gt;, c@z.com" - into
+        /// bare lower-cased addresses, appended to <paramref name="into"/> once
+        /// each. A display name around an address is dropped; only the address is
+        /// matched.
+        /// </summary>
+        private static void SplitAddresses(string list, List<string> into)
+        {
+            if (string.IsNullOrEmpty(list)) return;
+            string[] tokens = list.Split(new char[] { ';', ',' });
+            for (int i = 0; i < tokens.Length; i++)
+            {
+                string t = tokens[i].Trim();
+                int lt = t.IndexOf('<'), gt = t.IndexOf('>');
+                if (lt >= 0 && gt > lt) t = t.Substring(lt + 1, gt - lt - 1).Trim();
+                t = t.ToLowerInvariant();
+                if (t.IndexOf('@') <= 0) continue;
+                if (!into.Contains(t)) into.Add(t);
             }
         }
 
@@ -5376,7 +5643,11 @@ namespace VASLogic.Models
         private static string MailBodyToText(string body)
         {
             if (string.IsNullOrEmpty(body)) return body;
-            if (!HTML_BODY.IsMatch(body)) return body;      // plain-text mail
+            body = UnwrapEncodedBody(body);
+            // A plain-text mail: nothing to flatten, but its entities still decode
+            // (18-Sep-2026) - the composer stores what was typed HTML-encoded, so
+            // a body with "&" in it reached the screen reading "&amp;".
+            if (!HTML_BODY.IsMatch(body)) return DecodeEntities(body);
 
             try
             {
@@ -5462,9 +5733,36 @@ namespace VASLogic.Models
         /// format), for one that sanitises down to nothing, and on any failure —
         /// the caller then shows the flattened text, which is what it always did.
         /// </summary>
+        /// <summary>
+        /// A body the composer stored HTML-ENCODED - "&amp;lt;p&amp;gt;Hello&amp;lt;/p&amp;gt;",
+        /// the markup itself escaped - is decoded ONCE so the markup underneath
+        /// can be flattened or sanitised like any other. Left alone when decoding
+        /// reveals no markup: a plain body with a stray "&amp;amp;" is still plain.
+        /// </summary>
+        private static string UnwrapEncodedBody(string body)
+        {
+            if (string.IsNullOrEmpty(body) || HTML_BODY.IsMatch(body)) return body;
+            if (body.IndexOf("&lt;", StringComparison.OrdinalIgnoreCase) < 0) return body;
+            try
+            {
+                string decoded = WebUtility.HtmlDecode(body);
+                return HTML_BODY.IsMatch(decoded) ? decoded : body;
+            }
+            catch (Exception) { return body; }
+        }
+
+        /// <summary>Entities decoded, and nothing else touched; the value on any failure.</summary>
+        private static string DecodeEntities(string text)
+        {
+            if (string.IsNullOrEmpty(text) || text.IndexOf('&') < 0) return text;
+            try { return WebUtility.HtmlDecode(text); }
+            catch (Exception) { return text; }
+        }
+
         private static string MailBodyToSafeHtml(string body)
         {
             if (string.IsNullOrEmpty(body)) return "";
+            body = UnwrapEncodedBody(body);
             if (!HTML_BODY.IsMatch(body)) return "";        // plain text: nothing to format
 
             try
@@ -5763,6 +6061,30 @@ namespace VASLogic.Models
             return DateTime.Now;
         }
 
+        /// <summary>
+        /// Whether the tenant allows a NON-ITEM product on a shipment / receipt
+        /// (AD_Client.IsAllowNonItem - the flag MOrder, InOutGenerate and
+        /// InvoiceGenerate all branch on, read through the same $AllowNonItem
+        /// context they read first). False on a revision without the column.
+        /// </summary>
+        private bool AllowNonItemOnShipment(Ctx ctx)
+        {
+            try
+            {
+                string fromCtx = Util.GetValueOfString(ctx.GetContext("$AllowNonItem")).Trim();
+                if (fromCtx.Length > 0) return fromCtx == "Y";
+                if (!ColumnExists("AD_Client", "IsAllowNonItem")) return false;
+                return Util.GetValueOfString(DB.ExecuteScalar(
+                    "SELECT IsAllowNonItem FROM AD_Client WHERE AD_Client_ID=" + ctx.GetAD_Client_ID(),
+                    null, null)) == "Y";
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("VAS_190 AllowNonItemOnShipment: " + ex.Message);
+                return false;
+            }
+        }
+
         /// <summary>Resolves an AD_Table_ID by table name (0 when not found).</summary>
         private int GetTableId(string tableName)
         {
@@ -5884,6 +6206,8 @@ namespace VASLogic.Models
             public int    C_AcctSchema_ID { get; set; }
             public string Name            { get; set; }
             public string CostingMethod   { get; set; }
+            /// <summary>The schema's cost element - what a 'C' method names.</summary>
+            public int    M_CostElement_ID { get; set; }
             public string CurrencyISO     { get; set; }
             public string CurSymbol       { get; set; }
             public int    StdPrecision    { get; set; }
@@ -6281,7 +6605,10 @@ namespace VASLogic.Models
 
         public class AccountRowData
         {
-            public string AccountRole    { get; set; }   // the M_Product_Acct column name
+            public string AccountRole    { get; set; }   // the M_Product_Acct column name, or the FRPT default's name
+            /// <summary>The FRPT accounting default's search key (Value); empty on
+            /// the classic scheme.</summary>
+            public string AccountKey     { get; set; }
             public string Combination    { get; set; }
             public string Description    { get; set; }
             /// <summary>The accounting-default fields behind this account — Related
@@ -6353,10 +6680,10 @@ namespace VASLogic.Models
             public string    MailCc      { get; set; }
             public string    MailBcc     { get; set; }
             public bool      IsSent      { get; set; }
-            /// <summary>The mail came IN rather than went out — AttachmentType 'I',
-            /// which is what the inbox reader files a received message under, or a
-            /// row that carries a received date or a sender. The panel leads such a
-            /// row with WHO IT CAME FROM; a sent one leads with where it went.</summary>
+            /// <summary>The mail came IN rather than went out — AttachmentType 'I'
+            /// (the framework's INBOX value), or an untyped row that carries a
+            /// received date. The panel leads such a row with WHO IT CAME FROM; a
+            /// sent one leads with where it went. Always false on a letter ('L').</summary>
             public bool      IsReceived  { get; set; }
 
             /// <summary>
