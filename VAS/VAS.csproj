@@ -176,6 +176,7 @@
     <Compile Include="Areas\VAS\Controllers\VAS_065_APInvoicePanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_189_ARInvoiceDetailPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_191_APPaymentDetailPanelController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_291_GLJournalRightPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_192_CurrentPeriodWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_193_PreviousPeriodWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_196_PeriodControlMatrixWidgetController.cs" />
@@ -611,6 +612,7 @@
     <Content Include="Areas\VAS\Content\VAS_065_APInvoicePanel.css" />
     <Content Include="Areas\VAS\Content\VAS_189_ARInvoiceDetailPanel.css" />
     <Content Include="Areas\VAS\Content\VAS_191_APPaymentDetailPanel.css" />
+    <Content Include="Areas\VAS\Content\VAS_291_GLJournalRightPanel.css" />
     <Content Include="Areas\VAS\Content\VAS_074_CreateInvoiceLinePanel.css" />
     <Content Include="Areas\VAS\Content\VAS_107_CreateOrderBottomPanel.css" />
     <Content Include="Areas\VAS\Content\VAS_240_RequisitionBottomPanel.css" />
@@ -780,6 +782,7 @@
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_065_APInvoicePanel.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_189_ARInvoiceDetailPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_191_APPaymentDetailPanel.js" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_291_GLJournalRightPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_074_CreateInvoiceLinePanel.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_107_CreateOrderBottomPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_247_MaterialTransferBottomPanel.js" />
