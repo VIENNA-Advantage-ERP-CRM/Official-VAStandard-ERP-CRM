@@ -19,16 +19,27 @@
  *   VAS_067_Unpaid            => "Unpaid"
  *   VAS_067_Rep               => "Representative"
  *   VAS_067_Ref               => "Reference No"
- *   VAS_063_Filters           => "Filters"          (filter popover, shared with VAS_063)
- *   VAS_063_InvoiceDate       => "Invoice Date"
- *   VAS_063_DueDate           => "Due Date"
- *   VAS_063_Amount            => "Amount"
- *   VAS_063_Currency          => "Currency"
- *   VAS_063_From / VAS_063_To => "From" / "To"
- *   VAS_063_Apply             => "Apply"
- *   VAS_063_ClearAll          => "Clear all"
- *   VAS_063_InvalidRange      => '"From" date must be on or before "To"'
- *   VAS_063_InvalidAmountRange=> '"From" amount must be less than or equal to "To"'
+ *   VAS_067_Filters           => "Filters"          (filter popover)
+ *   VAS_067_InvoiceDate       => "Invoice Date"
+ *   VAS_067_DueDate           => "Due Date"
+ *   VAS_067_Amount            => "Amount"
+ *   VAS_067_Currency          => "Currency"
+ *   VAS_067_From / VAS_067_To => "From" / "To"
+ *   VAS_067_Apply             => "Apply"
+ *   VAS_067_ClearAll          => "Clear all"
+ *   VAS_067_InvalidRange      => '"From" date must be on or before "To"'
+ *   VAS_067_InvalidAmountRange=> '"From" amount must be less than or equal to "To"'
+ *   VAS_067_StatusCompleted      => "Completed"
+ *   VAS_067_StatusClosed         => "Closed"
+ *   VAS_067_StatusApproved       => "Approved"
+ *   VAS_067_StatusDraft          => "Draft"
+ *   VAS_067_StatusInProcess      => "In Process"
+ *   VAS_067_StatusWaitingConfirm => "Waiting Confirm"
+ *   VAS_067_StatusWaitingPayment => "Waiting Payment"
+ *   VAS_067_StatusNotApproved    => "Not Approved"
+ *   VAS_067_StatusInvalid        => "Invalid"
+ *   VAS_067_StatusVoided         => "Voided"
+ *   VAS_067_StatusReversed       => "Reversed"
  *
  * Filters (funnel button, AND'ed on top of the term): Invoice Date (C_Invoice.DateInvoiced),
  * Due Date (C_InvoicePaySchedule.DueDate), a grand-total Amount band and a Currency restriction.
@@ -125,8 +136,8 @@
             /* Funnel — opens the filter popover. The dot badge lights up while any filter is
                applied, so the narrowing is never invisible. */
             $filterBtn = $('<button type="button" class="vas-dssrch-filter" tabindex="-1" ' +
-                'title="' + dsEsc(msg('VAS_063_Filters', 'Filters')) + '" ' +
-                'aria-label="' + dsEsc(msg('VAS_063_Filters', 'Filters')) + '">' +
+                'title="' + dsEsc(msg('VAS_067_Filters', 'Filters')) + '" ' +
+                'aria-label="' + dsEsc(msg('VAS_067_Filters', 'Filters')) + '">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
                 'stroke-linecap="round" stroke-linejoin="round"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></svg>' +
                 '<span class="vas-dssrch-filter-dot"></span></button>');
@@ -208,20 +219,20 @@
         function filterSummary() {
             var parts = [];
             if (filterState.invFrom || filterState.invTo) {
-                parts.push(msg('VAS_063_InvoiceDate', 'Invoice Date') + ' ' +
+                parts.push(msg('VAS_067_InvoiceDate', 'Invoice Date') + ' ' +
                     (filterState.invFrom || '…') + ' → ' + (filterState.invTo || '…'));
             }
             if (filterState.dueFrom || filterState.dueTo) {
-                parts.push(msg('VAS_063_DueDate', 'Due Date') + ' ' +
+                parts.push(msg('VAS_067_DueDate', 'Due Date') + ' ' +
                     (filterState.dueFrom || '…') + ' → ' + (filterState.dueTo || '…'));
             }
             if (filterState.amtFrom !== '' || filterState.amtTo !== '') {
-                parts.push(msg('VAS_063_Amount', 'Amount') + ' ' +
+                parts.push(msg('VAS_067_Amount', 'Amount') + ' ' +
                     (filterState.amtFrom === '' ? '…' : filterState.amtFrom) + ' → ' +
                     (filterState.amtTo === '' ? '…' : filterState.amtTo));
             }
             if (filterState.currencyId) {
-                parts.push(msg('VAS_063_Currency', 'Currency') + ' ' + (filterState.currencyName || filterState.currencyId));
+                parts.push(msg('VAS_067_Currency', 'Currency') + ' ' + (filterState.currencyName || filterState.currencyId));
             }
             return parts.join(' · ');
         }
@@ -229,8 +240,8 @@
         function dateRangeHtml(title, fromId, toId) {
             return '<div class="vas-dssrch-frow"><div class="vas-dssrch-flabel">' + dsEsc(title) + '</div>' +
                 '<div class="vas-dssrch-fpair">' +
-                '<label><span>' + dsEsc(msg('VAS_063_From', 'From')) + '</span><input type="date" id="' + fromId + '"></label>' +
-                '<label><span>' + dsEsc(msg('VAS_063_To', 'To')) + '</span><input type="date" id="' + toId + '"></label>' +
+                '<label><span>' + dsEsc(msg('VAS_067_From', 'From')) + '</span><input type="date" id="' + fromId + '"></label>' +
+                '<label><span>' + dsEsc(msg('VAS_067_To', 'To')) + '</span><input type="date" id="' + toId + '"></label>' +
                 '</div></div>';
         }
 
@@ -239,8 +250,8 @@
         function slotRangeHtml(title, fromSlotId, toSlotId) {
             return '<div class="vas-dssrch-frow"><div class="vas-dssrch-flabel">' + dsEsc(title) + '</div>' +
                 '<div class="vas-dssrch-fpair">' +
-                '<label><span>' + dsEsc(msg('VAS_063_From', 'From')) + '</span><span class="vas-dssrch-fslot" id="' + fromSlotId + '"></span></label>' +
-                '<label><span>' + dsEsc(msg('VAS_063_To', 'To')) + '</span><span class="vas-dssrch-fslot" id="' + toSlotId + '"></span></label>' +
+                '<label><span>' + dsEsc(msg('VAS_067_From', 'From')) + '</span><span class="vas-dssrch-fslot" id="' + fromSlotId + '"></span></label>' +
+                '<label><span>' + dsEsc(msg('VAS_067_To', 'To')) + '</span><span class="vas-dssrch-fslot" id="' + toSlotId + '"></span></label>' +
                 '</div></div>';
         }
 
@@ -257,8 +268,8 @@
             }
             try {
                 var DT = VIS.DisplayType;
-                amtFromCtrl = new VIS.Controls.VAmountTextBox('GrandTotal', false, false, true, 50, 100, DT.Amount, msg('VAS_063_From', 'From'));
-                amtToCtrl = new VIS.Controls.VAmountTextBox('GrandTotal', false, false, true, 50, 100, DT.Amount, msg('VAS_063_To', 'To'));
+                amtFromCtrl = new VIS.Controls.VAmountTextBox('GrandTotal', false, false, true, 50, 100, DT.Amount, msg('VAS_067_From', 'From'));
+                amtToCtrl = new VIS.Controls.VAmountTextBox('GrandTotal', false, false, true, 50, 100, DT.Amount, msg('VAS_067_To', 'To'));
                 slots[0].append(amtFromCtrl.getControl().addClass('vas-dssrch-fctrl').css('width', '100%'));
                 slots[1].append(amtToCtrl.getControl().addClass('vas-dssrch-fctrl').css('width', '100%'));
             } catch (e) {
@@ -299,17 +310,17 @@
             if ($filters) { return; }
             /* Ids carry the widget instance so two copies on one dashboard never collide. */
             var uid = 'vasAp' + widgetID;
-            $filters = $('<div class="vas-dssrch-filters" role="dialog" aria-label="' + dsEsc(msg('VAS_063_Filters', 'Filters')) + '">');
+            $filters = $('<div class="vas-dssrch-filters" role="dialog" aria-label="' + dsEsc(msg('VAS_067_Filters', 'Filters')) + '">');
             $filters.html(
-                dateRangeHtml(msg('VAS_063_InvoiceDate', 'Invoice Date'), uid + 'InvFrom', uid + 'InvTo') +
-                dateRangeHtml(msg('VAS_063_DueDate', 'Due Date'), uid + 'DueFrom', uid + 'DueTo') +
-                slotRangeHtml(msg('VAS_063_Amount', 'Amount'), uid + 'AmtFromSlot', uid + 'AmtToSlot') +
-                '<div class="vas-dssrch-frow"><div class="vas-dssrch-flabel">' + dsEsc(msg('VAS_063_Currency', 'Currency')) + '</div>' +
+                dateRangeHtml(msg('VAS_067_InvoiceDate', 'Invoice Date'), uid + 'InvFrom', uid + 'InvTo') +
+                dateRangeHtml(msg('VAS_067_DueDate', 'Due Date'), uid + 'DueFrom', uid + 'DueTo') +
+                slotRangeHtml(msg('VAS_067_Amount', 'Amount'), uid + 'AmtFromSlot', uid + 'AmtToSlot') +
+                '<div class="vas-dssrch-frow"><div class="vas-dssrch-flabel">' + dsEsc(msg('VAS_067_Currency', 'Currency')) + '</div>' +
                 '<div class="vas-dssrch-fcur" id="' + uid + 'CurSlot"></div></div>' +
                 '<p class="vas-dssrch-ferror" role="alert"></p>' +
                 '<div class="vas-dssrch-factions">' +
-                '<button type="button" class="vas-dssrch-fbtn" data-act="clear">' + dsEsc(msg('VAS_063_ClearAll', 'Clear all')) + '</button>' +
-                '<button type="button" class="vas-dssrch-fbtn vas-dssrch-fbtn-primary" data-act="apply">' + dsEsc(msg('VAS_063_Apply', 'Apply')) + '</button>' +
+                '<button type="button" class="vas-dssrch-fbtn" data-act="clear">' + dsEsc(msg('VAS_067_ClearAll', 'Clear all')) + '</button>' +
+                '<button type="button" class="vas-dssrch-fbtn vas-dssrch-fbtn-primary" data-act="apply">' + dsEsc(msg('VAS_067_Apply', 'Apply')) + '</button>' +
                 '</div>');
             $('body').append($filters);
 
@@ -428,11 +439,11 @@
             /* ISO strings compare lexicographically, so a plain > is a correct date compare. */
             if ((next.invFrom && next.invTo && next.invFrom > next.invTo) ||
                 (next.dueFrom && next.dueTo && next.dueFrom > next.dueTo)) {
-                $filters.find('.vas-dssrch-ferror').text(msg('VAS_063_InvalidRange', '"From" date must be on or before "To"'));
+                $filters.find('.vas-dssrch-ferror').text(msg('VAS_067_InvalidRange', '"From" date must be on or before "To"'));
                 return;
             }
             if (next.amtFrom !== '' && next.amtTo !== '' && next.amtFrom > next.amtTo) {
-                $filters.find('.vas-dssrch-ferror').text(msg('VAS_063_InvalidAmountRange', '"From" amount must be less than or equal to "To"'));
+                $filters.find('.vas-dssrch-ferror').text(msg('VAS_067_InvalidAmountRange', '"From" amount must be less than or equal to "To"'));
                 return;
             }
             if (!next.currencyId) { next.currencyName = ''; }
@@ -734,24 +745,23 @@
 
         function statusMeta(code) {
             switch (String(code).toUpperCase()) {
-                case 'CO': return { label: 'Completed',       tone: 'ok' };
-                case 'CL': return { label: 'Closed',          tone: 'ok' };
-                case 'AP': return { label: 'Approved',        tone: 'info' };
-                case 'DR': return { label: 'Draft',           tone: 'muted' };
-                case 'IP': return { label: 'In Process',      tone: 'warn' };
-                case 'WC': return { label: 'Waiting Confirm', tone: 'warn' };
-                case 'WP': return { label: 'Waiting Payment', tone: 'warn' };
-                case 'NA': return { label: 'Not Approved',    tone: 'err' };
-                case 'IN': return { label: 'Invalid',         tone: 'err' };
-                case 'VO': return { label: 'Voided',          tone: 'err' };
-                case 'RE': return { label: 'Reversed',        tone: 'err' };
+                case 'CO': return { label: msg('VAS_067_StatusCompleted', 'Completed'),       tone: 'ok' };
+                case 'CL': return { label: msg('VAS_067_StatusClosed', 'Closed'),          tone: 'ok' };
+                case 'AP': return { label: msg('VAS_067_StatusApproved', 'Approved'),        tone: 'info' };
+                case 'DR': return { label: msg('VAS_067_StatusDraft', 'Draft'),           tone: 'muted' };
+                case 'IP': return { label: msg('VAS_067_StatusInProcess', 'In Process'),      tone: 'warn' };
+                case 'WC': return { label: msg('VAS_067_StatusWaitingConfirm', 'Waiting Confirm'), tone: 'warn' };
+                case 'WP': return { label: msg('VAS_067_StatusWaitingPayment', 'Waiting Payment'), tone: 'warn' };
+                case 'NA': return { label: msg('VAS_067_StatusNotApproved', 'Not Approved'),    tone: 'err' };
+                case 'IN': return { label: msg('VAS_067_StatusInvalid', 'Invalid'),         tone: 'err' };
+                case 'VO': return { label: msg('VAS_067_StatusVoided', 'Voided'),          tone: 'err' };
+                case 'RE': return { label: msg('VAS_067_StatusReversed', 'Reversed'),        tone: 'err' };
                 default:   return { label: code,              tone: 'muted' };
             }
         }
 
         function msg(key, fallback) {
-            var value = VIS.Msg.getMsg(key);
-            return value && value !== key && value !== '[' + key + ']' ? value : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function dsEsc(str) {

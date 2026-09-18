@@ -5,9 +5,9 @@
  * Summary Message Table
  *  # | Current Text             | Message Key
  * ---+--------------------------+--------------------------
- *  1 | New Stock Adjustment     | VAS_NewStockAdjustment
- *  2 | Open Inventory Count     | VAS_OpenInventoryCount
- *  3 | Unable to open the window| VAS_CouldntOpenWindow
+ *  1 | New Stock Adjustment     | VAS_077_NewStockAdjustment
+ *  2 | Open Inventory Count     | VAS_077_OpenInventoryCount
+ *  3 | Unable to open the window| VAS_077_CouldntOpenWindow
  */
 ; VAS = window.VAS || {};
 
@@ -24,8 +24,7 @@
         var isOpening = false;
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return translated && translated.charAt(0) !== '[' ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function openInventoryCount() {
@@ -64,10 +63,10 @@
                         return;
                     }
 
-                    VIS.ADialog.error('VAS_CouldntOpenWindow', true, '', label('VAS_CouldntOpenWindow', 'Unable to open the window.'));
+                    VIS.ADialog.error('VAS_077_CouldntOpenWindow', true, '', label('VAS_077_CouldntOpenWindow', 'Unable to open the window.'));
                 },
                 error: function () {
-                    VIS.ADialog.error('VAS_CouldntOpenWindow', true, '', label('VAS_CouldntOpenWindow', 'Unable to open the window.'));
+                    VIS.ADialog.error('VAS_077_CouldntOpenWindow', true, '', label('VAS_077_CouldntOpenWindow', 'Unable to open the window.'));
                 },
                 complete: function () {
                     isOpening = false;
@@ -105,8 +104,8 @@
                 '</button>'
             );
 
-            var title = label('VAS_NewStockAdjustment', 'New Stock Adjustment');
-            var subtitle = label('VAS_OpenInventoryCount', 'Open Inventory Count');
+            var title = label('VAS_077_NewStockAdjustment', 'New Stock Adjustment');
+            var subtitle = label('VAS_077_OpenInventoryCount', 'Open Inventory Count');
 
             $tile.attr('aria-label', title + '. ' + subtitle);
             $tile.find('.MPC-stock-adjustment-title').text(title);

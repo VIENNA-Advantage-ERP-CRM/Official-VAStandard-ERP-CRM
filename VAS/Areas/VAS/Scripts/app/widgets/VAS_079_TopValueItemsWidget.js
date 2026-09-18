@@ -3,12 +3,12 @@
  * Summary Message Table
  *  # | Current Text           | Message Key
  * ---+------------------------+--------------------------
- *  1 | Top Value Items        | VAS_TopValueItems
- *  2 | Highest carrying value | VAS_HighestCarryingValue
- *  3 | All Warehouses         | VAS_AllWarehouses
- *  4 | No stock value found.  | VAS_NoStockValueFound
- *  5 | units                  | VAS_Units
- *  6 | items                  | VAS_Items
+ *  1 | Top Value Items        | VAS_079_TopValueItems
+ *  2 | Highest carrying value | VAS_079_HighestCarryingValue
+ *  3 | All Warehouses         | VAS_079_AllWarehouses
+ *  4 | No stock value found.  | VAS_079_NoStockValueFound
+ *  5 | units                  | VAS_079_Units
+ *  6 | items                  | VAS_079_Items
  *  7 | of                     | VAS_Of
  *  8 | Previous page          | VAS_PreviousPage
  *  9 | Next page              | VAS_NextPage
@@ -41,8 +41,7 @@
         var rowResizeObserver = null;
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return translated && translated.charAt(0) !== '[' ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function parseResponse(response) {
@@ -163,7 +162,7 @@
 
         function renderWarehouseOptions() {
             $warehouseSelect.empty();
-            $('<option>').val('').text(label('VAS_AllWarehouses', 'All Warehouses')).appendTo($warehouseSelect);
+            $('<option>').val('').text(label('VAS_079_AllWarehouses', 'All Warehouses')).appendTo($warehouseSelect);
             warehouses.forEach(function (warehouse) {
                 $('<option>').val(warehouse.warehouse_id).text(warehouse.warehouse_name).appendTo($warehouseSelect);
             });
@@ -178,7 +177,7 @@
             stdPrecision = response.std_precision;
 
             if (!items.length) {
-                $list.html('<div class="MPC-tv-empty">' + escapeHtml(label('VAS_NoStockValueFound', 'No stock value found.')) + '</div>');
+                $list.html('<div class="MPC-tv-empty">' + escapeHtml(label('VAS_079_NoStockValueFound', 'No stock value found.')) + '</div>');
                 renderFooter();
                 return;
             }
@@ -187,12 +186,12 @@
             items.forEach(function (item) {
                 var amount = formatAmount(item.carrying_value);
                 var exactAmount = formatAmountExact(item.carrying_value);
-                var warehouseName = item.warehouse_name || label('VAS_AllWarehouses', 'All Warehouses');
+                var warehouseName = item.warehouse_name || label('VAS_079_AllWarehouses', 'All Warehouses');
                 html +=
                     '<button type="button" class="MPC-tv-row" data-product-id="' + Number(item.product_id) + '" data-product-name="' + escapeHtml(item.product_name) + '">' +
                         '<span class="MPC-tv-main">' +
                             '<strong>' + escapeHtml(item.product_name) + '</strong>' +
-                            '<small>' + escapeHtml(formatQty(item.qty_on_hand)) + ' ' + escapeHtml(label('VAS_Units', 'units')) + ' \u00b7 ' + escapeHtml(warehouseName) + '</small>' +
+                            '<small>' + escapeHtml(formatQty(item.qty_on_hand)) + ' ' + escapeHtml(label('VAS_079_Units', 'units')) + ' \u00b7 ' + escapeHtml(warehouseName) + '</small>' +
                         '</span>' +
                         '<span class="MPC-tv-value" title="' + escapeHtml(exactAmount) + '">' + escapeHtml(amount) + '</span>' +
                     '</button>';
@@ -204,7 +203,7 @@
         function renderFooter() {
             var totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
             $footer.html(
-                '<span>' + totalRecords.toLocaleString(window.navigator.language) + ' ' + escapeHtml(label('VAS_Items', 'items')) + '</span>' +
+                '<span>' + totalRecords.toLocaleString(window.navigator.language) + ' ' + escapeHtml(label('VAS_079_Items', 'items')) + '</span>' +
                 '<span class="MPC-tv-pager">' +
                     '<button type="button" data-page="previous" aria-label="' + escapeHtml(label('VAS_PreviousPage', 'Previous page')) + '"' + (pageNo === 1 ? ' disabled' : '') + '>&lsaquo;</button>' +
                     '<span>' + pageNo + ' ' + escapeHtml(label('VAS_Of', 'of')) + ' ' + totalPages + '</span>' +
@@ -285,8 +284,8 @@
                     '<div class="MPC-tv-header">' +
                         '<span class="MPC-tv-icon">' + gemIcon() + '</span>' +
                         '<span class="MPC-tv-titles">' +
-                            '<strong>' + escapeHtml(label('VAS_TopValueItems', 'Top Value Items')) + '</strong>' +
-                            '<small>' + escapeHtml(label('VAS_HighestCarryingValue', 'Highest carrying value')) + '</small>' +
+                            '<strong>' + escapeHtml(label('VAS_079_TopValueItems', 'Top Value Items')) + '</strong>' +
+                            '<small>' + escapeHtml(label('VAS_079_HighestCarryingValue', 'Highest carrying value')) + '</small>' +
                         '</span>' +
                         '<select class="MPC-tv-select" aria-label="' + escapeHtml(label('Warehouse', 'Warehouse')) + '"></select>' +
                     '</div>' +

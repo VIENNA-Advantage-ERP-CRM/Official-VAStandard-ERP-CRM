@@ -76,8 +76,7 @@
         var ZOOM_WINDOW_NAME_OLD = 'Cash Journal';
 
         function lbl(key, fallback) {
-            var text = VIS.Msg.getMsg(key);
-            return text && text !== key && text !== '[' + key + ']' ? text : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function safeNumber(value) {
@@ -463,7 +462,7 @@
             $list.empty();
 
             if (!items.length) {
-                setState('No data');
+                setState(lbl('VAS_053_NoData', 'No in-progress cash journals'));
                 return;
             }
 

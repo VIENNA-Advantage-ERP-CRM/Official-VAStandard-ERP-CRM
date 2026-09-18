@@ -143,8 +143,7 @@
         var $modal = null;
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return (translated && translated.charAt(0) !== '[') ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -527,10 +526,6 @@
                 }
             });
 
-            $(document).on('keydown.vas221modal', function (e) {
-                if (e.key === 'Escape') { closeModal(); }
-            });
-
             renderBanner();
             loadRows();
         }
@@ -545,7 +540,6 @@
                 $modal.remove();
                 $modal = null;
             }
-            $(document).off('keydown.vas221modal');
         }
 
         /* Three-stat banner: this period, the period it is measured against, and the

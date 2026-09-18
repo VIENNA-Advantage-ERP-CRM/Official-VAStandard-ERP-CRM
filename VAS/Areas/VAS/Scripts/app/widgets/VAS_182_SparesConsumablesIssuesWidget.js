@@ -9,6 +9,13 @@
  *  1 | Spares / Consumables            | VAS_182_SparesConsumables
  *  2 | Of issued value MTD             | VAS_182_OfIssuedValueMTD
  *  3 | Couldn't load                   | VAS_182_CouldntLoad
+ *
+ * NOTE (2026-09-18, Claude): setupResizeObserver()/--widget-inline-size removed from
+ * Initalize() to match VAS_180_IssuedMTDWidget's label/value/meta size. VAS_180 never
+ * scopes --widget-inline-size to its own card, so its font-size clamp() falls through
+ * to the dashboard-wide --dash-inline-size and lands near the clamp's midpoint
+ * (~18.4px); this widget's own --widget-inline-size was scoped to its ~300px card,
+ * which is small enough that the clamp always bottomed out at its 16px floor instead.
  */
 ; VAS = window.VAS || {};
 
@@ -115,8 +122,7 @@
 // ===== NEW CODE END — currency format =====
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return (translated && translated.charAt(0) !== '[') ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -142,7 +148,6 @@
 
         this.Initalize = function () {
             createWidget();
-            setupResizeObserver();
             loadKpi();
         };
 
@@ -236,7 +241,7 @@
                 $valueEl.attr('title', pct + '%');
             }
             if ($metaEl) {
-                $metaEl.text(label("VAS_OfIssuedValueMTD", "Of issued value MTD"));
+                $metaEl.text(label("VAS_182_OfIssuedValueMTD", "Of issued value MTD"));
             }
             if ($card) { $card.prop('disabled', false); }
         }
@@ -282,28 +287,35 @@
         // (the production KPI is a hard 0%), so the drill carries no work-order clause at all -
         // an unresolved column would make the grid query throw instead of opening.
         function openSparesConsumablesList() {
-            // Keep in lock-step with GetSparesConsumablesPercentageData in the controller, and the
-            // exact complement of the VAS_181 drill-through. The classification is line-level but
-            // this drills through at DOCUMENT level, so it is expressed as an EXISTS over the
-            // non-work-order issue lines.
-            var woTests = [];
-            for (var w = 0; w < (workOrderColumns || []).length; w++) {
-                woTests.push("COALESCE(il." + workOrderColumns[w] + ", 0) > 0");
-            }
-            var woClause = woTests.length > 0
-                ? " AND EXISTS (SELECT 1 FROM M_InventoryLine il WHERE il.M_Inventory_ID = M_Inventory.M_Inventory_ID"
-                  + " AND il.IsActive = 'Y' AND COALESCE(il.QtyInternalUse, 0) > 0 AND NOT (" + woTests.join(" OR ") + "))"
-                : "";
-            var where = "M_Inventory.IsActive = 'Y' AND M_Inventory.DocStatus IN ('CO', 'CL')"
-                + " AND COALESCE(M_Inventory.IsInternalUse, 'N') = 'Y'"
-                + woClause
-                + " AND M_Inventory.MovementDate >= TRUNC(SYSDATE, 'MM') AND M_Inventory.MovementDate < ADD_MONTHS(TRUNC(SYSDATE, 'MM'), 1)";
-            $self.widgetFirevalueChanged({
-                "TabWhereClause": where,
-                "TabLayout": "Y",
-                "TabIndex": "0",
-                "ActionName": hostWindowName() || "VAS_InternalUseInventory",
-                "ActionType": "W"
+            // Keep in lock-step with GetSparesConsumablesIdsData in the controller.
+            // The TabWhereClause is a flat M_Inventory_ID IN (...) list, NOT a
+            // correlated EXISTS(SELECT 1 FROM M_InventoryLine ...) subquery - the
+            // host window's own "duplicate DocumentNo" grid diagnostic does naive,
+            // parenthesis-unaware text surgery on the TabWhereClause looking for a
+            // FROM to lift out, and it mishandled the nested EXISTS(...) (confirmed
+            // via the app log: it produced malformed SQL and Oracle rejected it with
+            // ORA-00933, which is what was actually hanging this drill-through, the
+            // same bug VAS_181 hit and fixed the same way). A flat ID list has no
+            // FROM/subquery in it at all, so there is nothing for that diagnostic
+            // query to mishandle.
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_182_SparesConsumablesIssuesWidget/GetSparesConsumablesIds',
+                type: 'GET',
+                cache: false,
+                success: function (res) {
+                    var data = parseResponse(res);
+                    if (data.error) { return; }
+                    var ids = data.ids || [];
+                    var idList = ids.length ? ids.join(',') : '-1';
+                    var where = "M_Inventory.M_Inventory_ID IN (" + idList + ")";
+                    $self.widgetFirevalueChanged({
+                        "TabWhereClause": where,
+                        "TabLayout": "N",
+                        "TabIndex": "0",
+                        "ActionName": hostWindowName() || "VAS_InternalUseInventory",
+                        "ActionType": "W"
+                    }); 
+                }
             });
         }
 

@@ -23,6 +23,13 @@
  * 14  | Close                                            | VAS_160_Close
  * 15  | No negative variance records available           | VAS_160_NoNegativeVarianceRecords
  * 16  | Unable to load negative variance data            | VAS_160_UnableToLoadNegativeVariance
+ * 17  | Close dialog                                     | VAS_160_CloseDialog
+ * 18  | Loading...                                       | VAS_160_Loading
+ * 19  | Previous page                                    | VAS_160_PreviousPage
+ * 20  | Next page                                        | VAS_160_NextPage
+ * 21  | Showing                                          | VAS_160_Showing
+ * 22  | Retry                                             | VAS_160_Retry
+ * 23  | Error                                             | VAS_160_Error
  */
 ; VAS = window.VAS || {};
 
@@ -31,6 +38,9 @@
     // Window name / search key for the Inventory Count (Physical Inventory) screen. Window IDs
     // differ per installation, so the screen is resolved by NAME - never by a hardcoded id.
     var COUNT_WINDOW_NAME = "VAS_PhysicalInventory";
+    /* Resolved AD_Window_ID for the Home Page zoom path, cached after the first successful
+       lookup so a second click does not repeat the round trip. */
+    var countWindowId = 0;
 
     function ensureDashInlineSizeVar($el) {
         var container = $el.closest('.vis-widget-container, [data-dashboard-container], .vis-widget-body, body')[0] || document.documentElement;
@@ -76,8 +86,7 @@
         var isModalOpen = false;
 
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            return (t && t.charAt(0) !== '[') ? t : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function showBusy(show) {
@@ -248,7 +257,7 @@
                 '  <div class="vas-neg-var-dialog">' +
                 '    <div class="vas-neg-var-modal-header">' +
                 '      <h3>' + escapeHtml(lbl("VAS_160_NegVarLines", "Negative Variance Lines")) + '</h3>' +
-                '      <button class="vas-neg-var-modal-close" aria-label="Close dialog">&times;</button>' +
+                '      <button class="vas-neg-var-modal-close" aria-label="' + escapeHtml(lbl("VAS_160_CloseDialog")) + '">&times;</button>' +
                 '    </div>' +
                 '    <div class="vas-neg-var-modal-grid-header">' +
                 '      <span>' + escapeHtml(lbl("VAS_160_DocNo", "Document No.")) + '</span>' +
@@ -261,13 +270,13 @@
                 '    </div>' +
                 '    <div class="vas-neg-var-modal-body"></div>' +
                 '    <div class="vas-neg-var-modal-footer">' +
-                '      <div class="vas-neg-var-footer-helper">Loading...</div>' +
+                '      <div class="vas-neg-var-footer-helper">' + escapeHtml(lbl("VAS_160_Loading")) + '</div>' +
                 '      <div class="vas-neg-var-pager">' +
-                '        <button class="vas-neg-var-pgbtn vas-neg-var-prev" aria-label="Previous page">' +
+                '        <button class="vas-neg-var-pgbtn vas-neg-var-prev" aria-label="' + escapeHtml(lbl("VAS_160_PreviousPage")) + '">' +
                 '          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>' +
                 '        </button>' +
-                '        <span class="vas-neg-var-pgtext">1 of 1</span>' +
-                '        <button class="vas-neg-var-pgbtn vas-neg-var-next" aria-label="Next page">' +
+                '        <span class="vas-neg-var-pgtext">1 ' + escapeHtml(lbl("VAS_160_Of")) + ' 1</span>' +
+                '        <button class="vas-neg-var-pgbtn vas-neg-var-next" aria-label="' + escapeHtml(lbl("VAS_160_NextPage")) + '">' +
                 '          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>' +
                 '        </button>' +
                 '      </div>' +
@@ -289,7 +298,7 @@
         }
 
         function bindModalEvents() {
-            $modalOverlay.find('.vas-neg-var-modal-close, .vas-neg-var-modal-scrim').on('click', function (e) {
+            $modalOverlay.find('.vas-neg-var-modal-close').on('click', function (e) {
                 e.preventDefault();
                 closeModal();
             });
@@ -306,12 +315,6 @@
                 if (currentPage < maxPages) {
                     currentPage++;
                     fetchModalPage(currentPage);
-                }
-            });
-
-            $(window).on('keydown.vasNegVarModal', function (e) {
-                if (isModalOpen && e.key === 'Escape') {
-                    closeModal();
                 }
             });
 
@@ -355,7 +358,7 @@
             for (var i = 0; i < currentPageSize; i++) {
                 $modalBody.append('<div class="vas-neg-var-row vas-neg-var-skel-row"><div class="vas-neg-var-skel-bar"></div></div>');
             }
-            $modalFooterHelper.text("Loading...");
+            $modalFooterHelper.text(lbl("VAS_160_Loading"));
         }
 
         function renderModalRows(data) {
@@ -414,8 +417,8 @@
 
             var startIdx = ((currentPage - 1) * currentPageSize) + 1;
             var endIdx = Math.min(currentTotalRows, currentPage * currentPageSize);
-            $modalFooterHelper.text("Showing " + startIdx + "–" + endIdx + " of " + currentTotalRows);
-            $pageText.text(currentPage + " of " + totalPages);
+            $modalFooterHelper.text(lbl("VAS_160_Showing") + " " + startIdx + "–" + endIdx + " " + lbl("VAS_160_Of") + " " + currentTotalRows);
+            $pageText.text(currentPage + " " + lbl("VAS_160_Of") + " " + totalPages);
 
             $btnPrev.prop('disabled', currentPage <= 1);
             $btnNext.prop('disabled', currentPage >= totalPages);
@@ -423,18 +426,18 @@
 
         function renderModalEmpty() {
             $modalBody.html('<div class="vas-neg-var-empty">' + escapeHtml(lbl("VAS_160_NoNegVarLinesMonth", "No negative variance lines this month")) + '</div>');
-            $modalFooterHelper.text("Showing 0 of 0");
-            $pageText.text("1 of 1");
+            $modalFooterHelper.text(lbl("VAS_160_Showing") + " 0 " + lbl("VAS_160_Of") + " 0");
+            $pageText.text("1 " + lbl("VAS_160_Of") + " 1");
             $btnPrev.prop('disabled', true);
             $btnNext.prop('disabled', true);
         }
 
         function renderModalError() {
-            $modalBody.html('<div class="vas-neg-var-error">' + escapeHtml(lbl("VAS_160_UnableToLoadModalData", "Unable to load negative variance lines.")) + ' <button class="vas-neg-var-retry-btn">Retry</button></div>');
+            $modalBody.html('<div class="vas-neg-var-error">' + escapeHtml(lbl("VAS_160_UnableToLoadModalData", "Unable to load negative variance lines.")) + ' <button class="vas-neg-var-retry-btn">' + escapeHtml(lbl("VAS_160_Retry")) + '</button></div>');
             $modalBody.find('.vas-neg-var-retry-btn').on('click', function () {
                 fetchModalPage(currentPage);
             });
-            $modalFooterHelper.text("Error");
+            $modalFooterHelper.text(lbl("VAS_160_Error"));
         }
 
         // The framework navigates IN-PLACE only when the payload's ActionName equals the name of
@@ -472,13 +475,20 @@
 
             closeModal();
 
-            $self.widgetFirevalueChanged({
-                "TabWhereClause": "M_Inventory.M_Inventory_ID=" + Number(mInventoryId),
-                "TabLayout": "Y",   /* 'N' Grid, 'Y' Single, 'C' Card */
-                "TabIndex": "0",
-                "ActionName": hostWindowName() || COUNT_WINDOW_NAME,
-                "ActionType": "W"
-            });
+            if ($self.windowNo >= 0) {
+                /* Screen Landing Page */
+                $self.widgetFirevalueChanged({
+                    "TabWhereClause": "M_Inventory.M_Inventory_ID=" + Number(mInventoryId),
+                    "TabLayout": "Y",   /* 'N' Grid, 'Y' Single, 'C' Card */
+                    "TabIndex": "0",
+                    "ActionName": hostWindowName() || COUNT_WINDOW_NAME,
+                    "ActionType": "W"
+                });
+            } else {
+                /* From Home Page */
+                VAS.ZoomUtil.zoomToRecord("M_Inventory_ID", Number(mInventoryId), countWindowId, "VAS_PhysicalInventory", "Physical Inventory")
+                    .done(function (id) { if (id > 0) { countWindowId = id; } });
+            }
         }
 
         this.refreshData = function () {

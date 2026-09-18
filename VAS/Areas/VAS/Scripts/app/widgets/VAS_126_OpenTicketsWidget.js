@@ -103,8 +103,7 @@
         var searchCurrency = { symbol: '', iso: '', precision: 0 };
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return translated && translated.charAt(0) !== '[' ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -596,7 +595,7 @@
         function createDetailDialog() {
             $detail = $(
                 '<div class="vas126-detail" role="dialog" aria-modal="true" aria-hidden="true" aria-label="' + escapeHtml(label('VAS_126_CustomerDetails', 'Customer details')) + '">' +
-                    '<div class="vas126-scrim" data-detail-close></div>' +
+                    '<div class="vas126-scrim"></div>' +
                     '<section class="vas126-dpanel">' +
                         '<header class="vas126-dhead">' +
                             '<h2 class="vas126-panel-title">' + escapeHtml(label('VAS_126_CustomerDetails', 'Customer details')) + '</h2>' +
@@ -652,7 +651,7 @@
             $dialogCount = $dialog.find('.vas126-count');
             $dialogPager = $dialog.find('.vas126-pager');
 
-            $dialog.on('click', '.vas126-close, .vas126-scrim, [data-act="close"]', closeTriage);
+            $dialog.on('click', '.vas126-close, [data-act="close"]', closeTriage);
             $dialog.on('click', '[data-act="open"]', openInBrowser);
             $dialog.on('click', '.vas126-grid-row', function () {
                 openCustomerDetail(Number($(this).attr('data-id')));
@@ -693,12 +692,6 @@
             createDialog();
             createDetailDialog();
 
-            $(document).on('keydown.MPCvas126', function (event) {
-                if (event.key !== 'Escape') { return; }
-                else if ($detail && $detail.hasClass('is-open')) { closeDetail(); }
-                else if ($dialog.hasClass('is-open')) { closeTriage(); }
-            });
-
             loadKpi();
         };
 
@@ -709,7 +702,6 @@
         this.getRoot = function () { return $root; };
 
         this.disposeComponent = function () {
-            $(document).off('keydown.MPCvas126');
             if ($dialog) { $dialog.remove(); $dialog = null; }
             if ($detail) { $detail.remove(); $detail = null; }
             $('body').removeClass('vas126-modal-open');

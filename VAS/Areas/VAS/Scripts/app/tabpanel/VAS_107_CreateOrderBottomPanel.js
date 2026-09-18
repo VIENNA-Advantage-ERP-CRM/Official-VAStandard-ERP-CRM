@@ -224,9 +224,7 @@
 
         /* ---------- short helpers ---------- */
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            if (t && t.charAt(0) !== "[") return t;
-            return (fallback !== undefined) ? fallback : t;
+            return VIS.Msg.getMsg(key);
         }
 
         function precision() { return (parent && parent.StdPrecision >= 0) ? parent.StdPrecision : 2; }
@@ -4263,7 +4261,7 @@
                 '<p class="vas-obl-dialog__error vas-obl-is-hidden" id="vasOblScanError"></p></header>' +
                 '<div class="vas-obl-dialog__body vas-obl-dialog__body--fixed">' +
                 '<div class="vas-obl-scan-empty" id="vasOblScanEmpty"><div class="vas-obl-scan-empty__badge">' + icon("scan-line", "▭") + "</div>" +
-                '<p class="vas-obl-scan-empty__title">' + esc(lbl("VAS_107_ScanToBegin", "Scan a barcode to begin")) + '</p><p class="vas-obl-scan-empty__hint">e.g. PRD-BLW-001 · CHG-INS-001</p></div>' +
+                '<p class="vas-obl-scan-empty__title">' + esc(lbl("VAS_107_ScanToBegin", "Scan a barcode to begin")) + '</p><p class="vas-obl-scan-empty__hint">' + esc(lbl("VAS_107_ScanExampleHint", "e.g. PRD-BLW-001 · CHG-INS-001")) + '</p></div>' +
                 '<div class="vas-obl-scan-grid vas-obl-is-hidden" id="vasOblScanGrid"><div class="vas-obl-scan-grid__head"><div>' + esc(lbl("VAS_107_Code", "Code")) + "</div><div>" + esc(lbl("VAS_107_ProductCharge", "Product / Charge")) +
                 "</div><div>" + esc(lbl("VAS_107_Status", "Status")) + "</div><div>" + esc(lbl("VAS_107_Qty", "Qty")) + '</div><div></div></div><div class="vas-obl-scan-grid__body" id="vasOblScanRows"></div></div></div>' +
                 '<footer class="vas-obl-dialog__footer"><p class="vas-obl-dialog__summary" id="vasOblScanSummary">' + esc(lbl("VAS_107_NoScans", "No scans yet")) + "</p>" +

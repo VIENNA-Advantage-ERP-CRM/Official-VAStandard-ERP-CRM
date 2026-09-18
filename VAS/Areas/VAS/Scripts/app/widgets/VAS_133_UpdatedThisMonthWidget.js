@@ -85,8 +85,7 @@
         var lastFocusedEl = null;
 
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            return (t && t.charAt(0) !== '[') ? t : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function pluralize(n, singularKey, singularFallback, pluralKey, pluralFallback) {
@@ -233,9 +232,7 @@
             panel.appendChild(foot);
             overlay.appendChild(panel);
 
-            overlay.addEventListener('mousedown', function (e) { if (e.target === overlay) { closeModal(); } });
             overlay.addEventListener('keydown', function (e) {
-                if (e.key === 'Escape') { closeModal(); return; }
                 if (e.key === 'Tab') {
                     var focusables = panel.querySelectorAll('button');
                     if (!focusables.length) { return; }

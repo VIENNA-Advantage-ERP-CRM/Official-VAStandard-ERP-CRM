@@ -63,8 +63,7 @@
         var rowResizeObserver = null;
 
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            return (t && t.charAt(0) !== '[') ? t : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -362,12 +361,8 @@
             $dialogBusy = $dialog.find('.vas-qah-modal-busy');
 
             $dialog.find('.vas-qah-modal-close').on('click', closeDetail);
-            $dialog.find('.vas-qah-scrim').on('click', closeDetail);
             $dialog.on('change', '.vas-qah-actual', updateActualTone);
             $dialog.on('click', '.vas-qah-save', saveQAResult);
-            $(document).on('keydown.vas-qah', function (e) {
-                if (e.key === 'Escape' && !$dialog.hasClass('vas-qah-hidden')) { closeDetail(); }
-            });
 
             $('body').append($dialog);
         }

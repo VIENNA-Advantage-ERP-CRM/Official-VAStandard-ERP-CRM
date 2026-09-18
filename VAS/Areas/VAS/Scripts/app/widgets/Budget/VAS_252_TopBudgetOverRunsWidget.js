@@ -88,24 +88,24 @@
  *                   7 | Actual spending is within the      | VAS_252_NoOverRunsHint
  *                     |   approved budget for the          |
  *                     |   selected financial year.         |
- *                   8 | Account                            | VAS_234_Account         (reuse)
- *                   9 | Budget                             | VAS_254_Budget          (reuse)
- *                  10 | Variance                           | VAS_254_Variance        (reuse)
- *                  11 | Organization Unit                  | VAS_256_OrganizationUnit (reuse)
- *                  12 | Financial year                     | VAS_256_FinancialYear   (reuse)
- *                  13 | No financial years available       | VAS_256_NoYears         (reuse)
- *                  14 | No primary calendar is configured  | VAS_256_NoCalendar      (reuse)
- *                  15 | No primary accounting schema is    | VAS_256_NoAcctSchema    (reuse)
+ *                   8 | Account                            | VAS_252_Account         (reuse)
+ *                   9 | Budget                             | VAS_252_Budget          (reuse)
+ *                  10 | Variance                           | VAS_252_Variance        (reuse)
+ *                  11 | Organization Unit                  | VAS_252_OrganizationUnit (reuse)
+ *                  12 | Financial year                     | VAS_252_FinancialYear   (reuse)
+ *                  13 | No financial years available       | VAS_252_NoYears         (reuse)
+ *                  14 | No primary calendar is configured  | VAS_252_NoCalendar      (reuse)
+ *                  15 | No primary accounting schema is    | VAS_252_NoAcctSchema    (reuse)
  *                     |   configured                       |
- *                  16 | Showing                            | VAS_020_Showing         (reuse)
- *                  17 | of                                 | VAS_020_Of              (reuse)
- *                  18 | Previous                           | VAS_020_Prev            (reuse)
- *                  19 | Next                               | VAS_020_Next            (reuse)
- *                  20 | Couldn't load                      | VAS_192_CouldntLoad     (reuse)
+ *                  16 | Showing                            | VAS_252_Showing         (reuse)
+ *                  17 | of                                 | VAS_252_Of              (reuse)
+ *                  18 | Previous                           | VAS_252_Prev            (reuse)
+ *                  19 | Next                               | VAS_252_Next            (reuse)
+ *                  20 | Couldn't load                      | VAS_252_CouldntLoad     (reuse)
  *
  *                  Three keys are RETIRED and can be dropped from AD_Message:
  *                  VAS_252_Dimension (the column is captioned "Organization Unit" now,
- *                  reusing VAS_256_OrganizationUnit rather than seeding the same text
+ *                  reusing VAS_252_OrganizationUnit rather than seeding the same text
  *                  twice), VAS_252_LedgerAccountBudget (the column names the transaction
  *                  organization rather than the budget's grain) and
  *                  VAS_252_NoTransactionOrg (a row with no transaction organization now
@@ -361,7 +361,7 @@
 
                     var data = parseResponse(raw);
                     if (!data || data.error) {
-                        renderState(label('VAS_192_CouldntLoad', "Couldn't load"));
+                        renderState(label('VAS_252_CouldntLoad', "Couldn't load"));
                         return;
                     }
 
@@ -373,7 +373,7 @@
                     }
 
                     if (!data.Loaded) {
-                        renderState(label('VAS_192_CouldntLoad', "Couldn't load"));
+                        renderState(label('VAS_252_CouldntLoad', "Couldn't load"));
                         return;
                     }
 
@@ -403,7 +403,7 @@
                     /* The overlay comes down on failure too - a spinner left running over
                        an error the user cannot see is the worst of both. */
                     hideBusyIndicator();
-                    renderState(label('VAS_192_CouldntLoad', "Couldn't load"));
+                    renderState(label('VAS_252_CouldntLoad', "Couldn't load"));
                 }
             });
         }
@@ -430,15 +430,15 @@
 
         function errorLabel(code) {
             if (code === 'NOCALENDAR') {
-                return label('VAS_256_NoCalendar', 'No primary calendar is configured');
+                return label('VAS_252_NoCalendar', 'No primary calendar is configured');
             }
             if (code === 'NOACCTSCHEMA') {
-                return label('VAS_256_NoAcctSchema', 'No primary accounting schema is configured');
+                return label('VAS_252_NoAcctSchema', 'No primary accounting schema is configured');
             }
             if (code === 'NOYEAR') {
-                return label('VAS_256_NoYears', 'No financial years available');
+                return label('VAS_252_NoYears', 'No financial years available');
             }
-            return label('VAS_192_CouldntLoad', "Couldn't load");
+            return label('VAS_252_CouldntLoad', "Couldn't load");
         }
 
         /* "6 accounts with actual above approved" - the FULL count of over-budget accounts,
@@ -454,7 +454,7 @@
         function paintYearLabel() {
             var text = _fiscalYear || yearNameOf(_yearId);
             $yearBtn.find('.vas-252-year-label').text(text);
-            $yearBtn.attr('title', label('VAS_256_FinancialYear', 'Financial year') + ': ' + text);
+            $yearBtn.attr('title', label('VAS_252_FinancialYear', 'Financial year') + ': ' + text);
         }
 
         function yearNameOf(id) {
@@ -471,16 +471,16 @@
            every label would sit over the wrong column. */
         function paintHead() {
             $card.find('.vas-252-ghead').html(
-                '<span role="columnheader">' + escapeHtml(label('VAS_234_Account', 'Account')) + '</span>' +
-                '<span role="columnheader">' + escapeHtml(label('VAS_256_OrganizationUnit', 'Organization Unit')) + '</span>' +
+                '<span role="columnheader">' + escapeHtml(label('VAS_252_Account', 'Account')) + '</span>' +
+                '<span role="columnheader">' + escapeHtml(label('VAS_252_OrganizationUnit', 'Organization Unit')) + '</span>' +
                 /* The four figure columns are right-aligned - they are what a reader scans
                    vertically, and a column of numbers is read against its own edge. */
                 '<span class="vas-252-num" role="columnheader">' +
-                    escapeHtml(label('VAS_254_Budget', 'Budget')) + '</span>' +
+                    escapeHtml(label('VAS_252_Budget', 'Budget')) + '</span>' +
                 '<span class="vas-252-num" role="columnheader">' +
                     escapeHtml(label('VAS_252_Actual', 'Actual')) + '</span>' +
                 '<span class="vas-252-num" role="columnheader">' +
-                    escapeHtml(label('VAS_254_Variance', 'Variance')) + '</span>' +
+                    escapeHtml(label('VAS_252_Variance', 'Variance')) + '</span>' +
                 '<span class="vas-252-num" role="columnheader">' +
                     escapeHtml(label('VAS_252_Utilized', 'Utilized')) + '</span>'
             );
@@ -604,11 +604,11 @@
             var lines = [];
 
             lines.push(isBlank(account) ? NIL : account);
-            lines.push(label('VAS_256_OrganizationUnit', 'Organization Unit') + ': ' +
+            lines.push(label('VAS_252_OrganizationUnit', 'Organization Unit') + ': ' +
                 (isBlank(dimension) ? NIL : dimension));
-            lines.push(label('VAS_254_Budget', 'Budget') + ': ' + fullAmount(Number(item.Budget) || 0));
+            lines.push(label('VAS_252_Budget', 'Budget') + ': ' + fullAmount(Number(item.Budget) || 0));
             lines.push(label('VAS_252_Actual', 'Actual') + ': ' + fullAmount(Number(item.Actual) || 0));
-            lines.push(label('VAS_254_Variance', 'Variance') + ': ' +
+            lines.push(label('VAS_252_Variance', 'Variance') + ': ' +
                 signedFullAmount(Number(item.Variance) || 0));
             lines.push(label('VAS_252_Utilized', 'Utilized') + ': ' +
                 percentText(Number(item.UtilizedPct) || 0));
@@ -627,8 +627,8 @@
             var from = (_page - 1) * _pageSize + 1;
             var to = Math.min(_page * _pageSize, _totalRows);
 
-            var showing = label('VAS_020_Showing', 'Showing') + ' ' + from + '–' + to + ' ' +
-                label('VAS_020_Of', 'of') + ' ' + _totalRows + ' · ' +
+            var showing = label('VAS_252_Showing', 'Showing') + ' ' + from + '–' + to + ' ' +
+                label('VAS_252_Of', 'of') + ' ' + _totalRows + ' · ' +
                 label('VAS_252_SortedByVariance', 'sorted by variance');
 
             var prevDis = _page <= 1 ? ' disabled' : '';
@@ -640,11 +640,11 @@
                         escapeHtml(showing) + '</span>' +
                     '<div class="vas-252-pager-nav">' +
                         '<button type="button" class="vas-252-pgbtn vas-252-pg-prev" aria-label="' +
-                            escapeHtml(label('VAS_020_Prev', 'Previous')) + '"' + prevDis + '>' + ICONS.prev + '</button>' +
+                            escapeHtml(label('VAS_252_Prev', 'Previous')) + '"' + prevDis + '>' + ICONS.prev + '</button>' +
                         '<span class="vas-252-pager-label">' + _page + ' ' +
-                            escapeHtml(label('VAS_020_Of', 'of')) + ' ' + _totalPages + '</span>' +
+                            escapeHtml(label('VAS_252_Of', 'of')) + ' ' + _totalPages + '</span>' +
                         '<button type="button" class="vas-252-pgbtn vas-252-pg-next" aria-label="' +
-                            escapeHtml(label('VAS_020_Next', 'Next')) + '"' + nextDis + '>' + ICONS.next + '</button>' +
+                            escapeHtml(label('VAS_252_Next', 'Next')) + '"' + nextDis + '>' + ICONS.next + '</button>' +
                     '</div>' +
                 '</div>'
             );
@@ -715,7 +715,7 @@
         /* ------------------------------------------------------------ */
         function buildPicker() {
             $picker = $('<div class="vas-252-pp vas-252-hidden" role="listbox" aria-label="' +
-                escapeHtml(label('VAS_256_FinancialYear', 'Financial year')) + '"></div>');
+                escapeHtml(label('VAS_252_FinancialYear', 'Financial year')) + '"></div>');
             $('body').append($picker);
 
             $picker.on('click', '.vas-252-pp-opt', function () {
@@ -727,11 +727,11 @@
 
         function fillPicker() {
             var html = '<div class="vas-252-pp-h">' +
-                escapeHtml(label('VAS_256_FinancialYear', 'Financial year')) + '</div>';
+                escapeHtml(label('VAS_252_FinancialYear', 'Financial year')) + '</div>';
 
             if (_years.length === 0) {
                 html += '<div class="vas-252-pp-empty">' +
-                    escapeHtml(label('VAS_256_NoYears', 'No financial years available')) + '</div>';
+                    escapeHtml(label('VAS_252_NoYears', 'No financial years available')) + '</div>';
             }
 
             for (var i = 0; i < _years.length; i++) {
@@ -946,14 +946,7 @@
         /* Every user-facing string goes through AD_Message; the fallback keeps the card
            readable when a key has not been seeded yet. */
         function label(key, fallback) {
-            try {
-                if (VIS.Msg && typeof VIS.Msg.getMsg === 'function') {
-                    var v = VIS.Msg.getMsg(key);
-                    if (v && v !== key && v.charAt(0) !== '[') { return v; }
-                }
-            }
-            catch (e) { /* ignore */ }
-            return fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         this.getRoot = function () { return $root; };

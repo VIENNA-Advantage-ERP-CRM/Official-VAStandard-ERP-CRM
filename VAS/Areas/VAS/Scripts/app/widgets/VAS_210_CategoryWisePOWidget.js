@@ -52,6 +52,12 @@
  * 43 | No lines available.                   | VAS_210_NoLinesAvailable
  * 44 | lines of                              | VAS_210_LinesOf
  * 45 | PO value                              | VAS_210_POValue
+ * 46 | Month                                 | VAS_210_Month
+ * 47 | Year                                  | VAS_210_Year
+ * 48 | Previous                              | VAS_210_Previous
+ * 49 | Next                                  | VAS_210_Next
+ * 50 | View lines of                         | VAS_210_ViewLinesOf
+ * 51 | Open record                           | VAS_210_OpenRecord
  */
 ; VAS = window.VAS || {};
 
@@ -112,8 +118,7 @@
         ];
 
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            return (t && t.charAt(0) !== '[') ? t : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -206,8 +211,8 @@
                 '      <p class="vas-cpow-title">' + escapeHtml(title) + '</p>' +
                 '    </div>' +
                 '    <div class="vas-cpow-mfilter">' +
-                '      <select class="vas-cpow-msel vas-cpow-m-sel" aria-label="Month"></select>' +
-                '      <select class="vas-cpow-msel vas-cpow-y-sel" aria-label="Year"></select>' +
+                '      <select class="vas-cpow-msel vas-cpow-m-sel" aria-label="' + escapeHtml(lbl("VAS_210_Month")) + '"></select>' +
+                '      <select class="vas-cpow-msel vas-cpow-y-sel" aria-label="' + escapeHtml(lbl("VAS_210_Year")) + '"></select>' +
                 '    </div>' +
                 '  </div>' +
                 '  <div class="vas-cpow-donutwrap">' +
@@ -403,20 +408,10 @@
             $modal.find('.vas-cpow-m-close, .vas-cpow-m-close-btn').on('click', closeModal);
             $modal.find('.vas-cpow-m-back').on('click', backModal);
 
-            $modal.on('click', function (e) {
-                if (e.target === this) { closeModal(); }
-            });
-
-            $(document).off('keydown.vas-cpow');
-            $(document).on('keydown.vas-cpow', function (e) {
-                if (e.key === 'Escape' || e.keyCode === 27) { closeModal(); }
-            });
-
             if (cfg.afterRender) { cfg.afterRender($modal); }
         }
 
         function closeModal() {
-            $(document).off('keydown.vas-cpow');
             if ($modal) { $modal.remove(); $modal = null; }
             modalStack = [];
             currentModalConfig = null;
@@ -477,9 +472,9 @@
                 '  <div class="vas-cpow-mtfoot">' +
                 '    <span class="vas-cpow-helper vas-cpow-po-helper"></span>' +
                 '    <span class="vas-cpow-pager vas-cpow-po-pager">' +
-                '      <button type="button" class="vas-cpow-pbtn vas-cpow-po-prev" disabled aria-label="Previous"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button>' +
-                '      <span class="vas-cpow-ptxt vas-cpow-po-ptxt">1 of 1</span>' +
-                '      <button type="button" class="vas-cpow-pbtn vas-cpow-po-next" disabled aria-label="Next"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg></button>' +
+                '      <button type="button" class="vas-cpow-pbtn vas-cpow-po-prev" disabled aria-label="' + escapeHtml(lbl("VAS_210_Previous")) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button>' +
+                '      <span class="vas-cpow-ptxt vas-cpow-po-ptxt">1 ' + escapeHtml(lbl("VAS_210_Of", "of")) + ' 1</span>' +
+                '      <button type="button" class="vas-cpow-pbtn vas-cpow-po-next" disabled aria-label="' + escapeHtml(lbl("VAS_210_Next")) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg></button>' +
                 '    </span>' +
                 '  </div>' +
                 '</div>';
@@ -534,10 +529,10 @@
                     rowsHtml +=
                         '<div class="vas-cpow-mrow">' +
                         '  <span class="vas-cpow-cell center vas-cpow-col-icon">' +
-                        '    <button type="button" class="vas-cpow-iconbtn" data-orderid="' + p.OrderId + '" title="View lines of ' + escapeHtml(p.DocumentNo) + '">' + iconLines + '</button>' +
+                        '    <button type="button" class="vas-cpow-iconbtn" data-orderid="' + p.OrderId + '" title="' + escapeHtml(lbl("VAS_210_ViewLinesOf")) + ' ' + escapeHtml(p.DocumentNo) + '">' + iconLines + '</button>' +
                         '  </span>' +
                         '  <span class="vas-cpow-cell vas-cpow-col-pono">' +
-                        '    <button type="button" class="vas-cpow-lnk" data-orderid="' + p.OrderId + '" title="Open record ' + escapeHtml(p.DocumentNo) + '">' + escapeHtml(p.DocumentNo) + '</button>' +
+                        '    <button type="button" class="vas-cpow-lnk" data-orderid="' + p.OrderId + '" title="' + escapeHtml(lbl("VAS_210_OpenRecord")) + ' ' + escapeHtml(p.DocumentNo) + '">' + escapeHtml(p.DocumentNo) + '</button>' +
                         '  </span>' +
                         '  <span class="vas-cpow-cell c-std vas-cpow-col-podate" title="' + escapeHtml(p.DateOrderedFull) + '">' + escapeHtml(p.DateOrderedFull) + '</span>' +
                         '  <span class="vas-cpow-cell c-std vas-cpow-col-vendor" title="' + escapeHtml(p.Vendor) + '">' + escapeHtml(p.Vendor) + '</span>' +
@@ -674,9 +669,9 @@
                 '  <div class="vas-cpow-mtfoot">' +
                 '    <span class="vas-cpow-helper vas-cpow-lines-helper"></span>' +
                 '    <span class="vas-cpow-pager vas-cpow-lines-pager">' +
-                '      <button type="button" class="vas-cpow-pbtn vas-cpow-lines-prev" disabled aria-label="Previous"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button>' +
-                '      <span class="vas-cpow-ptxt vas-cpow-lines-ptxt">1 of 1</span>' +
-                '      <button type="button" class="vas-cpow-pbtn vas-cpow-lines-next" disabled aria-label="Next"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg></button>' +
+                '      <button type="button" class="vas-cpow-pbtn vas-cpow-lines-prev" disabled aria-label="' + escapeHtml(lbl("VAS_210_Previous")) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button>' +
+                '      <span class="vas-cpow-ptxt vas-cpow-lines-ptxt">1 ' + escapeHtml(lbl("VAS_210_Of", "of")) + ' 1</span>' +
+                '      <button type="button" class="vas-cpow-pbtn vas-cpow-lines-next" disabled aria-label="' + escapeHtml(lbl("VAS_210_Next")) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg></button>' +
                 '    </span>' +
                 '  </div>' +
                 '</div>';
@@ -761,7 +756,6 @@
         this.getRoot = function () { return $root; };
 
         this.disposeComponent = function () {
-            $(document).off('keydown.vas-cpow');
             if ($modal) { $modal.remove(); $modal = null; }
             $root.remove();
         };

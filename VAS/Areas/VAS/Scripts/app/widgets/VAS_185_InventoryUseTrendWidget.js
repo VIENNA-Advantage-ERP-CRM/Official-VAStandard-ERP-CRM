@@ -66,8 +66,7 @@
 // ----- END OLD CODE -----
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return (translated && translated.charAt(0) !== '[') ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -139,6 +138,13 @@
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
             });
+        }
+
+        // NOTE (2026-09-17): formatINR is called below (SVG tooltip text) but was never defined
+        // anywhere in this file - a pre-existing bug that threw ReferenceError whenever a bar or
+        // point was hovered. Aliased to the exact-value formatter already used for the popover.
+        function formatINR(value) {
+            return formatFullValue(value);
         }
 // ===== NEW CODE END — currency format =====
 // ----- OLD CODE (kept for rollback, do not delete) -----

@@ -9,7 +9,7 @@
  *  2  | Drafts waiting                       | VAS_036_DraftsWaiting
  *  3  | Unposted Journals                    | VAS_036_UnpostedJournals
  *  4  | Journals waiting to be posted        | VAS_036_UnpostedSub
- *  5  | Export                               | VAS_Export
+ *  5  | Export                               | VAS_036_Export
  *  6  | Close                                | VAS_Close
  *  7  | Approve                              | VAS_036_Approve
  *  8  | Post Journal                         | VAS_036_PostJournal
@@ -44,14 +44,7 @@
     }
 
     function lbl(key, fallback) {
-        var text = VIS.Msg.getMsg(key);
-
-        return (
-            text &&
-            text.charAt(0) !== "["
-        )
-            ? text
-            : fallback;
+        return VIS.Msg.getMsg(key);
     }
 
     function esc(value) {
@@ -522,7 +515,7 @@
                         "<span>" +
                         esc(
                             lbl(
-                                "VAS_Export",
+                                "VAS_036_Export",
                                 "Export"
                             )
                         ) +
@@ -553,7 +546,8 @@
 
                         /* Footer carries the pager only (design.md widget footer pager).
                            No totals strip and no action buttons: Export moved to the
-                           header and the dialog closes from the header X / Escape. */
+                           header and the dialog closes only from the header X (Close
+                           button); it no longer closes on Escape or outside click. */
                         '<div class="VAS-glju-dialog-footer">' +
 
                         '<div class="VAS-glju-dialog-actions" ' +
@@ -586,8 +580,7 @@
                 showDialogBusy(false);
 
                 $dialog.find(
-                    ".VAS-glju-dialog-close, " +
-                    ".VAS-glju-dialog-scrim"
+                    ".VAS-glju-dialog-close"
                 ).on(
                     "click",
                     closeDialog
@@ -689,27 +682,6 @@
                         loadDialogRows();
                     }
                     );
-
-                $(document).on(
-                    "keydown.VAS-glju-" +
-                    id,
-                    function (event) {
-                        if (
-                            event.key !== "Escape" ||
-                            VAS.GLJournalDetailDialog.isBusy()
-                        ) {
-                            return;
-                        }
-
-                        if (
-                            $dialog &&
-                            $dialog.is(":visible") &&
-                            !VAS.GLJournalDetailDialog.isOpen()
-                        ) {
-                            closeDialog();
-                        }
-                    }
-                );
 
                 $("body").append($dialog);
             }
@@ -1562,11 +1534,6 @@
                         dialogResizeObserver.disconnect();
                         dialogResizeObserver = null;
                     }
-
-                    $(document).off(
-                        "keydown.VAS-glju-" +
-                        $self.AD_UserHomeWidgetID
-                    );
 
                     $("body").removeClass(
                         "VAS-glju-body-lock"

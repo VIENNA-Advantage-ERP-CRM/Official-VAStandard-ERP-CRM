@@ -58,7 +58,7 @@
  * 25  | Vendor, amount and timing all agree.              | VAS_072_MatchSignalsAgree
  * 26  | Confidence                                        | VAS_072_Confidence
  * 27  | Vendor payment                                    | VAS_072_VendorPayment
- * 28  | Payment date                                      | VAS_PaymentDate
+ * 28  | Payment date                                      | VAS_072_PaymentDate
  * 29  | Vendor                                            | VAS_Vendor
  * 30  | Payment method                                    | VAS_072_PaymentMethod
  * 31  | Reference                                         | VAS_072_Reference
@@ -170,20 +170,7 @@
         var adaptiveAdjustCount = 0;
 
         function lbl(key, fallback) {
-            var text = null;
-
-            try {
-                text = VIS.Msg.getMsg(key);
-            }
-            catch (error) {
-                text = null;
-            }
-
-            return text &&
-                text !== key &&
-                text !== "[" + key + "]"
-                ? text
-                : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -1565,7 +1552,7 @@
                 ) +
                 reviewPaneRow(
                     lbl(
-                        "VAS_PaymentDate",
+                        "VAS_072_PaymentDate",
                         "Payment date"
                     ),
                     formatDate(detail.PaymentDate)

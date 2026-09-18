@@ -18,6 +18,17 @@
  *   VAS_DocSearch_Error       => "Search failed. Please try again."
  *   VAS_DocSearch_Results     => "results"
  *   VAS_DocSearch_Invoice     => "Invoice"
+ *   VAS_069_StatusCompleted      => "Completed"
+ *   VAS_069_StatusClosed         => "Closed"
+ *   VAS_069_StatusApproved       => "Approved"
+ *   VAS_069_StatusDraft          => "Draft"
+ *   VAS_069_StatusInProcess      => "In Process"
+ *   VAS_069_StatusWaitingConfirm => "Waiting Confirm"
+ *   VAS_069_StatusWaitingPayment => "Waiting Payment"
+ *   VAS_069_StatusNotApproved    => "Not Approved"
+ *   VAS_069_StatusInvalid        => "Invalid"
+ *   VAS_069_StatusVoided         => "Voided"
+ *   VAS_069_StatusReversed       => "Reversed"
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -405,24 +416,23 @@
 
         function statusMeta(code) {
             switch (String(code).toUpperCase()) {
-                case 'CO': return { label: 'Completed',       tone: 'ok' };
-                case 'CL': return { label: 'Closed',          tone: 'ok' };
-                case 'AP': return { label: 'Approved',        tone: 'info' };
-                case 'DR': return { label: 'Draft',           tone: 'muted' };
-                case 'IP': return { label: 'In Process',      tone: 'warn' };
-                case 'WC': return { label: 'Waiting Confirm', tone: 'warn' };
-                case 'WP': return { label: 'Waiting Payment', tone: 'warn' };
-                case 'NA': return { label: 'Not Approved',    tone: 'err' };
-                case 'IN': return { label: 'Invalid',         tone: 'err' };
-                case 'VO': return { label: 'Voided',          tone: 'err' };
-                case 'RE': return { label: 'Reversed',        tone: 'err' };
+                case 'CO': return { label: msg('VAS_069_StatusCompleted'),      tone: 'ok' };
+                case 'CL': return { label: msg('VAS_069_StatusClosed'),         tone: 'ok' };
+                case 'AP': return { label: msg('VAS_069_StatusApproved'),       tone: 'info' };
+                case 'DR': return { label: msg('VAS_069_StatusDraft'),          tone: 'muted' };
+                case 'IP': return { label: msg('VAS_069_StatusInProcess'),      tone: 'warn' };
+                case 'WC': return { label: msg('VAS_069_StatusWaitingConfirm'), tone: 'warn' };
+                case 'WP': return { label: msg('VAS_069_StatusWaitingPayment'), tone: 'warn' };
+                case 'NA': return { label: msg('VAS_069_StatusNotApproved'),    tone: 'err' };
+                case 'IN': return { label: msg('VAS_069_StatusInvalid'),        tone: 'err' };
+                case 'VO': return { label: msg('VAS_069_StatusVoided'),         tone: 'err' };
+                case 'RE': return { label: msg('VAS_069_StatusReversed'),       tone: 'err' };
                 default:   return { label: code,              tone: 'muted' };
             }
         }
 
         function msg(key, fallback) {
-            var value = VIS.Msg.getMsg(key);
-            return value && value !== key && value !== '[' + key + ']' ? value : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function dsEsc(str) {

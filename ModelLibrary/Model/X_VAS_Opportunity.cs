@@ -1,10 +1,10 @@
-namespace ModelLibrary.Model{
+namespace VAdvantage.Model{
 /** Generated Model - DO NOT CHANGE */
 using System;using System.Text;using VAdvantage.DataBase;using VAdvantage.Common;using VAdvantage.Classes;using VAdvantage.Process;using VAdvantage.Model;using VAdvantage.Utility;using System.Data;/** Generated Model for VAS_Opportunity
  *  @author Raghu (Updated) 
  *  @version Vienna Framework 1.1.1 - $Id$ */
-public class X_VAS_Opportunity : PO{public X_VAS_Opportunity (Context ctx, int VAS_Opportunity_ID, Trx trxName) : base (ctx, VAS_Opportunity_ID, trxName){/** if (VAS_Opportunity_ID == 0){SetVAS_Opportunity_ID (0);} */
-}public X_VAS_Opportunity (Ctx ctx, int VAS_Opportunity_ID, Trx trxName) : base (ctx, VAS_Opportunity_ID, trxName){/** if (VAS_Opportunity_ID == 0){SetVAS_Opportunity_ID (0);} */
+public class X_VAS_Opportunity : PO{public X_VAS_Opportunity (Context ctx, int VAS_Opportunity_ID, Trx trxName) : base (ctx, VAS_Opportunity_ID, trxName){/** if (VAS_Opportunity_ID == 0){SetName (null);SetVAS_Opportunity_ID (0);} */
+}public X_VAS_Opportunity (Ctx ctx, int VAS_Opportunity_ID, Trx trxName) : base (ctx, VAS_Opportunity_ID, trxName){/** if (VAS_Opportunity_ID == 0){SetName (null);SetVAS_Opportunity_ID (0);} */
 }/** Load Constructor 
 @param ctx context
 @param rs result set 
@@ -24,8 +24,8 @@ public X_VAS_Opportunity (Ctx ctx, IDataReader dr, Trx trxName) : base(ctx, dr, 
  Set Table ID By Table Name
  added by ->Harwinder */
 static X_VAS_Opportunity(){ Table_ID = Get_Table_ID(Table_Name); model = new KeyNamePair(Table_ID,Table_Name);}/** Serial Version No */
-static long serialVersionUID = 28062608414978L;/** Last Updated Timestamp 6/3/2026 4:08:18 PM */
-public static long updatedMS = 1780483098189L;/** AD_Table_ID=1000722 */
+static long serialVersionUID = 28071860509169L;/** Last Updated Timestamp 9/18/2026 6:09:52 PM */
+public static long updatedMS = 1789735192380L;/** AD_Table_ID=1000722 */
 public static int Table_ID; // =1000722;
 /** TableName=VAS_Opportunity */
 public static String Table_Name="VAS_Opportunity";
@@ -84,7 +84,12 @@ public DateTime? GetC_EnquiryRdate() {return (DateTime?)Get_Value("C_EnquiryRdat
 public void SetC_Lead_ID (int C_Lead_ID){if (C_Lead_ID <= 0) Set_Value ("C_Lead_ID", null);else
 Set_Value ("C_Lead_ID", C_Lead_ID);}/** Get Lead.
 @return Business Lead */
-public int GetC_Lead_ID() {Object ii = Get_Value("C_Lead_ID");if (ii == null) return 0;return Convert.ToInt32(ii);}/** Set Comments.
+public int GetC_Lead_ID() {Object ii = Get_Value("C_Lead_ID");if (ii == null) return 0;return Convert.ToInt32(ii);}/** Set Order.
+@param C_Order_ID Sales Order */
+public void SetC_Order_ID (int C_Order_ID){if (C_Order_ID <= 0) Set_Value ("C_Order_ID", null);else
+Set_Value ("C_Order_ID", C_Order_ID);}/** Get Order.
+@return Sales Order */
+public int GetC_Order_ID() {Object ii = Get_Value("C_Order_ID");if (ii == null) return 0;return Convert.ToInt32(ii);}/** Set Comments.
 @param Comments Comments or additional information */
 public void SetComments (String Comments){if (Comments != null && Comments.Length > 2000){log.Warning("Length > 2000 - truncated");Comments = Comments.Substring(0,2000);}Set_Value ("Comments", Comments);}/** Get Comments.
 @return Comments or additional information */
@@ -123,7 +128,7 @@ Set_Value ("M_PriceList_Version_ID", M_PriceList_Version_ID);}/** Get Price List
 @return Identifies a unique instance of a Price List */
 public int GetM_PriceList_Version_ID() {Object ii = Get_Value("M_PriceList_Version_ID");if (ii == null) return 0;return Convert.ToInt32(ii);}/** Set Name.
 @param Name Alphanumeric identifier of the entity */
-public void SetName (String Name){if (Name != null && Name.Length > 255){log.Warning("Length > 255 - truncated");Name = Name.Substring(0,255);}Set_Value ("Name", Name);}/** Get Name.
+public void SetName (String Name){if (Name == null) throw new ArgumentException ("Name is mandatory.");if (Name.Length > 255){log.Warning("Length > 255 - truncated");Name = Name.Substring(0,255);}Set_Value ("Name", Name);}/** Get Name.
 @return Alphanumeric identifier of the entity */
 public String GetName() {return (String)Get_Value("Name");}/** Set Total Amount.
 @param PlannedAmt Total Amount */
@@ -158,7 +163,26 @@ public int GetSalesRep_ID() {Object ii = Get_Value("SalesRep_ID");if (ii == null
 @param VAS_Archive Archive */
 public void SetVAS_Archive (String VAS_Archive){if (VAS_Archive != null && VAS_Archive.Length > 1){log.Warning("Length > 1 - truncated");VAS_Archive = VAS_Archive.Substring(0,1);}Set_Value ("VAS_Archive", VAS_Archive);}/** Get Archive.
 @return Archive */
-public String GetVAS_Archive() {return (String)Get_Value("VAS_Archive");}/** Set Competitor.
+public String GetVAS_Archive() {return (String)Get_Value("VAS_Archive");}
+/** VAS_ArchivedReason AD_Reference_ID=1000354 */
+public static int VAS_ARCHIVEDREASON_AD_Reference_ID=1000354;/** No Response = 10 */
+public static String VAS_ARCHIVEDREASON_NoResponse = "10";/** Not Interested = 20 */
+public static String VAS_ARCHIVEDREASON_NotInterested = "20";/** No Budget = 30 */
+public static String VAS_ARCHIVEDREASON_NoBudget = "30";/** Not a Fit = 40 */
+public static String VAS_ARCHIVEDREASON_NotAFit = "40";/** Duplicate = 50 */
+public static String VAS_ARCHIVEDREASON_Duplicate = "50";/** Invalid Contact = 60 */
+public static String VAS_ARCHIVEDREASON_InvalidContact = "60";/** Postponed = 70 */
+public static String VAS_ARCHIVEDREASON_Postponed = "70";/** Other = 80 */
+public static String VAS_ARCHIVEDREASON_Other = "80";/** Converted to Opportunity = 90 */
+public static String VAS_ARCHIVEDREASON_ConvertedToOpportunity = "90";/** Is test a valid value.
+@param test testvalue
+@returns true if valid **/
+public bool IsVAS_ArchivedReasonValid (String test){return test == null || test.Equals("10") || test.Equals("20") || test.Equals("30") || test.Equals("40") || test.Equals("50") || test.Equals("60") || test.Equals("70") || test.Equals("80") || test.Equals("90");}/** Set Archived Reason.
+@param VAS_ArchivedReason Archived Reason */
+public void SetVAS_ArchivedReason (String VAS_ArchivedReason){if (!IsVAS_ArchivedReasonValid(VAS_ArchivedReason))
+throw new ArgumentException ("VAS_ArchivedReason Invalid value - " + VAS_ArchivedReason + " - Reference_ID=1000354 - 10 - 20 - 30 - 40 - 50 - 60 - 70 - 80 - 90");if (VAS_ArchivedReason != null && VAS_ArchivedReason.Length > 2){log.Warning("Length > 2 - truncated");VAS_ArchivedReason = VAS_ArchivedReason.Substring(0,2);}Set_Value ("VAS_ArchivedReason", VAS_ArchivedReason);}/** Get Archived Reason.
+@return Archived Reason */
+public String GetVAS_ArchivedReason() {return (String)Get_Value("VAS_ArchivedReason");}/** Set Competitor.
 @param VAS_Competitor Competitor */
 public void SetVAS_Competitor (String VAS_Competitor){if (VAS_Competitor != null && VAS_Competitor.Length > 1){log.Warning("Length > 1 - truncated");VAS_Competitor = VAS_Competitor.Substring(0,1);}Set_Value ("VAS_Competitor", VAS_Competitor);}/** Get Competitor.
 @return Competitor */
@@ -186,7 +210,11 @@ public DateTime? GetVAS_DecisionDate() {return (DateTime?)Get_Value("VAS_Decisio
 @param VAS_EstimatedBudgetAmt Estimated Budget Amount */
 public void SetVAS_EstimatedBudgetAmt (Decimal? VAS_EstimatedBudgetAmt){Set_Value ("VAS_EstimatedBudgetAmt", (Decimal?)VAS_EstimatedBudgetAmt);}/** Get Estimated Budget Amount.
 @return Estimated Budget Amount */
-public Decimal GetVAS_EstimatedBudgetAmt() {Object bd =Get_Value("VAS_EstimatedBudgetAmt");if (bd == null) return Env.ZERO;return  Convert.ToDecimal(bd);}
+public Decimal GetVAS_EstimatedBudgetAmt() {Object bd =Get_Value("VAS_EstimatedBudgetAmt");if (bd == null) return Env.ZERO;return  Convert.ToDecimal(bd);}/** Set Archived.
+@param VAS_IsArchived Archived */
+public void SetVAS_IsArchived (Boolean VAS_IsArchived){Set_Value ("VAS_IsArchived", VAS_IsArchived);}/** Get Archived.
+@return Archived */
+public Boolean IsVAS_IsArchived() {Object oo = Get_Value("VAS_IsArchived");if (oo != null) { if (oo.GetType() == typeof(bool)) return Convert.ToBoolean(oo); return "Y".Equals(oo);}return false;}
 /** VAS_LastProposalStatus AD_Reference_ID=1000361 */
 public static int VAS_LASTPROPOSALSTATUS_AD_Reference_ID=1000361;/** Draft = 10 */
 public static String VAS_LASTPROPOSALSTATUS_Draft = "10";/** Sent = 11 */
@@ -293,7 +321,11 @@ public bool IsVAS_RiskLevelValid (String test){return test == null || test.Equal
 public void SetVAS_RiskLevel (String VAS_RiskLevel){if (!IsVAS_RiskLevelValid(VAS_RiskLevel))
 throw new ArgumentException ("VAS_RiskLevel Invalid value - " + VAS_RiskLevel + " - Reference_ID=1000358 - 10 - 11 - 12 - 13 - 14 - 15");if (VAS_RiskLevel != null && VAS_RiskLevel.Length > 2){log.Warning("Length > 2 - truncated");VAS_RiskLevel = VAS_RiskLevel.Substring(0,2);}Set_Value ("VAS_RiskLevel", VAS_RiskLevel);}/** Get Risk Level.
 @return Risk Level */
-public String GetVAS_RiskLevel() {return (String)Get_Value("VAS_RiskLevel");}/** Set Search Key.
+public String GetVAS_RiskLevel() {return (String)Get_Value("VAS_RiskLevel");}/** Set Sales Quotation/Order History.
+@param VAS_SalesQuotOrder Sales Quotation/Order History */
+public void SetVAS_SalesQuotOrder (String VAS_SalesQuotOrder){if (VAS_SalesQuotOrder != null && VAS_SalesQuotOrder.Length > 1){log.Warning("Length > 1 - truncated");VAS_SalesQuotOrder = VAS_SalesQuotOrder.Substring(0,1);}Set_Value ("VAS_SalesQuotOrder", VAS_SalesQuotOrder);}/** Get Sales Quotation/Order History.
+@return Sales Quotation/Order History */
+public String GetVAS_SalesQuotOrder() {return (String)Get_Value("VAS_SalesQuotOrder");}/** Set Search Key.
 @param Value Search key for the record in the format required - must be unique */
 public void SetValue (String Value){if (Value != null && Value.Length > 30){log.Warning("Length > 30 - truncated");Value = Value.Substring(0,30);}Set_Value ("Value", Value);}/** Get Search Key.
 @return Search key for the record in the format required - must be unique */

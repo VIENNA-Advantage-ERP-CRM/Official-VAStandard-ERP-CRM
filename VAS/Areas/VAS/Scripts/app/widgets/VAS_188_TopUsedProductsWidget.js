@@ -15,17 +15,34 @@
  *  5 | Couldn't load                           | VAS_188_CouldntLoad
  *  6 | Close                                  | VAS_188_Close
  *  7 | Month                                  | VAS_188_Month
- *  8 | Consumed Qty                           | VAS_188_ConsumedQty
+ *  8 | Consumed Qty (In Base UOM)             | VAS_188_ConsumedQty
  *  9 | Consumed Value                         | VAS_188_ConsumedValue
  * 10 | Issue Lines                            | VAS_188_IssueLines
  * 11 | Doc No.                                | VAS_188_DocNo
  * 12 | Date                                   | VAS_188_Date
  * 13 | WH + Loc                               | VAS_188_WarehouseLocator
+ * 13a| UOM                                    | VAS_188_UOM
+ * 13b| Qty (Base UOM)                         | VAS_188_QtyBaseUom
  * 14 | Loading...                             | VAS_188_Loading
  * 15 | No usage lines found.                  | VAS_188_NoUsageLinesFound
  * 16 | of                                     | VAS_188_Of
  * 17 | Page                                   | VAS_188_Page
  * 18 | lines                                  | VAS_188_Lines
+ * 19 | Jan,Feb,Mar,...                        | VAS_188_Months
+ * 20 | No products consumed in                | VAS_188_NoProductsConsumedIn
+ * 21 | General                                | VAS_188_CategoryFallback
+ * 22 | Nos                                    | VAS_188_UomFallback
+ *
+ * NOTE (2026-09-18, Claude): the "Consumed Qty (In Base UOM)" summary field is now
+ * re-derived, after GetProductUsageDetails loads, as the sum of the modal table's own
+ * qtyBaseUom column - not left as the totalQty passed in from the tile's separate
+ * GetTopProducts aggregate. The two are computed by different queries/timing and could
+ * drift; summing the same rows the user sees keeps the header honest against the table.
+ *
+ * NOTE (2026-09-18, Claude): that same field also appends the PRODUCT's base UOM name
+ * (data.baseUomName, from GetProductUsageDetails) after the number, e.g. "26,005 Liter" -
+ * the product's own base UOM, not a per-line entered UOM (which can vary row to row, as
+ * the Qty/UOM columns below it show), since the summary number itself is a base-UOM sum.
  */
 ; VAS = window.VAS || {};
 
@@ -79,8 +96,7 @@
         function DateTimeNowYear() { return new Date().getFullYear(); }
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return (translated && translated.charAt(0) !== '[') ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -175,7 +191,7 @@
 // ----- END OLD CODE -----
 
         function formatMonthName(m) {
-            var monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            var monthNames = label("VAS_188_Months", "Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec").split(',');
             return monthNames[Math.max(0, Math.min(11, m - 1))];
         }
 
@@ -257,9 +273,9 @@
             if (pageNo > totalPages) { pageNo = totalPages; }
 
             if (productsData.length === 0) {
-                $body.html('<div class="vas-tup-empty">No products consumed in ' + escapeHtml(formatMonthName(selectedMonth) + ' ' + selectedYear) + '.</div>');
-                if ($footHelper) { $footHelper.text('0 of 0'); }
-                if ($pagerText) { $pagerText.text('1 of 1'); }
+                $body.html('<div class="vas-tup-empty">' + escapeHtml(label("VAS_188_NoProductsConsumedIn", "No products consumed in") + ' ' + formatMonthName(selectedMonth) + ' ' + selectedYear + '.') + '</div>');
+                if ($footHelper) { $footHelper.text('0 ' + label("VAS_188_Of", "of") + ' 0'); }
+                if ($pagerText) { $pagerText.text('1 ' + label("VAS_188_Of", "of") + ' 1'); }
                 if ($prevBtn) { $prevBtn.prop('disabled', true); }
                 if ($nextBtn) { $nextBtn.prop('disabled', true); }
                 return;
@@ -272,17 +288,17 @@
             for (var i = startIndex; i < endIndex; i++) {
                 var item = productsData[i];
                 var rank = i + 1;
-                var metaStr = (item.attribute ? (item.attribute + ' · ') : '') + (item.categoryName || 'General');
+                var metaStr = (item.attribute ? (item.attribute + ' · ') : '') + (item.categoryName || label("VAS_188_CategoryFallback", "General"));
 
                 rowsHtml +=
-                    '<button type="button" class="vas-tup-row" data-pid="' + item.productId + '" data-pname="' + escapeHtml(item.productName) + '" data-cat="' + escapeHtml(item.categoryName || "General") + '" data-uom="' + escapeHtml(item.uomName || "Nos") + '" data-qty="' + item.totalQty + '" data-val="' + item.totalValue + '">' +
+                    '<button type="button" class="vas-tup-row" data-pid="' + item.productId + '" data-pname="' + escapeHtml(item.productName) + '" data-cat="' + escapeHtml(item.categoryName || label("VAS_188_CategoryFallback", "General")) + '" data-uom="' + escapeHtml(item.uomName || label("VAS_188_UomFallback", "Nos")) + '" data-qty="' + item.totalQty + '" data-val="' + item.totalValue + '">' +
                     getRankBadge(rank) +
                     '<div class="vas-tup-row-left">' +
                     '<div class="vas-tup-p-name" title="' + escapeHtml(item.productName) + '">' + escapeHtml(item.productName) + '</div>' +
                     '<div class="vas-tup-p-meta" title="' + escapeHtml(metaStr) + '">' + escapeHtml(metaStr) + '</div>' +
                     '</div>' +
                     '<div class="vas-tup-row-right">' +
-                    '<div class="vas-tup-qty-uom">' + formatQty(item.totalQty) + ' ' + escapeHtml(item.uomName || "Nos") + '</div>' +
+                    '<div class="vas-tup-qty-uom">' + formatQty(item.totalQty) + ' ' + escapeHtml(item.uomName || label("VAS_188_UomFallback", "Nos")) + '</div>' +
 // ===== NEW CODE START — currency format (agent A10, 2026-08-19) =====
                     '<div class="vas-tup-val" title="' + escapeHtml(formatCurrencyFull(item.totalValue)) + '">' + escapeHtml(formatCurrencyCompact(item.totalValue)) + '</div>' +
 // ===== NEW CODE END — currency format =====
@@ -300,13 +316,64 @@
             $body.toggleClass('single-row', (endIndex - startIndex) === 1);
 
             if ($footHelper) {
-                $footHelper.text((startIndex + 1) + '–' + endIndex + ' of ' + productsData.length);
+                $footHelper.text((startIndex + 1) + '–' + endIndex + ' ' + label("VAS_188_Of", "of") + ' ' + productsData.length);
             }
             if ($pagerText) {
-                $pagerText.text(pageNo + ' of ' + totalPages);
+                $pagerText.text(pageNo + ' ' + label("VAS_188_Of", "of") + ' ' + totalPages);
             }
             if ($prevBtn) { $prevBtn.prop('disabled', pageNo <= 1); }
             if ($nextBtn) { $nextBtn.prop('disabled', pageNo >= totalPages); }
+        }
+
+        /* Doc No -> real Inventory Use record navigation. Same pattern as VAS_186/VAS_244: when
+           hosted on a window, relay through widgetFirevalueChanged/ActionName so the host resolves
+           the window BY NAME (a hardcoded AD_Window_ID has previously resolved to the wrong window
+           on a real install); otherwise fall back to VAS.ZoomUtil.zoomToRecord with a window id
+           resolved once via VAS_178's existing GetMaterialIssueWindowId endpoint (reused rather
+           than re-deriving the same window lookup here). */
+        var INVENTORY_USE_WINDOW_NAME = 'Inventory Use';
+        var inventoryUseWindowId = 0;
+
+        function hostWindowName() {
+            try {
+                var listener = $self.listener;
+                for (var i = 0; i < 6 && listener; i++) {
+                    if (listener.apanel && listener.apanel.gridWindow && listener.apanel.gridWindow.getName) { return listener.apanel.gridWindow.getName(); }
+                    if (listener.gridWindow && listener.gridWindow.getName) { return listener.gridWindow.getName(); }
+                    listener = listener.listener;
+                }
+            } catch (e) { /* best-effort */ }
+            return '';
+        }
+
+        function zoomToInventoryRecord(inventoryId) {
+            if (!inventoryId) { return; }
+            try {
+                if ($self.windowNo >= 0) {
+                    $self.widgetFirevalueChanged({
+                        "TabWhereClause": "M_Inventory.M_Inventory_ID=" + Number(inventoryId),
+                        "TabLayout": "Y", "TabIndex": "0",
+                        "ActionName": hostWindowName() || INVENTORY_USE_WINDOW_NAME,
+                        "ActionType": "W"
+                    });
+                    return;
+                }
+                if (inventoryUseWindowId > 0) {
+                    if (window.VAS && VAS.ZoomUtil) { VAS.ZoomUtil.zoomToRecord('M_Inventory_ID', Number(inventoryId), inventoryUseWindowId, null, null); }
+                    return;
+                }
+                $.ajax({
+                    url: VIS.Application.contextUrl + 'VAS_178_NewMaterialIssueQuickAction/GetMaterialIssueWindowId',
+                    type: 'GET', dataType: 'json', cache: false,
+                    success: function (res) {
+                        var data = parseResponse(res);
+                        inventoryUseWindowId = Number((data && data.windowId) || 0);
+                        if (inventoryUseWindowId > 0 && window.VAS && VAS.ZoomUtil) {
+                            VAS.ZoomUtil.zoomToRecord('M_Inventory_ID', Number(inventoryId), inventoryUseWindowId, null, null);
+                        }
+                    }
+                });
+            } catch (e) { /* best-effort */ }
         }
 
         function openProductUsageDetailModal(pid, pname, categoryName, uomName, totalQty, totalValue) {
@@ -338,7 +405,7 @@
                 '<div class="vas-tup-modal-body">' +
                 '<div class="vas-tup-summary-grid">' +
                 '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_188_Month", "Month")) + '</div><div class="vas-tup-field-val">' + escapeHtml(monthFull) + '</div></div>' +
-                '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_188_ConsumedQty", "Consumed Qty")) + '</div><div class="vas-tup-field-val">' + escapeHtml(formatQty(totalQty) + ' ' + uomName) + '</div></div>' +
+                '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_188_ConsumedQty", "Consumed Qty") + ' (In Base UOM)') + '</div><div class="vas-tup-field-val vas-tup-m-qtybase">' + escapeHtml(formatQty(totalQty)) + '</div></div>' +
                 '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_188_ConsumedValue", "Consumed Value")) + '</div><div class="vas-tup-field-val" title="' + escapeHtml(formatCurrencyFull(totalValue)) + '">' + escapeHtml(formatCurrencyCompact(totalValue)) + '</div></div>' +
                 '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_188_UnitPrice", "Unit Price")) + '</div><div class="vas-tup-field-val" title="' + escapeHtml(unitPriceStr) + '">' + escapeHtml(unitPriceStr) + '</div></div>' +
                 '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_188_IssueLines", "Issue Lines")) + '</div><div class="vas-tup-field-val vas-tup-m-lines-cnt">—</div></div>' +
@@ -349,9 +416,11 @@
                 '<th>' + escapeHtml(label("VAS_188_Date", "Date")) + '</th>' +
                 '<th>' + escapeHtml(label("VAS_188_WarehouseLocator", "WH + Loc")) + '</th>' +
                 '<th>' + escapeHtml(label("VAS_188_Qty", "Qty")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_188_UOM", "UOM")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_188_QtyBaseUom", "Qty (Base UOM)")) + '</th>' +
                 '<th>' + escapeHtml(label("VAS_188_Value", "Value")) + '</th>' +
                 '</tr></thead>' +
-                '<tbody class="vas-tup-m-tbody"><tr><td colspan="5" class="vas-tup-m-msgcell">' + escapeHtml(label("VAS_188_Loading", "Loading...")) + '</td></tr></tbody>' +
+                '<tbody class="vas-tup-m-tbody"><tr><td colspan="7" class="vas-tup-m-msgcell">' + escapeHtml(label("VAS_188_Loading", "Loading...")) + '</td></tr></tbody>' +
                 '</table>' +
                 '<div class="vas-tup-modal-foot">' +
                 '<div class="vas-tup-m-helper">' + escapeHtml('0 ' + label("VAS_188_Of", "of") + ' 0 ' + label("VAS_188_Lines", "lines")) + '</div>' +
@@ -392,13 +461,13 @@
                 function fillerRows(count) {
                     var html = '';
                     for (var f = 0; f < count; f++) {
-                        html += '<tr class="vas-tup-m-filler" aria-hidden="true"><td colspan="5">&nbsp;</td></tr>';
+                        html += '<tr class="vas-tup-m-filler" aria-hidden="true"><td colspan="7">&nbsp;</td></tr>';
                     }
                     return html;
                 }
 
                 if (usageLines.length === 0) {
-                    $tbody.html('<tr><td colspan="5" class="vas-tup-m-msgcell">' +
+                    $tbody.html('<tr><td colspan="7" class="vas-tup-m-msgcell">' +
                         escapeHtml(label("VAS_188_NoUsageLinesFound", "No usage lines found.")) + '</td></tr>' +
                         fillerRows(mPageSize - 1));
                     $mHelper.text('0 ' + ofTxt + ' 0 ' + linesTxt);
@@ -416,10 +485,16 @@
                     var rec = usageLines[j];
                     tbodyHtml +=
                         '<tr>' +
-                        '<td title="' + escapeHtml(rec.documentNo) + '">' + escapeHtml(rec.documentNo) + '</td>' +
+                        '<td title="' + escapeHtml(rec.documentNo) + '">' +
+                        (rec.inventoryId
+                            ? '<button type="button" class="vas-tup-m-doclink" data-invid="' + rec.inventoryId + '">' + escapeHtml(rec.documentNo) + '</button>'
+                            : escapeHtml(rec.documentNo)) +
+                        '</td>' +
                         '<td>' + escapeHtml(rec.movementDate) + '</td>' +
                         '<td title="' + escapeHtml(rec.whLoc) + '">' + escapeHtml(rec.whLoc) + '</td>' +
                         '<td>' + escapeHtml(formatQty(rec.qty)) + '</td>' +
+                        '<td>' + escapeHtml(rec.uomName || label("VAS_188_UomFallback", "Nos")) + '</td>' +
+                        '<td>' + escapeHtml(formatQty(rec.qtyBaseUom)) + '</td>' +
 // ===== NEW CODE START — currency format (agent A10, 2026-08-19) =====
                         '<td title="' + escapeHtml(formatCurrencyFull(rec.value)) + '">' + escapeHtml(formatCurrencyCompact(rec.value)) + '</td>' +
 // ===== NEW CODE END — currency format =====
@@ -452,12 +527,11 @@
                 closeModal();
             });
 
-            $modal.on('click', function (e) {
-                if (e.target === this) { closeModal(); }
-            });
-
-            $(document).on('keydown.vas-tup-modal', function (e) {
-                if (e.key === 'Escape' || e.keyCode === 27) { closeModal(); }
+            $modal.on('click', '.vas-tup-m-doclink', function (e) {
+                e.stopPropagation();
+                var invId = Number($(this).data('invid') || 0);
+                closeModal();
+                zoomToInventoryRecord(invId);
             });
 
             $modal.find('.vas-tup-m-prev').on('click', function () {
@@ -483,6 +557,17 @@
                     }
                     usageLines = data.lines || [];
                     $modal.find('.vas-tup-m-lines-cnt').text(usageLines.length);
+                    // Consumed Qty (In Base UOM) is re-derived as the sum of the lines actually
+                    // shown in the table below, rather than left as the tile's own separately
+                    // computed totalQty - the two can drift (different access-filter timing),
+                    // and the summary should always foot to what the modal displays.
+                    var qtyBaseSum = 0;
+                    for (var qi = 0; qi < usageLines.length; qi++) {
+                        qtyBaseSum += Number(usageLines[qi].qtyBaseUom || 0);
+                    }
+                    var qtyBaseSumText = formatQty(qtyBaseSum);
+                    if (data.baseUomName) { qtyBaseSumText += ' ' + data.baseUomName; }
+                    $modal.find('.vas-tup-m-qtybase').text(qtyBaseSumText);
                     mPageNo = 1;
                     renderLinesTable();
                 }
@@ -520,17 +605,17 @@
                 '<select class="vas-tup-select vas-tup-y-sel"></select>' +
                 '<div class="vas-tup-divider"></div>' +
                 '<div class="vas-tup-toggle-grp">' +
-                '<button type="button" class="vas-tup-pill vas-tup-qty-pill active">Qty</button>' +
-                '<button type="button" class="vas-tup-pill vas-tup-val-pill">Value</button>' +
+                '<button type="button" class="vas-tup-pill vas-tup-qty-pill active">' + escapeHtml(label("VAS_188_Qty", "Qty")) + '</button>' +
+                '<button type="button" class="vas-tup-pill vas-tup-val-pill">' + escapeHtml(label("VAS_188_Value", "Value")) + '</button>' +
                 '</div>' +
                 '</div>' +
                 '</div>' +
                 '<div class="vas-tup-body"></div>' +
                 '<div class="vas-tup-foot">' +
-                '<div class="vas-tup-foot-helper">0 of 0</div>' +
+                '<div class="vas-tup-foot-helper">0 ' + escapeHtml(label("VAS_188_Of", "of")) + ' 0</div>' +
                 '<div class="vas-tup-pager">' +
                 '<button type="button" class="vas-tup-pager-btn vas-tup-prev">&lsaquo;</button>' +
-                '<span class="vas-tup-pager-txt">1 of 1</span>' +
+                '<span class="vas-tup-pager-txt">1 ' + escapeHtml(label("VAS_188_Of", "of")) + ' 1</span>' +
                 '<button type="button" class="vas-tup-pager-btn vas-tup-next">&rsaquo;</button>' +
                 '</div>' +
                 '</div>' +
@@ -547,9 +632,9 @@
             $qtyPill = $card.find('.vas-tup-qty-pill');
             $valPill = $card.find('.vas-tup-val-pill');
 
-            var monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            var monthNames = label("VAS_188_Months", "Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec").split(',');
             for (var m = 1; m <= 12; m++) {
-                $monthSelect.append('<option value="' + m + '" ' + (m === selectedMonth ? 'selected' : '') + '>' + monthNames[m - 1] + '</option>');
+                $monthSelect.append('<option value="' + m + '" ' + (m === selectedMonth ? 'selected' : '') + '>' + escapeHtml(monthNames[m - 1]) + '</option>');
             }
 
             var currentYear = DateTimeNowYear();

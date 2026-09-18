@@ -55,8 +55,7 @@
         var state = { mode: 'fast', fast: [], slow: [], fastWindow: 30, slowWindow: 90 };
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return translated && translated.charAt(0) !== '[' ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function format(key, fallback, token) {
@@ -221,10 +220,7 @@
             $modal.find('.MPC-mv-modal-close').attr({ 'aria-label': closeText, title: closeText });
             $('body').append($modal);
 
-            $modal.on('click' + modalEventNamespace, '.MPC-mv-modal-close, .MPC-mv-modal-scrim', closeModal);
-            $(document).on('keydown' + modalEventNamespace, function (event) {
-                if (event.key === 'Escape') { closeModal(); }
-            });
+            $modal.on('click' + modalEventNamespace, '.MPC-mv-modal-close', closeModal);
         }
 
         function closeModal() {

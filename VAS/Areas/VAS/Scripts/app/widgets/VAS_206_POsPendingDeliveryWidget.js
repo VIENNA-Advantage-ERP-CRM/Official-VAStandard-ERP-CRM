@@ -8,27 +8,27 @@
  * Summary Message Table
  *  # | Current Text                                       | Message Key
  * ---+----------------------------------------------------+-----------------------------------
- *  1 | POs Pending Delivery                               | VAS_POsPendingDelivery
- *  2 | Open till date                                     | VAS_OpenTillDate
- *  3 | items pending                                      | VAS_ItemsPendingLabel
- *  4 | delivery                                           | VAS_DeliveryLabel
- *  5 | undelivered                                        | VAS_Undelivered
- *  6 | past due                                           | VAS_PastDueLabel
- *  7 | All POs till date that are not fully delivered     | VAS_PendingDeliverySubtitle
- *  8 | Open POs                                           | VAS_OpenPOs
- *  9 | Items pending                                      | VAS_ItemsPending
- * 10 | Undelivered value                                  | VAS_UndeliveredValue
- * 11 | Past due                                           | VAS_PastDue
- * 12 | Purchase orders awaiting delivery                  | VAS_POsAwaitingDelivery
- * 13 | earliest expected first                            | VAS_EarliestExpectedFirst
- * 14 | PO No                                              | VAS_PONumber
+ *  1 | POs Pending Delivery                               | VAS_206_POsPendingDelivery
+ *  2 | Open till date                                     | VAS_206_OpenTillDate
+ *  3 | items pending                                      | VAS_206_ItemsPendingLabel
+ *  4 | delivery                                           | VAS_206_DeliveryLabel
+ *  5 | undelivered                                        | VAS_206_Undelivered
+ *  6 | past due                                           | VAS_206_PastDueLabel
+ *  7 | All POs till date that are not fully delivered     | VAS_206_PendingDeliverySubtitle
+ *  8 | Open POs                                           | VAS_206_OpenPOs
+ *  9 | Items pending                                      | VAS_206_ItemsPending
+ * 10 | Undelivered value                                  | VAS_206_UndeliveredValue
+ * 11 | Past due                                           | VAS_206_PastDue
+ * 12 | Purchase orders awaiting delivery                  | VAS_206_POsAwaitingDelivery
+ * 13 | earliest expected first                            | VAS_206_EarliestExpectedFirst
+ * 14 | PO No                                              | VAS_206_PONumber
  * 15 | PO date                                            | VAS_PODate
  * 16 | Vendor                                             | VAS_Vendor
  * 17 | Warehouse                                          | VAS_Warehouse
  * 18 | Ordered                                            | VAS_Ordered
  * 19 | Pending items                                      | VAS_PendingItems
- * 20 | Pending value                                      | VAS_PendingValue
- * 21 | Expected                                           | VAS_Expected
+ * 20 | Pending value                                      | VAS_206_PendingValue
+ * 21 | Expected                                           | VAS_206_Expected
  * 22 | Delivery                                           | VAS_Delivery
  * 23 | Status                                             | VAS_Status
  * 24 | Pending                                            | VAS_Pending
@@ -57,10 +57,12 @@
  * 47 | Open Record                                        | VAS_OpenRecord
  * 48 | Showing                                            | VAS_Showing
  * 49 | of                                                 | VAS_Of
- * 50 | No pending delivery POs found                      | VAS_NoPendingDeliveryPOs
+ * 50 | No pending delivery POs found                      | VAS_206_NoPendingDeliveryPOs
  * 51 | Loading...                                         | VAS_Loading
  * 52 | Couldn't load data                                 | VAS_CouldntLoad
  * 53 | lines of                                           | VAS_LinesOf
+ * 54 | Previous                                            | VAS_206_Previous
+ * 55 | Next                                                | VAS_206_Next
  */
 
 ; VAS = window.VAS || {};
@@ -84,8 +86,7 @@
     }
 
     function lbl(key, fallback) {
-        var translated = VIS.Msg.getMsg(key);
-        return (translated && translated.charAt(0) !== '[') ? translated : fallback;
+        return VIS.Msg.getMsg(key);
     }
 
     function esc(s) {
@@ -207,9 +208,9 @@
         }
 
         function createWidgetHtml() {
-            var title = lbl('VAS_POsPendingDelivery', 'POs Pending Delivery');
-            var itemsPendingLbl = lbl('VAS_ItemsPendingLabel', 'items pending');
-            var deliveryLbl = lbl('VAS_DeliveryLabel', 'delivery');
+            var title = lbl('VAS_206_POsPendingDelivery', 'POs Pending Delivery');
+            var itemsPendingLbl = lbl('VAS_206_ItemsPendingLabel', 'items pending');
+            var deliveryLbl = lbl('VAS_206_DeliveryLabel', 'delivery');
 
             $card = $(
                 '<button type="button" class="vas-206-card vas-206-border-warn" aria-label="' + esc(title) + '">' +
@@ -221,7 +222,7 @@
                     '<div class="vas-206-body-row">' +
                         '<div class="vas-206-left-block">' +
                             '<p class="vas-206-kpi-val vas-206-warn">—</p>' +
-                            '<p class="vas-206-kpi-meta">' + esc(lbl('VAS_OpenTillDate', 'Open till date')) + '</p>' +
+                            '<p class="vas-206-kpi-meta">' + esc(lbl('VAS_206_OpenTillDate', 'Open till date')) + '</p>' +
                         '</div>' +
                         '<div class="vas-206-kpi-side">' +
                             '<div class="vas-206-side-v">—</div>' +
@@ -292,9 +293,9 @@
                 $kpiItems.attr('title', formatNumber(itemsPending));
             }
             if ($kpiMeta) {
-                var metaText = lbl('VAS_OpenTillDate', 'Open till date') + ' · ' +
-                               formattedUndelivered + ' ' + lbl('VAS_Undelivered', 'undelivered') + ' · ' +
-                               pastDue + ' ' + lbl('VAS_PastDueLabel', 'past due');
+                var metaText = lbl('VAS_206_OpenTillDate', 'Open till date') + ' · ' +
+                               formattedUndelivered + ' ' + lbl('VAS_206_Undelivered', 'undelivered') + ' · ' +
+                               pastDue + ' ' + lbl('VAS_206_PastDueLabel', 'past due');
                 $kpiMeta.text(metaText);
                 $kpiMeta.attr('title', metaText);
             }
@@ -393,12 +394,7 @@
             $modalHost.find('.vas-206-back-btn').on('click', popModal);
 
             $modalHost.on('click', function (e) {
-                if (e.target === this) { closeModal(); }
                 if ($(e.target).closest('[data-vas-close]').length) { closeModal(); }
-            });
-
-            $(document).on('keydown.vas206', function (e) {
-                if (e.key === 'Escape') { closeModal(); }
             });
 
             $(window).on('resize.vas206', function () {
@@ -563,7 +559,7 @@
                  '<div class="vas-206-mbody">';
 
             if (slice.length === 0) {
-                h += '<div class="vas-206-empty-row">' + esc(lbl('VAS_NoPendingDeliveryPOs', 'No pending delivery POs found')) + '</div>';
+                h += '<div class="vas-206-empty-row">' + esc(lbl('VAS_206_NoPendingDeliveryPOs', 'No pending delivery POs found')) + '</div>';
             } else {
                 for (var ri = 0; ri < slice.length; ri++) {
                     var r = slice[ri];
@@ -587,9 +583,9 @@
 
             if (pages > 1) {
                 h += '<span class="vas-206-pager">' +
-                        '<button type="button" class="vas-206-pbtn" data-mt="' + id + '" data-dir="-1"' + (t.page === 0 ? ' disabled' : '') + ' aria-label="Previous">' + ICON_PREV + '</button>' +
+                        '<button type="button" class="vas-206-pbtn" data-mt="' + id + '" data-dir="-1"' + (t.page === 0 ? ' disabled' : '') + ' aria-label="' + esc(lbl('VAS_206_Previous')) + '">' + ICON_PREV + '</button>' +
                         '<span class="vas-206-ptxt">' + (t.page + 1) + ' ' + lbl('VAS_Of', 'of') + ' ' + pages + '</span>' +
-                        '<button type="button" class="vas-206-pbtn" data-mt="' + id + '" data-dir="1"' + (t.page >= pages - 1 ? ' disabled' : '') + ' aria-label="Next">' + ICON_NEXT + '</button>' +
+                        '<button type="button" class="vas-206-pbtn" data-mt="' + id + '" data-dir="1"' + (t.page >= pages - 1 ? ' disabled' : '') + ' aria-label="' + esc(lbl('VAS_206_Next')) + '">' + ICON_NEXT + '</button>' +
                      '</span>';
             } else {
                 h += '<span></span>';
@@ -640,22 +636,22 @@
             var formattedUndelivered = formatMoney(kpiData.undeliveredValue, cur.CurSymbol, cur.ISO_Code, cur.StdPrecision);
 
             var statStrip = mstatsHtml([
-                { l: lbl('VAS_OpenPOs', 'Open POs'), v: formatNumber(kpiData.openPOs) },
-                { l: lbl('VAS_ItemsPending', 'Items pending'), v: formatNumber(kpiData.itemsPending) },
-                { l: lbl('VAS_UndeliveredValue', 'Undelivered value'), v: formattedUndelivered },
-                { l: lbl('VAS_PastDue', 'Past due'), v: formatNumber(kpiData.pastDue) }
+                { l: lbl('VAS_206_OpenPOs', 'Open POs'), v: formatNumber(kpiData.openPOs) },
+                { l: lbl('VAS_206_ItemsPending', 'Items pending'), v: formatNumber(kpiData.itemsPending) },
+                { l: lbl('VAS_206_UndeliveredValue', 'Undelivered value'), v: formattedUndelivered },
+                { l: lbl('VAS_206_PastDue', 'Past due'), v: formatNumber(kpiData.pastDue) }
             ]);
 
             var cols = [
                 { label: '', w: 0.32 },
-                { label: lbl('VAS_PONumber', 'PO No'), w: 1.15, cls: 'vas-206-c-link' },
+                { label: lbl('VAS_206_PONumber', 'PO No'), w: 1.15, cls: 'vas-206-c-link' },
                 { label: lbl('VAS_PODate', 'PO date'), w: 1.0 },
                 { label: lbl('VAS_Vendor', 'Vendor'), w: 1.6 },
                 { label: lbl('VAS_Warehouse', 'Warehouse'), w: 1.2 },
                 { label: lbl('VAS_Ordered', 'Ordered'), w: 0.75, align: 'right' },
                 { label: lbl('VAS_PendingItems', 'Pending items'), w: 0.9, align: 'right', cls: 'vas-206-c-prim' },
-                { label: lbl('VAS_PendingValue', 'Pending value'), w: 0.95, align: 'right', cls: 'vas-206-c-emph' },
-                { label: lbl('VAS_Expected', 'Expected'), w: 1.0 },
+                { label: lbl('VAS_206_PendingValue', 'Pending value'), w: 0.95, align: 'right', cls: 'vas-206-c-emph' },
+                { label: lbl('VAS_206_Expected', 'Expected'), w: 1.0 },
                 { label: lbl('VAS_Delivery', 'Delivery'), w: 1.05 }
             ];
 
@@ -680,14 +676,14 @@
 
             var bodyHtml =
                 statStrip +
-                '<div class="vas-206-msec">' + esc(lbl('VAS_POsAwaitingDelivery', 'Purchase orders awaiting delivery')) + '</div>' +
-                pagedTable(cols, rows, { label: lbl('VAS_EarliestExpectedFirst', 'earliest expected first') });
+                '<div class="vas-206-msec">' + esc(lbl('VAS_206_POsAwaitingDelivery', 'Purchase orders awaiting delivery')) + '</div>' +
+                pagedTable(cols, rows, { label: lbl('VAS_206_EarliestExpectedFirst', 'earliest expected first') });
 
             openModal({
-                title: lbl('VAS_POsPendingDelivery', 'POs Pending Delivery'),
-                subtitle: lbl('VAS_PendingDeliverySubtitle', 'All POs till date that are not fully delivered'),
+                title: lbl('VAS_206_POsPendingDelivery', 'POs Pending Delivery'),
+                subtitle: lbl('VAS_206_PendingDeliverySubtitle', 'All POs till date that are not fully delivered'),
                 body: bodyHtml,
-                foot: '<span class="vas-206-foot-note">' + all.length + ' ' + esc(lbl('VAS_OpenPOs', 'Open POs')) + ' · ' + esc(formattedUndelivered) + '</span>' +
+                foot: '<span class="vas-206-foot-note">' + all.length + ' ' + esc(lbl('VAS_206_OpenPOs', 'Open POs')) + ' · ' + esc(formattedUndelivered) + '</span>' +
                       '<span><button type="button" class="vas-206-btn" data-vas-close="1">' + esc(lbl('VAS_Close', 'Close')) + '</button></span>'
             });
         }
@@ -937,7 +933,6 @@
 
         this.disposeComponent = function () {
             if ($card) { $card.off('click'); }
-            $(document).off('keydown.vas206');
             $(window).off('resize.vas206');
             if ($modalHost) {
                 $modalHost.remove();

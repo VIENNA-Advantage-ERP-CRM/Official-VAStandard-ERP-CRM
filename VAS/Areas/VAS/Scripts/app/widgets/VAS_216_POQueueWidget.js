@@ -8,25 +8,25 @@
  * Summary Message Table
  *  # | Current Text                                            | Message Key
  * ---+---------------------------------------------------------+-----------------------------------
- *  1 | PO Queue                                                | VAS_POQueue
- *  2 | Live purchase orders by expected delivery date          | VAS_POQueueSubtitle
+ *  1 | PO Queue                                                | VAS_216_POQueue
+ *  2 | Live purchase orders by expected delivery date          | VAS_216_POQueueSubtitle
  *  3 | Month                                                   | VAS_Month
  *  4 | Year                                                    | VAS_Year
- *  5 | PO No                                                   | VAS_PONumber
+ *  5 | PO No                                                   | VAS_216_PONumber
  *  6 | PO date                                                 | VAS_PODate
  *  7 | Vendor                                                  | VAS_Vendor
  *  8 | Warehouse                                               | VAS_Warehouse
- *  9 | Requisition                                             | VAS_Requisition
+ *  9 | Requisition                                             | VAS_216_Requisition
  * 10 | Representative                                          | VAS_Representative
- * 11 | Expected                                                | VAS_Expected
+ * 11 | Expected                                                | VAS_216_Expected
  * 12 | Value                                                   | VAS_Value
  * 13 | Status                                                  | VAS_Status
  * 14 | Showing                                                 | VAS_Showing
  * 15 | of                                                      | VAS_Of
- * 16 | select a PO number to open the record                   | VAS_SelectPORecordHelper
+ * 16 | select a PO number to open the record                   | VAS_216_SelectPORecordHelper
  * 17 | Previous                                                | VAS_Previous
  * 18 | Next                                                    | VAS_Next
- * 19 | No live purchase orders found for the selected period   | VAS_NoLivePOsFound
+ * 19 | No live purchase orders found for the selected period   | VAS_216_NoLivePOsFound
  * 20 | Loading...                                              | VAS_Loading
  * 21 | Couldn't load data                                      | VAS_CouldntLoad
  * 22 | Expected on                                             | VAS_ExpectedOn
@@ -82,8 +82,7 @@
     }
 
     function lbl(key, fallback) {
-        var translated = VIS.Msg.getMsg(key);
-        return (translated && translated.charAt(0) !== '[') ? translated : fallback;
+        return VIS.Msg.getMsg(key);
     }
 
     function esc(s) {
@@ -171,14 +170,13 @@
             case 'VO':
                 return { text: lbl('VAS_Voided', 'Voided'), chip: 'vas-216-chip-risk' };
             case 'RE':
-                return { text: lbl('VAS_Reversed', 'Reversed'), chip: 'vas-216-chip-risk' };
+                return { text: lbl('VAS_216_Reversed', 'Reversed'), chip: 'vas-216-chip-risk' };
             case 'WC':
-                return { text: lbl('VAS_WaitingConfirmation', 'Waiting Confirmation'), chip: 'vas-216-chip-prop' };
+                return { text: lbl('VAS_216_WaitingConfirmation', 'Waiting Confirmation'), chip: 'vas-216-chip-prop' };
             case 'WP':
-                return { text: lbl('VAS_WaitingPayment', 'Waiting Payment'), chip: 'vas-216-chip-prop' };
+                return { text: lbl('VAS_216_WaitingPayment', 'Waiting Payment'), chip: 'vas-216-chip-prop' };
             default:
-                var translated = VIS.Msg.getMsg(docStatus);
-                return { text: (translated && translated.charAt(0) !== '[') ? translated : docStatus, chip: 'vas-216-chip-neutral' };
+                return { text: VIS.Msg.getMsg(docStatus), chip: 'vas-216-chip-neutral' };
         }
     }
 
@@ -285,8 +283,8 @@
         }
 
         function createWidgetHtml() {
-            var title = lbl('VAS_POQueue', 'PO Queue');
-            var subtitle = lbl('VAS_POQueueSubtitle', 'Live purchase orders by expected delivery date');
+            var title = lbl('VAS_216_POQueue', 'PO Queue');
+            var subtitle = lbl('VAS_216_POQueueSubtitle', 'Live purchase orders by expected delivery date');
 
             $card = $(
                 '<div class="vas-216-card">' +
@@ -399,13 +397,13 @@
 
         function renderTableHeaders() {
             var headers = [
-                { label: lbl('VAS_PONumber', 'PO No'), align: 'left' },
+                { label: lbl('VAS_216_PONumber', 'PO No'), align: 'left' },
                 { label: lbl('VAS_PODate', 'PO date'), align: 'left' },
                 { label: lbl('VAS_Vendor', 'Vendor'), align: 'left' },
                 { label: lbl('VAS_Warehouse', 'Warehouse'), align: 'left' },
-                { label: lbl('VAS_Requisition', 'Requisition'), align: 'left' },
+                { label: lbl('VAS_216_Requisition', 'Requisition'), align: 'left' },
                 { label: lbl('VAS_Representative', 'Representative'), align: 'left' },
-                { label: lbl('VAS_Expected', 'Expected'), align: 'left' },
+                { label: lbl('VAS_216_Expected', 'Expected'), align: 'left' },
                 { label: lbl('VAS_Value', 'Value'), align: 'right' },
                 { label: lbl('VAS_Status', 'Status'), align: 'left' }
             ];
@@ -461,7 +459,7 @@
 
         function renderTableRows(records) {
             if (!records || records.length === 0) {
-                var emptyMsg = lbl('VAS_NoLivePOsFound', 'No live purchase orders found for the selected period');
+                var emptyMsg = lbl('VAS_216_NoLivePOsFound', 'No live purchase orders found for the selected period');
                 $tableBody.html(
                     '<div class="vas-216-empty-state">' +
                         ICON_EMPTY +
@@ -517,7 +515,7 @@
             var helperText = lbl('VAS_Showing', 'Showing') + ' ' +
                              startIdx + '–' + endIdx + ' ' +
                              lbl('VAS_Of', 'of') + ' ' + totalRecords + ' · ' +
-                             lbl('VAS_SelectPORecordHelper', 'select a PO number to open the record');
+                             lbl('VAS_216_SelectPORecordHelper', 'select a PO number to open the record');
 
             $helper.text(helperText);
             $helper.attr('title', helperText);
@@ -623,12 +621,7 @@
             $modalHost.find('.vas-216-back-btn').on('click', popModal);
 
             $modalHost.on('click', function (e) {
-                if (e.target === this) { closeModal(); }
                 if ($(e.target).closest('[data-vas-close]').length) { closeModal(); }
-            });
-
-            $(document).on('keydown.vas216', function (e) {
-                if (e.key === 'Escape') { closeModal(); }
             });
 
             $(window).on('resize.vas216', function () {

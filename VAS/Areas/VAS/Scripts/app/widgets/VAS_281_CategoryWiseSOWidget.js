@@ -87,6 +87,8 @@
  * 54  | of                                                                    | VAS_281_Of
  * 55  | Showing                                                               | VAS_281_Showing
  * 56  | Search is unavailable right now. Try again in a moment.               | VAS_281_LoadError
+ * 57  | Month                                                                 | VAS_281_Month
+ * 58  | Year                                                                  | VAS_281_Year
  */
 ; VAS = window.VAS || {};
 
@@ -148,8 +150,7 @@
         var currentCfg = null;
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return (translated && translated.charAt(0) !== '[') ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -257,8 +258,8 @@
             $htxt.append('<p class="vas281-sub">' + escapeHtml(label('VAS_281_Subtitle', 'Share of SO value')) + '</p>');
 
             var $filter = $('<div class="vas281-mfilter"></div>');
-            $monthSel = $('<select class="vas281-msel" aria-label="Month"></select>');
-            $yearSel = $('<select class="vas281-msel" aria-label="Year"></select>');
+            $monthSel = $('<select class="vas281-msel" aria-label="' + escapeHtml(label('VAS_281_Month', 'Month')) + '"></select>');
+            $yearSel = $('<select class="vas281-msel" aria-label="' + escapeHtml(label('VAS_281_Year', 'Year')) + '"></select>');
             fillMonthSelect($monthSel);
             fillYearSelect($yearSel);
             $filter.append($monthSel, $yearSel);
@@ -434,9 +435,6 @@
 
             $closeBtn.on('click', closeModal);
             $mBack.on('click', backModal);
-            $mask.on('mousedown', function (event) {
-                if (event.target === $mask[0]) { closeModal(); }
-            });
             $mBody.on('click', function (event) {
                 var pageBtn = event.target.closest ? event.target.closest('[data-dir]') : null;
                 if (pageBtn) { turnPage(pageBtn.getAttribute('data-table'), Number(pageBtn.getAttribute('data-dir'))); return; }
@@ -450,10 +448,6 @@
         function bindDocumentLevelEvents() {
             var ns = '.vas281-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget');
 
-            $(document).on('keydown' + ns, function (event) {
-                if (event.key !== 'Escape') { return; }
-                if ($mask.hasClass('is-open')) { closeModal(); }
-            });
             $(window).on('resize' + ns, function () {
                 if ($mask.hasClass('is-open')) { fitAllTables(); }
             });

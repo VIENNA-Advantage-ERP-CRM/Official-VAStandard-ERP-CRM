@@ -1,6 +1,6 @@
 /********************************************************
  * Project Name   : ModelLibrary
- * Class Name     : MOppLines
+ * Class Name     : MVASOppLines
  * Purpose        : Business-logic layer over X_VAS_OppLines (table VAS_OppLines),
  *                  the opportunity-line counterpart of MProjectLine / C_ProjectLine.
  * Class Used     : X_VAS_OppLines
@@ -20,12 +20,12 @@ using VAdvantage.Logging;
 using VAdvantage.Model;
 using VAdvantage.Utility;
 
-namespace ModelLibrary.Model
+namespace VAdvantage.Model
 {
-    public class MOppLines : X_VAS_OppLines
+    public class MVASOppLines : X_VAS_OppLines
     {
         /** Parent				*/
-        private MOpportunity _parent = null;
+        private MVASOpportunity _parent = null;
         private int currencyPrecision = 0;
 
         /// <summary>
@@ -34,7 +34,7 @@ namespace ModelLibrary.Model
         /// <param name="ctx">context</param>
         /// <param name="VAS_OppLines_ID">id</param>
         /// <param name="trxName">transaction</param>
-        public MOppLines(Ctx ctx, int VAS_OppLines_ID, Trx trxName)
+        public MVASOppLines(Ctx ctx, int VAS_OppLines_ID, Trx trxName)
             : base(ctx, VAS_OppLines_ID, trxName)
         {
             if (VAS_OppLines_ID == 0)
@@ -53,7 +53,7 @@ namespace ModelLibrary.Model
         /// <param name="ctx">context</param>
         /// <param name="rs">result set</param>
         /// <param name="trxName">transaction</param>
-        public MOppLines(Ctx ctx, DataRow rs, Trx trxName)
+        public MVASOppLines(Ctx ctx, DataRow rs, Trx trxName)
             : base(ctx, rs, trxName)
         {
         }
@@ -62,7 +62,7 @@ namespace ModelLibrary.Model
         /// Parent Constructor
         /// </summary>
         /// <param name="opportunity">parent</param>
-        public MOppLines(MOpportunity opportunity)
+        public MVASOppLines(MVASOpportunity opportunity)
             : this(opportunity.GetCtx(), 0, opportunity.Get_TrxName())
         {
             SetClientOrg(opportunity);
@@ -145,7 +145,7 @@ namespace ModelLibrary.Model
         private void UpdateHeader()
         {
                 //Used transaction because total was not updating on header
-                MOpportunity prj = new MOpportunity(GetCtx(), GetVAS_Opportunity_ID(), Get_TrxName());
+                MVASOpportunity prj = new MVASOpportunity(GetCtx(), GetVAS_Opportunity_ID(), Get_TrxName());
                 decimal plnAmt = Util.GetValueOfDecimal(DB.ExecuteScalar("SELECT COALESCE(SUM(pl.PlannedAmt),0)  FROM vas_opplines pl WHERE pl.IsActive = 'Y' AND pl.VAS_Opportunity_ID =" + GetVAS_Opportunity_ID(), null, Get_TrxName()));
                 prj.SetPlannedAmt(plnAmt);
                 prj.Save();
@@ -173,11 +173,11 @@ namespace ModelLibrary.Model
         /// Get parent Opportunity
         /// </summary>
         /// <returns>parent</returns>
-        public MOpportunity GetOpportunity()
+        public MVASOpportunity GetOpportunity()
         {
             if (_parent == null && GetVAS_Opportunity_ID() != 0)
             {
-                _parent = new MOpportunity(GetCtx(), GetVAS_Opportunity_ID(), Get_TrxName());
+                _parent = new MVASOpportunity(GetCtx(), GetVAS_Opportunity_ID(), Get_TrxName());
                 if (Get_TrxName() != null)
                     _parent.Load(Get_TrxName());
             }
@@ -213,7 +213,7 @@ namespace ModelLibrary.Model
         /// <returns>info</returns>
         public override String ToString()
         {
-            StringBuilder sb = new StringBuilder("MOppLines[");
+            StringBuilder sb = new StringBuilder("MVASOppLines[");
             sb.Append(Get_ID()).Append("-")
                 .Append(GetVAS_LineNo())
                 .Append(",VAS_Opportunity_ID=").Append(GetVAS_Opportunity_ID())

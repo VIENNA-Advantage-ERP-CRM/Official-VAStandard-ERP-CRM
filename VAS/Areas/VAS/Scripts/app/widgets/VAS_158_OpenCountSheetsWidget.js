@@ -21,6 +21,17 @@
  * 13  | Close                                            | VAS_158_Close
  * 14  | No draft count sheets available                  | VAS_158_NoDraftCountSheets
  * 15  | Unable to load count sheets                      | VAS_158_UnableToLoadCountSheets
+ * 16  | Open Count Sheets Widget                         | VAS_158_OpenCountSheetsWidgetLabel
+ * 17  | Drafted Count Sheets                             | VAS_158_DraftedCountSheets
+ * 18  | Close modal                                      | VAS_158_CloseModal
+ * 19  | Loading drafted count sheets...                  | VAS_158_LoadingDraftedCountSheets
+ * 20  | No drafted count sheets found.                   | VAS_158_NoDraftedCountSheetsFound
+ * 21  | Unable to load drafted count sheets.              | VAS_158_UnableToLoadDraftedCountSheets
+ * 22  | No drafted count sheets                          | VAS_158_NoDraftedCountSheets
+ * 23  | Locator                                          | VAS_158_Locator
+ * 24  | Previous page                                    | VAS_158_PreviousPage
+ * 25  | Next page                                        | VAS_158_NextPage
+ * 26  | Showing                                          | VAS_158_Showing
  */
 ; VAS = window.VAS || {};
 
@@ -47,6 +58,13 @@
     // "Inventory Count navigation" section. Used as the fallback when the widget is not hosted
     // inside that window itself.
     var COUNT_WINDOW_NAME = "VAS_PhysicalInventory";
+    /* Resolved AD_Window_ID for the Home Page zoom path, cached after the first successful
+       lookup so a second click does not repeat the round trip. */
+    var countWindowId = 0;
+
+    function lbl(key) {
+        return VIS.Msg.getMsg(key);
+    }
 
     VAS.VAS_158_OpenCountSheetsWidget = function () {
 
@@ -56,7 +74,7 @@
 
         var $self = this;
         var $wrapper = $('<div class="vas-opencountsheets-container">');
-        var $root = $('<div class="vas-opencountsheets-root" role="button" tabindex="0" aria-haspopup="dialog" aria-label="Open Count Sheets Widget">');
+        var $root = $('<div class="vas-opencountsheets-root" role="button" tabindex="0" aria-haspopup="dialog" aria-label="' + lbl("VAS_158_OpenCountSheetsWidgetLabel") + '">');
         var $valEl;
         var draftCount = 0;
         var draftList = [];
@@ -73,7 +91,7 @@
         };
 
         function createWidget() {
-            var $label = $('<div class="vas-opencountsheets-label">Open Count Sheets</div>');
+            var $label = $('<div class="vas-opencountsheets-label">' + lbl("VAS_158_OpenCountSheets") + '</div>');
             $valEl = $('<div class="vas-opencountsheets-value">--</div>');
             /* No meta subline. The card used to carry "Tap to view drafted counts" under the
                value; removed on request. The card stays clickable - the affordance is the
@@ -136,14 +154,14 @@
             var $dialog = $('<div class="vas-opencountsheets-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="vas-opencountsheets-modal-title">');
 
             var $header = $('<div class="vas-opencountsheets-modal-header">');
-            var $title = $('<h3 id="vas-opencountsheets-modal-title" class="vas-opencountsheets-modal-title">Drafted Count Sheets</h3>');
-            var $closeBtn = $('<button type="button" class="vas-opencountsheets-modal-close" aria-label="Close modal">&times;</button>');
+            var $title = $('<h3 id="vas-opencountsheets-modal-title" class="vas-opencountsheets-modal-title">' + lbl("VAS_158_DraftedCountSheets") + '</h3>');
+            var $closeBtn = $('<button type="button" class="vas-opencountsheets-modal-close" aria-label="' + lbl("VAS_158_CloseModal") + '">&times;</button>');
 
             $header.append($title).append($closeBtn);
             $dialog.append($header);
 
             var $body = $('<div class="vas-opencountsheets-modal-body">');
-            $body.html('<div class="vas-opencountsheets-message">Loading drafted count sheets...</div>');
+            $body.html('<div class="vas-opencountsheets-message">' + lbl("VAS_158_LoadingDraftedCountSheets") + '</div>');
             $dialog.append($body);
 
             $overlay.append($dialog);
@@ -159,17 +177,6 @@
             };
 
             $closeBtn.on('click', closeModal);
-            $overlay.on('click', function (e) {
-                if ($(e.target).hasClass('vas-opencountsheets-modal-overlay')) {
-                    closeModal();
-                }
-            });
-
-            $(document).off('keydown.vas-opencountsheets').on('keydown.vas-opencountsheets', function (e) {
-                if (e.key === 'Escape' && $modalOverlay) {
-                    closeModal();
-                }
-            });
 
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_158_OpenCountSheetsWidget/GetDraftSheetsList",
@@ -181,12 +188,12 @@
                         currentPage = 1;
                         renderModalContent($body);
                     } else {
-                        $body.html('<div class="vas-opencountsheets-message">No drafted count sheets found.</div>');
+                        $body.html('<div class="vas-opencountsheets-message">' + lbl("VAS_158_NoDraftedCountSheetsFound") + '</div>');
                     }
                 },
                 error: function (err) {
                     console.error("VAS_158_OpenCountSheetsWidget: Error loading draft list", err);
-                    $body.html('<div class="vas-opencountsheets-message">Unable to load drafted count sheets.</div>');
+                    $body.html('<div class="vas-opencountsheets-message">' + lbl("VAS_158_UnableToLoadDraftedCountSheets") + '</div>');
                 }
             });
         }
@@ -209,18 +216,18 @@
             $body.empty();
 
             if (!draftList || draftList.length === 0) {
-                $body.html('<div class="vas-opencountsheets-message">No drafted count sheets</div>');
+                $body.html('<div class="vas-opencountsheets-message">' + lbl("VAS_158_NoDraftedCountSheets") + '</div>');
                 return;
             }
 
             var $headerRow = $(
                 '<div class="vas-opencountsheets-grid-row vas-opencountsheets-header-row">' +
-                '<div class="vas-opencountsheets-th">Document No.</div>' +
-                '<div class="vas-opencountsheets-th">Warehouse</div>' +
-                '<div class="vas-opencountsheets-th">Locator</div>' +
-                '<div class="vas-opencountsheets-th vas-opencountsheets-th-right">Lines</div>' +
-                '<div class="vas-opencountsheets-th">Movement Date</div>' +
-                '<div class="vas-opencountsheets-th">Status</div>' +
+                '<div class="vas-opencountsheets-th">' + lbl("VAS_158_DocumentNo") + '</div>' +
+                '<div class="vas-opencountsheets-th">' + lbl("VAS_158_Warehouse") + '</div>' +
+                '<div class="vas-opencountsheets-th">' + lbl("VAS_158_Locator") + '</div>' +
+                '<div class="vas-opencountsheets-th vas-opencountsheets-th-right">' + lbl("VAS_158_Lines") + '</div>' +
+                '<div class="vas-opencountsheets-th">' + lbl("VAS_158_MovementDate") + '</div>' +
+                '<div class="vas-opencountsheets-th">' + lbl("VAS_158_Status") + '</div>' +
                 '</div>'
             );
             $body.append($headerRow);
@@ -232,9 +239,9 @@
                 '<div class="vas-opencountsheets-modal-footer">' +
                 '<div class="vas-opencountsheets-footer-text"></div>' +
                 '<div class="vas-opencountsheets-pager">' +
-                '<button type="button" class="vas-opencountsheets-pager-btn vas-prev" aria-label="Previous page">&lsaquo;</button>' +
+                '<button type="button" class="vas-opencountsheets-pager-btn vas-prev" aria-label="' + lbl("VAS_158_PreviousPage") + '">&lsaquo;</button>' +
                 '<span class="vas-opencountsheets-pager-info"></span>' +
-                '<button type="button" class="vas-opencountsheets-pager-btn vas-next" aria-label="Next page">&rsaquo;</button>' +
+                '<button type="button" class="vas-opencountsheets-pager-btn vas-next" aria-label="' + lbl("VAS_158_NextPage") + '">&rsaquo;</button>' +
                 '</div>' +
                 '</div>'
             );
@@ -318,12 +325,12 @@
             var $btnNext = $footer.find('.vas-next');
 
             if (totalItems > 0) {
-                $footerText.text('Showing ' + (startIndex + 1) + '–' + endIndex + ' of ' + totalItems);
+                $footerText.text(lbl("VAS_158_Showing") + ' ' + (startIndex + 1) + '–' + endIndex + ' ' + lbl("VAS_158_Of") + ' ' + totalItems);
             } else {
-                $footerText.text('Showing 0 of 0');
+                $footerText.text(lbl("VAS_158_Showing") + ' 0 ' + lbl("VAS_158_Of") + ' 0');
             }
 
-            $pagerInfo.text(currentPage + ' of ' + totalPages);
+            $pagerInfo.text(currentPage + ' ' + lbl("VAS_158_Of") + ' ' + totalPages);
             $btnPrev.prop('disabled', currentPage === 1);
             $btnNext.prop('disabled', currentPage === totalPages);
 
@@ -381,13 +388,20 @@
         function openInventoryWindow(inventoryId) {
             if (!inventoryId) { return; }
 
-            $self.widgetFirevalueChanged({
-                "TabWhereClause": "M_Inventory.M_Inventory_ID=" + Number(inventoryId),
-                "TabLayout": "Y",
-                "TabIndex": "0",
-                "ActionName": hostWindowName() || COUNT_WINDOW_NAME,
-                "ActionType": "W"
-            });
+            if ($self.windowNo >= 0) {
+                /* Screen Landing Page */
+                $self.widgetFirevalueChanged({
+                    "TabWhereClause": "M_Inventory.M_Inventory_ID=" + Number(inventoryId),
+                    "TabLayout": "Y",
+                    "TabIndex": "0",
+                    "ActionName": hostWindowName() || COUNT_WINDOW_NAME,
+                    "ActionType": "W"
+                });
+            } else {
+                /* From Home Page */
+                VAS.ZoomUtil.zoomToRecord("M_Inventory_ID", Number(inventoryId), countWindowId, "VAS_PhysicalInventory", "Physical Inventory")
+                    .done(function (id) { if (id > 0) { countWindowId = id; } });
+            }
 
             /* The navigation happens on the screen behind the popup, so the popup has to get out
                of the way - previously it stayed open on top of the record it had just opened. */

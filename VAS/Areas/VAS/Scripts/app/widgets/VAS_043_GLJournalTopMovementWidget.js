@@ -14,6 +14,7 @@
  *  8  | Next                                 | VIS_Next
  *  9  | Of                                   | VIS_Of
  * 10  | Error Loading Data                   | VIS_Error
+ * 11  | Period                               | VAS_043_Period
  * ---------------------------------------------------------------------
  */
 
@@ -46,8 +47,7 @@
     // ───────────────────────────────────────────────────────────────────────────
 
     function lbl(key, fallback) {
-        var t = VIS.Msg.getMsg(key);
-        return (t && t.charAt(0) !== '[') ? t : fallback;
+        return VIS.Msg.getMsg(key);
     }
 
     function esc(str) {
@@ -175,7 +175,7 @@
                 +     '<div class="w-title">' + lbl('VAS_043_TopLedgerMovement', 'Top Ledger Movement') + '</div>'
                 +     '<div class="VAS-gljtm-subtitle">' + lbl('VAS_043_PrimaryBookSubtitle', 'Showing data from Primary Accounting Book') + '</div>'
                 +   '</div>'
-                +   '<div class="VAS-gljtm-period-group" role="group" aria-label="Period">'
+                +   '<div class="VAS-gljtm-period-group" role="group" aria-label="' + esc(lbl('VAS_043_Period', 'Period')) + '">'
                 +     '<button type="button" class="VAS-gljtm-period-btn" data-period="ytd">'
                 +       lbl('VAS_043_YTD', 'YTD')
                 +     '</button>'
