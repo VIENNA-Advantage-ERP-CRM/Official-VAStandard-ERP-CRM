@@ -8,6 +8,10 @@
  *                  listener when the panel is destroyed.
  * Chronological development:
  *   VAI154   12-Aug-2026  Created
+ *   VAI163   17-Sep-2026  Auto-repeated keydown (e.repeat) is swallowed: one
+ *                         action per press, so a held key can no longer run the
+ *                         callback twice and toast "nothing to undo" after an
+ *                         undo that had worked.
  ************************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS) {
@@ -57,6 +61,11 @@
         function handler(e) {
             // Require Ctrl+Alt; reject Shift and Meta (Windows key / Mac Command).
             if (!e.ctrlKey || !e.altKey || e.shiftKey || e.metaKey) return;
+            // One action per key PRESS. A key held a fraction too long auto-repeats
+            // keydown: the first event did the undo / delete, the repeat found nothing
+            // left to act on and answered "Nothing to undo" / "Select a row to delete"
+            // as though the shortcut had failed (17-Sep-2026).
+            if (e.repeat) { e.preventDefault(); e.stopPropagation(); return; }
 
             // Panel must be visible and have a record loaded.
             if (!opts.isActive()) return;

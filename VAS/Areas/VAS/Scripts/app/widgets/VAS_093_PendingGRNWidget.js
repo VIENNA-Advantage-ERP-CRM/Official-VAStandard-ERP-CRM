@@ -136,6 +136,40 @@
             });
         }
 
+        /* QA sheet Pending GRN #61 (2026-09-15): decimals of the received quantity follow the line
+           UOM's standard precision (0 = whole numbers only, 2 = 1.25 / 10.50 ...); same rules as the
+           Expected GRN widget. */
+        function decimalPlaces(raw) {
+            var text = String(raw == null ? '' : raw).trim();
+            if (text === '') { return 0; }
+            var sci = text.match(/^[-+]?\d*(?:\.(\d*))?e([-+]?\d+)$/i);
+            if (sci) {
+                return Math.max(0, (sci[1] || '').replace(/0+$/, '').length - Number(sci[2]));
+            }
+            var dot = text.indexOf('.');
+            return dot < 0 ? 0 : text.substring(dot + 1).replace(/0+$/, '').length;
+        }
+
+        function exceedsUomPrecision(raw, precision) {
+            if (precision == null || !isFinite(Number(precision))) { return false; }
+            return decimalPlaces(raw) > Math.max(0, Number(precision));
+        }
+
+        function uomPrecisionMessage(line) {
+            var p = Math.max(0, Number(line.uomPrecision || 0));
+            var name = (line.itemName || '') + (line.uom ? ' (' + line.uom + ')' : '');
+            if (p === 0) {
+                return lbl("VAS_QtyWholeNumberOnly", "Enter a whole number as the received quantity for") + ' ' + name + '.';
+            }
+            return lbl("VAS_QtyDecimalPlacesAllowed", "Decimal places allowed in the received quantity for") + ' ' + name + ': ' + p + '.';
+        }
+
+        /* Input step matching the UOM precision: 1, 0.1, 0.01, 0.001 ... */
+        function uomStep(precision) {
+            var p = Math.max(0, Number(precision || 0));
+            return p === 0 ? '1' : '0.' + new Array(p).join('0') + '1';
+        }
+
         function toInputValue(value) {
             var num = Number(value || 0);
             if (!isFinite(num)) { return "0"; }
@@ -395,19 +429,43 @@
             return null;
         }
 
+        /* QA sheet Pending GRN #58 / #61 (2026-09-15): validation message for a typed quantity, '' when
+           it is valid. Above the remaining quantity -> "Entered Quantity should be less than or equal
+           than PO Quantity"; more decimals than the line UOM's standard precision -> precision message
+           (UOM precision 0 allows whole numbers only). */
+        function lineQtyError(orderLineId) {
+            var raw = lineQtyById[orderLineId];
+            var line = childLineById(orderLineId);
+            if (raw == null || !line) { return ''; }
+            var text = String(raw).replace(/,/g, "").trim();
+            if (text === '') { return ''; }
+            var qty = Number(text);
+            if (!isFinite(qty) || qty < 0) {
+                return lbl("VAS_ReceivedQtyInvalid", "Received quantity must be between 0 and the remaining quantity.");
+            }
+            var max = Number(line.openQty);
+            if (isFinite(max) && qty > max + 0.000001) {
+                return lbl("VAS_EnteredQtyAbovePOQty", "Entered Quantity should be less than or equal than PO Quantity");
+            }
+            if (exceedsUomPrecision(text, line.uomPrecision)) {
+                return uomPrecisionMessage(line);
+            }
+            return '';
+        }
+
         /* Reads a selected line's editable quantity from lineQtyById state (so it
-           works across pages); null when invalid (negative, not a number, or
-           above the remaining quantity). */
+           works across pages); null when invalid (see lineQtyError) or not above 0. */
         function selectedLineQty(orderLineId) {
+            if (lineQtyError(orderLineId)) { return null; }
             var raw = lineQtyById[orderLineId];
             if (raw == null) { return null; }
             var qty = Number(String(raw).replace(/,/g, ""));
-            var line = childLineById(orderLineId);
-            var max = line ? Number(line.openQty) : 0;
             if (!isFinite(qty) || qty <= 0) { return null; }
-            if (isFinite(max) && max > 0 && qty > max + 0.000001) { return null; }
             return qty;
         }
+
+        /* True while the error line shows a quantity message (not a server error). */
+        var qtyErrorShown = false;
 
         function updateGenerateState() {
             var valid = selectedOrderLineIDs.length > 0;
@@ -415,6 +473,24 @@
                 if (selectedLineQty(selectedOrderLineIDs[i]) == null) { valid = false; }
             }
             $dialogBody.find('.vas-egrn-create-btn').prop('disabled', !valid);
+
+            /* Quantities are validated as they are typed: every offending input on the visible page is
+               flagged and the first message of any line (all pages) is shown. */
+            var firstError = '';
+            for (var c = 0; c < currentChildRecords.length && !firstError; c++) {
+                firstError = lineQtyError(currentChildRecords[c].poLineId);
+            }
+            $dialogBody.find('.vas-pgrn-qty').each(function () {
+                var $input = $(this);
+                $input.toggleClass('vas-pgrn-qty-invalid', !!lineQtyError(Number($input.data('orderlineid') || 0)));
+            });
+            if (firstError) {
+                setDialogError(firstError);
+                qtyErrorShown = true;
+            } else if (qtyErrorShown) {
+                setDialogError('');
+                qtyErrorShown = false;
+            }
         }
 
         function fieldHtml(label, value, strong) {
@@ -527,18 +603,31 @@
             var start = (linePageNo - 1) * linePageSize;
             var end = Math.min(start + linePageSize, childRecords.length);
 
+            /* QA sheet Pending GRN #54 (2026-09-15): the Attribute column is shown only when at least one
+               line of the PO has a real attribute; empty, whitespace and dash-only ("---") instance
+               descriptions do not count. */
+            function hasAttributeText(attributeName) {
+                var text = String(attributeName == null ? '' : attributeName).trim();
+                return text !== '' && !/^-+$/.test(text);
+            }
+            var showAttr = false;
+            for (var a = 0; a < childRecords.length; a++) {
+                if (hasAttributeText(childRecords[a].attributeName)) { showAttr = true; break; }
+            }
+            var lineCls = 'vas-egrn-rcv-line vas-pgrn-line' + (showAttr ? '' : ' vas-pgrn-noattr');
+
             var rows = '';
             for (var i = start; i < end; i++) {
                 var line = childRecords[i];
                 var checked = selectedOrderLineIDs.indexOf(Number(line.poLineId)) >= 0 ? ' checked' : '';
                 var qtyValue = lineQtyById[line.poLineId] != null ? lineQtyById[line.poLineId] : toInputValue(line.openQty);
                 rows +=
-                    '<div class="vas-egrn-rcv-line vas-pgrn-line">' +
+                    '<div class="' + lineCls + '">' +
                     '<label class="vas-egrn-rcv-name vas-pgrn-name" title="' + escapeHtml(line.itemName) + '">' +
                     '<input type="checkbox" class="vas-pgrn-check" data-orderlineid="' + escapeHtml(line.poLineId) + '"' + checked + '/>' +
                     '<span>' + escapeHtml(line.itemName) + '</span>' +
                     '</label>' +
-                    attrCellHtml(line.attributeName) +
+                    (showAttr ? attrCellHtml(line.attributeName) : '') +
                     /* Editable received quantity, defaulting to the remaining qty. */
                     '<input class="vas-egrn-rcv-in vas-pgrn-qty" type="number" min="0" max="' + escapeHtml(line.openQty) + '" step="any" value="' + escapeHtml(qtyValue) + '" data-orderlineid="' + escapeHtml(line.poLineId) + '" aria-label="' + escapeHtml(lbl("VAS_093_RemianingQty", "Remaining Qty")) + '"/>' +
                     '<div class="vas-egrn-rcv-uom" title="' + escapeHtml(line.uom) + '">' + escapeHtml(line.uom) + '</div>' +
@@ -648,6 +737,12 @@
                         $(document).trigger('VAS_GRNCreated', [data]);
                         $self.currentPage = 1;
                         $self.intialLoad($self.currentPage);
+
+                        /* QA sheet Pending GRN #60: confirm the creation with the generated GRN document number. */
+                        var confirmText = lbl("VAS_GRNCreatedWithDocNo", "GRN created successfully with Document No.:") + ' ' + (data.grnNo || '');
+                        if (VIS.ADialog && VIS.ADialog.info) {
+                            VIS.ADialog.info("", "", confirmText);
+                        }
                     }
                     else {
                         setDialogError(data.message != null && data.message !== ""

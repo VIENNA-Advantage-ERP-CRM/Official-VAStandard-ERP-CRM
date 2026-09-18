@@ -188,6 +188,13 @@
         border-bottom: 0;
     }
 
+    /* A single record sits at the top at its natural height instead of stretching (flex: 1 1 0)
+       into a full-body row that reads as vertically centred. The JS sets .single-row on the body
+       when the page shows exactly one record. */
+    .vas-tup-body.single-row .vas-tup-row {
+        flex: 0 0 auto;
+    }
+
     .vas-tup-row:hover {
         background: rgba(234, 248, 255, 0.6);
     }

@@ -33,6 +33,35 @@ namespace VIS.Controllers
         private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_188_TopUsedProductsWidgetController).FullName);
 
         /// <summary>
+        /// Factor that converts an issue-line quantity from the line's entered UOM to the
+        /// product's own (selected) UOM, so quantities and unit prices are reported in the UOM
+        /// the product is defined with - e.g. a line issued in Litres reads as millilitres when
+        /// the product's UOM is MILLILITRE.
+        ///
+        /// C_UOM_Conversion stores the product-specific rate with C_UOM_ID = product UOM and
+        /// C_UOM_To_ID = entered UOM; qty(product UOM) = qty(entered) * DivideRate (1 BOX = 126
+        /// Each is stored as DivideRate 126). Same UOM short-circuits to 1, and an issue line
+        /// with no conversion defined is left unchanged rather than dropped.
+        /// Client/org-specific rows win, matching MUOMConversion's lookup order.
+        /// Expects the line aliased as "line" and the product as "p".
+        /// </summary>
+        private const string UomToProductFactorSql = @"
+                      COALESCE(
+                        CASE WHEN COALESCE(line.C_UOM_ID, 0) = COALESCE(p.C_UOM_ID, 0) THEN 1 END,
+                        (SELECT conv.DivideRate
+                         FROM (SELECT conv0.DivideRate
+                               FROM C_UOM_Conversion conv0
+                               WHERE conv0.IsActive = 'Y'
+                                 AND conv0.M_Product_ID = p.M_Product_ID
+                                 AND conv0.C_UOM_ID = p.C_UOM_ID
+                                 AND conv0.C_UOM_To_ID = line.C_UOM_ID
+                                 AND COALESCE(conv0.DivideRate, 0) <> 0
+                               ORDER BY conv0.AD_Client_ID DESC, conv0.AD_Org_ID DESC
+                              ) conv
+                         WHERE ROWNUM = 1),
+                        1)";
+
+        /// <summary>
         /// The product's CURRENT cost price, as a derived table (M_Product_ID, CurrentCostPrice).
         /// Picks the M_Cost row whose cost element matches the accounting schema's own costing
         /// method, so landed-cost and other cost COMPONENT rows are excluded. A plain
@@ -82,12 +111,15 @@ namespace VIS.Controllers
                 // for why the NULLIF guards are required.
                 string orderBy = (measure == "val")
                     ? "SUM(line.QtyInternalUse * " + LineUnitCostSql + ") DESC"
-                    : "SUM(line.QtyInternalUse) DESC";
+                    : "SUM(line.QtyInternalUse * " + UomToProductFactorSql + ") DESC";
 
                 // Role access is applied to the inner header SELECT; applying it to this wrapped
                 // aggregate would append the predicate outside the subquery (ORA-00907).
                 string invAccessSql = BuildAccessibleInventorySql(ctx, msl, nmsl);
 
+                // Ranking measure is the product's CURRENT cost price, per spec §3/§8 - the
+                // quantity is converted to the product's selected UOM first so products whose
+                // issue lines were entered in a different UOM still rank on comparable volume.
                 string sql = @"
                     SELECT * FROM (
                       SELECT
@@ -95,19 +127,19 @@ namespace VIS.Controllers
                         p.Name AS ProductName,
                         asi.Description AS Attribute,
                         pcat.Name AS CategoryName,
-                        uom.Name AS UomName,
-                        SUM(line.QtyInternalUse) AS TotalQty,
+                        puom.Name AS UomName,
+                        SUM(line.QtyInternalUse * " + UomToProductFactorSql + @") AS TotalQty,
                         SUM(line.QtyInternalUse * " + LineUnitCostSql + @") AS TotalValue
                       FROM M_InventoryLine line
                       INNER JOIN (" + invAccessSql + @") ai ON ai.M_Inventory_ID = line.M_Inventory_ID
                       INNER JOIN M_Product p ON p.M_Product_ID = line.M_Product_ID
                       LEFT JOIN M_Product_Category pcat ON pcat.M_Product_Category_ID = p.M_Product_Category_ID
-                      LEFT JOIN C_UOM uom ON uom.C_UOM_ID = line.C_UOM_ID
+                      LEFT JOIN C_UOM puom ON puom.C_UOM_ID = p.C_UOM_ID
                       LEFT JOIN M_AttributeSetInstance asi ON asi.M_AttributeSetInstance_ID = line.M_AttributeSetInstance_ID
                       LEFT JOIN (" + ProductCurrentCostSql + @") pc ON pc.M_Product_ID = line.M_Product_ID
                       WHERE line.IsActive = 'Y'
                         AND COALESCE(line.QtyInternalUse, 0) > 0
-                      GROUP BY p.M_Product_ID, p.Name, asi.Description, pcat.Name, uom.Name
+                      GROUP BY p.M_Product_ID, p.Name, asi.Description, pcat.Name, puom.Name
                       ORDER BY " + orderBy + @"
                     ) WHERE ROWNUM <= 10";
 

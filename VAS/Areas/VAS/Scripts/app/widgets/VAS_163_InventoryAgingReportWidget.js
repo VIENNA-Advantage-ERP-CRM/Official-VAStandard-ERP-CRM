@@ -94,7 +94,7 @@
         var selectedWarehouseId = null;
         var selectedWarehouseName = lbl("VAS_163_AllWarehouses");
         var warehousesList = [];
-        var summaryData = { b0_30: 0, b31_90: 0, b91_180: 0, b180_plus: 0, totalProducts: 0 };
+        var summaryData = { b0_30: 0, b31_90: 0, b91_180: 0, b180_plus: 0, totalQty: 0 };
 
         var $bucketBtns = {};
         var widgetObserver = null;
@@ -258,7 +258,9 @@
         }
 
         function updateWidgetUI() {
-            var total = summaryData.totalProducts || 0;
+            // Bucket values are aging QUANTITIES from M_Transaction.MovementQty
+            // (not product counts), so the share bars compare quantity share.
+            var total = summaryData.totalQty || 0;
 
             for (var i = 0; i < bucketsConfig.length; i++) {
                 var b = bucketsConfig[i];

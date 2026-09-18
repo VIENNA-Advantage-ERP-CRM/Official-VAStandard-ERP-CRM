@@ -287,7 +287,7 @@
 // ===== NEW CODE START — currency format (agent A07, 2026-08-19) =====
                 var titleEl = document.createElementNS('http://www.w3.org/2000/svg', 'title');
                 titleEl.textContent = item.fullMonth + ': ' + label("VAS_185_Qty", "Qty") + ' ' + formatQty(item.qty)
-                    + ', ' + label("VAS_185_Value", "Value") + ' ' + formatINR(item.val);
+                    + ', ' + label("VAS_185_Value", "Value") + ' ' + formatCompactValue(item.val);
                 rect.appendChild(titleEl);
                 $svg.append(rect);
 // ===== NEW CODE END — currency format =====
@@ -359,7 +359,7 @@
 
 // ===== NEW CODE START — currency format (agent A07, 2026-08-19) =====
                 var titlePt = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-                titlePt.textContent = pt.item.fullMonth + ': ' + label("VAS_185_Value", "Value") + ' ' + formatINR(pt.item.val);
+                titlePt.textContent = pt.item.fullMonth + ': ' + label("VAS_185_Value", "Value") + ' ' + formatCompactValue(pt.item.val);
                 circle.appendChild(titlePt);
                 $svg.append(circle);
 

@@ -21,6 +21,7 @@ using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Web.Mvc;
 using System.Web.SessionState;
+using VAdvantage.Logging;
 using VAdvantage.Model;
 using VAdvantage.Utility;
 using VASLogic.Models;
@@ -124,7 +125,7 @@ namespace VAS.Controllers
                         }
                         else
                         {
-                            res.Error = fres.Error;
+                            res.Error = ReadableError(ctx, fres.Error);
                         }
                     }
                 }
@@ -132,6 +133,34 @@ namespace VAS.Controllers
                 retJSON = JsonConvert.SerializeObject(res);
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>
+        /// The framework reports a failed instance save as "Not Saved - &lt;table&gt;" (the
+        /// internal table name, e.g. M_ProductAttributes), which tells the user nothing.
+        /// The logged save error carries the actual reason, so that is shown where there
+        /// is one; otherwise a plain statement that the attribute could not be saved. Any
+        /// other framework message (a mandatory attribute, a duplicate lot) is already
+        /// readable and passes through as it is. Added 17-Sep-2026.
+        /// </summary>
+        /// <param name="ctx">session context (message lookup)</param>
+        /// <param name="raw">framework error text</param>
+        /// <returns>user-readable error</returns>
+        private static string ReadableError(Ctx ctx, string raw)
+        {
+            string s = (raw ?? "").Trim();
+            if (!s.StartsWith("Not Saved", System.StringComparison.OrdinalIgnoreCase)) return s;
+            string reason = "";
+            try
+            {
+                ValueNamePair pp = VLogger.RetrieveError();
+                if (pp != null) reason = (pp.GetName() ?? "").Trim();
+                if (reason.StartsWith("Not Saved", System.StringComparison.OrdinalIgnoreCase)) reason = "";
+            }
+            catch (System.Exception) { reason = ""; }
+            string msg = Msg.GetMsg(ctx, "VAS_AttrNotSaved");
+            if (string.IsNullOrEmpty(msg) || msg == "VAS_AttrNotSaved") msg = "The attribute could not be saved. Check the values entered and try again.";
+            return reason.Length > 0 ? msg + " (" + reason + ")" : msg;
         }
 
         /// <summary>

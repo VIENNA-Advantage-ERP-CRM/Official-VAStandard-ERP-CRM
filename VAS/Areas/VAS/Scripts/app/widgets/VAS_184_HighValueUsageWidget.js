@@ -362,8 +362,8 @@
                 '<div class="vas-hvu-modal-grid">' +
                 '<div class="vas-hvu-modal-field"><div class="vas-hvu-m-lbl">' + escapeHtml(label("VAS_184_Attribute", "Attribute")) + '</div><div class="vas-hvu-m-val" title="' + escapeHtml(attr) + '">' + escapeHtml(attr) + '</div></div>' +
                 '<div class="vas-hvu-modal-field"><div class="vas-hvu-m-lbl">' + escapeHtml(label("VAS_184_UoM", "UoM")) + '</div><div class="vas-hvu-m-val">' + escapeHtml(uom) + '</div></div>' +
-                '<div class="vas-hvu-modal-field"><div class="vas-hvu-m-lbl">' + escapeHtml(label("VAS_184_CurrentCostPrice", "Current Cost Price")) + '</div><div class="vas-hvu-m-val">' + escapeHtml(formatINR(cost)) + '</div></div>' +
-                '<div class="vas-hvu-modal-field"><div class="vas-hvu-m-lbl">' + escapeHtml(label("VAS_184_TotalIssued", "Total Issued")) + '</div><div class="vas-hvu-m-val">' + escapeHtml(formatQty(issuedQty) + ' ' + uom + ' · ' + formatINR(issuedValue)) + '</div></div>' +
+                '<div class="vas-hvu-modal-field"><div class="vas-hvu-m-lbl">' + escapeHtml(label("VAS_184_CurrentCostPrice", "Current Cost Price")) + '</div><div class="vas-hvu-m-val">' + escapeHtml(formatMoney(cost, false)) + '</div></div>' +
+                '<div class="vas-hvu-modal-field"><div class="vas-hvu-m-lbl">' + escapeHtml(label("VAS_184_TotalIssued", "Total Issued")) + '</div><div class="vas-hvu-m-val">' + escapeHtml(formatQty(issuedQty) + ' ' + uom + ' · ' + formatMoney(issuedValue, false)) + '</div></div>' +
                 '</div>' +
 // ===== NEW CODE END — currency format =====
 // ----- OLD CODE (kept for rollback, do not delete) -----

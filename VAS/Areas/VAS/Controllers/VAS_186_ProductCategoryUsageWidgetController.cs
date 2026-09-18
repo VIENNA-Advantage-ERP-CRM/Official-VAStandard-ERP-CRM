@@ -113,6 +113,35 @@ namespace VIS.Controllers
                       AND ce.CostingMethod = acs.CostingMethod
                     GROUP BY c.M_Product_ID";
 
+        /// <summary>
+        /// Factor that converts an issue-line quantity from the line's entered UOM to the
+        /// product's own (selected) UOM, so quantities are always reported in the UOM the
+        /// product is defined with - e.g. a line issued in Litres reads as millilitres when the
+        /// product's UOM is MILLILITRE.
+        ///
+        /// C_UOM_Conversion stores the product-specific rate with C_UOM_ID = product UOM and
+        /// C_UOM_To_ID = entered UOM; qty(product UOM) = qty(entered) * DivideRate (1 BOX = 126
+        /// Each is stored as DivideRate 126). Same UOM short-circuits to 1, and an issue line
+        /// with no conversion defined is left unchanged rather than dropped.
+        /// Client/org-specific rows win, matching MUOMConversion's lookup order.
+        /// Expects the line aliased as "line" and the product as "p".
+        /// </summary>
+        private const string UomToProductFactorSql = @"
+                      COALESCE(
+                        CASE WHEN COALESCE(line.C_UOM_ID, 0) = COALESCE(p.C_UOM_ID, 0) THEN 1 END,
+                        (SELECT conv.DivideRate
+                         FROM (SELECT conv0.DivideRate
+                               FROM C_UOM_Conversion conv0
+                               WHERE conv0.IsActive = 'Y'
+                                 AND conv0.M_Product_ID = p.M_Product_ID
+                                 AND conv0.C_UOM_ID = p.C_UOM_ID
+                                 AND conv0.C_UOM_To_ID = line.C_UOM_ID
+                                 AND COALESCE(conv0.DivideRate, 0) <> 0
+                               ORDER BY conv0.AD_Client_ID DESC, conv0.AD_Org_ID DESC
+                              ) conv
+                         WHERE ROWNUM = 1),
+                        1)";
+
 
 
         /// <summary>Endpoint A: Category usage aggregates for selected month and year.</summary>
@@ -147,7 +176,7 @@ namespace VIS.Controllers
                     SELECT
                       pc.M_Product_Category_ID,
                       pc.Name AS CategoryName,
-                      SUM(line.QtyInternalUse) AS TotalQty,
+                      SUM(line.QtyInternalUse * " + UomToProductFactorSql + @") AS TotalQty,
                       SUM(line.QtyInternalUse * COALESCE(NULLIF(line.CurrentCostPrice, 0), NULLIF(line.PriceCost, 0), NULLIF(line.VA024_CostPrice, 0), pcst.CurrentCostPrice, 0)) AS TotalValue
                     FROM M_InventoryLine line
                     INNER JOIN (" + invAccessSql + @") ai ON ai.M_Inventory_ID = line.M_Inventory_ID
@@ -277,7 +306,7 @@ namespace VIS.Controllers
                       ai.DocumentNo,
                       p.Name AS ProductName,
                       asi.Description AS Attribute,
-                      uom.Name AS UomName,
+                      puom.Name AS UomName,
                       wh.Name AS WarehouseName,
                       " + locatorSql + @" AS LocatorCode,
                       line.QtyEntered,
@@ -285,7 +314,7 @@ namespace VIS.Controllers
                     FROM M_InventoryLine line
                     INNER JOIN (" + invAccessSql + @") ai ON ai.M_Inventory_ID = line.M_Inventory_ID
                     INNER JOIN M_Product p ON p.M_Product_ID = line.M_Product_ID
-                    LEFT JOIN C_UOM uom ON uom.C_UOM_ID = line.C_UOM_ID
+                    LEFT JOIN C_UOM puom ON puom.C_UOM_ID = p.C_UOM_ID
                     LEFT JOIN M_AttributeSetInstance asi ON asi.M_AttributeSetInstance_ID = line.M_AttributeSetInstance_ID
                     LEFT JOIN M_Locator loc ON loc.M_Locator_ID = line.M_Locator_ID
                     LEFT JOIN M_Warehouse wh ON wh.M_Warehouse_ID = loc.M_Warehouse_ID

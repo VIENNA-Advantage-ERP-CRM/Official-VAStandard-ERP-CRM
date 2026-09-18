@@ -85,6 +85,8 @@
 
         this.Initalize = function () {
             createWidget();
+            /* A GRN created from any receiving widget on the dashboard updates the count at once. */
+            $(document).on('VAS_GRNCreated.vas-rmtd', loadKpi);
             loadKpi();
         };
 
@@ -154,6 +156,7 @@
         this.getRoot = function () { return $root; };
 
         this.disposeComponent = function () {
+            $(document).off('VAS_GRNCreated.vas-rmtd');
             $root.remove();
         };
     };

@@ -3,8 +3,72 @@
  * Purpose        : Create Order Bottom Panel — client logic
  * Employee Code  : VAI154
  * Date           : 09-Jul-2026
+ *
+ * Chronological development:
+ *   VAI163   2026-09-16  Purchase-order round of fixes. PURCHASE-ONLY SCOPE: every
+ *                        item below applies when the header is a purchase order
+ *                        (C_Order.IsSOTrx = 'N', so never a quotation) - gated on
+ *                        docIsPurchase() in the code and on the .vas-obl-doc-purchase
+ *                        root class in the CSS. Sales orders and quotations keep the
+ *                        behaviour they had before this date.
+ *                        - Attribute picker opens with "Show All (include zero and
+ *                          (-ve) qty)" ticked on a purchase order.
+ *                        - "Required: ..." validation names the FIELD ("Tax"), not the
+ *                          column ("C_Tax_ID"); Save on a product-less new line flags
+ *                          the line instead of doing nothing.
+ *                        - Tax dropdown: no blank option, list left-aligned.
+ *                        - An attribute caption shows only for a real instance (> 0);
+ *                          the dash instance 0 carries on some tenants no longer shows.
+ *                        - Product / Charge list is fixed to the viewport (same size
+ *                          below or above the input, never clipped by the panel).
+ *                        - Additional Info: Project Phase out, Activity in its place
+ *                          under Dimension (dictionary DisplayLogic decides); Plan Run
+ *                          and Original PO Line out of References.
+ *                        - Add / Save / Delete (and every cell) lock the moment the
+ *                          order is completed / closed from the header - the tab's
+ *                          data-status is watched (liveDocLocked, onTabDataStatus).
+ *                        - Newest line first (model orders Line DESC).
+ *                        - No column is dropped at any width / zoom (CSS).
+ *                        - Release purchase order: product is read-only and comes from
+ *                          the Blanket Order Line picked in Additional Info, which is
+ *                          mandatory and fills product / qty / UOM / price / tax / org
+ *                          (applyBlanketLine + GetBlanketLine).
+ *                        - Taxable Amount on a tax-inclusive price list is net of tax.
+ *   VAI163   2026-09-17  Sales-order round: every item of the purchase-only round
+ *                        above now applies to a real SALES ORDER as well (IsSOTrx =
+ *                        'Y' and not a quotation) - gated on docIsRealOrder() /
+ *                        docIsReleaseOrder(); a quotation keeps the earlier behaviour.
+ *                        On top of that:
+ *                        - Billing Code sits under "Dimensions" (renamed) on every
+ *                          document and follows its own dictionary DisplayLogic on an
+ *                          order (the always-show override is a quotation's only).
+ *                        - Blanket Order Line on a sales order shows where the header
+ *                          names a blanket (@C_Order_Blanket@>0); on a release order of
+ *                          either side it is offered and mandatory, and fills the line.
+ *                        - Drop Shipment under References on any drop-ship order;
+ *                          Quotation Line gone from References.
+ *                        - Ticking Contract reveals the contract fields in the same
+ *                          modal instead of opening the framework's contract dialog.
+ *                        - Taxable Amount is restated from the line's own price on every
+ *                          real order, and a saved price-list change re-fetches the
+ *                          panel, so a Prices-Include-Tax switch never leaves the old
+ *                          calculation on screen.
+ *                        - The "..." button is white with nothing inside and blue once
+ *                          the line carries Additional Info values (CSS).
+ *   VAI163   2026-09-18  Sales-order and quotation corrections.
+ *                        - Sub Total is restated from LineNetAmt against the price
+ *                          list's CURRENT Prices-Include-Tax flag (model), never from
+ *                          the stored TaxableAmt a line kept from the previous list.
+ *                        - The "..." button counts only the fields the pop-up SHOWS: a
+ *                          DisplayLogic-hidden value no longer turns it blue.
+ *                        - Additional Info on a sales order: References = Project,
+ *                          Project Phase, Billing Code, Blanket Order Line, Org Unit;
+ *                          sections are tagged per field (grp), not anchor ranges.
+ *                        - Billing Code follows its dictionary DisplayLogic on a
+ *                          quotation too (the always-show override is gone).
+ *                        - Quotation: no column is dropped at any width, newest line
+ *                          first, tax list left-aligned, product list viewport-fixed.
  ************************************************************/
-// NOTE: Replace VAI_XXX with your own Employee Code before committing.
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
 
@@ -250,7 +314,20 @@
            tax-exclusive = QtyOrdered × PriceEntered × (1 − Discount);
            tax-inclusive = gross minus extracted tax. */
         function lineAmount(line) {
-            if (line.status === "saved" && !line.dirty) {
+            // Tax-INCLUSIVE price list: the stored TaxableAmt is the entered (gross) line
+            // amount, tax and all, so the column read as though nothing had been taken
+            // out. The taxable amount is what is left after the tax is deducted -
+            // LineNetAmt less TaxAmt and surcharge, the same base the Sub Total uses.
+            // Real orders, purchase and sales (17-Sep-2026); a quotation keeps reading the
+            // stored value.
+            //
+            // And the other way round: once the price list has been changed to Prices
+            // Include Tax = N, the stored TaxableAmt of a line saved under the old
+            // tax-INCLUSIVE list is the old gross-less-tax figure, not qty x price. The
+            // column restates the base from the line's own price on every real order,
+            // whichever way the flag is set now, so a price-list change never leaves the
+            // previous calculation on screen (the panel re-fetches on the header change).
+            if (line.status === "saved" && !line.dirty && !docIsRealOrder()) {
                 var taxable = lineVal(line, "TaxableAmt");
                 if (taxable != null && taxable !== "") return +taxable || 0;
             }
@@ -452,6 +529,11 @@
             vals.Description = r.Description || "";
             if (vals.Discount == null) vals.Discount = 0;
             if (vals.Notes == null) vals.Notes = "";
+            // An attribute caption belongs to a REAL instance only. A line with no
+            // attributes holds instance 0, and the description that row carries on some
+            // tenants (a dash) is not an attribute of this line - it must read blank.
+            // Purchase orders only; a sales document keeps showing whatever came back.
+            var attrName = (docIsRealOrder() && !(vals.M_AttributeSetInstance_ID > 0)) ? "" : (r.AttrName || "");
             var line = {
                 rowId: "r" + (++rowCounter), status: "saved", dirty: false, _priceOverride: false,
                 _productType: r.ProductType || "",
@@ -459,7 +541,7 @@
                 display: {
                     productName: r.ProductName || "", chargeName: r.ChargeName || "",
                     uomName: r.UOMName || "", taxName: r.TaxName || "",
-                    attrName: r.AttrName || "", hasAttributeSet: r.M_Product_ID > 0 && (!!r.AttrName || !!r.HasAttributeSet)
+                    attrName: attrName, hasAttributeSet: r.M_Product_ID > 0 && (!!attrName || !!r.HasAttributeSet)
                 }
             };
             // Pristine snapshot of the just-loaded/just-saved state, so the row Undo can
@@ -678,12 +760,22 @@
 
         /* ---------- render ---------- */
         function render() {
-            if (!parent || !parent.C_Order_ID) { $body.hide(); $emptyState.show(); return; }
+            // The catalog dropdown lives on <body> (see positionCatalog); it must not
+            // outlive the primary cell that opened it.
+            if (!(editing && (editing.field === "product" || editing.field === "charge"))) closeCatalog();
+            if (!parent || !parent.C_Order_ID) { lastLockState = null; $body.hide(); $emptyState.show(); return; }
             $emptyState.hide(); $body.show();
             // Read-only order (completed/void/reversed/closed): mark the panel so disabled controls (checkbox, "...")
             // show a not-allowed cursor via their (enabled) parent cell - a disabled
             // control ignores its own `cursor` in Chromium, so the cell shows it instead.
-            $body.toggleClass("vas-obl-locked", !panelEditable());
+            var locked = !panelEditable();
+            lastLockState = locked;   // what this paint reflects - see onTabDataStatus
+            $body.toggleClass("vas-obl-locked", locked);
+            // The keep-every-column layout is the stylesheet's only layout now (quotations
+            // included since 18-Sep-2026 - opening the right panel narrowed the grid past
+            // the step that dropped Description and Tax), so no root class is needed. Any
+            // earlier paint's flag is cleared so the stylesheet never sees a stale one.
+            $root.removeClass("vas-obl-doc-purchase");
             // The head row was built before the order data arrived, so refresh the Price
             // header now that parent.IsTaxIncluded (price-list tax mode) is known...
             updatePriceHeader();
@@ -757,7 +849,9 @@
                 var prec = (h.StdPrecision != null && h.StdPrecision >= 0) ? h.StdPrecision : precision();
                 function fmtP(n) { return sym + (+n || 0).toLocaleString(window.navigator.language, { minimumFractionDigits: prec, maximumFractionDigits: prec }); }
                 $totalsRow.append(totalsRow(lbl("VAS_107_Subtotal", "Sub Total") + ":", fmtP(h.TotalLines), false));
+                var taxTotal = 0;
                 for (var i = 0; i < taxSummary.length; i++) {
+                    taxTotal += +taxSummary[i].TaxAmt || 0;
                     if (!taxSummary[i].TaxName) continue;
                     // TaxAmt from C_OrderTax is the base tax only (surcharge is separate).
                     $totalsRow.append(totalsRow(esc(taxSummary[i].TaxName) + ":", fmtP(taxSummary[i].TaxAmt), false));
@@ -765,7 +859,24 @@
                 // Surcharge stored on index-0 (total across all lines; separate from base tax).
                 if (+h.TotalSurcharge) $totalsRow.append(totalsRow(lbl("VAS_107_Surcharge", "Surcharge") + ":", fmtP(h.TotalSurcharge), false));
                 if (+h.TCSAmount) $totalsRow.append(totalsRow(lbl("VA106_TaxCollectedAtSource", "TCS") + ":", fmtP(h.TCSAmount), false));
-                $totalsRow.append(totalsRow(lbl("VAS_107_Total", "Grand Total") + ":", fmtP(h.GrandTotal), true));
+                // Grand Total = the rows above it, NOT C_Order.GrandTotal (18-Sep-2026).
+                // The framework's two halves read two different Prices-Include-Tax
+                // flags: MOrderLine / MOrderTax judge the line amounts, TaxAmt and
+                // C_OrderTax by M_PriceList.IsTaxIncluded, while MOrder.CalculateTaxTotal
+                // decides whether GrandTotal is TotalLines or TotalLines + tax by
+                // C_Order.IsTaxIncluded - a copy taken when the price list was
+                // assigned. A price list whose flag was switched afterwards leaves that
+                // copy stale, and the header then holds gross + extracted tax (2,630.33
+                // on a 2,500.00 tax-inclusive line) under rows that add up to 2,500.00.
+                // The panel's rows follow the price list, as the lines were written, so
+                // the total is their sum: tax-inclusive net + tax = the gross entered,
+                // tax-exclusive net + tax = net plus tax - the same figure the framework
+                // stores whenever its two flags agree. The tax added is EVERY C_OrderTax
+                // row (MOrder sums exactly those; a surcharge tax has its own row there,
+                // so TotalSurcharge - the same money read off the lines - is not added
+                // again).
+                var grand = (+h.TotalLines || 0) + taxTotal + (+h.TCSAmount || 0);
+                $totalsRow.append(totalsRow(lbl("VAS_107_Total", "Grand Total") + ":", fmtP(grand), true));
                 return;
             }
             // Fallback: C_OrderTax server breakdown not yet available (new/unsaved order, or
@@ -842,10 +953,102 @@
             }
         }
 
+        /* Doc statuses that end the order's editable life - the same set the server uses
+           for IsEditable (DocStatus NOT IN (CO, CL, VO, RE)). */
+        var LOCKED_DOC_STATUS = { CO: 1, CL: 1, VO: 1, RE: 1 };
+
+        /* Whether the order the panel is showing is locked RIGHT NOW, read off the hosting
+           GridTab: true / false, or null when the tab cannot say.
+
+           parent.IsEditable is only a SNAPSHOT, taken when the panel last fetched.
+           Completing (or closing / voiding / reversing) the order from the tab's own
+           toolbar changes DocStatus WITHOUT the panel reloading, so the snapshot still
+           said "editable" and Add line / Save row / Delete record stayed live on a
+           completed order until the record was re-selected. The GridTab knows the new
+           status immediately, so it is asked first - in BOTH directions, so a re-activated
+           order unlocks just as promptly - and only when the tab is sitting on the very
+           record the panel is showing. Mirrors VAS_074. */
+        function liveDocLocked() {
+            var t = $self.curTab;
+            if (!t) return null;
+            if (!docIsRealOrder()) return null;   // purchase and sales orders - a quotation keeps the snapshot
+            try {
+                // Bail only on a DEFINITE mismatch - an id the tab can't supply (0 /
+                // undefined) is not evidence that it is pointing somewhere else.
+                var tabId = (typeof t.getRecord_ID === "function") ? (+t.getRecord_ID() || 0) : 0;
+                var panelId = +(parent && parent.C_Order_ID) || 0;
+                if (tabId > 0 && panelId > 0 && tabId !== panelId) return null;
+                // Processed is conclusive on its own, whatever DocStatus reads.
+                if (typeof t.getIsProcessed === "function" && t.getIsProcessed()) return true;
+                if (typeof t.getValueAsString !== "function") return null;
+                var st = $.trim(t.getValueAsString("DocStatus") || "");
+                if (!st) return null;   // tab has no answer - fall back to the snapshot
+                return !!LOCKED_DOC_STATUS[st.toUpperCase()];
+            } catch (e) { if (window.console) console.log(e); return null; }
+        }
+
         /* The panel is editable only while the order can still take line changes -
-           server-computed IsEditable = !Processed && DocStatus NOT IN (CO, CL, VO, RE).
+           server-computed IsEditable = !Processed && DocStatus NOT IN (CO, CL, VO, RE),
+           overridden by the tab's live status when it has one (see liveDocLocked).
            When false the whole panel is read-only: no Add / Save / Delete and no cell edit. */
-        function panelEditable() { return !!(parent && parent.IsEditable); }
+        function panelEditable() {
+            if (!parent) return false;
+            var locked = liveDocLocked();
+            if (locked !== null) return !locked;
+            return !!parent.IsEditable;
+        }
+
+        /* Lock state the panel was last PAINTED for (set by render), so a data-status
+           event only repaints on a real transition. */
+        var lastLockState = null;
+
+        /* The hosting tab's data status changed - a doc action (Complete / Close / Void /
+           Reverse / Re-activate) is the case that matters here, because it flips the
+           order's editable state under an already-loaded panel. Repaint only on a real
+           transition: Add line / Save row / Delete record and every cell then follow
+           panelEditable() into their disabled state. */
+        function onTabDataStatus() {
+            if (!parent) return;                     // nothing loaded - nothing to lock
+            // The header's PRICE LIST was changed and saved (17-Sep-2026): the panel's
+            // Prices-Include-Tax reading and every amount hang off it, so the panel
+            // re-fetches - the server restates the header flag and the lines, and no
+            // figure from the previous list survives. Only on a SAVED header (a pending
+            // edit is not yet the order's price list) and only on a real change, so
+            // ordinary field edits do not reload the grid.
+            if (docIsRealOrder() && priceListChangedOnTab()) {
+                if (!isHeaderDirty()) { $self.fetchData(parent.C_Order_ID, linePage); return; }
+            }
+            var locked = !panelEditable();
+            if (lastLockState === null || locked === lastLockState) return;
+            // Any open dialog was built against the previous state (the "..." modal's
+            // fields, the attribute picker), so it goes rather than being left half-valid.
+            closeDialogs();
+            try { if (window.VIS && VIS.AttributeControl && VIS.AttributeControl.close) VIS.AttributeControl.close(); } catch (e) { }
+            editing = null;
+            render();                                // rebuilds rows + toolbar for the new state
+            if (locked) {
+                showToast(docMsg("VAS_107_DocLockedNow",
+                    "This {0} is no longer editable - the lines are now read-only"));
+            }
+        }
+        /* True when the hosting tab's M_PriceList_ID differs from the one the panel was
+           loaded with - the tab sitting on the very record the panel shows. */
+        function priceListChangedOnTab() {
+            var t = $self.curTab;
+            if (!t) return false;
+            try {
+                var tabId = (typeof t.getRecord_ID === "function") ? (+t.getRecord_ID() || 0) : 0;
+                var panelId = +(parent && parent.C_Order_ID) || 0;
+                if (tabId > 0 && panelId > 0 && tabId !== panelId) return false;
+                var raw = (typeof t.getValue === "function") ? t.getValue("M_PriceList_ID")
+                        : (typeof t.getValueAsString === "function") ? t.getValueAsString("M_PriceList_ID") : null;
+                var pl = parseInt(raw, 10) || 0;
+                var mine = +(parent && parent.M_PriceList_ID) || 0;
+                return pl > 0 && mine > 0 && pl !== mine;
+            } catch (e) { return false; }
+        }
+        /* Registered on the GridTab by startPanel, released by dispose. */
+        this.tabDataListener = { dataStatusChanged: function (e) { onTabDataStatus(e); } };
 
         /* Returns true when the parent header tab has unsaved changes — i.e. the user has
            edited a header field (pricelist, BPartner, etc.) without saving yet, or the header
@@ -958,7 +1161,7 @@
            Clicking it enters edit mode exactly like the old <p> did. */
         function dispInput(line, field, text, opts) {
             opts = opts || {};
-            var editable = parent && parent.IsEditable;
+            var editable = panelEditable();   // live tab status first, then the snapshot
             // draggable=false stops the browser starting a text-drag on the readonly
             // input (which flashes the "not-allowed" / no-drop cursor while dragging).
             var $i = $('<input type="text" readonly tabindex="-1" draggable="false" class="vas-obl-cell-edit__input vas-obl-cell-disp" />');
@@ -981,7 +1184,7 @@
         }
 
         function renderPrimaryCell(line) {
-            var editable = parent && parent.IsEditable;
+            var editable = panelEditable();   // live tab status first, then the snapshot
             var pField = primaryField(line);
             var isEditing = editing && editing.rowId === line.rowId && (editing.field === "product" || editing.field === "charge");
             var cell = $('<div class="vas-obl-cell" role="cell"></div>');
@@ -1016,7 +1219,24 @@
                 setTimeout(function () { $inp.focus(); }, 0);
             } else {
                 var pv = primaryValue(line);
-                wrap.append(dispInput(line, pField, pv, { placeholder: lbl("VAS_107_AddProductCharge", "Add product / charge…") }));
+                var primaryRO = fieldReadOnly(line, pField);   // release PO: product comes from the blanket line
+                var $pi = dispInput(line, pField, pv, {
+                    placeholder: primaryRO ? lbl("VAS_107_FromBlanketLine", "From blanket order line…")
+                                           : lbl("VAS_107_AddProductCharge", "Add product / charge…"),
+                    // Read-only styling, but NOT disabled: a disabled input swallows the
+                    // click (nothing fires, not even on the cell), and on a release the
+                    // click is exactly where the reader is told where the product IS
+                    // chosen.
+                    readOnly: primaryRO && !docIsReleaseOrder()
+                });
+                if (primaryRO && docIsReleaseOrder()) {
+                    $pi.addClass("vas-obl-cell-disp--ro").off("click").on("click", function () {
+                        if (!panelEditable()) return;
+                        showToast(productRequiredMsg());
+                        focusMoreBtn(line);
+                    });
+                }
+                wrap.append($pi);
                 // For a product carrying (or able to carry) an attribute set, show the
                 // attribute-set-instance description as a clickable sub-line under the
                 // product. Clicking it opens the attribute control instead of editing
@@ -1042,7 +1262,7 @@
 
         function renderEditableCell(line, field, value, placeholder, opts) {
             opts = opts || {};
-            var editable = parent && parent.IsEditable;
+            var editable = panelEditable();   // live tab status first, then the snapshot
             var cell = $('<div class="vas-obl-cell' + (opts.align === "right" ? " vas-obl-cell--right" : "") + '" role="cell"></div>');
             var wrap = $('<div class="vas-obl-cell-edit"></div>');
             var isEditing = editing && editing.rowId === line.rowId && editing.field === field;
@@ -1079,7 +1299,7 @@
 
         function renderQtyUomCell(line) {
             var v = line.values;
-            var editable = parent && parent.IsEditable;
+            var editable = panelEditable();   // live tab status first, then the snapshot
             var cell = $('<div class="vas-obl-cell vas-obl-cell--right" role="cell"></div>');
             var wrap = $('<div class="vas-obl-cell-edit"></div>');
             var editQty = editing && editing.rowId === line.rowId && editing.field === "quantity";
@@ -1138,7 +1358,7 @@
 
         function renderTaxCell(line) {
             var v = line.values;
-            var editable = parent && parent.IsEditable;
+            var editable = panelEditable();   // live tab status first, then the snapshot
             // Right-aligned to match its column header - see buildHeadRow.
             var cell = $('<div class="vas-obl-cell vas-obl-cell--right" role="cell"></div>');
             var wrap = $('<div class="vas-obl-cell-edit"></div>');
@@ -1148,8 +1368,12 @@
 
             if (isEditing) {
                 // Tax options filtered to this line's context (C_Tax_ID AD_Val_Rule);
-                // refined in place once the per-row list arrives.
-                var $sel = $('<select class="vas-obl-cell-edit__select"></select>').css("text-align", "right");
+                // refined in place once the per-row list arrives. The list reads
+                // LEFT-aligned like every other dropdown on every document (quotations
+                // too since 18-Sep-2026 - right-aligned, the names opened against the
+                // right edge and read as though the list were RTL); the column's right
+                // alignment is for the resting figure-style cell, not for a list of names.
+                var $sel = $('<select class="vas-obl-cell-edit__select vas-obl-tax-select"></select>');
                 fillTaxOptions($sel, line);
                 ensureRowLookups(line, function () {
                     if (editing && editing.rowId === line.rowId && editing.field === "tax" && $sel.closest("body").length)
@@ -1172,7 +1396,7 @@
         }
 
         function renderMoreCell(line) {
-            var editable = parent && parent.IsEditable;
+            var editable = panelEditable();   // live tab status first, then the snapshot
             var cell = $('<div class="vas-obl-cell vas-obl-cell--more" role="cell" style="position:relative"></div>');
             // Undo affordance (↺). On a SAVED row with unsaved edits it reverts the row to
             // its last pristine snapshot; on a NEW (never-saved) row it removes the row
@@ -1431,13 +1655,29 @@
             if (!found && v.C_UOM_ID > 0) $sel.prepend($("<option></option>").attr("value", v.C_UOM_ID).text(line.display.uomName || "").prop("selected", true));
         }
         function fillTaxOptions($sel, line) {
-            var v = line.values, list = rowTaxList(line);
+            var v = line.values, list = rowTaxList(line), found = false;
+            // Purchase AND sales orders (17-Sep-2026); the variable keeps its name so the
+            // comments below still read. A quotation keeps the "none" row it always had.
+            var purchase = docIsRealOrder();
             $sel.empty();
-            $sel.append($("<option></option>").attr("value", 0).text(lbl("VAS_107_NoTax", "—")));
+            if (!purchase) $sel.append($("<option></option>").attr("value", 0).text(lbl("VAS_107_NoTax", "—")));
             for (var i = 0; i < list.length; i++) {
+                // A tax with no name would render as an empty row; there is nothing to
+                // pick there, so it is not offered (purchase order).
+                if (purchase && (!list[i].Name || !String(list[i].Name).trim())) continue;
                 var o = $("<option></option>").attr("value", list[i].C_Tax_ID).text(list[i].Name);
-                if (list[i].C_Tax_ID === v.C_Tax_ID) o.prop("selected", true);
+                if (list[i].C_Tax_ID === v.C_Tax_ID) { o.prop("selected", true); found = true; }
                 $sel.append(o);
+            }
+            // Purchase order: no blank "none" row - tax is mandatory on the line, and the
+            // empty option (whose caption some sites had translated to nothing) read as a
+            // blank value in the list. A line that has no tax yet, or one whose tax is not
+            // in this row's filtered list, opens on a disabled prompt so the first real tax
+            // is never shown as though it were already chosen.
+            if (purchase && !found) {
+                $sel.prepend($("<option></option>").attr("value", v.C_Tax_ID > 0 ? v.C_Tax_ID : 0)
+                    .text(v.C_Tax_ID > 0 ? (line.display.taxName || "") : lbl("VAS_107_SelectTax", "Select tax…"))
+                    .prop("disabled", !(v.C_Tax_ID > 0)).prop("selected", true));
             }
         }
 
@@ -1524,7 +1764,7 @@
 
         /* ---------- line operations ---------- */
         function addLine() {
-            if (!parent || !parent.IsEditable) { showToast(lbl("VAS_107_OrderNotEditable", "This order cannot take new lines")); return; }
+            if (!panelEditable()) { showToast(docMsg("VAS_107_OrderNotEditable", "This {0} cannot take new lines")); return; }
             if (blockedByDirtyHeader()) return;       // unsaved header edit — save the tab first
             var maxLine = 0;
             for (var i = 0; i < lines.length; i++) maxLine = Math.max(maxLine, lines[i].values.Line || 0);
@@ -1536,6 +1776,16 @@
             };
             seedAllColumns(line.values);
             lines.unshift(line);
+            if (docIsReleaseOrder()) {
+                // Release order (purchase or sales): the product is not keyed here. The line opens
+                // with its product locked, the reader is told to pick the blanket order
+                // line in Additional Info, and focus lands on the "..." that opens it.
+                editing = null;
+                render();
+                showToast(productRequiredMsg());
+                focusMoreBtn(line);
+                return;
+            }
             editing = { rowId: line.rowId, field: "product" };
             catalog.term = ""; catalog.highlight = 0;
             render();
@@ -1559,9 +1809,16 @@
            new rows - the whole list is never rebuilt (that was the scroll jank). */
         function resetCatalog(term, inner, line, $inp) {
             catalog.term = term || ""; catalog.offset = 0; catalog.hasMore = true; catalog.results = []; catalog.seq++; catalog.highlight = 0;
+            closeCatalog();
             catalog.$inp = $inp;   // kept so positionCatalog() can re-measure as rows load
-            inner.find(".vas-obl-catalog-popover").remove();
-            catalog.$pop = $('<div class="vas-obl-catalog-popover"></div>');
+            // Mounted on <body>, positioned fixed (see positionCatalog) - NOT inside the
+            // row, whose root scroll box (and, since 18-Sep-2026, every cell's own
+            // overflow clip) would cut it off. Every document: purchase orders since
+            // 16-Sep-2026, sales orders since 17-Sep, quotations since 18-Sep, when the
+            // keep-every-column grid (cells clip) reached them. The in-row branch below is
+            // kept for the flag's sake only.
+            catalog.fixed = true;
+            catalog.$pop = $('<div class="vas-obl-catalog-popover' + (catalog.fixed ? " vas-obl-catalog-popover--fixed" : "") + '"></div>');
             catalog.$pop.on("scroll", function () {
                 var el = this;
                 if (catalog.hasMore && !catalog.loading && el.scrollTop + el.clientHeight >= el.scrollHeight - 40) loadCatalogPage(inner, line, $inp, false);
@@ -1571,8 +1828,21 @@
                 commitCatalogItem(line, catalog.results[+$(this).attr("data-idx")]);
             });
             catalog.$pop.on("mouseenter", ".vas-obl-catalog-popover__item", function () { setHighlight(+$(this).attr("data-idx")); });
-            inner.append(catalog.$pop);
+            if (catalog.fixed) {
+                // Parked off-screen until it can be measured against the input (which is
+                // not in the document yet while the row is being built - see
+                // positionCatalog); the deferred call below places it.
+                catalog.$pop.css({ position: "fixed", top: "-9999px", left: "-9999px" });
+                $("body").append(catalog.$pop);
+                // Fixed positioning is relative to the viewport, so the list must follow
+                // the input when the panel scrolls or the window resizes / zooms.
+                if ($root && $root.length) $root.on("scroll.vasoblcat", positionCatalog);
+                $(window).on("resize.vasoblcat", positionCatalog);
+            } else {
+                inner.append(catalog.$pop);
+            }
             positionCatalog();
+            setTimeout(positionCatalog, 0);   // once the row is in the grid
             // Fire the server search immediately, even for an empty term: the server uses
             // LIKE '%' which returns all products and charges so the user sees the full list
             // on first click without having to type anything.
@@ -1580,35 +1850,77 @@
             loadCatalogPage(inner, line, $inp, true);
         }
 
-        /* Place the dropdown so it is NEVER clipped by the panel root (which is
-           overflow-y:auto, a hard clip box). Open below by default; flip ABOVE only when the
-           list can't fit below AND there is more room above. Either way the popover's
-           max-height is clamped to the space actually available on the chosen side WITHIN
-           the root, so it stays fully visible and every row is reachable via internal scroll
-           (fixes: flipped-up list clipped at the top, top rows unreachable). Re-measured as
-           rows load. The --above modifier attaches it flush over the input (see CSS). */
+        /* Place the dropdown: BELOW the input by default, ABOVE it when there is not room
+           for the whole list below. The list is the SAME SIZE on either side - it is never
+           squeezed to the space left on the chosen side, which used to leave a stub of two
+           rows under an input near the bottom of the panel.
+
+           It can only keep its size because it lives on <body> with position:fixed: inside
+           the row, the root's overflow-y:auto scroll box clipped whatever did not fit, and
+           the earlier fix for that clamped the list's height to the room inside the root.
+           Fixed to the viewport, the only limit is the window itself, and the list flips
+           above the input whenever the viewport has less than a full list's height below
+           it. Width follows the input (with the CSS min-width behind it), so it lines up
+           with the cell it drops from. Re-run as rows load (the first page changes the
+           height from the Loading hint to the list) and on scroll / resize. */
         var CATALOG_MAX_PX = 260;   // keep in sync with .vas-obl-catalog-popover max-height (16.25em)
         function positionCatalog() {
             if (!catalog.$pop || !catalog.$pop.length) return;
             var $inp = catalog.$inp;
             if (!$inp || !$inp.length || !$inp[0].getBoundingClientRect) return;
+            // The row is built BEFORE it is appended to the grid (renderRow returns it),
+            // so on the first call the input is not in the document yet and cannot be
+            // measured. Leave the list where it is - it is measured again a tick later
+            // (resetCatalog) and when the first page of rows lands (appendCatalogRows).
+            // Never close it here: resetCatalog still has to paint the Loading hint into it.
+            if (!$inp.closest("body").length) return;
+            if (!catalog.fixed) { positionCatalogInRow($inp); return; }   // sales document: in-row list
             var r = $inp[0].getBoundingClientRect();
-            // Clip boundary = the root's scroll box; fall back to the viewport.
+            var vh = window.innerHeight || document.documentElement.clientHeight;
+            var GAP = 4;   // small breathing gap from the viewport edge
+            var spaceBelow = vh - r.bottom - GAP;
+            var spaceAbove = r.top - GAP;
+            // What the list wants to be: its content, capped at the fixed maximum.
+            var natural = Math.min((catalog.$pop[0].scrollHeight || CATALOG_MAX_PX) + 2, CATALOG_MAX_PX + 2);
+            // Below when it fits below; above when it does not fit below but fits above;
+            // otherwise whichever side has more room. The size is the same either way.
+            var above;
+            if (natural <= spaceBelow) above = false;
+            else if (natural <= spaceAbove) above = true;
+            else above = spaceAbove > spaceBelow;
+            catalog.$pop.css({
+                position: "fixed",
+                left: Math.round(r.left) + "px",
+                width: Math.round(r.width) + "px",
+                maxHeight: CATALOG_MAX_PX + "px",
+                top: above ? "auto" : (Math.round(r.bottom) + "px"),
+                bottom: above ? (Math.round(vh - r.top) + "px") : "auto"
+            });
+            catalog.$pop.toggleClass("vas-obl-catalog-popover--above", above);
+        }
+
+        /* The in-row placement a SALES document keeps: never clipped by the panel root
+           (overflow-y:auto, a hard clip box). Open below by default; flip ABOVE only when
+           the list can't fit below AND there is more room above. Either way the popover's
+           max-height is clamped to the space actually available on the chosen side WITHIN
+           the root, so it stays fully visible and every row is reachable via internal
+           scroll. The --above modifier attaches it flush over the input (see CSS). */
+        function positionCatalogInRow($inp) {
+            var r = $inp[0].getBoundingClientRect();
             var clipTop = 0, clipBottom = window.innerHeight;
             if ($root && $root.length && $root[0].getBoundingClientRect) {
                 var rr = $root[0].getBoundingClientRect();
                 clipTop = Math.max(clipTop, rr.top);
                 clipBottom = Math.min(clipBottom, rr.bottom);
             }
-            var GAP = 4;   // small breathing gap from the clip edge
+            var GAP = 4;
             var spaceBelow = clipBottom - r.bottom - GAP;
             var spaceAbove = r.top - clipTop - GAP;
-            // Natural (unclamped) content height + borders, to decide whether it fits.
             var natural = (catalog.$pop[0].scrollHeight || CATALOG_MAX_PX) + 2;
             var above;
-            if (natural <= spaceBelow) above = false;         // fits below - default
-            else if (natural <= spaceAbove) above = true;     // fits above
-            else above = spaceAbove > spaceBelow;             // neither fits - pick the roomier side
+            if (natural <= spaceBelow) above = false;
+            else if (natural <= spaceAbove) above = true;
+            else above = spaceAbove > spaceBelow;
             var avail = above ? spaceAbove : spaceBelow;
             var maxH = Math.min(CATALOG_MAX_PX, Math.max(avail, 0));
             catalog.$pop.css("max-height", maxH > 0 ? (maxH + "px") : "");
@@ -1620,6 +1932,8 @@
         function closeCatalog() {
             if (catalog.debounce) { clearTimeout(catalog.debounce); catalog.debounce = null; }
             if (catalog.$pop) { catalog.$pop.remove(); catalog.$pop = null; }
+            if ($root && $root.length) $root.off("scroll.vasoblcat");
+            $(window).off("resize.vasoblcat");
             catalog.$inp = null;
             catalog.results = []; catalog.loading = false;
         }
@@ -2073,6 +2387,16 @@
         function isMandatory(col) { var m = columnMeta[col]; return !!(m && m.IsMandatory); }
         /* AD_Column.FieldLength for a column (0 when unknown) - caps text input length. */
         function colFieldLength(col) { var m = columnMeta[col]; return (m && +m.FieldLength) || 0; }
+        /* The dictionary's caption for a column (AD_Field / AD_Column Name), for messages.
+           The "Required: ..." validation used to print the COLUMN NAME (e.g. "C_Tax_ID"),
+           which the user never sees anywhere else on the screen. */
+        function colLabel(col) {
+            var m = columnMeta[col] || columnMeta[columnNameByLc[String(col).toLowerCase()]];
+            return (m && m.Name) || col;
+        }
+        /* "Required: <field>" — one wording for every mandatory-field failure. Purchase
+           orders name the field; a sales document keeps naming the column as before. */
+        function requiredMsg(col) { return lbl("VAS_107_FieldRequired", "Required") + ": " + (docIsRealOrder() ? colLabel(col) : col); }
 
         /* ---------- AD_Column read-only logic ----------
          * A field is read-only when AD_Field.IsReadOnly is set or the column's
@@ -2088,6 +2412,9 @@
 
         function isColumnReadOnly(line, col) {
             if (FORCED_READONLY_COLS[col]) return true;
+            // Release purchase order: the product / charge is NOT picked on the line - it
+            // comes with the blanket order line chosen in Additional Info (item 13).
+            if ((col === "M_Product_ID" || col === "C_Charge_ID") && docIsReleaseOrder()) return true;
             // C_UOM_ID: always read-only for charge lines (default UOM is auto-assigned).
             // For product lines: editable until saved, then locked.
             if (col === "C_UOM_ID" && line && line.values) {
@@ -2103,7 +2430,7 @@
             if (m.IsReadOnly) return true;
             return !!(m.ReadOnlyLogic && evalLogic(line, m.ReadOnlyLogic));
         }
-        var FIELD_COL = { uom: "C_UOM_ID", tax: "C_Tax_ID", quantity: "QtyEntered", price: "PriceEntered", description: "Description" };
+        var FIELD_COL = { product: "M_Product_ID", charge: "C_Charge_ID", uom: "C_UOM_ID", tax: "C_Tax_ID", quantity: "QtyEntered", price: "PriceEntered", description: "Description" };
         function fieldReadOnly(line, field) {
             var col = FIELD_COL[field];
             return col ? isColumnReadOnly(line, col) : false;
@@ -2112,8 +2439,17 @@
            VAS_107 has no conditional-mandatory columns today; extend this function if any
            are added (e.g. an asset-related column whose mandatory state depends on line values). */
         function dynMandatory(line, m) {
+            if (!m) return false;
+            // A release line MUST name the blanket order line it releases: the product,
+            // quantity and price all come from it, and the framework validates the
+            // release against it on save. Mandatory here whatever the dictionary says.
+            if (docIsReleaseOrder() && isBlanketLineCol(m.ColumnName)) return true;
             return !!m.IsMandatory;
         }
+        /* The blanket-release link column, compared case-insensitively - a saved line's
+           keys are DB-cased (PostgreSQL lowercases, Oracle uppercases). */
+        var BLANKET_LINE_COL = "C_OrderLine_Blanket_ID";
+        function isBlanketLineCol(col) { return String(col || "").toLowerCase() === BLANKET_LINE_COL.toLowerCase(); }
         /* Read a login/global token from the live framework context (VIS.Env / VIS.context).
            The 1-arg getContext(name) reads the GLOBAL bag where $/# tokens (e.g. the
            accounting-element flags $Element_*) live. Returns "" when absent / unavailable. */
@@ -2197,71 +2533,67 @@
          * covered by the mandatory check in validateLine. Values live in line.values and
          * persist through the existing generic column save. */
         /* Curated "Additional Info" columns shown in the "..." modal, in this order.
-           To add a field, append its column name here (with an optional `when`
-           condition). A column missing from the dictionary (e.g. a module's columns
-           when the module isn't installed) is silently skipped. */
+           To add a field, append its column name here with the section it belongs to
+           (`grp`, a MORE_FIELD_GROUPS id) and an optional `when` condition. A column
+           missing from the dictionary (e.g. a module's columns when the module isn't
+           installed) is silently skipped.
+
+           A column may be listed TWICE with complementary `when`s so it sits in a
+           different section per document (additionalInfoColumns keeps the first entry
+           that applies). The list must stay ordered section by section for any ONE
+           document - the modal appends fields in this order and a section header owns
+           the fields that follow it up to the next header (applyGroupCollapse). */
         var ADDITIONAL_INFO_FIELDS = [
-            // --- Dimension group ---
-            { col: "AD_OrgTrx_ID" },
-            { col: "C_Project_ID" },
-            // Project Phase belongs with Project (it is scoped by the chosen project).
-            // On every real order, purchase as well as sales; not on a quotation.
-            { col: "C_ProjectPhase_ID", when: "order" },
-            { col: "C_Campaign_ID" },
-            // "Billing Code" (C_Activity_ID) sits in TWO places, and the two entries are
-            // mutually exclusive by `when`, so exactly one is ever built - see the second
-            // entry under References. On a QUOTATION it belongs here, with the accounting
-            // dimensions: a quotation carries no billing references at all (no blanket
-            // release, no originating PO line, no converted-from quotation line), so
-            // References is empty on a quotation and the field would otherwise be the lone
-            // survivor holding an empty section open. On every real order it stays under
-            // References, where it is read as a billing reference rather than a dimension.
-            { col: "C_Activity_ID", when: "quotation" },
-            { col: "VAS_Opportunity_ID" },
-            // --- Contract group (SALES ORDERS only: IsSOTrx = 'Y' and not a quotation).
+            // --- Dimensions ---
+            // On a SALES ORDER (18-Sep-2026) Org Unit, Project, Project Phase and Billing
+            // Code sit under References instead (below); Dimensions keeps Campaign and
+            // Opportunity there. A purchase order and a quotation keep them here.
+            { col: "AD_OrgTrx_ID",      grp: "dim", when: "notSalesOrder" },
+            { col: "C_Project_ID",      grp: "dim", when: "notSalesOrder" },
+            // Activity ("Billing Code" in this dictionary) - an accounting dimension,
+            // offered exactly as the line tab offers it: its own DisplayLogic decides on
+            // every document (typically the accounting schema's Activity element flag).
+            { col: "C_Activity_ID",     grp: "dim", when: "notSalesOrder" },
+            { col: "C_Campaign_ID",     grp: "dim" },
+            { col: "VAS_Opportunity_ID", grp: "dim" },
+            // --- Contract (SALES ORDERS only: IsSOTrx = 'Y' and not a quotation).
             // Contract billing is raised against the customer document, so these never
             // belong on a purchase order or a quotation. Each field still carries its own
             // AD_Field DisplayLogic, which applyDynDisplay runs after the control is
             // built, so the dictionary can narrow this further. ---
-            { col: "IsContract",     when: "salesOrder" },
-            { col: "C_Frequency_ID", when: "salesOrder" },   // "Billing Frequency"
-            { col: "NoofCycle",      when: "salesOrder" },
-            { col: "QtyPerCycle",    when: "salesOrder" },
-            { col: "StartDate",      when: "salesOrder" },
-            { col: "EndDate",        when: "salesOrder" },
-            // --- References group ---
-            // A_Asset_ID excluded per design.
-            { col: "VA106_TaxCollectedAtSource_ID", when: "va106_" },
-            { col: "VA106_TCSAmount", when: "va106_" },
-            // Purchase-side origin references, both read-only: each is stamped by the
-            // process that raised the line, never entered by hand (see
-            // FORCED_READONLY_COLS). Plan Run belongs to the optional VAMRP module and
-            // is skipped silently wherever that module is not installed.
-            // Drop Shipment: only on a purchase order whose HEADER is itself flagged
-            // C_Order.IsDropShip. On any other order the line flag is meaningless, so the
-            // field is not offered at all.
-            { col: "IsDropShip",       when: "purchaseDropShip" },
-            { col: "VAMRP_PlanRun_ID", when: "purchase" },   // MRP plan run (VAMRP module)
-            // "Billing Code" — this dictionary's label for C_Activity_ID. On a real ORDER
-            // it is read as a billing reference rather than as an accounting dimension, so
-            // it belongs here; on a QUOTATION it moves up into Dimension (see the paired
-            // entry there). The caption the modal prints is the dictionary's own (AD_Field
-            // / AD_Column Name), so it reads "Billing Code" without the panel hard-coding
-            // the word. On any sales document it is always offered - see
-            // DISPLAY_LOGIC_ALWAYS_SHOW.
-            { col: "C_Activity_ID", when: "order" },
+            { col: "IsContract",     grp: "contract", when: "salesOrder" },
+            { col: "C_Frequency_ID", grp: "contract", when: "salesOrder" },   // "Billing Frequency"
+            { col: "NoofCycle",      grp: "contract", when: "salesOrder" },
+            { col: "QtyPerCycle",    grp: "contract", when: "salesOrder" },
+            { col: "StartDate",      grp: "contract", when: "salesOrder" },
+            { col: "EndDate",        grp: "contract", when: "salesOrder" },
+            // --- References ---
+            // Sales order (18-Sep-2026): Project with its Phase (scoped by the chosen
+            // project), Billing Code, Blanket Order Line, Org Unit - in that order.
+            { col: "C_Project_ID",      grp: "ref", when: "salesOrder" },
+            { col: "C_ProjectPhase_ID", grp: "ref", when: "salesOrder" },
+            { col: "C_Activity_ID",     grp: "ref", when: "salesOrder" },
             // Blanket release link ("Order Line"). It records which BLANKET order line the
             // release came from, so it is meaningless on a quotation - a quotation is never
-            // a release against a blanket. Real orders only (purchase and sales); always
-            // offered on a sales order (DISPLAY_LOGIC_ALWAYS_SHOW).
-            { col: "C_OrderLine_Blanket_ID", when: "order" },
-            // Original PO Line. The column is Ref_C_Orderline_ID, NOT Ref_OrderLine_ID -
-            // both exist on C_OrderLine and only this one carries that field label. Its
-            // own DisplayLogic (@Ref_C_Order_ID@>0 & @VAS_OrderType@='VO') restricts it
-            // further, so it appears on the documents the dictionary intends.
-            { col: "Ref_C_Orderline_ID", when: "purchase" },
-            // Quotation line the sales order line was converted from.
-            { col: "C_Quotation_Line_ID", when: "salesOrder" }
+            // a release against a blanket. Real orders only (purchase and sales): shown
+            // where the header names a blanket order (@C_Order_Blanket@>0, see
+            // DISPLAY_LOGIC_OVERRIDES) or on a release order, and MANDATORY on a release
+            // (dynMandatory).
+            { col: "C_OrderLine_Blanket_ID", grp: "ref", when: "order" },
+            { col: "AD_OrgTrx_ID",      grp: "ref", when: "salesOrder" },
+            // A_Asset_ID excluded per design.
+            { col: "VA106_TaxCollectedAtSource_ID", grp: "ref", when: "va106_" },
+            { col: "VA106_TCSAmount",               grp: "ref", when: "va106_" },
+            // Drop Shipment, read-only: stamped by the process that raised the line, never
+            // entered by hand (see FORCED_READONLY_COLS). Only on an order - purchase or,
+            // since 17-Sep-2026, sales - whose HEADER is itself flagged C_Order.IsDropShip;
+            // on any other order the line flag is meaningless, so the field is not
+            // offered at all.
+            { col: "IsDropShip",       grp: "ref", when: "orderDropShip" }
+            // Plan Run (VAMRP_PlanRun_ID) and Original PO Line (Ref_C_Orderline_ID) were
+            // dropped from References on 16-Sep-2026, and Quotation Line
+            // (C_Quotation_Line_ID) on 17-Sep-2026: each is stamped by the process that
+            // raises the line and read nowhere in this panel.
         ];
 
         /* Document-kind helpers for the Additional-Info `when` conditions. The panel is
@@ -2276,6 +2608,19 @@
         function docIsOrder()      { return !docIsQuotation(); }
         /* The ORDER HEADER is flagged as a drop shipment (C_Order.IsDropShip = 'Y'). */
         function docIsDropShip()   { return !!(parent && parent.IsDropShip); }
+        /* A RELEASE purchase order: a purchase document whose target document type is
+           flagged C_DocType.IsReleaseDocument (parent.IsReleaseDoc, model side). Its lines
+           are raised against blanket order lines, so the product is not picked from the
+           catalog - it comes with the blanket line chosen in Additional Info. */
+        function docIsReleasePO()  { return docIsPurchase() && !!(parent && parent.IsReleaseDoc); }
+        /* A RELEASE order of either side - purchase or SALES (17-Sep-2026): the sales-order
+           round gave a release sales order the same blanket-line flow. Quotations never. */
+        function docIsReleaseOrder() { return docIsOrder() && !!(parent && parent.IsReleaseDoc); }
+        /* The corrections that were purchase-only on 16-Sep-2026 apply to a real SALES
+           ORDER as well since 17-Sep-2026 (IsSOTrx = 'Y' and not a quotation): every
+           gate that used docIsPurchase() for them now uses this. A quotation keeps the
+           behaviour it had. */
+        function docIsRealOrder()  { return docIsPurchase() || docIsSalesOrder(); }
 
         /* Whether a conditional group applies to this line. */
         function dynCondMet(line, when) {
@@ -2284,8 +2629,17 @@
             if (when === "purchase") return docIsPurchase();
             // Purchase order whose header carries the drop-shipment flag.
             if (when === "purchaseDropShip") return docIsPurchase() && docIsDropShip();
+            // Any real order (purchase or sales) whose header carries the drop-shipment flag.
+            if (when === "orderDropShip") return docIsRealOrder() && docIsDropShip();
+            // Release purchase order (target document type IsReleaseDocument).
+            if (when === "releasePO") return docIsReleasePO();
+            // Release order of either side.
+            if (when === "releaseOrder") return docIsReleaseOrder();
             // Sales order that is not a quotation (IsSOTrx = 'Y' AND IsSalesQuotation = 'N').
             if (when === "salesOrder") return docIsSalesOrder();
+            // Its exact complement - a purchase order or a quotation - so a column listed
+            // under both lands in exactly one section whatever the document is.
+            if (when === "notSalesOrder") return !docIsSalesOrder();
             // Any SALES-side document (IsSOTrx = 'Y') - sales order OR quotation.
             if (when === "sales") return !!(parent && parent.IsSOTrx);
             // A quotation only (IsSOTrx = 'Y' AND IsSalesQuotation = 'Y'). The exact
@@ -2312,44 +2666,38 @@
         }
 
         /* ---------- collapsible field groups (Additional Info modal) ----------
-           Reusable full-row section headers injected before an anchor field. A group owns
-           the sibling fields between its header and the next header; the header's Show
-           More/Less toggle collapses/expands them. Add an object here to add another group:
-           `anchor` = ColumnName of the group's first field, `key`/`def` = AD_Message key +
-           English fallback, `collapsed` = initial collapsed state. */
+           Reusable full-row section headers injected before the first field of each
+           section. A group owns the sibling fields between its header and the next
+           header; the header's Show More/Less toggle collapses/expands them. Add an object
+           here to add another group: `id` = the `grp` tag its fields carry in
+           ADDITIONAL_INFO_FIELDS, `key`/`def` = AD_Message key + English fallback,
+           `collapsed` = initial collapsed state.
+
+           Membership is the field's own `grp` tag (18-Sep-2026), not a range between
+           anchor columns: a column can then sit in one section on a sales order and in
+           another on a purchase order or quotation (Org Unit, Project, Billing Code), which
+           an anchor range - resolved from the column's FIRST listing - could not express. */
         var MORE_FIELD_GROUPS = [
-            { anchor: "AD_OrgTrx_ID",              key: "VAS_107_GrpDimension",  def: "Dimension",  collapsed: false },
-            { anchor: "IsContract",                key: "VAS_107_GrpContract",   def: "Contract",   collapsed: false },
-            { anchor: "VA106_TaxCollectedAtSource_ID", key: "VAS_107_GrpReferences", def: "References", collapsed: false }
+            // "Dimensions" (plural, 17-Sep-2026) - its own key, so a site that seeded the
+            // old singular wording is not left showing it.
+            { id: "dim",      key: "VAS_107_GrpDimensions", def: "Dimensions", collapsed: false },
+            { id: "contract", key: "VAS_107_GrpContract",   def: "Contract",   collapsed: false },
+            { id: "ref",      key: "VAS_107_GrpReferences", def: "References", collapsed: false }
         ];
-        // Per-anchor collapsed state; persists across modal re-opens in the same session.
+        // Per-group collapsed state; persists across modal re-opens in the same session.
         var moreGroupCollapsed = {};
 
-        /* Position of a curated column in ADDITIONAL_INFO_FIELDS (-1 when absent). */
-        function dynSpecIndex(col) {
-            for (var i = 0; i < ADDITIONAL_INFO_FIELDS.length; i++)
-                if (ADDITIONAL_INFO_FIELDS[i].col === col) return i;
-            return -1;
-        }
-
-        /* All ColumnNames owned by group gi (from its anchor to the next group's anchor).
-           Specs that do not apply to THIS document are skipped, so a group only ever
-           claims fields the modal actually built. That matters if a column is ever listed
-           under two groups with mutually exclusive `when` conditions: without the filter
-           the group it is NOT in would still claim it, and applyFieldGroups would anchor
-           that group's header on a field rendered somewhere else entirely. */
+        /* All ColumnNames owned by group gi, in modal order. Specs that do not apply to
+           THIS document are skipped, so a group only ever claims fields the modal
+           actually built: a column listed under two groups with complementary `when`
+           conditions is claimed by the one it is rendered in, never by the other. */
         function groupCols(gi) {
-            var start = dynSpecIndex(MORE_FIELD_GROUPS[gi].anchor);
-            if (start < 0) return [];
-            var end = ADDITIONAL_INFO_FIELDS.length;
-            for (var g = gi + 1; g < MORE_FIELD_GROUPS.length; g++) {
-                var idx = dynSpecIndex(MORE_FIELD_GROUPS[g].anchor);
-                if (idx > start && idx < end) end = idx;
-            }
-            var out = [];
-            for (var k = start; k < end; k++) {
-                if (!dynCondMet(null, ADDITIONAL_INFO_FIELDS[k].when)) continue;
-                out.push(ADDITIONAL_INFO_FIELDS[k].col);
+            var id = MORE_FIELD_GROUPS[gi].id, out = [];
+            for (var k = 0; k < ADDITIONAL_INFO_FIELDS.length; k++) {
+                var spec = ADDITIONAL_INFO_FIELDS[k];
+                if (spec.grp !== id) continue;
+                if (!dynCondMet(null, spec.when)) continue;
+                out.push(spec.col);
             }
             return out;
         }
@@ -2367,9 +2715,9 @@
                     if ($f.length) { $anchor = $f; break; }
                 }
                 if (!$anchor) continue;
-                var collapsed = (grp.anchor in moreGroupCollapsed) ? moreGroupCollapsed[grp.anchor] : !!grp.collapsed;
+                var collapsed = (grp.id in moreGroupCollapsed) ? moreGroupCollapsed[grp.id] : !!grp.collapsed;
                 $anchor.before(
-                    '<div class="vas-obl-fldgrp" data-grp="' + grp.anchor + '"' + (collapsed ? ' data-collapsed="1"' : "") + '>' +
+                    '<div class="vas-obl-fldgrp" data-grp="' + grp.id + '"' + (collapsed ? ' data-collapsed="1"' : "") + '>' +
                     '<span class="vas-obl-fldgrp-name">' + esc(lbl(grp.key, grp.def)) + "</span>" +
                     '<button type="button" class="vas-obl-fldgrp-toggle" data-act="fldgrp-toggle">' +
                     '<span class="vas-obl-fldgrp-txt">' + esc(collapsed ? lbl("VAS_107_ShowMore", "Show More") : lbl("VAS_107_ShowLess", "Show Less")) + "</span>" +
@@ -2449,11 +2797,20 @@
            Uses dynFieldKind to classify each field — critical for YesNo columns whose
            value is "N" (No): +("N") === NaN, and NaN !== 0 is true, so the naive
            +val !== 0 check would wrongly highlight the button for an unset checkbox.
-           Pass a pre-computed cols array to avoid calling additionalInfoColumns twice. */
+           Pass a pre-computed cols array to avoid calling additionalInfoColumns twice.
+
+           Only a field the pop-up actually SHOWS counts (18-Sep-2026): a column the
+           dictionary's DisplayLogic hides for this line (Billing Code where the Activity
+           element is off, the contract fields while Contract is unticked, ...) can still
+           carry a value - one the framework copied from the header or seeded from a column
+           default - and it was turning the button blue on a line the user had put nothing
+           into. The button is the pop-up's summary, so it reads what the pop-up reads. */
         function hasAdditionalValues(line, cols) {
             if (!cols) cols = additionalInfoColumns(line);
             for (var i = 0; i < cols.length; i++) {
-                var m = cols[i], v = lineVal(line, m.ColumnName);
+                var m = cols[i];
+                if (!dynFieldVisible(line, m)) continue;
+                var v = lineVal(line, m.ColumnName);
                 if (v == null) continue;
                 var s = String(v).trim();
                 if (!s) continue;
@@ -2510,15 +2867,26 @@
            is written for the document that raises the link (e.g. the blanket-release
            windows, or an accounting-element gate) and therefore hides it on an ordinary
            sales order. Purchase orders are untouched - the dictionary keeps deciding
-           there. `when` uses the same vocabulary as ADDITIONAL_INFO_FIELDS.
+           there - with ONE exception: a release purchase order must offer the Blanket
+           Order Line, because that is where its product comes from (docIsReleasePO).
+           `when` uses the same vocabulary as ADDITIONAL_INFO_FIELDS.
 
-           Billing Code uses `sales`, not `salesOrder`: a QUOTATION carries the same
-           dictionary DisplayLogic as the sales order it becomes, so without the override
-           the field was offered on the order and missing on the quotation even though the
-           accounting schema enables it and the Quotation line tab shows it. */
+           Billing Code (C_Activity_ID) is NOT in this list any more (18-Sep-2026). It was
+           forced on for a quotation, so the field sat in the pop-up while the accounting
+           schema had the Activity element switched off and the Quotation line tab hid it.
+           On every document it now follows its own dictionary DisplayLogic, exactly as the
+           line tab shows it. */
         var DISPLAY_LOGIC_ALWAYS_SHOW = [
-            { col: "C_Activity_ID",          when: "sales" },        // "Billing Code"
-            { col: "C_OrderLine_Blanket_ID", when: "salesOrder" }    // "Blanket Order Line"
+            // "Blanket Order Line" on a release order of either side: that is where the
+            // product comes from, so it is offered whatever the dictionary says.
+            { col: "C_OrderLine_Blanket_ID", when: "releaseOrder" }
+        ];
+        /* Fields whose DisplayLogic is REPLACED by a panel-side rule for the given
+           document, evaluated with the same evaluator and header tokens as a dictionary
+           rule. "Blanket Order Line" on a SALES ORDER (17-Sep-2026): shown only where the
+           header names a blanket order - the rule the Lines tab applies. */
+        var DISPLAY_LOGIC_OVERRIDES = [
+            { col: "C_OrderLine_Blanket_ID", when: "salesOrder", logic: "@C_Order_Blanket@>0" }
         ];
         /* True when this column's DisplayLogic is overridden for the current document. */
         function dynDisplayForced(m) {
@@ -2530,9 +2898,22 @@
             }
             return false;
         }
+        /* The panel-side DisplayLogic that replaces the dictionary's for this column on
+           the current document, or null when the dictionary keeps deciding. */
+        function dynDisplayOverride(m) {
+            if (!m || !m.ColumnName) return null;
+            var name = String(m.ColumnName).toLowerCase();
+            for (var i = 0; i < DISPLAY_LOGIC_OVERRIDES.length; i++) {
+                var s = DISPLAY_LOGIC_OVERRIDES[i];
+                if (s.col.toLowerCase() === name && dynCondMet(null, s.when)) return s.logic;
+            }
+            return null;
+        }
 
         function dynFieldVisible(line, m) {
             if (dynDisplayForced(m)) return true;
+            var override = dynDisplayOverride(m);
+            if (override) return !!evalLogic(line, override, false);
             return !(m && m.DisplayLogic && !evalLogic(line, m.DisplayLogic, true));
         }
 
@@ -2736,6 +3117,11 @@
                 stage("IsTaxIncluded",          !!parent.IsTaxIncluded);
                 stage("Processed",              !!parent.Processed);
                 stage("DocStatus",              parent.DocStatus              || "");
+                // The header columns the line's DisplayLogic / AD_Val_Rule read by token
+                // (@C_Order_Blanket@ above all: the Blanket Order Line lookup lists the
+                // lines of THAT order, and without it the list on a fresh window is empty).
+                var lg = parent.LogicContext || {};
+                for (var lk in lg) if (lg.hasOwnProperty(lk)) stage(lk, lg[lk]);
             }
             // Stage line columns ONLY when the canonical name is known (columnNameByLc covers
             // all Additional-Info columns whose val-rules need @token@ resolution) OR when the
@@ -2968,6 +3354,24 @@
                 line._dynTouched[col] = true;
             }
             var m = columnMeta[col];
+            // Blanket Order Line: the panel fills the line from it itself (see
+            // applyBlanketLine) rather than through the dictionary callout - that callout
+            // writes the product into the GridTab and leaves the product callout chain to
+            // price it, neither of which the line bag has.
+            if (isBlanketLineCol(col) && !sameVal(prev, value)) {
+                applyBlanketLine(line, value);
+                return;
+            }
+            // Contract (IsContract): the dictionary callout on this column opens the
+            // framework's own contract dialog - a second pop-up over the Additional Info
+            // modal (17-Sep-2026). The modal already holds the contract fields (Billing
+            // Frequency, cycles, quantity per cycle, start / end date), each gated by its
+            // DisplayLogic on this very flag, so ticking the box simply re-evaluates them
+            // in place: they appear under the checkbox, and disappear when it is cleared.
+            if (String(col).toLowerCase() === "iscontract") {
+                refreshMoreDialog(line);
+                return;
+            }
             if (m && m.Callout) {
                 // Snapshot the other modal fields so we can refresh just the ones the
                 // callout changed (e.g. VA106_TCSAmount after picking the TCS type).
@@ -2996,6 +3400,94 @@
                 if (!line._dynTouched) line._dynTouched = {};
                 line._dynTouched[col] = true;
             }
+        }
+
+        /* The user picked (or cleared) the Blanket Order Line in Additional Info. On a
+           release the line IS that blanket line's release, so everything it carries comes
+           across: product / charge and their names, the quantity still open on the blanket
+           line, its UOM, its price (held - a release keeps the blanket price, so the
+           re-pricing below runs with the override set), discount, attribute instance, tax
+           and transaction organisation, plus QtyBlanket, which the framework validates the
+           release against on save. Then the ordinary product callout runs (server path)
+           so the amounts and tax are recomputed the way any product change is.
+           Mirrors the framework's CalloutOrder.BlanketOrderLine (item 12). */
+        function applyBlanketLine(line, value) {
+            var id = parseInt(value, 10) || 0;
+            var v = line.values, d = line.display;
+            if (id <= 0) {
+                // Cleared: the product that came with the blanket line goes with it.
+                v.M_Product_ID = 0; v.C_Charge_ID = 0; v.M_AttributeSetInstance_ID = 0;
+                d.productName = ""; d.chargeName = ""; d.attrName = ""; d.hasAttributeSet = false;
+                line._productType = ""; line._priceOverride = false;
+                setLineVal(line, "QtyBlanket", null);
+                markDirty(line);
+                render();
+                return;
+            }
+            setRowBusy(line, true);
+            calloutPending++;
+            $.ajax({
+                url: VIS.Application.contextUrl + "VAS_107_CreateOrderBottomPanel/GetBlanketLine",
+                type: "GET", dataType: "json", data: { C_OrderLine_ID: id },
+                success: function (raw) {
+                    var b = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
+                    if (!b || !(b.C_OrderLine_ID > 0) || lineById(line.rowId) !== line) {
+                        line._busy = false; render(); calloutSettled();
+                        if (b && !(b.C_OrderLine_ID > 0)) showToast(lbl("VAS_107_BlanketLineNotFound", "The blanket order line could not be read"));
+                        return;
+                    }
+                    // The modal's other fields as they were, so the ones the blanket line
+                    // changes (Trx Organization, ...) can be rebuilt afterwards.
+                    var before = snapshotDynValues(line);
+                    delete before[BLANKET_LINE_COL];
+                    if (b.M_Product_ID > 0) {
+                        v.M_Product_ID = b.M_Product_ID; v.C_Charge_ID = 0;
+                        d.productName = b.ProductName || ""; d.chargeName = "";
+                        d.hasAttributeSet = !!b.HasAttributeSet;
+                        line._productType = b.ProductType || "";
+                    } else {
+                        v.C_Charge_ID = b.C_Charge_ID || 0; v.M_Product_ID = 0;
+                        d.chargeName = b.ChargeName || ""; d.productName = "";
+                        d.hasAttributeSet = false;
+                        line._productType = "";
+                    }
+                    v.M_AttributeSetInstance_ID = b.M_AttributeSetInstance_ID || 0;
+                    d.attrName = (b.M_AttributeSetInstance_ID > 0) ? (b.AttrName || "") : "";
+                    if (b.QtyEntered > 0) { v.QtyEntered = b.QtyEntered; v.QtyOrdered = b.QtyEntered; }
+                    if (b.C_UOM_ID > 0) { v.C_UOM_ID = b.C_UOM_ID; d.uomName = b.UOMName || uomName(b.C_UOM_ID) || ""; }
+                    v.PriceEntered = +b.PriceEntered || 0;
+                    setLineVal(line, "PriceActual", +b.PriceActual || v.PriceEntered);
+                    setLineVal(line, "PriceList", +b.PriceList || 0);
+                    line._priceOverride = true;   // the blanket price is the release price
+                    v.Discount = +b.Discount || 0;
+                    if (b.C_Tax_ID > 0) { v.C_Tax_ID = b.C_Tax_ID; d.taxName = b.TaxName || taxName(b.C_Tax_ID) || ""; }
+                    setLineVal(line, "QtyBlanket", +b.QtyBlanket || 0);
+                    if (b.AD_OrgTrx_ID > 0) setLineVal(line, "AD_OrgTrx_ID", b.AD_OrgTrx_ID);
+                    if (b.VAS_ContractLine_ID > 0 && columnMeta["VAS_ContractLine_ID"]) setLineVal(line, "VAS_ContractLine_ID", b.VAS_ContractLine_ID);
+                    if (!v.Description && b.Description) v.Description = b.Description;
+                    // These landed through the panel, not the modal's own controls: mark
+                    // them touched so the save persists them exactly (ApplyExtraColumns).
+                    if (!line._dynTouched) line._dynTouched = {};
+                    line._dynTouched.QtyBlanket = true;
+                    if (b.AD_OrgTrx_ID > 0) line._dynTouched.AD_OrgTrx_ID = true;
+                    markDirty(line);
+                    line._busy = false;
+                    // Re-price through the product callout with the blanket price held, then
+                    // bring the modal's other fields (Trx Org, ...) up to date.
+                    runCallout(line, v.M_Product_ID > 0 ? "M_Product_ID" : "C_Charge_ID", function () {
+                        ensureRowLookups(line);
+                        primeLineContext(line);
+                        syncMoreDialogValues(line, before, BLANKET_LINE_COL);
+                        renderTotals();
+                    });
+                    calloutSettled();
+                },
+                error: function (err) {
+                    console.log(err);
+                    line._busy = false; render(); calloutSettled();
+                    showToast(lbl("VAS_107_BlanketLineNotFound", "The blanket order line could not be read"));
+                }
+            });
         }
 
         /* Rebuild a single Additional-Info modal field in-place without closing/reopening
@@ -3081,6 +3573,9 @@
             // control (and its lookup) is preserved when it re-appears.
             $b.children("[data-col]").each(function () { if (!seen[$(this).attr("data-col")]) $(this).remove(); });
             var visible = applyDynDisplay(line, $b);
+            // The re-chaining above moves fields past the section headers, so the headers
+            // are re-seated in front of the first field each section now owns.
+            applyFieldGroups($b);
             $b.children(".vas-obl-empty-message").remove();
             if (!visible)
                 $b.append('<p class="vas-obl-empty-message">' + esc(lbl("VAS_107_NoAdditionalInfo", "No additional info for this line")) + "</p>");
@@ -3160,17 +3655,28 @@
             $wrap.append(fk.$pop);
         }
 
+        /* The message for a line with no product / charge. On a release the product is
+           not picked here at all - it comes with the blanket order line - so the line is
+           told to go and select that instead. */
+        function productRequiredMsg() {
+            return docIsReleaseOrder()
+                ? lbl("VAS_107_SelectBlanketLine", "Please select the Blanket Order Line details in the Additional Info section to select the product.")
+                : lbl("VAS_107_ProductChargeRequired", "Select a product or charge");
+        }
+
         function validateLine(line) {
             var v = line.values;
             if (v.M_Product_ID <= 0 && v.C_Charge_ID <= 0)
-                return { col: "M_Product_ID", msg: lbl("VAS_107_ProductChargeRequired", "Select a product or charge") };
+                return { col: "M_Product_ID", msg: productRequiredMsg() };
 
+            // Each message names the FIELD as the screen labels it ("Required: Tax"), not
+            // the column ("Required: C_Tax_ID").
             var err = VAS.PanelUtil.validateFields(v, [
-                { col: "QtyEntered",   msg: lbl("VAS_107_FieldRequired", "Required") + ": QtyEntered",   check: function (vv) { return isMandatory("QtyEntered")   && !(vv.QtyEntered > 0); } },
-                { col: "C_UOM_ID",     msg: lbl("VAS_107_FieldRequired", "Required") + ": C_UOM_ID",     check: function (vv) { return isMandatory("C_UOM_ID")     && !(vv.C_UOM_ID > 0); } },
-                { col: "PriceEntered", msg: lbl("VAS_107_FieldRequired", "Required") + ": PriceEntered", check: function (vv) { return isMandatory("PriceEntered") && (vv.PriceEntered == null || vv.PriceEntered === ""); } },
-                { col: "C_Tax_ID",     msg: lbl("VAS_107_FieldRequired", "Required") + ": C_Tax_ID",     check: function (vv) { return isMandatory("C_Tax_ID")     && !(vv.C_Tax_ID > 0); } },
-                { col: "Description",  msg: lbl("VAS_107_FieldRequired", "Required") + ": Description",  check: function (vv) { return isMandatory("Description")  && !(vv.Description && String(vv.Description).trim()); } }
+                { col: "QtyEntered",   msg: requiredMsg("QtyEntered"),   check: function (vv) { return isMandatory("QtyEntered")   && !(vv.QtyEntered > 0); } },
+                { col: "C_UOM_ID",     msg: requiredMsg("C_UOM_ID"),     check: function (vv) { return isMandatory("C_UOM_ID")     && !(vv.C_UOM_ID > 0); } },
+                { col: "PriceEntered", msg: requiredMsg("PriceEntered"), check: function (vv) { return isMandatory("PriceEntered") && (vv.PriceEntered == null || vv.PriceEntered === ""); } },
+                { col: "C_Tax_ID",     msg: requiredMsg("C_Tax_ID"),     check: function (vv) { return isMandatory("C_Tax_ID")     && !(vv.C_Tax_ID > 0); } },
+                { col: "Description",  msg: requiredMsg("Description"),  check: function (vv) { return isMandatory("Description")  && !(vv.Description && String(vv.Description).trim()); } }
             ]);
             if (err) return err;
 
@@ -3181,7 +3687,9 @@
             var dynRules = [];
             for (var d = 0; d < dyn.length; d++) {
                 (function (dm) {
-                    if (!dm.IsMandatory) return;
+                    // dynMandatory, not the raw flag: the Blanket Order Line is mandatory on
+                    // a release whatever the dictionary says (see dynMandatory).
+                    if (!dynMandatory(line, dm)) return;
                     dynRules.push({
                         col: dm.ColumnName,
                         msg: lbl("VAS_107_FieldRequired", "Required") + ": " + (dm.Name || dm.ColumnName),
@@ -3246,8 +3754,11 @@
                 // attribute form directly (the instance is usually being created).
                 IsSOTrx: !!(parent && parent.IsSOTrx),
                 newAttribute: !(parent && parent.IsSOTrx),
-                // Default to hiding zero / negative qty instances; user can toggle via checkbox.
-                showAll: false,
+                // Purchase order: "Show All (include zero and (-ve) qty)" starts TICKED —
+                // the goods are being bought, so the instances in question mostly have no
+                // stock yet and a stock-only list would be empty. Sales side keeps the
+                // stock-on-hand list first; the user can toggle either way.
+                showAll: docIsPurchase(),
                 lbl: lbl, esc: esc, icon: icon,
                 showBusy: showBusy, showToast: showToast,
                 dateStr: dateStr, fmtMoney: fmtMoney, parseNum: parseNum,
@@ -3327,7 +3838,8 @@
                         // would light up every row of that ASI. rowKey is unique per row.
                         rowKey: "r" + i,
                         key: "ASI:" + r.M_AttributeSetInstance_ID,
-                        code: r.Lot || r.SerNo || ("#" + r.M_AttributeSetInstance_ID),
+                        // Lot No: the lot, else the serial number - never the instance id.
+                        code: r.Lot || r.SerNo || "",
                         label: r.Description || "",
                         spec: r.GuaranteeDate ? dateStr(r.GuaranteeDate) : "",   // guarantee / expiration
                         locator: r.Value || "",                                  // l.Value (locator)
@@ -3355,7 +3867,7 @@
                 '<div class="vas-obl-search-input" id="vasOblAttrSearchRow">' + icon("search", "🔍") + '<input type="text" id="vasOblAttrSearch" placeholder="' + esc(lbl("VAS_107_AttrSearch", "Search attribute values")) + '" /></div>' +
                 "</header>" +
                 '<div class="vas-obl-dialog__body vas-obl-dialog__body--fixed">' +
-                '<div id="vasOblAttrList"' + (attrState.info && attrState.info.IsCanEdit ? ' class="vas-obl-attr-grid--editable"' : "") + '><div class="vas-obl-attr-grid__head"><div></div><div>' + esc(lbl("VAS_107_Code", "Code")) + "</div><div>" + esc(lbl("Description", "Description")) +
+                '<div id="vasOblAttrList"' + (attrState.info && attrState.info.IsCanEdit ? ' class="vas-obl-attr-grid--editable"' : "") + '><div class="vas-obl-attr-grid__head"><div></div><div>' + esc(lbl("Lot", "Lot No")) + "</div><div>" + esc(lbl("Description", "Description")) +
                 "</div><div>" + esc(lbl("GuaranteeDate", "Guarantee Date")) + "</div><div>" + esc(lbl("M_Locator_ID", "Locator")) + '</div><div class="vas-obl-attr-h-right">' + esc(lbl("QtyOnHand", "On Hand")) + "</div>" +
                 (attrState.info && attrState.info.IsCanEdit ? "<div>" + esc(lbl("VAS_107_Edit", "Edit")) + "</div>" : "") +
                 '</div><div class="vas-obl-attr-grid__body" id="vasOblAttrRows"></div></div>' +
@@ -3846,7 +4358,7 @@
            auto-created - the user adds the next line manually via the Add button. A
            blank/invalid row blocks with the same message the Save button shows. */
         function saveThenAddLine() {
-            if (!parent || !parent.IsEditable) { showToast(docMsg("VAS_107_OrderNotEditable", "This {0} cannot take new lines")); return; }
+            if (!panelEditable()) { showToast(docMsg("VAS_107_OrderNotEditable", "This {0} cannot take new lines")); return; }
             if (unsavedLines().length) afterCallouts(function () { saveRows(); });   // wait for in-flight callout first
             editing = null; render();
         }
@@ -3928,6 +4440,15 @@
             if (isHeaderDirty()) { showToast(lbl("VAS_107_SaveHeaderFirst", "Please save the header record before adding lines.")); if (done) done(false); return; }
             var batch = unsavedLines();
             if (restrictIds) batch = batch.filter(function (l) { return restrictIds[l.rowId]; });
+            if (!batch.length && !restrictIds && docIsRealOrder()) {
+                // Nothing saveable, but a new line with NO product / charge is on the
+                // page: it is not in the batch (unsavedLines needs a product), so Save
+                // used to do nothing at all. Flag it in place instead, with the same
+                // wording the full validation gives - on a release that is the request to
+                // pick the blanket order line.
+                var blank = lines.filter(function (l) { return !l._saving && l.status === "new" && !(l.values.M_Product_ID > 0 || l.values.C_Charge_ID > 0); });
+                if (blank.length) { validateUnsaved(blank); if (done) done(false); return; }
+            }
             if (!batch.length || !parent) { if (done) done(false); return; }
             if (!validateUnsaved(batch)) { if (done) done(false); return; }   // AD_Column mandatory validation
             // Prevent a concurrent POST from racing on the same DB transaction.
@@ -4169,6 +4690,11 @@
         if (curTab && typeof curTab.getAD_Table_ID === "function") this.table_ID = curTab.getAD_Table_ID();
         if (curTab && typeof curTab.getAD_Window_ID === "function") this.AD_Window_ID = curTab.getAD_Window_ID();
         this.init();
+        // Watch the tab's data status so a doc action (Complete / Close / ...) run from
+        // the header locks the panel at once - see onTabDataStatus.
+        if (curTab && typeof curTab.addDataStatusListener === "function") {
+            try { curTab.addDataStatusListener(this.tabDataListener); } catch (e) { }
+        }
     };
 
     VAS.VAS_107_CreateOrderBottomPanel.prototype.refreshPanelData = function (recordID, selectedRow) {
@@ -4198,9 +4724,13 @@
     VAS.VAS_107_CreateOrderBottomPanel.prototype.dispose = function () {
         // Remove the capture-phase shortcut listener registered during init (VAI154 12-Aug-2026).
         if (this._shortcuts) { this._shortcuts.dispose(); this._shortcuts = null; }
+        if (this.curTab && typeof this.curTab.removeDataStatusListener === "function") {
+            try { this.curTab.removeDataStatusListener(this.tabDataListener); } catch (e) { }
+        }
+        this.tabDataListener = null;
         $(document).off("mousedown.vascil").off("keydown.vascil");
-        $(window).off("resize.vasobl107");
-        $("#vasOblAttr, #vasOblScan, .vas-obl-toast").remove();
+        $(window).off("resize.vasobl107").off("resize.vasoblcat");
+        $("#vasOblAttr, #vasOblScan, #vasOblMore, .vas-obl-toast, .vas-obl-catalog-popover--fixed").remove();
         this.record_ID = 0; this.table_ID = 0; this.windowNo = 0;
         this.curTab = null; this.selectedRow = null; this.panelWidth = null;
     };

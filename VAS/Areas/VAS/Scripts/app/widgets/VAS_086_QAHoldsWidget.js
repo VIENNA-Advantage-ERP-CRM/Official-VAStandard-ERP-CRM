@@ -143,11 +143,19 @@
             return d.getFullYear() + '-' + (month < 10 ? '0' + month : month) + '-' + (day < 10 ? '0' + day : day);
         }
 
-        function holdAge(value) {
-            if (!value) { return "-"; }
-            var d = new Date(value);
-            if (isNaN(d.getTime())) { return "-"; }
-            var diffHours = Math.max(0, Math.floor((new Date().getTime() - d.getTime()) / 3600000));
+        /* QA sheet GRN #33: the hold age comes from the server (database clock minus the confirmation
+           line's Created). The browser used to parse the server timestamp as local time, so every hold
+           was off by the browser/server time-zone gap. */
+        function holdAge(value, serverHours) {
+            var diffHours;
+            if (serverHours != null && isFinite(Number(serverHours))) {
+                diffHours = Math.max(0, Math.floor(Number(serverHours)));
+            } else {
+                if (!value) { return "-"; }
+                var d = new Date(value);
+                if (isNaN(d.getTime())) { return "-"; }
+                diffHours = Math.max(0, Math.floor((new Date().getTime() - d.getTime()) / 3600000));
+            }
             if (diffHours < 24) { return diffHours + "h"; }
             return Math.floor(diffHours / 24) + "d";
         }
@@ -296,7 +304,7 @@
             for (var i = 0; i < rows.length; i++) {
                 var r = rows[i];
                 var label = escapeHtml(r.grnNo) + ' &middot; ' + escapeHtml(r.supplier);
-                var meta = escapeHtml(r.itemName) + ' &middot; ' + escapeHtml(lbl("VAS_086_Held", "held")) + ' ' + escapeHtml(holdAge(r.holdStartedOn));
+                var meta = escapeHtml(r.itemName) + ' &middot; ' + escapeHtml(lbl("VAS_086_Held", "held")) + ' ' + escapeHtml(holdAge(r.holdStartedOn, r.holdAgeHours));
                 $listBody.append(
                     '<button type="button" class="vas-qah-row" data-holdid="' + escapeHtml(r.grnConfirmationLineId) + '">' +
                     '<div class="vas-qah-row-main">' +

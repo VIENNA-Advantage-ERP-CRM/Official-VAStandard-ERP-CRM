@@ -20,9 +20,26 @@
  *                  other's documents.
  * Employee Code  : VAI154
  * Date           : 09-Sep-2026
+ *
+ * Chronological development:
+ *   VAI163   2026-09-17  One panel per window (ported from VAS_249): a second
+ *                        instance started for the same windowNo parks itself
+ *                        (hidden, no shortcuts, no fetch) and takes over only if
+ *                        the first is disposed; a repeat startPanel on one
+ *                        instance rebuilds in place; shortcuts are registered
+ *                        from init, never twice. This is what stopped the
+ *                        "Nothing to undo" / "Select a row to delete" toasts
+ *                        after a shortcut that had in fact worked - the second,
+ *                        idle instance was answering too. (The shared shortcut
+ *                        util also swallows auto-repeated keydown now.)
  ************************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
+
+    /* Live panel per windowNo, so a second instance the host starts for the same window
+       does not paint a second copy of the grid (and answer every shortcut a second time).
+       See startPanel / dispose. */
+    var LIVE_BY_WINDOW = {};
 
     VAS.VAS_248_DeliveryOrderBottomPanel = function () {
         this.record_ID = 0;
@@ -189,6 +206,15 @@
 
         /* ---------- lifecycle ---------- */
         this.init = function () {
+            // A repeat startPanel on this same instance rebuilds IN PLACE: the root the
+            // host already holds is taken out of the document first, so the window never
+            // shows the old grid beside the new one.
+            if ($root && $root.length) {
+                closeCatalog(); closeDialogs();
+                $(document).off("mousedown.vasdol");
+                $(window).off("resize.vasdol");
+                $root.remove();
+            }
             $root = $('<div class="vas-dol-root"></div>');
             $body = $('<div class="vas-dol-body"></div>');
             $emptyState = $('<div class="vas-dol-empty" style="display:none;"></div>');
@@ -197,6 +223,7 @@
             createBusyIndicator();
             buildShell();
             $(document).on("mousedown.vasdol", onDocMouseDown);
+            registerShortcuts();
             fitHostWidth();
             /* Browser zoom fires resize, which is where a stale host width is released.
                Debounced through rAF - a zoom or a splitter drag emits a burst of events
@@ -243,6 +270,9 @@
         function showBusy(show) { if ($busy && $busy[0]) $busy[0].style.visibility = show ? "visible" : "hidden"; }
 
         this.fetchData = function (recordID, page) {
+            // A parked duplicate (see startPanel) only remembers what it was asked for, so
+            // it can pick up where the live panel left off if it ever takes over.
+            if ($self._parked) { $self._parkedRecord = recordID; return; }
             // Framework calls fetchData(recordID) on record load -> reset to page 0; the
             // pager calls it with an explicit page. Server returns LinePageSize (10) rows.
             var reqPage = (typeof page === "number" && page >= 0) ? page : 0;
@@ -521,7 +551,7 @@
                 render();
             });
             $row.append('<div class="vas-dol-cell" role="columnheader">' + esc(lbl("VAS_248_ProductCharge", "Product / Charge")) + "</div>");
-            $row.append('<div class="vas-dol-cell" role="columnheader">' + esc(lbl("Description", "Description")) + "</div>");
+            $row.append('<div class="vas-dol-cell" role="columnheader">' + esc(lbl("VAS_248_Description", "Description")) + "</div>");
             $row.append('<div class="vas-dol-cell" role="columnheader">' + esc(lbl("VAS_248_Locator", "Locator")) + "</div>");
             $row.append('<div class="vas-dol-cell vas-dol-cell--right" role="columnheader">' + esc(lbl("VAS_248_QtyUom", "Quantity / UOM")) + "</div>");
             $row.append('<div class="vas-dol-cell vas-dol-cell--more" role="columnheader" aria-label="' + esc(lbl("VAS_248_More", "More")) + '"></div>');
@@ -1317,10 +1347,31 @@
                 }
             };
             seedAllColumns(line.values);
+            seedHeaderDateRequired(line);
             lines.unshift(line);
             editing = { rowId: line.rowId, field: "product" };
             catalog.term = ""; catalog.highlight = 0;
             render();
+        }
+
+        /* The line's Date Required from the header (17-Sep-2026, as VAS_240 / VAS_247): the
+           header's own date arrives as an ISO date (parent.DateRequired, model side) and is
+           seeded under both names a line table may carry - DTD001_DateRequired (the DTD001
+           module's) and a plain DateRequired. A name the table does not carry is dropped
+           by the server; SaveLines applies the same default for a line that reaches it
+           without one. Marked touched so the value is persisted exactly. */
+        function seedHeaderDateRequired(line) {
+            var iso = parent && parent.DateRequired;
+            if (!iso || !/^\d{4}-\d{2}-\d{2}/.test(String(iso))) return;
+            var hdrDate = String(iso).slice(0, 10);
+            var dateCols = ["DTD001_DateRequired", "DateRequired"];
+            for (var dc = 0; dc < dateCols.length; dc++) {
+                var dcol = dateCols[dc];
+                if (line.values[dcol] != null && line.values[dcol] !== "") continue;
+                line.values[dcol] = hdrDate;
+                if (!line._dynTouched) line._dynTouched = {};
+                line._dynTouched[dcol] = true;
+            }
         }
 
         function lineById(id) { for (var i = 0; i < lines.length; i++) if (lines[i].rowId === id) return lines[i]; return null; }
@@ -1505,9 +1556,12 @@
             // Default the unit from the product, but never overwrite a unit the user has
             // already chosen on this line. (A charge has no unit of its own; the server
             // callout supplies the system default so the line can save.)
-            if (item.C_UOM_ID > 0 && !v.C_UOM_ID) {
+            // The product's own unit goes on the line the moment the product is picked. A
+            // NEW product means a new unit: the one the previous product left on the line
+            // is not kept (the user can still change it after) - 17-Sep-2026.
+            if (item.C_UOM_ID > 0) {
                 v.C_UOM_ID = item.C_UOM_ID;
-                d.uomName = item.UomName || "";
+                d.uomName = item.UomName || uomName(item.C_UOM_ID) || "";
             }
             if (!(+v.QtyEntered > 0)) v.QtyEntered = 1;
             line._productType = (item.Kind === "C") ? "" : (item.ProductType || "");
@@ -1841,12 +1895,16 @@
             var vals = res.Values || {}, disp = res.Display || {};
             for (var col in vals) {
                 if (!vals.hasOwnProperty(col)) continue;
+                // A unit the server could not state (0) never clears the one the line
+                // already holds - the product's own, put there as it was picked.
+                if (col === "C_UOM_ID" && !(+vals[col] > 0) && (+v.C_UOM_ID > 0)) continue;
                 // Case-insensitive write: a saved line keys columns in DB case, which won't
                 // match the dictionary-cased name the callout returns, so a direct v[col]=
                 // would silently write a second key.
                 setLineVal(line, col, vals[col]);
             }
-            if (disp.uomName != null) d.uomName = disp.uomName;
+            if (disp.uomName != null && disp.uomName !== "") d.uomName = disp.uomName;
+            else if (!d.uomName && +v.C_UOM_ID > 0) d.uomName = uomName(+v.C_UOM_ID) || d.uomName;
             markDirty(line);
         }
 
@@ -3308,8 +3366,16 @@
             // The Additional-Info modal closes ONLY via its Done button (Escape ignored).
         });
 
-        // Alt+Ctrl+N/S/D/Z/Q keyboard shortcuts via the shared utility.
-        $self._shortcuts = VAS.PanelShortcuts.register({
+        // Alt+Ctrl+N/S/D/Z/Q keyboard shortcuts via the shared utility. Registered from
+        // init (not the constructor), so a parked duplicate never listens and a rebuilt
+        // panel never listens twice - a second listener was what answered a shortcut
+        // that had already worked with "Nothing to undo" / "Select a row to delete".
+        function registerShortcuts() {
+            if ($self._shortcuts) { $self._shortcuts.dispose(); $self._shortcuts = null; }
+            if ($self._parked) return;
+            $self._shortcuts = VAS.PanelShortcuts.register(shortcutHandlers());
+        }
+        function shortcutHandlers() { return {
             /**
              * Panel is active when it is visible in the DOM and a shipment is loaded.
              * Both conditions must hold; the shortcut is silently ignored otherwise.
@@ -3373,9 +3439,22 @@
             onRefresh: function () {
                 if (parent && parent.M_InOut_ID) $self.fetchData(parent.M_InOut_ID, linePage);
             }
-        });
+        }; }
 
         this.getRoot = function () { return $root; };
+
+        /* A parked duplicate takes over from the panel that was live for its window (that
+           one has been disposed): shown, listening, and loaded with whatever record it was
+           last asked for. */
+        this.unpark = function () {
+            if (!$self._parked) return;
+            $self._parked = false;
+            if ($root) $root.removeClass("vas-dol-is-hidden");
+            registerShortcuts();
+            var rec = $self._parkedRecord;
+            $self._parkedRecord = null;
+            if (rec > 0) $self.fetchData(rec); else $self.clear(rec === 0);
+        };
         this.dispose_ = function () {
             if (fitRaf) {
                 if (window.cancelAnimationFrame) window.cancelAnimationFrame(fitRaf);
@@ -3395,10 +3474,43 @@
         this.curTab = curTab;
         if (curTab && typeof curTab.getAD_Table_ID === "function") this.table_ID = curTab.getAD_Table_ID();
         if (curTab && typeof curTab.getAD_Window_ID === "function") this.AD_Window_ID = curTab.getAD_Window_ID();
+        // ONE live panel per window. When the host starts a second instance for a window
+        // that already has one, this one parks: hidden, no shortcuts, no fetch - so the
+        // window never shows two copies of the grid, and a shortcut is never answered
+        // twice. It takes over if the live one is disposed (see dispose / unpark). A
+        // repeat startPanel on the SAME instance simply rebuilds in place (init).
+        var key = String(windowNo || 0);
+        var live = LIVE_BY_WINDOW[key];
+        if (live === this || (live && live._disposed)) live = null;
+        if (live) {
+            // Is that entry STALE - a panel whose window was closed without dispose being
+            // called? Only a panel that has been SHOWN (the host called refreshPanelData
+            // on it) and whose root has since left the document counts as stale. A panel
+            // that has merely not been appended yet is NOT stale: the host builds every
+            // instance for a window before it appends any root.
+            var attached = false;
+            try { attached = !!(live.getRoot && live.getRoot() && live.getRoot().closest("body").length); } catch (e) { attached = false; }
+            if (live._everRefreshed && !attached) live = null;
+        }
+        this._parked = !!live;
+        this._disposed = false;
         this.init();
+        if (this._parked) {
+            this.getRoot().addClass("vas-dol-is-hidden");
+            if (!live._parkedTwins) live._parkedTwins = [];
+            live._parkedTwins.push(this);
+        } else {
+            LIVE_BY_WINDOW[key] = this;
+        }
     };
 
     VAS.VAS_248_DeliveryOrderBottomPanel.prototype.refreshPanelData = function (recordID, selectedRow) {
+        this._everRefreshed = true;   // the host has shown this panel (see startPanel's stale test)
+        if (this._parked) {
+            // Remember only, for a take-over: > 0 a record, 0 a new unsaved row, -1 none.
+            this._parkedRecord = (recordID > 0) ? recordID : (selectedRow !== undefined ? 0 : -1);
+            return;
+        }
         if (selectedRow == undefined || recordID <= 0) {
             // Pass true when a row exists in the grid but the shipment has no DB ID yet
             // (new unsaved record), so the panel shows a blank body rather than the
@@ -3421,9 +3533,23 @@
     };
 
     VAS.VAS_248_DeliveryOrderBottomPanel.prototype.dispose = function () {
+        this._disposed = true;
         // Remove the capture-phase shortcut listener registered during init.
         if (this._shortcuts) { this._shortcuts.dispose(); this._shortcuts = null; }
         if (typeof this.dispose_ === "function") this.dispose_();
+        // Hand the window to a parked twin, if one is waiting; otherwise the entry goes.
+        var key = String(this.windowNo || 0);
+        if (LIVE_BY_WINDOW[key] === this) {
+            delete LIVE_BY_WINDOW[key];
+            var twins = this._parkedTwins || [], next = null;
+            for (var i = 0; i < twins.length; i++) if (twins[i] && !twins[i]._disposed) { next = twins[i]; break; }
+            if (next) {
+                LIVE_BY_WINDOW[key] = next;
+                next._parkedTwins = twins.filter(function (t) { return t !== next && t && !t._disposed; });
+                try { next.unpark(); } catch (e) { if (window.console) console.log(e); }
+            }
+        }
+        this._parkedTwins = null;
         $("#vasDolAttr, #vasDolScan, #vasDolMore, .vas-dol-toast").remove();
         this.record_ID = 0; this.table_ID = 0; this.windowNo = 0;
         this.curTab = null; this.selectedRow = null;

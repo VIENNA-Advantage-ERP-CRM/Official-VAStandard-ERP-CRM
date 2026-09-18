@@ -257,10 +257,19 @@ namespace VIS.Controllers
                        COALESCE(AttributeSet.IsLotMandatory, 'N') AS Is_Lot_Mandatory,
                        COALESCE(AttributeSet.IsSerNoMandatory, 'N') AS Is_SerNo_Mandatory,
                        COALESCE(AttributeSet.IsGuaranteeDateMandatory, 'N') AS Is_Guarantee_Mandatory,
-                       COALESCE(OrderLine.QtyOrdered, 0) AS PO_Qty,
-                       COALESCE(OrderLine.QtyDelivered, 0) AS Already_Received_Qty,
-                       COALESCE(OrderLine.QtyOrdered, 0) - COALESCE(OrderLine.QtyDelivered, 0) - __VAS_UNPOSTED_GRN_QTY__ AS Open_Qty,
-                       UOM.Name AS Uom
+                       /* QA sheet Receive Against PO #75 / #76 (2026-09-15): quantities in the PO line's
+                          own UOM (QtyEntered) - the unit C_UOM_ID and its StdPrecision describe.
+                          QtyOrdered / QtyDelivered / MovementQty are product-UOM values and are rescaled
+                          by QtyEntered / QtyOrdered (ROUND keeps the result inside .NET decimal range). */
+                       COALESCE(OrderLine.QtyEntered, OrderLine.QtyOrdered, 0) AS PO_Qty,
+                       CASE WHEN COALESCE(OrderLine.QtyOrdered, 0) <> 0
+                            THEN ROUND(COALESCE(OrderLine.QtyDelivered, 0) * COALESCE(OrderLine.QtyEntered, OrderLine.QtyOrdered) / OrderLine.QtyOrdered, 12)
+                            ELSE COALESCE(OrderLine.QtyDelivered, 0) END AS Already_Received_Qty,
+                       CASE WHEN COALESCE(OrderLine.QtyOrdered, 0) <> 0
+                            THEN ROUND((COALESCE(OrderLine.QtyOrdered, 0) - COALESCE(OrderLine.QtyDelivered, 0) - __VAS_UNPOSTED_GRN_QTY__) * COALESCE(OrderLine.QtyEntered, OrderLine.QtyOrdered) / OrderLine.QtyOrdered, 12)
+                            ELSE 0 END AS Open_Qty,
+                       UOM.Name AS Uom,
+                       COALESCE(UOM.StdPrecision, 0) AS Uom_Precision
                 FROM C_Order PurchaseOrder
                 INNER JOIN C_OrderLine OrderLine ON (OrderLine.C_Order_ID=PurchaseOrder.C_Order_ID AND OrderLine.IsActive='Y')
                 /* Correction 2026-07-18: only ITEM products (ProductType 'I')
@@ -315,6 +324,17 @@ namespace VIS.Controllers
                 while (dr != null && dr.Read())
                 {
                     decimal openQty = Util.GetValueOfDecimal(dr["Open_Qty"]);
+                    int uomPrecision = Util.GetValueOfInt(dr["Uom_Precision"]);
+
+                    // The pre-filled received quantity must itself respect the UOM precision: a rescaled
+                    // open quantity such as 1,666.67 ml defaults to 1,666 (never above the open quantity).
+                    decimal defaultReceivedQty = openQty;
+                    if (uomPrecision >= 0 && uomPrecision <= 12)
+                    {
+                        decimal scale = 1m;
+                        for (int p = 0; p < uomPrecision; p++) { scale *= 10m; }
+                        defaultReceivedQty = decimal.Floor(openQty * scale) / scale;
+                    }
 
                     rows.Add(new
                     {
@@ -339,8 +359,9 @@ namespace VIS.Controllers
                         poQty = Util.GetValueOfDecimal(dr["PO_Qty"]),
                         alreadyReceivedQty = Util.GetValueOfDecimal(dr["Already_Received_Qty"]),
                         openQty = openQty,
-                        defaultReceivedQty = openQty,
-                        uom = Util.GetValueOfString(dr["Uom"])
+                        defaultReceivedQty = defaultReceivedQty,
+                        uom = Util.GetValueOfString(dr["Uom"]),
+                        uomPrecision = uomPrecision
                     });
                 }
 
@@ -353,10 +374,12 @@ namespace VIS.Controllers
                 // selected warehouse).
                 int poOrgId = 0;
                 int defaultWarehouseId = 0;
+                string poDropShip = "N";
 
                 string headerSql = @"
                     SELECT PurchaseOrder.AD_Org_ID AS PO_Org_ID,
-                           COALESCE(PurchaseOrder.M_Warehouse_ID, 0) AS PO_Warehouse_ID
+                           COALESCE(PurchaseOrder.M_Warehouse_ID, 0) AS PO_Warehouse_ID,
+                           COALESCE(PurchaseOrder.IsDropShip, 'N') AS PO_Drop_Ship
                     FROM C_Order PurchaseOrder
                     WHERE PurchaseOrder.C_Order_ID=@Header_PO_ID
                       AND PurchaseOrder.AD_Client_ID=@Header_Client_ID";
@@ -370,6 +393,7 @@ namespace VIS.Controllers
                 {
                     poOrgId = Util.GetValueOfInt(dr["PO_Org_ID"]);
                     defaultWarehouseId = Util.GetValueOfInt(dr["PO_Warehouse_ID"]);
+                    poDropShip = Util.GetValueOfString(dr["PO_Drop_Ship"]) == "Y" ? "Y" : "N";
                 }
                 dr.Close();
                 dr.Dispose();
@@ -416,6 +440,9 @@ namespace VIS.Controllers
                 dr.Dispose();
                 dr = null;
 
+                // QA sheet Receive Against PO #68 (2026-09-15): the warehouse list follows the PO's
+                // IsDropShip - a drop-ship PO offers only drop-ship warehouses, any other PO only
+                // warehouses with IsDropShip = 'N'.
                 List<object> warehouses = new List<object>();
                 bool defaultInList = false;
                 string warehouseSql = @"
@@ -425,12 +452,14 @@ namespace VIS.Controllers
                     WHERE Warehouse.IsActive='Y'
                       AND Warehouse.AD_Client_ID=@WH_Client_ID
                       AND Warehouse.AD_Org_ID=@WH_Org_ID
+                      AND COALESCE(Warehouse.IsDropShip, 'N')=@WH_Drop_Ship
                     ORDER BY Warehouse.Name";
 
                 dr = DB.ExecuteReader(warehouseSql, new SqlParameter[]
                 {
                     new SqlParameter("@WH_Client_ID", ctx.GetAD_Client_ID()),
-                    new SqlParameter("@WH_Org_ID", poOrgId)
+                    new SqlParameter("@WH_Org_ID", poOrgId),
+                    new SqlParameter("@WH_Drop_Ship", poDropShip)
                 });
                 while (dr != null && dr.Read())
                 {
@@ -443,15 +472,28 @@ namespace VIS.Controllers
                     });
                 }
 
-                // The PO's own warehouse always stays selectable even when it
-                // belongs to another org (legacy data).
+                // The PO's own warehouse stays selectable even when it belongs to
+                // another org (legacy data) - but only when its drop-ship setting
+                // matches the PO (#68); otherwise the first listed warehouse is the
+                // default.
                 if (defaultWarehouseId > 0 && !defaultInList)
                 {
                     string poWarehouseName = Util.GetValueOfString(DB.ExecuteScalar(
-                        "SELECT Name FROM M_Warehouse WHERE M_Warehouse_ID=@PO_WH_ID",
-                        new SqlParameter[] { new SqlParameter("@PO_WH_ID", defaultWarehouseId) },
+                        "SELECT Name FROM M_Warehouse WHERE M_Warehouse_ID=@PO_WH_ID AND COALESCE(IsDropShip, 'N')=@PO_WH_Drop_Ship",
+                        new SqlParameter[]
+                        {
+                            new SqlParameter("@PO_WH_ID", defaultWarehouseId),
+                            new SqlParameter("@PO_WH_Drop_Ship", poDropShip)
+                        },
                         null));
-                    warehouses.Insert(0, new { warehouseId = defaultWarehouseId, warehouseName = poWarehouseName });
+                    if (!string.IsNullOrEmpty(poWarehouseName))
+                    {
+                        warehouses.Insert(0, new { warehouseId = defaultWarehouseId, warehouseName = poWarehouseName });
+                    }
+                    else
+                    {
+                        defaultWarehouseId = 0;
+                    }
                 }
 
                 return Ok(new
@@ -634,6 +676,17 @@ namespace VIS.Controllers
                 {
                     return Fail("Received quantity cannot be greater than open quantity.");
                 }
+
+                // QA sheet Receive Against PO #75 (2026-09-15): the quantity is entered in the PO
+                // line's UOM and may carry no more decimals than that UOM's standard precision.
+                int uomId = openLines[selectedLine.Key].UomId;
+                int uomPrecision = uomId > 0 ? MUOM.GetPrecision(ctx, uomId) : -1;
+                if (uomPrecision >= 0 && decimal.Round(selectedLine.Value, uomPrecision, MidpointRounding.AwayFromZero) != selectedLine.Value)
+                {
+                    return Fail(uomPrecision == 0
+                        ? "Enter a whole number as the received quantity."
+                        : "The received quantity allows only " + uomPrecision.ToString(CultureInfo.InvariantCulture) + " decimal places.");
+                }
             }
 
             Trx trx = null;
@@ -656,6 +709,28 @@ namespace VIS.Controllers
                     {
                         receiptWarehouseId = openLine.Value.WarehouseId;
                         break;
+                    }
+                }
+
+                // QA sheet Receive Against PO #68: the receiving warehouse must share the PO's
+                // IsDropShip setting (the form only offers such warehouses; re-checked here).
+                if (receiptWarehouseId > 0)
+                {
+                    int dropShipMatch = Util.GetValueOfInt(DB.ExecuteScalar(@"
+                        SELECT COUNT(1)
+                        FROM C_Order PurchaseOrder
+                        INNER JOIN M_Warehouse Warehouse ON (Warehouse.M_Warehouse_ID=@Rcv_Warehouse_ID)
+                        WHERE PurchaseOrder.C_Order_ID=@Rcv_PO_ID
+                          AND COALESCE(Warehouse.IsDropShip, 'N')=COALESCE(PurchaseOrder.IsDropShip, 'N')",
+                        new SqlParameter[]
+                        {
+                            new SqlParameter("@Rcv_Warehouse_ID", receiptWarehouseId),
+                            new SqlParameter("@Rcv_PO_ID", poId)
+                        }, trx));
+                    if (dropShipMatch == 0)
+                    {
+                        trx.Rollback();
+                        return Fail("The selected warehouse does not match the Drop Shipment setting of the Purchase Order.");
                     }
                 }
 
@@ -700,7 +775,19 @@ namespace VIS.Controllers
                         return Fail("One or more selected PO lines are no longer available.");
                     }
 
-                    decimal receivedQty = selectedLine.Value;
+                    // The received quantity is entered in the PO line's own UOM (5,000 ml, not 5 l).
+                    // MovementQty stays in the product UOM (rescaled by QtyOrdered / QtyEntered);
+                    // QtyEntered is what the user typed.
+                    decimal enteredQty = selectedLine.Value;
+                    decimal receivedQty = enteredQty;
+                    if (orderLine.GetQtyEntered() != 0 && orderLine.GetQtyEntered() != orderLine.GetQtyOrdered())
+                    {
+                        receivedQty = decimal.Round(
+                            decimal.Divide(decimal.Multiply(enteredQty, orderLine.GetQtyOrdered()), orderLine.GetQtyEntered()),
+                            12,
+                            MidpointRounding.AwayFromZero);
+                    }
+
                     int lineLocatorId = locatorByLine.ContainsKey(selectedLine.Key) && locatorByLine[selectedLine.Key] > 0
                         ? locatorByLine[selectedLine.Key]
                         : locatorId;
@@ -708,6 +795,7 @@ namespace VIS.Controllers
                     MInOutLine receiptLine = new MInOutLine(receipt);
                     receiptLine.SetOrderLine(orderLine, lineLocatorId, receivedQty);
                     receiptLine.SetQty(receivedQty);
+                    receiptLine.SetQtyEntered(enteredQty);
 
                     /* Apply the attribute set instance chosen in the modal. This must come AFTER
                        SetOrderLine, which copies the ORDER line's instance onto the receipt line -
@@ -716,14 +804,6 @@ namespace VIS.Controllers
                     if (attributeByLine.ContainsKey(selectedLine.Key) && attributeByLine[selectedLine.Key] > 0)
                     {
                         receiptLine.SetM_AttributeSetInstance_ID(attributeByLine[selectedLine.Key]);
-                    }
-
-                    if (orderLine.GetQtyOrdered() != 0 && orderLine.GetQtyEntered() != orderLine.GetQtyOrdered())
-                    {
-                        receiptLine.SetQtyEntered(decimal.Round(
-                            decimal.Divide(decimal.Multiply(receivedQty, orderLine.GetQtyEntered()), orderLine.GetQtyOrdered()),
-                            12,
-                            MidpointRounding.AwayFromZero));
                     }
 
                     if (receiptLine.Get_ColumnIndex("PrintDescription") >= 0)
@@ -867,7 +947,10 @@ namespace VIS.Controllers
             string sql = @"
                 SELECT ol.C_OrderLine_ID AS PO_Line_ID,
                        COALESCE(ol.M_Warehouse_ID, o.M_Warehouse_ID) AS Warehouse_ID,
-                       COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) - __VAS_UNPOSTED_GRN_QTY__ AS Open_Qty
+                       COALESCE(ol.C_UOM_ID, 0) AS UOM_ID,
+                       CASE WHEN COALESCE(ol.QtyOrdered, 0) <> 0
+                            THEN ROUND((COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) - __VAS_UNPOSTED_GRN_QTY__) * COALESCE(ol.QtyEntered, ol.QtyOrdered) / ol.QtyOrdered, 12)
+                            ELSE 0 END AS Open_Qty
                 FROM C_Order o
                 INNER JOIN C_OrderLine ol ON (ol.C_Order_ID=o.C_Order_ID)
                 /* Correction 2026-07-18: create-time validation mirrors the
@@ -906,6 +989,7 @@ namespace VIS.Controllers
                     lines[lineId] = new ReceiveOpenLine
                     {
                         WarehouseId = Util.GetValueOfInt(dr["Warehouse_ID"]),
+                        UomId = Util.GetValueOfInt(dr["UOM_ID"]),
                         OpenQty = Util.GetValueOfDecimal(dr["Open_Qty"])
                     };
                 }
@@ -993,7 +1077,18 @@ namespace VIS.Controllers
         private sealed class ReceiveOpenLine
         {
             public int WarehouseId { get; set; }
+            /// <summary>PO line UOM (C_OrderLine.C_UOM_ID) - the unit of OpenQty and of the entered quantity.</summary>
+            public int UomId { get; set; }
             public decimal OpenQty { get; set; }
+        }
+
+        /// <summary>One GRN of the Print GRN Label search page, before its per-UOM quantities are attached.</summary>
+        private sealed class LabelRow
+        {
+            public int GrnId { get; set; }
+            public string GrnNo { get; set; }
+            public string PartyName { get; set; }
+            public decimal ReceivedQty { get; set; }
         }
 
         /// <summary>
@@ -1094,16 +1189,79 @@ namespace VIS.Controllers
             {
                 dr = DB.ExecuteReader(sql, parameters.ToArray());
 
+                List<LabelRow> labelRows = new List<LabelRow>();
                 while (dr != null && dr.Read())
                 {
                     totalRecords = Util.GetValueOfInt(dr["TotalRecords"]);
 
+                    labelRows.Add(new LabelRow
+                    {
+                        GrnId = Util.GetValueOfInt(dr["GRN_ID"]),
+                        GrnNo = Util.GetValueOfString(dr["GRN_No"]),
+                        PartyName = Util.GetValueOfString(dr["Party_Name"]),
+                        ReceivedQty = Util.GetValueOfDecimal(dr["Received_Qty"])
+                    });
+                }
+
+                if (dr != null)
+                {
+                    dr.Close();
+                    dr.Dispose();
+                    dr = null;
+                }
+
+                // QA sheet Print GRN Label #65 (2026-09-15): the quantity is shown in the unit entered on
+                // the GRN lines - SUM(QtyEntered) per line UOM (GRN 1000164: 21 Ea and 3,000 Milliliter)
+                // instead of the product-UOM MovementQty total (21 + 3 liters). One row per UOM, so a
+                // receipt with lines in several UOMs never adds different units together.
+                Dictionary<int, List<object>> quantitiesByGrn = new Dictionary<int, List<object>>();
+                if (labelRows.Count > 0)
+                {
+                    List<SqlParameter> qtyParameters = new List<SqlParameter>();
+                    List<string> grnIdParameters = new List<string>();
+                    for (int i = 0; i < labelRows.Count; i++)
+                    {
+                        string parameterName = "@Label_GRN_ID" + i.ToString(CultureInfo.InvariantCulture);
+                        grnIdParameters.Add(parameterName);
+                        qtyParameters.Add(new SqlParameter(parameterName, labelRows[i].GrnId));
+                        quantitiesByGrn[labelRows[i].GrnId] = new List<object>();
+                    }
+
+                    string qtySql = @"
+                        SELECT InOutLine.M_InOut_ID AS GRN_ID,
+                               COALESCE(UOM.UOMSymbol, UOM.Name) AS Uom,
+                               COALESCE(UOM.StdPrecision, 0) AS Uom_Precision,
+                               SUM(COALESCE(InOutLine.QtyEntered, InOutLine.MovementQty, 0)) AS Qty
+                        FROM M_InOutLine InOutLine
+                        LEFT OUTER JOIN C_UOM UOM ON (UOM.C_UOM_ID=InOutLine.C_UOM_ID)
+                        WHERE InOutLine.IsActive='Y'
+                          AND InOutLine.M_InOut_ID IN (" + string.Join(",", grnIdParameters) + @")
+                        GROUP BY InOutLine.M_InOut_ID, COALESCE(UOM.UOMSymbol, UOM.Name), COALESCE(UOM.StdPrecision, 0)
+                        ORDER BY InOutLine.M_InOut_ID, COALESCE(UOM.UOMSymbol, UOM.Name)";
+
+                    dr = DB.ExecuteReader(qtySql, qtyParameters.ToArray());
+                    while (dr != null && dr.Read())
+                    {
+                        int lineGrnId = Util.GetValueOfInt(dr["GRN_ID"]);
+                        if (!quantitiesByGrn.ContainsKey(lineGrnId)) { continue; }
+                        quantitiesByGrn[lineGrnId].Add(new
+                        {
+                            qty = Util.GetValueOfDecimal(dr["Qty"]),
+                            uom = Util.GetValueOfString(dr["Uom"]),
+                            precision = Util.GetValueOfInt(dr["Uom_Precision"])
+                        });
+                    }
+                }
+
+                foreach (LabelRow labelRow in labelRows)
+                {
                     rows.Add(new
                     {
-                        grnId = Util.GetValueOfInt(dr["GRN_ID"]),
-                        grnNo = Util.GetValueOfString(dr["GRN_No"]),
-                        partyName = Util.GetValueOfString(dr["Party_Name"]),
-                        receivedQty = Util.GetValueOfDecimal(dr["Received_Qty"]),
+                        grnId = labelRow.GrnId,
+                        grnNo = labelRow.GrnNo,
+                        partyName = labelRow.PartyName,
+                        receivedQty = labelRow.ReceivedQty,
+                        quantities = quantitiesByGrn.ContainsKey(labelRow.GrnId) ? quantitiesByGrn[labelRow.GrnId] : new List<object>()
                     });
                 }
 
@@ -1349,6 +1507,7 @@ namespace VIS.Controllers
                        InOut.DocumentNo AS GRN_No,
                        BPartner.Name AS Supplier_Name,
                        Warehouse.Name AS Warehouse_Name,
+                       COALESCE(InOut.M_Warehouse_ID, 0) AS Warehouse_ID,
                        COALESCE(InOut.MovementDate, Confirm.Created) AS Doc_Date
                 FROM M_InOutConfirm Confirm
                 INNER JOIN M_InOut InOut ON (InOut.M_InOut_ID=Confirm.M_InOut_ID AND InOut.IsActive='Y')
@@ -1387,7 +1546,7 @@ namespace VIS.Controllers
                 LEFT OUTER JOIN M_Product Product ON (Product.M_Product_ID=InOutLine.M_Product_ID AND Product.IsActive='Y')
                 LEFT OUTER JOIN C_UOM UomInfo ON (UomInfo.C_UOM_ID=InOutLine.C_UOM_ID AND UomInfo.IsActive='Y')
                 LEFT OUTER JOIN M_AttributeSetInstance AttributeInstance ON (AttributeInstance.M_AttributeSetInstance_ID=InOutLine.M_AttributeSetInstance_ID)
-                LEFT OUTER JOIN M_Locator Locator ON (Locator.M_Locator_ID=InOutLine.M_Locator_ID AND Locator.IsActive='Y')
+                LEFT OUTER JOIN M_Locator ScrapLocator ON (ScrapLocator.M_Locator_ID=LineConfirm.M_Locator_ID)
                 WHERE LineConfirm.IsActive='Y'
                   AND LineConfirm.M_InOutConfirm_ID=@Line_Confirm_Parent_ID
                   AND LineConfirm.AD_Client_ID=@Line_AD_Client_ID";
@@ -1422,6 +1581,8 @@ namespace VIS.Controllers
                         grnNo = Util.GetValueOfString(dr["GRN_No"]),
                         supplier = Util.GetValueOfString(dr["Supplier_Name"]),
                         warehouseName = Util.GetValueOfString(dr["Warehouse_Name"]),
+                        // Scrap Locator options on the confirmation line come from this warehouse (#84).
+                        warehouseId = Util.GetValueOfInt(dr["Warehouse_ID"]),
                         docDate = docDate.HasValue ? docDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                         status = ConfirmationStatus(Util.GetValueOfString(dr["Doc_Status"]), Util.GetValueOfString(dr["In_Dispute"]))
                     };
@@ -1449,7 +1610,8 @@ namespace VIS.Controllers
                         productName = Util.GetValueOfString(dr["Product_Name"]),
                         uomName = Util.GetValueOfString(dr["UOM_Name"]),
                         attributeSetInstance = Util.GetValueOfString(dr["Attribute_Description"]),
-                        locatorValue = Util.GetValueOfString(dr["Locator_Value"]),
+                        scrapLocatorId = Util.GetValueOfInt(dr["Scrap_Locator_ID"]),
+                        scrapLocatorName = Util.GetValueOfString(dr["Scrap_Locator_Name"]),
                         targetQty = Util.GetValueOfDecimal(dr["Target_Qty"]),
                         confirmedQty = Util.GetValueOfDecimal(dr["Confirmed_Qty"]),
                         scrappedQty = Util.GetValueOfDecimal(dr["Scrapped_Qty"]),
@@ -1482,7 +1644,7 @@ namespace VIS.Controllers
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
         [HttpPost]
-        public JsonResult SaveGRNConfirmationLine(int lineConfirmId = 0, string targetQty = "", string confirmedQty = "", string scrappedQty = "", string description = "")
+        public JsonResult SaveGRNConfirmationLine(int lineConfirmId = 0, string targetQty = "", string confirmedQty = "", string scrappedQty = "", string description = "", int scrapLocatorId = 0)
         {
             if (Session["ctx"] == null)
             {
@@ -1501,6 +1663,19 @@ namespace VIS.Controllers
                 return Fail(Msg.GetMsg(ctx, "VAS_090_InvalidQuantity") ?? "Quantities must be zero or positive numbers.");
             }
 
+            if (confirmed > target)
+            {
+                return Fail("Confirmed Quantity cannot be greater than Target Quantity.");
+            }
+            if (scrapped > target)
+            {
+                return Fail("Scrapped Quantity cannot be greater than Target Quantity.");
+            }
+            if (confirmed + scrapped > target)
+            {
+                return Fail("Confirmed Quantity and Scrapped Quantity cannot exceed Target Quantity.");
+            }
+
             try
             {
                 MInOutLineConfirm line = new MInOutLineConfirm(ctx, lineConfirmId, null);
@@ -1515,10 +1690,57 @@ namespace VIS.Controllers
                     return Fail(Msg.GetMsg(ctx, "VAS_090_ConfirmationCompleted") ?? "This GRN confirmation is already completed.");
                 }
 
+                // QA sheet Complete GRN Confirmation #88 / #89 (2026-09-15): neither quantity may exceed
+                // the Target quantity, and the two together may not either - the model then derives
+                // Difference = Target - Confirmed - Scrapped, so Confirmed + Difference + Scrapped = Target.
+                // Mirrors the popup's own checks so a direct post cannot bypass them.
+                if (confirmed > target)
+                {
+                    return Fail("Confirmed Quantity cannot be greater than Target Quantity.");
+                }
+                if (scrapped > target)
+                {
+                    return Fail("Scrapped Quantity cannot be greater than Target Quantity.");
+                }
+                if (decimal.Add(confirmed, scrapped) > target)
+                {
+                    return Fail("Confirmed Quantity and Scrapped Quantity cannot exceed Target Quantity.");
+                }
+
+                // QA sheet Complete GRN Confirmation #84 (2026-09-15): editable Scrap Locator. A newly chosen
+                // locator must be an active locator of the GRN's warehouse (the core confirmation puts it on
+                // the split receipt line of that warehouse); a locator already stored on the line is kept.
+                if (scrapLocatorId < 0) { scrapLocatorId = 0; }
+                if (scrapLocatorId > 0 && scrapLocatorId != line.GetM_Locator_ID())
+                {
+                    int locatorInWarehouse = Util.GetValueOfInt(DB.ExecuteScalar(@"
+                        SELECT COUNT(1)
+                        FROM M_InOutLineConfirm LineConfirm
+                        INNER JOIN M_InOutLine InOutLine ON (InOutLine.M_InOutLine_ID=LineConfirm.M_InOutLine_ID)
+                        INNER JOIN M_InOut InOut ON (InOut.M_InOut_ID=InOutLine.M_InOut_ID)
+                        INNER JOIN M_Locator Locator ON (Locator.M_Warehouse_ID=InOut.M_Warehouse_ID AND Locator.IsActive='Y')
+                        WHERE LineConfirm.M_InOutLineConfirm_ID=@Scrap_Line_Confirm_ID
+                          AND Locator.M_Locator_ID=@Scrap_Locator_ID",
+                        new SqlParameter[]
+                        {
+                            new SqlParameter("@Scrap_Line_Confirm_ID", lineConfirmId),
+                            new SqlParameter("@Scrap_Locator_ID", scrapLocatorId)
+                        }, null));
+                    if (locatorInWarehouse == 0)
+                    {
+                        string invalidText = ResolveMessage(ctx, "VAS_090_ScrapLocatorInvalid");
+                        return Fail(string.IsNullOrEmpty(invalidText) || invalidText == "VAS_090_ScrapLocatorInvalid"
+                            ? "Select a scrap locator of the GRN's warehouse."
+                            : invalidText);
+                    }
+                }
+
                 line.SetTargetQty(target);
                 line.SetConfirmedQty(confirmed);
                 line.SetScrappedQty(scrapped);
                 line.SetDescription(description ?? "");
+                // Blank option = no scrap locator (column is optional).
+                line.Set_Value("M_Locator_ID", scrapLocatorId > 0 ? (object)scrapLocatorId : null);
 
                 if (!line.Save())
                 {
@@ -1565,6 +1787,12 @@ namespace VIS.Controllers
                 if (confirm.GetDocStatus() == "CO" || confirm.GetDocStatus() == "CL")
                 {
                     return Fail(Msg.GetMsg(ctx, "VAS_090_ConfirmationCompleted") ?? "This GRN confirmation is already completed.");
+                }
+
+                string productName = GetProductMissingQualityActualValue(ctx, confirmId);
+                if (!string.IsNullOrEmpty(productName))
+                {
+                    return Fail("Product name (" + productName + ") is not verified with all the Quality Parameters. Please fill actual value for the missing Quality Parameters in Quality Control.");
                 }
 
                 bool processed = confirm.ProcessIt(X_M_InOutConfirm.DOCACTION_Complete);
@@ -1720,6 +1948,41 @@ namespace VIS.Controllers
             catch
             {
                 return 0;
+            }
+        }
+
+        /// <summary>
+        /// Returns the first product with a missing QA actual value for this
+        /// confirmation. The quality module is optional, so an unavailable schema
+        /// simply has no pre-completion QA block.
+        /// </summary>
+        private string GetProductMissingQualityActualValue(Ctx ctx, int confirmId)
+        {
+            try
+            {
+                string sql = @"
+                    SELECT Product.Name
+                    FROM M_InOutLineConfirm LineConfirm
+                    INNER JOIN VA010_ShipConfParameters QAParam
+                        ON (QAParam.M_InOutLineConfirm_ID=LineConfirm.M_InOutLineConfirm_ID AND QAParam.IsActive='Y')
+                    LEFT OUTER JOIN M_Product Product ON (Product.M_Product_ID=QAParam.M_Product_ID AND Product.IsActive='Y')
+                    WHERE LineConfirm.IsActive='Y'
+                      AND LineConfirm.M_InOutConfirm_ID=@Confirm_ID
+                      AND LineConfirm.AD_Client_ID=@AD_Client_ID
+                      AND QAParam.AD_Client_ID=@QA_AD_Client_ID
+                      AND (QAParam.VA010_ActualValue IS NULL OR QAParam.VA010_ActualValue='' OR QAParam.VA010_ActualValue='0')
+                    ORDER BY Product.Name";
+
+                return Util.GetValueOfString(DB.ExecuteScalar(sql, new SqlParameter[]
+                {
+                    new SqlParameter("@Confirm_ID", confirmId),
+                    new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
+                    new SqlParameter("@QA_AD_Client_ID", ctx.GetAD_Client_ID())
+                }, null));
+            }
+            catch
+            {
+                return "";
             }
         }
 

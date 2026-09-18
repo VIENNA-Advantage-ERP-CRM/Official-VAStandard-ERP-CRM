@@ -263,7 +263,7 @@ namespace VAS.Controllers
                         COALESCE(bp.Name, N'—') AS VendorName,
                         w.Name          AS WarehouseName,
                         COALESCE(usr.Name, N'—') AS SalesRepName,
-                        o.GrandTotal    AS OrderTotal,
+                        COALESCE(o.TotalLines, 0) AS OrderTotal, -- Sub total (excl. taxes) per specification
                         o.DocStatus     AS DocStatus,
                         COALESCE(c.CurSymbol, c.ISO_Code, N'') AS CurrencySymbol,
                         COALESCE(lines.QtyOrdered, 0)   AS QtyOrdered,
@@ -277,10 +277,14 @@ namespace VAS.Controllers
                     LEFT JOIN (
                         SELECT
                             ol.C_Order_ID,
-                            SUM(COALESCE(ol.QtyOrdered, 0))   AS QtyOrdered,
-                            SUM(COALESCE(ol.QtyDelivered, 0)) AS QtyDelivered,
+                            -- Quantity pending (ordered/delivered) counts ITEM type
+                            -- products only; charges and other non-item lines are
+                            -- excluded from the per-source specification.
+                            SUM(CASE WHEN Prod.ProductType = 'I' THEN COALESCE(ol.QtyOrdered, 0) ELSE 0 END)   AS QtyOrdered,
+                            SUM(CASE WHEN Prod.ProductType = 'I' THEN COALESCE(ol.QtyDelivered, 0) ELSE 0 END) AS QtyDelivered,
                             COUNT(ol.C_OrderLine_ID)          AS LineCount
                         FROM C_OrderLine ol
+                        LEFT JOIN M_Product Prod ON (Prod.M_Product_ID = ol.M_Product_ID)
                         WHERE ol.IsActive = 'Y'
                         GROUP BY ol.C_Order_ID
                     ) lines ON (lines.C_Order_ID = o.C_Order_ID)
@@ -434,7 +438,7 @@ namespace VAS.Controllers
                         o.DateOrdered   AS DateOrdered,
                         o.DatePromised  AS DatePromised,
                         o.Created       AS CreatedOn,
-                        o.GrandTotal    AS GrandTotal,
+                        COALESCE(o.TotalLines, 0) AS SubTotal, -- Sub total (excl. taxes) per specification
                         o.DocStatus     AS DocStatus,
                         COALESCE(bp.Name, N'—') AS VendorName,
                         w.Name          AS WarehouseName,
@@ -484,7 +488,7 @@ namespace VAS.Controllers
                         dateOrdered    = Util.GetValueOfDateTime(dr["DateOrdered"]),
                         datePromised   = Util.GetValueOfDateTime(dr["DatePromised"]),
                         createdOn      = Util.GetValueOfDateTime(dr["CreatedOn"]),
-                        grandTotal     = Util.GetValueOfDecimal(dr["GrandTotal"]),
+                        subTotal       = Util.GetValueOfDecimal(dr["SubTotal"]),
                         vendorName     = Util.GetValueOfString(dr["VendorName"]),
                         warehouseName  = Util.GetValueOfString(dr["WarehouseName"]),
                         createdByName  = Util.GetValueOfString(dr["CreatedByName"]),
@@ -542,8 +546,13 @@ namespace VAS.Controllers
 
                     // Header roll-ups stay in the product base UOM: summing mixed UOMs
                     // (millilitres with each) across lines would be meaningless.
-                    totalQtyOrdered += ord;
-                    totalQtyDelivered += del;
+                    // QA sheet #10: only ITEM type products count toward ordered / pending -
+                    // charges and non-stock products are excluded (IsNonStock covers both).
+                    if (!isNonStock)
+                    {
+                        totalQtyOrdered += ord;
+                        totalQtyDelivered += del;
+                    }
 
                     // Per-line figures are shown in the UOM the line was entered in.
                     decimal uomRatio = (ord != 0) ? (entered / ord) : 1m;

@@ -142,13 +142,17 @@
             return row && row.statusCode ? row.statusCode : "";
         }
 
-        function getLineStatus(orderedQty, receivedQty) {
+        /* QA sheet GRN #40/#41: the line is "Received" once the quantity received against the PO line
+           across ALL of its GRNs (this one and earlier / later ones, reversed and voided excluded) equals
+           the ordered quantity - not when this single GRN happens to match ("Matches" is no longer shown).
+           cumulativeQty comes from the server in the PO line's UOM; it falls back to this GRN's quantity. */
+        function getLineStatus(orderedQty, cumulativeQty) {
             var ordered = Number(orderedQty || 0);
-            var received = Number(receivedQty || 0);
+            var received = Number(cumulativeQty || 0);
             var diff = received - ordered;
 
             if (Math.abs(diff) < 0.000001) {
-                return lbl("VAS_088_Matches", "Matches");
+                return lbl("VAS_088_Received", "Received");
             }
             if (diff < 0) {
                 return formatQty(Math.abs(diff)) + " " + lbl("VAS_088_Short", "short");
@@ -460,7 +464,7 @@
                 field(lbl("VAS_088_LinkedPO", "Linked PO"), header.poNo) +
                 field(lbl("VAS_088_ReceivedQty", "Received Qty"), formatQty(header.receivedQty)) +
                 field(lbl("VAS_088_By", "By"), header.receivedBy) +
-                field(lbl("VAS_088_On", "On"), formatDateTime(header.receivedTime)) +
+                field(lbl("VAS_088_CreatedOn", "Created on"), formatCreatedOn(header)) +
                 '</div>' +
                 '<div class="vas-rq-lines-title">' + escapeHtml(lbl("VAS_088_ReceivedLines", "Received Lines")) + '</div>' +
                 '<div class="vas-rq-lines-wrap">';
@@ -477,15 +481,28 @@
                 return;
             }
 
+            /* QA sheet GRN #38: Attribute column only when at least one line has a real attribute
+               (empty / dash-only instance descriptions do not count). GRN #42: Ordered and Received are in
+               the line's UOM, shown in their own UOM column. GRN #40/#41: status from the quantity received
+               against the PO line over all its GRNs. */
+            var showAttr = false;
+            for (var a = 0; a < lines.length; a++) {
+                if (hasAttributeText(lines[a].attributeName)) { showAttr = true; break; }
+            }
+
             var body = '';
             for (var i = 0; i < lines.length; i++) {
                 var ln = lines[i];
-                var lineStatus = getLineStatus(ln.orderedQty, ln.receivedQty);
+                var cumulative = ln.cumulativeReceivedQty != null ? ln.cumulativeReceivedQty : ln.receivedQty;
+                var lineStatus = getLineStatus(ln.orderedQty, cumulative);
+                var attrText = hasAttributeText(ln.attributeName) ? String(ln.attributeName) : '';
                 body +=
                     '<tr>' +
                     '<td class="vas-rq-l-item" title="' + escapeHtml(ln.itemName) + '"><span class="vas-rq-trunc">' + escapeHtml(ln.itemName) + '</span></td>' +
+                    (showAttr ? '<td class="vas-rq-l-attr" title="' + escapeHtml(attrText) + '"><span class="vas-rq-trunc">' + escapeHtml(attrText) + '</span></td>' : '') +
                     '<td class="vas-rq-l-num" title="' + escapeHtml(formatQty(ln.orderedQty)) + '">' + escapeHtml(formatQty(ln.orderedQty)) + '</td>' +
                     '<td class="vas-rq-l-num" title="' + escapeHtml(formatQty(ln.receivedQty)) + '">' + escapeHtml(formatQty(ln.receivedQty)) + '</td>' +
+                    '<td class="vas-rq-l-uom" title="' + escapeHtml(ln.uom || '-') + '"><span class="vas-rq-trunc">' + escapeHtml(ln.uom || '-') + '</span></td>' +
                     '<td class="vas-rq-l-status" title="' + escapeHtml(lineStatus) + '">' + escapeHtml(lineStatus) + '</td>' +
                     '</tr>';
             }
@@ -494,12 +511,29 @@
                 '<table class="vas-rq-lines-table">' +
                 '<thead><tr>' +
                 '<th class="vas-rq-l-item">' + escapeHtml(lbl("VAS_088_Item", "Item")) + '</th>' +
+                (showAttr ? '<th class="vas-rq-l-attr">' + escapeHtml(lbl("VAS_088_Attribute", "Attribute")) + '</th>' : '') +
                 '<th class="vas-rq-l-num">' + escapeHtml(lbl("VAS_088_Ordered", "Ordered")) + '</th>' +
                 '<th class="vas-rq-l-num">' + escapeHtml(lbl("VAS_088_Received", "Received")) + '</th>' +
+                '<th class="vas-rq-l-uom">' + escapeHtml(lbl("VAS_088_UOM", "UOM")) + '</th>' +
                 '<th class="vas-rq-l-status">' + escapeHtml(lbl("VAS_088_Status", "Status")) + '</th>' +
                 '</tr></thead><tbody>' + body + '</tbody></table></div>';
 
             $dialogBody.html(html);
+
+            function hasAttributeText(attributeName) {
+                var text = String(attributeName == null ? '' : attributeName).trim();
+                return text !== '' && !/^-+$/.test(text);
+            }
+        }
+
+        /* QA sheet GRN #39: the receipt's creation moment on the viewer's clock. The server measures
+           how many hours ago the receipt was created on the database clock; subtracting that from the
+           browser's now removes the database / browser time-zone gap. */
+        function formatCreatedOn(header) {
+            if (header && header.createdHoursAgo != null && isFinite(Number(header.createdHoursAgo))) {
+                return formatDateTime(new Date(new Date().getTime() - Number(header.createdHoursAgo) * 3600000));
+            }
+            return formatDateTime(header ? header.receivedTime : null);
         }
 
         function closeDetail() {

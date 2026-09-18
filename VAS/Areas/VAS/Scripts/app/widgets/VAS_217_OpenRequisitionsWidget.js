@@ -367,6 +367,8 @@
                         }
                     }
                     if (reqObj) {
+                        // A new requisition starts a new PO - header defaults (org doc types, vendor payment method) must not carry over
+                        poHeaderValues = {};
                         openStep2LinesModal(reqObj);
                     }
                 }
@@ -774,13 +776,18 @@
 
             var vendors = (formLookups && formLookups.vendors) || [];
 
-            var LINE_COLS = 'minmax(0, 0.28fr) minmax(0, 1.6fr) minmax(0, 1.25fr) minmax(0, 0.5fr) minmax(0, 0.75fr) minmax(0, 0.9fr) minmax(0, 0.75fr) minmax(0, 0.9fr) minmax(0, 1.6fr) minmax(0, 0.75fr)';
+            // The Attribute column is shown only when at least one pending line carries an attribute
+            var showAttr = activeReqLines.some(hasAttribute);
+            var LINE_COLS = ['minmax(0, 0.28fr)', 'minmax(0, 1.6fr)']
+                .concat(showAttr ? ['minmax(0, 1.25fr)'] : [])
+                .concat(['minmax(0, 0.5fr)', 'minmax(0, 0.75fr)', 'minmax(0, 0.9fr)', 'minmax(0, 0.75fr)', 'minmax(0, 0.9fr)', 'minmax(0, 1.6fr)', 'minmax(0, 0.9fr)'])
+                .join(' ');
 
             var $tableWrap = $('<div class="vas-217-orw-mtbl"></div>');
             var $tableHead = $('<div class="vas-217-orw-mrow vas-217-orw-mhead" style="grid-template-columns:' + LINE_COLS + ';">' +
                 '<span class="vas-217-orw-cell"></span>' +
                 '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_Product', 'Product')) + '">' + esc(lbl('VAS_Product', 'Product')) + '</span>' +
-                '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_Attribute', 'Attribute')) + '">' + esc(lbl('VAS_Attribute', 'Attribute')) + '</span>' +
+                (showAttr ? '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_Attribute', 'Attribute')) + '">' + esc(lbl('VAS_Attribute', 'Attribute')) + '</span>' : '') +
                 '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_UoM', 'UoM')) + '">' + esc(lbl('VAS_UoM', 'UoM')) + '</span>' +
                 '<span class="vas-217-orw-cell right" title="' + esc(lbl('VAS_217_ReqQty', 'Req qty')) + '">' + esc(lbl('VAS_217_ReqQty', 'Req qty')) + '</span>' +
                 '<span class="vas-217-orw-cell right" title="' + esc(lbl('VAS_217_AlreadyOrdered', 'Already ordered')) + '">' + esc(lbl('VAS_217_AlreadyOrdered', 'Already ordered')) + '</span>' +
@@ -836,7 +843,7 @@
                         '<span class="vas-217-orw-cell right c-prim" title="' + num(l.pendingQty) + '">' + num(l.pendingQty) + '</span>' +
                         '<span class="vas-217-orw-cell"><input class="vas-217-orw-rowin in-qty" type="number" min="1" max="' + l.pendingQty + '" value="' + (l.orderQty || l.pendingQty) + '" data-idx="' + globalIdx + '" aria-label="' + esc(lbl('VAS_217_QtyToOrder', 'Qty to order')) + '"></span>' +
                         '<span class="vas-217-orw-cell"><select class="vas-217-orw-rowsel sel-vend" data-idx="' + globalIdx + '" aria-label="' + esc(lbl('VAS_Vendor', 'Vendor')) + '">' + vendorOpts + '</select></span>' +
-                        '<span class="vas-217-orw-cell right c-std" title="' + esc(fmtMoney(l.rate)) + '">' + esc(fmtMoney(l.rate)) + '</span>' +
+                        '<span class="vas-217-orw-cell"><input class="vas-217-orw-rowin in-rate" type="number" min="0" step="any" value="' + (Number(l.rate) || 0) + '" data-idx="' + globalIdx + '" aria-label="' + esc(lbl('VAS_Rate', 'Rate')) + '"></span>' +
                         '</div>';
 
                     $tableBody.append(rowHtml);
@@ -905,10 +912,46 @@
                 var idx = parseInt($(this).data('idx'), 10);
                 if (activeReqLines[idx]) {
                     activeReqLines[idx].vendorId = parseInt($(this).val(), 10) || 0;
-                    activeReqLines[idx].vendorName = $(this).find('option:selected').text();
+                    activeReqLines[idx].vendorName = activeReqLines[idx].vendorId > 0 ? $(this).find('option:selected').text() : '';
                     syncStep2FootNote();
                 }
             });
+
+            $tableBody.off('change.ratein').on('change.ratein', '.in-rate', function (e) {
+                var idx = parseInt($(this).data('idx'), 10);
+                if (activeReqLines[idx]) {
+                    var val = parseFloat($(this).val());
+                    if (isNaN(val) || val < 0) val = 0;
+                    activeReqLines[idx].rate = val;
+                    $(this).val(val);
+                    syncStep2FootNote();
+                }
+            });
+        }
+
+        function hasAttribute(line) {
+            return !!(line && line.attributeDescription && String(line.attributeDescription).trim());
+        }
+
+        /**
+         * Vendor options for a Step-2 line. The select always shows the vendor the line is really ordered
+         * from: a requisition vendor missing from the vendor lookup is added, and a line without a vendor
+         * shows a placeholder instead of silently displaying the first vendor of the list.
+         */
+        function buildVendorOptions(vendors, line) {
+            var found = false;
+            var html = vendors.map(function (v) {
+                var isSelected = v.id === line.vendorId;
+                if (isSelected) found = true;
+                return '<option value="' + v.id + '"' + (isSelected ? ' selected' : '') + '>' + esc(v.name) + '</option>';
+            }).join('');
+            if (line.vendorId > 0 && !found) {
+                html = '<option value="' + line.vendorId + '" selected>' + esc(line.vendorName) + '</option>' + html;
+            }
+            if (!(line.vendorId > 0)) {
+                html = '<option value="0" selected>' + esc(lbl('VAS_SelectVendor', 'Select vendor')) + '</option>' + html;
+            }
+            return html;
         }
 
         function getSelectedStep2Lines() {
@@ -927,14 +970,18 @@
                 return;
             }
 
-            var vendorMap = {};
+            // Vendor consistency is judged on vendor IDs, across the selected lines that have a vendor
+            var vendorIds = [];
+            var vendorNames = {};
             for (var i = 0; i < sel.length; i++) {
-                var vName = sel[i].vendorName || ('Vendor_' + sel[i].vendorId);
-                vendorMap[vName] = sel[i].vendorId;
+                var vId = sel[i].vendorId;
+                if (vId > 0 && vendorIds.indexOf(vId) < 0) {
+                    vendorIds.push(vId);
+                    vendorNames[vId] = sel[i].vendorName;
+                }
             }
-            var distinctVendors = Object.keys(vendorMap);
 
-            if (distinctVendors.length > 1) {
+            if (vendorIds.length > 1) {
                 $note.attr('class', 'vas-217-orw-warnnote').text(
                     sel.length + ' ' + lbl('VAS_217_LinesSelected', 'lines selected') + ' · ' +
                     distinctVendors.length + ' ' + lbl('VAS_217_MultiVendorWarning', 'different vendors — one PO needs a single vendor')
@@ -943,8 +990,24 @@
                 return;
             }
 
-            selectedVendorName = distinctVendors[0] || "";
-            selectedVendorId = vendorMap[selectedVendorName] || 0;
+            if (!vendorIds.length) {
+                $note.attr('class', 'vas-217-orw-warnnote').text(lbl('VAS_SelectVendorForLines', 'Select a vendor for the selected lines'));
+                $btn.prop('disabled', true);
+                return;
+            }
+
+            selectedVendorId = vendorIds[0];
+            selectedVendorName = vendorNames[selectedVendorId] || '';
+
+            // Selected lines without a vendor of their own are ordered from the vendor of the other selected lines
+            var vendors = (formLookups && formLookups.vendors) || [];
+            for (var j = 0; j < sel.length; j++) {
+                if (!(sel[j].vendorId > 0)) {
+                    sel[j].vendorId = selectedVendorId;
+                    sel[j].vendorName = selectedVendorName;
+                    $('#vas_217_lines_wrap .sel-vend[data-idx="' + activeReqLines.indexOf(sel[j]) + '"]').html(buildVendorOptions(vendors, sel[j]));
+                }
+            }
 
             var totalVal = sel.reduce(function (acc, l) {
                 return acc + ((l.orderQty || l.pendingQty) * (l.rate || 0));
@@ -961,9 +1024,57 @@
            STEP 3: PO DETAILS (PAGE 1 OF 2) & PO LINES (PAGE 2 OF 2)
            ============================================================ */
 
+        function findById(list, id) {
+            if (!list || !id) return null;
+            for (var i = 0; i < list.length; i++) {
+                if (list[i].id === id) return list[i];
+            }
+            return null;
+        }
+
+        // Priority options are the C_Order.PriorityRule list; the default is that column's default (Medium)
+        function getDefaultPriority() {
+            var list = (formLookups && formLookups.priorities) || [];
+            var def = formLookups && formLookups.defaultPriority;
+            if (def && findById(list, def)) return def;
+            return list.length ? list[0].id : '';
+        }
+
+        // Currency rate type defaults to the type flagged as default (Spot)
+        function getDefaultConversionTypeId() {
+            var list = (formLookups && formLookups.conversionTypes) || [];
+            for (var i = 0; i < list.length; i++) {
+                if (list[i].isDefault) return list[i].id;
+            }
+            return list.length ? list[0].id : 0;
+        }
+
         function proceedToStep3Details() {
             var sel = getSelectedStep2Lines();
             if (!sel.length) return;
+
+            // Initialize default header values once per requisition (reset when a requisition row is clicked)
+            if (!poHeaderValues.initialized) {
+                poHeaderValues.initialized = true;
+                poHeaderValues.docTypeId = (formLookups.docTypes && formLookups.docTypes[0]) ? formLookups.docTypes[0].id : 0;
+                poHeaderValues.orderReference = 'REF/' + new Date().getFullYear().toString().slice(-2) + '/' + (Math.floor(100 + Math.random() * 800));
+                poHeaderValues.dateOrdered = fIso();
+                // An older requisition's needed-by date can already be past; date promised may not precede the PO date
+                poHeaderValues.datePromised = (activeRequisition.neededBy && activeRequisition.neededBy > poHeaderValues.dateOrdered) ? activeRequisition.neededBy : poHeaderValues.dateOrdered;
+                poHeaderValues.priority = getDefaultPriority();
+                poHeaderValues.warehouseId = activeRequisition.warehouseId || (formLookups.warehouses && formLookups.warehouses[0] ? formLookups.warehouses[0].id : 0);
+                // The requisition's price list is used only when it is one of the purchase price lists offered
+                var defaultPriceList = findById(formLookups.priceLists, activeRequisition.priceListId) || (formLookups.priceLists && formLookups.priceLists[0]) || null;
+                poHeaderValues.priceListId = defaultPriceList ? defaultPriceList.id : 0;
+                // Currency is read-only and follows the price list
+                poHeaderValues.currencyId = (defaultPriceList && defaultPriceList.currencyId) || activeRequisition.currencyId || 0;
+                poHeaderValues.conversionTypeId = getDefaultConversionTypeId();
+                poHeaderValues.incotermId = activeRequisition.incotermId || (formLookups.incoterms && formLookups.incoterms[0] ? formLookups.incoterms[0].id : 0);
+                poHeaderValues.paymentTermId = (formLookups.paymentTerms && formLookups.paymentTerms[0]) ? formLookups.paymentTerms[0].id : 0;
+                poHeaderValues.paymentMethod = (formLookups.paymentMethods && formLookups.paymentMethods[0]) ? String(formLookups.paymentMethods[0].id) : '';
+                poHeaderValues.taxId = (formLookups.taxes && formLookups.taxes[0]) ? formLookups.taxes[0].id : 0;
+                poHeaderValues.description = lbl('VAS_PurchaseAgainst', 'Purchase against') + ' ' + activeRequisition.requisitionNumber;
+            }
 
             // Initialize PO Lines State from selected lines
             poLinesState = sel.map(function (l) {
@@ -1016,19 +1127,50 @@
 
             for (var i = 0; i < poLinesState.length; i++) {
                 var l = poLinesState[i];
-                var amt = l.orderQty * l.rate;
-                subtotal += amt;
-                taxTotal += amt * (l.taxRate || 0);
+                subtotal += l.orderQty * l.rate;
+                taxTotal += Number(l.taxAmt) || 0;
                 totalQty += l.orderQty;
             }
 
             return {
                 subtotal: subtotal,
                 taxTotal: taxTotal,
-                grandTotal: subtotal + taxTotal,
+                // On a tax-inclusive price list the line amounts already contain the tax
+                grandTotal: poHeaderValues.taxIncluded ? subtotal : subtotal + taxTotal,
                 totalQty: totalQty,
                 lineCount: poLinesState.length
             };
+        }
+
+        /**
+         * Line tax (surcharge tax included) is calculated on the server with MTax - the same calculation
+         * the purchase order line uses - honouring a tax-inclusive price list. The old client formula
+         * multiplied the amount by the percentage itself and ignored surcharge taxes.
+         */
+        var taxRecalcSeq = 0;
+        function recalcTaxes($host) {
+            var seq = ++taxRecalcSeq;
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_217_OpenRequisitionsWidget/CalculateLineTaxes',
+                type: 'POST',
+                data: {
+                    priceListId: poHeaderValues.priceListId || 0,
+                    linesJson: JSON.stringify(poLinesState.map(function (l) {
+                        return { taxId: l.taxId || 0, amount: (Number(l.orderQty) || 0) * (Number(l.rate) || 0) };
+                    }))
+                },
+                cache: false,
+                success: function (res) {
+                    if (seq !== taxRecalcSeq) return; // a newer recalculation superseded this one
+                    var data = parseResponse(res);
+                    if (!data || data.success === false || !data.lines) return;
+                    poHeaderValues.taxIncluded = !!data.isTaxIncluded;
+                    for (var i = 0; i < poLinesState.length && i < data.lines.length; i++) {
+                        poLinesState[i].taxAmt = Number(data.lines[i].taxAmt) || 0;
+                    }
+                    refreshStep3Totals($host);
+                }
+            });
         }
 
         function openStep3DetailsPage() {
@@ -1141,6 +1283,7 @@
                     $foot.find('.vas-217-orw-btn-back').on('click', popModal);
                     $foot.find('#vas_217_to_lines').on('click', function () {
                         captureHeaderValues();
+                        if (!validateHeaderDates(getModalHost())) return;
                         openStep3LinesPage();
                     });
                 },
@@ -1149,6 +1292,31 @@
                     bindHeaderChangeEvents($host);
                 }
             });
+        }
+
+        function detailsFootNoteHtml() {
+            return '<span class="vas-217-orw-req-star">*</span> ' + esc(lbl('VAS_RequiredLineDetailsOnNextPage', 'required · line details on the next page'));
+        }
+
+        function datePromisedErrorText() {
+            return lbl('VAS_DatePromisedBeforeDateOrdered', 'Error: Date Promised should be greater than or equal to Date Ordered');
+        }
+
+        // Dates are yyyy-mm-dd strings, so text comparison orders them correctly
+        function isPromisedBeforeOrdered(promised, ordered) {
+            return !!(promised && ordered && promised < ordered);
+        }
+
+        function validateHeaderDates($host) {
+            var invalid = isPromisedBeforeOrdered($host.find('#fPromised').val(), $host.find('#fPoDate').val());
+            $host.find('#fPromised').toggleClass('vas-217-orw-invalid', invalid);
+            var $note = $host.find('#vas_217_details_note');
+            if (invalid) {
+                $note.attr('class', 'vas-217-orw-warnnote').text(datePromisedErrorText());
+            } else {
+                $note.attr('class', 'vas-217-orw-foot-note').html(detailsFootNoteHtml());
+            }
+            return !invalid;
         }
 
         function loadVendorLocationsAndContacts(vendorId, $host) {
@@ -1179,14 +1347,26 @@
         }
 
         function bindHeaderChangeEvents($host) {
+            // Currency is read-only and follows the selected price list
+            $host.find('#fPrice').on('change', function () {
+                var priceList = findById(formLookups.priceLists, parseInt($(this).val(), 10) || 0);
+                poHeaderValues.priceListId = priceList ? priceList.id : 0;
+                if (priceList && priceList.currencyId) {
+                    poHeaderValues.currencyId = priceList.currencyId;
+                    $host.find('#fCur').val(priceList.currencyId);
+                }
+            });
+
+            $host.find('#fPoDate, #fPromised').on('change', function () {
+                validateHeaderDates($host);
+            });
+
             $host.find('#fTax').on('change', function () {
                 var taxId = parseInt($(this).val(), 10) || 0;
-                var rate = parseFloat($(this).find('option:selected').data('rate')) || 0.18;
                 poHeaderValues.taxId = taxId;
-                // Cascade default tax to all lines
+                // Cascade default tax to all lines; tax amounts are recalculated on the server when the lines page opens
                 for (var i = 0; i < poLinesState.length; i++) {
                     poLinesState[i].taxId = taxId;
-                    poLinesState[i].taxRate = rate;
                 }
             });
 
@@ -1266,14 +1446,38 @@
                         '</span>');
 
                     $foot.find('.vas-217-orw-btn-back').on('click', popModal);
+                    $foot.find('#vas_217_po_stage').on('change', function () {
+                        poHeaderValues.docStatus = $(this).val();
+                    });
                     $foot.find('#vas_217_btn_create_po').on('click', function () {
                         submitCreatePurchaseOrder();
                     });
                 },
                 afterRender: function ($host) {
                     renderPagedStep3LinesTable($host.find('#vas_217_polines_table_wrap'), $host);
+                    recalcTaxes($host);
                 }
             });
+        }
+
+        // PO stage options (Drafted / Completed) come from the C_Order.DocStatus list; default is the column default (Drafted)
+        function getDefaultDocStatus() {
+            var list = (formLookups && formLookups.docStatuses) || [];
+            var def = formLookups && formLookups.defaultDocStatus;
+            if (def && findById(list, def)) return def;
+            return findById(list, 'DR') ? 'DR' : (list.length ? list[0].id : 'DR');
+        }
+
+        function getDocStatusName(value) {
+            var item = findById((formLookups && formLookups.docStatuses) || [], value);
+            return item ? item.name : '';
+        }
+
+        function docStatusOptionsHtml() {
+            var selected = poHeaderValues.docStatus || getDefaultDocStatus();
+            return ((formLookups && formLookups.docStatuses) || []).map(function (s) {
+                return '<option value="' + esc(s.id) + '"' + (s.id === selected ? ' selected' : '') + '>' + esc(s.name) + '</option>';
+            }).join('');
         }
 
         function renderPagedStep3LinesTable($container, $host) {
@@ -1284,12 +1488,17 @@
 
             var taxes = (formLookups && formLookups.taxes) || [];
 
-            var PO_LINE_COLS = 'minmax(0, 1.45fr) minmax(0, 1.35fr) minmax(0, 0.75fr) minmax(0, 0.6fr) minmax(0, 0.7fr) minmax(0, 0.9fr) minmax(0, 0.85fr) minmax(0, 1.05fr) minmax(0, 0.6fr)';
+            // The Attribute column is shown only when at least one PO line carries an attribute
+            var showAttr = poLinesState.some(hasAttribute);
+            var PO_LINE_COLS = ['minmax(0, 1.45fr)']
+                .concat(showAttr ? ['minmax(0, 1.35fr)'] : [])
+                .concat(['minmax(0, 0.75fr)', 'minmax(0, 0.6fr)', 'minmax(0, 0.85fr)', 'minmax(0, 0.9fr)', 'minmax(0, 0.85fr)', 'minmax(0, 1.05fr)', 'minmax(0, 0.6fr)'])
+                .join(' ');
 
             var $tableWrap = $('<div class="vas-217-orw-mtbl"></div>');
             var $tableHead = $('<div class="vas-217-orw-mrow vas-217-orw-mhead" style="grid-template-columns:' + PO_LINE_COLS + ';">' +
                 '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_Product', 'Product')) + '">' + esc(lbl('VAS_Product', 'Product')) + '</span>' +
-                '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_Attribute', 'Attribute')) + '">' + esc(lbl('VAS_Attribute', 'Attribute')) + '</span>' +
+                (showAttr ? '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_Attribute', 'Attribute')) + '">' + esc(lbl('VAS_Attribute', 'Attribute')) + '</span>' : '') +
                 '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_UoM', 'UoM')) + '">' + esc(lbl('VAS_UoM', 'UoM')) + '</span>' +
                 '<span class="vas-217-orw-cell right" title="' + esc(lbl('VAS_Qty', 'Qty')) + '">' + esc(lbl('VAS_Qty', 'Qty')) + '</span>' +
                 '<span class="vas-217-orw-cell right" title="' + esc(lbl('VAS_Rate', 'Rate')) + '">' + esc(lbl('VAS_Rate', 'Rate')) + '</span>' +
@@ -1374,8 +1583,7 @@
                 var idx = parseInt($(this).data('idx'), 10);
                 if (poLinesState[idx]) {
                     poLinesState[idx].taxId = parseInt($(this).val(), 10) || 0;
-                    poLinesState[idx].taxRate = parseFloat($(this).find('option:selected').data('rate')) || 0.18;
-                    refreshStep3Totals($host);
+                    recalcTaxes($host);
                 }
             });
 
@@ -1383,6 +1591,21 @@
                 var idx = parseInt($(this).data('idx'), 10);
                 if (poLinesState[idx]) {
                     poLinesState[idx].datePromised = $(this).val();
+                    validateLineDates($host);
+                }
+            });
+
+            $tableBody.off('change.lrate').on('change.lrate', '.in-lrate', function () {
+                var idx = parseInt($(this).data('idx'), 10);
+                if (poLinesState[idx]) {
+                    var val = parseFloat($(this).val());
+                    if (isNaN(val) || val < 0) val = 0;
+                    poLinesState[idx].rate = val;
+                    $(this).val(val);
+                    var amt = poLinesState[idx].orderQty * val;
+                    $(this).closest('.vas-217-orw-mrow').find('.amt-cell').attr('title', fmtMoney(amt)).text(fmtMoney(amt));
+                    refreshStep3Totals($host);
+                    recalcTaxes($host);
                 }
             });
 
@@ -1400,6 +1623,24 @@
             });
         }
 
+        // A line's date promised may not precede the PO date either
+        function validateLineDates($host) {
+            var anyInvalid = false;
+            for (var i = 0; i < poLinesState.length; i++) {
+                var invalid = isPromisedBeforeOrdered(poLinesState[i].datePromised, poHeaderValues.dateOrdered);
+                if (invalid) anyInvalid = true;
+                $host.find('.in-ldate[data-idx="' + i + '"]').toggleClass('vas-217-orw-invalid', invalid);
+            }
+            var $footNote = $host.find('#vas_217_step3_footnote');
+            if (anyInvalid) {
+                $footNote.attr('class', 'vas-217-orw-warnnote').text(datePromisedErrorText());
+            } else if ($footNote.hasClass('vas-217-orw-warnnote')) {
+                $footNote.attr('class', 'vas-217-orw-foot-note');
+                refreshStep3Totals($host);
+            }
+            return !anyInvalid;
+        }
+
         function refreshStep3Totals($host) {
             var totals = calculatePoTotals();
             var $totline = $host.find('#vas_217_totline');
@@ -1411,6 +1652,7 @@
                 );
             }
 
+            // While a date error is shown the footer keeps the error; totals return once it is fixed
             var $footNote = $host.find('#vas_217_step3_footnote');
             if ($footNote.length) {
                 $footNote.text(poLinesState.length + ' ' + (poLinesState.length > 1 ? lbl('VAS_Lines', 'lines') : lbl('VAS_217_LineSelected', 'line')) + ' · ' + num(totals.totalQty) + ' ' + lbl('VAS_Qty', 'qty') + ' · ' + lbl('VAS_217_OrderTotal', 'order total') + ' ' + fmtMoney(totals.grandTotal));
@@ -1453,6 +1695,9 @@
         function submitCreatePurchaseOrder() {
             if (isSubmitting) return;
 
+            // Date promised may not precede the PO date on any line
+            if (!validateLineDates(getModalHost())) return;
+
             var $btn = $('#vas_217_btn_create_po');
             $btn.prop('disabled', true);
             isSubmitting = true;
@@ -1493,7 +1738,8 @@
                 priority: poHeaderValues.priority || '5',
                 description: poHeaderValues.description || '',
                 defaultTaxId: poHeaderValues.taxId || 0,
-                linesJson: JSON.stringify(payloadLines)
+                linesJson: JSON.stringify(payloadLines),
+                docStatus: poHeaderValues.docStatus || getDefaultDocStatus()
             };
 
             var url = VIS.Application.contextUrl + 'VAS_217_OpenRequisitionsWidget/CreatePurchaseOrder';

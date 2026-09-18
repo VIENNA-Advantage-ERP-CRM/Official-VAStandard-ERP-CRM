@@ -765,6 +765,14 @@
         // does the click falls back to the zoom target exactly as before. Nothing
         // is hard-failed on a name we cannot confirm.
         var VENDOR_WINDOW_NAMES = ["VAS_VendorMaster"];
+        // C_Order is the other case (18-Sep-2026): the dictionary's zoom target
+        // for it on this installation opens the AR / AP INVOICE window, so a
+        // sales-order row landed on an invoice screen with an order's id in it.
+        // The order windows are asked for by name - the names the PO receipt
+        // panel resolves them by, new first - and only a tenant that has neither
+        // falls back to the zoom target.
+        var SALES_ORDER_WINDOW_NAMES    = ["VAS_SalesOrder", "Sales Order"];
+        var PURCHASE_ORDER_WINDOW_NAMES = ["VAS_PurchaseOrder", "Purchase Order"];
 
         // The names are tried one after the other rather than all at once: the
         // first that resolves is the answer, and asking for the rest would be
@@ -2370,7 +2378,10 @@
                     value: formatAmount(o.LineNetAmt, sym, o.CurPrecision),
                     openTable: "C_Order",
                     openId: o.C_Order_ID,
-                    openSOTrx: o.IsSOTrx
+                    openSOTrx: o.IsSOTrx,
+                    // The ORDER window, by name - the zoom target opened the
+                    // invoice screen. See SALES_ORDER_WINDOW_NAMES.
+                    openWindows: o.IsSOTrx ? SALES_ORDER_WINDOW_NAMES : PURCHASE_ORDER_WINDOW_NAMES
                 }));
             }
         }
@@ -2605,18 +2616,18 @@
                 // there is no "from category" qualifier to print — what the panel
                 // shows is what that tab holds.
                 //
-                // The account's NAME leads on the left and its combination is the
-                // row's value on the right; both are the bold slots. Between them,
-                // under the name, are the accounting default's own fields — what
-                // the accounting defaults screen states against this account, and
-                // what tells two accounts of a similar name apart. The
-                // combination's description keeps its own line beneath those: it
-                // describes the ACCOUNT, not the default, and running the two
-                // together read as one list.
+                // The account's NAME leads on the left in bold, with the accounting
+                // default's search key beside it (18-Sep-2026), and its combination
+                // is the row's value on the right. Under the name are the
+                // accounting default's own fields — what the accounting defaults
+                // screen states against this account, and what tells two accounts
+                // of a similar name apart. The combination's DESCRIPTION is no
+                // longer printed as a third line: it repeated the combination the
+                // row already states on the right.
                 return listRow({
                     primary: role ? msg(role.key, role.text) : a.AccountRole,
+                    primarySoft: a.AccountKey || "",
                     meta: accountDetailText(a),
-                    meta2: a.Description || "",
                     value: a.Combination || "—"
                 });
             }, $list);
@@ -2651,11 +2662,12 @@
             // nobody has seeded cannot be overridden by the old wording, and a
             // tenant that wants its own word seeds this one.
             "chat":        { tone: "info",    icon: "chat",     key: "VAS_190_TagChatNote",    text: "Note" },
-            // MailAttachment1 with AttachmentType 'I' — an attached LETTER
-            // document, which is how VAS_105, VAS_123 and the shared activity
-            // sources have always read that value. A document icon rather than an
-            // envelope, and no direction anywhere on it: a letter filed against
-            // the product neither went out nor came in, it is simply there.
+            // MailAttachment1 with AttachmentType 'L' — an attached LETTER
+            // document, the value the platform's own history panel lists letters
+            // under (18-Sep-2026; 'I' is its INBOX, i.e. a received mail). A
+            // document icon rather than an envelope, and no direction anywhere on
+            // it: a letter filed against the product neither went out nor came
+            // in, it is simply there.
             "letter":      { tone: "purple",  icon: "doc",      key: "VAS_190_TagLetter",      text: "Letter" },
             // Calls (VA048_CallDetails), the one shared source this panel was
             // missing.
@@ -3005,7 +3017,12 @@
             if (meta.icon) $tag.append(svgIcon(meta.icon));
             $tag.append($('<span></span>').text(msg(meta.key, meta.text)));
             $head.append($tag);
-            $head.append($('<span class="vas_190-sheetTitle"></span>').text(activityTitle(a)));
+            // A NOTE has no subject of its own - its headline IS its text, which
+            // the Content block below shows in full - so the header carries the
+            // chip alone rather than the same words twice (18-Sep-2026).
+            if (a.Type !== "chat") {
+                $head.append($('<span class="vas_190-sheetTitle"></span>').text(activityTitle(a)));
+            }
             // NO close cross here. The sheet offers exactly ONE way out, the
             // Close button in its footer: a header cross beside it gave every
             // entry two controls that did the same thing, and a reader deciding
@@ -3051,21 +3068,30 @@
                     .text(msg("VAS_190_Emails", "emails")));
                 $sBody.append(buildApptMailBlock(a).show().removeClass("vas_190-actBody"));
             }
+
+            // A recorded meeting's TRANSCRIPT, as the history panel shows it
+            // (18-Sep-2026): its own section under the meeting, headed
+            // "Transcript" with the download beside the heading, the lines
+            // underneath with the speaker picked out. It was a footer button
+            // only, so the transcript could be saved but never read here.
+            if (a.Transcript && String(a.Transcript).trim()) {
+                $sBody.append(buildTranscriptBlock(a));
+            }
             $sheet.append($sBody);
 
             // ----- Footer: close, and whatever this kind of entry can do -----
             var $foot = $('<div class="vas_190-sheetFoot"></div>');
 
-            // A recorded meeting's transcript is offered as a FILE. It runs to
-            // pages, so putting it on screen would bury everything above it.
-            if (a.Transcript && String(a.Transcript).trim()) {
-                $foot.append(sheetButton(msg("VAS_190_DownloadTranscript", "Download transcript"),
-                    false, function () { downloadTranscript(a); }));
-            }
             // Replying is only offered where there is somebody to reply TO.
             if (a.Type === "mail" && replyAddress(a)) {
                 $foot.append(sheetButton(msg("VAS_190_Reply", "Reply"), true,
                     function () { replyToMail(a); }));
+            }
+            // A NOTE is replied to in the record's own chat (18-Sep-2026): the
+            // platform chat opens on this product, where the note was typed.
+            if (a.Type === "chat" && canOpenChat()) {
+                $foot.append(sheetButton(msg("VAS_190_Reply", "Reply"), true,
+                    function () { openChatForReply(); }));
             }
             var $close = sheetButton(msg("VAS_190_Close", "Close"), false, closeDetail);
             $foot.append($close);
@@ -3131,9 +3157,14 @@
                               a.IsClosed ? msg("VAS_190_TaskCompleted", "Completed")
                                          : msg("VAS_190_TaskOpen", "Open"));
                     pushField(fields, msg("VAS_190_TaskResult", "Result"), a.TaskResult);
-                } else if (a.IsCancelled) {
-                    pushField(fields, msg("VAS_190_TaskState", "State"),
-                              msg("VAS_190_Cancelled", "Cancelled"));
+                } else {
+                    if (a.IsCancelled) {
+                        pushField(fields, msg("VAS_190_TaskState", "State"),
+                                  msg("VAS_190_Cancelled", "Cancelled"));
+                    }
+                    // A meeting's DUE date, next to its detail (18-Sep-2026).
+                    pushField(fields, msg("VAS_190_DueOn", "Due on"),
+                              formatDateTime(a.EndDate || a.StartDate));
                 }
 
                 pushField(fields, msg("VAS_190_DetailDetail", "Detail"), a.Location);
@@ -3162,7 +3193,10 @@
                 pushField(fields, msg("VAS_190_To", "To"), a.MailTo);
                 pushField(fields, msg("VAS_190_Cc", "Cc"), a.MailCc);
                 pushField(fields, msg("VAS_190_Bcc", "Bcc"), a.MailBcc);
-                pushField(fields, msg("VAS_190_DetailPeople", "People"), a.Actor);
+                // The USERS whose addresses are on To and Cc, by name (server-
+                // resolved, 18-Sep-2026). It used to print the sender's user,
+                // which is not who the mail was between.
+                pushField(fields, msg("VAS_190_DetailPeople", "People"), a.People);
                 return fields;
             }
 
@@ -3249,8 +3283,13 @@
                     // did not. Same rule as the detail sheet above: BodyHtml is
                     // sanitised, a.Body is not markup and must be escaped.
                     var quoted = "<br><br><hr>" + (a.BodyHtml || textToHtml(a.Body));
+                    // The TENTH argument is the MailAttachment1_ID of the mail
+                    // being answered (18-Sep-2026) - what the platform's own
+                    // history panel passes on its Reply, and what the composer
+                    // sends as attachment_ID so the reply is filed in the record's
+                    // mail thread rather than as a fresh, unrelated message.
                     var email = new VIS.Email(to, null, null, shownRecordId, true, true,
-                                              $self.table_ID || 0, quoted, subject, null);
+                                              $self.table_ID || 0, quoted, subject, +a.Id || 0);
                     var frame = new VIS.CFrame();
                     var label = VIS.Msg.getMsg("EMail");
                     frame.setName(label);
@@ -3271,18 +3310,19 @@
                     } catch (e2) { }
                     return;
                 } catch (e) {
-                    console.log(e);
-                    // fall through to the workstation composer
+                    console.log("VAS_190: the platform mail composer could not be opened "
+                              + "for mail " + a.Id + ".", e);
                 }
+                return;
             }
 
-            // No platform composer on this page. Better the workstation's than
-            // nothing — the reply will not be filed against the product, but the
-            // reader still gets an addressed message.
-            try {
-                window.open("mailto:" + encodeURIComponent(to) +
-                            "?subject=" + encodeURIComponent(subject), "_blank");
-            } catch (e3) { console.log(e3); }
+            // No platform composer on this page. NOTHING else is opened
+            // (18-Sep-2026): the workstation's mail client used to stand in here,
+            // and a reply written there leaves the application, goes out from the
+            // reader's personal account and is never filed against the product -
+            // which is not a reply to this mail in any sense the feed can show.
+            console.log("VAS_190: VIS.Email is not available on this window; the reply "
+                      + "to mail " + a.Id + " cannot be composed here.");
         }
 
         // Plain text into the composer's HTML body: escaped, with line breaks
@@ -3298,6 +3338,74 @@
                     .replace(/\r\n/g, "\n")
                     .replace(/\r/g, "\n")
                     .replace(/\n/g, "<br>");
+        }
+
+        // The transcript section of a meeting's sheet: a heading row with the
+        // download beside it, then the lines. A line that opens "Speaker: ..."
+        // (the shape the recorder writes) gets its speaker picked out, as the
+        // history panel's transcript box does; any other line is printed as it
+        // is. Text only - a transcript is never handed to the browser as markup.
+        function buildTranscriptBlock(a) {
+            var $block = $('<div class="vas_190-sheetTranscript"></div>');
+            var $head = $('<div class="vas_190-sheetTrHead"></div>');
+            $head.append($('<div class="vas_190-sheetLabel"></div>')
+                .text(msg("VAS_190_Transcript", "Transcript")));
+            $head.append(sheetButton(msg("VAS_190_DownloadTranscript", "Download transcript"),
+                false, function () { downloadTranscript(a); }).addClass("vas_190-sheetBtn--sm"));
+            $block.append($head);
+
+            var $box = $('<div class="vas_190-sheetText vas_190-sheetTrBox"></div>');
+            var lines = String(a.Transcript).replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+            for (var i = 0; i < lines.length; i++) {
+                var line = $.trim(lines[i]);
+                if (!line) continue;
+                var $line = $('<div class="vas_190-sheetTrLine"></div>');
+                var ci = line.indexOf(":");
+                if (ci > 0 && ci < 50) {
+                    $line.append($('<span class="vas_190-sheetTrSpeaker"></span>')
+                        .text(line.substring(0, ci) + ":"));
+                    $line.append($('<span></span>').text(" " + $.trim(line.substring(ci + 1))));
+                } else {
+                    $line.text(line);
+                }
+                $box.append($line);
+            }
+            $block.append($box);
+            return $block;
+        }
+
+        // Whether the platform chat can be opened on this product from here.
+        function canOpenChat() {
+            return !!(window.VIS && typeof VIS.Chat === "function" && shownRecordId > 0);
+        }
+
+        // Opens the platform's chat on THIS product - the same VIS.Chat the
+        // window's own chat button opens, on (AD_Table_ID, Record_ID) - so a
+        // reply to a note is typed where the note itself was, and comes back
+        // onto this feed. Mirrors VAS_InvoiceOverview's openChatPopup.
+        function openChatForReply() {
+            if (!canOpenChat()) return;
+            closeDetail();
+            try {
+                var tableId = $self.table_ID || 0;
+                if (!tableId && $self.curTab && typeof $self.curTab.getAD_Table_ID === "function") {
+                    tableId = $self.curTab.getAD_Table_ID();
+                }
+                var chatId = 0;
+                if ($self.curTab && typeof $self.curTab.getCM_ChatID === "function") {
+                    chatId = $self.curTab.getCM_ChatID() || 0;
+                }
+                var about = (data && data.Product) ? (data.Product.Name || data.Product.Value || "") : "";
+                var chat = new VIS.Chat(shownRecordId, chatId, tableId, about, $self.windowNo);
+                chat.onClose = function () {
+                    if ($self.curTab && typeof $self.curTab.loadChats === "function") {
+                        try { $self.curTab.loadChats(); } catch (e) { }
+                    }
+                    // Whatever was typed is an activity change.
+                    nudgeActivityCheck();
+                };
+                chat.show();
+            } catch (e) { console.log(e); }
         }
 
         // Saves the meeting transcript as a text file. It runs to pages, so it is
@@ -3436,6 +3544,10 @@
             } else if (a.Type === "appointment") {
                 if (a.IsCancelled) bits.push(msg("VAS_190_Cancelled", "Cancelled"));
                 if (a.Location) bits.push(a.Location);
+                // WHEN the meeting is due, beside its detail (18-Sep-2026) - the
+                // row sorted on it but never said it.
+                var apptDue = formatDateTime(a.EndDate || a.StartDate);
+                if (apptDue) bits.push(msg("VAS_190_DueOn", "due") + " " + apptDue);
                 appendMailCountBit(bits, a);
             } else if (a.Type === "workflow") {
                 // The dictionary label, resolved server-side in the reader's own

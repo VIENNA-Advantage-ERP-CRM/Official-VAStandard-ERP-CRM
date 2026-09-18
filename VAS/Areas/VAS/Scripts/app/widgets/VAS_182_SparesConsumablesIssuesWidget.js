@@ -116,6 +116,9 @@
 // ===== NEW CODE START — currency format (agent A04, 2026-08-19) =====
         var currencyIso = '';
         var currencySymbol = '';
+        // Work-order columns this installation actually has, reported by the KPI endpoint
+        // (they are manufacturing-module only and are absent on some databases).
+        var workOrderColumns = [];
 // ===== NEW CODE END — currency format =====
 
         function label(key, fallback) {
@@ -190,6 +193,7 @@
                 success: function (res) {
                     var data = parseResponse(res);
                     if (data.error) { setError(); return; }
+                    if (data.workOrderColumns) { workOrderColumns = data.workOrderColumns; }
                     renderMetric(data);
                 },
                 error: function () { setError(); },
@@ -277,9 +281,11 @@
         // current month that carry at least one spares / consumables line. The EXISTS predicate
         // mirrors the line-level classification in GetSparesConsumablesPercentageData() one-for-one,
         // so the list can never drift from the percentage on the tile.
-        // Portability: only columns present on every target DB are used here - the work-order
-        // columns (VA075_WorkOrder_ID / VAMFG_M_WorkOrder_ID) are module-specific and absent on
-        // DB 1, and an unresolved column makes the grid query throw instead of opening.
+        // Portability: the work-order columns (VA075_WorkOrder_ID / VAMFG_M_WorkOrder_ID) are
+        // manufacturing-module only and are absent on DB 1, so the controller reports which ones
+        // this installation actually has. With none of them every issue line is spares/consumables
+        // (the production KPI is a hard 0%), so the drill carries no work-order clause at all -
+        // an unresolved column would make the grid query throw instead of opening.
         function openSparesConsumablesList() {
             // Keep in lock-step with GetSparesConsumablesIdsData in the controller.
             // The TabWhereClause is a flat M_Inventory_ID IN (...) list, NOT a

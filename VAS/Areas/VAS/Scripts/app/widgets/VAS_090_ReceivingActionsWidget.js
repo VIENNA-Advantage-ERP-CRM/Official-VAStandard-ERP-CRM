@@ -38,6 +38,13 @@
  * 18  | Back to pending confirmations   | VAS_090_BackToConfirmations
  * 19  | Confirmation Lines              | VAS_090_ConfirmationLines
  * 20  | This GRN confirmation is completed. | VAS_090_ConfirmationCompleted
+ * 21  | UOM (Receive Against PO column) | VAS_090_UOM
+ * 22  | Enter a whole number as the received quantity for | VAS_QtyWholeNumberOnly
+ * 23  | Decimal places allowed in the received quantity for | VAS_QtyDecimalPlacesAllowed
+ *
+ * QA sheet 2026-09-15 (batch 10): Print GRN Label quantity per GRN line UOM (#65); warehouses
+ * follow the PO's IsDropShip (#68); Attribute column only when a line has an attribute (#71);
+ * received quantity limited to the line UOM precision (#75); separate UOM column (#76).
  */
 ; VAS = window.VAS || {};
 
@@ -107,6 +114,7 @@
         var gcLoading = false;
         var gcDetail = null;
         var gcLineIndex = -1;
+        var gcQualityRows = [];
 
         var labelRows = [];
         var labelRowsById = {};
@@ -259,9 +267,81 @@
             return Number(value || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 2 });
         }
 
-        function formatQtyWithUom(value, uom) {
-            var text = formatQty(value);
-            return uom ? text + " " + uom : text;
+        /* QA sheet Receive Against PO #76: quantities are plain numbers (the unit has its own UOM
+           column), shown with the decimals the line UOM allows. */
+        function formatQtyPrecision(value, precision) {
+            var p = Math.max(0, Math.min(6, Number(precision || 0)));
+            return Number(value || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: p });
+        }
+
+        /* QA sheet Print GRN Label #65: the quantity in the unit entered on the GRN lines (QtyEntered
+           per UOM) - 3,000 Milliliter, not 3 (liters). A GRN with lines in several UOMs lists each. */
+        function formatLabelQuantities(row) {
+            var list = row && row.quantities ? row.quantities : [];
+            if (!list.length) { return formatQty(row ? row.receivedQty : 0); }
+            var parts = [];
+            for (var i = 0; i < list.length; i++) {
+                var digits = Math.max(2, Math.min(6, Number(list[i].precision || 0)));
+                var text = Number(list[i].qty || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: digits });
+                parts.push(list[i].uom ? text + " " + list[i].uom : text);
+            }
+            return parts.join(" · ");
+        }
+
+        /* Empty attribute instances carry dash-only descriptions ("-", "---"): those are no attribute. */
+        function hasAttributeText(attributeName) {
+            var text = String(attributeName == null ? "" : attributeName).trim();
+            return text !== "" && !/^-+$/.test(text);
+        }
+
+        /* QA sheet Receive Against PO #75: decimals of the received quantity follow the line UOM's
+           standard precision (0 = whole numbers only, 2 = 1.25 / 10.50 ...). */
+        function decimalPlaces(raw) {
+            var text = String(raw == null ? "" : raw).trim();
+            if (text === "") { return 0; }
+            var sci = text.match(/^[-+]?\d*(?:\.(\d*))?e([-+]?\d+)$/i);
+            if (sci) {
+                return Math.max(0, (sci[1] || "").replace(/0+$/, "").length - Number(sci[2]));
+            }
+            var dot = text.indexOf(".");
+            return dot < 0 ? 0 : text.substring(dot + 1).replace(/0+$/, "").length;
+        }
+
+        function exceedsUomPrecision(raw, precision) {
+            if (precision == null || !isFinite(Number(precision))) { return false; }
+            return decimalPlaces(raw) > Math.max(0, Number(precision));
+        }
+
+        function uomPrecisionMessage(line) {
+            var p = Math.max(0, Number(line.uomPrecision || 0));
+            var name = (line.itemName || "") + (line.uom ? " (" + line.uom + ")" : "");
+            if (p === 0) {
+                return lbl("VAS_QtyWholeNumberOnly", "Enter a whole number as the received quantity for") + " " + name + ".";
+            }
+            return lbl("VAS_QtyDecimalPlacesAllowed", "Decimal places allowed in the received quantity for") + " " + name + ": " + p + ".";
+        }
+
+        /* Input step matching the UOM precision: 1, 0.1, 0.01, 0.001 ... */
+        function uomStep(precision) {
+            var p = Math.max(0, Number(precision || 0));
+            return p === 0 ? "1" : "0." + new Array(p).join("0") + "1";
+        }
+
+        /* Validation message for a typed received quantity, "" when it is valid (empty counts as 0). */
+        function receiveQtyError(line, raw) {
+            var text = String(raw == null ? "" : raw).replace(/,/g, "").trim();
+            if (text === "") { return ""; }
+            var qty = Number(text);
+            if (!isFinite(qty) || qty < 0) {
+                return lbl("VAS_090_ReceivedQtyInvalid", "Received quantity cannot be negative.");
+            }
+            if (qty > Number(line.openQty || 0) + 0.000001) {
+                return lbl("VAS_090_ReceivedQtyTooHigh", "Received quantity cannot be greater than open quantity.");
+            }
+            if (exceedsUomPrecision(text, line.uomPrecision)) {
+                return uomPrecisionMessage(line);
+            }
+            return "";
         }
 
         function toInputValue(value) {
@@ -419,6 +499,10 @@
                 var id = Number($(this).data('polineid'));
                 if (!lineEntry[id]) { lineEntry[id] = {}; }
                 lineEntry[id].qty = String($(this).val() || "");
+                /* QA sheet #75: the typed quantity is validated as it changes (UOM precision, open qty). */
+                var line = currentLineById(id);
+                var qtyError = line ? receiveQtyError(line, lineEntry[id].qty) : "";
+                $(this).toggleClass('vas-ra-rcv-invalid', !!qtyError).attr('title', qtyError);
             });
             $dialog.on('change', '.vas-ra-loc-select', function () {
                 var id = Number($(this).data('polineid'));
@@ -438,6 +522,8 @@
             $dialog.on('click', '.vas-ra-gc-line-row', function () { openGRNConfirmationLine(Number($(this).data('lineidx'))); });
             $dialog.on('click', '.vas-ra-gc-back-detail', function () { gcLineIndex = -1; openGRNConfirmationDetail(gcDetail ? gcDetail.header.confirmId : 0); });
             $dialog.on('click', '.vas-ra-gc-complete', completeGRNConfirmation);
+            $dialog.on('click', '.vas-ra-gc-quality-back', function () { openGRNConfirmationDetail(gcDetail ? gcDetail.header.confirmId : 0); });
+            $dialog.on('click', '.vas-ra-gc-quality-save', saveQualityParametersAndComplete);
             $dialog.on('click', '.vas-ra-gc-dispute', disputeGRNConfirmation);
             $dialog.on('click', '.vas-ra-gc-save-line', saveGRNConfirmationLine);
             $dialog.on('input', '.vas-ra-gc-qty', paintGRNConfirmDifference);
@@ -683,6 +769,19 @@
            instead of Supplier / PO / Dock / Supplier Reference; every line has
            a Locator choice that follows the selected warehouse. */
         function renderReceiveLines() {
+            /* QA sheet Receive Against PO #71 (2026-09-15): the Attribute column is shown only when at
+               least one line has an attribute - a real instance description (dash-only "---" does not
+               count), an attribute picked in the dialog, or a product whose attribute set needs one
+               (its picker button lives in that column). Otherwise the column is omitted entirely. */
+            var showAttr = false;
+            for (var a = 0; a < (currentLines || []).length && !showAttr; a++) {
+                var attrEntry = lineEntry[currentLines[a].poLineId] || {};
+                showAttr = !!currentLines[a].hasAttributeSet
+                    || hasAttributeText(currentLines[a].attributeName)
+                    || hasAttributeText(attrEntry.attributeName);
+            }
+            var rowCls = 'vas-ra-receive-row' + (showAttr ? '' : ' vas-ra-noattr');
+
             /* Header fields styled like the Quality Control form: icon tile +
                label + value on an underline. Both Document Type and Warehouse are
                editable, so both carry the BLUE (.active) underline - the Quality
@@ -706,7 +805,15 @@
                 '</div>' +
                 '<div class="vas-ra-lines-title">' + escapeHtml(lbl("VAS_090_ReceivedLines", "Received Lines")) + '</div>' +
                 '<div class="vas-ra-receive-table">' +
-                '<div class="vas-ra-receive-row head"><span>' + escapeHtml(lbl("VAS_090_Item", "Item")) + '</span><span>' + escapeHtml(lbl("VAS_090_Attribute", "Attribute")) + '</span><span>' + escapeHtml(lbl("VAS_090_POQty", "PO Qty")) + '</span><span>' + escapeHtml(lbl("VAS_090_OpenQty", "Open Qty")) + '</span><span>' + escapeHtml(lbl("VAS_090_Locator", "Locator")) + '</span><span>' + escapeHtml(lbl("VAS_090_Received", "Received")) + '</span></div>';
+                '<div class="' + rowCls + ' head">' +
+                '<span>' + escapeHtml(lbl("VAS_090_Item", "Item")) + '</span>' +
+                (showAttr ? '<span>' + escapeHtml(lbl("VAS_090_Attribute", "Attribute")) + '</span>' : '') +
+                '<span class="num">' + escapeHtml(lbl("VAS_090_POQty", "PO Qty")) + '</span>' +
+                '<span class="num">' + escapeHtml(lbl("VAS_090_OpenQty", "Open Qty")) + '</span>' +
+                '<span class="vas-ra-line-uom">' + escapeHtml(lbl("VAS_090_UOM", "UOM")) + '</span>' +
+                '<span class="vas-ra-line-loc">' + escapeHtml(lbl("VAS_090_Locator", "Locator")) + '</span>' +
+                '<span class="num">' + escapeHtml(lbl("VAS_090_Received", "Received")) + '</span>' +
+                '</div>';
 
             /* ---- Product attribute (lot / serial / guarantee date) -----------------------------
                A product whose attribute set has IsInstanceAttribute='Y' needs an attribute set
@@ -767,14 +874,16 @@
                         : Number(line.attributeSetInstanceId || 0);
                     var attrMissing = attrRequired && attrChosenId <= 0;
                     var qtyValue = entry.qty != null ? entry.qty : toInputValue(line.defaultReceivedQty);
+                    var qtyError = receiveQtyError(line, qtyValue);
                     html +=
-                        '<div class="vas-ra-receive-row">' +
+                        '<div class="' + rowCls + '">' +
                         '<span class="vas-ra-line-name" title="' + escapeHtml(line.itemName || "-") + '">' + escapeHtml(line.itemName || "-") + '</span>' +
-                        '<span class="vas-ra-line-attr">' + attributeCellHtml(line, attributeText, attrChosenId, attrMissing) + '</span>' +
-                        '<span class="num">' + escapeHtml(formatQtyWithUom(line.poQty, line.uom)) + '</span>' +
-                        '<span class="num">' + escapeHtml(formatQtyWithUom(line.openQty, line.uom)) + '</span>' +
-                        '<span>' + locatorSelectHtml(line.poLineId) + '</span>' +
-                        '<span><input class="vas-ra-rcv-input" type="number" min="0" step="any" value="' + escapeHtml(qtyValue) + '" data-polineid="' + escapeHtml(line.poLineId) + '" data-openqty="' + escapeHtml(toInputValue(line.openQty)) + '"/></span>' +
+                        (showAttr ? '<span class="vas-ra-line-attr">' + attributeCellHtml(line, attributeText, attrChosenId, attrMissing) + '</span>' : '') +
+                        '<span class="num">' + escapeHtml(formatQtyPrecision(line.poQty, line.uomPrecision)) + '</span>' +
+                        '<span class="num">' + escapeHtml(formatQtyPrecision(line.openQty, line.uomPrecision)) + '</span>' +
+                        '<span class="vas-ra-line-uom" title="' + escapeHtml(line.uom || "-") + '">' + escapeHtml(line.uom || "-") + '</span>' +
+                        '<span class="vas-ra-line-loc">' + locatorSelectHtml(line.poLineId) + '</span>' +
+                        '<span><input class="vas-ra-rcv-input' + (qtyError ? ' vas-ra-rcv-invalid' : '') + '" type="number" min="0" step="' + escapeHtml(uomStep(line.uomPrecision)) + '" value="' + escapeHtml(qtyValue) + '" title="' + escapeHtml(qtyError) + '" data-polineid="' + escapeHtml(line.poLineId) + '" data-openqty="' + escapeHtml(toInputValue(line.openQty)) + '"/></span>' +
                         '</div>';
                 }
             }
@@ -835,6 +944,13 @@
         /* M_InOutLine.M_AttributeSetInstance_ID - the receipt line's attribute column. NOT
            C_OrderLine's 8767: the instance is being set on the GRN being created, not on the PO. */
         var INOUTLINE_ASI_COLUMN_ID = 8772;
+
+        function currentLineById(poLineId) {
+            for (var i = 0; i < (currentLines || []).length; i++) {
+                if (Number(currentLines[i].poLineId) === Number(poLineId)) { return currentLines[i]; }
+            }
+            return null;
+        }
 
         function openAttributeDialog(poLineId) {
             var line = null;
@@ -933,15 +1049,11 @@
                 var entry = lineEntry[line.poLineId] || {};
                 var raw = String(entry.qty != null ? entry.qty : toInputValue(line.defaultReceivedQty)).replace(/,/g, "");
                 var qty = Number(raw);
-                var openQty = Number(line.openQty || 0);
 
-                if (!isFinite(qty) || qty < 0) {
-                    invalidMessage = lbl("VAS_090_ReceivedQtyInvalid", "Received quantity cannot be negative.");
-                    break;
-                }
-
-                if (qty > openQty + 0.000001) {
-                    invalidMessage = lbl("VAS_090_ReceivedQtyTooHigh", "Received quantity cannot be greater than open quantity.");
+                /* Negative, above the open quantity, or more decimals than the line UOM allows (#75). */
+                var qtyError = receiveQtyError(line, raw);
+                if (qtyError) {
+                    invalidMessage = qtyError;
                     break;
                 }
 
@@ -1220,9 +1332,64 @@
             $dialogBody.html(html);
         }
 
+        /* QA sheet Complete GRN Confirmation #84 (2026-09-15): the Scrap Locator is editable. It is the
+           confirmation line's own M_Locator_ID (blank unless one was saved), chosen from the active
+           locators of the GRN's warehouse - the warehouse the core confirmation keeps the split receipt
+           line in. The previous read-only field wrongly showed the GRN line's receiving locator. */
+        var gcLocatorsByWarehouse = {};
+
+        function scrapLocatorFieldHtml(line) {
+            var warehouseId = gcDetail && gcDetail.header ? Number(gcDetail.header.warehouseId || 0) : 0;
+            var locators = gcLocatorsByWarehouse[warehouseId] || [];
+            var chosen = Number(line.scrapLocatorId || 0);
+            var options = '<option value="0"></option>';
+            var chosenListed = false;
+            for (var i = 0; i < locators.length; i++) {
+                var isChosen = Number(locators[i].locatorId) === chosen;
+                if (isChosen) { chosenListed = true; }
+                options += '<option value="' + escapeHtml(locators[i].locatorId) + '"' + (isChosen ? ' selected' : '') + '>' +
+                    escapeHtml(locators[i].locatorName || "-") + '</option>';
+            }
+            /* A locator saved earlier outside this list stays visible instead of being silently dropped. */
+            if (chosen > 0 && !chosenListed) {
+                options += '<option value="' + escapeHtml(chosen) + '" selected>' + escapeHtml(line.scrapLocatorName || String(chosen)) + '</option>';
+            }
+            return '<div class="vas-ra-qc-field active">' +
+                '<div class="vas-ra-qc-ico">' + icon("search") + '</div>' +
+                '<div class="vas-ra-qc-main">' +
+                '<div class="vas-ra-qc-label">' + escapeHtml(lbl("VAS_090_ScrapLocator", "Scrap Locator")) + '</div>' +
+                '<select class="vas-ra-gc-inp vas-ra-gc-scrap-loc">' + options + '</select>' +
+                '</div>' +
+                '</div>';
+        }
+
         function openGRNConfirmationLine(lineIndex) {
             if (!gcDetail || !gcDetail.lines || !gcDetail.lines[lineIndex]) { return; }
             if (gcDetail.header.status === "completed") { return; }
+
+            /* Load the warehouse's locators once, then render the line. */
+            var gcWarehouseId = Number(gcDetail.header.warehouseId || 0);
+            if (gcWarehouseId > 0 && !gcLocatorsByWarehouse[gcWarehouseId]) {
+                showDialogBusy(true);
+                $.ajax({
+                    url: VIS.Application.contextUrl + 'VAS_090_ReceivingActionsWidget/GetWarehouseLocators',
+                    type: 'GET',
+                    cache: false,
+                    data: { warehouseId: gcWarehouseId },
+                    success: function (res) {
+                        var data = parseResponse(res);
+                        gcLocatorsByWarehouse[gcWarehouseId] = (data && !data.error && data.rows) ? data.rows : [];
+                    },
+                    error: function () {
+                        gcLocatorsByWarehouse[gcWarehouseId] = [];
+                    },
+                    complete: function () {
+                        showDialogBusy(false);
+                        openGRNConfirmationLine(lineIndex);
+                    }
+                });
+                return;
+            }
 
             gcLineIndex = lineIndex;
             var line = gcDetail.lines[lineIndex];
@@ -1256,7 +1423,7 @@
 
             var right =
                 disabledQAField("shield", lbl("VAS_090_UOM", "UOM"), line.uomName || "-") +
-                disabledQAField("search", lbl("VAS_090_ScrapLocator", "Scrap Locator"), line.locatorValue || "-") +
+                scrapLocatorFieldHtml(line) +
                 inputField("edit", lbl("VAS_090_ConfirmedQuantity", "Confirmed Quantity"), line.confirmedQty, "confirmed", true) +
                 '<div class="vas-ra-qc-field active note">' +
                 '<div class="vas-ra-qc-main">' +
@@ -1304,6 +1471,18 @@
                 notify(lbl("VAS_090_InvalidQuantity", "Quantities must be zero or positive numbers."));
                 return;
             }
+            if (confirmed > target) {
+                notify("Confirmed Quantity cannot be greater than Target Quantity.");
+                return;
+            }
+            if (scrapped > target) {
+                notify("Scrapped Quantity cannot be greater than Target Quantity.");
+                return;
+            }
+            if (confirmed + scrapped > target) {
+                notify("Confirmed Quantity and Scrapped Quantity cannot exceed Target Quantity.");
+                return;
+            }
 
             showDialogBusy(true);
             $dialogBody.find('.vas-ra-gc-save-line').prop('disabled', true);
@@ -1317,6 +1496,8 @@
                     targetQty: String(target),
                     confirmedQty: String(confirmed),
                     scrappedQty: String(scrapped),
+                    /* QA sheet #84: 0 = no scrap locator (blank option). */
+                    scrapLocatorId: Number($dialogBody.find('.vas-ra-gc-scrap-loc').val() || 0),
                     description: $dialogBody.find('.vas-ra-desc').val() || ""
                 },
                 success: function (res) {
@@ -1342,7 +1523,163 @@
         }
 
         function completeGRNConfirmation() {
-            resolveGRNConfirmation('CompleteGRNConfirmation', '.vas-ra-gc-complete');
+            loadGRNConfirmationQualityParameters();
+        }
+
+        function loadGRNConfirmationQualityParameters() {
+            if (!gcDetail || !gcDetail.header || gcDetail.header.status === "completed") { return; }
+
+            var completeWithoutQuality = false;
+            var qualityPopupOpening = false;
+            showDialogBusy(true);
+            $dialogBody.find('.vas-ra-gc-complete').prop('disabled', true);
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_086_QAHoldsWidget/GetConfirmationQualityParameters',
+                type: 'GET',
+                cache: false,
+                data: { confirmId: gcDetail.header.confirmId },
+                success: function (res) {
+                    var data = parseResponse(res);
+                    gcQualityRows = (data && !data.error && data.rows) ? data.rows : [];
+                    if (!gcQualityRows.length) {
+                        completeWithoutQuality = true;
+                        return;
+                    }
+                    qualityPopupOpening = true;
+                    loadGCQualityValueOptions(0);
+                },
+                error: function () {
+                    showDialogBusy(false);
+                    notify(lbl("VAS_090_SaveFailed", "Save failed."));
+                },
+                complete: function () {
+                    if (completeWithoutQuality) {
+                        resolveGRNConfirmation('CompleteGRNConfirmation', '.vas-ra-gc-complete');
+                    } else if (!qualityPopupOpening && $dialogBody) {
+                        $dialogBody.find('.vas-ra-gc-complete').prop('disabled', false);
+                    }
+                }
+            });
+        }
+
+        function loadGCQualityValueOptions(index) {
+            if (index >= gcQualityRows.length) {
+                showDialogBusy(false);
+                renderGRNConfirmationQualityControl();
+                return;
+            }
+
+            var qualityRow = gcQualityRows[index];
+            qualityRow.valueOptions = [];
+            if (Number(qualityRow.testParameterId || 0) <= 0) {
+                loadGCQualityValueOptions(index + 1);
+                return;
+            }
+
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_086_QAHoldsWidget/GetTestParameterValues',
+                type: 'GET',
+                cache: false,
+                data: { testParameterId: qualityRow.testParameterId },
+                success: function (res) {
+                    var data = parseResponse(res);
+                    qualityRow.valueOptions = (data && !data.error && data.rows) ? data.rows : [];
+                },
+                complete: function () {
+                    loadGCQualityValueOptions(index + 1);
+                }
+            });
+        }
+
+        function qualityActualValueHtml(qualityRow) {
+            var selected = String(qualityRow.actualValue || "");
+            var options = '<option value="">' + escapeHtml(lbl("VAS_086_SelectResult", "Select result...")) + '</option>';
+            for (var i = 0; i < qualityRow.valueOptions.length; i++) {
+                var value = qualityRow.valueOptions[i];
+                var isSelected = selected !== "" && (String(value.valueId) === selected || String(value.valueName) === selected);
+                options += '<option value="' + escapeHtml(value.valueId) + '"' + (isSelected ? ' selected' : '') + '>' +
+                    escapeHtml(value.valueName || value.valueId) + '</option>';
+            }
+            return '<select class="vas-ra-gc-quality-actual" data-qarecordid="' + escapeHtml(qualityRow.qaRecordId) + '">' + options + '</select>';
+        }
+
+        function renderGRNConfirmationQualityControl() {
+            setModal(lbl("VAS_086_QualityControl", "Quality Control"), "", "info");
+            var html =
+                '<div class="vas-ra-modal-back vas-ra-gc-quality-back">' + icon("chevL") + '<span>' + escapeHtml(lbl("VAS_090_BackTo", "Back to") + ' ' + (gcDetail.header.confirmNo || "-")) + '</span></div>' +
+                '<div class="vas-ra-qc-headline">' + escapeHtml(lbl("VAS_086_QualityControl", "Quality Control")) + '</div>' +
+                '<div class="vas-ra-gc-quality-list">';
+
+            for (var i = 0; i < gcQualityRows.length; i++) {
+                var qualityRow = gcQualityRows[i];
+                html +=
+                    '<div class="vas-ra-gc-quality-row">' +
+                    '<span class="vas-ra-gc-quality-product">' + escapeHtml(qualityRow.productName || "-") + '</span>' +
+                    '<span class="vas-ra-gc-quality-parameter">' + escapeHtml(qualityRow.testParameter || "-") + '</span>' +
+                    qualityActualValueHtml(qualityRow) +
+                    '</div>';
+            }
+
+            html += '</div>' +
+                '<div class="vas-ra-action-footer right">' +
+                '<button type="button" class="vas-ra-primary vas-ra-gc-quality-save">' + icon("check") + escapeHtml(lbl("VAS_090_CompleteGRNConfirmation", "Complete GRN Confirmation")) + '</button>' +
+                '</div>';
+            $dialogBody.html(html);
+        }
+
+        function saveQualityParametersAndComplete() {
+            var valuesByRecord = {};
+            var incomplete = false;
+            $dialogBody.find('.vas-ra-gc-quality-actual').each(function () {
+                var qaRecordId = Number($(this).data('qarecordid') || 0);
+                var actualValue = $(this).val();
+                if (!qaRecordId || !actualValue) { incomplete = true; return false; }
+                valuesByRecord[qaRecordId] = actualValue;
+            });
+            if (incomplete) {
+                notify(lbl("VAS_086_SelectQAActualValue", "Select an actual value before saving."));
+                return;
+            }
+
+            showDialogBusy(true);
+            $dialogBody.find('.vas-ra-gc-quality-save').prop('disabled', true);
+            saveNextQualityParameter(0, valuesByRecord);
+        }
+
+        function saveNextQualityParameter(index, valuesByRecord) {
+            if (index >= gcQualityRows.length) {
+                gcQualityRows = [];
+                resolveGRNConfirmation('CompleteGRNConfirmation', '.vas-ra-gc-quality-save');
+                return;
+            }
+
+            var qualityRow = gcQualityRows[index];
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_086_QAHoldsWidget/SaveQAResult',
+                type: 'POST',
+                cache: false,
+                data: {
+                    qaRecordId: qualityRow.qaRecordId,
+                    actualValue: valuesByRecord[qualityRow.qaRecordId],
+                    qaQcDate: qualityRow.qaQcDate || "",
+                    description: qualityRow.description || ""
+                },
+                success: function (res) {
+                    var data = parseResponse(res);
+                    if (!data || data.error) {
+                        showDialogBusy(false);
+                        $dialogBody.find('.vas-ra-gc-quality-save').prop('disabled', false);
+                        notify(data && data.error ? data.error : lbl("VAS_090_SaveFailed", "Save failed."));
+                        return;
+                    }
+                    saveNextQualityParameter(index + 1, valuesByRecord);
+                },
+                error: function () {
+                    showDialogBusy(false);
+                    $dialogBody.find('.vas-ra-gc-quality-save').prop('disabled', false);
+                    notify(lbl("VAS_090_SaveFailed", "Save failed."));
+                }
+            });
         }
 
         function disputeGRNConfirmation() {
@@ -1463,7 +1800,7 @@
                         '<tr class="vas-ra-label-row" data-grnid="' + escapeHtml(r.grnId) + '">' +
                         '<td class="s" title="' + escapeHtml(r.grnNo || "-") + '">' + escapeHtml(r.grnNo || "-") + '</td>' +
                         '<td title="' + escapeHtml(r.partyName || "-") + '">' + escapeHtml(r.partyName || "-") + '</td>' +
-                        '<td class="r">' + escapeHtml(formatQty(r.receivedQty)) + '</td>' +
+                        '<td class="r" title="' + escapeHtml(formatLabelQuantities(r)) + '">' + escapeHtml(formatLabelQuantities(r)) + '</td>' +
                         '<td class="r"><span class="vas-ra-pill info">' + escapeHtml(lbl("VAS_090_Print", "Print")) + '</span></td>' +
                         '</tr>';
                 }

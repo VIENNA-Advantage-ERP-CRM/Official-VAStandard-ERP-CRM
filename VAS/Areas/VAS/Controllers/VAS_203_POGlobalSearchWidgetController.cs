@@ -557,6 +557,158 @@ namespace VAS.Controllers
             }
         }
 
+        /// <summary>
+        /// Detail for one purchase order (header + lines), shown in the widget's
+        /// own detail modal. Per specification, clicking a search result opens
+        /// THIS detail view instead of navigating to the Purchase Order screen.
+        /// </summary>
+        [HttpGet]
+        public JsonResult GetPurchaseOrderDetail(int orderId)
+        {
+            Ctx ctx = Session["ctx"] as Ctx;
+            if (ctx == null)
+            {
+                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+            }
+
+            if (orderId <= 0)
+            {
+                return Fail("Invalid purchase order");
+            }
+
+            try
+            {
+                string headerSql = @"
+                    SELECT
+                        o.C_Order_ID,
+                        o.DocumentNo,
+                        o.DateOrdered,
+                        o.DatePromised,
+                        o.DocStatus,
+                        o.GrandTotal,
+                        o.POReference,
+                        bp.Name AS VendorName,
+                        wh.Name AS WarehouseName,
+                        rep.Name AS SalesRepName,
+                        curr.CurSymbol,
+                        curr.ISO_Code,
+                        COALESCE(curr.StdPrecision, 2) AS StdPrecision
+                    FROM C_Order o
+                    INNER JOIN C_BPartner bp ON bp.C_BPartner_ID = o.C_BPartner_ID
+                    LEFT JOIN M_Warehouse wh ON wh.M_Warehouse_ID = o.M_Warehouse_ID
+                    LEFT JOIN AD_User rep ON rep.AD_User_ID = o.SalesRep_ID
+                    LEFT JOIN C_Currency curr ON curr.C_Currency_ID = o.C_Currency_ID
+                    WHERE o.C_Order_ID = @OrderID
+                      AND o.AD_Client_ID = @ClientID
+                      AND o.IsActive = 'Y'
+                      AND o.IsSOTrx = 'N'";
+
+                headerSql = MRole.GetDefault(ctx).AddAccessSQL(headerSql, "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+                SqlParameter[] headParams = new SqlParameter[]
+                {
+                    new SqlParameter("@OrderID", orderId),
+                    new SqlParameter("@ClientID", ctx.GetAD_Client_ID())
+                };
+
+                object header = null;
+                IDataReader dr = null;
+                try
+                {
+                    dr = DB.ExecuteReader(headerSql, headParams, null);
+                    if (dr != null && dr.Read())
+                    {
+                        DateTime? dateOrdered = Util.GetValueOfDateTime(dr["DateOrdered"]);
+                        DateTime? datePromised = Util.GetValueOfDateTime(dr["DatePromised"]);
+                        header = new
+                        {
+                            orderId = Util.GetValueOfInt(dr["C_Order_ID"]),
+                            documentNo = Util.GetValueOfString(dr["DocumentNo"]),
+                            vendorName = Util.GetValueOfString(dr["VendorName"]),
+                            warehouseName = Util.GetValueOfString(dr["WarehouseName"]),
+                            salesRepName = Util.GetValueOfString(dr["SalesRepName"]),
+                            poReference = Util.GetValueOfString(dr["POReference"]),
+                            docStatus = Util.GetValueOfString(dr["DocStatus"]),
+                            docStatusLabel = GetDocStatusLabel(ctx, Util.GetValueOfString(dr["DocStatus"])),
+                            grandTotal = Util.GetValueOfDecimal(dr["GrandTotal"]),
+                            orderDate = dateOrdered.HasValue ? dateOrdered.Value.ToString("yyyy-MM-dd") : "",
+                            orderDateDisplay = dateOrdered.HasValue ? dateOrdered.Value.ToString("dd MMM yyyy") : "",
+                            promisedDateDisplay = datePromised.HasValue ? datePromised.Value.ToString("dd MMM yyyy") : "",
+                            currencySymbol = Util.GetValueOfString(dr["CurSymbol"]),
+                            currencyIso = Util.GetValueOfString(dr["ISO_Code"]),
+                            stdPrecision = Util.GetValueOfInt(dr["StdPrecision"])
+                        };
+                    }
+                }
+                finally
+                {
+                    if (dr != null) { dr.Close(); dr.Dispose(); }
+                }
+
+                if (header == null)
+                {
+                    return Fail(Msg.GetMsg(ctx, "RecordNotFound") ?? "Record not found");
+                }
+
+                string linesSql = @"
+                    SELECT
+                        ol.C_OrderLine_ID,
+                        ol.Line,
+                        COALESCE(p.Name, ol.Description, 'Standard Product') AS ProductName,
+                        COALESCE(p.Value, '') AS ProductCode,
+                        COALESCE(asi.Description, '') AS AttributeDesc,
+                        COALESCE(uom.UOMSymbol, uom.Name, '') AS UomName,
+                        COALESCE(ol.QtyOrdered, 0) AS QtyOrdered,
+                        COALESCE(ol.QtyDelivered, 0) AS QtyDelivered,
+                        COALESCE(ol.PriceActual, 0) AS PriceActual,
+                        COALESCE(ol.LineNetAmt, 0) AS LineNetAmt
+                    FROM C_OrderLine ol
+                    LEFT JOIN M_Product p ON p.M_Product_ID = ol.M_Product_ID
+                    LEFT JOIN C_UOM uom ON uom.C_UOM_ID = ol.C_UOM_ID
+                    LEFT JOIN M_AttributeSetInstance asi ON asi.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID
+                    WHERE ol.C_Order_ID = @OrderID
+                      AND ol.IsActive = 'Y'
+                    ORDER BY ol.Line ASC, ol.C_OrderLine_ID ASC";
+
+                var lines = new List<object>();
+                dr = null;
+                try
+                {
+                    dr = DB.ExecuteReader(linesSql, headParams, null);
+                    while (dr != null && dr.Read())
+                    {
+                        decimal qtyOrdered = Util.GetValueOfDecimal(dr["QtyOrdered"]);
+                        decimal qtyDelivered = Util.GetValueOfDecimal(dr["QtyDelivered"]);
+                        lines.Add(new
+                        {
+                            lineId = Util.GetValueOfInt(dr["C_OrderLine_ID"]),
+                            lineNo = Util.GetValueOfInt(dr["Line"]),
+                            productName = Util.GetValueOfString(dr["ProductName"]),
+                            productCode = Util.GetValueOfString(dr["ProductCode"]),
+                            attribute = Util.GetValueOfString(dr["AttributeDesc"]),
+                            uom = Util.GetValueOfString(dr["UomName"]),
+                            qtyOrdered = qtyOrdered,
+                            qtyDelivered = qtyDelivered,
+                            qtyPending = Math.Max(0m, qtyOrdered - qtyDelivered),
+                            priceActual = Util.GetValueOfDecimal(dr["PriceActual"]),
+                            lineNetAmt = Util.GetValueOfDecimal(dr["LineNetAmt"])
+                        });
+                    }
+                }
+                finally
+                {
+                    if (dr != null) { dr.Close(); dr.Dispose(); }
+                }
+
+                return Ok(new { header = header, lines = lines });
+            }
+            catch (Exception ex)
+            {
+                _log.Log(Level.SEVERE, "VAS_203_POGlobalSearchWidget.GetPurchaseOrderDetail", ex);
+                return Fail(Msg.GetMsg(ctx, "Error") ?? "Error");
+            }
+        }
+
         private static void AddCandidate(List<SearchResultCandidate> list, HashSet<string> seen, SearchResultCandidate candidate)
         {
             string key = candidate.GroupKey + "_" + candidate.OrderId + (candidate.OrderLineId.HasValue ? "_" + candidate.OrderLineId.Value : "");

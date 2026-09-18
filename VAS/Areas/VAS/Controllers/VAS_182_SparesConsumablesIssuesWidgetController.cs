@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Web.Mvc;
 using System.Data.SqlClient;
@@ -238,10 +239,21 @@ namespace VIS.Controllers
             //
             // Cost fallback must end in 0: NVL(CurrentCostPrice, PriceCost) yields NULL when both
             // are null, and SUM() silently drops those lines from the total.
+            //
+            // Without any work-order column the installation cannot classify a production issue,
+            // so every issue line counts as spares / consumables (production KPI reads 0%).
+            var woTests = new List<string>();
+            foreach (string column in workOrderColumns)
+            {
+                woTests.Add("COALESCE(line." + column + ", 0) > 0");
+            }
+            string isNotWorkOrderLine = woTests.Count > 0
+                ? "NOT (" + string.Join(" OR ", woTests) + ")"
+                : "1 = 1";
+
             string sql = @"
                 SELECT
-                  COALESCE(SUM(CASE WHEN COALESCE(line.VA075_WorkOrder_ID, 0) = 0
-                                     AND COALESCE(line.VAMFG_M_WorkOrder_ID, 0) = 0
+                  COALESCE(SUM(CASE WHEN " + isNotWorkOrderLine + @"
                                     THEN (line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0))
                                     ELSE 0 END), 0) AS SparesValue,
                   COALESCE(SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0)), 0) AS TotalValue

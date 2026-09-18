@@ -82,6 +82,9 @@
 
 // ===== NEW CODE START — currency format (agent A03, 2026-08-19) =====
         var currencyInfo = { iso: '', symbol: '' };
+        // Work-order columns this installation actually has, reported by the KPI endpoint
+        // (they are manufacturing-module only and are absent on some databases).
+        var workOrderColumns = [];
 
         function loadCurrencyInfo() {
             $.ajax({
@@ -187,6 +190,7 @@
                 success: function (res) {
                     var data = parseResponse(res);
                     if (data.error) { setError(); return; }
+                    if (data.workOrderColumns) { workOrderColumns = data.workOrderColumns; }
                     renderMetric(data);
                 },
                 error: function () { setError(); },

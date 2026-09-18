@@ -74,7 +74,7 @@ namespace VASLogic.Models
 
             if (page < 0) page = 0;
             int total;
-            data.Lines = LoadLines(ctx, C_Order_ID, tabIds, page, out total);
+            data.Lines = LoadLines(ctx, C_Order_ID, tabIds, page, IsRealOrder(data), out total);
             data.LinesTotal = total;
             data.LinePage = page;
             data.LinePageSize = LINE_PAGE_SIZE;
@@ -868,6 +868,14 @@ namespace VASLogic.Models
             // the panel carries the header flag to gate it. Guarded like the others: an
             // older dictionary without the column reads as 'N'.
             string dropShipCol  = TrxFlagExpr("IsDropShip");
+            // C_DocType.IsReleaseDocument on the TARGET document type — a release against
+            // a blanket order. On a release the line's product comes from the blanket
+            // order line it releases, so the panel locks the product picker and asks for
+            // the blanket line instead (see the client's docIsReleasePO). Guarded like the
+            // flags above: a dictionary without the column reads as 'N'.
+            string releaseCol   = ColumnExists("C_DocType", "IsReleaseDocument")
+                ? "COALESCE(dt.IsReleaseDocument, 'N') AS IsReleaseDocument,"
+                : "'N' AS IsReleaseDocument,";
             // ...and the header columns the order line's own DisplayLogic reads by token.
             StringBuilder logicCols = new StringBuilder();
             foreach (string c in _logicTokenColumns) logicCols.Append(LogicTokenExpr(c)).Append(' ');
@@ -877,6 +885,7 @@ namespace VASLogic.Models
                               " + blanketCol + @"
                               " + returnCol + @"
                               " + dropShipCol + @"
+                              " + releaseCol + @"
                               o.C_Order_ID,
                               o.AD_Client_ID,
                               o.AD_Org_ID,
@@ -896,6 +905,7 @@ namespace VASLogic.Models
                            FROM C_Order o
                            INNER JOIN C_Currency cur ON (o.C_Currency_ID = cur.C_Currency_ID)
                            INNER JOIN M_PriceList pl ON (o.M_PriceList_ID = pl.M_PriceList_ID)
+                           LEFT JOIN C_DocType dt ON (dt.C_DocType_ID = o.C_DocTypeTarget_ID)
                            WHERE o.C_Order_ID = @C_Order_ID
                              AND o.IsActive = 'Y'";
 
@@ -920,6 +930,7 @@ namespace VASLogic.Models
             data.IsBlanketTrx = Util.GetValueOfString(r["IsBlanketTrx"]) == "Y";
             data.IsReturnTrx = Util.GetValueOfString(r["IsReturnTrx"]) == "Y";
             data.IsDropShip = Util.GetValueOfString(r["IsDropShip"]) == "Y";
+            data.IsReleaseDoc = Util.GetValueOfString(r["IsReleaseDocument"]) == "Y";
             // Header values named by order-line DisplayLogic tokens. A DBNull stays absent
             // from the bag rather than becoming "" or 0, so the client can tell "not set"
             // from a real value and "@token@=null" evaluates the way the dictionary means.
@@ -936,8 +947,25 @@ namespace VASLogic.Models
                 && data.DocStatus != "VO" && data.DocStatus != "RE";
         }
 
-        /// <summary>Loads the order lines saved against the parent order.</summary>
-        private List<OrderLineRow> LoadLines(Ctx ctx, int C_Order_ID, List<int> AD_Tab_IDs, int page, out int total)
+        /// <summary>
+        /// A real ORDER - purchase, or a sales order that is not a quotation. What the
+        /// 16-Sep-2026 purchase-only line treatment (newest first, attribute caption from
+        /// a real instance only) applies to since 17-Sep-2026; a quotation keeps its
+        /// earlier behaviour.
+        /// </summary>
+        /// <param name="d">loaded header context</param>
+        /// <returns>true for a purchase order or a real sales order</returns>
+        private static bool IsRealOrder(CreateOrderPanelData d)
+        {
+            return d != null && (!d.IsSOTrx || !d.IsSalesQuotation);
+        }
+
+        /// <summary>Loads the order lines saved against the parent order, newest line first.</summary>
+        /// <param name="purchase">A real order (purchase, or sales that is not a
+        /// quotation - see IsRealOrder). Such orders take an attribute caption only from a
+        /// real instance; a quotation keeps its earlier behaviour there. The parameter
+        /// keeps its 16-Sep-2026 name.</param>
+        private List<OrderLineRow> LoadLines(Ctx ctx, int C_Order_ID, List<int> AD_Tab_IDs, int page, bool purchase, out int total)
         {
             List<OrderLineRow> rows = new List<OrderLineRow>();
 
@@ -965,13 +993,24 @@ namespace VASLogic.Models
                LEFT JOIN C_Charge ch ON (ol.C_Charge_ID = ch.C_Charge_ID)
                LEFT JOIN C_UOM uom ON (ol.C_UOM_ID = uom.C_UOM_ID)
                LEFT JOIN C_Tax t ON (ol.C_Tax_ID = t.C_Tax_ID)
-               LEFT JOIN M_AttributeSetInstance asi ON (ol.M_AttributeSetInstance_ID = asi.M_AttributeSetInstance_ID)
+               LEFT JOIN M_AttributeSetInstance asi ON (ol.M_AttributeSetInstance_ID = asi.M_AttributeSetInstance_ID"
+               // Purchase order: only a REAL instance carries a description. A line with
+               // no attributes holds instance 0, and where that row exists in
+               // M_AttributeSetInstance its description (a dash on some tenants) was joined
+               // in and shown under the product as though it were an attribute.
+               + (purchase ? " AND ol.M_AttributeSetInstance_ID > 0" : "") + @")
                WHERE ol.C_Order_ID = @C_Order_ID
                  AND ol.IsActive = 'Y'";
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "ol", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             if (page < 0) page = 0;
-            sql += " ORDER BY ol.Line" + PagingSuffix(LINE_PAGE_SIZE, page * LINE_PAGE_SIZE);
+            // Newest line first, on EVERY document (quotations included since 18-Sep-2026;
+            // purchase orders since 16-Sep, sales orders since 17-Sep). The line number
+            // climbs with every line added, so the latest created sits at the top of the
+            // first page — where the panel also puts a line while it is being keyed
+            // (addLine unshifts), so the order does not change when it is saved.
+            sql += " ORDER BY ol.Line DESC, ol.C_OrderLine_ID DESC"
+                 + PagingSuffix(LINE_PAGE_SIZE, page * LINE_PAGE_SIZE);
 
             DataSet ds = DB.ExecuteDataset(sql,
                 new SqlParameter[] { new SqlParameter("@C_Order_ID", C_Order_ID) }, null);
@@ -1120,17 +1159,29 @@ namespace VASLogic.Models
             // in the second query below where it is reliably present when VA106 is installed.
             // Sub Total must be the taxable base (net of tax), not the gross LineNetAmt stored in
             // C_Order.TotalLines. For a tax-inclusive price list, TotalLines = sum of LineNetAmt
-            // which embeds the tax, so it is LARGER than the taxable base. Using SUM(TaxableAmt)
-            // from C_OrderLine mirrors VAS_074's SUM(TaxBaseAmt) pattern and is correct for both
-            // tax-inclusive and tax-exclusive price lists.
+            // which embeds the tax, so it is LARGER than the taxable base.
+            //
+            // It is restated from LineNetAmt against the price list's CURRENT Prices-Include-Tax
+            // flag - the same formula LoadGrandTotals uses - and NOT read from the stored
+            // C_OrderLine.TaxableAmt (18-Sep-2026). TaxableAmt is written when the line is
+            // saved, under whatever flag the price list had THEN: a line saved on a
+            // tax-inclusive list keeps its gross-less-tax figure after the header is moved to a
+            // list with Prices Include Tax = N, so the footer showed the old inclusive
+            // calculation (284.36 under a 300.00 line) while the header and the Overview panel
+            // already read 300.00. Tax-inclusive: LineNetAmt - TaxAmt - SurchargeAmt;
+            // tax-exclusive: LineNetAmt.
             string sql = @"SELECT t.Name AS TaxName, ot.TaxAmt, ot.TaxBaseAmt,
-                                  (SELECT COALESCE(SUM(ol2.TaxableAmt), 0) FROM C_OrderLine ol2
+                                  (SELECT COALESCE(SUM(CASE WHEN COALESCE(pl.IsTaxIncluded, 'N') = 'Y'
+                                                            THEN ol2.LineNetAmt - COALESCE(ol2.TaxAmt, 0) - COALESCE(ol2.SurchargeAmt, 0)
+                                                            ELSE ol2.LineNetAmt END), 0)
+                                   FROM C_OrderLine ol2
                                    WHERE ol2.C_Order_ID = co.C_Order_ID AND ol2.IsActive = 'Y') AS TotalLines,
                                   co.GrandTotal, cy.CurSymbol, cy.StdPrecision
                            FROM C_Order co
                            INNER JOIN C_OrderTax ot ON (ot.C_Order_ID = co.C_Order_ID)
                            INNER JOIN C_Tax t ON (t.C_Tax_ID = ot.C_Tax_ID)
                            INNER JOIN C_Currency cy ON (cy.C_Currency_ID = co.C_Currency_ID)
+                           INNER JOIN M_PriceList pl ON (pl.M_PriceList_ID = co.M_PriceList_ID)
                            WHERE co.C_Order_ID = @C_Order_ID
                            AND ot.IsActive = 'Y'
                            ORDER BY t.Name";
@@ -1389,6 +1440,100 @@ namespace VASLogic.Models
                 return it;
             }
             return none;
+        }
+
+        /// <summary>
+        /// The blanket order line a release line is raised against, with everything the
+        /// release line takes from it: product / charge (and their names), the blanket
+        /// quantity still open, UOM, prices, discount, attribute instance, tax and the
+        /// transaction organisation. Mirrors the framework's CalloutOrder.BlanketOrderLine,
+        /// which the panel cannot run as-is: that callout writes through the GridTab and
+        /// relies on the product callout chain firing behind it, neither of which the
+        /// panel's line bag has. The panel applies these values itself, then re-prices
+        /// through the ordinary product callout with the blanket price held.
+        /// </summary>
+        /// <param name="ctx">session context</param>
+        /// <param name="C_OrderLine_ID">the blanket order line</param>
+        /// <returns>the line's values; C_OrderLine_ID = 0 when not found / no access</returns>
+        public OrderBlanketLineData GetBlanketLine(Ctx ctx, int C_OrderLine_ID)
+        {
+            OrderBlanketLineData d = new OrderBlanketLineData();
+            if (C_OrderLine_ID <= 0) return d;
+
+            bool hasReleased = ColumnExists("C_OrderLine", "QtyReleased");
+            bool hasContract = ColumnExists("C_OrderLine", "VAS_ContractLine_ID");
+            bool hasOrgTrx   = ColumnExists("C_OrderLine", "AD_OrgTrx_ID");
+            string sql = @"SELECT ol.C_OrderLine_ID, ol.Line,
+                                  COALESCE(ol.M_Product_ID, 0)   AS M_Product_ID,
+                                  COALESCE(p.Name, N'')          AS ProductName,
+                                  COALESCE(p.ProductType, '')    AS ProductType,
+                                  COALESCE(p.M_AttributeSet_ID, 0) AS M_AttributeSet_ID,
+                                  COALESCE(ol.C_Charge_ID, 0)    AS C_Charge_ID,
+                                  COALESCE(ch.Name, N'')         AS ChargeName,
+                                  COALESCE(ol.QtyEntered, 0)     AS QtyEntered,
+                                  COALESCE(ol.QtyOrdered, 0)     AS QtyOrdered,
+                                  " + (hasReleased ? "COALESCE(ol.QtyReleased, 0)" : "0") + @" AS QtyReleased,
+                                  COALESCE(ol.C_UOM_ID, 0)       AS C_UOM_ID,
+                                  COALESCE(uom.Name, N'')        AS UOMName,
+                                  COALESCE(ol.PriceEntered, 0)   AS PriceEntered,
+                                  COALESCE(ol.PriceActual, 0)    AS PriceActual,
+                                  COALESCE(ol.PriceList, 0)      AS PriceList,
+                                  COALESCE(ol.Discount, 0)       AS Discount,
+                                  COALESCE(ol.M_AttributeSetInstance_ID, 0) AS M_AttributeSetInstance_ID,
+                                  COALESCE(asi.Description, N'') AS AttrName,
+                                  COALESCE(ol.C_Tax_ID, 0)       AS C_Tax_ID,
+                                  COALESCE(t.Name, N'')          AS TaxName,
+                                  " + (hasOrgTrx ? "COALESCE(ol.AD_OrgTrx_ID, 0)" : "0") + @" AS AD_OrgTrx_ID,
+                                  " + (hasContract ? "COALESCE(ol.VAS_ContractLine_ID, 0)" : "0") + @" AS VAS_ContractLine_ID,
+                                  COALESCE(ol.Description, N'')  AS Description
+                             FROM C_OrderLine ol
+                             LEFT JOIN M_Product p   ON (p.M_Product_ID = ol.M_Product_ID)
+                             LEFT JOIN C_Charge ch   ON (ch.C_Charge_ID = ol.C_Charge_ID)
+                             LEFT JOIN C_UOM uom     ON (uom.C_UOM_ID = ol.C_UOM_ID)
+                             LEFT JOIN C_Tax t       ON (t.C_Tax_ID = ol.C_Tax_ID)
+                             LEFT JOIN M_AttributeSetInstance asi ON (asi.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID
+                                                                  AND ol.M_AttributeSetInstance_ID > 0)
+                            WHERE ol.C_OrderLine_ID = @C_OrderLine_ID";
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "ol", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+            DataSet ds = DB.ExecuteDataset(sql, new SqlParameter[] { new SqlParameter("@C_OrderLine_ID", C_OrderLine_ID) }, null);
+            if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return d;
+            DataRow r = ds.Tables[0].Rows[0];
+
+            d.C_OrderLine_ID = Util.GetValueOfInt(r["C_OrderLine_ID"]);
+            d.M_Product_ID = Util.GetValueOfInt(r["M_Product_ID"]);
+            d.ProductName = Util.GetValueOfString(r["ProductName"]);
+            d.ProductType = Util.GetValueOfString(r["ProductType"]);
+            d.HasAttributeSet = Util.GetValueOfInt(r["M_AttributeSet_ID"]) > 0;
+            d.C_Charge_ID = Util.GetValueOfInt(r["C_Charge_ID"]);
+            d.ChargeName = Util.GetValueOfString(r["ChargeName"]);
+            decimal qtyEntered = Util.GetValueOfDecimal(r["QtyEntered"]);
+            decimal qtyOrdered = Util.GetValueOfDecimal(r["QtyOrdered"]);
+            decimal qtyReleased = Util.GetValueOfDecimal(r["QtyReleased"]);
+            // What the release may still take, in the blanket line's ENTERED unit:
+            // QtyReleased is kept in the base unit, so it is scaled by the line's own
+            // entered/base ratio. A fully released line offers nothing rather than the
+            // whole quantity again, which the framework would refuse on save.
+            decimal releasedEntered = (qtyOrdered != 0)
+                ? decimal.Round(decimal.Multiply(qtyReleased, decimal.Divide(qtyEntered, qtyOrdered)), 6)
+                : qtyReleased;
+            decimal open = decimal.Subtract(qtyEntered, releasedEntered);
+            d.QtyEntered = open > 0 ? open : 0;
+            d.QtyBlanket = qtyOrdered;
+            d.C_UOM_ID = Util.GetValueOfInt(r["C_UOM_ID"]);
+            d.UOMName = Util.GetValueOfString(r["UOMName"]);
+            d.PriceEntered = Util.GetValueOfDecimal(r["PriceEntered"]);
+            d.PriceActual = Util.GetValueOfDecimal(r["PriceActual"]);
+            d.PriceList = Util.GetValueOfDecimal(r["PriceList"]);
+            d.Discount = Util.GetValueOfDecimal(r["Discount"]);
+            d.M_AttributeSetInstance_ID = Util.GetValueOfInt(r["M_AttributeSetInstance_ID"]);
+            d.AttrName = Util.GetValueOfString(r["AttrName"]);
+            d.C_Tax_ID = Util.GetValueOfInt(r["C_Tax_ID"]);
+            d.TaxName = Util.GetValueOfString(r["TaxName"]);
+            d.AD_OrgTrx_ID = Util.GetValueOfInt(r["AD_OrgTrx_ID"]);
+            d.VAS_ContractLine_ID = Util.GetValueOfInt(r["VAS_ContractLine_ID"]);
+            d.Description = Util.GetValueOfString(r["Description"]);
+            return d;
         }
 
         #region AD_Val_Rule enforcement
@@ -2237,7 +2382,7 @@ namespace VASLogic.Models
             res.Success = true;
             if (page < 0) page = 0;
             int total;
-            res.Lines = LoadLines(ctx, C_Order_ID, ResolveOrderLineTabs(AD_Window_ID), page, out total);
+            res.Lines = LoadLines(ctx, C_Order_ID, ResolveOrderLineTabs(AD_Window_ID), page, IsRealOrder(ctxData), out total);
             res.LinesTotal = total;
             res.LinePage = page;
             res.LinePageSize = LINE_PAGE_SIZE;
@@ -2310,12 +2455,12 @@ namespace VASLogic.Models
             res.Success = true;
             if (page < 0) page = 0;
             int total;
-            res.Lines = LoadLines(ctx, C_Order_ID, ResolveOrderLineTabs(AD_Window_ID), page, out total);
+            res.Lines = LoadLines(ctx, C_Order_ID, ResolveOrderLineTabs(AD_Window_ID), page, IsRealOrder(ctxData), out total);
             int pageCount = System.Math.Max(1, (int)System.Math.Ceiling(total / (double)LINE_PAGE_SIZE));
             if (page > pageCount - 1)
             {
                 page = pageCount - 1;
-                res.Lines = LoadLines(ctx, C_Order_ID, ResolveOrderLineTabs(AD_Window_ID), page, out total);
+                res.Lines = LoadLines(ctx, C_Order_ID, ResolveOrderLineTabs(AD_Window_ID), page, IsRealOrder(ctxData), out total);
             }
             res.LinesTotal = total;
             res.LinePage = page;
@@ -2363,6 +2508,12 @@ namespace VASLogic.Models
         /// field in Additional Info is shown only when this is set.
         /// </summary>
         public bool IsDropShip { get; set; }
+        /// <summary>
+        /// C_DocType.IsReleaseDocument on the order's TARGET document type — the order is a
+        /// release against a blanket order. The panel then takes the product from the
+        /// blanket order line (Additional Info) rather than from the catalog picker.
+        /// </summary>
+        public bool IsReleaseDoc { get; set; }
         public bool IsTaxIncluded { get; set; }
         public string DocStatus { get; set; }
         public bool Processed { get; set; }
@@ -2718,6 +2869,39 @@ namespace VASLogic.Models
         public bool HasAttributeSet { get; set; }
         /// <summary>M_Product.ProductType; empty for a charge.</summary>
         public string ProductType { get; set; }
+    }
+
+    /// <summary>
+    /// A blanket order line as a release line reads it (GetBlanketLine). C_OrderLine_ID is
+    /// 0 when the line was not found or the role cannot see it.
+    /// </summary>
+    public class OrderBlanketLineData
+    {
+        public int C_OrderLine_ID { get; set; }
+        public int M_Product_ID { get; set; }
+        public string ProductName { get; set; }
+        public string ProductType { get; set; }
+        public bool HasAttributeSet { get; set; }
+        public int C_Charge_ID { get; set; }
+        public string ChargeName { get; set; }
+        /// <summary>Quantity still open for release, in the blanket line's entered unit.</summary>
+        public decimal QtyEntered { get; set; }
+        /// <summary>The blanket line's ordered (base-unit) quantity — C_OrderLine.QtyBlanket
+        /// on the release line, which the framework validates the release against.</summary>
+        public decimal QtyBlanket { get; set; }
+        public int C_UOM_ID { get; set; }
+        public string UOMName { get; set; }
+        public decimal PriceEntered { get; set; }
+        public decimal PriceActual { get; set; }
+        public decimal PriceList { get; set; }
+        public decimal Discount { get; set; }
+        public int M_AttributeSetInstance_ID { get; set; }
+        public string AttrName { get; set; }
+        public int C_Tax_ID { get; set; }
+        public string TaxName { get; set; }
+        public int AD_OrgTrx_ID { get; set; }
+        public int VAS_ContractLine_ID { get; set; }
+        public string Description { get; set; }
     }
 
     /// <summary>

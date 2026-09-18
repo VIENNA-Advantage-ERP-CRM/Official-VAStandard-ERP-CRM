@@ -153,6 +153,13 @@ namespace VAS.Controllers
         /// the one piece of the statement that AddAccessSQL is applied to - see the
         /// class summary). Scope: active, transactional sales orders only
         /// (IsSOTrx='Y', not a return, not a quotation), per the widget spec.
+        ///
+        /// The quotation join casts the NUMBER side (18-Sep-2026):
+        /// C_Order_Quotation is VARCHAR2(22) / character varying holding the
+        /// quotation's C_Order_ID as text. Compared raw, PostgreSQL rejects the
+        /// statement ("operator does not exist: numeric = character varying") and
+        /// Oracle converts the text implicitly, raising ORA-01722 on any
+        /// non-numeric value. CAST(... AS VARCHAR(22)) reads on both.
         /// </summary>
         private static string BuildBaseOrdersSql()
         {
@@ -183,7 +190,7 @@ namespace VAS.Controllers
                   INNER JOIN C_BPartner bp ON ( bp.C_BPartner_ID = o.C_BPartner_ID )
                   LEFT OUTER JOIN AD_User rep ON ( rep.AD_User_ID = o.SalesRep_ID )
                   LEFT OUTER JOIN M_Warehouse w ON ( w.M_Warehouse_ID = o.M_Warehouse_ID )
-                  LEFT OUTER JOIN C_Order q ON ( q.C_Order_ID = o.C_Order_Quotation )
+                  LEFT OUTER JOIN C_Order q ON ( CAST(q.C_Order_ID AS VARCHAR(22)) = TRIM(o.C_Order_Quotation) )
                   LEFT OUTER JOIN C_BPartner_Location bpl ON ( bpl.C_BPartner_Location_ID = o.C_BPartner_Location_ID )
                   LEFT OUTER JOIN C_Location loc ON ( loc.C_Location_ID = bpl.C_Location_ID )
                  WHERE o.AD_Client_ID = @AD_Client_ID
