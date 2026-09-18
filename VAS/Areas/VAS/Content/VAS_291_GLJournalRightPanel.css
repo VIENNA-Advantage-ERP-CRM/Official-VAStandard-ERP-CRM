@@ -44,7 +44,9 @@
  *   VAI145   2026-09-18  Created.
  *   VAI145   2026-09-18  Section intro dropped; busy-indicator slot added to
  *                        the lines grid for server-side paging; footer pager
- *                        restyled to the canonical VAS_020 shape.
+ *                        restyled to the canonical VAS_020 shape; approval
+ *                        routing redrawn as the VAS_191 rail with state-toned
+ *                        nodes instead of tinted step cards.
  ***********************************************************/
 
 /* ----------------------------------------------------------- */
@@ -74,11 +76,11 @@
     --p291-crit-bg:   linear-gradient(180deg, #FCEFEF 0%, #FBF7F7 100%);
     --p291-crit-bd:   #EDC8C8;  --p291-crit-tx: #A33F3F;
 
-    /* Step tones */
-    --p291-step-done-bg:    #E7F7EF;  --p291-step-done-bd:    #CFEAD9;  --p291-step-done-dot:    #20A464;
-    --p291-step-active-bg:  #EAF8FF;  --p291-step-active-bd:  #BFE4FF;  --p291-step-active-dot:  #0083DA;
-    --p291-step-pending-bg: #FBFDFF;  --p291-step-pending-bd: #D9E2EB;  --p291-step-pending-dot: #9AB0C0;
-    --p291-step-blocked-bg: #FCEFEF;  --p291-step-blocked-bd: #EDC8C8;  --p291-step-blocked-dot: #D14545;
+    /* Routing rail node tones */
+    --p291-step-done-dot:    #20A464;
+    --p291-step-active-dot:  #0083DA;
+    --p291-step-pending-dot: #9AB0C0;
+    --p291-step-blocked-dot: #D14545;
 
     /* THE ROOT IS THE SCROLLER (see header comment). */
     position: relative;
@@ -545,49 +547,60 @@
 .vas_291-pgBtn .vas_291-ic svg { width: 0.875em; height: 0.875em; }
 
 /* ----------------------------------------------------------- */
-/*  Primitive 9 - Step flow (approval routing)                  */
+/*  Approval routing rail                                       */
 /* ----------------------------------------------------------- */
-.vas_291-steps { display: flex; flex-direction: column; min-width: 0; }
+/* Same rail as the payment panel (VAS_191): a marker node per step, a
+   hairline connector down to the next one, title + meta in plain text - no
+   tinted card. The node carries the step state (see the tones below). */
+.vas_291-vsteps { padding: 0.25em 0.25em 0; }
 
-.vas_291-step {
-    display: flex;
-    align-items: stretch;
-    gap: 0.75em;
-    padding-bottom: 0.5em;
-    min-width: 0;
-}
-.vas_291-step:last-child { padding-bottom: 0; }
+.vas_291-vstep { display: flex; gap: 0.75em; min-width: 0; }
 
-.vas_291-stepRail {
+.vas_291-rail {
+    flex-shrink: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
-    flex-shrink: 0;
-    width: 10px;
 }
-/* 10px dot and 1px trail are physical markers - they do not scale. */
-.vas_291-stepDot {
-    width: 10px;
-    height: 10px;
-    border-radius: 999px;
-    margin-top: 0.5em;
+/* 22px physical marker - it does not scale with the anchor. */
+.vas_291-node {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--p291-step-pending-dot);
+    background: #FFFFFF;
+    color: #FFFFFF;
     flex-shrink: 0;
 }
-.vas_291-stepTrail {
-    width: 1px;
+.vas_291-node .vas_291-ic svg { width: 0.75em; height: 0.75em; }
+/* Node tones per step state - never custom colours. */
+.vas_291-is-done    .vas_291-node { border-color: var(--p291-step-done-dot);    background: var(--p291-step-done-dot); }
+.vas_291-is-active  .vas_291-node { border-color: var(--p291-step-active-dot);  background: #FFFFFF; }
+.vas_291-is-pending .vas_291-node { border-color: var(--p291-step-pending-dot); background: #FFFFFF; }
+.vas_291-is-blocked .vas_291-node { border-color: var(--p291-step-blocked-dot); background: var(--p291-step-blocked-dot); }
+/* Active reads radio-style: a ring with a dot inside. */
+.vas_291-nodeDot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--p291-step-active-dot);
+}
+/* The connector fills the gap down to the next node. */
+.vas_291-line {
     flex: 1;
-    margin-top: 0.25em;
-    background: var(--p291-trail);
+    width: 2px;
+    min-height: 0.625em;
+    margin: 0.1875em 0;
+    background: var(--p291-card-bd);
 }
 
-.vas_291-stepCard {
-    min-width: 0;
-    flex: 1;
-    border-radius: 10px;
-    border: 1px solid var(--p291-card-bd);
-    padding: 0.5em 0.75em;
-}
-.vas_291-stepTitle {
+.vas_291-vc { min-width: 0; padding-bottom: 0.875em; }
+.vas_291-vstep:last-child .vas_291-vc { padding-bottom: 0; }
+/* Step title / meta tokens. */
+.vas_291-st {
     font-size: 0.8125em;
     font-weight: 700;
     color: var(--p291-text);
@@ -595,25 +608,15 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.vas_291-stepMeta {
+.vas_291-mt {
     font-size: 0.6875em;
     font-weight: 400;
-    margin-top: 0.125em;
+    margin-top: 0.1875em;
     color: var(--p291-muted);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-
-/* Dot and card share one tone per step status - never custom colours. */
-.vas_291-is-done    .vas_291-stepDot  { background: var(--p291-step-done-dot); }
-.vas_291-is-done    .vas_291-stepCard { background: var(--p291-step-done-bg);    border-color: var(--p291-step-done-bd); }
-.vas_291-is-active  .vas_291-stepDot  { background: var(--p291-step-active-dot); }
-.vas_291-is-active  .vas_291-stepCard { background: var(--p291-step-active-bg);  border-color: var(--p291-step-active-bd); }
-.vas_291-is-pending .vas_291-stepDot  { background: var(--p291-step-pending-dot); }
-.vas_291-is-pending .vas_291-stepCard { background: var(--p291-step-pending-bg); border-color: var(--p291-step-pending-bd); }
-.vas_291-is-blocked .vas_291-stepDot  { background: var(--p291-step-blocked-dot); }
-.vas_291-is-blocked .vas_291-stepCard { background: var(--p291-step-blocked-bg); border-color: var(--p291-step-blocked-bd); }
 
 /* ----------------------------------------------------------- */
 /*  Motion                                                      */

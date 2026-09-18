@@ -7,8 +7,6 @@
 ///                 - the journal header (document, description, document /
 ///                   posting status, dates, totals, currency + conversion rate,
 ///                   accounting schema, period + fiscal year, batch, category),
-///                 - the period-control state of the journal's period for the
-///                   GL Journal document base type (open / closed / never opened),
 ///                 - the journal lines with the account and the accounting
 ///                   dimensions resolved through C_ValidCombination — the
 ///                   combination is the authority; the optional dimension
@@ -36,14 +34,16 @@
 ///               national-character prefix; stored code comparisons
 ///               (IsActive='Y', DocBaseType='GLJ') deliberately do not.
 ///
-///               List-reference columns (DocStatus, Posted, GAAP, PeriodStatus,
-///               WFState, PostingType) are resolved to their translated names
+///               List-reference columns (DocStatus, Posted, GAAP, WFState,
+///               PostingType) are resolved to their translated names
 ///               through AD_Ref_List / AD_Ref_List_Trl; the panel never renders
 ///               a raw code.
 /// Chronological development:
 ///   VAI145   2026-09-18  Created.
 ///   VAI145   2026-09-18  Lines paged on the server (LINES_PAGE_SIZE = 50) through
 ///                        GetJournalLines; count + Dr / Cr totals from one aggregate.
+///   VAI145   2026-09-18  Period-control read dropped - the routing rail shows
+///                        reached steps only and no longer needs it.
 /// </summary>
 
 using System;
@@ -63,9 +63,6 @@ namespace VASLogic.Models
     {
         private static readonly VLogger _log =
             VLogger.GetVLogger(typeof(VAS_291_GLJournalRightPanelModel).FullName);
-
-        /// <summary>Document base type of a GL Journal on C_PeriodControl.</summary>
-        private const string DOCBASETYPE_GLJOURNAL = "GLJ";
 
         /// <summary>Journal lines per page (server-side paged). The initial payload
         /// carries page 0; the panel asks for further pages through GetJournalLines.</summary>
@@ -100,8 +97,6 @@ namespace VASLogic.Models
             {
                 return result;   // not accessible to this role, or does not exist
             }
-
-            LoadPeriodControl(ctx, result);
 
             /* Lines page on the server: the count and the Dr / Cr totals cover EVERY
                line and come from one aggregate, the rows are the first page only.
@@ -279,52 +274,7 @@ namespace VASLogic.Models
         }
 
         // ----------------------------------------------------------------- //
-        //  2. Period control                                                 //
-        // ----------------------------------------------------------------- //
-
-        /// <summary>
-        /// Reads the period-control status of the journal's period for the GL
-        /// Journal document base type. A period with no control row for 'GLJ' is
-        /// reported with an empty status, which the panel treats as "not closed".
-        /// </summary>
-        /// <param name="ctx">User context.</param>
-        /// <param name="result">Payload carrying C_Period_ID; filled in place.</param>
-        private void LoadPeriodControl(Ctx ctx, JournalPanelData result)
-        {
-            if (result.C_Period_ID <= 0)
-            {
-                return;
-            }
-
-            string sql = @"SELECT pc.PeriodStatus
-                             FROM C_PeriodControl pc
-                            WHERE pc.C_Period_ID=@C_Period_ID
-                              AND pc.DocBaseType=@DocBaseType
-                              AND pc.IsActive='Y'";
-
-            string accessSql = MRole.GetDefault(ctx).AddAccessSQL(
-                sql, "pc", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-
-            try
-            {
-                /* Two binds, each occurring once, in the order they appear. */
-                string status = Util.GetValueOfString(DB.ExecuteScalar(accessSql, new SqlParameter[]
-                {
-                    new SqlParameter("@C_Period_ID", result.C_Period_ID),
-                    new SqlParameter("@DocBaseType", DOCBASETYPE_GLJOURNAL)
-                }, null));
-
-                result.PeriodStatus = status;
-                result.PeriodStatusName = GetListReferenceName(ctx, "C_PeriodControl", "PeriodStatus", status);
-            }
-            catch (Exception ex)
-            {
-                _log.Severe("VAS_291 LoadPeriodControl(" + result.C_Period_ID + "): " + ex.Message);
-            }
-        }
-
-        // ----------------------------------------------------------------- //
-        //  3. Journal lines                                                  //
+        //  2. Journal lines                                                  //
         // ----------------------------------------------------------------- //
 
         /// <summary>
@@ -906,9 +856,6 @@ namespace VASLogic.Models
             public string PeriodStartDate { get; set; }
             public string PeriodEndDate { get; set; }
             public string FiscalYear { get; set; }
-            /// <summary>C_PeriodControl.PeriodStatus for DocBaseType 'GLJ' ("" when no control row).</summary>
-            public string PeriodStatus { get; set; }
-            public string PeriodStatusName { get; set; }
 
             public int GL_JournalBatch_ID { get; set; }
             public string BatchDocumentNo { get; set; }
