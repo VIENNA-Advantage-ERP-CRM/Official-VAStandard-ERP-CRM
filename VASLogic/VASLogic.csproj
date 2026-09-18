@@ -193,6 +193,7 @@
     <Compile Include="Models\VAS_103_MaterialTransferModel.cs" />
     <Compile Include="Models\VAS_104_OverviewShipGRNConfirmationModel.cs" />
     <Compile Include="Models\VAS_105_AccountRightPanelModel.cs" />
+    <Compile Include="Models\VAS_290_ServiceContractRightPanelModel.cs" />
     <Compile Include="Models\VAS_106_OverviewSalesOrderModel.cs" />
     <Compile Include="Models\VAS_221_RecordGeneratedModel.cs" />
     <Compile Include="Models\VAS_222_UpcomingSchedulesModel.cs" />
