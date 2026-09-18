@@ -353,3 +353,5 @@ import "../app/widgets/VAS_214_POPendingForPaymentWidget.js";
 import "../app/widgets/VAS_215_RepresentativeWisePOWidget.js";
 import "../app/widgets/VAS_216_POQueueWidget.js";
 import "../app/widgets/VAS_217_OpenRequisitionsWidget.js";
+import "../app/tabpanel/VAS_290_ServiceContractRightPanel.js";
+

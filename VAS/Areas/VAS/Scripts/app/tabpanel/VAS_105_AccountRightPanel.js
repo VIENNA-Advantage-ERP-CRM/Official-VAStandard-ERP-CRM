@@ -778,13 +778,15 @@
                 '</div>';
 
             for (var i = 0; i < items.length; i++) {
-                var o = items[i];
+                var o    = items[i];
+                var iSym  = o.currencySymbol || sym;
+                var iPrec = (o.currencyPrecision != null) ? parseInt(o.currencyPrecision, 10) : prec;
                 html +=
                     '<div class="vas_105_acct-clickrow" style="grid-template-columns:2.25em 1.7fr 1fr 0.9fr 1fr;gap:0.75em;" data-opp-idx="' + i + '">' +
                       '<span class="vas_105_acct-wicon vas_105_acct-wicon--blue">' + SVG_OPP + '</span>' +
                       '<span style="font-size:0.875em;font-weight:700;color:var(--acct-text);">' + esc(o.name || '') + '</span>' +
                       '<span><span class="vas_105_acct-stage ' + stageClass(o.stageCode, o.stageName) + '">' + esc(o.stageName || stageLabel(o.stageCode)) + '</span></span>' +
-                      '<span style="font-size:0.875em;font-weight:700;color:var(--acct-text);text-align:right;">' + esc(fmtFull(toNum(o.value), sym, prec)) + '</span>' +
+                      '<span style="font-size:0.875em;font-weight:700;color:var(--acct-text);text-align:right;">' + esc(fmtFull(toNum(o.value), iSym, iPrec)) + '</span>' +
                       '<span style="font-size:0.8125em;color:var(--acct-text-2);text-align:right;">' + esc(fmtDate(o.closeDate)) + '</span>' +
                     '</div>';
             }
@@ -878,6 +880,8 @@
                 var statusCls   = isOverdue ? 'vas_105_acct-ctstatus--expired' : contractStatusClass(c.statusCode);
                 var statusLabel = isOverdue ? msg('VIS_OverDue')                : contractStatusLabel(c.statusCode);
                 var term = [fmtDate(c.startDate), c.endDate ? fmtDate(c.endDate) : 'Perpetual'].filter(Boolean).join(' – ');
+                var cSym  = c.currencySymbol || sym;
+                var cPrec = (c.currencyPrecision != null) ? parseInt(c.currencyPrecision, 10) : prec;
                 html +=
                     '<div class="vas_105_acct-ctrow" data-ct-idx="' + i + '">' +
                       '<span class="vas_105_acct-wicon vas_105_acct-wicon--teal">' + SVG_CONTRACT + '</span>' +
@@ -891,7 +895,7 @@
                         (c.productName ? '<div style="margin-top:0.1em;font-size:0.75em;color:var(--acct-text-2);">' + esc(c.productName) + '</div>' : (c.description ? '<div style="margin-top:0.1em;font-size:0.75em;color:var(--acct-text-2);">' + esc(c.description) + '</div>' : '')) +
                         (c.attributeDesc ? '<div style="margin-top:0.1em;font-size:0.75em;color:var(--acct-text-2);">' + esc(c.attributeDesc) + '</div>' : '') +
                       '</div>' +
-                      '<div style="font-size:0.875em;font-weight:700;color:var(--acct-text);white-space:nowrap;">' + esc(fmtFull(toNum(c.value), sym, prec)) + '</div>' +
+                      '<div style="font-size:0.875em;font-weight:700;color:var(--acct-text);white-space:nowrap;">' + esc(fmtFull(toNum(c.value), cSym, cPrec)) + '</div>' +
                     '</div>';
             }
 
@@ -993,6 +997,7 @@
         function orderStatusClass(code) {
             if (code === 'CO') return 'vas_105_acct-odstatus--fulfilled';
             if (code === 'VO') return 'vas_105_acct-odstatus--cancelled';
+            if (code === 'CL') return 'vas_105_acct-odstatus--cancelled';
             return 'vas_105_acct-odstatus--processing';
         }
         function orderStatusLabel(code) {
@@ -1000,6 +1005,7 @@
             if (code === 'VO') return 'Cancelled';
             if (code === 'DR') return 'Draft';
             if (code === 'IP') return 'Processing';
+            if (code === 'CL') return 'Closed';
             return code || '—';
         }
 
@@ -1023,6 +1029,8 @@
 
             for (var i = 0; i < items.length; i++) {
                 var o = items[i];
+                var oSym  = o.currencySymbol || sym;
+                var oPrec = (o.currencyPrecision != null) ? parseInt(o.currencyPrecision, 10) : prec;
                 html +=
                     '<div class="vas_105_acct-clickrow" style="grid-template-columns:2.25em 1fr 1.2fr 1fr 0.8fr;gap:0.75em;" data-ord-idx="' + i + '">' +
                       '<span class="vas_105_acct-wicon vas_105_acct-wicon--blue">' + SVG_ORDER + '</span>' +
@@ -1035,7 +1043,7 @@
                       '<span class="vas_105_acct-tip" data-tip="' + esc(o.items || '') + '">' +
                         '<span style="display:block;font-size:0.8125em;color:var(--acct-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(o.items || '') + '</span>' +
                       '</span>' +
-                      '<span style="font-size:0.875em;font-weight:700;color:var(--acct-text);text-align:right;">' + esc(fmtFull(toNum(o.amount), sym, prec)) + '</span>' +
+                      '<span style="font-size:0.875em;font-weight:700;color:var(--acct-text);text-align:right;">' + esc(fmtFull(toNum(o.amount), oSym, oPrec)) + '</span>' +
                       '<span style="text-align:right;"><span class="vas_105_acct-odstatus ' + orderStatusClass(o.statusCode) + '">' + esc(orderStatusLabel(o.statusCode)) + '</span></span>' +
                     '</div>';
             }
@@ -1093,6 +1101,8 @@
 
             for (var i = 0; i < items.length; i++) {
                 var inv = items[i];
+                var iSym  = inv.currencySymbol || sym;
+                var iPrec = (inv.currencyPrecision != null) ? parseInt(inv.currencyPrecision, 10) : prec;
                 html +=
                     '<div class="vas_105_acct-clickrow" style="grid-template-columns:2.25em 1fr 0.9fr 0.9fr 1fr 0.8fr;gap:0.75em;" data-inv-idx="' + i + '">' +
                       '<span class="vas_105_acct-wicon vas_105_acct-wicon--amber">' + SVG_INVOICE + '</span>' +
@@ -1100,9 +1110,9 @@
                         '<span style="font-size:0.8125em;font-weight:700;color:var(--acct-text);">' + esc(inv.invoiceNo || '') + '</span>' +
                         '<span style="font-size:0.75em;color:var(--acct-text-2);">' + esc(fmtDate(inv.invoiceDate)) + '</span>' +
                       '</div>' +
-                      '<span style="font-size:0.875em;font-weight:700;color:var(--acct-text);text-align:right;">' + esc(fmtFull(toNum(inv.amount), sym, prec)) + '</span>' +
+                      '<span style="font-size:0.875em;font-weight:700;color:var(--acct-text);text-align:right;">' + esc(fmtFull(toNum(inv.amount), iSym, iPrec)) + '</span>' +
                       '<span style="font-size:0.875em;color:var(--acct-text-2);text-align:right;">' +
-                        esc((inv.payStatus === 'Paid' || inv.payStatus === 'Partial') ? fmtFull(toNum(inv.paid), sym, prec) : '—') +
+                        esc((inv.payStatus === 'Paid' || inv.payStatus === 'Partial') ? fmtFull(toNum(inv.paid), iSym, iPrec) : '—') +
                       '</span>' +
                       '<span style="font-size:0.8125em;color:var(--acct-text-2);text-align:right;">' + esc(fmtDate(inv.dueDate)) + '</span>' +
                       '<span style="text-align:right;"><span class="vas_105_acct-ivstatus ' + ivStatusClass(inv.payStatus) + '">' + esc(inv.payStatus || 'Open') + '</span></span>' +
@@ -2016,7 +2026,10 @@
                        detailRow(msg('VAS_105_PayStatus'), inv.payStatus);
             showModal(inv.invoiceNo || msg('Invoice'), msg('VAS_105_InvoiceDetail'), body, detailFoot(), false);
             var btn = document.getElementById('vas_105_openrec_' + widgetID);
-            if (btn) btn.onclick = function () { openInWindow('C_Invoice', 'C_Invoice_ID', inv.id); };
+            // Use openInvoiceInWindow so the AR Invoice window is opened by name ('VAS_ARInvoice').
+            // openInWindow('C_Invoice',...) resolves AD_Table.AD_Window_ID which points to the
+            // AP Invoice window and causes the wrong form to open.
+            if (btn) btn.onclick = function () { openInvoiceInWindow(inv.id); };
         }
 
         function openProjectDetail(p) {
@@ -2360,6 +2373,16 @@
         // ── Open AR Invoice window for a specific C_Invoice_ID ───────────────
         function openInvoiceInWindow(invoiceId) {
             if (!invoiceId || !window.VIS) return;
+
+            function startWithId(windowId) {
+                if (windowId > 0 && VIS.viewManager && typeof VIS.viewManager.startWindow === 'function') {
+                    var q = (VIS.Query && VIS.Query.prototype && typeof VIS.Query.prototype.getEqualQuery === 'function')
+                        ? VIS.Query.prototype.getEqualQuery('C_Invoice_ID', invoiceId)
+                        : null;
+                    VIS.viewManager.startWindow(windowId, q);
+                }
+            }
+
             $.ajax({
                 url:  VIS.Application.contextUrl + 'VAS/VAS_105_AccountRightPanel/GetWindowId',
                 type: 'POST',
@@ -2369,12 +2392,23 @@
                     var parsed = null;
                     try { parsed = (typeof raw === 'string') ? jQuery.parseJSON(raw) : raw; } catch (e) {}
                     var windowId = (parsed && parsed.windowId) ? parsed.windowId : 0;
-                    if (windowId > 0 && VIS.viewManager && typeof VIS.viewManager.startWindow === 'function') {
-                        var q = (VIS.Query && VIS.Query.prototype && typeof VIS.Query.prototype.getEqualQuery === 'function')
-                            ? VIS.Query.prototype.getEqualQuery('C_Invoice_ID', invoiceId)
-                            : null;
-                        VIS.viewManager.startWindow(windowId, q);
+                    if (windowId > 0) {
+                        startWithId(windowId);
+                    } else {
+                        // Fallback: VAS_ARInvoice window name not found in AD_Window — try ZoomTarget.
+                        var wid = 0;
+                        if (VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === 'function') {
+                            try { wid = VIS.ZoomTarget.getZoomAD_Window_ID('C_Invoice', 0, null, false) || 0; } catch (e) {}
+                        }
+                        startWithId(wid);
                     }
+                },
+                error: function () {
+                    var wid = 0;
+                    if (VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === 'function') {
+                        try { wid = VIS.ZoomTarget.getZoomAD_Window_ID('C_Invoice', 0, null, false) || 0; } catch (e) {}
+                    }
+                    startWithId(wid);
                 }
             });
         }
@@ -3015,6 +3049,11 @@
                     '  <label class="vas_105_mtg-field-label">', esc(msg('VAS_105_MeetingUrl')), '</label>',
                     '  <input type="text" class="vas_105_mtg-input" id="', widgetID, '_mtgUrl" value="', esc(data.meetingUrl || ''), '">',
                     '</div>',
+
+                    // ── Description ──
+                    data.description
+                        ? '<div class="vas_105_mtg-notes">' + esc(data.description) + '</div>'
+                        : '',
 
                     // ── Comments: plain-text display block ──
                     data.comments

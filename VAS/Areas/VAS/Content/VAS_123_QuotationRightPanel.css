@@ -56,6 +56,13 @@
     overflow:         hidden;
 }
 
+/* No-selection state — hide the outer box so only the centred message is visible */
+.vas_123_qrp-panel--nosel {
+    border:     none;
+    box-shadow: none;
+    background: transparent;
+}
+
 /* ============================================================
    RULE 2 — PANEL HEADER
    ============================================================ */
@@ -2080,6 +2087,7 @@
     border-radius: 0.5em;
     overflow:      hidden;
     margin-bottom: 0.875em;
+    flex-shrink:   0; /* prevent the modal-body flex algorithm from clipping the second row */
 }
 
 .vas_123_qrp-mtg-infogrid__row {
@@ -2093,11 +2101,11 @@
 }
 
 .vas_123_qrp-mtg-infogrid__cell {
-    display:      flex;
-    align-items:  baseline;
-    gap:          0.75em;
-    padding:      0.5em 0.875em;
-    border-right: 0.0625em solid var(--qrp-divider);
+    display:        flex;
+    flex-direction: column;
+    gap:            0.25em;
+    padding:        0.5em 0.875em;
+    border-right:   0.0625em solid var(--qrp-divider);
 }
 
 .vas_123_qrp-mtg-infogrid__cell:last-child {
@@ -2112,9 +2120,12 @@
 }
 
 .vas_123_qrp-mtg-info-val {
-    font-size:   0.875em;
-    font-weight: 600;
-    color:       var(--qrp-ink);
+    font-size:        0.875em;
+    font-weight:      600;
+    color:            var(--qrp-ink);
+    white-space:      normal;
+    overflow-wrap:    break-word;
+    word-break:       break-word;
 }
 
 /* Plain-text comments block */

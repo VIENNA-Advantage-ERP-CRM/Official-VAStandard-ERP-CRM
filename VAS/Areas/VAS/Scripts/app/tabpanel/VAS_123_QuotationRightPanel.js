@@ -317,6 +317,9 @@
         // Load quotation header data from server
         function loadHeader(orderId) {
             if (!orderId || orderId <= 0) return;
+            // Restore the panel border now that a record is being loaded
+            var panelEl = document.getElementById('vas_123_panel_' + widgetID);
+            if (panelEl) panelEl.classList.remove('vas_123_qrp-panel--nosel');
             state.headerLoading = true;
             state.headerError   = null;
             renderPanel();
@@ -576,14 +579,13 @@
                 chips += '<span class="vas_123_qrp-chip vas_123_qrp-chip--success">' + esc(msg('VAS_123_Converted')) + '</span>';
             }
 
-            // Credit status chip — SO_CreditStatus: O/X = OK (no chip), W = Watch, H = Hold, C = Stop
-            var _hcs = h.creditStatus || '';
-            if (_hcs === 'W') {
-                chips += '<span class="vas_123_qrp-chip vas_123_qrp-chip--warn">'  + esc(msg('VAS_123_CreditWatch')) + '</span>';
-            } else if (_hcs === 'H') {
-                chips += '<span class="vas_123_qrp-chip vas_123_qrp-chip--risk">'  + esc(msg('VAS_123_CreditHold'))  + '</span>';
-            } else if (_hcs === 'C') {
-                chips += '<span class="vas_123_qrp-chip vas_123_qrp-chip--risk">'  + esc(msg('VAS_123_CreditStop'))  + '</span>';
+            // Credit status chip — only shown for non-OK statuses (O/X suppressed).
+            // Label comes from AD_Ref_List via creditStatusName; colour driven by the code.
+            var _hcs     = h.creditStatus     || '';
+            var _hcsName = h.creditStatusName || '';
+            if (_hcs && _hcs !== 'O' && _hcs !== 'X') {
+                var _hcsTone = (_hcs === 'W') ? 'vas_123_qrp-chip--warn' : 'vas_123_qrp-chip--risk';
+                chips += '<span class="vas_123_qrp-chip ' + _hcsTone + '">' + esc(_hcsName || _hcs) + '</span>';
             }
 
             // Sub-line: partner · quoted date · sales rep
@@ -1183,8 +1185,8 @@
                     var sku       = l.productValue  || l.ProductValue  || '';
                     var product   = l.productName   || l.ProductName   || '';
                     var attrDesc  = $.trim(l.attributeDesc || l.AttributeDesc || '');
-                    // VIS stores '--' as the default ASI description when no attribute is set — treat as empty
-                    if (attrDesc === '--') attrDesc = '';
+                    // VIS stores '--' or '---' as the default ASI description when no attribute is set — treat as empty
+                    if (attrDesc === '--' || attrDesc === '---') attrDesc = '';
                     var lineDesc  = l.description   || l.Description   || '';
                     // For charge lines (no product), fall back to line description as the display name
                     if (!product) product = lineDesc;
@@ -1251,12 +1253,8 @@
                                     '<div class="vas_123_qrp-e-titlerow">' +
                                         '<span class="vas_123_qrp-e-primary" title="' + esc(product) + '">' + esc(product) + '</span>' +
                                     '</div>' +
-                                    (function () {
-                                        var sp = [];
-                                        if (attrDesc) sp.push(esc(attrDesc));
-                                        if (lineDesc && lineDesc !== product) sp.push(esc(lineDesc));
-                                        return sp.length ? '<p class="vas_123_qrp-e-sub">' + sp.join(' · ') + '</p>' : '';
-                                    }()) +
+                                    // Only attrDesc shown in the list; lineDesc is shown in the detail modal only.
+                                    (attrDesc ? '<p class="vas_123_qrp-e-sub">' + esc(attrDesc) + '</p>' : '') +
                                     '<p class="vas_123_qrp-e-meta" title="' + metaStr + '">' + metaStr + '</p>' +
                                 '</div>' +
                                 '<div class="vas_123_qrp-etrail">' +
@@ -1363,17 +1361,19 @@
             var prec = (h.currencyPrecision != null) ? parseInt(h.currencyPrecision, 10) : 2;
             var bpId = h.c_BPartner_ID  || h.C_BPartner_ID || 0;
 
-            // ── Credit chip — SO_CreditStatus: X/O/'' = OK, W = Watch, H = Hold, C = Stop ──
-            var creditStatus = h.creditStatus || h.CustomerCreditStatus || '';
+            // ── Credit chip — label from AD_Ref_List (creditStatusName); colour from code ──
+            var creditStatus     = h.creditStatus     || h.CustomerCreditStatus || '';
+            var creditStatusName = h.creditStatusName || '';
+            var _chipLabel = creditStatusName || creditStatus;
             var creditChip;
-            if (creditStatus === 'W') {
-                creditChip = '<span class="vas_123_qrp-chip vas_123_qrp-chip--warn">'    + esc(msg('VAS_123_CreditWatch')) + '</span>';
-            } else if (creditStatus === 'H') {
-                creditChip = '<span class="vas_123_qrp-chip vas_123_qrp-chip--risk">'    + esc(msg('VAS_123_CreditHold'))  + '</span>';
-            } else if (creditStatus === 'C') {
-                creditChip = '<span class="vas_123_qrp-chip vas_123_qrp-chip--risk">'    + esc(msg('VAS_123_CreditStop'))  + '</span>';
+            if (!_chipLabel) {
+                creditChip = '';
+            } else if (creditStatus === 'W') {
+                creditChip = '<span class="vas_123_qrp-chip vas_123_qrp-chip--warn">'    + esc(_chipLabel) + '</span>';
+            } else if (creditStatus === 'H' || creditStatus === 'C' || creditStatus === 'S') {
+                creditChip = '<span class="vas_123_qrp-chip vas_123_qrp-chip--risk">'    + esc(_chipLabel) + '</span>';
             } else {
-                creditChip = '<span class="vas_123_qrp-chip vas_123_qrp-chip--success">' + esc(msg('VAS_123_CreditOK'))    + '</span>';
+                creditChip = '<span class="vas_123_qrp-chip vas_123_qrp-chip--success">' + esc(_chipLabel) + '</span>';
             }
 
             // ── Open balance — comes from state.addresses (fetched separately) ──
@@ -2584,16 +2584,16 @@
                     '  </div>',
                     '</div>',
 
-                    // ── Description (meeting agenda / purpose) ──
-                    data.description
-                        ? '<div class="vas_123_qrp-mtg-notes">' + esc(data.description) + '</div>'
-                        : '',
-
                     // ── Meeting URL (editable) ──
                     '<div class="vas_123_qrp-mtg-field">',
                     '  <label class="vas_123_qrp-mtg-field-label">', esc(msg('VAS_123_MeetingUrl')), '</label>',
                     '  <input type="text" class="vas_123_qrp-mtg-input" id="', widgetID, '_mtgUrl" value="', esc(data.meetingUrl || ''), '">',
                     '</div>',
+
+                    // ── Description (meeting agenda / purpose) ──
+                    data.description
+                        ? '<div class="vas_123_qrp-mtg-notes">' + esc(data.description) + '</div>'
+                        : '',
 
                     // ── Comments: plain-text display block ──
                     data.comments
@@ -3528,7 +3528,10 @@
             }
 
             // Show "no record selected" placeholder — icon + context message from AD_Message
-            var bodyEl = document.getElementById('vas_123_body_' + widgetID);
+            var bodyEl  = document.getElementById('vas_123_body_'  + widgetID);
+            var panelEl = document.getElementById('vas_123_panel_' + widgetID);
+            // Hide the outer box border while no record is selected
+            if (panelEl) panelEl.classList.add('vas_123_qrp-panel--nosel');
             if (bodyEl) bodyEl.innerHTML =
                 '<div class="vas_123_qrp-nosel">' +
                     '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"' +

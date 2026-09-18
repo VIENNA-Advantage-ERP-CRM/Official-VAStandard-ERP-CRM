@@ -95,7 +95,7 @@ namespace VAS.Models
                 COALESCE(o.GrandTotal, 0) AS GrandTotal,
                 COALESCE(o.TotalLines, 0) AS TotalLines,
                 COALESCE((SELECT SUM(ot.TaxAmt) FROM C_OrderTax ot WHERE ot.C_Order_ID = o.C_Order_ID AND ot.IsActive = 'Y'), 0) AS TaxAmt,
-                COALESCE((SELECT SUM(ot.TaxBaseAmt) FROM C_OrderTax ot WHERE ot.C_Order_ID = o.C_Order_ID AND ot.IsActive = 'Y'), 0) AS TaxBaseAmt,
+                COALESCE((SELECT SUM(ol2.TaxableAmt) FROM C_OrderLine ol2 WHERE ol2.C_Order_ID = o.C_Order_ID AND ol2.IsActive = 'Y'), 0) AS TaxBaseAmt,
                 o.C_BPartner_ID AS C_BPartner_ID,
                 bp.Name AS BPartnerName,
                 o.AD_User_ID AS AD_User_ID,
@@ -162,9 +162,11 @@ namespace VAS.Models
                     ? Convert.ToDecimal(row["GrandTotal"]) : 0m;
                 response.totalLines  = row["TotalLines"] != DBNull.Value
                     ? Convert.ToDecimal(row["TotalLines"]) : 0m;
-                // TaxAmt: actual tax charged; TaxBaseAmt: the taxable base amount — both from C_OrderTax.
-                // Using C_OrderTax values avoids the IsTaxIncluded = 'Y' edge case where
-                // GrandTotal - TotalLines gives 0 (tax is already embedded in line amounts).
+                // TaxAmt: actual tax charged (from C_OrderTax).
+                // TaxBaseAmt: taxable base — SUM(C_OrderLine.TaxableAmt) is correct for both
+                // tax-inclusive (tax extracted from price) and tax-exclusive (tax additive)
+                // price lists. C_OrderTax.TaxBaseAmt was previously used here but is incorrect
+                // for tax-inclusive orders where it does not match the stored line-level value.
                 response.taxAmt      = row["TaxAmt"] != DBNull.Value
                     ? Convert.ToDecimal(row["TaxAmt"]) : 0m;
                 response.taxBaseAmt  = row["TaxBaseAmt"] != DBNull.Value
@@ -214,15 +216,19 @@ namespace VAS.Models
             //    This prevents OracleHelper from logging ORA-00904 as SEVERE when the
             //    column is absent — the try/catch in the query itself cannot suppress
             //    the Oracle-level log that fires before the exception propagates.
-            response.creditStatus = string.Empty;
+            response.creditStatus     = string.Empty;
+            response.creditStatusName = string.Empty;
             if (_creditStatusColExists == null)
             {
                 try
                 {
+                    // The column in C_BPartner is named SOCreditStatus (no underscore).
+                    // The previous check used 'SO_CreditStatus', which always returned 0,
+                    // causing _creditStatusColExists to be cached as false permanently.
                     string colCheckSql = @"SELECT COUNT(*) FROM AD_Column c
                         INNER JOIN AD_Table t ON (t.AD_Table_ID = c.AD_Table_ID)
                         WHERE t.TableName = 'C_BPartner'
-                        AND c.ColumnName = 'SO_CreditStatus'
+                        AND c.ColumnName = 'SOCreditStatus'
                         AND c.IsActive = 'Y'";
                     object colCheck = DB.ExecuteScalar(colCheckSql, null, null);
                     _creditStatusColExists = (colCheck != null && Util.GetValueOfInt(colCheck) > 0);
@@ -238,20 +244,53 @@ namespace VAS.Models
             {
                 try
                 {
-                    string creditBaseSql = @"SELECT COALESCE(bp.SO_CreditStatus, N'') AS CreditStatus
-                        FROM C_BPartner bp
-                        INNER JOIN C_Order o ON (o.C_BPartner_ID = bp.C_BPartner_ID)
+                    // CreditStatusSettingOn controls whether status lives on the BPartner header
+                    // ('CH') or on the specific BPartner_Location ('CL' / default).
+                    // C_Order.C_BPartner_Location_ID points to the bill-to location used for
+                    // this quotation; that is the location whose SOCreditStatus applies when
+                    // the setting is location-level.
+                    // Role access is applied on "o" (C_Order) so org predicates match the
+                    // main header query and do not inadvertently filter out BPartner rows.
+                    // AD_Reference_ID 289 is the SOCreditStatus reference list; the Name from
+                    // AD_Ref_List is returned so the client shows the platform label text
+                    // instead of a hard-coded or missing AD_Message key.
+                    string adLang = ctx.GetAD_Language();
+                    string creditBaseSql = @"SELECT CASE WHEN (bp.CreditStatusSettingOn = 'CH')
+                                                         THEN COALESCE(bp.SOCreditStatus, N'')
+                                                         ELSE COALESCE(cl.SOCreditStatus, N'')
+                                                    END AS CreditStatus,
+                                             COALESCE(rlt.Name, rl.Name, N'') AS CreditStatusName
+                        FROM C_Order o
+                        INNER JOIN C_BPartner bp ON (bp.C_BPartner_ID = o.C_BPartner_ID)
+                        LEFT OUTER JOIN C_BPartner_Location cl ON (cl.C_BPartner_Location_ID = o.C_BPartner_Location_ID)
+                        LEFT OUTER JOIN AD_Ref_List rl ON (rl.AD_Reference_ID = 289
+                            AND rl.Value = CASE WHEN (bp.CreditStatusSettingOn = 'CH')
+                                                THEN bp.SOCreditStatus
+                                                ELSE cl.SOCreditStatus
+                                           END
+                            AND rl.IsActive = 'Y')
+                        LEFT OUTER JOIN AD_Ref_List_Trl rlt ON (rlt.AD_Ref_List_ID = rl.AD_Ref_List_ID
+                            AND rlt.AD_Language = @adLang
+                            AND rlt.IsActive = 'Y')
                         WHERE o.C_Order_ID = @orderId
                         AND o.IsActive = 'Y'";
 
                     string creditAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
-                        creditBaseSql, "bp", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                        creditBaseSql, "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-                    object creditResult = DB.ExecuteScalar(creditAccessSql,
-                        new SqlParameter[] { new SqlParameter("@orderId", orderId) }, null);
+                    DataSet creditDs = DB.ExecuteDataset(creditAccessSql,
+                        new SqlParameter[]
+                        {
+                            new SqlParameter("@orderId", orderId),
+                            new SqlParameter("@adLang", adLang)
+                        }, null);
 
-                    if (creditResult != null && creditResult != DBNull.Value)
-                        response.creditStatus = Util.GetValueOfString(creditResult);
+                    if (creditDs != null && creditDs.Tables.Count > 0 && creditDs.Tables[0].Rows.Count > 0)
+                    {
+                        DataRow cr = creditDs.Tables[0].Rows[0];
+                        response.creditStatus     = Util.GetValueOfString(cr["CreditStatus"]);
+                        response.creditStatusName = Util.GetValueOfString(cr["CreditStatusName"]);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -870,7 +909,7 @@ namespace VAS.Models
                 p.ProductType AS ProductType,
                 (SELECT arl.Name FROM AD_Ref_List arl WHERE arl.Value = p.ProductType AND arl.AD_Reference_ID = (SELECT c.AD_Reference_Value_ID FROM AD_Column c INNER JOIN AD_Table t ON (t.AD_Table_ID = c.AD_Table_ID) WHERE UPPER(t.TableName) = 'M_PRODUCT' AND UPPER(c.ColumnName) = 'PRODUCTTYPE')) AS ProductTypeName,
                 COALESCE(u.Name, N'') AS UOMName,
-                COALESCE(NULLIF(TRIM(asi.Description), '--'), N'') AS AttributeDesc
+                COALESCE(NULLIF(NULLIF(TRIM(asi.Description), '---'), '--'), N'') AS AttributeDesc
                 FROM C_OrderLine ol
                 LEFT OUTER JOIN M_Product p ON (p.M_Product_ID = ol.M_Product_ID AND p.IsActive = 'Y')
                 LEFT OUTER JOIN C_Charge ch ON (ch.C_Charge_ID = ol.C_Charge_ID AND ch.IsActive = 'Y')
@@ -917,9 +956,9 @@ namespace VAS.Models
                     l.productValue   = Util.GetValueOfString(row["ProductValue"]);
                     l.productName    = Util.GetValueOfString(row["ProductName"]);
                     l.uOMName        = Util.GetValueOfString(row["UOMName"]);
-                    // VIS stores '--' as the default ASI description when no attribute is set — suppress it
+                    // VIS stores '--' or '---' as the default ASI description when no attribute is set — suppress both
                     var rawAttr = Util.GetValueOfString(row["AttributeDesc"]).Trim();
-                    l.attributeDesc  = rawAttr == "--" ? "" : rawAttr;
+                    l.attributeDesc  = (rawAttr == "--" || rawAttr == "---") ? "" : rawAttr;
                     // Derive service flag from product type — 'S' = Service in Compiere/VIS product model
                     // productType codes: 'I' = Item, 'S' = Service, 'E' = Expense, 'R' = Resource
                     var rawProductType = Util.GetValueOfString(row["ProductType"]);
