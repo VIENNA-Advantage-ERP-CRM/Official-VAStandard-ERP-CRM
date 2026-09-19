@@ -29,7 +29,7 @@ Onfinity was named VIENNA Advantage until 2024. The company, the product and thi
 | HR | Employee record, contracts, recruitment, attendance and shifts, leave, appraisals, training, self-service. |
 | Platform | The Application Dictionary (tables, windows, tabs, fields, validation rules, callouts, processes, print formats, menus, roles, all as metadata); document workflows with approval limits; the change log on every record (old value, new value, user, time); translations per language; dashboards; a REST API; the mobile app; the Onfinity Market for modules and updates. |
 
-Bills of material are part of the core. Manufacturing execution (work centres, routings, work orders, shop-floor time, work order costing), payroll with country deductions, country tax localisations such as India GST and e-Invoicing, the document management system and the AI assistant are delivered as modules through the Onfinity Market, some free and some commercial. The [editions page](https://onfinity.io/erp-editions-comparison.php) says which is which.
+Bills of material are part of the core, and manufacturing execution (work centres, routings, work orders, shop-floor time, work order costing, multi-level MRP) is free in Pluto, the community edition. Payroll with country deductions, country tax localisations such as India GST and e-Invoicing, the document management system and the AI assistant are delivered as modules through the Onfinity Market, some free and some commercial. The [editions page](https://onfinity.io/erp-editions-comparison.php) says which is which.
 
 ## Repositories
 
