@@ -14,7 +14,8 @@
  *                    -> Bank account (metric grid, detail-card wrap)
  *                    -> Balance summary (metric grid, detail-card wrap)
  *                    -> Journal details (metric grid, two values per row)
- *                    -> Journal lines (data grid, paged on the server)
+ *                    -> Journal lines (filter chips + expandable transaction
+ *                       cards, paged on the server)
  *                    -> Accounting impact (metric grid + account data grid)
  *                    -> Audit (step rail: Drafted -> In progress -> Approved
  *                       -> Completed -> Posted, each with actor + moment).
@@ -54,10 +55,11 @@
  *                  the decimal values - nothing is compared as text here.
  *
  *                  Exceptions are data-driven and the section is hidden when
- *                  none exists: statement difference outside the currency
- *                  tolerance, unmatched active lines, completed / closed but
- *                  not posted. Optional fields and sections without meaningful
- *                  data are hidden rather than shown empty.
+ *                  none exists: unmatched active lines (a line is matched when
+ *                  it references a payment, a charge or a cash line), completed
+ *                  / closed but not posted. The statement difference is shown
+ *                  in the Balance summary only. Optional fields and sections
+ *                  without meaningful data are hidden rather than shown empty.
  *
  *                  Navigation - each action runs only when the framework
  *                  capability is available, and is drawn disabled otherwise:
@@ -70,16 +72,15 @@
  *                                      table, C_BankStatementLine), exactly as
  *                                      a click on that tab header does; never
  *                                      opens a second window instance.
- *                    View accounting - opens the framework account viewer
- *                                      (VIS.AcctViewer) on this record, the
- *                                      same dialog the window's Posted button
- *                                      raises; enabled only when posted.
+ *                    Line card links - payment / receipt reference and cash
+ *                                      journal zoom to their record through
+ *                                      VAS.ZoomUtil (windows resolved by name).
  *                  None of them creates a transaction.
  *
  *                  All on-screen strings resolve through VIS.Msg.getMsg with an
  *                  English fallback, so an unseeded AD_Message key never renders
- *                  as a raw key. The account number is masked here to its last
- *                  four characters.
+ *                  as a raw key. The bank account number is shown in full, by
+ *                  explicit request.
  * Class Used     : VAS.VAS_292_BankingJournalRightPanel
  * Chronological development:
  *   VAI145   2026-09-21  Created.
@@ -87,6 +88,33 @@
  *                        paged on the server at 20 per request; Audit redrawn
  *                        as the Drafted / In progress / Approved / Completed /
  *                        Posted rail; "Bank account currency" meta dropped.
+ *   VAI145   2026-09-21  Journal lines redrawn per
+ *                        banking-journal-right-panel-enhanced-lines.html:
+ *                        All / Receipts / Payments-Charges filter chips
+ *                        (server-side, counts over every line), expandable
+ *                        transaction cards (kind, line · date, party, payment
+ *                        no · bank ref, signed amount, match + posting pills;
+ *                        detail grid with source, method, references, dates,
+ *                        allocation, charge, accounting impact, description).
+ *                        No per-card action links. Section header right side
+ *                        untouched.
+ *   VAI145   2026-09-21  Payment method from VA009_PaymentMethod (tender type
+ *                        fallback); payment / receipt reference and cash
+ *                        journal drawn as links that zoom to the record
+ *                        (windows resolved by name); cash line / cash book and
+ *                        VA012 voucher / contra / difference cells added.
+ *   VAI145   2026-09-21  Accounting impact: header right side (status + "View
+ *                        accounting") dropped; account breakdown paged on the
+ *                        server at 20 per request with the shared footer pager.
+ *   VAI145   2026-09-21  Line card detail reordered (accounting date · statement
+ *                        line date / voucher type · reference / charge · tax /
+ *                        cash journal · cash book / payment method · contra
+ *                        type / voucher no · difference type); bank reference
+ *                        and allocation status dropped; blank cells hidden.
+ *   VAI145   2026-09-21  Expanded line cards kept per record outside the
+ *                        instance, so they survive the host rebuilding the panel
+ *                        on a tab switch; filter and page always restart at
+ *                        All / page 1 on a load.
  *
  * -- Labels / Message Keys ---------------------------------------------------
  *  Panel
@@ -97,8 +125,6 @@
  *   Net bank movement                     | VAS_292_NetBankMovement
  *   {0} journal lines                     | VAS_292_LineCount
  *   Posted / Unposted                     | VAS_292_Posted / VAS_292_Unposted
- *   Statement balanced                    | VAS_292_StatementBalanced
- *   Difference exists                     | VAS_292_DifferenceExists
  *   All lines matched                     | VAS_292_AllLinesMatched
  *   {0} unmatched                         | VAS_292_UnmatchedCount
  *
@@ -106,8 +132,6 @@
  *   Exceptions                            | VAS_292_Exceptions
  *   {0} open                              | VAS_292_OpenCount
  *   Review                                | VAS_292_Review
- *   Statement difference                  | VAS_292_StatementDifference
- *   Statement difference requires review  | VAS_292_StatementDifferenceMeta
  *   Unmatched journal lines               | VAS_292_UnmatchedLines
  *   {0} journal line(s) are not matched   | VAS_292_UnmatchedLinesMeta
  *   Completed but not posted              | VAS_292_CompletedNotPosted
@@ -157,26 +181,25 @@
  *   Journal lines                         | VAS_292_JournalLines
  *   {0} matched · {1} unmatched           | VAS_292_MatchedSummary
  *   View all lines                        | VAS_292_ViewAllLines
- *   Line                                  | VAS_292_Line
- *   Amount                                | VAS_292_Amount
- *   Match                                 | VAS_292_Match
+ *   All / Receipts / Payments / Charges   | VAS_292_All / VAS_292_Receipts / VAS_292_PaymentsCharges
+ *   Receipt / Payment / Bank charge       | VAS_292_Receipt / VAS_292_Payment / VAS_292_BankCharge
+ *   Line {0}                              | VAS_292_LineNo
  *   Matched / Unmatched                   | VAS_292_Matched / VAS_292_Unmatched
- *   Inflow line / Outflow line            | VAS_292_InflowLine / VAS_292_OutflowLine
- *   Zero amount line                      | VAS_292_ZeroLine
+ *   Show details / Hide details           | VAS_292_ShowDetails / VAS_292_HideDetails
+ *   Payment method                        | VAS_292_PaymentMethod
+ *   Payment reference / Receipt reference | VAS_292_PaymentReference / VAS_292_ReceiptReference
+ *   Cash journal / Cash book              | VAS_292_CashJournal / VAS_292_CashBook
+ *   Voucher type / Contra type            | VAS_292_VoucherType / VAS_292_ContraType
+ *   Voucher no. / Difference type         | VAS_292_VoucherNo / VAS_292_DifferenceType
+ *   Accounting date / Statement line date | VAS_292_AccountingDate / VAS_292_StatementLineDate
+ *   Charge / Tax                          | VAS_292_Charge / VAS_292_Tax
  *   No lines on this journal yet.         | VAS_292_NoLines
+ *   No journal lines in this category.    | VAS_292_NoLinesInCategory
  *   Showing                               | VAS_292_Showing
  *   Previous page / Next page / of        | VAS_292_Previous / VAS_292_Next / VAS_292_Of
- *   Statement line date                   | VAS_292_StatementLineDate
- *   Effective date                        | VAS_292_EffectiveDate
- *   Account date                          | VAS_292_AccountDate
- *   Reference no.                         | VAS_292_ReferenceNo
- *   Payment                               | VAS_292_Payment
- *   Business partner                      | VAS_292_BusinessPartner
- *   Charge                                | VAS_292_Charge
  *
  *  Accounting impact
  *   Accounting impact                     | VAS_292_AccountingImpact
- *   View accounting                       | VAS_292_ViewAccounting
  *   Total debit / Total credit            | VAS_292_TotalDebit / VAS_292_TotalCredit
  *   {0} accounting entries                | VAS_292_EntryCount
  *   Posting imbalance                     | VAS_292_PostingImbalance
@@ -200,6 +223,22 @@
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
+
+    /* Which line cards are expanded, per record - kept OUTSIDE the panel
+       instance, keyed by C_BankStatement_ID. The host rebuilds (or reloads) the
+       panel when the user moves to another tab and back, which would otherwise
+       collapse every card. Only the expansion is remembered: the filter and the
+       page always start over at All / page 1 on a load. */
+    var LINE_KIND_ALL = "all";
+    var LINE_KIND_RECEIPT = "receipt";
+    var LINE_KIND_PAYMENT = "payment";
+    var openLinesByRecord = {};
+
+    function openLinesFor(recordId) {
+        var id = +recordId || 0;
+        if (!openLinesByRecord[id]) openLinesByRecord[id] = {};
+        return openLinesByRecord[id];
+    }
 
     // True when the tab sits on a row that has not been saved yet - whether it
     // came from New Record or from Copy Record. The authority is the GRID
@@ -246,6 +285,19 @@
         var ZOOM_ACCOUNT_WINDOW_NEW = "VAS_BankAccount";
         var ZOOM_ACCOUNT_WINDOW_OLD = "Bank Account";
         var accountWindowId = 0;
+        /* Windows behind the reference links on a line card, resolved by NAME
+           the same way: the AR receipt / AP payment window for the payment
+           reference, the cash journal window for the cash line. 0 until
+           resolved; the value is drawn as plain text until then. */
+        var ZOOM_RECEIPT_WINDOW_NEW = "VAS_ARReceipt";
+        var ZOOM_RECEIPT_WINDOW_OLD = "";
+        var ZOOM_PAYMENT_WINDOW_NEW = "VAS_APPayment";
+        var ZOOM_PAYMENT_WINDOW_OLD = "Payment";
+        var ZOOM_CASH_WINDOW_NEW = "VAS_CashJournal";
+        var ZOOM_CASH_WINDOW_OLD = "";
+        var receiptWindowId = 0;
+        var paymentWindowId = 0;
+        var cashWindowId = 0;
         var disposed = false;
 
         /* The C_BankStatement_ID the panel is showing OR loading. 0 = nothing. */
@@ -278,6 +330,19 @@
         var DEFAULT_LINES_PER_PAGE = 20;
         /* A page fetch on the wire, keyed by the fetch token it belongs to. */
         var linesFetchToken = 0;
+        /* Line filter chips. The filter runs on the SERVER (it must cover every
+           line, not the page on screen), so pages are cached per kind + page. */
+        var linesKind = LINE_KIND_ALL;
+        /* Line ids whose card is expanded; survives a repaint, reset per record. */
+        var openLines = {};
+
+        /* Accounting breakdown page on screen and the pages fetched so far, keyed
+           by page index - same arrangement as the lines. Page 0 rides with the
+           initial payload; the rest come through GetAccountBreakdown. */
+        var accountsPage = 0;
+        var accountPages = {};
+        var DEFAULT_ACCOUNTS_PER_PAGE = 20;
+        var accountsFetchToken = 0;
 
         /* ---------------------------------------------------------------- */
         /*  Icons - inline SVG only; the host shell may not carry an icon font */
@@ -287,12 +352,12 @@
         var SVG = {
             external: '<svg ' + SVG_ATTR + '><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>',
             list: '<svg ' + SVG_ATTR + '><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>',
-            book: '<svg ' + SVG_ATTR + '><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
             inflow: '<svg ' + SVG_ATTR + '><path d="M17 7 7 17"/><path d="M17 17H7V7"/></svg>',
             outflow: '<svg ' + SVG_ATTR + '><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg>',
             neutral: '<svg ' + SVG_ATTR + '><path d="M5 12h14"/></svg>',
             prev: '<svg ' + SVG_ATTR + '><path d="m15 18-6-6 6-6"/></svg>',
             next: '<svg ' + SVG_ATTR + '><path d="m9 18 6-6-6-6"/></svg>',
+            chevron: '<svg ' + SVG_ATTR + '><path d="m6 9 6 6 6-6"/></svg>',
             check: '<svg ' + SVG_ATTR.replace('stroke-width="2"', 'stroke-width="3"') + '><path d="M20 6 9 17l-5-5"/></svg>',
             cross: '<svg ' + SVG_ATTR.replace('stroke-width="2"', 'stroke-width="3"') + '><path d="M18 6 6 18M6 6l12 12"/></svg>'
         };
@@ -362,7 +427,8 @@
            sign is the message (net movement, line amounts). */
         function signedMoney(value, symbol, precision) {
             var v = (+value) || 0;
-            var prefix = v < 0 ? "− " : (v > 0 ? "+ " : "");
+            /* Sign sits flush against the symbol - "−$100.00", not "− $100.00". */
+            var prefix = v < 0 ? "−" : (v > 0 ? "+" : "");
             return prefix + fmtMoney(Math.abs(v), symbol, precision);
         }
 
@@ -427,15 +493,6 @@
                 }
             }
             return kept.join(" · ");
-        }
-
-        /* Account number is masked HERE, never in SQL: four characters or fewer
-           are shown as they are, anything longer keeps only its last four. */
-        function maskAccountNo(value) {
-            var s = (value === null || value === undefined) ? "" : String(value).replace(/\s+/g, "");
-            if (!s) return "";
-            if (s.length <= 4) return s;
-            return "•••• " + s.substring(s.length - 4);
         }
 
         function yesNo(flag) {
@@ -511,17 +568,22 @@
                 e.preventDefault();
                 var $btn = $(this);
                 if ($btn.prop("disabled")) return;
-                runAction($btn.attr("data-action"));
+                runAction($btn.attr("data-action"), $btn);
             });
         }
 
-        function runAction(name) {
+        function runAction(name, $btn) {
             try {
                 if (name === "view-account") viewAccount();
                 else if (name === "view-lines") viewAllLines();
-                else if (name === "view-accounting") viewAccounting();
                 else if (name === "lines-prev") pageLines(-1);
                 else if (name === "lines-next") pageLines(1);
+                else if (name === "accounts-prev") pageAccounts(-1);
+                else if (name === "accounts-next") pageAccounts(1);
+                else if (name === "lines-filter") filterLines($btn.attr("data-kind"));
+                else if (name === "line-toggle") toggleLine($btn.attr("data-line"));
+                else if (name === "line-payment") zoomPayment($btn.attr("data-line"));
+                else if (name === "line-cash") zoomCash($btn.attr("data-line"));
             } catch (e) { if (window.console) console.log(e); }
         }
 
@@ -537,6 +599,21 @@
                     accountWindowId = Number(id) || 0;
                     if (accountWindowId > 0 && data) repaintSection("bank", renderBankAccount);
                 });
+            /* The windows behind the line-card reference links. The lines section
+               is repainted when one lands so values already on screen become
+               links. */
+            resolveLineWindow(ZOOM_RECEIPT_WINDOW_NEW, ZOOM_RECEIPT_WINDOW_OLD, function (id) { receiptWindowId = id; });
+            resolveLineWindow(ZOOM_PAYMENT_WINDOW_NEW, ZOOM_PAYMENT_WINDOW_OLD, function (id) { paymentWindowId = id; });
+            resolveLineWindow(ZOOM_CASH_WINDOW_NEW, ZOOM_CASH_WINDOW_OLD, function (id) { cashWindowId = id; });
+        }
+
+        function resolveLineWindow(newName, oldName, store) {
+            VAS.ZoomUtil.getWindowId(newName, oldName).then(function (id) {
+                if (disposed) return;
+                var windowId = Number(id) || 0;
+                store(windowId);
+                if (windowId > 0 && data) repaintLines(false);
+            });
         }
 
         /* ---------------------------------------------------------------- */
@@ -621,8 +698,19 @@
                     data = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     if (data && !(+data.C_BankStatement_ID > 0)) data = null;   // not accessible / not found
                     linesPage = 0;
+                    linesKind = LINE_KIND_ALL;
                     linePages = {};
-                    if (data) linePages[0] = data.Lines || [];
+                    openLines = {};
+                    accountsPage = 0;
+                    accountPages = {};
+                    if (data) {
+                        linePages[pageKey(LINE_KIND_ALL, 0)] = data.Lines || [];
+                        accountPages[0] = data.Accounts || [];
+                        /* Cards the user had expanded on this record stay expanded
+                           across a reload (see openLinesFor); filter and page
+                           start over. */
+                        openLines = openLinesFor(data.C_BankStatement_ID);
+                    }
                     render();
                     showBusy(false);
                 },
@@ -643,7 +731,11 @@
             data = null;
             shownRecordId = 0;
             linesPage = 0;
+            linesKind = LINE_KIND_ALL;
             linePages = {};
+            openLines = {};
+            accountsPage = 0;
+            accountPages = {};
             render();
             /* A discarded reply never reaches its own showBusy(false), so the
                spinner would otherwise sit on the empty panel for good. */
@@ -860,10 +952,10 @@
             $emph.append($('<div class="' + CLS + 'heroQual"></div>').text(fmt(msg("VAS_292_LineCount", "{0} journal lines"), lineCount())));
             $hero.append($emph);
 
-            /* Posting / balance / matching chips - each a data fact. */
+            /* Matching chip only (posting status is the audit rail's and the
+               accounting section's to report; the balance is the Balance
+               summary's). */
             var $chips = $('<div class="' + CLS + 'chips"></div>');
-            $chips.append(chip(isPosted() ? msg("VAS_292_Posted", "Posted") : msg("VAS_292_Unposted", "Unposted"), isPosted() ? "success" : "warning"));
-            $chips.append(chip(isBalanced() ? msg("VAS_292_StatementBalanced", "Statement balanced") : msg("VAS_292_DifferenceExists", "Difference exists"), isBalanced() ? "success" : "risk"));
             var un = unmatchedCount();
             $chips.append(chip(un === 0 ? msg("VAS_292_AllLinesMatched", "All lines matched") : fmt(msg("VAS_292_UnmatchedCount", "{0} unmatched"), un), un === 0 ? "success" : "warning"));
             $hero.append($chips);
@@ -874,12 +966,9 @@
         /* Exceptions - compact list, only when at least one exists ---------- */
 
         function renderExceptions() {
+            /* Unmatched lines and completed-but-unposted only; the statement
+               difference is reported by the Balance summary's Difference cell. */
             var items = [];
-            if (!isBalanced()) {
-                items.push(row(msg("VAS_292_StatementDifference", "Statement difference"), "",
-                    joinBits([money(data.StatementDifference), msg("VAS_292_StatementDifferenceMeta", "Statement difference requires review")]),
-                    { label: msg("VAS_292_Review", "Review"), tone: "risk" }));
-            }
             var un = unmatchedCount();
             if (un > 0) {
                 items.push(row(msg("VAS_292_UnmatchedLines", "Unmatched journal lines"), "",
@@ -915,8 +1004,9 @@
 
             var $card = detailCard();
             $card.grid.append(metric(msg("VAS_292_Bank", "Bank"), data.BankName, joinBits([data.SwiftCode, data.RoutingNo])));
-            $card.grid.append(metric(msg("VAS_292_Account", "Account"), data.BankAccountName || maskAccountNo(data.AccountNo),
-                data.BankAccountName ? maskAccountNo(data.AccountNo) : ""));
+            /* Full account number, by explicit request - not masked. */
+            $card.grid.append(metric(msg("VAS_292_Account", "Account"), data.BankAccountName || data.AccountNo,
+                data.BankAccountName ? data.AccountNo : ""));
             var curText = data.CurISO ? (data.CurISO + (data.CurSymbol && data.CurSymbol !== data.CurISO ? " (" + data.CurSymbol + ")" : "")) : "";
             $card.grid.append(metric(msg("VAS_292_Currency", "Currency"), curText, ""));
             $card.grid.append(metric(msg("VAS_292_CurrentBalance", "Current balance"), money(data.CurrentBalance), ""));
@@ -978,7 +1068,9 @@
             return $sec;
         }
 
-        /* Journal lines - data grid, paged on the server -------------------- */
+        /* Journal lines - filter chips + expandable transaction cards, paged  */
+        /* on the server. The section header (title, matched / unmatched      */
+        /* summary, "View all lines") is unchanged.                           */
 
         function canViewLines() {
             return !!(data && +data.C_BankStatement_ID > 0 && hostPanel() !== null);
@@ -986,12 +1078,24 @@
 
         function linesPerPage() { return (data && +data.LinesPageSize > 0) ? +data.LinesPageSize : DEFAULT_LINES_PER_PAGE; }
 
-        function linePageCount() { return Math.max(1, Math.ceil(lineCount() / linesPerPage())); }
+        /* Count of lines under the ACTIVE filter, from the server's aggregate -
+           the pager and the chip counts describe every line, not the page. */
+        function lineCountFor(kind) {
+            if (!data) return 0;
+            if (kind === LINE_KIND_RECEIPT) return +data.ReceiptCount || 0;
+            if (kind === LINE_KIND_PAYMENT) return +data.PaymentCount || 0;
+            return lineCount();
+        }
 
-        /* The rows of the page on screen, or null while that page is still on
-           the wire. */
+        function linePageCount() { return Math.max(1, Math.ceil(lineCountFor(linesKind) / linesPerPage())); }
+
+        function pageKey(kind, page) { return kind + ":" + page; }
+
+        /* The rows of the page on screen under the active filter, or null while
+           that page is still on the wire. */
         function currentLines() {
-            return linePages.hasOwnProperty(linesPage) ? linePages[linesPage] : null;
+            var key = pageKey(linesKind, linesPage);
+            return linePages.hasOwnProperty(key) ? linePages[key] : null;
         }
 
         function renderLines() {
@@ -1011,46 +1115,256 @@
                 return $sec;
             }
 
-            var $grid = $('<div class="' + CLS + 'dg ' + CLS + 'dgLines"></div>');
-
-            /* Header row: the leading affordance column carries no label. */
-            var $head = $('<div class="' + CLS + 'dgHead"></div>');
-            $head.append($('<span aria-hidden="true"></span>'));
-            $head.append(cell("dgH", msg("VAS_292_Line", "Line")));
-            $head.append(cell("dgH", msg("VAS_292_Description", "Description")));
-            $head.append(cell("dgH " + CLS + "right", msg("VAS_292_Amount", "Amount")));
-            $head.append(cell("dgH " + CLS + "right", msg("VAS_292_Match", "Match")));
-            $grid.append($head);
+            $sec.append(lineToolbar());
 
             var pageCount = linePageCount();
             if (linesPage > pageCount - 1) linesPage = pageCount - 1;
             if (linesPage < 0) linesPage = 0;
 
+            var $stack = $('<div class="' + CLS + 'txnStack"></div>');
             var rows = currentLines();
             if (rows) {
+                if (!rows.length) {
+                    /* The filter matches nothing on this statement. */
+                    $stack.append($('<div class="' + CLS + 'txnEmpty"></div>').text(msg("VAS_292_NoLinesInCategory", "No journal lines in this category.")));
+                }
                 for (var i = 0; i < rows.length; i++) {
-                    $grid.append(lineRow(rows[i], i === rows.length - 1));
+                    $stack.append(lineCard(rows[i]));
                 }
             } else {
                 /* Page still on the wire: the framework's own busy indicator sits
-                   where the rows will go, so the grid keeps its head and the rest
-                   of the panel stays usable. */
-                $grid.append($('<div class="' + CLS + 'dgBusy">' +
+                   where the cards will go, so the section keeps its shape and the
+                   rest of the panel stays usable. */
+                $stack.append($('<div class="' + CLS + 'dgBusy">' +
                     '<div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div>' +
                     '</div>'));
             }
-            $sec.append($grid);
+            $sec.append($stack);
 
-            if (pageCount > 1) $sec.append(pager(linesPage, pageCount));
+            if (pageCount > 1) $sec.append(pager(linesPage, pageCount, lineCountFor(linesKind), linesPerPage(), "lines-prev", "lines-next"));
             return $sec;
         }
 
+        /* Filter chips: All {n} · Receipts {n} · Payments / Charges {n}. The
+           active one is tinted; each carries the count over every line. */
+        function lineToolbar() {
+            var $bar = $('<div class="' + CLS + 'txnToolbar"></div>');
+            var $filters = $('<div class="' + CLS + 'txnFilters"></div>');
+            $filters.append(filterChip(LINE_KIND_ALL, msg("VAS_292_All", "All"), lineCountFor(LINE_KIND_ALL)));
+            $filters.append(filterChip(LINE_KIND_RECEIPT, msg("VAS_292_Receipts", "Receipts"), lineCountFor(LINE_KIND_RECEIPT)));
+            $filters.append(filterChip(LINE_KIND_PAYMENT, msg("VAS_292_PaymentsCharges", "Payments / Charges"), lineCountFor(LINE_KIND_PAYMENT)));
+            $bar.append($filters);
+            return $bar;
+        }
+
+        function filterChip(kind, label, count) {
+            var text = label + " " + count;
+            var $b = $('<button type="button" class="' + CLS + 'filterBtn' + (kind === linesKind ? " " + CLS + "isActive" : "") + '"></button>')
+                .attr("data-action", "lines-filter")
+                .attr("data-kind", kind)
+                .attr("aria-pressed", kind === linesKind ? "true" : "false")
+                .attr("title", text)
+                .text(text);
+            return $b;
+        }
+
+        /* What the line IS, for the card's kind label: a charge line (charge,
+           no payment) reads as a bank charge; otherwise the sign decides. */
+        function lineKindLabel(line) {
+            if (+line.C_Charge_ID > 0 && !(+line.C_Payment_ID > 0)) return msg("VAS_292_BankCharge", "Bank charge");
+            return (+line.StmtAmt || 0) >= 0 ? msg("VAS_292_Receipt", "Receipt") : msg("VAS_292_Payment", "Payment");
+        }
+
+        function pill(label, tone) {
+            return $('<span class="' + CLS + 'pill ' + CLS + 'tone-' + tone + '"></span>').text(label).attr("title", label);
+        }
+
+        /* "Debit accounts → credit accounts" of the line's Actual posting, or ""
+           when the statement is not posted / the line has no facts. */
+        function lineAccountingText(line) {
+            var dr = (line.DebitAccounts && line.DebitAccounts.length) ? line.DebitAccounts.join(", ") : "";
+            var cr = (line.CreditAccounts && line.CreditAccounts.length) ? line.CreditAccounts.join(", ") : "";
+            if (!dr && !cr) return "";
+            return (dr || "—") + " → " + (cr || "—");
+        }
+
+        /* One transaction card. The head is a real <button> that toggles the
+           detail; open cards stay open across a repaint (openLines is keyed by
+           line id) and close on a record change. */
+        function lineCard(line) {
+            var id = +line.C_BankStatementLine_ID || 0;
+            var amt = +line.StmtAmt || 0;
+            var isOpen = !!openLines[id];
+            var $card = $('<article class="' + CLS + 'txn' + (isOpen ? " " + CLS + "isOpen" : "") + '"></article>').attr("data-line", id);
+
+            /* Head ----------------------------------------------------------- */
+            var $head = $('<button type="button" class="' + CLS + 'txnHead"></button>')
+                .attr("data-action", "line-toggle")
+                .attr("data-line", id)
+                .attr("aria-expanded", isOpen ? "true" : "false")
+                .attr("title", isOpen ? msg("VAS_292_HideDetails", "Hide details") : msg("VAS_292_ShowDetails", "Show details"));
+
+            var $left = $('<div class="' + CLS + 'txnLeft"></div>');
+            var $top = $('<div class="' + CLS + 'txnTop"></div>');
+            $top.append($('<span class="' + CLS + 'txnKind"></span>').text(lineKindLabel(line)));
+            var lineMeta = joinBits([fmt(msg("VAS_292_LineNo", "Line {0}"), line.Line), fmtDate(line.StatementLineDate)]);
+            $top.append($('<span class="' + CLS + 'txnLine"></span>').text(lineMeta).attr("title", lineMeta));
+            $left.append($top);
+            var party = line.BPartnerName || line.ChargeName || line.Description || "—";
+            $left.append($('<div class="' + CLS + 'txnParty"></div>').text(party).attr("title", party));
+            /* Payment document · bank reference - blanks are simply left out, and
+               the line is not drawn at all when neither exists. */
+            var ref = joinBits([line.PaymentDocumentNo, line.ReferenceNo]);
+            if (ref) $left.append($('<div class="' + CLS + 'txnRef"></div>').text(ref).attr("title", ref));
+            $head.append($left);
+
+            var $right = $('<div class="' + CLS + 'txnRight"></div>');
+            var amountText = lineAmount(line);
+            var $amt = $('<div class="' + CLS + 'txnAmount ' + CLS + 'tx-' + (amt > 0 ? "success" : (amt < 0 ? "risk" : "muted")) + '"></div>');
+            $amt.append($('<span></span>').text(amountText).attr("title", amountText));
+            $amt.append($('<span class="' + CLS + 'txnChevron"></span>').append(icon("chevron")));
+            $right.append($amt);
+            var $statuses = $('<div class="' + CLS + 'txnStatuses"></div>');
+            $statuses.append(pill(line.IsMatched ? msg("VAS_292_Matched", "Matched") : msg("VAS_292_Unmatched", "Unmatched"), line.IsMatched ? "success" : "warning"));
+            $right.append($statuses);
+            $head.append($right);
+            $card.append($head);
+
+            /* Detail --------------------------------------------------------- */
+            var $detail = $('<div class="' + CLS + 'txnDetail"></div>');
+            var $grid = $('<div class="' + CLS + 'txnGrid"></div>');
+            /* Cells in the agreed order, two per row; a cell whose value is blank
+               is not drawn at all:
+                 Accounting date  | Statement line date
+                 Voucher type     | Payment / receipt reference
+                 Charge           | Tax
+                 Cash journal     | Cash book
+                 Payment method   | Contra type
+                 Voucher no.      | Difference type            */
+            var cells = [];
+            cells.push([msg("VAS_292_AccountingDate", "Accounting date"), fmtDate(line.DateAcct)]);
+            cells.push([msg("VAS_292_StatementLineDate", "Statement line date"), fmtDate(line.StatementLineDate)]);
+            cells.push([msg("VAS_292_VoucherType", "Voucher type"), line.VoucherTypeName]);
+            /* Payment / receipt reference is a link into the payment when the
+               matching window resolved; plain text otherwise. */
+            if (line.PaymentDocumentNo) {
+                cells.push([line.IsReceipt ? msg("VAS_292_ReceiptReference", "Receipt reference") : msg("VAS_292_PaymentReference", "Payment reference"),
+                    canZoomPayment(line) ? linkValue("line-payment", id, line.PaymentDocumentNo) : line.PaymentDocumentNo]);
+            }
+            cells.push([msg("VAS_292_Charge", "Charge"), line.ChargeName]);
+            cells.push([msg("VAS_292_Tax", "Tax"), joinBits([line.TaxName, (+line.TaxAmt || 0) !== 0 ? amount(line.TaxAmt) : ""])]);
+            /* Cash line the bank line settles - only when there is one. */
+            if (+line.C_CashLine_ID > 0) {
+                var cashText = joinBits([line.CashDocumentNo || line.CashName, line.CashLineNo ? fmt(msg("VAS_292_LineNo", "Line {0}"), line.CashLineNo) : ""]);
+                cells.push([msg("VAS_292_CashJournal", "Cash journal"), canZoomCash(line) ? linkValue("line-cash", id, cashText) : cashText]);
+                cells.push([msg("VAS_292_CashBook", "Cash book"), joinBits([line.CashBookName, line.CashLineAmt ? amount(line.CashLineAmt) : ""])]);
+            }
+            /* VA009 payment method (line's, else payment's), tender type as fallback
+               - the server already resolved that chain. */
+            cells.push([msg("VAS_292_PaymentMethod", "Payment method"), line.PaymentMethodName || line.TenderTypeName || line.TenderType]);
+            cells.push([msg("VAS_292_ContraType", "Contra type"), line.ContraTypeName]);
+            cells.push([msg("VAS_292_VoucherNo", "Voucher no."), line.VoucherNo]);
+            cells.push([msg("VAS_292_DifferenceType", "Difference type"), line.DifferenceTypeName]);
+            for (var c = 0; c < cells.length; c++) {
+                if (hasValue(cells[c][1])) $grid.append(detailCell(cells[c][0], cells[c][1]));
+            }
+            var acct = lineAccountingText(line);
+            if (acct) $grid.append(detailCell(msg("VAS_292_AccountingImpact", "Accounting impact"), acct, true));
+            $detail.append($grid);
+
+            var $desc = $('<div class="' + CLS + 'txnDescription"></div>');
+            $desc.append(detailCell(msg("VAS_292_Description", "Description"), line.Description));
+            $detail.append($desc);
+            $card.append($detail);
+
+            return $card;
+        }
+
+        /* True when a detail value has something to show: non-blank text or an
+           element (a link). */
+        function hasValue(value) {
+            if (value === null || value === undefined) return false;
+            if (typeof value === "object" && value.jquery) return value.length > 0;
+            return String(value).length > 0;
+        }
+
+        /* Label + value pair of the card detail; the value may be text or an
+           element (a link). A blank value reads as an em dash. */
+        function detailCell(label, value, wide) {
+            var $c = $('<div class="' + CLS + 'txnCell' + (wide ? " " + CLS + "txnWide" : "") + '"></div>');
+            $c.append($('<div class="' + CLS + 'txnLabel"></div>').text(label));
+            var $v = $('<div class="' + CLS + 'txnValue"></div>');
+            if (value && typeof value === "object" && value.jquery) $v.append(value);
+            else {
+                var t = (value === null || value === undefined || value === "") ? "—" : String(value);
+                $v.text(t).attr("title", t);
+            }
+            $c.append($v);
+            return $c;
+        }
+
+        /* A detail value drawn as an inline link (a real <button>) that zooms to
+           the referenced record. */
+        function linkValue(action, lineId, text) {
+            var t = (text === null || text === undefined || text === "") ? "—" : String(text);
+            return $('<button type="button" class="' + CLS + 'txnLinkValue"></button>')
+                .attr("data-action", action)
+                .attr("data-line", lineId)
+                .attr("title", t)
+                .text(t);
+        }
+
+        /* The line on screen with this id, from the page cache. */
+        function findLine(id) {
+            id = +id || 0;
+            var rows = currentLines() || [];
+            for (var i = 0; i < rows.length; i++) {
+                if (+rows[i].C_BankStatementLine_ID === id) return rows[i];
+            }
+            return null;
+        }
+
+        function canZoom() {
+            return !!(VAS.ZoomUtil && typeof VAS.ZoomUtil.zoomToRecord === "function");
+        }
+
+        /* The payment can be opened when the line carries one and the matching
+           window (AR receipt / AP payment) resolved by name. */
+        function canZoomPayment(line) {
+            if (!line || !(+line.C_Payment_ID > 0) || !canZoom()) return false;
+            return (line.IsReceipt ? receiptWindowId : paymentWindowId) > 0;
+        }
+
+        function canZoomCash(line) {
+            return !!(line && +line.C_Cash_ID > 0 && canZoom() && cashWindowId > 0);
+        }
+
+        /* Zooms to the line's payment - the AR receipt window for a receipt,
+           the AP payment window otherwise. */
+        function zoomPayment(id) {
+            var line = findLine(id);
+            if (!canZoomPayment(line)) return;
+            VAS.ZoomUtil.zoomToRecord("C_Payment_ID", +line.C_Payment_ID,
+                line.IsReceipt ? receiptWindowId : paymentWindowId,
+                line.IsReceipt ? ZOOM_RECEIPT_WINDOW_NEW : ZOOM_PAYMENT_WINDOW_NEW,
+                line.IsReceipt ? ZOOM_RECEIPT_WINDOW_OLD : ZOOM_PAYMENT_WINDOW_OLD);
+        }
+
+        /* Zooms to the cash journal that holds the line's cash line. */
+        function zoomCash(id) {
+            var line = findLine(id);
+            if (!canZoomCash(line)) return;
+            VAS.ZoomUtil.zoomToRecord("C_Cash_ID", +line.C_Cash_ID, cashWindowId,
+                ZOOM_CASH_WINDOW_NEW, ZOOM_CASH_WINDOW_OLD);
+        }
+
         /* Canonical footer pager (same shape as the VAS_020 widget pager):
-           "Showing a–b of N" on the left, compact  <  n of m  >  on the right. */
-        function pager(page, pageCount) {
-            var total = lineCount();
-            var from = total ? page * linesPerPage() + 1 : 0;
-            var to = Math.min(total, (page + 1) * linesPerPage());
+           "Showing a–b of N" on the left, compact  <  n of m  >  on the right.
+           Shared by the lines stack and the accounting breakdown - the caller
+           names the total, the page size and the prev / next actions. */
+        function pager(page, pageCount, total, perPage, prevAction, nextAction) {
+            var from = total ? page * perPage + 1 : 0;
+            var to = Math.min(total, (page + 1) * perPage);
             var of = msg("VAS_292_Of", "of");
 
             var $p = $('<div class="' + CLS + 'pager"></div>');
@@ -1059,13 +1373,13 @@
 
             var $nav = $('<div class="' + CLS + 'pgNav"></div>');
             var $prev = $('<button type="button" class="' + CLS + 'pgBtn"></button>')
-                .attr("data-action", "lines-prev")
+                .attr("data-action", prevAction)
                 .attr("title", msg("VAS_292_Previous", "Previous page"))
                 .attr("aria-label", msg("VAS_292_Previous", "Previous page"))
                 .prop("disabled", page <= 0);
             $prev.append(icon("prev"));
             var $next = $('<button type="button" class="' + CLS + 'pgBtn"></button>')
-                .attr("data-action", "lines-next")
+                .attr("data-action", nextAction)
                 .attr("title", msg("VAS_292_Next", "Next page"))
                 .attr("aria-label", msg("VAS_292_Next", "Next page"))
                 .prop("disabled", page >= pageCount - 1);
@@ -1078,8 +1392,8 @@
         }
 
         /* Only the lines section is repainted, and only in place: the rest of
-           the panel stays as it is. On a page change the panel is scrolled so
-           the grid's column head and first row sit at the top of the view. */
+           the panel stays as it is. On a page / filter change the panel is
+           scrolled so the toolbar and first card sit at the top of the view. */
         function repaintLines(scrollToFirstRow) {
             if (!$body) return;
             var $old = $body.children('[data-sec="lines"]').first();
@@ -1090,28 +1404,51 @@
         }
 
         /* Scrolls the panel (the root is the scroller in this host) so the
-           lines grid's head - and therefore its first row - is at the top. */
+           lines toolbar - and therefore the first card - is at the top. */
         function scrollLinesToTop($sec) {
+            scrollToElement($sec.find("." + CLS + "txnToolbar")[0]);
+        }
+
+        /* Scrolls the panel so the element sits at the top of the view, with a
+           little room above it so it does not sit hard on the edge. */
+        function scrollToElement(el) {
             var root = $root && $root[0];
-            var head = $sec.find("." + CLS + "dgHead")[0];
-            if (!root || !head) return;
+            if (!root || !el) return;
             var rootRect = root.getBoundingClientRect();
-            var headRect = head.getBoundingClientRect();
-            var target = root.scrollTop + (headRect.top - rootRect.top);
-            /* A little room above the head so it does not sit hard on the edge. */
+            var elRect = el.getBoundingClientRect();
+            var target = root.scrollTop + (elRect.top - rootRect.top);
             root.scrollTop = Math.max(0, target - root.clientHeight * 0.02);
         }
 
-        /* Moves the pager. A page already fetched is painted at once; any other
-           is asked from the server (20 rows per request) and painted when it
-           lands - unless the record changed meanwhile, in which case the reply
-           belongs to a record the panel has already left and is dropped. */
+        /* Switches the filter: back to page 0 of that kind, painted at once when
+           that page is on hand, else fetched. */
+        function filterLines(kind) {
+            if (kind !== LINE_KIND_RECEIPT && kind !== LINE_KIND_PAYMENT) kind = LINE_KIND_ALL;
+            if (kind === linesKind) return;
+            linesKind = kind;
+            linesPage = 0;
+            repaintLines(true);
+            ensureLinesPage(0);
+        }
+
+        /* Moves the pager within the active filter. */
         function pageLines(delta) {
             var next = linesPage + delta;
             if (next < 0 || next > linePageCount() - 1) return;
             linesPage = next;
             repaintLines(true);
-            if (linePages.hasOwnProperty(next)) return;
+            ensureLinesPage(next);
+        }
+
+        /* A page already fetched is on screen already; any other is asked from
+           the server (20 rows per request, under the active filter) and painted
+           when it lands - unless the record or the filter changed meanwhile, in
+           which case the reply belongs to a page the panel has left and is
+           dropped. */
+        function ensureLinesPage(page) {
+            var kind = linesKind;
+            var key = pageKey(kind, page);
+            if (linePages.hasOwnProperty(key)) return;
 
             var recordId = +data.C_BankStatement_ID;
             var token = ++linesFetchToken;
@@ -1120,69 +1457,51 @@
                 url: VIS.Application.contextUrl + "VAS/VAS_292_BankingJournalRightPanel/GetJournalLines",
                 type: "GET",
                 dataType: "json",
-                data: { C_BankStatement_ID: recordId, page: next, pageSize: linesPerPage() },
+                data: { C_BankStatement_ID: recordId, page: page, pageSize: linesPerPage(), kind: kind },
                 success: function (raw) {
                     if (token !== linesFetchToken || mainToken !== fetchToken || !data || +data.C_BankStatement_ID !== recordId) return;
-                    var page = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
-                    linePages[next] = (page && page.Rows) ? page.Rows : [];
-                    if (linesPage === next) repaintLines(true);
+                    var reply = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
+                    linePages[key] = (reply && reply.Rows) ? reply.Rows : [];
+                    if (linesKind === kind && linesPage === page) repaintLines(true);
                 },
                 error: function (err) {
                     if (window.console) console.log(err);
                     if (token !== linesFetchToken || mainToken !== fetchToken) return;
-                    /* Back to the last page that is actually on hand. */
-                    linesPage = Math.max(0, next - delta);
+                    /* Back to the first page of the filter, which is the last one
+                       known to be on hand (or page 0 of "all" at worst). */
+                    if (!linePages.hasOwnProperty(pageKey(linesKind, 0))) linesKind = LINE_KIND_ALL;
+                    linesPage = 0;
                     repaintLines(false);
                     error(msg("VAS_292_LoadFailed", "Could not load the banking journal details."));
                 }
             });
         }
 
-        function lineRow(line, isLast) {
-            var amt = +line.StmtAmt || 0;
-            var dir = amt > 0 ? "inflow" : (amt < 0 ? "outflow" : "neutral");
-            var $r = $('<div class="' + CLS + 'dgRow' + (isLast ? " " + CLS + "last" : "") + '"></div>');
-
-            /* Leading affordance: the line's direction, row-specific. */
-            var $ic = $('<span class="' + CLS + 'dgIcon ' + CLS + 'is-' + dir + '"></span>')
-                .attr("title", dir === "inflow" ? msg("VAS_292_InflowLine", "Inflow line")
-                    : (dir === "outflow" ? msg("VAS_292_OutflowLine", "Outflow line") : msg("VAS_292_ZeroLine", "Zero amount line")));
-            $ic.append(icon(dir));
-            $r.append($ic);
-
-            $r.append(cell("dgCell " + CLS + "muted", String(line.Line || "")));
-
-            /* Description; the tooltip carries the line's detail. */
-            var detail = lineTooltip(line);
-            $r.append(cell("dgCell " + CLS + "dgPrimary", line.Description || "—", detail));
-
-            var text = lineAmount(line);
-            $r.append(cell("dgCell " + CLS + "dgAmount " + CLS + "right " + CLS + "tx-" + (dir === "inflow" ? "success" : (dir === "outflow" ? "risk" : "muted")), text));
-
-            var matchText = line.IsMatched ? msg("VAS_292_Matched", "Matched") : msg("VAS_292_Unmatched", "Unmatched");
-            $r.append(cell("dgCell " + CLS + "dgMatch " + CLS + "right " + CLS + "tx-" + (line.IsMatched ? "success" : "warning"), matchText));
-            return $r;
+        /* Opens / closes one card in place - no repaint of the section. */
+        function toggleLine(id) {
+            id = +id || 0;
+            if (!id || !$body) return;
+            var $card = $body.find('[data-sec="lines"] .' + CLS + 'txn[data-line="' + id + '"]').first();
+            if (!$card.length) return;
+            var open = !$card.hasClass(CLS + "isOpen");
+            if (open) openLines[id] = true; else delete openLines[id];
+            $card.toggleClass(CLS + "isOpen", open);
+            $card.children("." + CLS + "txnHead")
+                .attr("aria-expanded", open ? "true" : "false")
+                .attr("title", open ? msg("VAS_292_HideDetails", "Hide details") : msg("VAS_292_ShowDetails", "Show details"));
         }
 
-        /* Everything the row cannot show inline, one fact per line. */
-        function lineTooltip(line) {
-            var bits = [];
-            if (line.Description) bits.push(line.Description);
-            if (line.StatementLineDate) bits.push(msg("VAS_292_StatementLineDate", "Statement line date") + ": " + fmtDate(line.StatementLineDate));
-            if (line.ValutaDate) bits.push(msg("VAS_292_EffectiveDate", "Effective date") + ": " + fmtDate(line.ValutaDate));
-            if (line.DateAcct) bits.push(msg("VAS_292_AccountDate", "Account date") + ": " + fmtDate(line.DateAcct));
-            if (line.ReferenceNo) bits.push(msg("VAS_292_ReferenceNo", "Reference no.") + ": " + line.ReferenceNo);
-            if (line.PaymentDocumentNo) bits.push(msg("VAS_292_Payment", "Payment") + ": " + line.PaymentDocumentNo);
-            if (line.BPartnerName) bits.push(msg("VAS_292_BusinessPartner", "Business partner") + ": " + line.BPartnerName);
-            if (line.ChargeName) bits.push(msg("VAS_292_Charge", "Charge") + ": " + line.ChargeName);
-            return bits.join("\n");
-        }
+        /* Accounting impact - metric grid + account data grid, paged --------- */
 
-        /* Accounting impact - metric grid + account data grid --------------- */
+        function accountsPerPage() { return (data && +data.AccountsPageSize > 0) ? +data.AccountsPageSize : DEFAULT_ACCOUNTS_PER_PAGE; }
 
-        function canViewAccounting() {
-            return !!(isPosted() && window.VIS && typeof VIS.AcctViewer === "function"
-                && $self.curTab && typeof $self.curTab.getAD_Window_ID === "function");
+        function accountCount() { return (data && +data.AccountCount) || 0; }
+
+        function accountPageCount() { return Math.max(1, Math.ceil(accountCount() / accountsPerPage())); }
+
+        /* The accounts of the page on screen, or null while still on the wire. */
+        function currentAccounts() {
+            return accountPages.hasOwnProperty(accountsPage) ? accountPages[accountsPage] : null;
         }
 
         function renderAccounting() {
@@ -1192,8 +1511,8 @@
 
             var postedText = isPosted() ? msg("VAS_292_Posted", "Posted") : msg("VAS_292_Unposted", "Unposted");
             var $sec = section("accounting");
-            $sec.append(sectionHeader(msg("VAS_292_AccountingImpact", "Accounting impact"), postedText,
-                sectionAction("view-accounting", "book", msg("VAS_292_ViewAccounting", "View accounting"), canViewAccounting())));
+            /* Title only - the posting status sits in the metric grid below. */
+            $sec.append(sectionHeader(msg("VAS_292_AccountingImpact", "Accounting impact"), "", null));
 
             if (!hasFacts()) {
                 $sec.append($('<div class="' + CLS + 'secEmpty"></div>').text(msg("VAS_292_NoEntries", "No accounting entries posted yet.")));
@@ -1210,8 +1529,11 @@
             $card.grid.append(metric(msg("VAS_292_PostingStatus", "Posting status"), postedText, ""));
             $sec.append($card);
 
-            var accounts = data.Accounts || [];
-            if (!accounts.length) return $sec;   // never an empty account grid
+            if (!accountCount()) return $sec;   // never an empty account grid
+
+            var pageCount = accountPageCount();
+            if (accountsPage > pageCount - 1) accountsPage = pageCount - 1;
+            if (accountsPage < 0) accountsPage = 0;
 
             var $grid = $('<div class="' + CLS + 'dg ' + CLS + 'dgAccounts"></div>');
             var $head = $('<div class="' + CLS + 'dgHead"></div>');
@@ -1220,11 +1542,68 @@
             $head.append(cell("dgH " + CLS + "right", msg("VAS_292_Debit", "Debit")));
             $head.append(cell("dgH " + CLS + "right", msg("VAS_292_Credit", "Credit")));
             $grid.append($head);
-            for (var i = 0; i < accounts.length; i++) {
-                $grid.append(accountRow(accounts[i], i === accounts.length - 1));
+
+            var accounts = currentAccounts();
+            if (accounts) {
+                for (var i = 0; i < accounts.length; i++) {
+                    $grid.append(accountRow(accounts[i], i === accounts.length - 1));
+                }
+            } else {
+                /* Page still on the wire: the busy indicator holds the rows' place. */
+                $grid.append($('<div class="' + CLS + 'dgBusy">' +
+                    '<div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div>' +
+                    '</div>'));
             }
             $sec.append($grid);
+
+            if (pageCount > 1) $sec.append(pager(accountsPage, pageCount, accountCount(), accountsPerPage(), "accounts-prev", "accounts-next"));
             return $sec;
+        }
+
+        /* Only the accounting section is repainted, in place; on a page change
+           the panel is scrolled so the grid head sits at the top of the view. */
+        function repaintAccounting(scrollToGrid) {
+            if (!$body) return;
+            var $old = $body.children('[data-sec="accounting"]').first();
+            var $new = renderAccounting();
+            if (!$old.length || !$new) return;
+            $old.replaceWith($new);
+            if (scrollToGrid) scrollToElement($new.find("." + CLS + "dgHead")[0]);
+        }
+
+        /* Moves the breakdown pager. A page already fetched is painted at once;
+           any other is asked from the server (20 accounts per request) and
+           painted when it lands - unless the record changed meanwhile. */
+        function pageAccounts(delta) {
+            var next = accountsPage + delta;
+            if (next < 0 || next > accountPageCount() - 1) return;
+            accountsPage = next;
+            repaintAccounting(true);
+            if (accountPages.hasOwnProperty(next)) return;
+
+            var recordId = +data.C_BankStatement_ID;
+            var token = ++accountsFetchToken;
+            var mainToken = fetchToken;
+            $.ajax({
+                url: VIS.Application.contextUrl + "VAS/VAS_292_BankingJournalRightPanel/GetAccountBreakdown",
+                type: "GET",
+                dataType: "json",
+                data: { C_BankStatement_ID: recordId, page: next, pageSize: accountsPerPage() },
+                success: function (raw) {
+                    if (token !== accountsFetchToken || mainToken !== fetchToken || !data || +data.C_BankStatement_ID !== recordId) return;
+                    var reply = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
+                    accountPages[next] = (reply && reply.Rows) ? reply.Rows : [];
+                    if (accountsPage === next) repaintAccounting(true);
+                },
+                error: function (err) {
+                    if (window.console) console.log(err);
+                    if (token !== accountsFetchToken || mainToken !== fetchToken) return;
+                    /* Back to the last page that is actually on hand. */
+                    accountsPage = Math.max(0, next - delta);
+                    repaintAccounting(false);
+                    error(msg("VAS_292_LoadFailed", "Could not load the banking journal details."));
+                }
+            });
         }
 
         function accountRow(acct, isLast) {
@@ -1483,21 +1862,6 @@
                 }
                 aPanel.onTabChange($self.windowNo + "_" + lineTab.getAD_Tab_ID());
             } catch (e) { if (window.console) console.log(e); }
-        }
-
-        /* View accounting: the framework account viewer on this record - the
-           same dialog the window's Posted button raises for a posted document
-           (VIS.AcctViewer(client, table, record, windowNo, window).showDialog()).
-           Nothing is posted or re-posted from here. */
-        function viewAccounting() {
-            if (!canViewAccounting()) return;
-            var tableId = ($self.curTab && typeof $self.curTab.getAD_Table_ID === "function")
-                ? +$self.curTab.getAD_Table_ID() : (+data.Table_ID || $self.table_ID);
-            var recordId = +data.C_BankStatement_ID;
-            if (!(tableId > 0) || !(recordId > 0)) return;
-            var viewer = new VIS.AcctViewer(VIS.context.getAD_Client_ID(), tableId, recordId,
-                $self.windowNo, $self.curTab.getAD_Window_ID());
-            if (viewer && typeof viewer.showDialog === "function") viewer.showDialog();
         }
 
         this.markDisposed = function () { disposed = true; };
