@@ -1,16 +1,36 @@
 /********************************************************
  * Project Name   : ModelLibrary
- * Class Name     : MOpportunity
+ * Class Name     : MVASOpportunity
  * Purpose        : Business-logic layer over X_VAS_Opportunity (table VAS_Opportunity),
  *                  the opportunity counterpart of MProject / C_Project.
  * Class Used     : X_VAS_Opportunity
  * Chronological Development
  * VAI052           03-Jun-2026 - Promoted the empty stub to a public PO subclass and
  *                  ported the parent-side members required by VAS_GenerateQuotation
- *                  (GetLines() returning MOppLines[] and GetM_PriceList_ID() derived
+ *                  (GetLines() returning MVASOppLines[] and GetM_PriceList_ID() derived
  *                  from the price-list version) from MProject, adapted to the
  *                  VAS_Opportunity columns. Made the class public so the public
- *                  MOppLines API (parent constructor / GetOpportunity) compiles.
+ *                  MVASOppLines API (parent constructor / GetOpportunity) compiles.
+ * Claude            18-Sep-2026 - Moved from namespace ModelLibrary.Model to
+ *                  VAdvantage.Model, matching every other hand-written model class in
+ *                  this project (MAccount, MOrder, etc. - see CLAUDE.md's documented
+ *                  "ModelLibrary -> VAdvantage.*" convention). MVASOppLines.cs references
+ *                  MVASOpportunity with no "using ModelLibrary.Model;" and lives in
+ *                  VAdvantage.Model itself, so the mismatch was a hard CS0246 compile
+ *                  error (confirmed via a direct msbuild run) - MVASOppLines.UpdateHeader
+ *                  never ran because the whole file, and this whole class, never
+ *                  actually built.
+ * Claude            18-Sep-2026 - Renamed MOpportunity -> MVASOpportunity (table
+ *                  VAS_Opportunity). Every OTHER hand-written model for a custom
+ *                  X_VAS_* table in this project keeps "VAS" in the class name
+ *                  (X_VAS_ContractMaster -> MVASContractMaster, X_VAS_ContractLine ->
+ *                  MVASContractLine, etc. - six for six checked). MOpportunity/MOppLines
+ *                  were the only two that stripped it, which is why saving from the
+ *                  classic Window never ran BeforeSave/AfterSave here: the framework's
+ *                  reflection-based model lookup for VAS_Opportunity/VAS_OppLines
+ *                  couldn't find them under the stripped names. Confirmed by contrast -
+ *                  MLead (standard C_Lead prefix, core ADempiere convention) always
+ *                  triggered AfterSave correctly; only this custom-prefixed pair didn't.
  ******************************************************/
 
 using System;
@@ -21,11 +41,10 @@ using VAdvantage.DataBase;
 using VAdvantage.Logging;
 using VAdvantage.Model;
 using VAdvantage.Utility;
-using ViennaAdvantage.Model;
 
-namespace ModelLibrary.Model
+namespace VAdvantage.Model
 {
-    public class MOpportunity : X_VAS_Opportunity
+    public class MVASOpportunity : X_VAS_Opportunity
     {
         /// <summary>
         /// Standard Constructor
@@ -33,7 +52,7 @@ namespace ModelLibrary.Model
         /// <param name="ctx">context</param>
         /// <param name="VAS_Opportunity_ID">id</param>
         /// <param name="trxName">transaction</param>
-        public MOpportunity(Ctx ctx, int VAS_Opportunity_ID, Trx trxName) : base(ctx, VAS_Opportunity_ID, trxName)
+        public MVASOpportunity(Ctx ctx, int VAS_Opportunity_ID, Trx trxName) : base(ctx, VAS_Opportunity_ID, trxName)
         {
         }
 
@@ -43,7 +62,7 @@ namespace ModelLibrary.Model
         /// <param name="ctx">context</param>
         /// <param name="rs">result set</param>
         /// <param name="trxName">transaction</param>
-        public MOpportunity(Ctx ctx, DataRow rs, Trx trxName) : base(ctx, rs, trxName)
+        public MVASOpportunity(Ctx ctx, DataRow rs, Trx trxName) : base(ctx, rs, trxName)
         {
         }
         protected override bool BeforeSave(bool newRecord)
@@ -76,12 +95,12 @@ namespace ModelLibrary.Model
         /// <summary>
         /// Get Opportunity Lines. Counterpart of MProject.GetLines(); reads the
         /// VAS_OppLines child table instead of C_ProjectLine and returns the
-        /// hand-written MOppLines model for each row.
+        /// hand-written MVASOppLines model for each row.
         /// </summary>
         /// <returns>array of opportunity lines (never null)</returns>
-        public MOppLines[] GetLines()
+        public MVASOppLines[] GetLines()
         {
-            List<MOppLines> list = new List<MOppLines>();
+            List<MVASOppLines> list = new List<MVASOppLines>();
             String sql = "SELECT * FROM VAS_OppLines WHERE VAS_Opportunity_ID=" + GetVAS_Opportunity_ID() + " ORDER BY VAS_LineNo";
             IDataReader idr = null;
             DataTable dt = null;
@@ -93,7 +112,7 @@ namespace ModelLibrary.Model
                 idr.Close();
                 foreach (DataRow dr in dt.Rows)
                 {
-                    list.Add(new MOppLines(GetCtx(), dr, Get_TrxName()));
+                    list.Add(new MVASOppLines(GetCtx(), dr, Get_TrxName()));
                 }
             }
             catch (Exception ex)
@@ -113,7 +132,7 @@ namespace ModelLibrary.Model
                 dt = null;
             }
 
-            MOppLines[] retValue = new MOppLines[list.Count];
+            MVASOppLines[] retValue = new MVASOppLines[list.Count];
             retValue = list.ToArray();
             return retValue;
         }

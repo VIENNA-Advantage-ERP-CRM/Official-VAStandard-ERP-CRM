@@ -23,6 +23,34 @@
  * 14  | Close                                            | VAS_163_Close
  * 15  | No stock items found in this age bucket          | VAS_163_NoStockInBucket
  * 16  | Unable to load inventory aging summary           | VAS_163_UnableToLoadAgingSummary
+ * 17  | Products on hand by age                          | VAS_163_ProductsOnHandByAge
+ * 18  | 0-30 days                                         | VAS_163_Days0_30
+ * 19  | Fresh stock                                      | VAS_163_FreshStockMeta
+ * 20  | 31-90 days                                        | VAS_163_Days31_90
+ * 21  | Normal turnover                                  | VAS_163_NormalTurnoverMeta
+ * 22  | 91-180 days                                       | VAS_163_Days91_180
+ * 23  | Slow moving - watch                               | VAS_163_SlowMovingWatchMeta
+ * 24  | 180+ days                                         | VAS_163_Days180Plus
+ * 25  | Dead stock                                        | VAS_163_DeadStockMeta
+ * 26  | View                                              | VAS_163_ViewPrefix
+ * 27  | product                                           | VAS_163_Product
+ * 28  | products                                          | VAS_163_Products
+ * 29  | Inventory Aging                                   | VAS_163_InventoryAgingPrefix
+ * 30  | Loading...                                        | VAS_163_Loading
+ * 31  | Close modal                                       | VAS_163_CloseModal
+ * 32  | Age Bucket                                        | VAS_163_AgeBucket
+ * 33  | Category Status                                   | VAS_163_CategoryStatus
+ * 34  | Scope                                             | VAS_163_Scope
+ * 35  | All Stocked Items                                 | VAS_163_AllStockedItems
+ * 36  | Loading products...                              | VAS_163_LoadingProducts
+ * 37  | No products found in this age bucket.            | VAS_163_NoProductsFoundBucket
+ * 38  | Unable to load product list.                     | VAS_163_UnableToLoadProductList
+ * 39  | Products in this bucket                          | VAS_163_ProductsInBucket
+ * 40  | Item / Attributes                                | VAS_163_ItemAttributes
+ * 41  | Qty                                               | VAS_163_Qty
+ * 42  | Showing                                           | VAS_163_Showing
+ * 43  | Previous page                                     | VAS_163_PreviousPage
+ * 44  | Next page                                         | VAS_163_NextPage
  */
 ; VAS = window.VAS || {};
 
@@ -30,6 +58,10 @@
 
     /* Only used until a real row can be measured - see getAdaptivePageSize(). */
     var FALLBACK_MODAL_ROWS = 7;
+
+    function lbl(key) {
+        return VIS.Msg.getMsg(key);
+    }
 
     function ensureDashInlineSizeVar($el) {
         var container = $el.closest('.vis-widget-container, [data-dashboard-container], .vis-widget-body, body')[0] || document.documentElement;
@@ -60,7 +92,7 @@
         var $whSelect;
 
         var selectedWarehouseId = null;
-        var selectedWarehouseName = "All Warehouses";
+        var selectedWarehouseName = lbl("VAS_163_AllWarehouses");
         var warehousesList = [];
         var summaryData = { b0_30: 0, b31_90: 0, b91_180: 0, b180_plus: 0, totalQty: 0 };
 
@@ -69,10 +101,10 @@
         var $modalOverlay = null;
 
         var bucketsConfig = [
-            { id: "0-30", label: "0-30 days", meta: "Fresh stock", color: "#20A464" },
-            { id: "31-90", label: "31-90 days", meta: "Normal turnover", color: "#0083DA" },
-            { id: "91-180", label: "91-180 days", meta: "Slow moving - watch", color: "#D78B10" },
-            { id: "180+", label: "180+ days", meta: "Dead stock", color: "#D14545" }
+            { id: "0-30", label: lbl("VAS_163_Days0_30"), meta: lbl("VAS_163_FreshStockMeta"), color: "#20A464" },
+            { id: "31-90", label: lbl("VAS_163_Days31_90"), meta: lbl("VAS_163_NormalTurnoverMeta"), color: "#0083DA" },
+            { id: "91-180", label: lbl("VAS_163_Days91_180"), meta: lbl("VAS_163_SlowMovingWatchMeta"), color: "#D78B10" },
+            { id: "180+", label: lbl("VAS_163_Days180Plus"), meta: lbl("VAS_163_DeadStockMeta"), color: "#D14545" }
         ];
 
         this.Initalize = function () {
@@ -87,14 +119,14 @@
             var $leftCluster = $('<div class="vas-invaging-left-cluster">');
             var $iconWell = $('<div class="vas-invaging-icon-well"><i class="fa fa-clock-o"></i></div>');
             var $titleBlock = $('<div class="vas-invaging-title-block">');
-            var $title = $('<h3 class="vas-invaging-title">Inventory Aging Report</h3>');
-            var $subtitle = $('<span class="vas-invaging-subtitle">Products on hand by age</span>');
+            var $title = $('<h3 class="vas-invaging-title">' + lbl("VAS_163_InventoryAgingReport") + '</h3>');
+            var $subtitle = $('<span class="vas-invaging-subtitle">' + lbl("VAS_163_ProductsOnHandByAge") + '</span>');
             $titleBlock.append($title).append($subtitle);
             $leftCluster.append($iconWell).append($titleBlock);
 
             // Native Warehouse Select Control (Unclipped by container overflow:hidden)
             $whSelect = $('<select class="vas-invaging-wh-select">');
-            $whSelect.append('<option value="">All Warehouses</option>');
+            $whSelect.append('<option value="">' + lbl("VAS_163_AllWarehouses") + '</option>');
 
             $headerRow.append($leftCluster).append($whSelect);
             $root.append($headerRow);
@@ -104,7 +136,7 @@
 
             for (var i = 0; i < bucketsConfig.length; i++) {
                 var b = bucketsConfig[i];
-                var $btn = $('<button type="button" class="vas-invaging-bucket-btn" data-id="' + b.id + '" aria-label="View ' + b.label + ' products">');
+                var $btn = $('<button type="button" class="vas-invaging-bucket-btn" data-id="' + b.id + '" aria-label="' + lbl("VAS_163_ViewPrefix") + ' ' + b.label + ' ' + lbl("VAS_163_Products") + '">');
 
                 var $topLine = $('<div class="vas-invaging-top-line">');
                 var $labelCluster = $('<div class="vas-invaging-label-cluster">');
@@ -112,7 +144,7 @@
                 var $bTitle = $('<span class="vas-invaging-bucket-title">' + b.label + '</span>');
                 $labelCluster.append($dot).append($bTitle);
 
-                var $countText = $('<span class="vas-invaging-count-text" style="color: ' + b.color + ';">0 products</span>');
+                var $countText = $('<span class="vas-invaging-count-text" style="color: ' + b.color + ';">0 ' + lbl("VAS_163_Products") + '</span>');
                 $topLine.append($labelCluster).append($countText);
 
                 var $metaText = $('<div class="vas-invaging-meta-text">' + b.meta + '</div>');
@@ -161,9 +193,9 @@
 
                 if (selectedWarehouseId) {
                     var selectedOpt = $(this).find('option:selected').text();
-                    selectedWarehouseName = selectedOpt || "Warehouse";
+                    selectedWarehouseName = selectedOpt || lbl("VAS_163_Warehouse");
                 } else {
-                    selectedWarehouseName = "All Warehouses";
+                    selectedWarehouseName = lbl("VAS_163_AllWarehouses");
                 }
 
                 loadSummary();
@@ -191,7 +223,7 @@
 
         function renderWarehouseOptions() {
             $whSelect.empty();
-            $whSelect.append('<option value="">All Warehouses</option>');
+            $whSelect.append('<option value="">' + lbl("VAS_163_AllWarehouses") + '</option>');
 
             for (var i = 0; i < warehousesList.length; i++) {
                 var wh = warehousesList[i];
@@ -241,7 +273,7 @@
 
                 var btnObj = $bucketBtns[b.id];
                 if (btnObj) {
-                    btnObj.$countText.text(count.toLocaleString() + " qty");
+                    btnObj.$countText.text(count.toLocaleString() + " " + (count === 1 ? lbl("VAS_163_Product") : lbl("VAS_163_Products")));
 
                     var pct = total > 0 ? Math.round((count / total) * 100) : 0;
                     btnObj.$barFill.css("width", pct + "%");
@@ -260,28 +292,28 @@
             // Header (Chrome 56px)
             var $header = $('<div class="vas-invaging-modal-header">');
             var $headerLeft = $('<div class="vas-invaging-modal-header-left">');
-            var $title = $('<h3 class="vas-invaging-modal-title">Inventory Aging · ' + bConfig.label + '</h3>');
-            var $pill = $('<span class="vas-invaging-modal-pill">Loading...</span>');
+            var $title = $('<h3 class="vas-invaging-modal-title">' + lbl("VAS_163_InventoryAgingPrefix") + ' · ' + bConfig.label + '</h3>');
+            var $pill = $('<span class="vas-invaging-modal-pill">' + lbl("VAS_163_Loading") + '</span>');
             $headerLeft.append($title).append($pill);
 
-            var $closeBtn = $('<button type="button" class="vas-invaging-modal-close" aria-label="Close modal">&times;</button>');
+            var $closeBtn = $('<button type="button" class="vas-invaging-modal-close" aria-label="' + lbl("VAS_163_CloseModal") + '">&times;</button>');
             $header.append($headerLeft).append($closeBtn);
             $dialog.append($header);
 
             // Summary Field Grid
             var $summaryGrid = $(
                 '<div class="vas-invaging-summary-grid">' +
-                '<div class="vas-invaging-summary-cell"><span class="vas-invaging-summary-label">Age Bucket</span><span class="vas-invaging-summary-val" style="color:' + bConfig.color + ';">' + bConfig.label + '</span></div>' +
-                '<div class="vas-invaging-summary-cell"><span class="vas-invaging-summary-label">Category Status</span><span class="vas-invaging-summary-val">' + bConfig.meta + '</span></div>' +
-                '<div class="vas-invaging-summary-cell"><span class="vas-invaging-summary-label">Scope</span><span class="vas-invaging-summary-val">All Stocked Items</span></div>' +
-                '<div class="vas-invaging-summary-cell"><span class="vas-invaging-summary-label">Warehouse</span><span class="vas-invaging-summary-val">' + selectedWarehouseName + '</span></div>' +
+                '<div class="vas-invaging-summary-cell"><span class="vas-invaging-summary-label">' + lbl("VAS_163_AgeBucket") + '</span><span class="vas-invaging-summary-val" style="color:' + bConfig.color + ';">' + bConfig.label + '</span></div>' +
+                '<div class="vas-invaging-summary-cell"><span class="vas-invaging-summary-label">' + lbl("VAS_163_CategoryStatus") + '</span><span class="vas-invaging-summary-val">' + bConfig.meta + '</span></div>' +
+                '<div class="vas-invaging-summary-cell"><span class="vas-invaging-summary-label">' + lbl("VAS_163_Scope") + '</span><span class="vas-invaging-summary-val">' + lbl("VAS_163_AllStockedItems") + '</span></div>' +
+                '<div class="vas-invaging-summary-cell"><span class="vas-invaging-summary-label">' + lbl("VAS_163_Warehouse") + '</span><span class="vas-invaging-summary-val">' + selectedWarehouseName + '</span></div>' +
                 '</div>'
             );
             $dialog.append($summaryGrid);
 
             // Modal Body
             var $body = $('<div class="vas-invaging-modal-body">');
-            $body.html('<div class="vas-invaging-message">Loading products...</div>');
+            $body.html('<div class="vas-invaging-message">' + lbl("VAS_163_LoadingProducts") + '</div>');
             $dialog.append($body);
 
             $overlay.append($dialog);
@@ -299,17 +331,6 @@
             };
 
             $closeBtn.on('click', closeModal);
-            $overlay.on('click', function (e) {
-                if ($(e.target).hasClass('vas-invaging-modal-overlay')) {
-                    closeModal();
-                }
-            });
-
-            $(document).off('keydown.vas-invaging').on('keydown.vas-invaging', function (e) {
-                if (e.key === 'Escape' && $modalOverlay) {
-                    closeModal();
-                }
-            });
 
             // Fetch Bucket Details
             var url = VIS.Application.contextUrl + "VAS_163_InventoryAgingReportWidget/GetBucketDetail?bucketId=" + encodeURIComponent(bConfig.id);
@@ -324,17 +345,17 @@
                 success: function (res) {
                     if (res && res.details) {
                         var totalCount = res.totalCount || res.details.length;
-                        $pill.text(totalCount === 1 ? "1 product" : totalCount + " products");
+                        $pill.text(totalCount === 1 ? "1 " + lbl("VAS_163_Product") : totalCount + " " + lbl("VAS_163_Products"));
                         renderModalGrid($body, res.details, totalCount);
                     } else {
-                        $pill.text("0 products");
-                        $body.html('<div class="vas-invaging-message">No products found in this age bucket.</div>');
+                        $pill.text("0 " + lbl("VAS_163_Products"));
+                        $body.html('<div class="vas-invaging-message">' + lbl("VAS_163_NoProductsFoundBucket") + '</div>');
                     }
                 },
                 error: function (err) {
                     console.error("VAS_163_InventoryAgingReportWidget: Error loading bucket detail", err);
-                    $pill.text("0 products");
-                    $body.html('<div class="vas-invaging-message">Unable to load product list.</div>');
+                    $pill.text("0 " + lbl("VAS_163_Products"));
+                    $body.html('<div class="vas-invaging-message">' + lbl("VAS_163_UnableToLoadProductList") + '</div>');
                 }
             });
         }
@@ -385,15 +406,15 @@
 
             var modalPageSize = FALLBACK_MODAL_ROWS;
 
-            var $sectionTitle = $('<div class="vas-invaging-table-header">Products in this bucket</div>');
+            var $sectionTitle = $('<div class="vas-invaging-table-header">' + lbl("VAS_163_ProductsInBucket") + '</div>');
             $body.append($sectionTitle);
 
             var $headerGrid = $(
                 '<div class="vas-invaging-modal-grid-template vas-invaging-header-row" style="padding: 0.375em 0.5em; border-bottom: 1px solid #D7D7D7;">' +
-                '<div class="vas-invaging-modal-th">Item / Attributes</div>' +
-                '<div class="vas-invaging-modal-th">Warehouse</div>' +
-                '<div class="vas-invaging-modal-th">Locator</div>' +
-                '<div class="vas-invaging-modal-th vas-invaging-modal-th-right">Qty</div>' +
+                '<div class="vas-invaging-modal-th">' + lbl("VAS_163_ItemAttributes") + '</div>' +
+                '<div class="vas-invaging-modal-th">' + lbl("VAS_163_Warehouse") + '</div>' +
+                '<div class="vas-invaging-modal-th">' + lbl("VAS_163_Locator") + '</div>' +
+                '<div class="vas-invaging-modal-th vas-invaging-modal-th-right">' + lbl("VAS_163_Qty") + '</div>' +
                 '</div>'
             );
             $body.append($headerGrid);
@@ -403,11 +424,11 @@
 
             var $footer = $(
                 '<div class="vas-invaging-modal-footer">' +
-                '<div class="vas-invaging-modal-footer-text vas-m-helper">Showing 0-0 of 0 products</div>' +
+                '<div class="vas-invaging-modal-footer-text vas-m-helper">' + lbl("VAS_163_Showing") + ' 0-0 ' + lbl("VAS_163_Of") + ' 0 ' + lbl("VAS_163_Products") + '</div>' +
                 '<div class="vas-invaging-pager">' +
-                '<button type="button" class="vas-invaging-pager-btn vas-m-prev" aria-label="Previous page">&lsaquo;</button>' +
-                '<span class="vas-invaging-pager-info vas-m-info">1 of 1</span>' +
-                '<button type="button" class="vas-invaging-pager-btn vas-m-next" aria-label="Next page">&rsaquo;</button>' +
+                '<button type="button" class="vas-invaging-pager-btn vas-m-prev" aria-label="' + lbl("VAS_163_PreviousPage") + '">&lsaquo;</button>' +
+                '<span class="vas-invaging-pager-info vas-m-info">1 ' + lbl("VAS_163_Of") + ' 1</span>' +
+                '<button type="button" class="vas-invaging-pager-btn vas-m-next" aria-label="' + lbl("VAS_163_NextPage") + '">&rsaquo;</button>' +
                 '</div>' +
                 '</div>'
             );
@@ -428,13 +449,20 @@
                     var item = pageItems[i];
                     var formattedQty = Number(item.qty || 0).toLocaleString();
 
+                    /* Blank when the product has no attribute - no hyphen, no "Standard". Some
+                       attribute set instances carry a lone dash ("-"/"–"/"—") as their
+                       stored Description instead of being genuinely empty; treat that the same
+                       as no attribute rather than displaying it as if it were real data. */
+                    var rawAttribute = item.attribute || '';
+                    var attributeIsBlank = !rawAttribute.trim() || /^[-‐-―]+$/.test(rawAttribute.trim());
+                    var attributeText = attributeIsBlank ? '' : rawAttribute;
+
                     var $mRow = $(
                         '<div class="vas-invaging-modal-grid-template vas-invaging-modal-data-row">' +
                         '<div class="vas-invaging-cell">' +
                         '<div class="vas-invaging-prod-name" title="' + item.product + '">' + item.product + '</div>' +
-                        /* Blank when the product has no attribute - no hyphen, no "Standard".
-                           The element is still rendered so the row keeps its height. */
-                        '<div class="vas-invaging-prod-attr" title="' + (item.attribute || '') + '">' + (item.attribute || '&nbsp;') + '</div>' +
+                        /* The element is still rendered (with &nbsp;) so the row keeps its height. */
+                        '<div class="vas-invaging-prod-attr" title="' + attributeText + '">' + (attributeText || '&nbsp;') + '</div>' +
                         '</div>' +
                         '<div class="vas-invaging-cell vas-invaging-cell-text" title="' + item.warehouse + '">' + item.warehouse + '</div>' +
                         '<div class="vas-invaging-cell vas-invaging-cell-text" title="' + item.locator + '">' + item.locator + '</div>' +
@@ -458,8 +486,8 @@
                     }
                 }
 
-                $footer.find('.vas-m-helper').text('Showing ' + (totalCount > 0 ? (start + 1) : 0) + '–' + end + ' of ' + totalCount + (totalCount === 1 ? ' product' : ' products'));
-                $footer.find('.vas-m-info').text(modalPage + ' of ' + totalPages);
+                $footer.find('.vas-m-helper').text(lbl("VAS_163_Showing") + ' ' + (totalCount > 0 ? (start + 1) : 0) + '–' + end + ' ' + lbl("VAS_163_Of") + ' ' + totalCount + ' ' + (totalCount === 1 ? lbl("VAS_163_Product") : lbl("VAS_163_Products")));
+                $footer.find('.vas-m-info').text(modalPage + ' ' + lbl("VAS_163_Of") + ' ' + totalPages);
 
                 var $mPrev = $footer.find('.vas-m-prev');
                 var $mNext = $footer.find('.vas-m-next');

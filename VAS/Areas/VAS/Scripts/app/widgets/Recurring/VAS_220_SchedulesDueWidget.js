@@ -150,8 +150,7 @@
         var $modal = null;
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return (translated && translated.charAt(0) !== '[') ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         /* Placeholder substitution for the few messages that carry a number or a
@@ -491,10 +490,6 @@
                 }
             });
 
-            $(document).on('keydown.vas220modal', function (e) {
-                if (e.key === 'Escape') { closeModal(); }
-            });
-
             renderTable();
         }
 
@@ -504,7 +499,6 @@
                 $modal.remove();
                 $modal = null;
             }
-            $(document).off('keydown.vas220modal');
         }
 
         function renderTable() {

@@ -207,8 +207,7 @@
         var dialogLoading = false;
 
         function lbl(key, fallback) {
-            var t = (window.VIS && VIS.Msg) ? VIS.Msg.getMsg(key) : null;
-            return (t && t.charAt(0) !== '[') ? t : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function showBusy(show) {
@@ -923,16 +922,6 @@
                 closeDialog();
             });
 
-            $dialog.find('.vas-rr-dialog-scrim').on('click', function () {
-                closeDialog();
-            });
-
-            $(document).on('keydown.vas-rr', function (e) {
-                if (e.key === 'Escape' && $dialog.is(':visible')) {
-                    closeDialog();
-                }
-            });
-
             /* Attached to <body> so fixed positioning escapes any
                transformed dashboard ancestor. */
             $('body').append($dialog);
@@ -1070,7 +1059,6 @@
         };
 
         this.disposeComponent = function () {
-            $(document).off('keydown.vas-rr');
             $('body').removeClass('vas-rr-body-lock');
 
             if ($dialog) {

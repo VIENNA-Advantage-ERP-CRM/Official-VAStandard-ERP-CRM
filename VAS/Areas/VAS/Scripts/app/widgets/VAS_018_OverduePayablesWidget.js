@@ -372,8 +372,7 @@
         }
 
         function msg(key, fallback) {
-            var value = VIS.Msg.getMsg(key);
-            return value && value !== key && value !== '[' + key + ']' ? value : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function showOverdueDialog() {

@@ -39,8 +39,7 @@
     var AVATAR_COLORS = ['#1F83FF', '#5F4AA6', '#0B6B45', '#D78B10', '#0083DA', '#A33F3F'];
 
     function label(key, fallback) {
-        var t = VIS.Msg.getMsg(key);
-        return t && t.charAt(0) !== '[' ? t : fallback;
+        return VIS.Msg.getMsg(key);
     }
     function escapeHtml(value) {
         if (value == null) { return ''; }
@@ -105,7 +104,7 @@
         function build() {
             $modal = $(
                 '<div class="MPC-kpidrill" role="dialog" aria-modal="true" aria-hidden="true" aria-label="' + escapeHtml(opts.title || '') + '">' +
-                    '<div class="MPC-kpidrill-scrim" data-drill-close></div>' +
+                    '<div class="MPC-kpidrill-scrim"></div>' +
                     '<section class="MPC-kpidrill-panel">' +
                         '<header class="MPC-kpidrill-head">' +
                             '<h2 class="MPC-kpidrill-title">' + escapeHtml(opts.title || '') + '</h2>' +

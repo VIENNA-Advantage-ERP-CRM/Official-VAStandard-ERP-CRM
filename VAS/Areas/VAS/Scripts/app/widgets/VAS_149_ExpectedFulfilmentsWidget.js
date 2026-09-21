@@ -52,6 +52,9 @@
  * 36  | Locator                                       | VAS_149_EXF_Locator
  * 37  | Status                                        | VAS_149_EXF_Status
  * 38  | Data unavailable                             | VAS_149_EXF_DataUnavailable
+ * 39  | Include (prefix, product name appended)      | VAS_149_EXF_Include
+ * 40  | Locator for (prefix, product name appended)  | VAS_149_EXF_LocatorFor
+ * 41  | Quantity for (prefix, product name appended) | VAS_149_EXF_QuantityFor
  */
 ; VAS = window.VAS || {};
 
@@ -98,8 +101,7 @@
         var selectedWarehouseId = 0;
 
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            return (t && t.charAt(0) !== '[') ? t : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -292,10 +294,6 @@
                 '</div>'
             );
             $dialog.find('.vas-exf-mclose').on('click', closeDialog);
-            $dialog.find('.vas-exf-scrim').on('click', closeDialog);
-            $(document).on('keydown.vas-exf', function (e) {
-                if (e.key === 'Escape' && $dialog && !$dialog.hasClass('vas-exf-hidden')) { closeDialog(); }
-            });
 
             var $c = $dialog.find('.vas-exf-mcontent');
             $c.on('change', '.vas-exf-f-wh', onWarehouseChange);
@@ -409,11 +407,11 @@
             var rowCls = 'vas-exf-line' + (line.checked ? (Number(line.onHandQty) >= Number(line.qty) ? ' avail' : ' short') : ' off');
             var locOpts = optionList(modalData.locators, 'locatorId', 'locatorName', line.locatorId);
             return '<div class="' + rowCls + '" data-id="' + escapeHtml(line.orderLineId) + '">' +
-                '<button type="button" class="vas-exf-chk' + (line.checked ? ' on' : '') + '" data-id="' + escapeHtml(line.orderLineId) + '" aria-label="Include ' + escapeHtml(line.productName) + '">' + (line.checked ? checkIcon() : '') + '</button>' +
+                '<button type="button" class="vas-exf-chk' + (line.checked ? ' on' : '') + '" data-id="' + escapeHtml(line.orderLineId) + '" aria-label="' + escapeHtml(lbl('VAS_149_EXF_Include') + ' ' + line.productName) + '">' + (line.checked ? checkIcon() : '') + '</button>' +
                                 '<span class="vas-exf-lname" title="' + escapeHtml(line.productName) + '">' + escapeHtml(line.productName) + '</span>' +
                 badgeFor(line) +
-                '<select class="vas-exf-loc" data-id="' + escapeHtml(line.orderLineId) + '" aria-label="Locator for ' + escapeHtml(line.productName) + '"' + disabled + '>' + locOpts + '</select>' +
-                '<span class="vas-exf-qtywrap"><input type="number" min="1" class="vas-exf-qty" data-id="' + escapeHtml(line.orderLineId) + '" value="' + escapeHtml(line.qty) + '" aria-label="Quantity for ' + escapeHtml(line.productName) + '"' + disabled + ' />' +
+                '<select class="vas-exf-loc" data-id="' + escapeHtml(line.orderLineId) + '" aria-label="' + escapeHtml(lbl('VAS_149_EXF_LocatorFor') + ' ' + line.productName) + '"' + disabled + '>' + locOpts + '</select>' +
+                '<span class="vas-exf-qtywrap"><input type="number" min="1" class="vas-exf-qty" data-id="' + escapeHtml(line.orderLineId) + '" value="' + escapeHtml(line.qty) + '" aria-label="' + escapeHtml(lbl('VAS_149_EXF_QuantityFor') + ' ' + line.productName) + '"' + disabled + ' />' +
                 '<span class="vas-exf-uom">' + escapeHtml(line.uomName) + '</span></span>' +
                 '</div>';
         }
@@ -636,7 +634,6 @@
         this.refreshWidget = function () { loadFulfilments(1); };
         this.getRoot = function () { return $root; };
         this.disposeComponent = function () {
-            $(document).off('keydown.vas-exf');
             $('body').removeClass('vas-exf-body-lock');
             if ($dialog) { $dialog.remove(); $dialog = null; }
             $root.remove();

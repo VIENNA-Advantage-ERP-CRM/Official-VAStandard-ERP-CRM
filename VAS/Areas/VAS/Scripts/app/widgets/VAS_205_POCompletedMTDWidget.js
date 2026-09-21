@@ -118,8 +118,7 @@
         var ZOOM_TABLE = 'C_Order';
 
         function lbl(key, fallback) {
-            var msg = VIS.Msg.getMsg(key);
-            return (msg && msg !== key && msg !== '[' + key + ']' && msg.charAt(0) !== '[') ? msg : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -432,13 +431,7 @@
             $activeModal.find('#vas205-mBack').on('click', function () { backModal(); });
             $activeModal.find('#vas205-mClose').on('click', function () { closeModal(); });
             $activeModal.on('click', function (e) {
-                if (e.target === this || $(e.target).closest('[data-close]').length > 0) {
-                    closeModal();
-                }
-            });
-
-            $(document).off('keydown.vas205modal').on('keydown.vas205modal', function (e) {
-                if (e.key === 'Escape') {
+                if ($(e.target).closest('[data-close]').length > 0) {
                     closeModal();
                 }
             });
@@ -944,7 +937,6 @@
                 $card.off();
             }
             closeModal();
-            $(document).off('keydown.vas205modal');
             $wrapper.remove();
         };
     };

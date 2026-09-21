@@ -12,7 +12,7 @@
  *  2 | Lowest Selling Products               | VAS_114_LowestSelling
  *  3 | High                                  | VAS_114_High
  *  4 | Low                                   | VAS_114_Low
- *  5 | Last Year                             | VAS_017_LastYear
+ *  5 | Last Year                             | VAS_114_LastYear
  *  6 | Current Year                          | VAS_CurrentYear
  *  7 | Ea                                    | VAS_114_UnitEa
  *  8 | No completed sales found.             | VAS_114_NoSales
@@ -54,8 +54,7 @@
         var ICON_LOW = '<polyline points="3 7 9 13 13 9 21 17"></polyline><polyline points="14 17 21 17 21 10"></polyline>';
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return translated && translated.charAt(0) !== '[' ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -177,7 +176,7 @@
                 '<div class="MPC-ts-cols">' +
                     '<div class="MPC-ts-col">' +
                         valueHtml(row.previous_year_value, row.previous_year_units, 'MPC-ts-last') +
-                        '<span class="MPC-ts-l">' + escapeHtml(label('VAS_017_LastYear', 'Last Year')) + '</span>' +
+                        '<span class="MPC-ts-l">' + escapeHtml(label('VAS_114_LastYear', 'Last Year')) + '</span>' +
                     '</div>' +
                     '<div class="MPC-ts-col">' +
                         valueHtml(row.current_year_value, row.current_year_units, 'MPC-ts-cur' + (low ? ' MPC-ts-bad' : '')) +

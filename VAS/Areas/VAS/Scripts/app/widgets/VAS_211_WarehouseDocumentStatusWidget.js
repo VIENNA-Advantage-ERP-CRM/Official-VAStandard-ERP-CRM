@@ -87,8 +87,7 @@
     }
 
     function lbl(key, fallback) {
-        var t = VIS.Msg.getMsg(key);
-        return (t && t !== key && t !== '[' + key + ']') ? t : fallback;
+        return VIS.Msg.getMsg(key);
     }
 
     function escapeHtml(value) {
@@ -174,7 +173,7 @@
             var lang = (VIS && VIS.Env) ? VIS.Env.getLanguage() : (window.navigator.language || 'en-US');
             return d.toLocaleString(lang, { month: 'long' });
         } catch (e) {
-            return MONTH_NAMES[monthIndex] || ('Month ' + (monthIndex + 1));
+            return MONTH_NAMES[monthIndex] || (lbl('Month', 'Month') + ' ' + (monthIndex + 1));
         }
     }
 
@@ -481,15 +480,6 @@
 
             $modalMask.find('.vas-211-mclose').on('click', closeModal);
             $modalMask.find('.vas-211-mback').on('click', backModal);
-            $modalMask.on('click', function (e) {
-                if (e.target === this) { closeModal(); }
-            });
-
-            $(document).on('keydown.vas211', function (e) {
-                if (e.key === 'Escape' && $modalMask && $modalMask.hasClass('vas-211-open')) {
-                    closeModal();
-                }
-            });
         }
 
         function openModalShell(config, isBack) {
@@ -964,7 +954,6 @@
 
         this.disposeComponent = function () {
             closeModal();
-            $(document).off('keydown.vas211');
             if ($modalMask) {
                 $modalMask.remove();
                 $modalMask = null;

@@ -132,8 +132,7 @@
     ];
 
     function label(key, fallback) {
-        var t = VIS.Msg.getMsg(key);
-        return t && t.charAt(0) !== '[' ? t : fallback;
+        return VIS.Msg.getMsg(key);
     }
 
     function escapeHtml(value) {
@@ -384,7 +383,7 @@
         function createListDialog() {
             $list = $(
                 '<div class="vas260-dialog" role="dialog" aria-modal="true" aria-hidden="true">' +
-                    '<div class="vas260-scrim" data-list-close></div>' +
+                    '<div class="vas260-scrim"></div>' +
                     '<section class="vas260-panel">' +
                         '<header class="vas260-phead">' +
                             '<h2 class="vas260-ptitle"></h2>' +
@@ -419,9 +418,7 @@
             $list.on('click', '.vas260-pgbtn', function () { turnPage($(this).attr('data-dir')); });
             $(document).on('keydown.MPCvas260', function (event) {
                 if (event.key !== 'Escape') { return; }
-                if ($confirm && $confirm.hasClass('is-open')) { closeConfirm(); return; }
-                if ($detail && $detail.hasClass('is-open')) { closeDetail(); return; }
-                if ($list.hasClass('is-open')) { closeList(); }
+                if ($confirm && $confirm.hasClass('is-open')) { closeConfirm(); }
             });
         }
 
@@ -559,7 +556,7 @@
         function createDetailDialog() {
             $detail = $(
                 '<div class="vas260-modal" role="dialog" aria-modal="true" aria-hidden="true">' +
-                    '<div class="vas260-scrim" data-detail-close></div>' +
+                    '<div class="vas260-scrim"></div>' +
                     '<section class="vas260-panel">' +
                         '<header class="vas260-mhead">' +
                             '<h2 class="vas260-mtitle">' + escapeHtml(label('VAS_260_ContractTitle', 'Service Contract')) + '</h2>' +

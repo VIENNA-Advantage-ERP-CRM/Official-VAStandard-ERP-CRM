@@ -19,6 +19,9 @@
 
     // Window name/search key for the Inventory Count screen, same target VAS_158 navigates to.
     var COUNT_WINDOW_NAME = "VAS_PhysicalInventory";
+    /* Resolved AD_Window_ID for the Home Page zoom path, cached after the first successful
+       lookup so a second click does not repeat the round trip. */
+    var countWindowId = 0;
     /* Lines the popup holds before paging. MUST stay in step with --vas-rows in
        VAS_156_CountedMTDWidget.css, which sizes the dialog to exactly this many rows. */
     var MODAL_PAGE_SIZE = 7;
@@ -41,8 +44,7 @@
         var modalTotalPages = 1;
 
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            return (t && t.charAt(0) !== '[') ? t : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function showBusy(show) {
@@ -161,13 +163,20 @@
 
         function openInventoryRecord(inventoryId) {
             if (!inventoryId) { return; }
-            $self.widgetFirevalueChanged({
-                "TabWhereClause": "M_Inventory.M_Inventory_ID=" + Number(inventoryId),
-                "TabLayout": "Y",
-                "TabIndex": "0",
-                "ActionName": hostWindowName() || COUNT_WINDOW_NAME,
-                "ActionType": "W"
-            });
+            if ($self.windowNo >= 0) {
+                /* Screen Landing Page */
+                $self.widgetFirevalueChanged({
+                    "TabWhereClause": "M_Inventory.M_Inventory_ID=" + Number(inventoryId),
+                    "TabLayout": "Y",
+                    "TabIndex": "0",
+                    "ActionName": hostWindowName() || COUNT_WINDOW_NAME,
+                    "ActionType": "W"
+                });
+            } else {
+                /* From Home Page */
+                VAS.ZoomUtil.zoomToRecord("M_Inventory_ID", Number(inventoryId), countWindowId, "VAS_PhysicalInventory", "Physical Inventory")
+                    .done(function (id) { if (id > 0) { countWindowId = id; } });
+            }
         }
 
         /* The status chip was rendering "Completed;" / "Closed;".
@@ -248,7 +257,6 @@
         }
 
         function openDetailModal() {
-            $(document).off('keydown.vas-counted-mtd');
             if ($modal) { $modal.remove(); }
 
             $modal = $(
@@ -260,11 +268,11 @@
                 '</div>' +
                 '<div class="vas-counted-mtd-modal-body">' +
                 '<div class="vas-counted-mtd-grid-row vas-counted-mtd-header-row">' +
-                '<div class="vas-counted-mtd-th">' + escapeHtml(lbl("VAS_DocNo", "Document No")) + '</div>' +
+                '<div class="vas-counted-mtd-th">' + escapeHtml(lbl("VAS_156_DocNo", "Document No")) + '</div>' +
                 '<div class="vas-counted-mtd-th">' + escapeHtml(lbl("VAS_Warehouse", "Warehouse")) + '</div>' +
                 '<div class="vas-counted-mtd-th">' + escapeHtml(lbl("VAS_Date", "Date")) + '</div>' +
                 '<div class="vas-counted-mtd-th vas-counted-mtd-th-right">' + escapeHtml(lbl("VAS_Lines", "Lines")) + '</div>' +
-                '<div class="vas-counted-mtd-th vas-counted-mtd-th-right">' + escapeHtml(lbl("VAS_Products", "Products")) + '</div>' +
+                '<div class="vas-counted-mtd-th vas-counted-mtd-th-right">' + escapeHtml(lbl("VAS_156_Products", "Products")) + '</div>' +
                 '<div class="vas-counted-mtd-th">' + escapeHtml(lbl("VAS_Status", "Status")) + '</div>' +
                 '</div>' +
                 '<div class="vas-counted-mtd-rows"></div>' +
@@ -282,19 +290,12 @@
             );
 
             function closeModal() {
-                $(document).off('keydown.vas-counted-mtd');
                 if ($modal) { $modal.remove(); $modal = null; }
             }
 
-            // Close button and scrim need separate handlers: the button's own glyph is the event
-            // target, so an `e.target === this` guard on a combined handler makes it a dead zone.
             $modal.find('.vas-counted-mtd-modal-close').on('click', function (e) {
                 e.stopPropagation();
                 closeModal();
-            });
-            $modal.on('click', function (e) { if (e.target === this) { closeModal(); } });
-            $(document).on('keydown.vas-counted-mtd', function (e) {
-                if (e.key === 'Escape' || e.keyCode === 27) { closeModal(); }
             });
 
             $modal.find('.vas-counted-mtd-prev').on('click', function () {
@@ -374,7 +375,6 @@
                 widgetObserver = null;
             }
             // The modal lives on <body>, so detaching $wrapper alone would leak it.
-            $(document).off('keydown.vas-counted-mtd');
             if ($modal) { $modal.remove(); $modal = null; }
             $wrapper.remove();
         };

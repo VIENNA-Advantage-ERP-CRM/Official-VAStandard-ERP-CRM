@@ -75,20 +75,20 @@
  *  8 | Created By                               | VAS_198_CreatedBy
  *  9 | No accounting value for this transaction type (tooltip) | VAS_198_NoAmountStrategy
  * 10 | Value                                    | VAS_Value                 (reuse)
- * 11 | Account Date                             | VAS_200_DateAcct          (reuse)
+ * 11 | Account Date                             | VAS_198_DateAcct
  * 12 | Document Type                            | VIS_DocumentType          (reuse)
- * 13 | Currency                                 | VAS_201_Currency          (reuse)
- * 14 | No open accounting period                | VAS_201_NoOpenPeriod      (reuse)
- * 15 | Dashboard period                         | VAS_201_DashboardPeriod   (reuse)
- * 16 | No records in this category              | VAS_201_NoRecords         (reuse)
+ * 13 | Currency                                 | VAS_198_Currency
+ * 14 | No open accounting period                | VAS_198_NoOpenPeriod
+ * 15 | Dashboard period                         | VAS_198_DashboardPeriod
+ * 16 | No records in this category              | VAS_198_NoRecords
  * 17 | Document No                              | DocumentNo                (reuse)
  * 18 | Created By                    (column)   | CreatedBy                 (reuse)
- * 19 | Close                                    | VAS_018_Close             (reuse)
- * 20 | Couldn't load                            | VAS_192_CouldntLoad       (reuse)
- * 21 | Showing                                  | VAS_026_Showing           (reuse)
- * 22 | of                                       | VAS_026_Of                (reuse)
- * 23 | Previous                                 | VAS_026_Prev              (reuse)
- * 24 | Next                                     | VAS_026_Next              (reuse)
+ * 19 | Close                                    | VAS_198_Close
+ * 20 | Couldn't load                            | VAS_198_CouldntLoad
+ * 21 | Showing                                  | VAS_198_Showing
+ * 22 | of                                       | VAS_198_Of
+ * 23 | Previous                                 | VAS_198_Prev
+ * 24 | Next                                     | VAS_198_Next
  * 25 | Other                                    | VAS_198_OtherRecords      (server)
  *
  * (server) is resolved in VAS_198_UnPostedAccountEntriesModel, not here: it
@@ -194,8 +194,7 @@
         // ── Small helpers ────────────────────────────────────────────────────
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return (translated && translated.charAt(0) !== '[' && translated !== key) ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         /* Column captions: prefer the framework's own translated element name so a
@@ -414,7 +413,7 @@
                 success: function (res) {
                     var data = null;
                     try { data = parseResponse(res); } catch (e) { }
-                    if (!data || data.error) { renderState(label('VAS_192_CouldntLoad', "Couldn't load"), true); return; }
+                    if (!data || data.error) { renderState(label('VAS_198_CouldntLoad', "Couldn't load"), true); return; }
 
                     _periods = data.Periods || [];
                     _periodId = data.C_Period_ID || 0;
@@ -423,13 +422,13 @@
                     paintPeriod();
 
                     if (_periods.length === 0 || _periodId <= 0) {
-                        renderState(label('VAS_201_NoOpenPeriod', 'No open accounting period.'), false);
+                        renderState(label('VAS_198_NoOpenPeriod', 'No open accounting period.'), false);
                         return;
                     }
 
                     applyData(data.Data);
                 },
-                error: function () { renderState(label('VAS_192_CouldntLoad', "Couldn't load"), true); },
+                error: function () { renderState(label('VAS_198_CouldntLoad', "Couldn't load"), true); },
                 complete: function () { showBusy(false); }
             });
         }
@@ -444,7 +443,7 @@
                 success: function (res) {
                     var data = null;
                     try { data = parseResponse(res); } catch (e) { }
-                    if (!data || data.error) { renderState(label('VAS_192_CouldntLoad', "Couldn't load"), true); return; }
+                    if (!data || data.error) { renderState(label('VAS_198_CouldntLoad', "Couldn't load"), true); return; }
 
                     /* A late response for a period the user has already moved away
                        from must not overwrite the current card. */
@@ -459,7 +458,7 @@
 
                     applyData(data);
                 },
-                error: function () { renderState(label('VAS_192_CouldntLoad', "Couldn't load"), true); },
+                error: function () { renderState(label('VAS_198_CouldntLoad', "Couldn't load"), true); },
                 complete: function () { showBusy(false); }
             });
         }
@@ -560,16 +559,16 @@
                 escapeHtml(hint) + '</span>';
 
             if (totalPages > 1) {
-                var ofTxt = label('VAS_026_Of', 'of');
+                var ofTxt = label('VAS_198_Of', 'of');
                 var prevDis = _cardPage <= 1 ? ' disabled' : '';
                 var nextDis = _cardPage >= totalPages ? ' disabled' : '';
 
                 html += '<span class="vas-198-pager-nav">' +
                     '<button type="button" class="vas-198-pgbtn" data-dir="prev" aria-label="' +
-                        escapeHtml(label('VAS_026_Prev', 'Previous')) + '"' + prevDis + '>' + icon('chevL') + '</button>' +
+                        escapeHtml(label('VAS_198_Prev', 'Previous')) + '"' + prevDis + '>' + icon('chevL') + '</button>' +
                     '<span class="vas-198-pager-label">' + _cardPage + ' ' + escapeHtml(ofTxt) + ' ' + totalPages + '</span>' +
                     '<button type="button" class="vas-198-pgbtn" data-dir="next" aria-label="' +
-                        escapeHtml(label('VAS_026_Next', 'Next')) + '"' + nextDis + '>' + icon('chevNext') + '</button>' +
+                        escapeHtml(label('VAS_198_Next', 'Next')) + '"' + nextDis + '>' + icon('chevNext') + '</button>' +
                 '</span>';
             }
 
@@ -628,7 +627,7 @@
            detail modal it closes on an outside click - it is a menu, not a dialog. */
         function buildPicker() {
             $picker = $('<div class="vas-198-pp vas-198-hidden" role="listbox" aria-label="' +
-                escapeHtml(label('VAS_201_DashboardPeriod', 'Dashboard period')) + '">');
+                escapeHtml(label('VAS_198_DashboardPeriod', 'Dashboard period')) + '">');
             $('body').append($picker);
 
             $picker.on('click', '.vas-198-pp-opt', function () {
@@ -640,7 +639,7 @@
 
         function fillPicker() {
             var html = '<div class="vas-198-pp-h">' +
-                escapeHtml(label('VAS_201_DashboardPeriod', 'Dashboard period')) + '</div>';
+                escapeHtml(label('VAS_198_DashboardPeriod', 'Dashboard period')) + '</div>';
 
             for (var i = 0; i < _periods.length; i++) {
                 var p = _periods[i];
@@ -788,7 +787,7 @@
                                 '<div class="vas-198-modal-sub"></div>' +
                             '</div>' +
                             '<button type="button" class="vas-198-modal-close" aria-label="' +
-                                escapeHtml(label('VAS_018_Close', 'Close')) + '">' + icon('close') + '</button>' +
+                                escapeHtml(label('VAS_198_Close', 'Close')) + '">' + icon('close') + '</button>' +
                         '</div>' +
                         '<div class="vas-198-modal-body"></div>' +
                         '<div class="vas-198-modal-foot"></div>' +
@@ -858,8 +857,6 @@
             _modalOpen = true;
             closePicker();
 
-            $(document).on('keydown' + _ns + 'm', onModalKeyDown);
-
             loadModalPage();
         }
 
@@ -869,11 +866,6 @@
             _detailSeq++;                       // drop any page still in flight
             showModalBusy(false);
             if ($overlay) { $overlay.addClass('vas-198-hidden'); }
-            $(document).off('keydown' + _ns + 'm');
-        }
-
-        function onModalKeyDown(e) {
-            if (e.key === 'Escape' || e.keyCode === 27) { closeModal(); }
         }
 
         function showModalBusy(show) {
@@ -911,7 +903,7 @@
                     try { data = parseResponse(res); } catch (e) { }
 
                     if (!data || data.error || data.ErrorCode) {
-                        renderModalState(label('VAS_192_CouldntLoad', "Couldn't load"), true);
+                        renderModalState(label('VAS_198_CouldntLoad', "Couldn't load"), true);
                         return;
                     }
 
@@ -920,7 +912,7 @@
                 },
                 error: function () {
                     if (mySeq !== _detailSeq) { return; }
-                    renderModalState(label('VAS_192_CouldntLoad', "Couldn't load"), true);
+                    renderModalState(label('VAS_198_CouldntLoad', "Couldn't load"), true);
                 },
                 complete: function () {
                     /* Only the newest request may clear the indicator - an overtaken
@@ -954,14 +946,14 @@
 
             var captions = [
                 colLabel('DocumentNo', 'VAS_198_DocumentNo', 'Document No'),
-                colLabel(dateColumn, 'VAS_200_DateAcct', 'Account Date')
+                colLabel(dateColumn, 'VAS_198_DateAcct', 'Account Date')
             ];
 
             if (data.HasDocType) {
                 captions.push(colLabel('C_DocType_ID', 'VIS_DocumentType', 'Document Type'));
             }
             if (data.HasCurrency) {
-                captions.push(colLabel('C_Currency_ID', 'VAS_201_Currency', 'Currency'));
+                captions.push(colLabel('C_Currency_ID', 'VAS_198_Currency', 'Currency'));
             }
             if (data.HasCreatedBy) {
                 captions.push(colLabel('CreatedBy', 'VAS_198_CreatedBy', 'Created By'));
@@ -992,7 +984,7 @@
             var rows = data.Rows || [];
 
             if (rows.length === 0) {
-                renderModalState(label('VAS_201_NoRecords', 'No records in this category.'), false);
+                renderModalState(label('VAS_198_NoRecords', 'No records in this category.'), false);
                 return;
             }
 
@@ -1117,8 +1109,8 @@
             var from = rows > 0 ? ((pageNo - 1) * pageSize) + 1 : 0;
             var to = rows > 0 ? from + rows - 1 : 0;
 
-            var ofTxt = label('VAS_026_Of', 'of');
-            var showing = label('VAS_026_Showing', 'Showing') + ' ' + from + '–' + to + ' ' +
+            var ofTxt = label('VAS_198_Of', 'of');
+            var showing = label('VAS_198_Showing', 'Showing') + ' ' + from + '–' + to + ' ' +
                 ofTxt + ' ' + formatCount(total);
 
             var prevDis = pageNo <= 1 ? ' disabled' : '';
@@ -1129,10 +1121,10 @@
                     escapeHtml(showing) + '</span>' +
                 '<span class="vas-198-pager-nav">' +
                     '<button type="button" class="vas-198-pgbtn" data-dir="prev" aria-label="' +
-                        escapeHtml(label('VAS_026_Prev', 'Previous')) + '"' + prevDis + '>' + icon('chevL') + '</button>' +
+                        escapeHtml(label('VAS_198_Prev', 'Previous')) + '"' + prevDis + '>' + icon('chevL') + '</button>' +
                     '<span class="vas-198-pager-label">' + pageNo + ' ' + escapeHtml(ofTxt) + ' ' + totalPages + '</span>' +
                     '<button type="button" class="vas-198-pgbtn" data-dir="next" aria-label="' +
-                        escapeHtml(label('VAS_026_Next', 'Next')) + '"' + nextDis + '>' + icon('chevNext') + '</button>' +
+                        escapeHtml(label('VAS_198_Next', 'Next')) + '"' + nextDis + '>' + icon('chevNext') + '</button>' +
                 '</span>'
             );
         }
@@ -1152,7 +1144,7 @@
                 VAS.ZoomUtil.zoomToRecord(keyColumn, recordId, windowId, '', '');
             } catch (e) {
                 if (window.console) { console.log(e); }
-                showError(label('VAS_192_CouldntLoad', "Couldn't load"));
+                showError(label('VAS_198_CouldntLoad', "Couldn't load"));
             }
         }
 

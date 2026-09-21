@@ -88,12 +88,7 @@
         var adaptiveAdjustCount = 0;
 
         function lbl(key, fallback) {
-            var text = VIS.Msg.getMsg(key);
-
-            return text &&
-                text !== '[' + key + ']'
-                ? text
-                : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function normalizeResponse(response) {
@@ -1417,8 +1412,7 @@
             );
 
             $dialog.find(
-                '.vas-cpa-dialog-close, ' +
-                '.vas-cpa-dialog-scrim'
+                '.vas-cpa-dialog-close'
             ).on(
                 'click',
                 closeDialog
@@ -1494,19 +1488,6 @@
                                 'Payment reconciliation window is not configured'
                             )
                         );
-                    }
-                }
-            );
-
-            $(document).on(
-                'keydown.VAS_027_ClearedAPPaymentWidget',
-                function (event) {
-                    if (
-                        event.key === 'Escape' &&
-                        $dialog &&
-                        $dialog.is(':visible')
-                    ) {
-                        closeDialog();
                     }
                 }
             );

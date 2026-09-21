@@ -9,42 +9,42 @@
  * Summary Message Table
  *  # | Current Text                                  | Message Key
  * ---+-----------------------------------------------+-----------------------------
- *  0 | Record / Open / Open product record           | VAS_Record, VAS_Open, VAS_OpenProductRecord
- *  1 | Search product by name, code, type or category| VAS_ProductSearchPlaceholder
- *  2 | Select a result for full product detail       | VAS_ProductSearchHelper
- *  3 | Searching...                                  | VAS_ProductSearching
- *  4 | No products match                             | VAS_ProductNoMatches
- *  5 | Product Detail                                | VAS_ProductDetail
- *  6 | Unable to load product detail.                | VAS_ProductDetailLoadError
- *  7 | latest records                                | VAS_LatestRecords
- *  8 | No records found for this product.            | VAS_NoProductRecords
- *  9 | On Hand Qty                                   | VAS_OnHandQty
- * 10 | Stock Value                                   | VAS_StockValue
- * 11 | Reorder Point                                 | VAS_ReorderPoint
- * 12 | Overview                                      | VAS_Overview
- * 13 | Stock                                         | VAS_Stock
+ *  0 | Record / Open / Open product record           | VAS_078_Record, VAS_078_Open, VAS_078_OpenProductRecord
+ *  1 | Search product by name, code, type or category| VAS_078_ProductSearchPlaceholder
+ *  2 | Select a result for full product detail       | VAS_078_ProductSearchHelper
+ *  3 | Searching...                                  | VAS_078_ProductSearching
+ *  4 | No products match                             | VAS_078_ProductNoMatches
+ *  5 | Product Detail                                | VAS_078_ProductDetail
+ *  6 | Unable to load product detail.                | VAS_078_ProductDetailLoadError
+ *  7 | latest records                                | VAS_078_LatestRecords
+ *  8 | No records found for this product.            | VAS_078_NoProductRecords
+ *  9 | On Hand Qty                                   | VAS_078_OnHandQty
+ * 10 | Stock Value                                   | VAS_078_StockValue
+ * 11 | Reorder Point                                 | VAS_078_ReorderPoint
+ * 12 | Overview                                      | VAS_078_Overview
+ * 13 | Stock                                         | VAS_078_Stock
  * 14 | Purchase Orders                               | VAS_PurchaseOrders
- * 15 | Sales Orders                                  | VAS_SalesOrders
- * 16 | Movements                                     | VAS_Movements
- * 17 | Requisitions                                  | VAS_Requisitions
- * 18 | Preferred Supplier                            | VAS_PreferredSupplier
- * 19 | Product Code                                  | VAS_ProductCode
- * 20 | Product Type                                  | VAS_ProductType
- * 21 | Product Category                              | VAS_ProductCategory
- * 22 | Unit of Measure                               | VAS_UnitOfMeasure
- * 23 | Ordered Qty                                   | VAS_OrderedQty
- * 24 | Delivered Qty                                 | VAS_DeliveredQty
- * 25 | Required Date                                 | VAS_RequiredDate
- * 26 | Document Date                                 | VAS_DocumentDate
+ * 15 | Sales Orders                                  | VAS_078_SalesOrders
+ * 16 | Movements                                     | VAS_078_Movements
+ * 17 | Requisitions                                  | VAS_078_Requisitions
+ * 18 | Preferred Supplier                            | VAS_078_PreferredSupplier
+ * 19 | Product Code                                  | VAS_078_ProductCode
+ * 20 | Product Type                                  | VAS_078_ProductType
+ * 21 | Product Category                              | VAS_078_ProductCategory
+ * 22 | Unit of Measure                               | VAS_078_UnitOfMeasure
+ * 23 | Ordered Qty                                   | VAS_078_OrderedQty
+ * 24 | Delivered Qty                                 | VAS_078_DeliveredQty
+ * 25 | Required Date                                 | VAS_078_RequiredDate
+ * 26 | Document Date                                 | VAS_078_DocumentDate
  * 27 | Previous page                                 | VAS_PreviousPage
  * 28 | Next page                                     | VAS_NextPage
  * 29 | Showing                                       | VAS_Showing
  * 30 | of                                            | VAS_Of
- * 31 | Discontinued From                             | VAS_DiscontinuedFrom
+ * 31 | Discontinued From                             | VAS_078_DiscontinuedFrom
  * 32 | Attribute                                     | VAS_Attribute
- * 33 | Delivered                                     | VAS_StatusDelivered
- * 34 | Partial                                       | VAS_StatusPartial
- * 35 | Discontinued                                  | VAS_StatusDiscontinued
+ * 33 | Delivered                                     | VAS_078_StatusDelivered
+ * 34 | Partial                                       | VAS_078_StatusPartial
+ * 35 | Discontinued                                  | VAS_078_StatusDiscontinued
  */
 ; VAS = window.VAS || {};
 
@@ -58,6 +58,7 @@
         var $self = this;
         var $root = $('<div class="MPC-product-search-root">');
         var $input;
+        var $clearBtn;
         var $suggest;
         var $dialog;
         var $dialogTitle;
@@ -96,8 +97,7 @@
         var openProductDetail;
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return translated && translated.charAt(0) !== '[' ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -227,24 +227,24 @@
 
         function productTypeLabel(code) {
             var productTypes = {
-                I: label('VAS_ProductTypeItem', 'Item'),
-                S: label('VAS_ProductTypeService', 'Service'),
-                R: label('VAS_ProductTypeResource', 'Resource'),
-                E: label('VAS_ProductTypeExpense', 'Expense'),
-                O: label('VAS_ProductTypeOnline', 'Online')
+                I: label('VAS_078_ProductTypeItem', 'Item'),
+                S: label('VAS_078_ProductTypeService', 'Service'),
+                R: label('VAS_078_ProductTypeResource', 'Resource'),
+                E: label('VAS_078_ProductTypeExpense', 'Expense'),
+                O: label('VAS_078_ProductTypeOnline', 'Online')
             };
             return productTypes[code] || code || '-';
         }
 
         function documentStatusLabel(code) {
             var statuses = {
-                DR: label('VAS_StatusDraft', 'Draft'),
-                IP: label('VAS_StatusInProgress', 'In Progress'),
-                CO: label('VAS_StatusCompleted', 'Completed'),
-                CL: label('VAS_StatusClosed', 'Closed'),
-                AP: label('VAS_StatusApproved', 'Approved'),
-                RE: label('VAS_StatusReversed', 'Reversed'),
-                VO: label('VAS_StatusVoided', 'Voided')
+                DR: label('VAS_078_StatusDraft', 'Draft'),
+                IP: label('VAS_078_StatusInProgress', 'In Progress'),
+                CO: label('VAS_078_StatusCompleted', 'Completed'),
+                CL: label('VAS_078_StatusClosed', 'Closed'),
+                AP: label('VAS_078_StatusApproved', 'Approved'),
+                RE: label('VAS_078_StatusReversed', 'Reversed'),
+                VO: label('VAS_078_StatusVoided', 'Voided')
             };
             return statuses[code] || code || '-';
         }
@@ -257,16 +257,16 @@
             if (code !== 'CO' && code !== 'CL') { return documentStatusLabel(code); }
             var ordered = Number(order.QuantityOrdered || 0);
             var delivered = Number(order.QuantityDelivered || 0);
-            if (ordered > 0 && delivered >= ordered) { return label('VAS_StatusDelivered', 'Delivered'); }
-            if (delivered > 0) { return label('VAS_StatusPartial', 'Partial'); }
-            return label('VAS_StatusCompleted', 'Completed');
+            if (ordered > 0 && delivered >= ordered) { return label('VAS_078_StatusDelivered', 'Delivered'); }
+            if (delivered > 0) { return label('VAS_078_StatusPartial', 'Partial'); }
+            return label('VAS_078_StatusCompleted', 'Completed');
         }
 
         function salesOrderStatusLabel(order) {
             var ordered = Number(order.QuantityOrdered || 0);
             var delivered = Number(order.QuantityDelivered || 0);
-            if (ordered > 0 && delivered >= ordered) { return label('VAS_StatusDelivered', 'Delivered'); }
-            if (delivered > 0 && delivered < ordered) { return label('VAS_StatusPartial', 'Partially Delivered'); }
+            if (ordered > 0 && delivered >= ordered) { return label('VAS_078_StatusDelivered', 'Delivered'); }
+            if (delivered > 0 && delivered < ordered) { return label('VAS_078_StatusPartial', 'Partially Delivered'); }
             return documentStatusLabel(order.DocumentStatus);
         }
 
@@ -275,13 +275,9 @@
         /* Status tile: Discontinued wins over Inactive; an inactive product
            (IsActive = 'N') must NOT read as Active. */
         function productStatusLabel() {
-            if (productDetail.Status === 'D') {
-                return label('VAS_StatusDiscontinued', 'Discontinued');
-            }
-            if (productDetail.Status === 'I') {
-                return label('VAS_StatusInactive', 'Inactive');
-            }
-            return label('Active', 'Active');
+            return productDetail.Status === 'D'
+                ? label('VAS_078_StatusDiscontinued', 'Discontinued')
+                : label('Active', 'Active');
         }
 
         /* Fallback only: the controller resolves the Type name from AD_Ref_List (reference 189,
@@ -291,20 +287,16 @@
         function movementTypeLabel(code, resolvedName) {
             if (resolvedName) { return resolvedName; }
             var movementTypes = {
-                'V+': label('VAS_MovementReceipt', 'Vendor Receipts'),
-                'V-': label('VAS_MovementVendorReturn', 'Vendor Returns'),
-                'C+': label('VAS_MovementCustomerReturn', 'Customer Returns'),
-                'C-': label('VAS_MovementShipment', 'Customer Shipment'),
-                'M+': label('VAS_MovementIn', 'Movement To'),
-                'M-': label('VAS_MovementOut', 'Movement From'),
-                'I+': label('VAS_InventoryIncrease', 'Inventory In'),
-                'I-': label('VAS_InventoryDecrease', 'Inventory Out'),
-                'IR': label('VAS_InventoryRevaluation', 'Inventory Revaluation'),
-                'P+': label('VAS_ProductionIn', 'Production +'),
-                'P-': label('VAS_ProductionOut', 'Production -'),
-                'W+': label('VAS_WorkOrderIn', 'Production Order +'),
-                'W-': label('VAS_WorkOrderOut', 'Production Order -'),
-                'VI': label('VAS_VendorInvoice', 'Vendor Invoice')
+                'V+': label('VAS_078_MovementReceipt', 'Receipt'),
+                'V-': label('VAS_078_MovementVendorReturn', 'Vendor Return'),
+                'C+': label('VAS_078_MovementCustomerReturn', 'Customer Return'),
+                'C-': label('VAS_078_MovementShipment', 'Shipment / Issue'),
+                'M+': label('VAS_078_MovementIn', 'Movement In'),
+                'M-': label('VAS_078_MovementOut', 'Movement Out'),
+                'I+': label('VAS_078_InventoryIncrease', 'Inventory Increase'),
+                'I-': label('VAS_078_InventoryDecrease', 'Inventory Decrease'),
+                'P+': label('VAS_078_ProductionIn', 'Production In'),
+                'P-': label('VAS_078_ProductionOut', 'Production Out')
             };
             return movementTypes[code] || code || '-';
         }
@@ -321,8 +313,8 @@
         };
 
         function createWidget() {
-            var placeholder = label('VAS_ProductSearchPlaceholder', 'Search product by name, code, type or category\u2026');
-            var helper = label('VAS_ProductSearchHelper', 'Select a result for full product detail');
+            var placeholder = label('VAS_078_ProductSearchPlaceholder', 'Search product by name, code, type or category\u2026');
+            var helper = label('VAS_078_ProductSearchHelper', 'Select a result for full product detail');
 
             $root.html(
                 '<div class="MPC-product-search-pill">' +
@@ -331,10 +323,12 @@
                         '<input class="MPC-product-search-input" type="text" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="MPC-product-search-suggestions-' + escapeHtml($self.windowNo || '') + '" placeholder="' + escapeHtml(placeholder) + '">' +
                     '</span>' +
                     '<span class="MPC-product-search-helper">' + escapeHtml(helper) + '</span>' +
+                    '<button type="button" class="MPC-product-search-clear" aria-label="' + escapeHtml(label('Clear', 'Clear')) + '" hidden>' + icon('close') + '</button>' +
                 '</div>'
             );
 
             $input = $root.find('.MPC-product-search-input');
+            $clearBtn = $root.find('.MPC-product-search-clear');
         }
 
         function createSuggestionList() {
@@ -345,16 +339,34 @@
             $('body').append($suggest);
         }
 
+        // Flips the popover above the search pill when there is not enough room below it (e.g. the
+        // widget sits near the bottom of the dashboard/viewport) but more room above - otherwise
+        // the list was clipped/hidden behind whatever sits below the viewport (taskbar, page edge).
+        // scrollHeight is read before repositioning since it reflects the content's natural height
+        // regardless of the popover's current on-screen position.
         function positionSuggest() {
             if (!$suggest) { return; }
             var pill = $root.find('.MPC-product-search-pill')[0];
             if (!pill) { return; }
             var rect = pill.getBoundingClientRect();
+            var gap = 6;
+            var suggestHeight = $suggest[0].scrollHeight;
+            var spaceBelow = window.innerHeight - rect.bottom - gap;
+            var spaceAbove = rect.top - gap;
+            var openAbove = suggestHeight > spaceBelow && spaceAbove > spaceBelow;
+
             $suggest.css({
                 left: Math.round(rect.left) + 'px',
-                top: Math.round(rect.bottom + 6) + 'px',
-                width: Math.round(rect.width) + 'px'
+                width: Math.round(rect.width) + 'px',
+                maxHeight: Math.round(Math.max(spaceBelow, spaceAbove, 0)) + 'px',
+                overflowY: 'auto'
             });
+
+            if (openAbove) {
+                $suggest.css({ top: 'auto', bottom: Math.round(window.innerHeight - rect.top + gap) + 'px' });
+            } else {
+                $suggest.css({ bottom: 'auto', top: Math.round(rect.bottom + gap) + 'px' });
+            }
         }
 
         function createDialog() {
@@ -389,12 +401,21 @@
             });
             $input.on('keydown', handleInputKeydown);
 
+            $clearBtn.on('click', function () {
+                if (searchTimer) { clearTimeout(searchTimer); }
+                requestSequence += 1;
+                $input.val('');
+                $clearBtn.prop('hidden', true);
+                closeSuggestions();
+                $input.trigger('focus');
+            });
+
             $suggest.on('mousedown', '.MPC-product-search-option', function (event) {
                 event.preventDefault();
                 selectSuggestion(Number($(this).attr('data-index')));
             });
 
-            $dialog.on('click', '.MPC-product-search-dialog-close, .MPC-product-search-dialog-scrim', closeDialog);
+            $dialog.on('click', '.MPC-product-search-dialog-close', closeDialog);
             $dialog.on('click', '.MPC-product-search-open-record', function () {
                 zoomProductRecord(currentProductId);
             });
@@ -416,8 +437,7 @@
             });
             $(document).on('keydown' + eventNamespace, function (event) {
                 if (event.key !== 'Escape') { return; }
-                if ($dialog.hasClass('is-open')) { closeDialog(); }
-                else { closeSuggestions(); }
+                closeSuggestions();
             });
 
             $(window).on('scroll' + eventNamespace, closeSuggestions);
@@ -435,6 +455,7 @@
             if (searchTimer) { clearTimeout(searchTimer); }
 
             var searchText = $input.val().trim();
+            if ($clearBtn) { $clearBtn.prop('hidden', !searchText); }
             if (!searchText) {
                 requestSequence += 1;
                 closeSuggestions();
@@ -448,7 +469,7 @@
 
         function searchProducts(searchText) {
             var sequence = ++requestSequence;
-            renderSuggestionState(label('VAS_ProductSearching', 'Searching\u2026'));
+            renderSuggestionState(label('VAS_078_ProductSearching', 'Searching\u2026'));
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_078_ProductSearchWidget/SearchProducts',
@@ -476,14 +497,14 @@
                 },
                 error: function () {
                     if (sequence !== requestSequence) { return; }
-                    renderSuggestionState(label('VAS_ProductDetailLoadError', 'Unable to load products.'));
+                    renderSuggestionState(label('VAS_078_ProductDetailLoadError', 'Unable to load products.'));
                 }
             });
         }
 
         function renderSuggestions(searchText) {
             if (!suggestions.length) {
-                renderSuggestionState(label('VAS_ProductNoMatches', 'No products match') + ' "' + searchText + '".');
+                renderSuggestionState(label('VAS_078_ProductNoMatches', 'No products match') + ' "' + searchText + '".');
                 return;
             }
 
@@ -583,7 +604,7 @@
                     var parsed = parseResponse(response);
                     detailLoading = false;
                     if (!parsed || parsed.Error || !parsed.Overview) {
-                        renderDialogError(parsed.Error || label('VAS_ProductDetailLoadError', 'Unable to load product detail.'));
+                        renderDialogError(parsed.Error || label('VAS_078_ProductDetailLoadError', 'Unable to load product detail.'));
                         return;
                     }
 
@@ -594,13 +615,13 @@
                 },
                 error: function () {
                     detailLoading = false;
-                    renderDialogError(label('VAS_ProductDetailLoadError', 'Unable to load product detail.'));
+                    renderDialogError(label('VAS_078_ProductDetailLoadError', 'Unable to load product detail.'));
                 }
             });
         }
 
         function openLoadingDialog(productName, productCode) {
-            $dialogTitle.text(productName || label('VAS_ProductDetail', 'Product Detail'));
+            $dialogTitle.text(productName || label('VAS_078_ProductDetail', 'Product Detail'));
             $dialogBadge.text(productCode || '').toggle(!!productCode);
             $dialogBody.html('<div class="MPC-product-search-dialog-state">' + escapeHtml(label('Loading', 'Loading\u2026')) + '</div>');
             $dialog.addClass('is-open').attr('aria-hidden', 'false');
@@ -624,7 +645,7 @@
                 overview.ProductCode,
                 productTypeLabel(overview.ProductType),
                 overview.CategoryName,
-                uomDisplay ? label('VAS_UnitOfMeasure', 'UoM') + ' - ' + uomDisplay : ''
+                uomDisplay ? label('VAS_078_UnitOfMeasure', 'UoM') + ' - ' + uomDisplay : ''
             ].filter(function (value) { return value; }).map(function (value) {
                 return '<span class="MPC-product-search-chip">' + escapeHtml(value) + '</span>';
             }).join('');
@@ -653,10 +674,10 @@
                fifth statistic. */
             var openRecordTile =
                 '<button type="button" class="MPC-product-search-stat MPC-product-search-open-record"' +
-                ' title="' + escapeHtml(label('VAS_OpenProductRecord', 'Open product record')) + '">' +
-                    '<div class="MPC-product-search-stat-label">' + escapeHtml(label('VAS_Record', 'Record')) + '</div>' +
+                ' title="' + escapeHtml(label('VAS_078_OpenProductRecord', 'Open product record')) + '">' +
+                    '<div class="MPC-product-search-stat-label">' + escapeHtml(label('VAS_078_Record', 'Record')) + '</div>' +
                     '<div class="MPC-product-search-open-record-value">' +
-                        '<span class="MPC-product-search-open-record-text">' + escapeHtml(label('VAS_Open', 'Open')) + '</span>' +
+                        '<span class="MPC-product-search-open-record-text">' + escapeHtml(label('VAS_078_Open', 'Open')) + '</span>' +
                         '<span class="MPC-product-search-open-record-arrow" aria-hidden="true">' +
                             '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
                                 '<polyline points="9 18 15 12 9 6"></polyline>' +
@@ -667,9 +688,9 @@
 
             var statsContent = '';
             if (isItem) {
-                statsContent += statTile(label('VAS_OnHandQty', 'On Hand Qty'), formatCompactQty(productDetail.OnHandQty), '');
-                statsContent += statTile(label('VAS_StockValue', 'Stock Value'), formatCompactAmount(productDetail.StockValue, productDetail.CurrencySymbol, productDetail.CurrencyIso), '');
-                statsContent += statTile(label('VAS_ReorderPoint', 'Reorder Pt'), formatQty(productDetail.ReorderPoint), 'is-warning');
+                statsContent += statTile(label('VAS_078_OnHandQty', 'On Hand Qty'), formatCompactQty(productDetail.OnHandQty), '');
+                statsContent += statTile(label('VAS_078_StockValue', 'Stock Value'), formatCompactAmount(productDetail.StockValue, productDetail.CurrencySymbol, productDetail.CurrencyIso), '');
+                statsContent += statTile(label('VAS_078_ReorderPoint', 'Reorder Pt'), formatQty(productDetail.ReorderPoint), 'is-warning');
             }
             statsContent += statTile(label('Status', 'Status'), status, productDetail.Status === 'Y' ? 'is-success' : 'is-warning');
             statsContent += openRecordTile;
@@ -684,12 +705,12 @@
             '</section>';
 
             var allTabList = [
-                ['overview', label('VAS_Overview', 'Overview')],
-                ['stock', label('VAS_Stock', 'Stock')],
+                ['overview', label('VAS_078_Overview', 'Overview')],
+                ['stock', label('VAS_078_Stock', 'Stock')],
                 ['purchaseOrders', label('VAS_PurchaseOrders', 'Purchase Orders')],
-                ['salesOrders', label('VAS_SalesOrders', 'Sales Orders')],
-                ['movements', label('VAS_Movements', 'Movements')],
-                ['requisitions', label('VAS_Requisitions', 'Requisitions')]
+                ['salesOrders', label('VAS_078_SalesOrders', 'Sales Orders')],
+                ['movements', label('VAS_078_Movements', 'Movements')],
+                ['requisitions', label('VAS_078_Requisitions', 'Requisitions')]
             ];
 
             if (!isItem) {
@@ -753,23 +774,23 @@
             var uomUpper = overview.UomName ? overview.UomName.toUpperCase() : '-';
 
             var fields = [
-                [label('VAS_ProductCode', 'Product Code'), overview.ProductCode],
+                [label('VAS_078_ProductCode', 'Product Code'), overview.ProductCode],
                 [label('Name', 'Name'), overview.ProductName],
-                [label('UPC', 'UPC'), overview.UPC],
-                [label('VAS_ProductType', 'Type'), productTypeLabel(overview.ProductType)],
-                [label('VAS_ProductCategory', 'Product Category'), overview.CategoryName],
-                [label('VAS_UnitOfMeasure', 'Unit of Measure'), uomUpper]
+                [label('VAS_078_UPC', 'UPC'), overview.UPC],
+                [label('VAS_078_ProductType', 'Type'), productTypeLabel(overview.ProductType)],
+                [label('VAS_078_ProductCategory', 'Product Category'), overview.CategoryName],
+                [label('VAS_078_UnitOfMeasure', 'Unit of Measure'), uomUpper]
             ];
 
             if (isItem) {
-                fields.push([label('VAS_PreferredSupplier', 'Preferred Supplier'), productDetail.PreferredSupplier]);
-                fields.push([label('VAS_OnHandQty', 'On Hand Qty'), formatQty(productDetail.OnHandQty), true]);
-                fields.push([label('VAS_StockValue', 'Stock Value'), formatBaseAmount(productDetail.StockValue), true]);
-                fields.push([label('VAS_ReorderPoint', 'Reorder Point'), formatQty(productDetail.ReorderPoint)]);
+                fields.push([label('VAS_078_PreferredSupplier', 'Preferred Supplier'), productDetail.PreferredSupplier]);
+                fields.push([label('VAS_078_OnHandQty', 'On Hand Qty'), formatQty(productDetail.OnHandQty), true]);
+                fields.push([label('VAS_078_StockValue', 'Stock Value'), formatBaseAmount(productDetail.StockValue), true]);
+                fields.push([label('VAS_078_ReorderPoint', 'Reorder Point'), formatQty(productDetail.ReorderPoint)]);
             }
 
             fields.push([label('Status', 'Status'), productStatusLabel()]);
-            fields.push([label('VAS_DiscontinuedFrom', 'Discontinued From'), formatDate(overview.DiscontinuedFrom)]);
+            fields.push([label('VAS_078_DiscontinuedFrom', 'Discontinued From'), formatDate(overview.DiscontinuedFrom)]);
 
             return '<div class="MPC-product-search-form-grid">' + fields.map(function (field) {
                 var value = field[1] || '-';
@@ -792,7 +813,7 @@
             });
 
             return renderTable(
-                [label('Warehouse', 'Warehouse'), label('Locator', 'Locator'), label('VAS_Attribute', 'Attribute'), label('VAS_OnHandQty', 'On Hand Qty'), label('Amount', 'Amount')],
+                [label('Warehouse', 'Warehouse'), label('Locator', 'Locator'), label('VAS_Attribute', 'Attribute'), label('VAS_078_OnHandQty', 'On Hand Qty'), label('Amount', 'Amount')],
                 rows,
                 [3, 4],
                 'stock'
@@ -801,12 +822,12 @@
 
         function renderOrders(orders, isSales) {
             var headers = [
-                isSales ? label('SalesOrder', 'SO #') : label('PurchaseOrder', 'PO #'),
-                label('DateOrdered', 'Ordered'),
-                label('DatePromised', 'Promised'),
+                isSales ? label('VAS_078_SalesOrder', 'SO #') : label('VAS_078_PurchaseOrder', 'PO #'),
+                label('VAS_078_DateOrdered', 'Ordered'),
+                label('VAS_078_DatePromised', 'Promised'),
                 label('VAS_Attribute', 'Attribute'),
-                label('VAS_OrderedQty', 'Ordered Qty'),
-                label('VAS_DeliveredQty', 'Delivered Qty'),
+                label('VAS_078_OrderedQty', 'Ordered Qty'),
+                label('VAS_078_DeliveredQty', 'Delivered Qty'),
                 label('Amount', 'Amount'),
                 label('Status', 'Status')
             ];
@@ -840,7 +861,7 @@
             });
 
             return latestRecordsNote(rows.length) + renderTable(
-                [label('MovementDate', 'Date'), label('MovementType', 'Type'), label('VAS_Attribute', 'Attribute'), label('Qty', 'Qty'), label('Warehouse', 'Warehouse'), label('Locator', 'Locator')],
+                [label('VAS_078_MovementDate', 'Date'), label('VAS_078_MovementType', 'Type'), label('VAS_Attribute', 'Attribute'), label('Qty', 'Qty'), label('Warehouse', 'Warehouse'), label('Locator', 'Locator')],
                 rows,
                 [3],
                 'movements'
@@ -861,7 +882,7 @@
             });
 
             return latestRecordsNote(rows.length) + renderTable(
-                [label('Requisition', 'Requisition #'), label('VAS_DocumentDate', 'Document Date'), label('VAS_RequiredDate', 'Required Date'), label('VAS_Attribute', 'Attribute'), label('Qty', 'Qty'), label('VAS_OrderedQty', 'Ordered Qty'), label('Status', 'Status')],
+                [label('Requisition', 'Requisition #'), label('VAS_078_DocumentDate', 'Document Date'), label('VAS_078_RequiredDate', 'Required Date'), label('VAS_Attribute', 'Attribute'), label('Qty', 'Qty'), label('VAS_078_OrderedQty', 'Ordered Qty'), label('Status', 'Status')],
                 rows,
                 [4, 5],
                 'requisitions'
@@ -873,12 +894,12 @@
            pager's "Showing x-y of N" already tells the whole story. */
         function latestRecordsNote(rowCount) {
             if (rowCount < TABLE_FETCH_SIZE) { return ''; }
-            return '<div class="MPC-product-search-note">' + icon('clock') + '<span>' + escapeHtml(label('VAS_Showing', 'Showing') + ' ' + TABLE_FETCH_SIZE + ' ' + label('VAS_LatestRecords', 'latest records')) + '</span></div>';
+            return '<div class="MPC-product-search-note">' + icon('clock') + '<span>' + escapeHtml(label('VAS_Showing', 'Showing') + ' ' + TABLE_FETCH_SIZE + ' ' + label('VAS_078_LatestRecords', 'latest records')) + '</span></div>';
         }
 
         function renderTable(headers, rows, rightAlignedColumns, pageKey) {
             if (!rows.length) {
-                return '<div class="MPC-product-search-empty">' + escapeHtml(label('VAS_NoProductRecords', 'No records found for this product.')) + '</div>';
+                return '<div class="MPC-product-search-empty">' + escapeHtml(label('VAS_078_NoProductRecords', 'No records found for this product.')) + '</div>';
             }
 
             var totalPages = Math.max(1, Math.ceil(rows.length / TABLE_PAGE_ROWS));

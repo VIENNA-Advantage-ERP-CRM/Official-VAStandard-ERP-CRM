@@ -3,8 +3,8 @@
  * Summary Message Table
  *  # | Current Text        | Message Key
  * ---+---------------------+--------------------------
- *  1 | Low Stock Count     | VAS_LowStockCount
- *  2 | Below reorder level | VAS_BelowReorderLevel
+ *  1 | Low Stock Count     | VAS_073_LowStockCount
+ *  2 | Below reorder level | VAS_073_BelowReorderLevel
  *  3 | Couldn't load       | VAS_CouldntLoad
  */
 ; VAS = window.VAS || {};
@@ -21,13 +21,12 @@
         var $meta;
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return translated && translated.charAt(0) !== '[' ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function loadCount() {
             $value.text('\u2014');
-            $meta.text(label('VAS_BelowReorderLevel', 'Below reorder level'));
+            $meta.text(label('VAS_073_BelowReorderLevel', 'Below reorder level'));
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_073_LowStockCountWidget/GetLowStockCount',
@@ -64,7 +63,7 @@
                 '</div>'
             );
 
-            $card.find('.MPC-low-stock-label').text(label('VAS_LowStockCount', 'Low Stock Count'));
+            $card.find('.MPC-low-stock-label').text(label('VAS_073_LowStockCount', 'Low Stock Count'));
             $value = $card.find('.MPC-low-stock-value');
             $meta = $card.find('.MPC-low-stock-meta');
             $root.append($card);

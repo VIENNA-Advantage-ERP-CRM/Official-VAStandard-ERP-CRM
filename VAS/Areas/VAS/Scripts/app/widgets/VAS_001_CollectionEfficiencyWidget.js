@@ -27,9 +27,9 @@
  * 11  | invoice                                   | VAS_001_Invoice
  * 12  | Overdue invoice aging                     | VAS_001_OverdueInvoiceAging
  * 13  | Open invoices past their due date         | VAS_001_OpenPastDue
- * 14  | Invoice No.                               | VAS_InvoiceNo
+ * 14  | Invoice No.                               | VAS_001_InvoiceNo
  * 15  | Customer                                  | VAS_Customer
- * 16  | Due date                                  | VAS_DueDate
+ * 16  | Due date                                  | VAS_001_DueDate
  * 17  | Age                                       | VAS_001_Age
  * 18  | Overdue amount                            | VAS_001_OverdueAmount
  * 18a | Currency                                  | VAS_Currency
@@ -105,8 +105,7 @@
         var rowsLoading = false;
 
         function lbl(key, fallback) {
-            var t = (window.VIS && VIS.Msg) ? VIS.Msg.getMsg(key) : null;
-            return (t && t.charAt(0) !== '[') ? t : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function showBusy(show) {
@@ -510,9 +509,9 @@
                 '<div class="vas-ce-dialog-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>' +
                 '<table class="vas-ce-dialog-table">' +
                 '<thead><tr>' +
-                '<th class="vas-ce-d-th-doc">' + escapeHtml(lbl("VAS_InvoiceNo", "Invoice No.")) + '</th>' +
+                '<th class="vas-ce-d-th-doc">' + escapeHtml(lbl("VAS_001_InvoiceNo", "Invoice No.")) + '</th>' +
                 '<th class="vas-ce-d-th-cust">' + escapeHtml(lbl("VAS_Customer", "Customer")) + '</th>' +
-                '<th class="vas-ce-d-th-date">' + escapeHtml(lbl("VAS_DueDate", "Due Date")) + '</th>' +
+                '<th class="vas-ce-d-th-date">' + escapeHtml(lbl("VAS_001_DueDate", "Due Date")) + '</th>' +
                 '<th class="vas-ce-d-th-age">' + escapeHtml(lbl("VAS_001_Age", "Age")) + '</th>' +
                 '<th class="vas-ce-d-th-cur">' + escapeHtml(lbl("VAS_Currency", "Currency")) + '</th>' +
                 '<th class="vas-ce-d-th-amount">' + escapeHtml(lbl("VAS_001_OverdueAmount", "Overdue amount")) + '</th>' +
@@ -552,8 +551,6 @@
                 e.stopPropagation();
                 closeDialog();
             });
-            $dialog.find('.vas-ce-dialog-scrim').on('click', function () { closeDialog(); });
-
             $pagerPrev.on('click', function () {
                 if (rowsLoading || pageNo <= 1) { return; }
                 pageNo--;
@@ -565,9 +562,6 @@
                 loadAging();
             });
 
-            $(document).on('keydown.vas-ce', function (e) {
-                if (e.key === 'Escape' && $dialog.is(':visible')) { closeDialog(); }
-            });
 
             $('body').append($dialog);
         }

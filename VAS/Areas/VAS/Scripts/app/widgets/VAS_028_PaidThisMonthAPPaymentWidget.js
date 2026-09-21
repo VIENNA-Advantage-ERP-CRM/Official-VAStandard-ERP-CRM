@@ -32,6 +32,7 @@
  * 29  | Execution Status                                  | VAS_028_MessageStatus
  * 30  | Previous                                          | VAS_Previous
  * 31  | Next                                              | VAS_Next
+ * 32  | MTD                                               | VAS_028_MessageMTD
  * ──────────────────────────────────────────────────────────────────────────────
  */
 
@@ -66,6 +67,7 @@
  * 29 | Execution Status                                  | VAS_028_MessageStatus
  * 30 | Previous                                          | VAS_Previous
  * 31 | Next                                              | VAS_Next
+ * 32 | MTD                                               | VAS_028_MessageMTD
  */
 
 ; VAS = window.VAS || {};
@@ -126,11 +128,7 @@
         var lastData = null;
 
         function lbl(key, fallback) {
-            var text = VIS.Msg.getMsg(key);
-
-            return text && text !== '[' + key + ']'
-                ? text
-                : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -919,7 +917,9 @@
                     'VAS_028_MessagePayments',
                     'payments'
                 ) +
-                ' · MTD ' +
+                ' · ' +
+                lbl('VAS_028_MessageMTD') +
+                ' ' +
                 formatHeaderAmount(
                     amount,
                     symbol,
@@ -1539,12 +1539,6 @@
                     closeDialog();
                 });
 
-            $dialog
-                .find('.vas-ptm-dialog-scrim')
-                .on('click', function () {
-                    closeDialog();
-                });
-
             $pagerPrev.on('click', function () {
                 if (
                     rowsLoading ||
@@ -1568,20 +1562,6 @@
                 pageNo++;
                 loadRows();
             });
-
-            $(document).on(
-                'keydown.vas-ptm-dialog-' +
-                self.AD_UserHomeWidgetID,
-                function (e) {
-                    if (
-                        e.key === 'Escape' &&
-                        $dialog &&
-                        $dialog.is(':visible')
-                    ) {
-                        closeDialog();
-                    }
-                }
-            );
 
             $('body').append($dialog);
 

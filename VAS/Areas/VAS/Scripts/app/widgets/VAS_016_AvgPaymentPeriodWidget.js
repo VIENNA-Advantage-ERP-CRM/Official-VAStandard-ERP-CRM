@@ -12,9 +12,9 @@
  *   VAS_016_AvgDaysToPay            => "Avg Days to Pay"
  *   VAS_056_DaysToPayThisQuarter    => "Days to Pay (This Quarter)"
  *   VAS_016_DaySuffix               => "d"
- *   VAS_DaysFasterThanLastQuarter   => " days faster than last quarter"
- *   VAS_DaysSlowerThanLastQuarter   => " days slower than last quarter"
- *   VIS_NoChange                    => "No change"
+ *   VAS_016_DaysFasterThanLastQuarter => " days faster than last quarter"
+ *   VAS_016_DaysSlowerThanLastQuarter => " days slower than last quarter"
+ *   VAS_016_NoChange                => "No change"
  *   VAS_016_Loading                 => "Loading..."
  ***********************************************************/
 ; VAS = window.VAS || {};
@@ -89,9 +89,9 @@
            diff = currentAvgDays - previousAvgDays: negative = we paid faster (good), positive = slower. */
         function comparisonText(diff) {
             var d = diff || 0;
-            if (d < 0) { return Math.abs(d) + msg('VAS_DaysFasterThanLastQuarter', ' days faster than last quarter'); }
-            if (d > 0) { return d + msg('VAS_DaysSlowerThanLastQuarter', ' days slower than last quarter'); }
-            return msg('VIS_NoChange', 'No change');
+            if (d < 0) { return Math.abs(d) + msg('VAS_016_DaysFasterThanLastQuarter', ' days faster than last quarter'); }
+            if (d > 0) { return d + msg('VAS_016_DaysSlowerThanLastQuarter', ' days slower than last quarter'); }
+            return msg('VAS_016_NoChange', 'No change');
         }
 
         /* ---- Render KPI content ---- */
@@ -125,8 +125,7 @@
         }
 
         function msg(key, fallback) {
-            var value = VIS.Msg.getMsg(key);
-            return value && value !== key && value !== '[' + key + ']' ? value : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function apEsc(value) {

@@ -1524,11 +1524,9 @@ namespace VIS.Controllers
                 MRole.SQL_RO
             );
 
-            // QA sheet Complete GRN Confirmation #84 (2026-09-15): the Scrap Locator is the confirmation
-            // line's own M_Locator_ID (editable, blank by default) - not the GRN line's receiving locator.
-            string scrapLocatorNameSql = HasColumn("M_Locator", "LocatorCombination")
-                ? "COALESCE(ScrapLocator.LocatorCombination, ScrapLocator.Value)"
-                : "ScrapLocator.Value";
+            string lineLocatorSql = HasColumn("M_Locator", "LocatorCombination")
+                ? "COALESCE(Locator.LocatorCombination, Locator.Value)"
+                : "Locator.Value";
 
             string linesSql = @"
                 SELECT LineConfirm.M_InOutLineConfirm_ID AS Line_Confirm_ID,
@@ -1536,8 +1534,7 @@ namespace VIS.Controllers
                        Product.Name AS Product_Name,
                        UomInfo.Name AS UOM_Name,
                        AttributeInstance.Description AS Attribute_Description,
-                       COALESCE(LineConfirm.M_Locator_ID, 0) AS Scrap_Locator_ID,
-                       " + scrapLocatorNameSql + @" AS Scrap_Locator_Name,
+                       " + lineLocatorSql + @" AS Locator_Value,
                        LineConfirm.TargetQty AS Target_Qty,
                        LineConfirm.ConfirmedQty AS Confirmed_Qty,
                        LineConfirm.ScrappedQty AS Scrapped_Qty,

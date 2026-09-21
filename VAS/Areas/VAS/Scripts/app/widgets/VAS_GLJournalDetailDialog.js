@@ -105,11 +105,7 @@
     /* ---- helpers -------------------------------------------------------- */
 
     function lbl(key, fallback) {
-        var text = VIS.Msg.getMsg(key);
-
-        return (text && text.charAt(0) !== "[")
-            ? text
-            : fallback;
+        return VIS.Msg.getMsg(key);
     }
 
     function esc(value) {
