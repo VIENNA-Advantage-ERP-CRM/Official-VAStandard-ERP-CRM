@@ -98,8 +98,7 @@
         /* ---------------- helpers ---------------- */
 
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            return (t && t.charAt(0) !== '[') ? t : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -396,7 +395,6 @@
             resetForm();
             $dialog.removeClass('vas-qj-hidden');
             $('body').addClass('vas-qj-body-lock');
-            $(document).on('keydown.vas-qj', function (e) { if (e.key === 'Escape') { closeDialog(); } });
             loadInitData();
             setTimeout(function () { $dialog.find('.vas-qj-desc').focus(); }, 150);
         }
@@ -826,7 +824,7 @@
         function validationMessage(result) {
             var parts = [];
             if (result.missing.length) {
-                parts.push(lbl("FillMandatory", "Fill mandatory field(s):") + ' ' + result.missing.join(', '));
+                parts.push(lbl("VAS_118_FillMandatory", "Fill mandatory field(s):") + ' ' + result.missing.join(', '));
             }
             for (var i = 0; i < result.conflicts.length; i++) { parts.push(result.conflicts[i]); }
             return parts.join(' ');

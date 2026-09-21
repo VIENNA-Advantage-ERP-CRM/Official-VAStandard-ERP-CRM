@@ -196,9 +196,7 @@
 
         /* ---------- short helpers ---------- */
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            if (t && t.charAt(0) !== "[") return t;
-            return (fallback !== undefined) ? fallback : t;
+            return VIS.Msg.getMsg(key);
         }
 
         function precision() { return (parent && parent.StdPrecision >= 0) ? parent.StdPrecision : 2; }
@@ -3654,7 +3652,7 @@
                 '<p class="vas-rbl-dialog__error vas-rbl-is-hidden" id="vasRblScanError"></p></header>' +
                 '<div class="vas-rbl-dialog__body vas-rbl-dialog__body--fixed">' +
                 '<div class="vas-rbl-scan-empty" id="vasRblScanEmpty"><div class="vas-rbl-scan-empty__badge">' + icon("scan-line", "▭") + "</div>" +
-                '<p class="vas-rbl-scan-empty__title">' + esc(lbl("VAS_240_ScanToBegin", "Scan a barcode to begin")) + '</p><p class="vas-rbl-scan-empty__hint">e.g. PRD-BLW-001 · CHG-INS-001</p></div>' +
+                '<p class="vas-rbl-scan-empty__title">' + esc(lbl("VAS_240_ScanToBegin", "Scan a barcode to begin")) + '</p><p class="vas-rbl-scan-empty__hint">' + esc(lbl("VAS_240_ScanExampleHint", "e.g. PRD-BLW-001 · CHG-INS-001")) + '</p></div>' +
                 '<div class="vas-rbl-scan-grid vas-rbl-is-hidden" id="vasRblScanGrid"><div class="vas-rbl-scan-grid__head"><div>' + esc(lbl("VAS_240_Code", "Code")) + "</div><div>" + esc(lbl("VAS_240_ProductCharge", "Product / Charge")) +
                 "</div><div>" + esc(lbl("VAS_240_Status", "Status")) + "</div><div>" + esc(lbl("VAS_240_Qty", "Qty")) + '</div><div></div></div><div class="vas-rbl-scan-grid__body" id="vasRblScanRows"></div></div></div>' +
                 '<footer class="vas-rbl-dialog__footer"><p class="vas-rbl-dialog__summary" id="vasRblScanSummary">' + esc(lbl("VAS_240_NoScans", "No scans yet")) + "</p>" +

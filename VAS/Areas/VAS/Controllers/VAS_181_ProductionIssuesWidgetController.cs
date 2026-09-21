@@ -86,7 +86,18 @@ namespace VIS.Controllers
         }
 // ===== NEW CODE END — currency format =====
 
-        /// <summary>Returns the percentage share of MTD issued value for production purpose.</summary>
+        /// <summary>
+        /// Returns the percentage share of MTD issued value for production purpose,
+        /// plus the same month-window boundaries as DB-ready SQL date literals
+        /// (MonthStartSql/NextMonthStartSql - via <see cref="ToSqlDate"/>, so Oracle
+        /// gets TO_DATE(...) and every other supported DB gets CAST(... AS DATE)).
+        /// The widget's own click-through reuses these literals verbatim in its
+        /// TabWhereClause instead of reconstructing the month window with
+        /// Oracle-only SYSDATE/TRUNC/ADD_MONTHS syntax - that raw-text
+        /// reconstruction broke the drill-through on this install's actual
+        /// Postgres backend (stuck on loading, never actually filtered), the same
+        /// class of bug VAS_140 already documents elsewhere in this codebase.
+        /// </summary>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
         public JsonResult GetProductionIssuesPercentage()
@@ -96,11 +107,16 @@ namespace VIS.Controllers
 
             try
             {
-                int percentage = GetProductionIssuesPercentageData(ctx);
+                DateTime now = DateTime.Now;
+                DateTime monthStart = new DateTime(now.Year, now.Month, 1);
+                DateTime nextMonthStart = monthStart.AddMonths(1);
+
+                int percentage = GetProductionIssuesPercentageData(ctx, monthStart, nextMonthStart);
                 string json = JsonConvert.SerializeObject(new
                 {
                     percentage = percentage,
-                    workOrderColumns = ResolveProductionOrderColumns(),
+                    monthStartSql = ToSqlDate(monthStart),
+                    nextMonthStartSql = ToSqlDate(nextMonthStart),
                     success = true
                 });
                 return Json(json, JsonRequestBehavior.AllowGet);
@@ -111,6 +127,84 @@ namespace VIS.Controllers
                 string json = JsonConvert.SerializeObject(new { error = Msg.GetMsg(ctx, "Error") ?? "Error" });
                 return Json(json, JsonRequestBehavior.AllowGet);
             }
+        }
+
+        /// <summary>
+        /// Every M_Inventory_ID matching the MTD production-issue predicate (capped
+        /// at <see cref="MaxZoomIds"/>) - the click-through builds its
+        /// TabWhereClause as a flat M_Inventory.M_Inventory_ID IN (...) list from
+        /// this, instead of a correlated EXISTS(SELECT 1 FROM M_InventoryLine ...)
+        /// subquery. The grid's own "duplicate DocumentNo" diagnostic query does
+        /// naive, parenthesis-unaware text surgery on the TabWhereClause looking
+        /// for a FROM it can lift out - it mishandled the nested EXISTS(...) and
+        /// sent Oracle malformed SQL (ORA-00933), which is what actually hung the
+        /// drill-through (confirmed directly in the app log). A flat ID list has
+        /// no FROM/subquery in it at all, so that diagnostic query has nothing to
+        /// mishandle.
+        /// </summary>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetProductionIssueIds()
+        {
+            Ctx ctx = Session["ctx"] as Ctx;
+            if (ctx == null) { return Json("", JsonRequestBehavior.AllowGet); }
+
+            try
+            {
+                DateTime now = DateTime.Now;
+                DateTime monthStart = new DateTime(now.Year, now.Month, 1);
+                DateTime nextMonthStart = monthStart.AddMonths(1);
+
+                var ids = GetProductionIssueIdsData(ctx, monthStart, nextMonthStart);
+                string json = JsonConvert.SerializeObject(new { ids = ids, success = true });
+                return Json(json, JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                Log.Log(Level.SEVERE, "VAS_181_ProductionIssuesWidget.GetProductionIssueIds", ex);
+                string json = JsonConvert.SerializeObject(new { error = Msg.GetMsg(ctx, "Error") ?? "Error" });
+                return Json(json, JsonRequestBehavior.AllowGet);
+            }
+        }
+
+        private const int MaxZoomIds = 1000;
+
+        private System.Collections.Generic.List<int> GetProductionIssueIdsData(Ctx ctx, DateTime monthStart, DateTime nextMonthStart)
+        {
+            var ids = new System.Collections.Generic.List<int>();
+            if (ctx == null) { return ids; }
+
+            string msl = ToSqlDate(monthStart);
+            string nmsl = ToSqlDate(nextMonthStart);
+
+            // Same population as GetProductionIssuesPercentageData's ProductionValue
+            // branch (line-level work-order classification), just DISTINCT header
+            // ids instead of a SUM.
+            string sql = @"
+                SELECT DISTINCT inv.M_Inventory_ID
+                  FROM M_Inventory inv
+                  INNER JOIN M_InventoryLine line ON ( line.M_Inventory_ID = inv.M_Inventory_ID )
+                 WHERE inv.IsActive = 'Y'
+                   AND line.IsActive = 'Y'
+                   AND inv.IsInternalUse = 'Y'
+                   AND inv.DocStatus IN ('CO', 'CL')
+                   AND COALESCE(line.QtyInternalUse, 0) > 0
+                   AND (COALESCE(line.VA075_WorkOrder_ID, 0) > 0 OR COALESCE(line.VAMFG_M_WorkOrder_ID, 0) > 0)
+                   AND inv.MovementDate >= " + msl + @"
+                   AND inv.MovementDate < " + nmsl;
+
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "inv", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+            using (System.Data.IDataReader dr = DB.ExecuteReader(sql, null, null))
+            {
+                while (dr != null && dr.Read())
+                {
+                    if (ids.Count >= MaxZoomIds) { break; }
+                    ids.Add(Util.GetValueOfInt(dr["M_Inventory_ID"]));
+                }
+            }
+
+            return ids;
         }
 
         /// <summary>
@@ -171,15 +265,10 @@ namespace VIS.Controllers
             return "(" + string.Join(" OR ", tests) + ")";
         }
 
-        private int GetProductionIssuesPercentageData(Ctx ctx)
+        private int GetProductionIssuesPercentageData(Ctx ctx, DateTime monthStart, DateTime nextMonthStart)
         {
             if (ctx == null) { return 0; }
 
-            List<string> workOrderColumns = ResolveProductionOrderColumns();
-
-            DateTime now = DateTime.Now;
-            DateTime monthStart = new DateTime(now.Year, now.Month, 1);
-            DateTime nextMonthStart = monthStart.AddMonths(1);
             string msl = ToSqlDate(monthStart);
             string nmsl = ToSqlDate(nextMonthStart);
 
@@ -197,14 +286,15 @@ namespace VIS.Controllers
             //
             // Cost fallback must end in 0: NVL(CurrentCostPrice, PriceCost) yields NULL when both
             // are null, and SUM() silently drops those lines from the total.
+            List<string> workOrderColumns = ResolveProductionOrderColumns();
             string sql = @"
                 SELECT
                   COALESCE(SUM(CASE WHEN " + WorkOrderLinePredicate(workOrderColumns) + @"
                                     THEN (line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0))
                                     ELSE 0 END), 0) AS ProductionValue,
                   COALESCE(SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0)), 0) AS TotalValue
-                FROM M_InventoryLine line
-                INNER JOIN M_Inventory inv ON inv.M_Inventory_ID = line.M_Inventory_ID
+                FROM M_Inventory inv
+                INNER JOIN M_InventoryLine line ON ( line.M_Inventory_ID = inv.M_Inventory_ID )
                 WHERE inv.IsActive = 'Y'
                   AND line.IsActive = 'Y'
                   AND inv.IsInternalUse = 'Y'

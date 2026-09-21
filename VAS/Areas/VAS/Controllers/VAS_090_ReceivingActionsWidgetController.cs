@@ -27,6 +27,10 @@ namespace VIS.Controllers
     ///               (ProductType 'I'): the PO list keeps only orders with at
     ///               least one open item line, the line list and the create
     ///               validation exclude non-item lines.
+    ///   Claude      2026-09-21 GetGRNConfirmationDetail: fixed a PR #1167 merge-
+    ///               conflict resolution bug where the Scrap Locator SELECT still
+    ///               referenced a dropped "Locator" alias and never produced the
+    ///               Scrap_Locator_ID/Scrap_Locator_Name columns the reader expects.
     /// </summary>
     public class VAS_090_ReceivingActionsWidgetController : Controller
     {
@@ -1524,8 +1528,6 @@ namespace VIS.Controllers
                 MRole.SQL_RO
             );
 
-            // QA sheet Complete GRN Confirmation #84 (2026-09-15): the Scrap Locator is the confirmation
-            // line's own M_Locator_ID (editable, blank by default) - not the GRN line's receiving locator.
             string scrapLocatorNameSql = HasColumn("M_Locator", "LocatorCombination")
                 ? "COALESCE(ScrapLocator.LocatorCombination, ScrapLocator.Value)"
                 : "ScrapLocator.Value";

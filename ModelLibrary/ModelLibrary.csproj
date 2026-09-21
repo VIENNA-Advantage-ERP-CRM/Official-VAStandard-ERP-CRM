@@ -244,8 +244,8 @@
     <Compile Include="Model\MConversionRate.cs" />
     <Compile Include="Model\MConversionType.cs" />
     <Compile Include="Model\MInventoryRevaluation.cs" />
-    <Compile Include="Model\MOppLines.cs" />
-    <Compile Include="Model\MOpportunity.cs" />
+    <Compile Include="Model\MVASOppLines.cs" />
+    <Compile Include="Model\MVASOpportunity.cs" />
     <Compile Include="Model\MProductionPlan.cs" />
     <Compile Include="Model\MRevaluationAcctSchema.cs" />
     <Compile Include="Model\MRevaluationLine.cs" />

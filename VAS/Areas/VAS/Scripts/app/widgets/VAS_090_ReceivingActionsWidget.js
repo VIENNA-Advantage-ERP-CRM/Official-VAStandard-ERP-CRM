@@ -127,8 +127,7 @@
         var labelLoading = false;
 
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            return (t && t.charAt(0) !== '[') ? t : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -480,7 +479,6 @@
             $dialogBusy = $dialog.find('.vas-ra-modal-busy');
 
             $dialog.find('.vas-ra-modal-close').on('click', closeDialog);
-            $dialog.find('.vas-ra-scrim').on('click', closeDialog);
             $dialog.on('click', '.vas-ra-po-row', function () { selectPurchaseOrder($(this).data('poid')); });
             $dialog.on('click', '.vas-ra-po-prev', function () { if (poPageNo > 1) { loadOpenPOLines(poPageNo - 1); } });
             $dialog.on('click', '.vas-ra-po-next', function () { if (poPageNo < poTotalPages) { loadOpenPOLines(poPageNo + 1); } });
@@ -547,9 +545,6 @@
             $dialog.on('click', '.vas-ra-label-row', function () { queueGRNLabelPrint($(this).data('grnid')); });
             $dialog.on('click', '.vas-ra-label-prev', function () { if (labelPageNo > 1) { searchGRNLabels(labelSearchText, labelPageNo - 1); } });
             $dialog.on('click', '.vas-ra-label-next', function () { if (labelPageNo < labelTotalPages) { searchGRNLabels(labelSearchText, labelPageNo + 1); } });
-            $(document).on('keydown.vas-ra', function (e) {
-                if (e.key === 'Escape' && !$dialog.hasClass('vas-ra-hidden')) { closeDialog(); }
-            });
             $(window).on('resize.vas-ra', syncOpenModalPageSize);
 
             $('body').append($dialog);

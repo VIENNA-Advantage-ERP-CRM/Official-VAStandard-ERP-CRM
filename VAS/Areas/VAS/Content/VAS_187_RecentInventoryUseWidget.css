@@ -65,8 +65,8 @@
     }
 
 .vas-riu-title {
-    font-size: .85em;
-    font-weight: 500;
+    font-size: .9em;
+    font-weight: 700;
     color: #102C3F;
     line-height: 1.2;
     overflow: hidden;
@@ -81,7 +81,12 @@
     line-height: 1.2;
 }
 
-.vas-riu-select {
+.vas-riu-filter-wrap {
+    position: relative;
+    flex: 0 0 auto;
+}
+
+.vas-riu-filter-btn {
     font-family: inherit;
     font-size: .6875em;
     font-weight: 500;
@@ -89,11 +94,61 @@
     background: #fff;
     border: 1px solid #D9E2EB;
     border-radius: 8px;
-    padding: .3em .5em;
+    padding: .4em .7em;
     outline: none;
     cursor: pointer;
-    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: .4em;
 }
+
+    .vas-riu-filter-btn svg {
+        width: 1em;
+        height: 1em;
+        flex: 0 0 auto;
+    }
+
+    .vas-riu-filter-btn:hover {
+        background: #F7FAFC;
+    }
+
+.vas-riu-filter-menu {
+    position: absolute;
+    top: calc(100% + .35em);
+    right: 0;
+    background: #fff;
+    border: 1px solid #D9E2EB;
+    border-radius: 10px;
+    box-shadow: 0 8px 20px rgba(15, 61, 97, .12);
+    padding: .3em;
+    min-width: 10em;
+    display: flex;
+    flex-direction: column;
+    gap: .1em;
+    z-index: 20;
+}
+
+.vas-riu-filter-opt {
+    font-family: inherit;
+    font-size: .6875em;
+    font-weight: 500;
+    text-align: left;
+    color: #41576A;
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    padding: .5em .6em;
+    cursor: pointer;
+}
+
+    .vas-riu-filter-opt:hover {
+        background: #EAF8FF;
+    }
+
+    .vas-riu-filter-opt.active {
+        background: #0083DA;
+        color: #fff;
+    }
 
 /* Document Row Items */
 .vas-riu-body {
@@ -119,6 +174,14 @@
        below its content height and the overflow returns. Same fix as .vas-mcw-row (VAS_183). */
     flex: 1 1 0;
     min-height: 0;
+    /* Row content must not exceed this shrunk height: the row itself has no overflow
+       clipping of its own (only .vas-riu-body does), so taller-than-allotted content
+       does not get clipped - it visually spills past the row's box into the next row's
+       space, which reads as the wrong Lines/Amount values sitting next to the wrong
+       document. Added 2026-09-18 after the redesign's two-line stat blocks first hit
+       this: overflow: hidden here clips instead of bleeding, as a safety net on top of
+       keeping the row's actual content height tight (see doc-meta / stat-lbl below). */
+    overflow: hidden;
     padding: .4em 0;
     border-bottom: 1px solid #E2EAF1;
     border-top: 0;
@@ -153,7 +216,7 @@
 }
 
 .vas-riu-doc-no {
-    font-size: .75em;
+    font-size: .85em;
     font-weight: 700;
     color: #102C3F;
 }
@@ -161,10 +224,23 @@
 .vas-riu-badge {
     font-size: .625em;
     font-weight: 700;
-    padding: .15em .45em;
+    padding: .15em .5em .15em .4em;
     border-radius: 999px;
     text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    gap: .3em;
 }
+
+    .vas-riu-badge-ico {
+        display: inline-flex;
+        flex: 0 0 auto;
+    }
+
+        .vas-riu-badge-ico svg {
+            width: 1em;
+            height: 1em;
+        }
 
     .vas-riu-badge.co {
         background: #EAF8F0;
@@ -185,27 +261,59 @@
     font-size: .6875em;
     color: #5F7283;
     margin-top: .15em;
+    display: flex;
+    align-items: center;
+    gap: .35em;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    line-height: 1.2;
+}
+
+    .vas-riu-doc-meta span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+.vas-riu-cal-ico {
+    width: .95em;
+    height: .95em;
+    flex: 0 0 auto;
+    color: #8FA3B3;
 }
 
 .vas-riu-row-right {
-    text-align: right;
+    display: flex;
+    align-items: center;
+    gap: .75em;
     flex: 0 0 auto;
 }
 
-.vas-riu-lines-qty {
+.vas-riu-stat {
+    text-align: right;
+}
+
+.vas-riu-stat-lbl {
+    font-size: .625em;
+    font-weight: 400;
+    color: #8FA3B3;
+    text-transform: capitalize;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.vas-riu-stat-val {
     font-size: .75em;
     font-weight: 700;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+    white-space: nowrap;
 }
 
-.vas-riu-val {
-    font-size: .6875em;
-    color: #748494;
-    font-variant-numeric: tabular-nums;
+.vas-riu-divider {
+    width: 1px;
+    align-self: stretch;
+    background: #E2EAF1;
 }
 
 /* Footer Pager */
@@ -237,7 +345,7 @@
     width: 24px;
     height: 24px;
     border: 1px solid #D9E2EB;
-    border-radius: 6px;
+    border-radius: 50%;
     background: #fff;
     color: #0083DA;
     display: inline-flex;
@@ -246,6 +354,11 @@
     cursor: pointer;
     padding: 0;
 }
+
+    .vas-riu-pager-btn svg {
+        width: 14px;
+        height: 14px;
+    }
 
     .vas-riu-pager-btn:disabled {
         color: #B8C6D2;

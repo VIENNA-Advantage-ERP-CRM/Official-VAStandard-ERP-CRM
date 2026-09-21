@@ -3,8 +3,8 @@
  * Summary Message Table
  *  # | Current Text                | Message Key
  * ---+-----------------------------+------------------------------
- *  1 | Total Stock Qty             | VAS_TotalStockQty
- *  2 | Units across all warehouses | VAS_UnitsAcrossAllWarehouses
+ *  1 | Total Stock Qty             | VAS_076_TotalStockQty
+ *  2 | Units across all warehouses | VAS_076_UnitsAcrossAllWarehouses
  *  3 | Couldn't load               | VAS_CouldntLoad
  */
 ; VAS = window.VAS || {};
@@ -21,8 +21,7 @@
         var $meta;
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return translated && translated.charAt(0) !== '[' ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function formatCompact(value) {
@@ -53,7 +52,7 @@
 
         function loadTotal() {
             $value.text('\u2014');
-            $meta.text(label('VAS_UnitsAcrossAllWarehouses', 'Units across all warehouses'));
+            $meta.text(label('VAS_076_UnitsAcrossAllWarehouses', 'Units across all warehouses'));
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_076_TotalStockQtyWidget/GetTotalStockQty',
@@ -89,7 +88,7 @@
                 '</div>'
             );
 
-            $card.find('.MPC-total-stock-label').text(label('VAS_TotalStockQty', 'Total Stock Qty'));
+            $card.find('.MPC-total-stock-label').text(label('VAS_076_TotalStockQty', 'Total Stock Qty'));
             $value = $card.find('.MPC-total-stock-value');
             $meta = $card.find('.MPC-total-stock-meta');
             $root.append($card);

@@ -42,7 +42,7 @@
  * 16  | Customer                              | VAS_Customer
  * 17  | Payment Method                        | VAS_035_PaymentMethod
  * 18  | Reference                             | VAS_035_Reference
- * 19  | Bank Account                          | VAS_011_BankAccount
+ * 19  | Bank Account                          | VAS_035_BankAccount
  * 20  | Currency                              | VAS_PaymentCurrency
  * 21  | Amount Received                       | VAS_035_AmountReceived
  * 22  | Invoice Date                          | VAS_035_InvoiceDate
@@ -147,8 +147,7 @@
         var totalRecords = 0;
 
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            return (t && t.charAt(0) !== '[') ? t : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function showBusy(show) {
@@ -489,7 +488,7 @@
                 paneRow(lbl("VAS_Customer", "Customer"), data.ReceiptCustomer) +
                 paneRow(lbl("VAS_035_PaymentMethod", "Payment Method"), data.PaymentMethod) +
                 paneRow(lbl("VAS_035_Reference", "Reference"), data.Reference) +
-                paneRow(lbl("VAS_011_BankAccount", "Bank Account"), formatBankAccount(data)) +
+                paneRow(lbl("VAS_035_BankAccount", "Bank Account"), formatBankAccount(data)) +
                 paneRow(lbl("VAS_PaymentCurrency", "Currency"), data.ReceiptCurrency) +
                 paneRow(lbl("VAS_035_AmountReceived", "Amount Received"), receiptAmt, 'vas-msug-amount-received') +
                 '</div>';
@@ -655,13 +654,8 @@
                 e.stopPropagation();
                 closeDialog();
             });
-            $dialog.find('.vas-msug-dialog-scrim').on('click', function () { closeDialog(); });
             $dialog.find('.vas-msug-btn-skip').on('click', function () { closeDialog(); });
             $dialogFooterApply.on('click', function () { applyCurrentSuggestion(); });
-
-            $(document).on('keydown.vas-msug', function (e) {
-                if (e.key === 'Escape' && $dialog.is(':visible')) { closeDialog(); }
-            });
 
             $('body').append($dialog);
         }

@@ -67,11 +67,11 @@
  *                  12 | Nothing unreconciled          | VAS_238_NothingOpen
  *                  13 | No bank accounts available    | VAS_238_NoAccounts
  *                  14 | days old                      | VAS_238_DaysOld
- *                  15 | Showing                       | VAS_020_Showing     (reuse)
- *                  16 | of                            | VAS_020_Of          (reuse)
- *                  17 | Previous                      | VAS_020_Prev        (reuse)
- *                  18 | Next                          | VAS_020_Next        (reuse)
- *                  19 | Couldn't load                 | VAS_192_CouldntLoad (reuse)
+ *                  15 | Showing                       | VAS_238_Showing
+ *                  16 | of                            | VAS_238_Of
+ *                  17 | Previous                      | VAS_238_Prev
+ *                  18 | Next                          | VAS_238_Next
+ *                  19 | Couldn't load                 | VAS_238_CouldntLoad
  *
  * Chronological development:
  *   VAI154         Created  Date 2026-09-03
@@ -363,7 +363,7 @@
 
                     var data = parseResponse(raw);
                     if (!data || data.error || !data.Loaded) {
-                        renderState(label('VAS_192_CouldntLoad', "Couldn't load"));
+                        renderState(label('VAS_238_CouldntLoad', "Couldn't load"));
                         return;
                     }
 
@@ -387,7 +387,7 @@
                     /* The overlay comes down on failure too - a spinner left running over
                        an error the user cannot see is the worst of both. */
                     hideBusyIndicator();
-                    renderState(label('VAS_192_CouldntLoad', "Couldn't load"));
+                    renderState(label('VAS_238_CouldntLoad', "Couldn't load"));
                 }
             });
         }
@@ -553,8 +553,8 @@
             var from = (_page - 1) * _pageSize + 1;
             var to = Math.min(_page * _pageSize, _totalRows);
 
-            var showing = label('VAS_020_Showing', 'Showing') + ' ' + from + '–' + to + ' ' +
-                label('VAS_020_Of', 'of') + ' ' + _totalRows;
+            var showing = label('VAS_238_Showing', 'Showing') + ' ' + from + '–' + to + ' ' +
+                label('VAS_238_Of', 'of') + ' ' + _totalRows;
 
             var prevDis = _page <= 1 ? ' disabled' : '';
             var nextDis = _page >= _totalPages ? ' disabled' : '';
@@ -564,11 +564,11 @@
                     '<span class="vas-238-pager-info">' + escapeHtml(showing) + '</span>' +
                     '<div class="vas-238-pager-nav">' +
                         '<button type="button" class="vas-238-pgbtn vas-238-pg-prev" aria-label="' +
-                            escapeHtml(label('VAS_020_Prev', 'Previous')) + '"' + prevDis + '>' + ICONS.prev + '</button>' +
+                            escapeHtml(label('VAS_238_Prev', 'Previous')) + '"' + prevDis + '>' + ICONS.prev + '</button>' +
                         '<span class="vas-238-pager-label">' + _page + ' ' +
-                            escapeHtml(label('VAS_020_Of', 'of')) + ' ' + _totalPages + '</span>' +
+                            escapeHtml(label('VAS_238_Of', 'of')) + ' ' + _totalPages + '</span>' +
                         '<button type="button" class="vas-238-pgbtn vas-238-pg-next" aria-label="' +
-                            escapeHtml(label('VAS_020_Next', 'Next')) + '"' + nextDis + '>' + ICONS.next + '</button>' +
+                            escapeHtml(label('VAS_238_Next', 'Next')) + '"' + nextDis + '>' + ICONS.next + '</button>' +
                     '</div>' +
                 '</div>'
             );
@@ -875,14 +875,7 @@
         /* Every user-facing string goes through AD_Message; the fallback keeps the card
            readable when a key has not been seeded yet. */
         function label(key, fallback) {
-            try {
-                if (VIS.Msg && typeof VIS.Msg.getMsg === 'function') {
-                    var v = VIS.Msg.getMsg(key);
-                    if (v && v !== key && v.charAt(0) !== '[') { return v; }
-                }
-            }
-            catch (e) { /* ignore */ }
-            return fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         this.getRoot = function () { return $root; };

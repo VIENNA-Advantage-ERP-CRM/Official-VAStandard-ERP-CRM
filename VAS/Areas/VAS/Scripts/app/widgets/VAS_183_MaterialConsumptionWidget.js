@@ -26,6 +26,9 @@
  * 17 | of                                     | VAS_183_Of
  * 18 | Page                                   | VAS_183_Page
  * 19 | lines                                  | VAS_183_Lines
+ * 20 | Warehouse                               | VAS_183_WarehouseFallback
+ * 21 | locators                                | VAS_183_Locators
+ * 22 | Jan,Feb,Mar,...                         | VAS_183_Months
  */
 ; VAS = window.VAS || {};
 
@@ -84,8 +87,7 @@
         function DateTimeNowYear() { return new Date().getFullYear(); }
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return (translated && translated.charAt(0) !== '[') ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -174,7 +176,7 @@
 // ----- END OLD CODE -----
 
         function formatMonthLabel(m, y) {
-            var monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            var monthNames = label("VAS_183_Months", "Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec").split(',');
             var name = monthNames[Math.max(0, Math.min(11, m - 1))];
             return name + ' ' + y;
         }
@@ -276,10 +278,19 @@
                 loadLocatorSummary();
             });
 
-            // One menu open at a time; clicking anywhere outside closes both.
-            $self._onDocClickMcw = function () {
-                closeMenu($whMenu, $whBtn);
-                closeMenu($monthMenu, $monthBtn);
+            // One menu open at a time; clicking anywhere outside closes both. This listens on
+            // 'mousedown' (capture phase) so it can also swallow the outside click before the
+            // host window's own handlers see it. But because the menu is hidden via display:none,
+            // closing it unconditionally here - including when the mousedown target IS a menu
+            // item - removed the button from the render tree before its own 'click' event could
+            // fire: display:none between mousedown and mouseup silently drops the click, so
+            // selecting an option looked like it did nothing. Skip closing a menu when the
+            // mousedown landed inside that menu (or its own trigger button) and let the menu
+            // item's own click handler close it after acting on the selection.
+            $self._onDocClickMcw = function (e) {
+                var $t = $(e.target);
+                if (!$t.closest('.vas-mcw-wh-menu, .vas-mcw-wh-btn').length) { closeMenu($whMenu, $whBtn); }
+                if (!$t.closest('.vas-mcw-month-menu, .vas-mcw-month-btn').length) { closeMenu($monthMenu, $monthBtn); }
             };
             $self._onReflowMcw = function () {
                 if ($whMenu.hasClass('vas-mcw-menu-open')) { positionMenu($whMenu, $whBtn); }
@@ -347,10 +358,15 @@
         }
 
         function renderWarehouseMenu() {
+            // Value (shortName) is often just an auto-generated numeric code (e.g. "1000002") on
+            // this deployment, which read as a raw ID to the user and gave no way to tell
+            // warehouses apart when picking one - same root cause as the locator names fixed in
+            // VAS_186. Name (fullName) is the real, human-readable warehouse name and must win;
+            // Value is only a fallback for the rare warehouse with no name at all.
             if ($whLbl) {
                 $whLbl.text(selectedWarehouse
-                    ? (selectedWarehouse.shortName || selectedWarehouse.name || '')
-                    : label("VAS_NoWarehouse", "No warehouse"));
+                    ? (selectedWarehouse.fullName || selectedWarehouse.shortName || '')
+                    : label("VAS_183_NoWarehouse", "No warehouse"));
             }
             if (!$whMenu) { return; }
 
@@ -360,7 +376,7 @@
                 var isOn = selectedWarehouse && Number(wh.warehouseId) === Number(selectedWarehouse.warehouseId);
                 html += '<button type="button" role="menuitem" data-whid="' + Number(wh.warehouseId) + '"' +
                     (isOn ? ' class="vas-mcw-menu-on"' : '') + '>' +
-                    escapeHtml(wh.shortName || wh.name || ('#' + wh.warehouseId)) + '</button>';
+                    escapeHtml(wh.fullName || wh.shortName || ('#' + wh.warehouseId)) + '</button>';
             }
             $whMenu.html(html);
         }
@@ -410,8 +426,8 @@
 
             if (locatorsData.length === 0) {
                 $body.html('<div class="vas-mcw-empty">' + escapeHtml(label("VAS_183_NoConsumptionRecords", "No consumption records")) + '</div>');
-                if ($footHelper) { $footHelper.text(formatMonthLabel(selectedMonth, selectedYear) + ' - 0 locators'); }
-                if ($pagerText) { $pagerText.text('1 of 1'); }
+                if ($footHelper) { $footHelper.text(formatMonthLabel(selectedMonth, selectedYear) + ' - 0 ' + label("VAS_183_Locators", "locators")); }
+                if ($pagerText) { $pagerText.text('1 ' + label("VAS_183_Of", "of") + ' 1'); }
                 if ($prevBtn) { $prevBtn.prop('disabled', true); }
                 if ($nextBtn) { $nextBtn.prop('disabled', true); }
                 return;
@@ -468,17 +484,17 @@
             $body.toggleClass('single-row', (endIndex - startIndex) === 1);
 
             if ($footHelper) {
-                $footHelper.text(formatMonthLabel(selectedMonth, selectedYear) + ' - ' + locatorsData.length + ' locators');
+                $footHelper.text(formatMonthLabel(selectedMonth, selectedYear) + ' - ' + locatorsData.length + ' ' + label("VAS_183_Locators", "locators"));
             }
             if ($pagerText) {
-                $pagerText.text(pageNo + ' of ' + totalPages);
+                $pagerText.text(pageNo + ' ' + label("VAS_183_Of", "of") + ' ' + totalPages);
             }
             if ($prevBtn) { $prevBtn.prop('disabled', pageNo <= 1); }
             if ($nextBtn) { $nextBtn.prop('disabled', pageNo >= totalPages); }
         }
 
         function openLocatorDetailModal(locatorId, locatorCode, locatorName) {
-            var whName = selectedWarehouse ? selectedWarehouse.fullName : "Warehouse";
+            var whName = selectedWarehouse ? selectedWarehouse.fullName : label("VAS_183_WarehouseFallback", "Warehouse");
             var whId = selectedWarehouse ? selectedWarehouse.warehouseId : 0;
             var monthLabel = formatMonthLabel(selectedMonth, selectedYear);
 
@@ -606,14 +622,6 @@
                 closeModal();
             });
 
-            $modal.on('click', function (e) {
-                if (e.target === this) { closeModal(); }
-            });
-
-            $(document).on('keydown.vas-mcw-modal', function (e) {
-                if (e.key === 'Escape' || e.keyCode === 27) { closeModal(); }
-            });
-
             $modal.find('.vas-mcw-m-prev').on('click', function () {
                 if (modalPageNo > 1) { modalPageNo--; renderModalTable(); }
             });
@@ -690,7 +698,7 @@
                 '</button>' +
                 '</div>' +
                 '<div class="vas-mcw-dd">' +
-                '<button type="button" class="vas-mcw-pill-btn vas-mcw-month-btn" aria-haspopup="true" aria-expanded="false" title="' + escapeHtml(label("VAS_Month", "Month")) + '">' +
+                '<button type="button" class="vas-mcw-pill-btn vas-mcw-month-btn" aria-haspopup="true" aria-expanded="false" title="' + escapeHtml(label("VAS_183_Month", "Month")) + '">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>' +
                 '<span class="vas-mcw-month-lbl">' + escapeHtml(formatMonthLabel(selectedMonth, selectedYear)) + '</span>' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>' +
@@ -703,7 +711,7 @@
                 '<div class="vas-mcw-foot-helper"></div>' +
                 '<div class="vas-mcw-pager">' +
                 '<button type="button" class="vas-mcw-pager-btn vas-mcw-prev">&lsaquo;</button>' +
-                '<span class="vas-mcw-pager-txt">1 of 1</span>' +
+                '<span class="vas-mcw-pager-txt">1 ' + escapeHtml(label("VAS_183_Of", "of")) + ' 1</span>' +
                 '<button type="button" class="vas-mcw-pager-btn vas-mcw-next">&rsaquo;</button>' +
                 '</div>' +
                 '</div>' +

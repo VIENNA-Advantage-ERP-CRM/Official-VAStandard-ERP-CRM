@@ -89,6 +89,8 @@
  * 53  | of                                                                    | VAS_277_Of
  * 54  | Showing                                                               | VAS_277_Showing
  * 55  | Search is unavailable right now. Try again in a moment.               | VAS_277_LoadError
+ * 56  | From month                                                            | VAS_277_FromMonth
+ * 57  | To month                                                              | VAS_277_ToMonth
  */
 ; VAS = window.VAS || {};
 
@@ -157,8 +159,7 @@
         var currentCfg = null;
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return (translated && translated.charAt(0) !== '[') ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -265,8 +266,8 @@
             $htxt.append('<p class="vas277-subtitle">' + escapeHtml(label('VAS_277_Subtitle', 'Sales orders booked, by month')) + '</p>');
 
             var $filter = $('<div class="vas277-filter"></div>');
-            $fromSel = $('<select aria-label="From month"></select>');
-            $toSel = $('<select aria-label="To month"></select>');
+            $fromSel = $('<select aria-label="' + escapeHtml(label('VAS_277_FromMonth', 'From month')) + '"></select>');
+            $toSel = $('<select aria-label="' + escapeHtml(label('VAS_277_ToMonth', 'To month')) + '"></select>');
             $filter.append($fromSel, '<span class="vas277-filter-sep">' + escapeHtml(label('VAS_277_RangeTo', 'to')) + '</span>', $toSel);
 
             $head.append($htxt, $filter);
@@ -439,9 +440,6 @@
 
             $closeBtn.on('click', closeModal);
             $mBack.on('click', backModal);
-            $mask.on('mousedown', function (event) {
-                if (event.target === $mask[0]) { closeModal(); }
-            });
             $mBody.on('click', function (event) {
                 var pageBtn = event.target.closest ? event.target.closest('[data-dir]') : null;
                 if (pageBtn) { turnPage(pageBtn.getAttribute('data-table'), Number(pageBtn.getAttribute('data-dir'))); return; }
@@ -455,10 +453,6 @@
         function bindDocumentLevelEvents() {
             var ns = '.vas277-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget');
 
-            $(document).on('keydown' + ns, function (event) {
-                if (event.key !== 'Escape') { return; }
-                if ($mask.hasClass('is-open')) { closeModal(); }
-            });
             $(window).on('resize' + ns, function () {
                 if ($mask.hasClass('is-open')) { fitAllTables(); }
             });

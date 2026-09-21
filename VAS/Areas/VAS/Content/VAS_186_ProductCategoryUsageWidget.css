@@ -141,9 +141,15 @@
         min-width: 4.2em;
     }
 
-    /* Centre each option row too, so the open list matches the closed control. */
+    /* Centre each option row too, so the open list matches the closed control.
+       text-align on <option> only works in Firefox - Chrome/Edge on Windows render the open
+       popup with their own menu-list-item box and ignore text-align there entirely (a long-
+       standing Chromium limitation), even though they do honour a plain padding on the same
+       element. Every option here is a fixed-width value (3-letter month / 4-digit year), so a
+       flat padding-left visually centres them for that browser too. */
     .vas-pcu-select option {
         text-align: center;
+        padding-left: 1em;
     }
 
     /* Standard select hover tint (was missing on this widget). */
@@ -565,6 +571,24 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+.vas-pcu-m-doclink {
+    border: 0;
+    background: none;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    font-weight: 700;
+    color: #0083DA;
+    cursor: pointer;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+}
+
+    .vas-pcu-m-doclink:hover { color: #0069AE; text-decoration: underline; }
 
 /* Loading / empty state cell */
 .vas-pcu-m-msgcell {

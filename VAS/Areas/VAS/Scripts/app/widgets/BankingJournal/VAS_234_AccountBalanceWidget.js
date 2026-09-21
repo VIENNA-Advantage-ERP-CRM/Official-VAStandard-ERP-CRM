@@ -88,11 +88,11 @@
  *                  11 | No bank accounts available    | VAS_234_NoAccounts
  *                  12 | accounts                      | VAS_234_Accounts
  *                  13 | Page                          | VAS_234_Page
- *                  14 | Showing                       | VAS_020_Showing   (reuse)
- *                  15 | of                            | VAS_020_Of        (reuse)
- *                  16 | Previous                      | VAS_020_Prev      (reuse)
- *                  17 | Next                          | VAS_020_Next      (reuse)
- *                  18 | Couldn't load                 | VAS_192_CouldntLoad (reuse)
+ *                  14 | Showing                       | VAS_234_Showing
+ *                  15 | of                            | VAS_234_Of
+ *                  16 | Previous                      | VAS_234_Prev
+ *                  17 | Next                          | VAS_234_Next
+ *                  18 | Couldn't load                 | VAS_234_CouldntLoad
  *
  *                  VAS_234_NoActivity is RETIRED - a row that did not move now prints
  *                  zeros like every other row. The key can be dropped from AD_Message.
@@ -405,7 +405,7 @@
 
                     var data = parseResponse(raw);
                     if (!data || data.error || !data.Loaded) {
-                        renderState(label('VAS_192_CouldntLoad', "Couldn't load"));
+                        renderState(label('VAS_234_CouldntLoad', "Couldn't load"));
                         return;
                     }
 
@@ -428,7 +428,7 @@
                     /* The overlay comes down on failure too - leaving a spinner spinning
                        over an error the user cannot see is the worst of both. */
                     hideBusyIndicator();
-                    renderState(label('VAS_192_CouldntLoad', "Couldn't load"));
+                    renderState(label('VAS_234_CouldntLoad', "Couldn't load"));
                 }
             });
         }
@@ -685,11 +685,11 @@
             var from = (_page - 1) * _pageSize + 1;
             var to = Math.min(_page * _pageSize, _totalRows);
 
-            var showing = label('VAS_020_Showing', 'Showing') + ' ' + from + '–' + to + ' ' +
-                label('VAS_020_Of', 'of') + ' ' + _totalRows + ' ' +
+            var showing = label('VAS_234_Showing', 'Showing') + ' ' + from + '–' + to + ' ' +
+                label('VAS_234_Of', 'of') + ' ' + _totalRows + ' ' +
                 label('VAS_234_Accounts', 'accounts');
             var pageText = label('VAS_234_Page', 'Page') + ' ' + _page + ' ' +
-                label('VAS_020_Of', 'of') + ' ' + _totalPages;
+                label('VAS_234_Of', 'of') + ' ' + _totalPages;
 
             var prevDis = _page <= 1 ? ' disabled' : '';
             var nextDis = _page >= _totalPages ? ' disabled' : '';
@@ -698,10 +698,10 @@
                 '<span class="vas-234-count">' + escapeHtml(showing) + '</span>' +
                 '<div class="vas-234-pager">' +
                     '<button type="button" class="vas-234-pgbtn vas-234-pg-prev" aria-label="' +
-                        escapeHtml(label('VAS_020_Prev', 'Previous')) + '"' + prevDis + '>' + ICONS.prev + '</button>' +
+                        escapeHtml(label('VAS_234_Prev', 'Previous')) + '"' + prevDis + '>' + ICONS.prev + '</button>' +
                     '<span class="vas-234-page">' + escapeHtml(pageText) + '</span>' +
                     '<button type="button" class="vas-234-pgbtn vas-234-pg-next" aria-label="' +
-                        escapeHtml(label('VAS_020_Next', 'Next')) + '"' + nextDis + '>' + ICONS.next + '</button>' +
+                        escapeHtml(label('VAS_234_Next', 'Next')) + '"' + nextDis + '>' + ICONS.next + '</button>' +
                 '</div>'
             );
 
@@ -1005,14 +1005,7 @@
         /* Every user-facing string goes through AD_Message; the fallback keeps the card
            readable when a key has not been seeded yet. */
         function label(key, fallback) {
-            try {
-                if (VIS.Msg && typeof VIS.Msg.getMsg === 'function') {
-                    var v = VIS.Msg.getMsg(key);
-                    if (v && v !== key && v.charAt(0) !== '[') { return v; }
-                }
-            }
-            catch (e) { /* ignore */ }
-            return fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         this.getRoot = function () { return $root; };

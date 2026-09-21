@@ -15,8 +15,7 @@
     /* ---- Message helper: returns the AD_Message text, or the inline default
          when the system has no message for the key. ---- */
     function msg(key, fallback) {
-        var value = VIS.Msg.getMsg(key);
-        return value && value !== key && value !== '[' + key + ']' ? value : fallback;
+        return VIS.Msg.getMsg(key);
     }
 
     /* Keep --dash-inline-size on :root equal to the dashboard container's current

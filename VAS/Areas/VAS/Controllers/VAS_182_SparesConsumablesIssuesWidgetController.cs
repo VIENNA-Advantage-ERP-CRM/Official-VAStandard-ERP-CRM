@@ -18,6 +18,11 @@ namespace VIS.Controllers
     /// Chronological development:
     ///   AI-Dev      2026-08-02 Created
     ///   Agent A04   2026-08-19 Added GetCurrencyInfo endpoint & currency formatting support
+    ///   Claude      2026-09-18 Reclassified Spares/Consumables via Product Category
+    ///                          (M_Product_Category.ProductGroup = 'C') instead of the
+    ///                          "not linked to a work order" complement of VAS_181 -- that
+    ///                          heuristic pushed this KPI to ~99% on installs where few
+    ///                          internal-use lines carry a work order link at all.
     /// </summary>
     public class VAS_182_SparesConsumablesIssuesWidgetController : Controller
     {
@@ -91,7 +96,16 @@ namespace VIS.Controllers
             return new { iso = iso, symbol = symbol };
         }
 
-        /// <summary>Returns the percentage share of MTD issued value for spares/consumables purpose.</summary>
+        /// <summary>
+        /// Returns the percentage share of MTD issued value for spares/consumables
+        /// purpose, plus the same month-window boundaries as DB-ready SQL date
+        /// literals (monthStartSql/nextMonthStartSql via <see cref="ToSqlDate"/>) -
+        /// the widget's own click-through reuses these verbatim in its
+        /// TabWhereClause instead of reconstructing the month window with
+        /// Oracle-only SYSDATE/TRUNC/ADD_MONTHS syntax (broke the drill-through on
+        /// this install's actual Postgres backend - stuck on loading, never
+        /// actually filtered - the same class of bug VAS_140/VAS_181 already hit).
+        /// </summary>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
         public JsonResult GetSparesConsumablesPercentage()
@@ -101,11 +115,16 @@ namespace VIS.Controllers
 
             try
             {
-                int percentage = GetSparesConsumablesPercentageData(ctx);
+                DateTime now = DateTime.Now;
+                DateTime monthStart = new DateTime(now.Year, now.Month, 1);
+                DateTime nextMonthStart = monthStart.AddMonths(1);
+
+                int percentage = GetSparesConsumablesPercentageData(ctx, monthStart, nextMonthStart);
                 string json = JsonConvert.SerializeObject(new
                 {
                     percentage = percentage,
-                    workOrderColumns = ResolveProductionOrderColumns(),
+                    monthStartSql = ToSqlDate(monthStart),
+                    nextMonthStartSql = ToSqlDate(nextMonthStart),
                     success = true
                 });
                 return Json(json, JsonRequestBehavior.AllowGet);
@@ -119,10 +138,100 @@ namespace VIS.Controllers
         }
 
         /// <summary>
-        /// The line-level work-order columns this installation actually has (manufacturing-module
-        /// only - absent on DB 1, for example). Referencing a missing column makes the whole query
-        /// die with ORA-00904 instead of the widget simply reporting its share, so the columns are
-        /// verified against the dictionary first.
+        /// Every M_Inventory_ID matching the MTD spares/consumables predicate
+        /// (capped at <see cref="MaxZoomIds"/>) - the click-through builds its
+        /// TabWhereClause as a flat M_Inventory.M_Inventory_ID IN (...) list from
+        /// this, instead of a correlated EXISTS(SELECT 1 FROM M_InventoryLine ...)
+        /// subquery. The grid's own "duplicate DocumentNo" diagnostic query does
+        /// naive, parenthesis-unaware text surgery on the TabWhereClause looking
+        /// for a FROM it can lift out - it mishandled the nested EXISTS(...) and
+        /// sent Oracle malformed SQL (ORA-00933), the same bug VAS_181 hit and
+        /// fixed the same way (confirmed directly in the app log).
+        /// </summary>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetSparesConsumablesIds()
+        {
+            Ctx ctx = Session["ctx"] as Ctx;
+            if (ctx == null) { return Json("", JsonRequestBehavior.AllowGet); }
+
+            try
+            {
+                DateTime now = DateTime.Now;
+                DateTime monthStart = new DateTime(now.Year, now.Month, 1);
+                DateTime nextMonthStart = monthStart.AddMonths(1);
+
+                var ids = GetSparesConsumablesIdsData(ctx, monthStart, nextMonthStart);
+                string json = JsonConvert.SerializeObject(new { ids = ids, success = true });
+                return Json(json, JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                Log.Log(Level.SEVERE, "VAS_182_SparesConsumablesIssuesWidget.GetSparesConsumablesIds", ex);
+                string json = JsonConvert.SerializeObject(new { error = Msg.GetMsg(ctx, "Error") ?? "Error" });
+                return Json(json, JsonRequestBehavior.AllowGet);
+            }
+        }
+
+        private const int MaxZoomIds = 1000;
+
+        private System.Collections.Generic.List<int> GetSparesConsumablesIdsData(Ctx ctx, DateTime monthStart, DateTime nextMonthStart)
+        {
+            var ids = new System.Collections.Generic.List<int>();
+            if (ctx == null) { return ids; }
+
+            string msl = ToSqlDate(monthStart);
+            string nmsl = ToSqlDate(nextMonthStart);
+
+            // Same population as GetSparesConsumablesPercentageData's SparesValue
+            // branch (Product Category group 'C' + line-level NOT-work-order
+            // classification), just DISTINCT header ids instead of a SUM.
+            string sql = @"
+                SELECT DISTINCT inv.M_Inventory_ID
+                  FROM M_Inventory inv
+                  INNER JOIN M_InventoryLine line ON ( line.M_Inventory_ID = inv.M_Inventory_ID )
+                  INNER JOIN M_Product mp ON ( mp.M_Product_ID = line.M_Product_ID )
+                  INNER JOIN M_Product_Category mpc ON ( mpc.M_Product_Category_ID = mp.M_Product_Category_ID )
+                 WHERE inv.IsActive = 'Y'
+                   AND mpc.ProductGroup = 'C'
+                   AND line.IsActive = 'Y'
+                   AND mp.IsActive = 'Y'
+                   AND mpc.IsActive = 'Y'
+                   AND COALESCE(inv.IsInternalUse, 'N') = 'Y'
+                   AND inv.DocStatus IN ('CO', 'CL')
+                   AND COALESCE(line.QtyInternalUse, 0) > 0
+                   AND COALESCE(line.VA075_WorkOrder_ID, 0) = 0
+                   AND COALESCE(line.VAMFG_M_WorkOrder_ID, 0) = 0
+                   AND inv.MovementDate >= " + msl + @"
+                   AND inv.MovementDate < " + nmsl;
+
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "inv", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+            using (IDataReader dr = DB.ExecuteReader(sql, null, null))
+            {
+                while (dr != null && dr.Read())
+                {
+                    if (ids.Count >= MaxZoomIds) { break; }
+                    ids.Add(Util.GetValueOfInt(dr["M_Inventory_ID"]));
+                }
+            }
+
+            return ids;
+        }
+
+        /// <summary>
+        /// The line-level production-order column, per the source specification
+        /// (03-use-c-production-issues-copilot-prompt.txt, "DATABASE TABLE MAPPING"):
+        ///   "Production order on line: M_InventoryLine.VAMFG_M_WorkOrder_ID"
+        ///   "Use the production order on the line level only ... Do not use the production-order
+        ///    field from M_Inventory header."
+        /// </summary>
+        private const string ProductionOrderColumn = "VAMFG_M_WorkOrder_ID";
+
+        /// <summary>
+        /// Returns the line-level production-order columns that this installation actually has
+        /// (never null; empty when the manufacturing module is not installed), same resolution
+        /// VAS_181 uses so both widgets agree on what counts as a work-order line.
         /// </summary>
         private static List<string> ResolveProductionOrderColumns()
         {
@@ -133,7 +242,7 @@ namespace VIS.Controllers
                 WHERE t.TableName = 'M_InventoryLine'
                   AND c.IsActive = 'Y'
                   AND UPPER(c.ColumnName) LIKE '%WORKORDER%'
-                ORDER BY c.ColumnName";
+                ORDER BY CASE WHEN UPPER(c.ColumnName) = UPPER('" + ProductionOrderColumn + @"') THEN 0 ELSE 1 END, c.ColumnName";
 
             var columns = new List<string>();
             using (IDataReader dr = DB.ExecuteReader(sql, null, null))
@@ -146,31 +255,30 @@ namespace VIS.Controllers
             return columns;
         }
 
-        private int GetSparesConsumablesPercentageData(Ctx ctx)
+        private int GetSparesConsumablesPercentageData(Ctx ctx, DateTime monthStart, DateTime nextMonthStart)
         {
             if (ctx == null) { return 0; }
 
-            List<string> workOrderColumns = ResolveProductionOrderColumns();
-
-            DateTime now = DateTime.Now;
-            DateTime monthStart = new DateTime(now.Year, now.Month, 1);
-            DateTime nextMonthStart = monthStart.AddMonths(1);
             string msl = ToSqlDate(monthStart);
             string nmsl = ToSqlDate(nextMonthStart);
 
-            // Spares / consumables share = value of issue lines NOT raised against a work order.
-            // Exact complement of VAS_181_ProductionIssuesWidget, so the two KPIs sum to 100%
-            // (as the source spec intends: 61% production + 39% spares).
+            // Spares / consumables share = value of issue lines for products whose Product
+            // Category is in the "Consumables/Spares" group (M_Product_Category.ProductGroup
+            // = 'C'), as a share of the SAME group's total issued value for the period.
             //
-            // The previous classification (C_Charge_ID IS NULL AND M_RequisitionLine_ID IS NULL)
-            // could never be true: an internal-use line always carries a charge account, so on
-            // FSMTesting6 this KPI returned a hard 0% for every period.
+            // Previously this widget classified "spares" as "any line NOT raised against a
+            // work order" -- an exact complement of VAS_181_ProductionIssuesWidget with no
+            // actual product classification behind it. On installs where few internal-use
+            // lines carry a work order link at all, that heuristic pushed this KPI to ~99-100%
+            // regardless of what was actually issued. Product Category is the real source of
+            // truth for what counts as a spare/consumable part.
             //
             // Cost fallback must end in 0: NVL(CurrentCostPrice, PriceCost) yields NULL when both
             // are null, and SUM() silently drops those lines from the total.
             //
             // Without any work-order column the installation cannot classify a production issue,
             // so every issue line counts as spares / consumables (production KPI reads 0%).
+            List<string> workOrderColumns = ResolveProductionOrderColumns();
             var woTests = new List<string>();
             foreach (string column in workOrderColumns)
             {
@@ -186,12 +294,17 @@ namespace VIS.Controllers
                                     THEN (line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0))
                                     ELSE 0 END), 0) AS SparesValue,
                   COALESCE(SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0)), 0) AS TotalValue
-                FROM M_InventoryLine line
-                INNER JOIN M_Inventory inv ON inv.M_Inventory_ID = line.M_Inventory_ID
+                FROM M_Inventory inv
+                INNER JOIN M_InventoryLine line ON ( line.M_Inventory_ID = inv.M_Inventory_ID )
+                INNER JOIN M_Product mp ON ( mp.M_Product_ID = line.M_Product_ID )
+                INNER JOIN M_Product_Category mpc ON ( mpc.M_Product_Category_ID = mp.M_Product_Category_ID )
                 WHERE inv.IsActive = 'Y'
+                  AND mpc.ProductGroup = 'C'
                   AND inv.DocStatus IN ('CO', 'CL')
                   AND COALESCE(inv.IsInternalUse, 'N') = 'Y'
                   AND line.IsActive = 'Y'
+                  AND mp.IsActive = 'Y'
+                  AND mpc.IsActive = 'Y'
                   AND COALESCE(line.QtyInternalUse, 0) > 0
                   AND inv.MovementDate >= " + msl + @"
                   AND inv.MovementDate < " + nmsl;

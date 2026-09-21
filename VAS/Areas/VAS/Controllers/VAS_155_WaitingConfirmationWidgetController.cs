@@ -173,6 +173,10 @@ namespace VAS.Controllers
 
             headerSql = MRole.GetDefault(ctx).AddAccessSQL(headerSql, "Confirm", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
+            string scrapLocatorSql = HasColumn("M_Locator", "LocatorCombination")
+                ? "COALESCE(ScrapLocator.LocatorCombination, ScrapLocator.Value)"
+                : "ScrapLocator.Value";
+
             string linesSql = @"
                 SELECT LineConfirm.M_InOutLineConfirm_ID AS Line_Confirm_ID,
                        InOutLine.Line AS Line_No,
@@ -180,7 +184,7 @@ namespace VAS.Controllers
                        COALESCE(UomInfo.UOMSymbol, UomInfo.Name) AS UOM_Name,
                        AttributeInstance.Description AS Attribute_Description,
                        LineConfirm.M_Locator_ID AS Scrap_Locator_ID,
-                       ScrapLocator.Value AS Scrap_Locator_Value,
+                       " + scrapLocatorSql + @" AS Scrap_Locator_Value,
                        LineConfirm.TargetQty AS Target_Qty,
                        LineConfirm.ConfirmedQty AS Confirmed_Qty,
                        LineConfirm.ScrappedQty AS Scrapped_Qty,

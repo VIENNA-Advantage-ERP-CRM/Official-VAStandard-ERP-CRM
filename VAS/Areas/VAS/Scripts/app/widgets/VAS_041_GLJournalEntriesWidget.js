@@ -9,7 +9,7 @@
  *  2  | All Journal Entries                  | VAS_041_AllJournalEntries
  *  3  | This Month                           | VAS_041_ThisMonth
  *  4  | Close                                | VAS_Close
- *  5  | Export                               | VAS_Export
+ *  5  | Export                               | VAS_041_Export
  *  6  | Download PDF                         | VAS_DownloadPDF
  *  7  | Approve                              | VAS_041_Approve
  *  8  | Post Journal                         | VAS_041_PostJournal
@@ -28,6 +28,9 @@
  * 21  | Details Not Loaded                   | VAS_041_DetailsNotLoaded
  * 22  | Details Not Available                | VAS_041_DetailsNotAvailable
  * 23  | Could Not Open Print Window          | VAS_041_PrintWindowFailed
+ * 24  | Showing                              | VAS_041_Showing
+ * 25  | All GL journal vouchers created in   | VAS_041_AllGlJournalVouchers
+ * 26  | Error loading journal entries.       | VAS_041_ErrorLoadingEntries
  * ---------------------------------------------------------------------
  */
 
@@ -55,15 +58,7 @@
     }
 
     function lbl(key, fallback) {
-        var text =
-            VIS.Msg.getMsg(key);
-
-        return (
-            text &&
-            text.charAt(0) !== "["
-        )
-            ? text
-            : fallback;
+        return VIS.Msg.getMsg(key);
     }
 
     function esc(value) {
@@ -426,11 +421,14 @@
             );
 
         return (
-            "Showing " +
+            lbl("VAS_041_Showing") +
+            " " +
             start +
             "-" +
             end +
-            " of " +
+            " " +
+            lbl("VIS_Of", "of") +
+            " " +
             total
         );
     }
@@ -1024,7 +1022,7 @@
                         "<span>" +
                         esc(
                             lbl(
-                                "VAS_Export",
+                                "VAS_041_Export",
                                 "Export"
                             )
                         ) +
@@ -1114,8 +1112,7 @@
                 );
 
                 $dialog.find(
-                    ".VAS-glje-dialog-close, " +
-                    ".VAS-glje-dialog-scrim"
+                    ".VAS-glje-dialog-close"
                 ).on(
                     "click",
                     closeDialog
@@ -1257,22 +1254,6 @@
                             loadDialogRows();
                         }
                     );
-
-                $(document).on(
-                    "keydown.VAS-glje-" +
-                    id,
-                    function (event) {
-                        if (
-                            event.key === "Escape" &&
-                            !VAS.GLJournalDetailDialog.isBusy() &&
-                            !VAS.GLJournalDetailDialog.isOpen() &&
-                            $dialog &&
-                            $dialog.is(":visible")
-                        ) {
-                            closeDialog();
-                        }
-                    }
-                );
 
                 $("body").append(
                     $dialog
@@ -1595,7 +1576,7 @@
                                 renderDialogError(
                                     getAjaxErrorMessage(
                                         xhr,
-                                        "Error loading journal entries."
+                                        lbl("VAS_041_ErrorLoadingEntries")
                                     )
                                 );
                             },
@@ -1684,7 +1665,8 @@
                     "#VAS-glje-dialog-sub-" +
                     $self.AD_UserHomeWidgetID
                 ).text(
-                    "All GL journal vouchers created in " +
+                    lbl("VAS_041_AllGlJournalVouchers") +
+                    " " +
                     monthName +
                     " " +
                     year

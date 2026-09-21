@@ -793,7 +793,7 @@ namespace VAS.Controllers
                        MovementTypeList.Name AS MovementType_Name,
                        Movement.MovementQty,
                        Warehouse.Name AS Warehouse_Name,
-                       Locator.Value AS Locator_Value,
+                       COALESCE(Locator.LocatorCombination, Locator.Value) AS Locator_Value,
                        COALESCE(AttributeInstance.Description,N'') AS Attribute_Description
                 FROM M_Transaction Movement
                 INNER JOIN M_Locator Locator ON (Locator.M_Locator_ID=Movement.M_Locator_ID AND Locator.IsActive=N'Y')

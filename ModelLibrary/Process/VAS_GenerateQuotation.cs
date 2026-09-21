@@ -5,7 +5,7 @@
 * (ModelLibrary\Process\GenerateQuotation.cs).
 *
 * The source record was switched from VAdvantage.Model.MProject / C_ProjectLine to
-* ModelLibrary.Model.MOpportunity / MOppLines (the dedicated VAS_Opportunity and
+* ModelLibrary.Model.MVASOpportunity / MVASOppLines (the dedicated VAS_Opportunity and
 * VAS_OppLines tables). Because the two table sets expose different columns, the
 * field mapping was adapted as follows (every spot is also commented inline):
 *
@@ -16,7 +16,7 @@
 *     original null-flag check ("No Generate Quotation found") has no counterpart and
 *     is dropped.
 *   - VAS_Opportunity stores only M_PriceList_Version_ID; the Price List id is derived
-*     through MOpportunity.GetM_PriceList_ID().
+*     through MVASOpportunity.GetM_PriceList_ID().
 *   - order.SetC_Project_ID(...) is a project FK and must not hold an opportunity id;
 *     the order is back-linked to the opportunity through its VAS_Opportunity_ID
 *     column instead (when that column is present on C_Order).
@@ -85,7 +85,7 @@ namespace ModelLibrary.Process
                 throw new ArgumentException("VAS_Opportunity_ID == 0");
             }
 
-            MOpportunity fromOpportunity = new MOpportunity(GetCtx(), _VAS_Opportunity_ID, Get_TrxName());
+            MVASOpportunity fromOpportunity = new MVASOpportunity(GetCtx(), _VAS_Opportunity_ID, Get_TrxName());
 
 
             //if (fromOpportunity.GetGenerate_Quotation() == null)
@@ -238,7 +238,7 @@ namespace ModelLibrary.Process
 
                 //Order Lines
                 int count = 0;
-                MOppLines[] lines = fromOpportunity.GetLines();
+                MVASOppLines[] lines = fromOpportunity.GetLines();
                 for (int i = 0; i < lines.Length; i++)
                 {
                     ol = new MOrderLine(order);

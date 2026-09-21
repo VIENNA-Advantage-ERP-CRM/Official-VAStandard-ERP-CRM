@@ -91,24 +91,24 @@
  *                  13 | Postings                           | VAS_251_Postings
  *                  14 | No accounts were posted in this    | VAS_251_NoDetail
  *                     |   period.                          |
- *                  15 | Account                            | VAS_234_Account         (reuse)
- *                  16 | Organization Unit                  | VAS_256_OrganizationUnit(reuse)
- *                  17 | Amount                             | VAS_235_Amount          (reuse)
- *                  18 | Budget                             | VAS_254_Budget          (reuse)
- *                  19 | Actual                             | VAS_252_Actual          (reuse)
- *                  20 | Variance                           | VAS_254_Variance        (reuse)
- *                  21 | Utilized                           | VAS_252_Utilized        (reuse)
- *                  22 | Close                              | VAS_235_Close           (reuse)
- *                  23 | Showing                            | VAS_020_Showing         (reuse)
- *                  24 | of                                 | VAS_020_Of              (reuse)
- *                  25 | Previous                           | VAS_020_Prev            (reuse)
- *                  26 | Next                               | VAS_020_Next            (reuse)
- *                  27 | Financial year                     | VAS_256_FinancialYear   (reuse)
- *                  28 | No financial years available       | VAS_256_NoYears         (reuse)
- *                  29 | No primary calendar is configured  | VAS_256_NoCalendar      (reuse)
- *                  30 | No primary accounting schema is    | VAS_256_NoAcctSchema    (reuse)
+ *                  15 | Account                            | VAS_251_Account
+ *                  16 | Organization Unit                  | VAS_251_OrganizationUnit
+ *                  17 | Amount                             | VAS_251_Amount
+ *                  18 | Budget                             | VAS_251_Budget
+ *                  19 | Actual                             | VAS_251_Actual
+ *                  20 | Variance                           | VAS_251_Variance
+ *                  21 | Utilized                           | VAS_251_Utilized
+ *                  22 | Close                              | VAS_251_Close
+ *                  23 | Showing                            | VAS_251_Showing
+ *                  24 | of                                 | VAS_251_Of
+ *                  25 | Previous                           | VAS_251_Prev
+ *                  26 | Next                               | VAS_251_Next
+ *                  27 | Financial year                     | VAS_251_FinancialYear
+ *                  28 | No financial years available       | VAS_251_NoYears
+ *                  29 | No primary calendar is configured  | VAS_251_NoCalendar
+ *                  30 | No primary accounting schema is    | VAS_251_NoAcctSchema
  *                     |   configured                       |
- *                  31 | Couldn't load                      | VAS_192_CouldntLoad     (reuse)
+ *                  31 | Couldn't load                      | VAS_251_CouldntLoad
  *
  * Chronological development:
  *   VAI145         Created  Date 2026-09-09
@@ -379,7 +379,7 @@
         function paintLegend() {
             var $lg = $card.find('.vas-251-lg-t');
             $lg.eq(0).text(label('VAS_251_ApprovedBudget', 'Approved budget'));
-            $lg.eq(1).text(label('VAS_252_Actual', 'Actual'));
+            $lg.eq(1).text(label('VAS_251_Actual', 'Actual'));
 
             var hint = label('VAS_251_SelectPeriod', 'Select a period for posted accounts');
             $card.find('.vas-251-hint').text(hint).attr('title', hint);
@@ -408,7 +408,7 @@
 
                     var data = parseResponse(raw);
                     if (!data || data.error) {
-                        renderState(label('VAS_192_CouldntLoad', "Couldn't load"));
+                        renderState(label('VAS_251_CouldntLoad', "Couldn't load"));
                         return;
                     }
 
@@ -420,7 +420,7 @@
                     }
 
                     if (!data.Loaded) {
-                        renderState(label('VAS_192_CouldntLoad', "Couldn't load"));
+                        renderState(label('VAS_251_CouldntLoad', "Couldn't load"));
                         return;
                     }
 
@@ -450,7 +450,7 @@
                        error the user cannot see is the worst of both. And no stale bar is left
                        standing as though it were current: renderState takes the body over. */
                     hideBusyIndicator();
-                    renderState(label('VAS_192_CouldntLoad', "Couldn't load"));
+                    renderState(label('VAS_251_CouldntLoad', "Couldn't load"));
                 }
             });
         }
@@ -477,21 +477,21 @@
 
         function errorLabel(code) {
             if (code === 'NOCALENDAR') {
-                return label('VAS_256_NoCalendar', 'No primary calendar is configured');
+                return label('VAS_251_NoCalendar', 'No primary calendar is configured');
             }
             if (code === 'NOACCTSCHEMA') {
-                return label('VAS_256_NoAcctSchema', 'No primary accounting schema is configured');
+                return label('VAS_251_NoAcctSchema', 'No primary accounting schema is configured');
             }
             if (code === 'NOYEAR') {
-                return label('VAS_256_NoYears', 'No financial years available');
+                return label('VAS_251_NoYears', 'No financial years available');
             }
-            return label('VAS_192_CouldntLoad', "Couldn't load");
+            return label('VAS_251_CouldntLoad', "Couldn't load");
         }
 
         function paintYearLabel() {
             var text = _fiscalYear || yearNameOf(_yearId);
             $yearBtn.find('.vas-251-year-label').text(text);
-            $yearBtn.attr('title', label('VAS_256_FinancialYear', 'Financial year') + ': ' + text);
+            $yearBtn.attr('title', label('VAS_251_FinancialYear', 'Financial year') + ': ' + text);
         }
 
         function yearNameOf(id) {
@@ -618,10 +618,10 @@
 
             var lines = [item.Name || NIL];
 
-            lines.push(label('VAS_254_Budget', 'Budget') + ': ' + fullAmount(budget));
-            lines.push(label('VAS_252_Actual', 'Actual') + ': ' + fullAmount(actual));
-            lines.push(label('VAS_254_Variance', 'Variance') + ': ' + signedFullAmount(budget - actual));
-            lines.push(label('VAS_252_Utilized', 'Utilized') + ': ' +
+            lines.push(label('VAS_251_Budget', 'Budget') + ': ' + fullAmount(budget));
+            lines.push(label('VAS_251_Actual', 'Actual') + ': ' + fullAmount(actual));
+            lines.push(label('VAS_251_Variance', 'Variance') + ': ' + signedFullAmount(budget - actual));
+            lines.push(label('VAS_251_Utilized', 'Utilized') + ': ' +
                 (budget !== 0 ? percentText(actual * 100 / budget, 1) : NIL));
 
             return lines.join('\n');
@@ -639,7 +639,7 @@
         /* ------------------------------------------------------------ */
         function buildPicker() {
             $picker = $('<div class="vas-251-pp vas-251-hidden" role="listbox" aria-label="' +
-                escapeHtml(label('VAS_256_FinancialYear', 'Financial year')) + '"></div>');
+                escapeHtml(label('VAS_251_FinancialYear', 'Financial year')) + '"></div>');
             $('body').append($picker);
 
             $picker.on('click', '.vas-251-pp-opt', function () {
@@ -651,11 +651,11 @@
 
         function fillPicker() {
             var html = '<div class="vas-251-pp-h">' +
-                escapeHtml(label('VAS_256_FinancialYear', 'Financial year')) + '</div>';
+                escapeHtml(label('VAS_251_FinancialYear', 'Financial year')) + '</div>';
 
             if (_years.length === 0) {
                 html += '<div class="vas-251-pp-empty">' +
-                    escapeHtml(label('VAS_256_NoYears', 'No financial years available')) + '</div>';
+                    escapeHtml(label('VAS_251_NoYears', 'No financial years available')) + '</div>';
             }
 
             for (var i = 0; i < _years.length; i++) {
@@ -803,7 +803,7 @@
                                 '<div class="vas-251-dlg-meta"></div>' +
                             '</div>' +
                             '<button type="button" class="vas-251-x" aria-label="' +
-                                escapeHtml(label('VAS_235_Close', 'Close')) + '">' + ICONS.close + '</button>' +
+                                escapeHtml(label('VAS_251_Close', 'Close')) + '">' + ICONS.close + '</button>' +
                         '</div>' +
                         /* THE PANEL IS A FIXED HEIGHT AND NOTHING INSIDE IT SCROLLS. The
                            metrics and the column header are chrome and stay put; only the
@@ -870,7 +870,6 @@
             $dlgFoot.empty();
 
             $dlg.removeClass('vas-251-hidden');
-            $(document).on('keydown' + _ns + '_dlg', onDialogKeyDown);
 
             /* NOTHING BEHIND THE SCRIM STAYS LIT. The class suppresses the column's hover and
                focus treatment for as long as the panel is up - a belt to the focus move's
@@ -949,7 +948,6 @@
             if (!$dlg) { return; }
 
             $dlg.addClass('vas-251-hidden');
-            $(document).off('keydown' + _ns + '_dlg');
 
             /* The chart is interactive again the moment the scrim is gone. */
             if ($root) { $root.removeClass('vas-251-modal-open'); }
@@ -984,10 +982,6 @@
             }
         }
 
-        function onDialogKeyDown(e) {
-            if (e.key === 'Escape' || e.keyCode === 27) { closeDialog(); }
-        }
-
         function showDialogBusy(on) {
             $dlg.find('.vas-251-dlg-busy').toggleClass('vas-251-hidden', !on);
         }
@@ -1016,7 +1010,7 @@
 
                     var data = parseResponse(raw);
                     if (!data || data.error || !data.Loaded) {
-                        renderDetailMessage(label('VAS_192_CouldntLoad', "Couldn't load"));
+                        renderDetailMessage(label('VAS_251_CouldntLoad', "Couldn't load"));
                         return;
                     }
 
@@ -1026,7 +1020,7 @@
                     _dlgLoading = false;
                     if (_disposed) { return; }
                     showDialogBusy(false);
-                    renderDetailMessage(label('VAS_192_CouldntLoad', "Couldn't load"));
+                    renderDetailMessage(label('VAS_251_CouldntLoad', "Couldn't load"));
                 }
             });
         }
@@ -1069,11 +1063,11 @@
             $dlg.find('.vas-251-metrics').html(
                 metricHtml(label('VAS_251_ApprovedBudget', 'Approved budget'),
                     compactAmount(budget), fullAmount(budget)) +
-                metricHtml(label('VAS_252_Actual', 'Actual'),
+                metricHtml(label('VAS_251_Actual', 'Actual'),
                     compactAmount(actual), fullAmount(actual)) +
-                metricHtml(label('VAS_254_Variance', 'Variance'),
+                metricHtml(label('VAS_251_Variance', 'Variance'),
                     signedCompactAmount(variance), signedFullAmount(variance)) +
-                metricHtml(label('VAS_252_Utilized', 'Utilized'), utilized, utilized)
+                metricHtml(label('VAS_251_Utilized', 'Utilized'), utilized, utilized)
             );
 
             /* THE TOTAL IS THE PERIOD'S OWN ACTUAL, not a sum of the rows on this page - and
@@ -1092,13 +1086,13 @@
             }
 
             $dlg.find('.vas-251-dg-h').removeClass('vas-251-hidden').html(
-                '<span role="columnheader">' + escapeHtml(label('VAS_234_Account', 'Account')) + '</span>' +
+                '<span role="columnheader">' + escapeHtml(label('VAS_251_Account', 'Account')) + '</span>' +
                 '<span role="columnheader">' +
-                    escapeHtml(label('VAS_256_OrganizationUnit', 'Organization Unit')) + '</span>' +
+                    escapeHtml(label('VAS_251_OrganizationUnit', 'Organization Unit')) + '</span>' +
                 '<span class="vas-251-num" role="columnheader">' +
                     escapeHtml(label('VAS_251_Postings', 'Postings')) + '</span>' +
                 '<span class="vas-251-num" role="columnheader">' +
-                    escapeHtml(label('VAS_235_Amount', 'Amount')) + '</span>'
+                    escapeHtml(label('VAS_251_Amount', 'Amount')) + '</span>'
             );
 
             $dlg.find('.vas-251-dg-total').removeClass('vas-251-hidden');
@@ -1132,14 +1126,14 @@
            the panel. It is rendered even on a single page: it states where the list ends
            rather than leaving the reader to infer it from a missing control. */
         function paintDetailFooter(from, to) {
-            var showing = label('VAS_020_Showing', 'Showing') + ' ' + from + '–' + to + ' ' +
-                label('VAS_020_Of', 'of') + ' ' + _dlgRows.length;
+            var showing = label('VAS_251_Showing', 'Showing') + ' ' + from + '–' + to + ' ' +
+                label('VAS_251_Of', 'of') + ' ' + _dlgRows.length;
 
             /* The server caps what it sends; when it did, the footer says so on hover rather
                than letting the reader assume they are seeing every account. */
             var tip = showing;
             if (_dlgTotalRows > _dlgRows.length) {
-                tip = showing + ' (' + label('VAS_020_Of', 'of') + ' ' + _dlgTotalRows + ')';
+                tip = showing + ' (' + label('VAS_251_Of', 'of') + ' ' + _dlgTotalRows + ')';
             }
 
             var prevDis = _dlgPage <= 1 ? ' disabled' : '';
@@ -1150,11 +1144,11 @@
                     escapeHtml(showing) + '</span>' +
                 '<div class="vas-251-pager">' +
                     '<button type="button" class="vas-251-pgbtn vas-251-pg-prev" aria-label="' +
-                        escapeHtml(label('VAS_020_Prev', 'Previous')) + '"' + prevDis + '>' + ICONS.prev + '</button>' +
+                        escapeHtml(label('VAS_251_Prev', 'Previous')) + '"' + prevDis + '>' + ICONS.prev + '</button>' +
                     '<span class="vas-251-pager-label">' + _dlgPage + ' ' +
-                        escapeHtml(label('VAS_020_Of', 'of')) + ' ' + _dlgTotalPages + '</span>' +
+                        escapeHtml(label('VAS_251_Of', 'of')) + ' ' + _dlgTotalPages + '</span>' +
                     '<button type="button" class="vas-251-pgbtn vas-251-pg-next" aria-label="' +
-                        escapeHtml(label('VAS_020_Next', 'Next')) + '"' + nextDis + '>' + ICONS.next + '</button>' +
+                        escapeHtml(label('VAS_251_Next', 'Next')) + '"' + nextDis + '>' + ICONS.next + '</button>' +
                 '</div>'
             );
 
@@ -1369,14 +1363,7 @@
         /* Every user-facing string goes through AD_Message; the fallback keeps the card
            readable when a key has not been seeded yet. */
         function label(key, fallback) {
-            try {
-                if (VIS.Msg && typeof VIS.Msg.getMsg === 'function') {
-                    var v = VIS.Msg.getMsg(key);
-                    if (v && v !== key && v.charAt(0) !== '[') { return v; }
-                }
-            }
-            catch (e) { /* ignore */ }
-            return fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         this.getRoot = function () { return $root; };
