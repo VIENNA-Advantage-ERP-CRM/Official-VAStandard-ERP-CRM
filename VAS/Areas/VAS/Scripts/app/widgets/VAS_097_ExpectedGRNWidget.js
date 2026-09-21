@@ -596,9 +596,8 @@
             $dialogBody.html(
                 fields +
                 '<div class="vas-egrn-note">' + fileIcon() + '<span>' + escapeHtml(lbl("VAS_097_EnterReceivedQtyAgainstLine", "Enter received quantity against each PO line, then create the GRN.")) + '</span></div>' +
-                '<div class="vas-egrn-rcv-line vas-egrn-rcv-head">' +
+                '<div class="vas-egrn-rcv-line' + layoutCls + ' vas-egrn-rcv-head">' +
                 '<div>' + escapeHtml(lbl("VAS_097_Item", "Item")) + '</div>' +
-                '<div>' + escapeHtml(lbl("VAS_Attribute", "Attribute")) + '</div>' +
                 '<div>' + escapeHtml(lbl("VAS_097_POQty", "PO Qty")) + '</div>' +
                 '<div>' + escapeHtml(lbl("VAS_Received", "Received")) + '</div>' +
                 '<div>' + escapeHtml(lbl("VAS_Uom", "UOM")) + '</div>' +

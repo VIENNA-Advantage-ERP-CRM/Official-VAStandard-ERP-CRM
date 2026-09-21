@@ -219,6 +219,42 @@ namespace VIS.Controllers
             return ids;
         }
 
+        /// <summary>
+        /// The line-level production-order column, per the source specification
+        /// (03-use-c-production-issues-copilot-prompt.txt, "DATABASE TABLE MAPPING"):
+        ///   "Production order on line: M_InventoryLine.VAMFG_M_WorkOrder_ID"
+        ///   "Use the production order on the line level only ... Do not use the production-order
+        ///    field from M_Inventory header."
+        /// </summary>
+        private const string ProductionOrderColumn = "VAMFG_M_WorkOrder_ID";
+
+        /// <summary>
+        /// Returns the line-level production-order columns that this installation actually has
+        /// (never null; empty when the manufacturing module is not installed), same resolution
+        /// VAS_181 uses so both widgets agree on what counts as a work-order line.
+        /// </summary>
+        private static List<string> ResolveProductionOrderColumns()
+        {
+            string sql = @"
+                SELECT c.ColumnName
+                FROM AD_Column c
+                INNER JOIN AD_Table t ON t.AD_Table_ID = c.AD_Table_ID
+                WHERE t.TableName = 'M_InventoryLine'
+                  AND c.IsActive = 'Y'
+                  AND UPPER(c.ColumnName) LIKE '%WORKORDER%'
+                ORDER BY CASE WHEN UPPER(c.ColumnName) = UPPER('" + ProductionOrderColumn + @"') THEN 0 ELSE 1 END, c.ColumnName";
+
+            var columns = new List<string>();
+            using (IDataReader dr = DB.ExecuteReader(sql, null, null))
+            {
+                while (dr != null && dr.Read())
+                {
+                    columns.Add(Util.GetValueOfString(dr["ColumnName"]));
+                }
+            }
+            return columns;
+        }
+
         private int GetSparesConsumablesPercentageData(Ctx ctx, DateTime monthStart, DateTime nextMonthStart)
         {
             if (ctx == null) { return 0; }
@@ -242,6 +278,7 @@ namespace VIS.Controllers
             //
             // Without any work-order column the installation cannot classify a production issue,
             // so every issue line counts as spares / consumables (production KPI reads 0%).
+            List<string> workOrderColumns = ResolveProductionOrderColumns();
             var woTests = new List<string>();
             foreach (string column in workOrderColumns)
             {

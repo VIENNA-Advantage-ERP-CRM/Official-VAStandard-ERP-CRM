@@ -19,6 +19,10 @@ namespace VIS.Controllers
     ///   AI-Dev      2026-08-02 Created
     ///   Claude      2026-09-18 GetCategoryIssueLines Qty column now sources
     ///                          M_InventoryLine.QtyEntered instead of QtyInternalUse.
+    ///   Claude      2026-09-21 GetCategoryIssueLines: fixed a PR #1167 merge-conflict
+    ///                          resolution bug where the UOM join label came from the
+    ///                          product's UOM while the displayed qty (QtyEntered) is
+    ///                          in the line's own UOM - joins on line.C_UOM_ID now.
     /// </summary>
     public class VAS_186_ProductCategoryUsageWidgetController : Controller
     {
@@ -306,7 +310,7 @@ namespace VIS.Controllers
                       ai.DocumentNo,
                       p.Name AS ProductName,
                       asi.Description AS Attribute,
-                      puom.Name AS UomName,
+                      lineUom.Name AS UomName,
                       wh.Name AS WarehouseName,
                       " + locatorSql + @" AS LocatorCode,
                       line.QtyEntered,
@@ -314,7 +318,7 @@ namespace VIS.Controllers
                     FROM M_InventoryLine line
                     INNER JOIN (" + invAccessSql + @") ai ON ai.M_Inventory_ID = line.M_Inventory_ID
                     INNER JOIN M_Product p ON p.M_Product_ID = line.M_Product_ID
-                    LEFT JOIN C_UOM puom ON puom.C_UOM_ID = p.C_UOM_ID
+                    LEFT JOIN C_UOM lineUom ON lineUom.C_UOM_ID = line.C_UOM_ID
                     LEFT JOIN M_AttributeSetInstance asi ON asi.M_AttributeSetInstance_ID = line.M_AttributeSetInstance_ID
                     LEFT JOIN M_Locator loc ON loc.M_Locator_ID = line.M_Locator_ID
                     LEFT JOIN M_Warehouse wh ON wh.M_Warehouse_ID = loc.M_Warehouse_ID

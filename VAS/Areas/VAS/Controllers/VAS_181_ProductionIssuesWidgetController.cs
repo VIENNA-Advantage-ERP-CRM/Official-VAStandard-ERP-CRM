@@ -286,6 +286,7 @@ namespace VIS.Controllers
             //
             // Cost fallback must end in 0: NVL(CurrentCostPrice, PriceCost) yields NULL when both
             // are null, and SUM() silently drops those lines from the total.
+            List<string> workOrderColumns = ResolveProductionOrderColumns();
             string sql = @"
                 SELECT
                   COALESCE(SUM(CASE WHEN " + WorkOrderLinePredicate(workOrderColumns) + @"
