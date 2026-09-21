@@ -242,6 +242,7 @@
     <Compile Include="Areas\VAS\Controllers\VAS_289_OpenSalesQuotationsWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_218_CreateOppLinesController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_105_AccountRightPanelController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_290_ServiceContractRightPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_106_OverviewSalesOrderController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_120_CustomerSearchWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_122_TotalCustomersWidgetController.cs" />
@@ -490,6 +491,7 @@
     <Content Include="Areas\VAS\Content\VAS_103_MaterialTransfer.css" />
     <Content Include="Areas\VAS\Content\VAS_104_OverviewShipGRNConfirmation.css" />
     <Content Include="Areas\VAS\Content\VAS_105_AccountRightPanel.css" />
+    <Content Include="Areas\VAS\Content\VAS_290_ServiceContractRightPanel.css" />
     <Content Include="Areas\VAS\Content\VAS_106_OverviewSalesOrder.css" />
     <Content Include="Areas\VAS\Content\VAS_120_CustomerSearchWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_121_NewCustomerWidget.css" />
@@ -556,6 +558,7 @@
     <Content Include="Areas\VAS\Content\VAS_172_PendingTransferConfirmationWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_173_TransfersByWarehouseWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_174_TransferQueueWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_123_QuotationRightPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\BankingJournal\VAS_236_ReceiptvsPaymentWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\BankingJournal\VAS_238_UnreconciledBankLineWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_218_CreateOppLines.js" />
@@ -580,6 +583,7 @@
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_103_MaterialTransfer.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_104_OverviewShipGRNConfirmation.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_105_AccountRightPanel.js" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_290_ServiceContractRightPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_106_OverviewSalesOrder.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_InvoiceOverview.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_PaymentVoucherPanel.js" />
