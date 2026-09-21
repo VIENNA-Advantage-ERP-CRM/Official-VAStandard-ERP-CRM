@@ -55,6 +55,22 @@
 ///   VAI145   2026-09-21  Lines paged on the server (LINES_PAGE_SIZE = 20) through
 ///                        GetJournalLines; workflow activities + posting moment
 ///                        read for the Audit trail.
+///   VAI145   2026-09-21  Line filter (all / receipt / payment) on the server;
+///                        payment tender / receipt / allocation facts and the
+///                        per-line accounting impact (Fact_Acct.Line_ID, one
+///                        query per page) for the expandable line cards.
+///   VAI145   2026-09-21  Payment method from VA009_PaymentMethod (line, else
+///                        payment) with tender type as fallback; cash line /
+///                        cash journal / cash book and the VA012 voucher /
+///                        contra / difference facts on each line.
+///   VAI145   2026-09-21  Accounting breakdown paged on the server
+///                        (ACCOUNTS_PAGE_SIZE = 20) through GetAccountBreakdown;
+///                        distinct account count from the summary aggregate.
+///   VAI145   2026-09-21  Matched / unmatched decided by the line's references
+///                        (MATCHED_CASE / IsLineMatched: payment or cash line
+///                        outright; charge line unless its amounts fail the
+///                        charge / interest reconciliation cases), not
+///                        MatchStatement; C_Tax joined for the line's tax.
 /// </summary>
 
 using System;
@@ -78,6 +94,17 @@ namespace VASLogic.Models
         /// <summary>Journal lines per page (server-side paged). The initial payload
         /// carries page 0; the panel asks for further pages through GetJournalLines.</summary>
         public const int LINES_PAGE_SIZE = 20;
+
+        /// <summary>Ledger accounts per page in the accounting breakdown (server-side
+        /// paged the same way; page 0 rides with the initial payload).</summary>
+        public const int ACCOUNTS_PAGE_SIZE = 20;
+
+        /// <summary>Line filter kinds the panel's chips send. Receipt = StmtAmt at or
+        /// above zero, payment (incl. charges) = StmtAmt below zero. Filtering is
+        /// done on the server so it covers every line, not just the page on screen.</summary>
+        public const string LINE_KIND_ALL = "all";
+        public const string LINE_KIND_RECEIPT = "receipt";
+        public const string LINE_KIND_PAYMENT = "payment";
 
         // ----------------------------------------------------------------- //
         //  Entry point                                                       //
@@ -115,7 +142,7 @@ namespace VASLogic.Models
                page only. Further pages arrive through GetJournalLines. */
             LoadLineSummary(ctx, C_BankStatement_ID, result);
             result.LinesPageSize = LINES_PAGE_SIZE;
-            result.Lines = LoadLines(ctx, C_BankStatement_ID, 0, LINES_PAGE_SIZE);
+            result.Lines = LoadLines(ctx, C_BankStatement_ID, 0, LINES_PAGE_SIZE, LINE_KIND_ALL, result.Posted == "Y");
 
             /* The Audit trail is composed on the client from these facts. */
             result.WorkflowSteps = LoadWorkflowSteps(ctx, C_BankStatement_ID);
@@ -129,9 +156,11 @@ namespace VASLogic.Models
             if (result.Posted == "Y")
             {
                 LoadAccountingSummary(ctx, C_BankStatement_ID, result);
+                result.AccountsPageSize = ACCOUNTS_PAGE_SIZE;
                 if (result.EntryCount > 0)
                 {
-                    result.Accounts = LoadAccountBreakdown(ctx, C_BankStatement_ID);
+                    /* Page 0 only; further pages arrive through GetAccountBreakdown. */
+                    result.Accounts = LoadAccountBreakdown(ctx, C_BankStatement_ID, 0, ACCOUNTS_PAGE_SIZE);
                 }
                 LoadPostedOn(ctx, C_BankStatement_ID, result);
             }
@@ -290,8 +319,57 @@ namespace VASLogic.Models
         // ----------------------------------------------------------------- //
 
         /// <summary>
-        /// Count, matched / unmatched split and money totals over EVERY active line,
-        /// in one aggregate. Inflow is the sum of positive StmtAmt, outflow the
+        /// 1 when the line is matched, else 0 - the SQL twin of IsLineMatched, used
+        /// by the aggregate so the counts and the per-line pill can never disagree:
+        ///   - a payment or a cash line reference is a match outright;
+        ///   - a charge line (C_Charge_ID set, no payment / cash line) is a match
+        ///     UNLESS one of the two unreconciled cases holds:
+        ///       1. TrxAmt <> 0, ChargeAmt <> 0, no payment, and
+        ///          StmtAmt <> TrxAmt + ChargeAmt;
+        ///       2. ChargeAmt = 0, TrxAmt = 0, and InterestAmt <> StmtAmt;
+        ///   - a line with none of the three references is unmatched.
+        /// </summary>
+        private const string MATCHED_CASE =
+            @"CASE WHEN COALESCE(bsl.C_Payment_ID, 0)>0 OR COALESCE(bsl.C_CashLine_ID, 0)>0 THEN 1
+                   WHEN COALESCE(bsl.C_Charge_ID, 0)>0 THEN
+                        CASE WHEN COALESCE(bsl.TrxAmt, 0)<>0 AND COALESCE(bsl.ChargeAmt, 0)<>0 AND COALESCE(bsl.C_Payment_ID, 0)=0
+                                  /* AND COALESCE(bsl.StmtAmt, 0)<>COALESCE(bsl.TrxAmt, 0)+COALESCE(bsl.ChargeAmt, 0) */ THEN 0
+                             WHEN COALESCE(bsl.ChargeAmt, 0)=0 AND COALESCE(bsl.TrxAmt, 0)=0
+                                  AND COALESCE(bsl.InterestAmt, 0)<>COALESCE(bsl.StmtAmt, 0) THEN 0
+                             ELSE 1 END
+                   ELSE 0 END";
+
+        /// <summary>
+        /// The C# twin of MATCHED_CASE, applied to one line row (see there for the
+        /// rule).
+        /// </summary>
+        /// <param name="row">Line with its references and amounts read.</param>
+        /// <returns>True when the line is matched.</returns>
+        private static bool IsLineMatched(JournalLineRow row)
+        {
+            if (row.C_Payment_ID > 0 || row.C_CashLine_ID > 0)
+            {
+                return true;
+            }
+            if (row.C_Charge_ID > 0)
+            {
+                /* Case 1: a charged transaction whose statement amount does not add
+                   up to transaction + charge. */
+                bool case1 = row.TrxAmt != 0 && row.ChargeAmt != 0 && row.C_Payment_ID == 0
+                    /*&& row.StmtAmt != row.TrxAmt + row.ChargeAmt*/ ;
+                /* Case 2: an interest-only line whose interest does not equal the
+                   statement amount. */
+                bool case2 = row.ChargeAmt == 0 && row.TrxAmt == 0 && row.InterestAmt != row.StmtAmt;
+                return !(case1 || case2);
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Count, matched / unmatched split, receipt / payment split (the line
+        /// filter's page totals) and money totals over EVERY active line, in one
+        /// aggregate. Matched follows MATCHED_CASE; the MatchStatement flag is not
+        /// consulted. Inflow is the sum of positive StmtAmt, outflow the
         /// absolute sum of negative StmtAmt - StmtAmt is the bank statement amount
         /// and is never inferred from TrxAmt. Flat SUM(CASE ...) only: no nested
         /// selects for the access parser to choke on.
@@ -303,8 +381,10 @@ namespace VASLogic.Models
         private void LoadLineSummary(Ctx ctx, int C_BankStatement_ID, BankingJournalPanelData result)
         {
             string sql = @"SELECT COUNT(bsl.C_BankStatementLine_ID) AS LineCount,
-                                  SUM(CASE WHEN bsl.MatchStatement='Y' THEN 1 ELSE 0 END) AS MatchedCount,
-                                  SUM(CASE WHEN COALESCE(bsl.MatchStatement, 'N')<>'Y' THEN 1 ELSE 0 END) AS UnmatchedCount,
+                                  SUM(" + MATCHED_CASE + @") AS MatchedCount,
+                                  SUM(CASE WHEN (" + MATCHED_CASE + @")=1 THEN 0 ELSE 1 END) AS UnmatchedCount,
+                                  SUM(CASE WHEN bsl.StmtAmt>=0 THEN 1 ELSE 0 END) AS ReceiptCount,
+                                  SUM(CASE WHEN bsl.StmtAmt<0 THEN 1 ELSE 0 END) AS PaymentCount,
                                   SUM(CASE WHEN bsl.StmtAmt>0 THEN bsl.StmtAmt ELSE 0 END) AS InflowAmount,
                                   SUM(CASE WHEN bsl.StmtAmt<0 THEN ABS(bsl.StmtAmt) ELSE 0 END) AS OutflowAmount,
                                   SUM(COALESCE(bsl.ChargeAmt, 0)) AS ChargeAmount,
@@ -334,6 +414,8 @@ namespace VASLogic.Models
                     result.LineCount = Util.GetValueOfInt(r["LineCount"]);
                     result.MatchedCount = Util.GetValueOfInt(r["MatchedCount"]);
                     result.UnmatchedCount = Util.GetValueOfInt(r["UnmatchedCount"]);
+                    result.ReceiptCount = Util.GetValueOfInt(r["ReceiptCount"]);
+                    result.PaymentCount = Util.GetValueOfInt(r["PaymentCount"]);
                     result.InflowAmount = Round(Util.GetValueOfDecimal(r["InflowAmount"]), p);
                     result.OutflowAmount = Round(Util.GetValueOfDecimal(r["OutflowAmount"]), p);
                     result.ChargeAmount = Round(Util.GetValueOfDecimal(r["ChargeAmount"]), p);
@@ -361,14 +443,16 @@ namespace VASLogic.Models
         /// <param name="C_BankStatement_ID">Selected banking journal id.</param>
         /// <param name="page">Zero-based page index.</param>
         /// <param name="pageSize">Rows per page; 0 or less means LINES_PAGE_SIZE.</param>
+        /// <param name="kind">Line filter: all / receipt / payment (anything else reads as all).</param>
         /// <returns>Populated <see cref="JournalLinesPage"/>; empty Rows when the id
         /// is invalid, not accessible, or the page is past the end.</returns>
-        public JournalLinesPage GetJournalLines(Ctx ctx, int C_BankStatement_ID, int page, int pageSize)
+        public JournalLinesPage GetJournalLines(Ctx ctx, int C_BankStatement_ID, int page, int pageSize, string kind)
         {
             JournalLinesPage result = new JournalLinesPage();
             result.Rows = new List<JournalLineRow>();
             result.Page = page < 0 ? 0 : page;
             result.PageSize = pageSize > 0 ? pageSize : LINES_PAGE_SIZE;
+            result.Kind = NormalizeKind(kind);
 
             if (ctx == null || C_BankStatement_ID <= 0)
             {
@@ -383,25 +467,54 @@ namespace VASLogic.Models
             }
 
             result.C_BankStatement_ID = C_BankStatement_ID;
-            result.Rows = LoadLines(ctx, C_BankStatement_ID, result.Page, result.PageSize);
+            result.Rows = LoadLines(ctx, C_BankStatement_ID, result.Page, result.PageSize, result.Kind, probe.Posted == "Y");
             return result;
         }
 
+        /// <summary>Maps whatever the browser sent to one of the three known kinds;
+        /// the value is never put into SQL as text.</summary>
+        /// <param name="kind">Raw kind from the request.</param>
+        /// <returns>LINE_KIND_ALL / LINE_KIND_RECEIPT / LINE_KIND_PAYMENT.</returns>
+        private static string NormalizeKind(string kind)
+        {
+            if (kind == LINE_KIND_RECEIPT || kind == LINE_KIND_PAYMENT)
+            {
+                return kind;
+            }
+            return LINE_KIND_ALL;
+        }
+
         /// <summary>
-        /// One page of the active lines in Line order, with the line's own currency
-        /// (kept when it differs from the bank account's), the payment document,
-        /// the business partner and the charge resolved for the tooltip. All
+        /// One page of the active lines in Line order, optionally filtered to
+        /// receipts or payments, with the line's own currency (kept when it differs
+        /// from the bank account's), the payment (document, tender type, receipt /
+        /// allocation flags), the business partner and the charge resolved. All
         /// lookups are LEFT OUTER so a line without them still comes back. ORDER BY
-        /// and the paging suffix go AFTER the access filter.
+        /// and the paging suffix go AFTER the access filter. When the statement is
+        /// posted, the accounting impact of each line on the page is read in ONE
+        /// further query and attached.
         /// </summary>
         /// <param name="ctx">User context.</param>
         /// <param name="C_BankStatement_ID">Selected banking journal id.</param>
         /// <param name="page">Zero-based page index.</param>
         /// <param name="pageSize">Rows per page.</param>
+        /// <param name="kind">Normalised line filter kind.</param>
+        /// <param name="posted">True when the statement is posted (Fact_Acct can exist).</param>
         /// <returns>Lines of that page in Line order; empty past the end.</returns>
-        private List<JournalLineRow> LoadLines(Ctx ctx, int C_BankStatement_ID, int page, int pageSize)
+        private List<JournalLineRow> LoadLines(Ctx ctx, int C_BankStatement_ID, int page, int pageSize, string kind, bool posted)
         {
             List<JournalLineRow> rows = new List<JournalLineRow>();
+
+            /* The filter is a fixed predicate chosen by kind - never request text. */
+            string kindFilter = "";
+            if (kind == LINE_KIND_RECEIPT)
+            {
+                kindFilter = " AND bsl.StmtAmt>=0";
+            }
+            else if (kind == LINE_KIND_PAYMENT)
+            {
+                kindFilter = " AND bsl.StmtAmt<0";
+            }
 
             string sql = @"SELECT bsl.C_BankStatementLine_ID,
                                   bsl.Line,
@@ -414,28 +527,52 @@ namespace VASLogic.Models
                                   bsl.TrxAmt,
                                   bsl.ChargeAmt,
                                   bsl.InterestAmt,
-                                  COALESCE(bsl.MatchStatement, 'N') AS MatchStatement,
                                   bsl.Processed,
                                   COALESCE(bsl.IsManual, 'N') AS IsManual,
                                   COALESCE(bsl.IsReversal, 'N') AS IsReversal,
                                   bsl.C_Payment_ID,
                                   bsl.C_BPartner_ID,
                                   bsl.C_Charge_ID,
+                                  bsl.VA009_PaymentMethod_ID,
                                   bsl.C_Currency_ID,
                                   cur.ISO_Code AS CurISO,
                                   CASE WHEN cur.CurSymbol IS NOT NULL THEN cur.CurSymbol ELSE cur.ISO_Code END AS CurSymbol,
                                   cur.StdPrecision,
                                   pay.DocumentNo AS PaymentDocumentNo,
+                                  pay.TenderType,
+                                  COALESCE(pay.IsReceipt, 'N') AS IsReceipt,
+                                  COALESCE(pay.IsAllocated, 'N') AS IsAllocated,
+                                  COALESCE(lpm.VA009_Name, ppm.VA009_Name) AS PaymentMethodName,
                                   bp.Name AS BPartnerName,
-                                  chg.Name AS ChargeName
+                                  chg.Name AS ChargeName,
+                                  bsl.C_Tax_ID,
+                                  tx.Name AS TaxName,
+                                  bsl.TaxAmt,
+                                  bsl.C_CashLine_ID,
+                                  cl.Line AS CashLineNo,
+                                  cl.Amount AS CashLineAmt,
+                                  cs.C_Cash_ID,
+                                  cs.DocumentNo AS CashDocumentNo,
+                                  cs.Name AS CashName,
+                                  cb.Name AS CashBookName,
+                                  bsl.VA012_VoucherType,
+                                  bsl.VA012_ContraType,
+                                  bsl.VA012_DifferenceType,
+                                  COALESCE(bsl.VA012_VoucherNo, N'') AS VA012_VoucherNo
                              FROM C_BankStatementLine bsl
                              LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID=bsl.C_Currency_ID)
                              LEFT OUTER JOIN C_Payment pay ON (pay.C_Payment_ID=bsl.C_Payment_ID)
                              LEFT OUTER JOIN C_BPartner bp ON (bp.C_BPartner_ID=bsl.C_BPartner_ID)
                              LEFT OUTER JOIN C_Charge chg ON (chg.C_Charge_ID=bsl.C_Charge_ID)
+                             LEFT OUTER JOIN C_Tax tx ON (tx.C_Tax_ID=bsl.C_Tax_ID)
+                             LEFT OUTER JOIN VA009_PaymentMethod lpm ON (lpm.VA009_PaymentMethod_ID=bsl.VA009_PaymentMethod_ID)
+                             LEFT OUTER JOIN VA009_PaymentMethod ppm ON (ppm.VA009_PaymentMethod_ID=pay.VA009_PaymentMethod_ID)
+                             LEFT OUTER JOIN C_CashLine cl ON (cl.C_CashLine_ID=bsl.C_CashLine_ID)
+                             LEFT OUTER JOIN C_Cash cs ON (cs.C_Cash_ID=cl.C_Cash_ID)
+                             LEFT OUTER JOIN C_CashBook cb ON (cb.C_CashBook_ID=cs.C_CashBook_ID)
                             WHERE bsl.C_BankStatement_ID=@C_BankStatement_ID
                               AND bsl.IsActive='Y'
-                              AND bsl.AD_Client_ID=@AD_Client_ID";
+                              AND bsl.AD_Client_ID=@AD_Client_ID" + kindFilter;
 
             string accessSql = MRole.GetDefault(ctx).AddAccessSQL(
                 sql, "bsl", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
@@ -462,10 +599,18 @@ namespace VASLogic.Models
                 return rows;
             }
 
-            if (ds == null || ds.Tables.Count == 0)
+            if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
             {
                 return rows;
             }
+
+            /* LIST columns - one dictionary read each serves every row of the page:
+               C_Payment.TenderType (fallback payment method) and the VA012 voucher /
+               contra / difference types on the line. */
+            Dictionary<string, string> tenderLabels = LoadRefListLabels(ctx, "C_Payment", "TenderType");
+            Dictionary<string, string> voucherLabels = LoadRefListLabels(ctx, "C_BankStatementLine", "VA012_VoucherType");
+            Dictionary<string, string> contraLabels = LoadRefListLabels(ctx, "C_BankStatementLine", "VA012_ContraType");
+            Dictionary<string, string> differenceLabels = LoadRefListLabels(ctx, "C_BankStatementLine", "VA012_DifferenceType");
 
             foreach (DataRow r in ds.Tables[0].Rows)
             {
@@ -491,22 +636,167 @@ namespace VASLogic.Models
                 row.ChargeAmt = Round(Util.GetValueOfDecimal(r["ChargeAmt"]), p);
                 row.InterestAmt = Round(Util.GetValueOfDecimal(r["InterestAmt"]), p);
 
-                row.IsMatched = Util.GetValueOfString(r["MatchStatement"]) == "Y";
                 row.Processed = Util.GetValueOfString(r["Processed"]) == "Y";
                 row.IsManual = Util.GetValueOfString(r["IsManual"]) == "Y";
                 row.IsReversal = Util.GetValueOfString(r["IsReversal"]) == "Y";
 
                 row.C_Payment_ID = Util.GetValueOfInt(r["C_Payment_ID"]);
                 row.PaymentDocumentNo = Util.GetValueOfString(r["PaymentDocumentNo"]);
+                row.TenderType = Util.GetValueOfString(r["TenderType"]);
+                row.TenderTypeName = LabelOf(tenderLabels, row.TenderType);
+                /* Payment method: the VA009 method on the line, else the payment's,
+                   else the payment's tender type. */
+                row.PaymentMethodName = Util.GetValueOfString(r["PaymentMethodName"]);
+                if (string.IsNullOrEmpty(row.PaymentMethodName))
+                {
+                    row.PaymentMethodName = row.TenderTypeName;
+                }
+                row.IsReceipt = Util.GetValueOfString(r["IsReceipt"]) == "Y";
+                row.IsAllocated = Util.GetValueOfString(r["IsAllocated"]) == "Y";
                 row.C_BPartner_ID = Util.GetValueOfInt(r["C_BPartner_ID"]);
                 row.BPartnerName = Util.GetValueOfString(r["BPartnerName"]);
                 row.C_Charge_ID = Util.GetValueOfInt(r["C_Charge_ID"]);
                 row.ChargeName = Util.GetValueOfString(r["ChargeName"]);
+                row.VA009_PaymentMethod_ID = Util.GetValueOfInt(r["VA009_PaymentMethod_ID"]);
+                row.C_Tax_ID = Util.GetValueOfInt(r["C_Tax_ID"]);
+                row.TaxName = Util.GetValueOfString(r["TaxName"]);
+                row.TaxAmt = Round(Util.GetValueOfDecimal(r["TaxAmt"]), p);
+
+                /* Cash line the bank line settles (cash-to-bank / bank-to-cash). */
+                row.C_CashLine_ID = Util.GetValueOfInt(r["C_CashLine_ID"]);
+                row.CashLineNo = Util.GetValueOfInt(r["CashLineNo"]);
+                row.CashLineAmt = Round(Util.GetValueOfDecimal(r["CashLineAmt"]), p);
+                row.C_Cash_ID = Util.GetValueOfInt(r["C_Cash_ID"]);
+                row.CashDocumentNo = Util.GetValueOfString(r["CashDocumentNo"]);
+                row.CashName = Util.GetValueOfString(r["CashName"]);
+                row.CashBookName = Util.GetValueOfString(r["CashBookName"]);
+
+                /* Voucher / contra facts (VA012), codes resolved to names. */
+                row.VoucherType = Util.GetValueOfString(r["VA012_VoucherType"]);
+                row.VoucherTypeName = LabelOf(voucherLabels, row.VoucherType);
+                row.ContraType = Util.GetValueOfString(r["VA012_ContraType"]);
+                row.ContraTypeName = LabelOf(contraLabels, row.ContraType);
+
+                /* Matched - same rule as the aggregate's MATCHED_CASE; needs the
+                   references, amounts and contra type read above. */
+                row.IsMatched = IsLineMatched(row);
+                row.DifferenceType = Util.GetValueOfString(r["VA012_DifferenceType"]);
+                row.DifferenceTypeName = LabelOf(differenceLabels, row.DifferenceType);
+                row.VoucherNo = Util.GetValueOfString(r["VA012_VoucherNo"]);
 
                 rows.Add(row);
             }
 
+            if (posted && rows.Count > 0)
+            {
+                AttachLineAccounting(ctx, C_BankStatement_ID, rows);
+            }
+
             return rows;
+        }
+
+        /// <summary>
+        /// The accounting impact of every line on the page, in ONE query: the
+        /// Actual Fact_Acct rows of the statement whose Line_ID is one of the page's
+        /// lines, grouped by line and account. Each line gets its debit accounts and
+        /// its credit accounts as two name lists; the panel draws them as
+        /// "debit accounts → credit accounts". The line ids are integers this
+        /// model just read, so they are inlined as an IN list rather than bound.
+        /// </summary>
+        /// <param name="ctx">User context.</param>
+        /// <param name="C_BankStatement_ID">Selected banking journal id.</param>
+        /// <param name="rows">The page's lines, filled in place.</param>
+        private void AttachLineAccounting(Ctx ctx, int C_BankStatement_ID, List<JournalLineRow> rows)
+        {
+            int tableId = MBankStatement.Table_ID;
+            if (tableId <= 0 || rows == null || rows.Count == 0)
+            {
+                return;
+            }
+
+            StringBuilder ids = new StringBuilder();
+            Dictionary<int, JournalLineRow> byId = new Dictionary<int, JournalLineRow>();
+            foreach (JournalLineRow row in rows)
+            {
+                if (row.C_BankStatementLine_ID <= 0 || byId.ContainsKey(row.C_BankStatementLine_ID))
+                {
+                    continue;
+                }
+                byId[row.C_BankStatementLine_ID] = row;
+                if (ids.Length > 0)
+                {
+                    ids.Append(",");
+                }
+                ids.Append(row.C_BankStatementLine_ID);
+            }
+            if (ids.Length == 0)
+            {
+                return;
+            }
+
+            /* Table id and line ids are resolved integers (see LoadAccountingSummary). */
+            string sql = @"SELECT fa.Line_ID,
+                                  ev.Name AS AccountName,
+                                  SUM(COALESCE(fa.AmtAcctDr, 0)) AS DebitAmount,
+                                  SUM(COALESCE(fa.AmtAcctCr, 0)) AS CreditAmount
+                             FROM Fact_Acct fa
+                             INNER JOIN C_ElementValue ev ON (ev.C_ElementValue_ID=fa.Account_ID)
+                            WHERE fa.AD_Table_ID=" + tableId + @"
+                              AND fa.Record_ID=@C_BankStatement_ID
+                              AND fa.Line_ID IN (" + ids + @")
+                              AND fa.PostingType='A'
+                              AND fa.IsActive='Y'
+                              AND fa.AD_Client_ID=@AD_Client_ID";
+
+            string accessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                sql, "fa", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            accessSql += " GROUP BY fa.Line_ID, ev.Value, ev.Name ORDER BY fa.Line_ID, ev.Value";
+
+            DataSet ds = null;
+            try
+            {
+                /* Two binds, each occurring once, in the order they appear. */
+                ds = DB.ExecuteDataset(accessSql, new SqlParameter[]
+                {
+                    new SqlParameter("@C_BankStatement_ID", C_BankStatement_ID),
+                    new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+                }, null);
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("VAS_292 AttachLineAccounting(" + C_BankStatement_ID + "): " + ex.Message);
+                return;
+            }
+
+            if (ds == null || ds.Tables.Count == 0)
+            {
+                return;
+            }
+
+            foreach (DataRow r in ds.Tables[0].Rows)
+            {
+                int lineId = Util.GetValueOfInt(r["Line_ID"]);
+                if (!byId.ContainsKey(lineId))
+                {
+                    continue;
+                }
+                JournalLineRow row = byId[lineId];
+                string account = Util.GetValueOfString(r["AccountName"]);
+                if (string.IsNullOrEmpty(account))
+                {
+                    continue;
+                }
+                if (Util.GetValueOfDecimal(r["DebitAmount"]) != 0)
+                {
+                    if (row.DebitAccounts == null) row.DebitAccounts = new List<string>();
+                    row.DebitAccounts.Add(account);
+                }
+                if (Util.GetValueOfDecimal(r["CreditAmount"]) != 0)
+                {
+                    if (row.CreditAccounts == null) row.CreditAccounts = new List<string>();
+                    row.CreditAccounts.Add(account);
+                }
+            }
         }
 
         // ----------------------------------------------------------------- //
@@ -532,6 +822,7 @@ namespace VASLogic.Models
             }
 
             string sql = @"SELECT COUNT(fa.Fact_Acct_ID) AS EntryCount,
+                                  COUNT(DISTINCT fa.Account_ID) AS AccountCount,
                                   SUM(COALESCE(fa.AmtAcctDr, 0)) AS TotalDebit,
                                   SUM(COALESCE(fa.AmtAcctCr, 0)) AS TotalCredit
                              FROM Fact_Acct fa
@@ -558,6 +849,7 @@ namespace VASLogic.Models
                 {
                     DataRow r = ds.Tables[0].Rows[0];
                     result.EntryCount = Util.GetValueOfInt(r["EntryCount"]);
+                    result.AccountCount = Util.GetValueOfInt(r["AccountCount"]);
                     result.TotalDebit = Round(Util.GetValueOfDecimal(r["TotalDebit"]), result.StdPrecision);
                     result.TotalCredit = Round(Util.GetValueOfDecimal(r["TotalCredit"]), result.StdPrecision);
                 }
@@ -569,15 +861,51 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// The Actual posting grouped by ledger account, in account-value order.
-        /// GROUP BY and ORDER BY are appended after the access filter. Only called
-        /// when the summary found at least one entry, so an empty grid is never
-        /// drawn.
+        /// One page of the accounting breakdown, for the section's pager. The
+        /// statement is re-read under MRole first, so a page can never be fetched
+        /// for a record the role cannot see; an unposted statement answers empty.
         /// </summary>
         /// <param name="ctx">User context.</param>
         /// <param name="C_BankStatement_ID">Selected banking journal id.</param>
-        /// <returns>One row per account; empty when nothing is posted.</returns>
-        private List<AccountRow> LoadAccountBreakdown(Ctx ctx, int C_BankStatement_ID)
+        /// <param name="page">Zero-based page index.</param>
+        /// <param name="pageSize">Rows per page; 0 or less means ACCOUNTS_PAGE_SIZE.</param>
+        /// <returns>Populated <see cref="AccountsPage"/>; empty Rows when the id is
+        /// invalid, not accessible, not posted, or the page is past the end.</returns>
+        public AccountsPage GetAccountBreakdown(Ctx ctx, int C_BankStatement_ID, int page, int pageSize)
+        {
+            AccountsPage result = new AccountsPage();
+            result.Rows = new List<AccountRow>();
+            result.Page = page < 0 ? 0 : page;
+            result.PageSize = pageSize > 0 ? pageSize : ACCOUNTS_PAGE_SIZE;
+
+            if (ctx == null || C_BankStatement_ID <= 0)
+            {
+                return result;
+            }
+
+            BankingJournalPanelData probe = new BankingJournalPanelData();
+            if (!LoadHeader(ctx, C_BankStatement_ID, probe) || probe.Posted != "Y")
+            {
+                return result;
+            }
+
+            result.C_BankStatement_ID = C_BankStatement_ID;
+            result.Rows = LoadAccountBreakdown(ctx, C_BankStatement_ID, result.Page, result.PageSize);
+            return result;
+        }
+
+        /// <summary>
+        /// One page of the Actual posting grouped by ledger account, in
+        /// account-value order. GROUP BY, ORDER BY and the paging suffix are
+        /// appended after the access filter. Only called when the summary found at
+        /// least one entry, so an empty grid is never drawn.
+        /// </summary>
+        /// <param name="ctx">User context.</param>
+        /// <param name="C_BankStatement_ID">Selected banking journal id.</param>
+        /// <param name="page">Zero-based page index.</param>
+        /// <param name="pageSize">Rows per page.</param>
+        /// <returns>Accounts of that page; empty past the end.</returns>
+        private List<AccountRow> LoadAccountBreakdown(Ctx ctx, int C_BankStatement_ID, int page, int pageSize)
         {
             List<AccountRow> rows = new List<AccountRow>();
 
@@ -603,7 +931,8 @@ namespace VASLogic.Models
 
             string accessSql = MRole.GetDefault(ctx).AddAccessSQL(
                 sql, "fa", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-            accessSql += " GROUP BY fa.Account_ID, ev.Value, ev.Name ORDER BY ev.Value";
+            accessSql += " GROUP BY fa.Account_ID, ev.Value, ev.Name ORDER BY ev.Value, fa.Account_ID";
+            accessSql += PagingSuffix(page, pageSize > 0 ? pageSize : ACCOUNTS_PAGE_SIZE);
 
             /* Two binds, each occurring once, in the order they appear. */
             SqlParameter[] param = new SqlParameter[]
@@ -797,6 +1126,20 @@ namespace VASLogic.Models
         // ----------------------------------------------------------------- //
         //  Shared helpers                                                    //
         // ----------------------------------------------------------------- //
+
+        /// <summary>The translated label of a stored list code, or the code itself
+        /// when unmapped / blank.</summary>
+        /// <param name="labels">Code → label map from LoadRefListLabels.</param>
+        /// <param name="code">Stored code.</param>
+        /// <returns>Label or code.</returns>
+        private static string LabelOf(Dictionary<string, string> labels, string code)
+        {
+            if (string.IsNullOrEmpty(code) || labels == null || !labels.ContainsKey(code))
+            {
+                return code;
+            }
+            return labels[code];
+        }
 
         /// <summary>
         /// The display labels of a LIST column's reference values, keyed by their
@@ -1044,6 +1387,10 @@ namespace VASLogic.Models
             public int LineCount { get; set; }
             public int MatchedCount { get; set; }
             public int UnmatchedCount { get; set; }
+            /// <summary>Receipt (StmtAmt at or above zero) / payment (below zero) split,
+            /// the page totals of the panel's line filter.</summary>
+            public int ReceiptCount { get; set; }
+            public int PaymentCount { get; set; }
             public decimal InflowAmount { get; set; }
             public decimal OutflowAmount { get; set; }
             public decimal ChargeAmount { get; set; }
@@ -1054,10 +1401,14 @@ namespace VASLogic.Models
 
             /// <summary>Actual posting from Fact_Acct; zero / empty when not posted.</summary>
             public int EntryCount { get; set; }
+            /// <summary>Distinct ledger accounts in the posting - the breakdown pager's total.</summary>
+            public int AccountCount { get; set; }
             public decimal TotalDebit { get; set; }
             public decimal TotalCredit { get; set; }
             /// <summary>|TotalDebit - TotalCredit| within the currency precision tolerance.</summary>
             public bool IsPostingBalanced { get; set; }
+            /// <summary>Rows per page the breakdown pages with; Accounts is page 0.</summary>
+            public int AccountsPageSize { get; set; }
             public List<AccountRow> Accounts { get; set; }
 
             /// <summary>yyyy-MM-dd HH:mm, read as UTC by the client.</summary>
@@ -1109,10 +1460,49 @@ namespace VASLogic.Models
 
             public int C_Payment_ID { get; set; }
             public string PaymentDocumentNo { get; set; }
+            /// <summary>Payment's stored TenderType code and its translated name.</summary>
+            public string TenderType { get; set; }
+            public string TenderTypeName { get; set; }
+            /// <summary>VA009 payment method name (line's, else payment's), falling back
+            /// to the tender type name.</summary>
+            public string PaymentMethodName { get; set; }
+            /// <summary>Payment's IsReceipt (AR receipt vs AP payment - decides the zoom window).</summary>
+            public bool IsReceipt { get; set; }
+            /// <summary>Payment's IsAllocated flag.</summary>
+            public bool IsAllocated { get; set; }
             public int C_BPartner_ID { get; set; }
             public string BPartnerName { get; set; }
             public int C_Charge_ID { get; set; }
             public string ChargeName { get; set; }
+            /// <summary>Line's own VA009 payment method id (feeds the charge-line match rule).</summary>
+            public int VA009_PaymentMethod_ID { get; set; }
+            /// <summary>Tax on the line; 0 / empty when none.</summary>
+            public int C_Tax_ID { get; set; }
+            public string TaxName { get; set; }
+            public decimal TaxAmt { get; set; }
+
+            /// <summary>Cash line the bank line settles; 0 / empty when none.</summary>
+            public int C_CashLine_ID { get; set; }
+            public int CashLineNo { get; set; }
+            public decimal CashLineAmt { get; set; }
+            public int C_Cash_ID { get; set; }
+            public string CashDocumentNo { get; set; }
+            public string CashName { get; set; }
+            public string CashBookName { get; set; }
+
+            /// <summary>VA012 voucher / contra facts: stored codes + translated names.</summary>
+            public string VoucherType { get; set; }
+            public string VoucherTypeName { get; set; }
+            public string ContraType { get; set; }
+            public string ContraTypeName { get; set; }
+            public string DifferenceType { get; set; }
+            public string DifferenceTypeName { get; set; }
+            public string VoucherNo { get; set; }
+
+            /// <summary>Accounts the line debited / credited (Actual posting);
+            /// null when the statement is not posted or the line has no facts.</summary>
+            public List<string> DebitAccounts { get; set; }
+            public List<string> CreditAccounts { get; set; }
         }
 
         /// <summary>One ledger account of the Actual posting.</summary>
@@ -1125,6 +1515,16 @@ namespace VASLogic.Models
             public decimal CreditAmount { get; set; }
         }
 
+        /// <summary>One page of the accounting breakdown, for the pager.</summary>
+        public class AccountsPage
+        {
+            public int C_BankStatement_ID { get; set; }
+            /// <summary>Zero-based page index actually served.</summary>
+            public int Page { get; set; }
+            public int PageSize { get; set; }
+            public List<AccountRow> Rows { get; set; }
+        }
+
         /// <summary>One page of journal lines, for the pager.</summary>
         public class JournalLinesPage
         {
@@ -1132,6 +1532,8 @@ namespace VASLogic.Models
             /// <summary>Zero-based page index actually served.</summary>
             public int Page { get; set; }
             public int PageSize { get; set; }
+            /// <summary>Normalised line filter the page was read with (all / receipt / payment).</summary>
+            public string Kind { get; set; }
             public List<JournalLineRow> Rows { get; set; }
         }
 

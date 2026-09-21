@@ -10,7 +10,10 @@
 ///                                      workflow steps + posting moment for the
 ///                                      audit trail).
 ///                 GetJournalLines    — one further page of lines (20 per
-///                                      request) for the panel's pager.
+///                                      request) for the panel's pager, under
+///                                      the all / receipt / payment filter.
+///                 GetAccountBreakdown — one further page of the accounting
+///                                      breakdown (20 accounts per request).
 ///
 ///               The statement id arriving from the browser is never trusted on
 ///               its own: the model reads C_BankStatement under MRole, so an id the
@@ -64,9 +67,11 @@ namespace VAS.Controllers
         /// <param name="C_BankStatement_ID">Selected banking journal id.</param>
         /// <param name="page">Zero-based page index.</param>
         /// <param name="pageSize">Rows per page.</param>
+        /// <param name="kind">Line filter: all / receipt / payment (the model
+        /// normalises anything else to all; the value never reaches SQL as text).</param>
         /// <returns>JSON-serialized
         /// <see cref="VAS_292_BankingJournalRightPanelModel.JournalLinesPage"/>.</returns>
-        public JsonResult GetJournalLines(int C_BankStatement_ID, int page, int pageSize)
+        public JsonResult GetJournalLines(int C_BankStatement_ID, int page, int pageSize, string kind)
         {
             string retJSON = "";
             if (Session["ctx"] != null)
@@ -74,7 +79,30 @@ namespace VAS.Controllers
                 Ctx ctx = Session["ctx"] as Ctx;
                 VAS_292_BankingJournalRightPanelModel model = new VAS_292_BankingJournalRightPanelModel();
                 retJSON = JsonConvert.SerializeObject(
-                    model.GetJournalLines(ctx, C_BankStatement_ID, page, pageSize));
+                    model.GetJournalLines(ctx, C_BankStatement_ID, page, pageSize, kind));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>
+        /// One page of the accounting breakdown (ledger accounts of the Actual
+        /// posting), for the Accounting impact section's pager. The totals and the
+        /// account count came with the initial payload.
+        /// </summary>
+        /// <param name="C_BankStatement_ID">Selected banking journal id.</param>
+        /// <param name="page">Zero-based page index.</param>
+        /// <param name="pageSize">Rows per page.</param>
+        /// <returns>JSON-serialized
+        /// <see cref="VAS_292_BankingJournalRightPanelModel.AccountsPage"/>.</returns>
+        public JsonResult GetAccountBreakdown(int C_BankStatement_ID, int page, int pageSize)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                VAS_292_BankingJournalRightPanelModel model = new VAS_292_BankingJournalRightPanelModel();
+                retJSON = JsonConvert.SerializeObject(
+                    model.GetAccountBreakdown(ctx, C_BankStatement_ID, page, pageSize));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
