@@ -45,6 +45,11 @@
  * 33 | Delivered                                     | VAS_078_StatusDelivered
  * 34 | Partial                                       | VAS_078_StatusPartial
  * 35 | Discontinued                                  | VAS_078_StatusDiscontinued
+ * 36 | Inactive                                      | VAS_078_StatusInactive
+ * 37 | Work Order In                                 | VAS_078_WorkOrderIn
+ * 38 | Work Order Out                                | VAS_078_WorkOrderOut
+ * 39 | Vendor Invoice Adjustment                     | VAS_078_VendorInvoiceAdjustment
+ * 40 | Inventory Revaluation                         | VAS_078_InventoryRevaluation
  */
 ; VAS = window.VAS || {};
 
@@ -275,9 +280,9 @@
         /* Status tile: Discontinued wins over Inactive; an inactive product
            (IsActive = 'N') must NOT read as Active. */
         function productStatusLabel() {
-            return productDetail.Status === 'D'
-                ? label('VAS_078_StatusDiscontinued', 'Discontinued')
-                : label('Active', 'Active');
+            if (productDetail.Status === 'D') { return label('VAS_078_StatusDiscontinued', 'Discontinued'); }
+            if (productDetail.Status === 'I') { return label('VAS_078_StatusInactive', 'Inactive'); }
+            return label('Active', 'Active');
         }
 
         /* Fallback only: the controller resolves the Type name from AD_Ref_List (reference 189,
@@ -296,7 +301,11 @@
                 'I+': label('VAS_078_InventoryIncrease', 'Inventory Increase'),
                 'I-': label('VAS_078_InventoryDecrease', 'Inventory Decrease'),
                 'P+': label('VAS_078_ProductionIn', 'Production In'),
-                'P-': label('VAS_078_ProductionOut', 'Production Out')
+                'P-': label('VAS_078_ProductionOut', 'Production Out'),
+                'W+': label('VAS_078_WorkOrderIn', 'Work Order In'),
+                'W-': label('VAS_078_WorkOrderOut', 'Work Order Out'),
+                'VI': label('VAS_078_VendorInvoiceAdjustment', 'Vendor Invoice Adjustment'),
+                'IR': label('VAS_078_InventoryRevaluation', 'Inventory Revaluation')
             };
             return movementTypes[code] || code || '-';
         }

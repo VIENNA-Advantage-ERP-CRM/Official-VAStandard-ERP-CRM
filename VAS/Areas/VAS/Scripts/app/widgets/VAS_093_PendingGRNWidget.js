@@ -629,7 +629,7 @@
                     '</label>' +
                     (showAttr ? attrCellHtml(line.attributeName) : '') +
                     /* Editable received quantity, defaulting to the remaining qty. */
-                    '<input class="vas-egrn-rcv-in vas-pgrn-qty" type="number" min="0" max="' + escapeHtml(line.openQty) + '" step="any" value="' + escapeHtml(qtyValue) + '" data-orderlineid="' + escapeHtml(line.poLineId) + '" aria-label="' + escapeHtml(lbl("VAS_093_RemianingQty", "Remaining Qty")) + '"/>' +
+                    '<input class="vas-egrn-rcv-in vas-pgrn-qty" type="number" min="0" max="' + escapeHtml(line.openQty) + '" step="' + escapeHtml(uomStep(line.uomPrecision)) + '" value="' + escapeHtml(qtyValue) + '" data-orderlineid="' + escapeHtml(line.poLineId) + '" aria-label="' + escapeHtml(lbl("VAS_093_RemianingQty", "Remaining Qty")) + '"/>' +
                     '<div class="vas-egrn-rcv-uom" title="' + escapeHtml(line.uom) + '">' + escapeHtml(line.uom) + '</div>' +
                     '</div>';
             }
@@ -640,9 +640,9 @@
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' +
                 '<span>' + escapeHtml(lbl("VAS_093_SelectLinesThenGRN", "Select the order lines to receive, then create the GRN.")) + '</span>' +
                 '</div>' +
-                '<div class="vas-egrn-rcv-line vas-pgrn-line vas-egrn-rcv-head">' +
+                '<div class="' + lineCls + ' vas-egrn-rcv-head">' +
                 '<div>' + escapeHtml(lbl("VAS_093_Item", "Item")) + '</div>' +
-                '<div>' + escapeHtml(lbl("VAS_Attribute", "Attribute")) + '</div>' +
+                (showAttr ? '<div>' + escapeHtml(lbl("VAS_Attribute", "Attribute")) + '</div>' : '') +
                 '<div>' + escapeHtml(lbl("VAS_093_RemianingQty", "Remaining Qty")) + '</div>' +
                 '<div>' + escapeHtml(lbl("VAS_Uom", "UOM")) + '</div>' +
                 '</div>' +

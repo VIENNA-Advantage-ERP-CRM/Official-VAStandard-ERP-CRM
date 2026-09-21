@@ -159,28 +159,6 @@
             if ($card) { $card.prop('disabled', true); }
         }
 
-        function showBusy(show) {
-            if (!$busy || !$busy[0]) { return; }
-            $busy.toggleClass('vas-imtd-hidden', !show);
-        }
-
-        function loadKpi() {
-            showBusy(true);
-
-            $.ajax({
-                url: VIS.Application.contextUrl + 'VAS_180_IssuedMTDWidget/GetIssuedMTDCount',
-                type: 'GET',
-                cache: false,
-                success: function (res) {
-                    var data = parseResponse(res);
-                    if (data.error) { setError(); return; }
-                    renderMetric(data);
-                },
-                error: function () { setError(); },
-                complete: function () { showBusy(false); }
-            });
-        }
-
         function setupResizeObserver() {
             if (typeof ResizeObserver === 'undefined') { return; }
             try {
@@ -195,12 +173,6 @@
                 ro.observe($root[0]);
             } catch (e) { }
         }
-
-        this.Initalize = function () {
-            createWidget();
-            setupResizeObserver();
-            loadKpi();
-        };
 
         function openIssuedMTDList() {
             // Keep in lock-step with GetIssuedMTDCountData in the controller. This drills through
@@ -297,6 +269,7 @@
 
         this.Initalize = function () {
             createWidget();
+            setupResizeObserver();
             loadKpi();
         };
 

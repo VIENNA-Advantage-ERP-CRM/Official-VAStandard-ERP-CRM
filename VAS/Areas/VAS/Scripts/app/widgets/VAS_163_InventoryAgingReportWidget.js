@@ -273,7 +273,7 @@
 
                 var btnObj = $bucketBtns[b.id];
                 if (btnObj) {
-                    btnObj.$countText.text(count.toLocaleString() + " " + (count === 1 ? lbl("VAS_163_Product") : lbl("VAS_163_Products")));
+                    btnObj.$countText.text(count.toLocaleString() + " " + lbl("VAS_Qty", "qty"));
 
                     var pct = total > 0 ? Math.round((count / total) * 100) : 0;
                     btnObj.$barFill.css("width", pct + "%");

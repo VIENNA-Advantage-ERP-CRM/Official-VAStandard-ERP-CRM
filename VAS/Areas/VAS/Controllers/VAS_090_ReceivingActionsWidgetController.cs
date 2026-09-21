@@ -27,6 +27,10 @@ namespace VIS.Controllers
     ///               (ProductType 'I'): the PO list keeps only orders with at
     ///               least one open item line, the line list and the create
     ///               validation exclude non-item lines.
+    ///   Claude      2026-09-21 GetGRNConfirmationDetail: fixed a PR #1167 merge-
+    ///               conflict resolution bug where the Scrap Locator SELECT still
+    ///               referenced a dropped "Locator" alias and never produced the
+    ///               Scrap_Locator_ID/Scrap_Locator_Name columns the reader expects.
     /// </summary>
     public class VAS_090_ReceivingActionsWidgetController : Controller
     {
@@ -1524,9 +1528,9 @@ namespace VIS.Controllers
                 MRole.SQL_RO
             );
 
-            string lineLocatorSql = HasColumn("M_Locator", "LocatorCombination")
-                ? "COALESCE(Locator.LocatorCombination, Locator.Value)"
-                : "Locator.Value";
+            string scrapLocatorNameSql = HasColumn("M_Locator", "LocatorCombination")
+                ? "COALESCE(ScrapLocator.LocatorCombination, ScrapLocator.Value)"
+                : "ScrapLocator.Value";
 
             string linesSql = @"
                 SELECT LineConfirm.M_InOutLineConfirm_ID AS Line_Confirm_ID,
@@ -1534,7 +1538,8 @@ namespace VIS.Controllers
                        Product.Name AS Product_Name,
                        UomInfo.Name AS UOM_Name,
                        AttributeInstance.Description AS Attribute_Description,
-                       " + lineLocatorSql + @" AS Locator_Value,
+                       COALESCE(LineConfirm.M_Locator_ID, 0) AS Scrap_Locator_ID,
+                       " + scrapLocatorNameSql + @" AS Scrap_Locator_Name,
                        LineConfirm.TargetQty AS Target_Qty,
                        LineConfirm.ConfirmedQty AS Confirmed_Qty,
                        LineConfirm.ScrappedQty AS Scrapped_Qty,
