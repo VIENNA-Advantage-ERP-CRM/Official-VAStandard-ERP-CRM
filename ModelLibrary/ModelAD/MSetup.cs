@@ -13,6 +13,12 @@ using System.Data;
 using VAdvantage.Print;
 using System.ServiceModel;
 using ViennaAdvantage.Model;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Threading.Tasks;
+using Newtonsoft.Json;
+using System.Web.Hosting;
+using Task = System.Threading.Tasks.Task;
 
 namespace VAdvantage.Model
 {
@@ -41,6 +47,10 @@ namespace VAdvantage.Model
         private StringBuilder m_info;
         //
         private String m_clientName;
+        /** Packages selected on the setup screen - installed at the end of CreateEntities	*/
+        private object m_packageInfo = null;
+        /** Module install runs once per setup, whoever calls InstallPackageModules first	*/
+        private bool m_modulesInstalled = false;
         //	private String          m_orgName;
         //
         private String m_stdColumns = "AD_Client_ID,AD_Org_ID,IsActive,Created,CreatedBy,Updated,UpdatedBy";
@@ -218,31 +228,31 @@ namespace VAdvantage.Model
             m_info.Append(Msg.Translate(m_lang, "AD_Role_ID")).Append("=").Append(name).Append("\n");
 
 
-
+            // Commented code to stop creation of User Role and User for user role
             //
-            name = m_clientName + " User";
-            MRole user = new MRole(m_ctx, 0, m_trx);
-            user.SetClientOrg(m_client);
-            user.SetName(name);
-            if (!user.Save())
-            {
-                String err = "User Role A NOT inserted";
-                log.Log(Level.SEVERE, err);
-                m_info.Append(err);
-                m_trx.Rollback();
-                m_trx.Close();
-                tInfo.Log = "User Role A NOT inserted";
-                // return false;
-                return tInfo;
-            }
-            tInfo.UserRole = user.GetName();
+            //name = m_clientName + " User";
+            //MRole user = new MRole(m_ctx, 0, m_trx);
+            //user.SetClientOrg(m_client);
+            //user.SetName(name);
+            //if (!user.Save())
+            //{
+            //    String err = "User Role A NOT inserted";
+            //    log.Log(Level.SEVERE, err);
+            //    m_info.Append(err);
+            //    m_trx.Rollback();
+            //    m_trx.Close();
+            //    tInfo.Log = "User Role A NOT inserted";
+            //    // return false;
+            //    return tInfo;
+            //}
+            //tInfo.UserRole = user.GetName();
             //  OrgAccess x,y
-            MRoleOrgAccess userOrgAccess = new MRoleOrgAccess(user, m_org.GetAD_Org_ID());
-            if (!userOrgAccess.Save())
-                log.Log(Level.SEVERE, "User Role_OrgAccess NOT created");
+            //MRoleOrgAccess userOrgAccess = new MRoleOrgAccess(user, m_org.GetAD_Org_ID());
+            //if (!userOrgAccess.Save())
+            //    log.Log(Level.SEVERE, "User Role_OrgAccess NOT created");
 
-            //  Info - Client Role
-            m_info.Append(Msg.Translate(m_lang, "AD_Role_ID")).Append("=").Append(name).Append("\n");
+            ////  Info - Client Role
+            //m_info.Append(Msg.Translate(m_lang, "AD_Role_ID")).Append("=").Append(name).Append("\n");
 
             /**
              *  Create Users
@@ -311,68 +321,68 @@ namespace VAdvantage.Model
             //}
 
 
-            tInfo.AdminUser = name;
-            tInfo.AdminUserPwd = name;
+            tInfo.AdminUser = AD_User_Name;
+            tInfo.AdminUserPwd = AD_User_Name;
 
             //  Info
             m_info.Append(Msg.Translate(m_lang, "AD_User_ID")).Append("=").Append(AD_User_Name).Append("/").Append(AD_User_Name).Append("\n");
 
-            name = userOrg;
-            if (name == null || name.Length == 0)
-                name = m_clientName + "Org";
-            AD_User_U_ID = GetNextID(AD_Client_ID, "AD_User");
+            // Commented code to stop creating Org User 
+            //name = userOrg;
+            //if (name == null || name.Length == 0)
+            //    name = m_clientName + "Org";
+            //AD_User_U_ID = GetNextID(AD_Client_ID, "AD_User");
 
-            ////////////////////////////
-            m_ctx.SetContext("#AD_User_U_ID", AD_User_U_ID);
-            ////////////////////////////
+            //////////////////////////////
+            //m_ctx.SetContext("#AD_User_U_ID", AD_User_U_ID);
+            //////////////////////////////
 
-            AD_User_U_Name = name;
-            name = DataBase.DB.TO_STRING(name);
+            //AD_User_U_Name = name;
+            //name = DataBase.DB.TO_STRING(name);
 
-            password = "";
-            if (isPwdEncrypted == "Y")
-            {
-                password = SecureEngine.Encrypt(name);
-            }
-            else if (isPwdHashed == "Y")
-            {
-                password = SecureEngine.ComputeHash(name);
-            }
-            else
-            {
-                password = name;
-            }
+            //password = "";
+            //if (isPwdEncrypted == "Y")
+            //{
+            //    password = SecureEngine.Encrypt(name);
+            //}
+            //else if (isPwdHashed == "Y")
+            //{
+            //    password = SecureEngine.ComputeHash(name);
+            //}
+            //else
+            //{
+            //    password = name;
+            //}
 
-            sql = "INSERT INTO AD_User(" + m_stdColumns + ",AD_User_ID,"
-                + "Value,Name,Description,Password,IsLoginUser)"
-                + " VALUES (" + m_stdValues + "," + AD_User_U_ID + ","
-                + name + "," + name + "," + name + "," + password + ",'Y')";
-            no = DataBase.DB.ExecuteQuery(sql, null, m_trx);
-            if (no != 1)
-            {
-                String err = "Org User NOT inserted - " + AD_User_U_Name;
-                log.Log(Level.SEVERE, err);
-                m_info.Append(err);
-                m_trx.Rollback();
-                m_trx.Close();
-                tInfo.Log = "Org User NOT inserted - " + AD_User_U_Name;
-                //return false;
-                return tInfo;
-            }
-
-            //Save Default Login Settings for Org User
-            //str =
-            SetupDefaultLogin(m_trx, m_client.GetAD_Client_ID(), user.GetAD_Role_ID(), m_org.GetAD_Org_ID(), AD_User_U_ID, 0);
+            //sql = "INSERT INTO AD_User(" + m_stdColumns + ",AD_User_ID,"
+            //    + "Value,Name,Description,Password,IsLoginUser)"
+            //    + " VALUES (" + m_stdValues + "," + AD_User_U_ID + ","
+            //    + name + "," + name + "," + name + "," + password + ",'Y')";
+            //no = DataBase.DB.ExecuteQuery(sql, null, m_trx);
+            //if (no != 1)
+            //{
+            //    String err = "Org User NOT inserted - " + AD_User_U_Name;
+            //    log.Log(Level.SEVERE, err);
+            //    m_info.Append(err);
+            //    m_trx.Rollback();
+            //    m_trx.Close();
+            //    tInfo.Log = "Org User NOT inserted - " + AD_User_U_Name;
+            //    //return false;
+            //    return tInfo;
+            //}
+            ////Save Default Login Settings for Org User
+            ////str =
+            //SetupDefaultLogin(m_trx, m_client.GetAD_Client_ID(), user.GetAD_Role_ID(), m_org.GetAD_Org_ID(), AD_User_U_ID, 0);
             //if (str != "OK")
             //{
             //    tInfo.Log = "Login Settings Not Saved for:" + name;
             //    return tInfo;
             //}
 
-            tInfo.OrgUser = name;
-            tInfo.OrgUserPwd = name;
-            //  Info
-            m_info.Append(Msg.Translate(m_lang, "AD_User_ID")).Append("=").Append(AD_User_U_Name).Append("/").Append(AD_User_U_Name).Append("\n");
+            //tInfo.OrgUser = name;
+            //tInfo.OrgUserPwd = name;
+            ////  Info
+            //m_info.Append(Msg.Translate(m_lang, "AD_User_ID")).Append("=").Append(AD_User_U_Name).Append("/").Append(AD_User_U_Name).Append("\n");
 
             /**
              *  Create User-Role
@@ -383,17 +393,19 @@ namespace VAdvantage.Model
             no = DataBase.DB.ExecuteQuery(sql, null, m_trx);
             if (no != 1)
                 log.Log(Level.SEVERE, "UserRole ClientUser+Admin NOT inserted");
-            sql = "INSERT INTO AD_User_Roles(" + m_stdColumns + ",AD_User_ID,AD_Role_ID)"
-                + " VALUES (" + m_stdValues + "," + AD_User_ID + "," + user.GetAD_Role_ID() + ")";
-            no = DataBase.DB.ExecuteQuery(sql, null, m_trx);
-            if (no != 1)
-                log.Log(Level.SEVERE, "UserRole ClientUser+User NOT inserted");
-            //  OrgUser             - User
-            sql = "INSERT INTO AD_User_Roles(" + m_stdColumns + ",AD_User_ID,AD_Role_ID)"
-                + " VALUES (" + m_stdValues + "," + AD_User_U_ID + "," + user.GetAD_Role_ID() + ")";
-            no = DataBase.DB.ExecuteQuery(sql, null, m_trx);
-            if (no != 1)
-                log.Log(Level.SEVERE, "UserRole OrgUser+Org NOT inserted");
+
+            // Commented user role access for org user
+            //sql = "INSERT INTO AD_User_Roles(" + m_stdColumns + ",AD_User_ID,AD_Role_ID)"
+            //    + " VALUES (" + m_stdValues + "," + AD_User_ID + "," + user.GetAD_Role_ID() + ")";
+            //no = DataBase.DB.ExecuteQuery(sql, null, m_trx);
+            //if (no != 1)
+            //    log.Log(Level.SEVERE, "UserRole ClientUser+User NOT inserted");
+            ////  OrgUser             - User
+            //sql = "INSERT INTO AD_User_Roles(" + m_stdColumns + ",AD_User_ID,AD_Role_ID)"
+            //    + " VALUES (" + m_stdValues + "," + AD_User_U_ID + "," + user.GetAD_Role_ID() + ")";
+            //no = DataBase.DB.ExecuteQuery(sql, null, m_trx);
+            //if (no != 1)
+            //    log.Log(Level.SEVERE, "UserRole OrgUser+Org NOT inserted");
 
             //	Processors
             if (Common.Common.lstTableName.Contains("C_AcctProcessor")) // Update by Paramjeet Singh
@@ -435,6 +447,191 @@ namespace VAdvantage.Model
             //return true;
         }
         //createClient
+
+        public static string NormalizeGuid(object value)
+        {
+            if (value == null || value == DBNull.Value)
+                return string.Empty;
+
+            byte[] bytes = value as byte[];              // Oracle RAW(16) / Postgres bytea
+            if (bytes != null)                           // strips BitConverter's byte separators,
+                return BitConverter.ToString(bytes).Replace("-", string.Empty); // not UUID dashes
+
+            if (value is Guid)                           // driver handed back a Guid directly
+                return ((Guid)value).ToString("D");
+
+            return value.ToString();                     // already a hex/uuid string
+        }
+
+        /// <summary>
+        /// Install the modules selected on the tenant setup screen through the Market Module API (RequestType = MD).
+        /// Must only be called once the setup transaction is committed - the Market service runs on its own
+        /// connection and blocks on the rows/DDL this transaction still holds.
+        /// Called at the end of CreateEntities, and safe for the setup screen to call itself once the setup
+        /// steps are through - the guard keeps a second call from installing the same modules twice.
+        /// </summary>
+        /// <param name="packageInfo">
+        /// SelectedPackageInfo, or a list of them. Only the Modules collection is used - each entry carries
+        /// Name and LatestAvailableVersion. Typed as object because the type lives outside this assembly.
+        /// Optional - the selection handed to CreateClient is used when nothing is passed.
+        /// </param>
+        /// <param name="logKey">
+        /// Identifies the install log on the Market side, so the caller can read the progress back with
+        /// RequestType = GL. Optional - a key is generated when the caller does not supply one, but then
+        /// only this log file records it and the progress cannot be followed.
+        /// </param>
+        /// <returns>true when the modules were installed, or when there was nothing to install</returns>
+        public bool InstallPackageModules(object packageInfo = null, string logKey = null)
+        {
+            if (m_modulesInstalled)
+            {
+                log.Info("Modules already installed for this setup - skipped");
+                return true;
+            }
+
+            object selection = packageInfo != null ? packageInfo : m_packageInfo;
+            if (selection == null)
+                return true;
+            //	The screen can call this without going through CreateClient
+            if (m_info == null)
+                m_info = new StringBuilder();
+
+            try
+            {
+                List<InstallModuleInfo> moduleList = GetModulesToInstall(selection);
+                if (moduleList.Count == 0)
+                {
+                    log.Info("No module selected for installation");
+                    return true;
+                }
+
+                //	Set before the call - a retry is the caller's decision, a double call must not install twice
+                m_modulesInstalled = true;
+
+                InstallModuleRequest request = new InstallModuleRequest();
+                request.RequestType = "MD";
+                request.IsModuleSeqRestrict = true;
+                request.LogKey = String.IsNullOrEmpty(logKey) ? DateTime.Now.ToString("yyyyMMddHHmmssfff") : logKey;
+                request.ModuleList = moduleList;
+                request.ReplaceAllModuleFilesTogether = true;
+                request.SessionGUID = NormalizeGuid(DB.ExecuteScalar("SELECT AD_Session_GUID FROM AD_Session WHERE AD_Session_ID = " + m_ctx.GetAD_Session_ID(), null, null));
+
+                String json = JsonConvert.SerializeObject(request,
+                    new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
+
+                string baseUrl = Env.GetApplicationURL(m_ctx);
+                string url = baseUrl.TrimEnd('/') + "/api/Market_ModuleAPI";
+                using (HttpClient client = new HttpClient())
+                {
+                    //	Long enough for a few modules, short enough that a dead endpoint fails instead of
+                    //	holding the setup screen. The Market side keeps installing after a timeout here.
+                    client.Timeout = TimeSpan.FromMinutes(5);
+                    StringContent content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                    log.Info("Installing modules - LogKey=" + request.LogKey + ", url=" + url);
+
+                    //	The setup runs synchronously - Task.Run keeps the wait off the request SynchronizationContext
+                    HttpResponseMessage response = Task.Run(() => client.PostAsync(url, content)).GetAwaiter().GetResult();
+                    String responseBody = Task.Run(() => response.Content.ReadAsStringAsync()).GetAwaiter().GetResult();
+
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        String err = "Module installation failed (" + (int)response.StatusCode + ") - " + responseBody;
+                        log.Log(Level.SEVERE, err);
+                        m_info.Append(err).Append("\n");
+                        return false;
+                    }
+
+                    log.Info("Modules installed - " + responseBody);
+                    m_info.Append("Modules installed: ")
+                        .Append(String.Join(", ", moduleList.Select(m => m.Name + " " + m.Version).ToArray()))
+                        .Append("\n");
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                //	A failed module install must not break tenant creation
+                log.Log(Level.SEVERE, "InstallPackageModules", ex);
+                m_info.Append("Module installation failed - ").Append(ex.Message).Append("\n");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Flatten the selected package(s) into the ModuleList of the Market request, keeping the selection order
+        /// (the API honours it when IsModuleSeqRestrict is true) and dropping duplicates across packages.
+        /// </summary>
+        private List<InstallModuleInfo> GetModulesToInstall(object packageInfo)
+        {
+            List<InstallModuleInfo> moduleList = new List<InstallModuleInfo>();
+
+            //	One package, or a list of packages
+            System.Collections.IEnumerable packages = packageInfo as System.Collections.IEnumerable;
+            if (packages == null || packageInfo is String)
+                packages = new object[] { packageInfo };
+
+            //	Tenant to install into, plus SYSTEM for the dictionary part
+            List<String> tenantSearchKeys = new List<String>() { m_clientName };
+
+            foreach (object package in packages)
+            {
+                System.Collections.IEnumerable modules = GetMemberValue(package, "Modules") as System.Collections.IEnumerable;
+                if (modules == null)
+                    continue;
+
+                foreach (object module in modules)
+                {
+                    String name = Util.GetValueOfString(GetMemberValue(module, "Name"));
+                    String version = Util.GetValueOfString(GetMemberValue(module, "LatestAvailableVersion"));
+                    if (String.IsNullOrEmpty(name) || String.IsNullOrEmpty(version))
+                    {
+                        log.Log(Level.WARNING, "Module skipped - Name/Version not available");
+                        continue;
+                    }
+
+                    if (moduleList.Any(m => m.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+                        continue;
+
+                    moduleList.Add(new InstallModuleInfo()
+                    {
+                        Name = name,
+                        Version = version,
+                        TenantSearchKeys = tenantSearchKeys,
+                        InstallOnlyAppFiles = false,
+                        RunSyncTerminology = false
+                    });
+                }
+            }
+            return moduleList;
+        }
+
+        /// <summary>
+        /// Read a field or property by name. SelectedPackageInfo/SelectedModuleInfo expose public fields and are
+        /// declared outside this assembly, so they are read reflectively instead of through the dynamic binder.
+        /// </summary>
+        private static object GetMemberValue(object obj, String memberName)
+        {
+            if (obj == null)
+                return null;
+
+            System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.Public
+                | System.Reflection.BindingFlags.NonPublic
+                | System.Reflection.BindingFlags.IgnoreCase;
+
+            Type type = obj.GetType();
+            System.Reflection.FieldInfo field = type.GetField(memberName, flags);
+            if (field != null)
+                return field.GetValue(obj);
+
+            System.Reflection.PropertyInfo property = type.GetProperty(memberName, flags);
+            if (property != null)
+                return property.GetValue(obj, null);
+
+            return null;
+        }
+
         private void CreateDefaultRoles(int adminUserID)
         {
             string sql = @"SELECT * FROM AD_Role WHERE AD_Client_ID=0 AND AD_Org_ID=0 AND Name != 'Sys Admin' AND Name!='System Administrator' AND IsForNewTenant='Y' AND IsActive = 'Y'";
@@ -3794,43 +3991,46 @@ namespace VAdvantage.Model
                     log.Log(Level.SEVERE, "ProductPrice NOT inserted");
 
             }
-            //	Create Sales Rep for Client-User
-            MBPartner bpCU = null;
-            if (Common.Common.lstTableName.Contains("C_BPartner"))
-            {
-                bpCU = new MBPartner(m_ctx, 0, m_trx);
-                bpCU.SetValue(AD_User_U_Name);
-                bpCU.SetName(AD_User_U_Name);
 
-                bpCU.SetBPGroup(bpg);
-                bpCU.SetIsEmployee(true);
-                bpCU.SetIsSalesRep(true);
-                if (bpCU.Save())
-                    m_info.Append(Msg.Translate(m_lang, "SalesRep_ID")).Append("=").Append(AD_User_U_Name).Append("\n");
-                else
-                    log.Log(Level.SEVERE, "SalesRep (User) NOT inserted");
+            // commented code
+            ////	Create Sales Rep for Client-User
+            //MBPartner bpCU = null;
+            //if (Common.Common.lstTableName.Contains("C_BPartner"))
+            //{
+            //    bpCU = new MBPartner(m_ctx, 0, m_trx);
+            //    bpCU.SetValue(AD_User_U_Name);
+            //    bpCU.SetName(AD_User_U_Name);
 
-                if (Common.Common.lstTableName.Contains("C_BPartner_Location"))
-                {
-                    //  Location for Client-User
-                    MLocation bpLocCU = new MLocation(m_ctx, C_Country_ID, C_Region_ID, City, m_trx);
-                    bpLocCU.Save();
-                    MBPartnerLocation bplCU = new MBPartnerLocation(bpCU);
-                    bplCU.SetC_Location_ID(bpLocCU.GetC_Location_ID());
-                    if (!bplCU.Save())
-                        log.Log(Level.SEVERE, "BP_Location (User) NOT inserted");
-                }
-            }
-            //  Update User
-            sqlCmd = new StringBuilder("UPDATE AD_User SET C_BPartner_ID=");
-            if (bpCU != null)
-            {
-                sqlCmd.Append(bpCU.GetC_BPartner_ID());
-            }
-            sqlCmd.Append(" WHERE AD_User_ID=").Append(AD_User_U_ID);
-            no = DataBase.DB.ExecuteQuery(sqlCmd.ToString(), null, m_trx);
-            if (no != 1)
-                log.Log(Level.SEVERE, "User of SalesRep (User) NOT updated");
+            //    bpCU.SetBPGroup(bpg);
+            //    bpCU.SetIsEmployee(true);
+            //    bpCU.SetIsSalesRep(true);
+            //    if (bpCU.Save())
+            //        m_info.Append(Msg.Translate(m_lang, "SalesRep_ID")).Append("=").Append(AD_User_U_Name).Append("\n");
+            //    else
+            //        log.Log(Level.SEVERE, "SalesRep (User) NOT inserted");
+
+            //    if (Common.Common.lstTableName.Contains("C_BPartner_Location"))
+            //    {
+            //        //  Location for Client-User
+            //        MLocation bpLocCU = new MLocation(m_ctx, C_Country_ID, C_Region_ID, City, m_trx);
+            //        bpLocCU.Save();
+            //        MBPartnerLocation bplCU = new MBPartnerLocation(bpCU);
+            //        bplCU.SetC_Location_ID(bpLocCU.GetC_Location_ID());
+            //        if (!bplCU.Save())
+            //            log.Log(Level.SEVERE, "BP_Location (User) NOT inserted");
+            //    }
+            //}
+
+            ////  Update User
+            //sqlCmd = new StringBuilder("UPDATE AD_User SET C_BPartner_ID=");
+            //if (bpCU != null)
+            //{
+            //    sqlCmd.Append(bpCU.GetC_BPartner_ID());
+            //}
+            //sqlCmd.Append(" WHERE AD_User_ID=").Append(AD_User_U_ID);
+            //no = DataBase.DB.ExecuteQuery(sqlCmd.ToString(), null, m_trx);
+            //if (no != 1)
+            //    log.Log(Level.SEVERE, "User of SalesRep (User) NOT updated");
 
 
             //	Create Sales Rep for Client-Admin
@@ -3946,7 +4146,9 @@ namespace VAdvantage.Model
             m_trx.Commit();
             m_trx.Close();
 
-
+            //	Tenant and entities are committed now, so the Market service can see them on its own connection.
+            //	Harmless if the setup screen calls InstallPackageModules itself - the guard makes it run once.
+            InstallPackageModules();
 
             log.Info("fini");
             return true;
@@ -4193,5 +4395,81 @@ namespace VAdvantage.Model
             get;
             set;
         }
+    }
+
+    /// <summary>
+    /// Request body of Market_ModuleAPI
+    /// </summary>
+    public class InstallModuleRequest
+    {
+        /// <summary>Auth token - when empty, UserName/Password are sent instead</summary>
+        public string Token { get; set; }
+
+        public string UserName { get; set; }
+
+        public string Password { get; set; }
+
+        /// <summary>ML = List Modules, MD = Install/Download Modules, see the Market API collection for the other types</summary>
+        public string RequestType { get; set; }
+
+        /// <summary>Module prefixes to act on, empty = all. RequestType = ML</summary>
+        public List<string> ModuleNames { get; set; }
+
+        public string VendorKey { get; set; }
+
+        /// <summary>RequestType = MD - install the modules in the order they are listed</summary>
+        public bool? IsModuleSeqRestrict { get; set; }
+
+        /// <summary>RequestType = MD - identifies the install log on the Market side</summary>
+        public string LogKey { get; set; }
+
+        /// <summary>Modules to install. RequestType = MD</summary>
+        public List<InstallModuleInfo> ModuleList { get; set; }
+
+        public string SessionGUID { get; set; }
+
+        public bool? ReplaceAllModuleFilesTogether { get; set; }
+    }
+
+    /// <summary>
+    /// One module to install, entry of InstallModuleRequest.ModuleList
+    /// </summary>
+    public class InstallModuleInfo
+    {
+        public string Name { get; set; }
+
+        public string Version { get; set; }
+
+        /// <summary>Tenants to install into - the new tenant and SYSTEM</summary>
+        public List<string> TenantSearchKeys { get; set; }
+
+        public bool InstallOnlyAppFiles { get; set; }
+
+        public bool RunSyncTerminology { get; set; }
+    }
+
+    /// <summary>
+    /// Response body of Market_ModuleAPI, RequestType=ML
+    /// </summary>
+    public class MarketModuleResponse
+    {
+        public List<MarketModuleInfo> ListModule { get; set; }
+    }
+
+    /// <summary>
+    /// One module as published on Market
+    /// </summary>
+    public class MarketModuleInfo
+    {
+        public string Name { get; set; }
+
+        public string Prefix { get; set; }
+
+        public string LatestAvailableVersion { get; set; }
+
+        /// <summary>null when the module is not installed - name matches the API casing</summary>
+        public string Installedversion { get; set; }
+
+        public List<string> AvailableVersions { get; set; }
     }
 }
