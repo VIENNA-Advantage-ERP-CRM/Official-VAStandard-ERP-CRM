@@ -2552,6 +2552,7 @@
                 $.ajax({
                     url: VIS.Application.contextUrl + "AlertSQLGenerate/GetTable",
                     type: "POST",
+                    async: false,
                     data: { tabID: tabID, windowNo: $self.windowNo },
                     success: function (result) {
                         result = JSON.parse(result);
@@ -2593,6 +2594,7 @@
                 $.ajax({
                     url: VIS.Application.contextUrl + "AlertSQLGenerate/GetTable",
                     type: "POST",
+                    async: false,
                     data: { tabID: tabID, windowNo: $self.windowNo },
                     success: function (result) {
                         result = JSON.parse(result);
