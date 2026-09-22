@@ -49,6 +49,9 @@
  *   VAI145   2026-09-21  Journal lines: filter chips + expandable transaction
  *                        cards replace the lines data grid (account grid kept
  *                        for the Accounting section).
+ *   VAI145   2026-09-22  RTL: the scroller is stepped in from the panel's left
+ *                        edge so its scrollbar clears the host's resize handle
+ *                        while staying on the left, as RTL calls for.
  ***********************************************************/
 
 /* ----------------------------------------------------------- */
@@ -950,3 +953,30 @@
 [dir="rtl"] .vas_292-txnStatuses { justify-content: flex-start; }
 [dir="rtl"] .vas_292-secAction .vas_292-ic svg,
 [dir="rtl"] .vas_292-pgBtn .vas_292-ic svg { transform: scaleX(-1); }
+
+/* --- RTL: the scrollbar keeps the left edge, the handle keeps its strip -----
+   The root IS the scroller (see the header comment), so in Arabic its vertical
+   scrollbar renders on the inline-start = physical LEFT edge of the panel,
+   which is where an Arabic reader expects it and where it stays.
+
+   The trouble is only that the VIS host hangs the tab-panel resize handle over
+   that same strip (APanel calls `.resizable({handles: ...})` on the panel
+   cell). The handle is on top, so the pointer there turns into the resize
+   cursor and a drag resizes the panel instead of moving the thumb: the panel
+   reads as "the scrollbar does not scroll".
+
+   So the SCROLLER is stepped in from the panel's left edge rather than flipped
+   to LTR. A margin moves the root's whole border box, and a scrollbar is laid
+   at its box's inline-start edge, so the thumb moves in with it and clears the
+   handle - while still reading as the left-hand scrollbar RTL calls for. The
+   width is reduced by the same amount so the step-in cannot overflow the host
+   and grow a horizontal scrollbar. The strip it vacates is the host's own
+   white, and it is the handle's to own.
+
+   --p292-rtl-scroll-inset is the single number to tune: it has to be at least
+   as wide as the handle (7px by jQuery UI's default) with room to grab. */
+[dir="rtl"] .vas_292-root {
+    --p292-rtl-scroll-inset: 16px;
+    margin-left: var(--p292-rtl-scroll-inset);
+    width: calc(100% - var(--p292-rtl-scroll-inset));
+}
