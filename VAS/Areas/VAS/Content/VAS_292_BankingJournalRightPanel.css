@@ -1,0 +1,952 @@
+/************************************************************
+ * Module Name    : VAS
+ * Purpose        : Styles for the Banking Journal overview right panel
+ *                  (VAS.VAS_292_BankingJournalRightPanel). Every class is panel
+ *                  prefixed (vas_292-) and scoped under .vas_292-root so it can
+ *                  neither collide with another panel nor repaint a base-theme
+ *                  selector.
+ *
+ *                  Panel Foundation (windows-and-panels.md > Panel Foundation):
+ *                    1. root     - solid white working surface. In THIS host the
+ *                                  root IS the panel body: it owns height:100% +
+ *                                  overflow-y:auto (the scroller), the
+ *                                  container-type and the canonical anchor
+ *                                  --panel-anchor: clamp(16px, 1vw, 18px).
+ *                                  Putting the scroller on an inner element does
+ *                                  not work here - the host's container has no
+ *                                  definite height for a percentage child to
+ *                                  resolve against. Same arrangement as
+ *                                  VAS_189 / VAS_191 / VAS_291.
+ *                    2. header   - owned by the VIS tab-panel host (title, close,
+ *                                  collapse strip), not styled here
+ *                    3. body     - a plain flow child: padding + column gap only,
+ *                                  no height and no overflow of its own
+ *                    4. reset    - nested form controls inherit the anchor, so a
+ *                                  chip inside a button is the same size as one
+ *                                  outside it
+ *                    5. units    - px for borders, dividers, radii, dots and
+ *                                  shadow offsets; em for every text size,
+ *                                  padding, margin, gap and scalable height
+ *
+ *                  COMPOSITION comes from the approved reference
+ *                  (banking-journal-right-panel-no-harness.html), minus its
+ *                  harness; SIZES come from design.md (Right Panel Body >
+ *                  Typography Quick Reference):
+ *                    section title 1em/700, section summary 0.75em/400,
+ *                    section action 0.8125em/400, hero title 1.125em/700,
+ *                    hero subtitle 0.75em, hero value 1.5em/700, metric label
+ *                    0.6875em, metric value 0.8125em/700, metric meta 0.6875em,
+ *                    compact list primary 0.75em/700, meta 0.75em/400,
+ *                    trailing 0.8125em/700, data grid head 0.6875em/500,
+ *                    data grid cell 0.75em, chip / pill 0.6875em/700.
+ *                  Nothing below 0.6875em; weights are 400 / 500 / 700 only.
+ *                  The reference's 10.5px / 11.5px cells and its 25px hero
+ *                  value are NOT carried forward.
+ * Chronological development:
+ *   VAI145   2026-09-21  Created.
+ *   VAI145   2026-09-21  Journal details grid + wide description cell; footer
+ *                        pager; Audit rail.
+ *   VAI145   2026-09-21  Journal lines: filter chips + expandable transaction
+ *                        cards replace the lines data grid (account grid kept
+ *                        for the Accounting section).
+ ***********************************************************/
+
+/* ----------------------------------------------------------- */
+/*  1. Panel wrapper                                            */
+/* ----------------------------------------------------------- */
+.vas_292-root {
+    /* Canonical palette (foundations.md) */
+    --p292-text:        #102C3F;
+    --p292-secondary:   #41576A;
+    --p292-muted:       #5F7283;
+    --p292-divider:     #E2EAF1;
+    --p292-head-bd:     #C5D2DD;
+    --p292-card-bd:     #D9E2EB;
+    --p292-action:      #0083DA;
+    --p292-action-deep: #005FA3;
+    --p292-action-bg:   #EEF8FF;
+    --p292-disabled:    #9AB0C0;
+
+    /* Semantic text tones */
+    --p292-success: #0B6B45;
+    --p292-warning: #9A6500;
+    --p292-risk:    #A33F3F;
+
+    /* Hero tones */
+    --p292-info-bg:   linear-gradient(180deg, #EEF8FF 0%, #F7FBFF 100%);
+    --p292-info-bd:   #CFE0ED;  --p292-info-tx: #0083DA;
+    --p292-ok-bg:     linear-gradient(180deg, #EFF9F3 0%, #F7FBF8 100%);
+    --p292-ok-bd:     #CFEAD9;  --p292-ok-tx:   #0B6B45;
+    --p292-warn-bg:   linear-gradient(180deg, #FFF8E8 0%, #FBFAF3 100%);
+    --p292-warn-bd:   #EBD7A6;  --p292-warn-tx: #9A6500;
+    --p292-crit-bg:   linear-gradient(180deg, #FCEFEF 0%, #FBF7F7 100%);
+    --p292-crit-bd:   #EDC8C8;  --p292-crit-tx: #A33F3F;
+
+    /* Pill grounds (compact list status pill) */
+    --p292-pill-success-bg: #E7F7EF;
+    --p292-pill-warning-bg: #FFF6E2;
+    --p292-pill-risk-bg:    #FCEFEF;
+    --p292-pill-neutral-bg: #F1F4F8;
+
+    /* Audit rail node tones */
+    --p292-step-done-dot:    #20A464;
+    --p292-step-active-dot:  #0083DA;
+    --p292-step-pending-dot: #9AB0C0;
+    --p292-step-blocked-dot: #D14545;
+
+    /* THE ROOT IS THE SCROLLER (see header comment). */
+    position: relative;
+    height: 100%;
+    width: 100%;
+    /* min-width:0 lets the fr-based grid shrink to the host instead of forcing
+       a horizontal scrollbar on the whole window. */
+    min-width: 0;
+    max-width: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: auto;
+    box-sizing: border-box;
+
+    /* The canonical panel anchor + container context live here for the same
+       reason: this element IS the panel body in this host. */
+    container-type: inline-size;
+    --panel-anchor: clamp(16px, 1vw, 18px);
+    font-size: var(--panel-anchor);
+
+    background: #FFFFFF;
+    font-family: Roboto, "Segoe UI", Arial, sans-serif;
+    color: var(--p292-text);
+}
+.vas_292-root * { box-sizing: border-box; }
+
+/* ----------------------------------------------------------- */
+/*  3. Panel body - sections stack, the root scrolls them        */
+/* ----------------------------------------------------------- */
+.vas_292-body {
+    min-width: 0;
+    padding: 1.125em 0.875em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875em;
+    background: #FFFFFF;
+}
+
+/* ----------------------------------------------------------- */
+/*  4. Body reset - nested controls inherit the anchor          */
+/* ----------------------------------------------------------- */
+/* Scoped to the panel, never to '*': without it every em inside a button
+   resolves against the user agent's ~13.33px default instead of the anchor. */
+.vas_292-root button,
+.vas_292-root input,
+.vas_292-root select,
+.vas_292-root textarea,
+.vas_292-root optgroup {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    color: inherit;
+}
+.vas_292-root button:focus-visible {
+    outline: 2px solid var(--p292-action);
+    outline-offset: 2px;
+}
+
+/* Empty selection */
+.vas_292-empty {
+    padding: 2em 1em;
+    text-align: center;
+    font-size: 0.875em;
+    color: var(--p292-muted);
+}
+
+/* ----------------------------------------------------------- */
+/*  Icons - inline SVG only                                     */
+/* ----------------------------------------------------------- */
+.vas_292-ic { display: inline-flex; align-items: center; justify-content: center; line-height: 1; flex-shrink: 0; }
+.vas_292-ic svg { width: 1em; height: 1em; display: block; }
+
+/* Semantic text tones - one class, used by metric values, grid cells and
+   the hero value alike. */
+.vas_292-tx-success { color: var(--p292-success); }
+.vas_292-tx-warning { color: var(--p292-warning); }
+.vas_292-tx-risk    { color: var(--p292-risk); }
+.vas_292-tx-muted   { color: var(--p292-muted); }
+.vas_292-muted      { color: var(--p292-muted); }
+
+/* ----------------------------------------------------------- */
+/*  Primitive 2 - Section header                                */
+/* ----------------------------------------------------------- */
+.vas_292-sec { min-width: 0; }
+
+.vas_292-secHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    margin: 0.5em 0;
+    padding-bottom: 0.375em;
+    border-bottom: 1px solid var(--p292-divider);
+}
+/* A section that opens the body sits flush with its top. */
+.vas_292-body > .vas_292-sec:first-child .vas_292-secHead { margin-top: 0; }
+
+.vas_292-secTitle {
+    font-size: 1em;
+    font-weight: 700;
+    color: var(--p292-text);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_292-secRight {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    min-width: 0;
+    flex-shrink: 0;
+}
+.vas_292-secSum {
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--p292-muted);
+    white-space: nowrap;
+}
+/* Action variant: a single inline link with a leading icon. Disabled is
+   visible, not hidden: the action exists, it is just unavailable. */
+.vas_292-secAction {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25em;
+    font-size: 0.8125em;
+    font-weight: 400;
+    color: var(--p292-action);
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    white-space: nowrap;
+    border-radius: 4px;
+}
+.vas_292-secAction:hover:not(:disabled) { color: var(--p292-action-deep); }
+.vas_292-secAction:disabled {
+    color: var(--p292-disabled);
+    cursor: not-allowed;
+    opacity: 0.8;
+}
+.vas_292-secAction .vas_292-ic svg { width: 1em; height: 1em; }
+
+/* Section empty state - a data section is never left blank. */
+.vas_292-secEmpty {
+    padding: 0.75em 0;
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--p292-muted);
+}
+
+/* ----------------------------------------------------------- */
+/*  Chip - one tier, no bespoke sizes                           */
+/* ----------------------------------------------------------- */
+.vas_292-chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.3125em 0.625em;
+    font-size: 0.6875em;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    flex-shrink: 0;
+    background: #FFFFFF;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+/* The status pill inside the tinted hero takes the card's tone. */
+.vas_292-tone-info .vas_292-chip.vas_292-onTint { color: var(--p292-info-tx); }
+.vas_292-tone-ok   .vas_292-chip.vas_292-onTint { color: var(--p292-ok-tx); }
+.vas_292-tone-warn .vas_292-chip.vas_292-onTint { color: var(--p292-warn-tx); }
+.vas_292-tone-crit .vas_292-chip.vas_292-onTint { color: var(--p292-crit-tx); }
+/* Fact chips carry their own semantic tone regardless of the card's. */
+.vas_292-chip.vas_292-tone-success { color: var(--p292-success); }
+.vas_292-chip.vas_292-tone-warning { color: var(--p292-warning); }
+.vas_292-chip.vas_292-tone-risk    { color: var(--p292-risk); }
+.vas_292-chip.vas_292-tone-neutral { color: var(--p292-secondary); }
+
+.vas_292-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3125em;
+    margin-top: 0.75em;
+}
+
+/* ----------------------------------------------------------- */
+/*  Primitive 3 - Hero status card                              */
+/* ----------------------------------------------------------- */
+.vas_292-hero {
+    border-radius: 14px;
+    padding: 0.75em 0.875em;
+    border: 1px solid var(--p292-card-bd);
+    min-width: 0;
+}
+.vas_292-hero.vas_292-tone-info { background: var(--p292-info-bg); border-color: var(--p292-info-bd); }
+.vas_292-hero.vas_292-tone-ok   { background: var(--p292-ok-bg);   border-color: var(--p292-ok-bd); }
+.vas_292-hero.vas_292-tone-warn { background: var(--p292-warn-bg); border-color: var(--p292-warn-bd); }
+.vas_292-hero.vas_292-tone-crit { background: var(--p292-crit-bg); border-color: var(--p292-crit-bd); }
+
+.vas_292-heroTop {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.625em;
+}
+.vas_292-heroId { min-width: 0; }
+.vas_292-heroTitle {
+    font-size: 1.125em;
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--p292-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_292-heroSub {
+    font-size: 0.75em;
+    font-weight: 400;
+    line-height: 1.4;
+    margin-top: 0.125em;
+    color: var(--p292-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* Emphasis row: the labelled net movement on the left, the line count
+   qualifier bottom-aligned on the right. */
+.vas_292-heroEmph {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.75em;
+    margin-top: 0.75em;
+    min-width: 0;
+}
+.vas_292-heroValueWrap { min-width: 0; }
+.vas_292-heroLabel {
+    font-size: 0.6875em;
+    font-weight: 400;
+    line-height: 1.4;
+    color: var(--p292-muted);
+}
+.vas_292-heroValue {
+    font-size: 1.5em;
+    font-weight: 700;
+    line-height: 1.1;
+    margin-top: 0.125em;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+.vas_292-heroQual {
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--p292-secondary);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* ----------------------------------------------------------- */
+/*  Primitive 4a - Metric grid, detail-card wrap                */
+/* ----------------------------------------------------------- */
+.vas_292-card {
+    border: 1px solid var(--p292-card-bd);
+    border-radius: 12px;
+    background: #FFFFFF;
+    padding: 0.875em;
+    min-width: 0;
+}
+.vas_292-metrics {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 0.875em;
+    row-gap: 0.625em;
+}
+.vas_292-metric { min-width: 0; }
+.vas_292-metricLabel {
+    font-size: 0.6875em;
+    font-weight: 400;
+    line-height: 1.4;
+    color: var(--p292-muted);
+}
+.vas_292-metricValue {
+    font-size: 0.8125em;
+    font-weight: 700;
+    line-height: 1.35;
+    color: var(--p292-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+.vas_292-metricMeta {
+    font-size: 0.6875em;
+    font-weight: 400;
+    line-height: 1.4;
+    margin-top: 0.125em;
+    color: var(--p292-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* Free-text cell (description) spanning both columns: wraps to a few lines
+   instead of truncating, since it is the only place the text is shown. */
+.vas_292-metricWide { grid-column: 1 / -1; }
+.vas_292-metricText {
+    font-size: 0.75em;
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--p292-secondary);
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow-wrap: anywhere;
+}
+
+/* ----------------------------------------------------------- */
+/*  Primitive 5 - Compact list (flat, divider-only)             */
+/* ----------------------------------------------------------- */
+.vas_292-list { display: flex; flex-direction: column; min-width: 0; }
+.vas_292-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    padding: 0.625em 0.125em;
+    border-bottom: 1px solid var(--p292-divider);
+    min-width: 0;
+}
+.vas_292-row:last-child { border-bottom: 0; }
+.vas_292-rowLeft { min-width: 0; flex: 1 1 auto; }
+.vas_292-rowLabel {
+    font-size: 0.75em;
+    font-weight: 700;
+    line-height: 1.4;
+    color: var(--p292-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_292-rowMeta {
+    font-size: 0.75em;
+    font-weight: 400;
+    line-height: 1.4;
+    margin-top: 0.1875em;
+    color: var(--p292-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_292-rowValue {
+    font-size: 0.8125em;
+    font-weight: 700;
+    color: var(--p292-text);
+    text-align: right;
+    white-space: nowrap;
+    flex-shrink: 0;
+    max-width: 60%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+}
+/* Status pill on a row - tinted ground, semantic text. */
+.vas_292-pill {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.1875em 0.5em;
+    font-size: 0.6875em;
+    font-weight: 700;
+    line-height: 1.4;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.vas_292-pill.vas_292-tone-success { background: var(--p292-pill-success-bg); color: var(--p292-success); }
+.vas_292-pill.vas_292-tone-warning { background: var(--p292-pill-warning-bg); color: var(--p292-warning); }
+.vas_292-pill.vas_292-tone-risk    { background: var(--p292-pill-risk-bg);    color: var(--p292-risk); }
+.vas_292-pill.vas_292-tone-neutral { background: var(--p292-pill-neutral-bg); color: var(--p292-secondary); }
+
+/* ----------------------------------------------------------- */
+/*  Primitive 11 - Data grid (journal lines / accounts)         */
+/* ----------------------------------------------------------- */
+/* Single shared template across header and every body row: the fixed
+   1.75em leading-affordance column, then minmax(0,Nfr) only. The lines grid
+   adds a narrow fixed line-number column right after the affordance. */
+.vas_292-dg { min-width: 0; }
+.vas_292-dgAccounts { --dg-cols: 1.75em minmax(0, 1.7fr) minmax(0, 0.9fr) minmax(0, 0.9fr); }
+
+.vas_292-dgHead,
+.vas_292-dgRow {
+    display: grid;
+    grid-template-columns: var(--dg-cols);
+    gap: 0.5em;
+    align-items: center;
+    min-width: 0;
+}
+.vas_292-dgHead {
+    padding-bottom: 0.5em;
+    border-bottom: 1px solid var(--p292-head-bd);
+}
+.vas_292-dgH {
+    font-size: 0.6875em;
+    font-weight: 500;
+    color: var(--p292-secondary);
+    text-transform: capitalize;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_292-right { text-align: right; }
+
+.vas_292-dgRow {
+    padding: 0.625em 0;
+    border-bottom: 1px solid var(--p292-divider);
+}
+.vas_292-dgRow.vas_292-last { border-bottom: 0; }
+
+/* Leading affordance: a 1em glyph, no tile, row-specific tone. */
+.vas_292-dgIcon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 1.4em;
+}
+.vas_292-dgIcon .vas_292-ic svg { width: 1em; height: 1em; }
+.vas_292-dgIcon.vas_292-is-inflow  { color: var(--p292-success); }
+.vas_292-dgIcon.vas_292-is-outflow { color: var(--p292-risk); }
+.vas_292-dgIcon.vas_292-is-neutral { color: var(--p292-disabled); }
+
+.vas_292-dgCell {
+    display: block;
+    font-size: 0.75em;
+    font-weight: 400;
+    line-height: 1.4;
+    color: var(--p292-text);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_292-dgPrimary { font-weight: 700; }
+.vas_292-dgAmount { font-weight: 700; font-variant-numeric: tabular-nums; }
+.vas_292-dgAmount.vas_292-isEmpty { font-weight: 400; color: var(--p292-muted); }
+
+/* ----------------------------------------------------------- */
+/*  Journal lines - filter chips + transaction cards            */
+/* ----------------------------------------------------------- */
+/* Per the enhanced-lines reference: a chip toolbar above a stack of
+   per-item cards (per-item cards may carry borders - same rule as Timeline
+   entries). Sizes are normalised to the panel tokens: card primary 0.75em /
+   700, secondary 0.6875em, amount 0.8125em / 700, chips 0.6875em / 700,
+   detail label 0.6875em, detail value 0.75em / 500. */
+.vas_292-txnToolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    margin-bottom: 0.5em;
+}
+.vas_292-txnFilters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375em;
+    min-width: 0;
+}
+/* Scoped under the root and with every box property pinned: the base theme
+   styles bare <button> with its own height / min-height / padding / margin,
+   and a lone class selector does not reliably outrank that. Chip tier:
+   0.6875em / 700, ~1.8em tall. */
+.vas_292-root .vas_292-filterBtn {
+    display: inline-flex;
+    align-items: center;
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    margin: 0;
+    border: 1px solid var(--p292-card-bd);
+    background: #FFFFFF;
+    color: var(--p292-secondary);
+    border-radius: 999px;
+    padding: 0.25em 0.625em;
+    font-size: 0.6875em;
+    font-weight: 700;
+    line-height: 1.3;
+    white-space: nowrap;
+    cursor: pointer;
+    box-shadow: none;
+    outline: none;
+}
+.vas_292-root .vas_292-filterBtn:focus-visible { outline: 2px solid var(--p292-action); outline-offset: 2px; }
+.vas_292-root .vas_292-filterBtn:hover { background: var(--p292-action-bg); }
+.vas_292-root .vas_292-filterBtn.vas_292-isActive {
+    border-color: #B7D9F0;
+    background: #EEF7FD;
+    color: var(--p292-action-deep);
+}
+
+.vas_292-txnStack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+    min-width: 0;
+}
+/* The filter matches nothing on this statement. */
+.vas_292-txnEmpty {
+    border: 1px dashed var(--p292-card-bd);
+    border-radius: 12px;
+    padding: 1em;
+    text-align: center;
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--p292-muted);
+    background: #FBFCFD;
+}
+
+.vas_292-txn {
+    border: 1px solid var(--p292-card-bd);
+    border-radius: 12px;
+    background: #FFFFFF;
+    overflow: hidden;
+    min-width: 0;
+}
+/* The head is a real button: the whole strip toggles the detail. */
+.vas_292-root .vas_292-txnHead {
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: #FFFFFF;
+    padding: 0.6875em 0.75em;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.625em;
+    text-align: left;
+    cursor: pointer;
+    color: inherit;
+    min-width: 0;
+}
+.vas_292-root .vas_292-txnHead:hover { background: #FAFCFE; }
+.vas_292-txnLeft { min-width: 0; flex: 1 1 auto; }
+.vas_292-txnTop {
+    display: flex;
+    align-items: center;
+    gap: 0.4375em;
+    min-width: 0;
+    flex-wrap: wrap;
+}
+.vas_292-txnKind {
+    font-size: 0.75em;
+    font-weight: 700;
+    color: var(--p292-text);
+    white-space: nowrap;
+}
+.vas_292-txnLine {
+    font-size: 0.6875em;
+    font-weight: 400;
+    color: var(--p292-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+.vas_292-txnParty {
+    font-size: 0.75em;
+    font-weight: 700;
+    line-height: 1.4;
+    margin-top: 0.3125em;
+    color: var(--p292-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_292-txnRef {
+    font-size: 0.6875em;
+    font-weight: 400;
+    line-height: 1.4;
+    margin-top: 0.1875em;
+    color: var(--p292-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_292-txnRight { flex-shrink: 0; text-align: right; max-width: 55%; }
+.vas_292-txnAmount {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.25em;
+    font-size: 0.8125em;
+    font-weight: 700;
+    line-height: 1.4;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    max-width: 100%;
+}
+.vas_292-txnAmount > span:first-child { overflow: hidden; text-overflow: ellipsis; }
+.vas_292-txnChevron {
+    display: inline-flex;
+    color: var(--p292-muted);
+    flex-shrink: 0;
+}
+.vas_292-txnChevron .vas_292-ic svg { width: 1em; height: 1em; }
+.vas_292-txn.vas_292-isOpen .vas_292-txnChevron { transform: rotate(180deg); }
+.vas_292-txnStatuses {
+    display: flex;
+    gap: 0.3125em;
+    justify-content: flex-end;
+    margin-top: 0.3125em;
+    flex-wrap: wrap;
+}
+
+/* Detail - hidden until the card is open. */
+.vas_292-txnDetail {
+    display: none;
+    border-top: 1px solid var(--p292-divider);
+    background: #FBFCFD;
+    padding: 0.625em 0.75em;
+}
+.vas_292-txn.vas_292-isOpen .vas_292-txnDetail { display: block; }
+.vas_292-txnGrid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 0.75em;
+    row-gap: 0.625em;
+}
+.vas_292-txnCell { min-width: 0; }
+.vas_292-txnWide { grid-column: 1 / -1; }
+.vas_292-txnLabel {
+    font-size: 0.6875em;
+    font-weight: 400;
+    line-height: 1.4;
+    color: var(--p292-muted);
+    margin-bottom: 0.125em;
+}
+.vas_292-txnValue {
+    font-size: 0.75em;
+    font-weight: 500;
+    line-height: 1.4;
+    color: var(--p292-text);
+    overflow-wrap: anywhere;
+}
+/* A detail value that zooms to its record: inline, link-blue, same size and
+   weight as a plain value; scoped + pinned so the theme's button box does
+   not inflate it. */
+.vas_292-root .vas_292-txnLinkValue {
+    display: inline;
+    height: auto;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--p292-action);
+    font-size: inherit;
+    font-weight: inherit;
+    line-height: inherit;
+    text-align: left;
+    cursor: pointer;
+    overflow-wrap: anywhere;
+}
+.vas_292-root .vas_292-txnLinkValue:hover { color: var(--p292-action-deep); text-decoration: underline; }
+.vas_292-txnDescription {
+    margin-top: 0.625em;
+    padding-top: 0.5625em;
+    border-top: 1px dashed #DCE5EC;
+}
+
+/* A page still on the wire: the framework busy indicator (vis_widgetloader)
+   takes the rows' place beneath the grid head, so the section keeps its
+   shape and does not jump while it waits. Tall enough that the spinner is
+   not clipped by the grid's dividers. */
+.vas_292-dgBusy {
+    min-height: 4em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+/* Two data grids in one section (accounting): the account breakdown sits a
+   little below the metric card. */
+.vas_292-card + .vas_292-dg { margin-top: 0.75em; }
+
+/* ----------------------------------------------------------- */
+/*  Section pager                                               */
+/* ----------------------------------------------------------- */
+/* Canonical footer pager (dashboard-widgets.md > widget footer pager, as the
+   VAS_020 widget draws it): "Showing a–b of N" on the left, compact
+   < n of m > on the right, beneath the grid. Never an inner scrollbar: the
+   panel body owns scrolling, and a section that paginates does not grow its
+   own. */
+.vas_292-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    margin-top: 0.5em;
+    padding-top: 0.5em;
+    border-top: 1px solid var(--p292-divider);
+}
+.vas_292-pgInfo {
+    font-size: 0.6875em;
+    font-weight: 400;
+    line-height: 1;
+    color: var(--p292-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+.vas_292-pgNav {
+    display: flex;
+    align-items: center;
+    gap: 0.375em;
+    flex-shrink: 0;
+}
+.vas_292-pgLabel {
+    font-size: 0.75em;
+    font-weight: 500;
+    line-height: 1;
+    color: var(--p292-text);
+    white-space: nowrap;
+}
+/* 24px-class square buttons with a hairline border and a 14px-class chevron. */
+.vas_292-root .vas_292-pgBtn {
+    width: 1.5em;
+    height: 1.5em;
+    min-height: 0;
+    margin: 0;
+    box-shadow: none;
+    padding: 0;
+    border: 1px solid var(--p292-card-bd);
+    border-radius: 6px;
+    background: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--p292-action);
+    cursor: pointer;
+}
+.vas_292-root .vas_292-pgBtn:hover:not(:disabled) { background: var(--p292-action-bg); border-color: #C6D6E4; }
+.vas_292-root .vas_292-pgBtn:disabled { color: var(--p292-disabled); cursor: default; background: #FFFFFF; }
+.vas_292-pgBtn .vas_292-ic svg { width: 0.875em; height: 0.875em; }
+
+/* ----------------------------------------------------------- */
+/*  Audit rail                                                  */
+/* ----------------------------------------------------------- */
+/* Same rail as the payment / GL journal panels (VAS_191 / VAS_291): a marker
+   node per step, a hairline connector down to the next one, title + meta in
+   plain text - no tinted card. The node carries the step state. */
+.vas_292-vsteps { padding: 0.25em 0.25em 0; }
+
+.vas_292-vstep { display: flex; gap: 0.75em; min-width: 0; }
+
+.vas_292-rail {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+/* 22px physical marker - it does not scale with the anchor. */
+.vas_292-node {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--p292-step-pending-dot);
+    background: #FFFFFF;
+    color: #FFFFFF;
+    flex-shrink: 0;
+}
+.vas_292-node .vas_292-ic svg { width: 0.75em; height: 0.75em; }
+/* Node tones per step state - never custom colours. */
+.vas_292-is-done    .vas_292-node { border-color: var(--p292-step-done-dot);    background: var(--p292-step-done-dot); }
+.vas_292-is-active  .vas_292-node { border-color: var(--p292-step-active-dot);  background: #FFFFFF; }
+.vas_292-is-pending .vas_292-node { border-color: var(--p292-step-pending-dot); background: #FFFFFF; }
+.vas_292-is-blocked .vas_292-node { border-color: var(--p292-step-blocked-dot); background: var(--p292-step-blocked-dot); }
+/* Active reads radio-style: a ring with a dot inside. */
+.vas_292-nodeDot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--p292-step-active-dot);
+}
+/* The connector fills the gap down to the next node. */
+.vas_292-line {
+    flex: 1;
+    width: 2px;
+    min-height: 0.625em;
+    margin: 0.1875em 0;
+    background: var(--p292-card-bd);
+}
+
+.vas_292-vc { min-width: 0; padding-bottom: 0.875em; }
+.vas_292-vstep:last-child .vas_292-vc { padding-bottom: 0; }
+/* Step title / meta tokens. */
+.vas_292-st {
+    font-size: 0.8125em;
+    font-weight: 700;
+    color: var(--p292-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_292-mt {
+    font-size: 0.6875em;
+    font-weight: 400;
+    margin-top: 0.1875em;
+    color: var(--p292-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ----------------------------------------------------------- */
+/*  Motion                                                      */
+/* ----------------------------------------------------------- */
+@media (prefers-reduced-motion: no-preference) {
+    .vas_292-secAction, .vas_292-pgBtn, .vas_292-filterBtn, .vas_292-txnHead {
+        transition: background-color 120ms ease, color 120ms ease;
+    }
+    .vas_292-txnChevron { transition: transform 150ms ease; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Narrow panel                                                */
+/* ----------------------------------------------------------- */
+/* Two metric columns are too cramped below this - a single stack keeps the
+   values readable instead of ellipsising every one of them. */
+@container (max-width: 320px) {
+    .vas_292-metrics { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ----------------------------------------------------------- */
+/*  RTL                                                         */
+/* ----------------------------------------------------------- */
+[dir="rtl"] .vas_292-right,
+[dir="rtl"] .vas_292-rowValue,
+[dir="rtl"] .vas_292-txnRight { text-align: left; }
+[dir="rtl"] .vas_292-txnHead,
+[dir="rtl"] .vas_292-root .vas_292-txnLinkValue { text-align: right; }
+[dir="rtl"] .vas_292-txnAmount,
+[dir="rtl"] .vas_292-txnStatuses { justify-content: flex-start; }
+[dir="rtl"] .vas_292-secAction .vas_292-ic svg,
+[dir="rtl"] .vas_292-pgBtn .vas_292-ic svg { transform: scaleX(-1); }
