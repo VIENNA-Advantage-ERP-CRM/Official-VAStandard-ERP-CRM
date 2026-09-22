@@ -273,7 +273,9 @@ namespace VAdvantage.Model
         {
             SetClientOrg(client);
             SetC_Currency_ID(currency.GetKey());
-            SetName(client.GetName() + " " + GetGAAP() + "/" + Get_ColumnCount() + " " + currency.GetName());
+            // vis0008 As discussed we only need client name currency name in the accounting schema name
+            //SetName(client.GetName() + " " + GetGAAP() + "/" + Get_ColumnCount() + " " + currency.GetName());
+            SetName(client.GetName() + " " + currency.GetName());
         }	//	MAcctSchema
 
         /// <summary>
