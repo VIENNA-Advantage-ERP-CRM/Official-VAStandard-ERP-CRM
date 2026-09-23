@@ -80,6 +80,11 @@
  *                        row wears the same chevron, and an open row is marked by
  *                        its card's accent border plus the chevron's rotation.
  *                        Detail tables are uniformly left-aligned.
+ *   VAI145   2026-09-23  Detail name cells can render as a link (.vas_293-link) -
+ *                        a <button> stripped back to read as one, since the panel
+ *                        has no href to give it.
+ *   VAI145   2026-09-23  Those links are underlined at REST rather than on hover:
+ *                        a table cell has no other room to advertise itself.
  ***********************************************************/
 
 /* ----------------------------------------------------------- */
@@ -135,7 +140,6 @@
     font-size: var(--panel-anchor);
 
     background: #FFFFFF;
-    font-family: Roboto, "Segoe UI", Arial, sans-serif;
     color: var(--p293-text);
 }
 .vas_293-root * { box-sizing: border-box; }
@@ -162,7 +166,6 @@
 .vas_293-root select,
 .vas_293-root textarea,
 .vas_293-root optgroup {
-    font-family: inherit;
     font-size: inherit;
     line-height: inherit;
     color: inherit;
@@ -390,7 +393,6 @@
 /* Machine identifiers - account no., IBAN, routing no., SWIFT/BIC. Monospaced
    so digit groups line up between cells and a transposed character shows. */
 .vas_293-mono {
-    font-family: Consolas, Menlo, Monaco, "Courier New", monospace;
     letter-spacing: 0.01em;
 }
 
@@ -458,7 +460,7 @@
 }
 /* An odd card closes the grid across both columns rather than leaving a hole
    beside itself. */
-.vas_293-statWide { grid-column: 1 / -1; }
+.vas_293-statWide { /*grid-column: 1 / 1;*/ }
 .vas_293-statLabel {
     font-size: 0.6875em;
     font-weight: 400;
@@ -755,6 +757,30 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
+/* A cell value that opens its own record. It is a real <button> - the panel has
+   no href to give it - stripped back to read as a link, and it keeps the cell's
+   truncation rather than pushing the column wider. */
+.vas_293-link {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    text-align: left;
+    font: inherit;
+    color: var(--p293-action);
+    cursor: pointer;
+    /* Underlined at REST, not on hover. A cell in a dense table has no other
+       room to advertise itself, and a link a user has to find by sweeping the
+       mouse over it is a link most users never find. The offset keeps the rule
+       clear of the descenders at this size. */
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+}
+.vas_293-link:hover,
+.vas_293-link:focus-visible { color: var(--p293-action-deep); }
+[dir="rtl"] .vas_293-link { text-align: right; }
 /* A cell's second fact, carried as a sub-line so the table does not have to
    grow a column it has no room for. The cell already sits AT the 0.6875em token
    floor, so the sub-line cannot be made smaller - colour and weight separate it

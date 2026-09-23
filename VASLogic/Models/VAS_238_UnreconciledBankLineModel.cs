@@ -24,10 +24,19 @@ namespace VASLogic.Models
     ///               statement lines the bank has reported and the books have not yet
     ///               matched:
     ///
-    ///                 Population  C_BankStatementLine on a COMPLETED or CLOSED statement
-    ///                             with IsReconciled &lt;&gt; 'Y'. A drafted statement has
-    ///                             not been agreed with the bank yet, so its lines are not
-    ///                             an exception - they are simply not in play.
+    ///                 Population  C_BankStatementLine on a statement whose DocStatus is
+    ///                             NOT one of CO / CL / RE / VO, and whose line fails the
+    ///                             reconciliation rule SHARED with the Banking Journal
+    ///                             panel - VAS_292_BankingJournalRightPanelModel.
+    ///                             MATCHED_CASE, negated. That rule counts a line as
+    ///                             matched when it carries a payment or a cash line, or
+    ///                             when it carries a charge whose amounts add up; this
+    ///                             widget lists everything else.
+    ///
+    ///                             The rule is REFERENCED, never restated: the panel and
+    ///                             this widget both report on the same lines, and two
+    ///                             screens disagreeing about whether one is matched is a
+    ///                             support call rather than a cosmetic difference.
     ///                 Narration   C_BankStatementLine.Description, and only that. Memo
     ///                             and ReferenceNo are deliberately NOT used as fallbacks:
     ///                             they hold different things - a clerk's note and a bank
@@ -79,6 +88,10 @@ namespace VASLogic.Models
     ///               with PostgreSQL and Oracle.
     /// Chronological development:
     ///   VAI154      2026-09-03 Created
+    ///   VAI145      2026-09-23 Unreconciled now means the Banking Journal panel's
+    ///                          MATCHED_CASE negated, instead of the local "no payment,
+    ///                          no charge, no cash line" test - which missed a charge
+    ///                          line whose amounts do not add up.
     /// </summary>
     public class VAS_238_UnreconciledBankLineModel
     {
@@ -188,8 +201,23 @@ namespace VASLogic.Models
                   AND bsl.AD_Client_ID=@AD_Client_ID
                   AND bs.DocStatus NOT IN ('").Append(DOCSTATUS_Completed).Append("','").Append(DOCSTATUS_Closed)
                   .Append("','").Append(DOCSTATUS_Reversed).Append("','").Append(DOCSTATUS_Voided).Append(@"')
-                  AND bsl.StatementLineDate IS NOT NULL
-                  AND bsl.C_Payment_ID IS NULL AND bsl.C_Charge_ID IS NULL AND bsl.C_CashLine_ID IS NULL");
+                  AND bsl.StatementLineDate IS NOT NULL");
+
+            /* UNRECONCILED is the exact inverse of the reconciliation rule the Banking
+               Journal panel applies, and it is SHARED with it rather than restated here
+               (VAS_292_BankingJournalRightPanelModel.MATCHED_CASE / IsLineMatched). Two
+               screens that disagree about whether a line is matched is a support call,
+               so there is one definition and this widget negates it.
+
+               It is deliberately NOT the old test - "no payment, no charge and no cash
+               line". That only found lines carrying no reference at all, and so missed
+               the case this widget most needs to raise: a line that HAS a charge but
+               whose amounts do not add up. The shared rule covers both.
+
+               The expression names the alias bsl, which is what C_BankStatementLine is
+               read as above. */
+            from.Append(@"
+                  AND (").Append(VAS_292_BankingJournalRightPanelModel.MATCHED_CASE).Append(@")=0");
 
             /* One bank account rather than all of them. The id is not trusted - it is
                simply an extra equality on top of the tenant filter and MRole's own access

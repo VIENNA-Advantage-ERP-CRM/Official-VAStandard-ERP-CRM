@@ -79,6 +79,8 @@
 ///                        VA012_StatementClass master alongside the row's own,
 ///                        resolved through the dictionary since that table is not
 ///                        source here.
+///   VAI145   2026-09-23  Linked configuration rows come back in the PANEL's order
+///                        (DISPLAY_ORDER), not the window's AD_Tab.SeqNo.
 /// </summary>
 
 using System;
@@ -105,16 +107,35 @@ namespace VASLogic.Models
         public const string RECON_REVIEW = "REVIEW";
         public const string RECON_NO_STATEMENT = "NOSTMT";
 
-        /// <summary>Physical tables behind the linked child tabs, in the order the
-        /// panel lists them. A tab whose table is not one of these is not a
-        /// configuration row, and a row is only ever drawn for a table that has an
-        /// ACTIVE tab in the hosting window.</summary>
+        /// <summary>Physical tables behind the linked child tabs. A tab whose table
+        /// is not one of these is not a configuration row, and a row is only ever
+        /// drawn for a table that has an ACTIVE tab in the hosting window.</summary>
         public const string TBL_ACCOUNT_LINE = "C_BankAccountLine";
         public const string TBL_ACCOUNT_DOC = "C_BankAccountDoc";
         public const string TBL_PAYMENT_PROCESSOR = "C_PaymentProcessor";
         public const string TBL_STATEMENT_LOADER = "C_BankStatementLoader";
         public const string TBL_STATEMENT_CLASS = "VA012_BankStatementClass";
         public const string TBL_DEFAULT_ACCOUNTING = "FRPT_BankAccount_Acct";
+
+        /// <summary>The order the PANEL lists the configuration rows in.
+        ///
+        /// Deliberately NOT the window's own AD_Tab.SeqNo, which interleaves them by
+        /// how the window is built rather than by how the panel reads: the two rows
+        /// that expand a detail table in place (Bank Account Document, Statement
+        /// Class) sit together behind the Account Line they describe, and the three
+        /// rows that only navigate follow.
+        ///
+        /// A table that somehow reaches here without a place in this list sorts last
+        /// rather than disappearing - the list decides ORDER, never membership.</summary>
+        private static readonly string[] DISPLAY_ORDER = new string[]
+        {
+            TBL_ACCOUNT_LINE,
+            TBL_ACCOUNT_DOC,
+            TBL_STATEMENT_CLASS,
+            TBL_PAYMENT_PROCESSOR,
+            TBL_STATEMENT_LOADER,
+            TBL_DEFAULT_ACCOUNTING
+        };
 
         /// <summary>AD dictionary answers for "does this column exist", keyed
         /// TableName.ColumnName. The dictionary does not change between requests, and
@@ -519,13 +540,16 @@ namespace VASLogic.Models
 
         /// <summary>
         /// Reads the ACTIVE child tabs of the hosting window whose table is one of the
-        /// six configuration tables, in tab sequence. Runs without AddAccessSQL: these
-        /// are AD dictionary rows at AD_Client_ID = 0 describing the window the caller
-        /// already has open - the same convention GetListReferenceName uses below.
+        /// six configuration tables, and returns them in the PANEL's own order (see
+        /// <see cref="DISPLAY_ORDER"/>) rather than the window's tab sequence.
+        ///
+        /// Runs without AddAccessSQL: these are AD dictionary rows at AD_Client_ID = 0
+        /// describing the window the caller already has open - the same convention
+        /// GetListReferenceName uses below.
         /// </summary>
         /// <param name="ctx">User context.</param>
         /// <param name="AD_Window_ID">Hosting window.</param>
-        /// <returns>One empty row per active configuration tab, in SeqNo order.</returns>
+        /// <returns>One empty row per active configuration tab, in display order.</returns>
         private List<LinkedConfigRow> LoadLinkedTabs(Ctx ctx, int AD_Window_ID)
         {
             List<LinkedConfigRow> rows = new List<LinkedConfigRow>();
@@ -588,6 +612,22 @@ namespace VASLogic.Models
                 row.SeqNo = Util.GetValueOfInt(r["SeqNo"]);
                 rows.Add(row);
             }
+
+            /* The PANEL's order, not the window's. Sorted here rather than in SQL:
+               the order is a presentation decision that belongs with the list that
+               declares it, and a CASE expression per table name would have to be
+               kept in step with DISPLAY_ORDER by hand. The tab's own SeqNo breaks
+               a tie, so a window carrying the same table twice stays stable. */
+            rows.Sort(delegate (LinkedConfigRow a, LinkedConfigRow b)
+            {
+                int byDisplay = DisplayRank(a.TableName).CompareTo(DisplayRank(b.TableName));
+                if (byDisplay != 0)
+                {
+                    return byDisplay;
+                }
+                int bySeq = a.SeqNo.CompareTo(b.SeqNo);
+                return (bySeq != 0) ? bySeq : a.AD_Tab_ID.CompareTo(b.AD_Tab_ID);
+            });
 
             return rows;
         }
@@ -1052,6 +1092,25 @@ namespace VASLogic.Models
         // ----------------------------------------------------------------- //
         //  Helpers                                                           //
         // ----------------------------------------------------------------- //
+
+        /// <summary>
+        /// Where a configuration table sits in the panel's list. A table with no
+        /// place in <see cref="DISPLAY_ORDER"/> sorts after every one that has,
+        /// rather than being dropped - the list decides ORDER, never membership.
+        /// </summary>
+        /// <param name="tableName">Physical table of the configuration row.</param>
+        /// <returns>Zero-based rank; DISPLAY_ORDER.Length when unlisted.</returns>
+        private static int DisplayRank(string tableName)
+        {
+            for (int i = 0; i < DISPLAY_ORDER.Length; i++)
+            {
+                if (string.Equals(DISPLAY_ORDER[i], tableName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return i;
+                }
+            }
+            return DISPLAY_ORDER.Length;
+        }
 
         /// <summary>
         /// True when the AD dictionary knows an active column of that name on that

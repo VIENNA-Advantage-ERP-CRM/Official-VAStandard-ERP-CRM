@@ -41,7 +41,23 @@
  *                      aria-controls, an accented card while open, and the SAME
  *                      chevron every other row wears, turned to point down;
  *                    - the detail reads active AND inactive rows, because the
- *                      tables carry a Status column.
+ *                      tables carry a Status column;
+ *                    - the NAME cell of each detail row is a link that opens that
+ *                      record in its own window through VIS.AEnv.zoom, which
+ *                      resolves the target window from the AD_Table_ID server
+ *                      side - no window id is named anywhere in this panel.
+ *
+ *                  Row order is the PANEL's, set by the model's DISPLAY_ORDER:
+ *                  Account Line, Bank Account Document, Statement Class, Payment
+ *                  Processor, Statement Loader, Default Accounting - NOT the
+ *                  window's AD_Tab.SeqNo.
+ *
+ *                  Payment Processor and Statement Loader are dropped entirely
+ *                  when they hold nothing: an account without either is the
+ *                  ordinary case, not an omission worth a line. The other four
+ *                  always show, because "Not configured" IS news for them. The
+ *                  section summary counts the rows actually drawn, so it can
+ *                  never be read against a different number than is on screen.
  *
  *                  The panel is a tab panel: the framework loads it by the
  *                  AD_Tab class name, so it is NOT imported by VASjs.js on its
@@ -108,6 +124,12 @@
  *                        open state is carried by the card's accent and the
  *                        chevron's rotation. Cheque series left-aligns with the
  *                        rest of the table; no column is right-aligned any more.
+ *   VAI145   2026-09-23  Detail name cells (Document, Statement class) became
+ *                        links that zoom to their own record, and the linked
+ *                        configuration list moved to a fixed panel order.
+ *   VAI145   2026-09-23  Payment Processor and Statement Loader are hidden when
+ *                        they hold no record; the section summary counts only the
+ *                        rows drawn. Detail links are underlined at rest.
  *
  * -- Labels / Message Keys ---------------------------------------------------
  *  Panel
@@ -125,7 +147,7 @@
  *   Currency                                    | VAS_293_Currency
  *   IBAN                                        | VAS_293_IBAN
  *   Routing no.                                 | VAS_293_RoutingNo
- *   SWIFT / BIC                                 | VAS_293_SwiftCode
+ *   Swift code                                  | VAS_293_SwiftCode
  *   Organization                                | VAS_293_Organization
  *   Default account                             | VAS_293_DefaultAccount
  *   Bank address                                | VAS_293_BankAddress
@@ -166,6 +188,7 @@
  *   Hide details                                | VAS_293_HideDetail
  *   Loading...                                  | VAS_293_Loading
  *   Could not load the configuration details.   | VAS_293_DetailLoadFailed
+ *   Open this record    (link tooltip)          | VAS_293_OpenRecord
  *   Status                                      | VAS_293_ColStatus
  *   Active / Inactive  (shared with the header) | VAS_293_Active / _Inactive
  *    Bank account document details
@@ -427,13 +450,40 @@
             return "neutral";
         }
 
-        function configuredCount() {
-            var list = (data && data.LinkedConfigs) || [];
+        function configuredCount(list) {
             var n = 0;
             for (var i = 0; i < list.length; i++) {
                 if (list[i] && list[i].IsConfigured) n++;
             }
             return n;
+        }
+
+        /* The two configuration rows that are only worth a line when they hold
+           something. An account with no payment processor and no statement loader
+           is the ordinary case rather than an omission, so an empty row for each
+           is noise - whereas "Not configured" IS news for the other four, which
+           every account is expected to have. The server still reports all six; it
+           is the panel that decides what is worth showing. */
+        var HIDE_WHEN_EMPTY = [TBL_PAYMENT_PROCESSOR, TBL_STATEMENT_LOADER];
+
+        function isRowVisible(cfg) {
+            if (!cfg) return false;
+            for (var i = 0; i < HIDE_WHEN_EMPTY.length; i++) {
+                if (cfg.TableName === HIDE_WHEN_EMPTY[i]) return (+cfg.RecordCount || 0) > 0;
+            }
+            return true;
+        }
+
+        /* The rows the section actually draws. The section summary counts from this
+           SAME list, so "3 of 4 configured" can never be read against a different
+           number of rows than the user can see. */
+        function visibleConfigs() {
+            var list = (data && data.LinkedConfigs) || [];
+            var kept = [];
+            for (var i = 0; i < list.length; i++) {
+                if (isRowVisible(list[i])) kept.push(list[i]);
+            }
+            return kept;
         }
 
         /* ---------------------------------------------------------------- */
@@ -484,6 +534,7 @@
             try {
                 if (name === "open-tab") openLinkedTab($btn.attr("data-tab"));
                 else if (name === "toggle-detail") toggleDetail($btn);
+                else if (name === "zoom") zoomToRecord($btn.attr("data-zoom-table"), $btn.attr("data-zoom-id"));
             } catch (e) { if (window.console) console.log(e); }
         }
 
@@ -825,7 +876,7 @@
             $card.grid.append(metric(msg("VAS_293_Currency", "Currency"), currencyText()));
             $card.grid.append(metric(msg("VAS_293_IBAN", "IBAN"), data.IBAN, { wide: true, mono: true }));
             $card.grid.append(metric(msg("VAS_293_RoutingNo", "Routing no."), data.RoutingNo, { mono: true }));
-            $card.grid.append(metric(msg("VAS_293_SwiftCode", "SWIFT / BIC"), data.SwiftCode, { mono: true }));
+            $card.grid.append(metric(msg("VAS_293_SwiftCode", "Swift code"), data.SwiftCode, { mono: true }));
             $card.grid.append(metric(msg("VAS_293_Organization", "Organization"), data.OrganizationName));
             $card.grid.append(metric(msg("VAS_293_DefaultAccount", "Default account"), yesNo(data.IsDefault)));
             $card.grid.append(metric(msg("VAS_293_BankAddress", "Bank address"), data.BankAddress, { wide: true }));
@@ -904,9 +955,9 @@
 
         function renderLinkedConfig() {
             var $sec = section("linked");
-            var list = (data.LinkedConfigs) || [];
+            var list = visibleConfigs();
             $sec.append(sectionHeader(msg("VAS_293_LinkedConfiguration", "Linked configuration"),
-                list.length ? fmt(msg("VAS_293_ConfiguredCount", "{0} of {1} configured"), configuredCount(), list.length) : ""));
+                list.length ? fmt(msg("VAS_293_ConfiguredCount", "{0} of {1} configured"), configuredCount(list), list.length) : ""));
 
             /* A window with no active configuration tab is a real state, and it
                gets its own line - a data section is never left blank. */
@@ -1064,15 +1115,18 @@
                     empty: msg("VAS_293_NoDocDetail", "No Bank Account Document configuration found."),
                     columns: [
                         {
-                            /* Priority rides UNDER the document name rather than
-                               taking a column of its own: five columns is already
-                               what a right panel affords, and a one-or-two digit
-                               figure does not earn a sixth. */
+                            /* The document NAME links to its own record. Priority
+                               rides UNDER it rather than taking a column of its
+                               own: five columns is already what a right panel
+                               affords, and a one-or-two digit figure does not earn
+                               a sixth. */
                             label: msg("VAS_293_ColDocument", "Document"),
                             cell: function (row) {
-                                return cellText(row.Name, row.Priority
-                                    ? fmt(msg("VAS_293_PriorityMeta", "Priority {0}"), ltrToken(row.Priority))
-                                    : "");
+                                return cellText(row.Name,
+                                    row.Priority
+                                        ? fmt(msg("VAS_293_PriorityMeta", "Priority {0}"), ltrToken(row.Priority))
+                                        : "",
+                                    { tableId: configTableId(TBL_ACCOUNT_DOC), recordId: row.C_BankAccountDoc_ID });
                             }
                         },
                         {
@@ -1114,11 +1168,16 @@
                 empty: msg("VAS_293_NoClassDetail", "No Statement Class configuration found."),
                 columns: [
                     {
-                        /* Two different names: the configuration row's own, and the
-                           VA012_StatementClass master it points at. They answer
-                           different questions, so each gets its own column. */
+                        /* Two different names: the configuration row's own - which
+                           links to its record - and the VA012_StatementClass master
+                           it points at. They answer different questions, so each
+                           gets its own column. */
                         label: msg("VAS_293_ColStatementClass", "Statement class"),
-                        cell: function (row) { return cellText(row.ClassName); }
+                        cell: function (row) {
+                            return cellText(row.ClassName, "",
+                                { tableId: configTableId(TBL_STATEMENT_CLASS),
+                                  recordId: row.VA012_BankStatementClass_ID });
+                        }
                     },
                     {
                         label: msg("VAS_293_ColClass", "Class"),
@@ -1145,15 +1204,51 @@
         /* A truncating cell that carries its full value as a tooltip - a right panel
            is never wide enough to promise a column will fit. An optional `meta` adds
            a smaller second line, which is how a cell carries a second fact without
-           the table growing a column it has no room for. */
-        function cellText(value, meta) {
+           the table growing a column it has no room for.
+
+           `zoom` = {tableId, recordId} turns the value into a link that opens that
+           record in its own window. It degrades to plain text whenever the zoom
+           cannot be performed - a dead link is worse than no link. */
+        function cellText(value, meta, zoom) {
             var v = orDash(value);
             var $c = $('<span class="' + CLS + 'cellText"></span>');
-            $c.append($('<span class="' + CLS + 'cellMain"></span>').text(v).attr("title", v));
+            var linkable = zoom && canZoom() && (+zoom.tableId > 0) && (+zoom.recordId > 0)
+                           && v !== "—";
+            var $main = linkable
+                ? $('<button type="button" class="' + CLS + 'cellMain ' + CLS + 'link"></button>')
+                    .attr("data-action", "zoom")
+                    .attr("data-zoom-table", zoom.tableId)
+                    .attr("data-zoom-id", zoom.recordId)
+                : $('<span class="' + CLS + 'cellMain"></span>');
+            $main.text(v).attr("title", linkable
+                ? (v + " — " + msg("VAS_293_OpenRecord", "Open this record"))
+                : v);
+            $c.append($main);
             if (meta) {
                 $c.append($('<span class="' + CLS + 'cellMeta"></span>').text(meta).attr("title", meta));
             }
             return $c;
+        }
+
+        /* The framework's own record zoom, which resolves the target window from
+           the TABLE id on the server (Form/GetZoomWindowID) and honours a
+           zoom-across choice. No window id is ever named here - they differ per
+           environment, and the table id already came from the window's metadata. */
+        function canZoom() {
+            try {
+                return !!(window.VIS && VIS.AEnv && typeof VIS.AEnv.zoom === "function");
+            } catch (e) { return false; }
+        }
+
+        /* The AD_Table_ID the server sent with a configuration row. Looked up by
+           table name rather than threaded through the detail spec, so a column
+           renderer needs to know nothing about which row it belongs to. */
+        function configTableId(tableName) {
+            var list = (data && data.LinkedConfigs) || [];
+            for (var i = 0; i < list.length; i++) {
+                if (list[i] && list[i].TableName === tableName) return +list[i].AD_Table_ID || 0;
+            }
+            return 0;
         }
 
         function statusPill(isActive) {
@@ -1331,6 +1426,21 @@
                 }
             }
             return null;
+        }
+
+        /* Opens ONE record of a detail table in its own window. The framework
+           resolves which window that is from the AD_Table_ID - the same route its
+           own Zoom action takes - so no window id is named here and a zoom-across
+           choice is still offered where the table has several targets. The table
+           id came from the hosting window's metadata, never from a constant.
+           Degrades silently: a click can never throw. */
+        function zoomToRecord(tableId, recordId) {
+            var table = +tableId || 0;
+            var record = +recordId || 0;
+            if (table <= 0 || record <= 0 || !canZoom()) return;
+            try {
+                VIS.AEnv.zoom(table, record);
+            } catch (e) { if (window.console) console.log(e); }
         }
 
         /* Switches the HOSTING window to the configuration tab the row names -

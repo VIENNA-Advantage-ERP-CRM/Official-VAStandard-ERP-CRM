@@ -323,25 +323,68 @@ namespace VASLogic.Models
         /// by the aggregate so the counts and the per-line pill can never disagree:
         ///   - a payment or a cash line reference is a match outright;
         ///   - a charge line (C_Charge_ID set, no payment / cash line) is a match
-        ///     UNLESS one of the two unreconciled cases holds:
-        ///       1. TrxAmt <> 0, ChargeAmt <> 0, no payment, and
-        ///          StmtAmt <> TrxAmt + ChargeAmt;
-        ///       2. ChargeAmt = 0, TrxAmt = 0, and InterestAmt <> StmtAmt;
+        ///     UNLESS one of the four unreconciled cases holds:
+        ///       1. TrxAmt &lt;&gt; 0, ChargeAmt &lt;&gt; 0 and no payment
+        ///          (the StmtAmt test is commented out on both sides);
+        ///       2. ChargeAmt = 0, TrxAmt = 0 and InterestAmt &lt;&gt; StmtAmt;
+        ///       3. TrxAmt &lt;&gt; 0, ChargeAmt = 0 and a payment / cash line
+        ///          reference is missing;
+        ///       4. TrxAmt &lt;&gt; 0, a payment / cash line reference is present and
+        ///          TrxAmt + ChargeAmt &lt;&gt; StmtAmt;
         ///   - a line with none of the three references is unmatched.
+        ///
+        /// Transcribed case by case rather than reduced, deliberately: the two
+        /// twins are only safe while a reader can set them side by side and check
+        /// them line for line, and the C# side carries a commented-out condition
+        /// that is plainly still being decided. Reducing either one to its minimal
+        /// boolean form would hide that.
+        ///
+        /// NOTE the reachability, which is the same on both sides: this inner CASE
+        /// is only evaluated when the line has NEITHER a payment NOR a cash line,
+        /// so case 4's reference test can never be true (it never changes an
+        /// answer) and case 3's can never be false (it reduces to TrxAmt &lt;&gt; 0
+        /// AND ChargeAmt = 0). See the remark on IsLineMatched.
+        ///
+        /// SHARED, not copied: VAS_238_UnreconciledBankLineModel selects the lines
+        /// this expression calls UNMATCHED, so the dashboard widget and this panel
+        /// have to agree on what "matched" means. It is internal rather than
+        /// private for that one reason.
+        ///
+        /// It names the alias <c>bsl</c>, so any query using it must read
+        /// C_BankStatementLine under that alias.
         /// </summary>
-        private const string MATCHED_CASE =
+        internal const string MATCHED_CASE =
             @"CASE WHEN COALESCE(bsl.C_Payment_ID, 0)>0 OR COALESCE(bsl.C_CashLine_ID, 0)>0 THEN 1
                    WHEN COALESCE(bsl.C_Charge_ID, 0)>0 THEN
                         CASE WHEN COALESCE(bsl.TrxAmt, 0)<>0 AND COALESCE(bsl.ChargeAmt, 0)<>0 AND COALESCE(bsl.C_Payment_ID, 0)=0
                                   /* AND COALESCE(bsl.StmtAmt, 0)<>COALESCE(bsl.TrxAmt, 0)+COALESCE(bsl.ChargeAmt, 0) */ THEN 0
                              WHEN COALESCE(bsl.ChargeAmt, 0)=0 AND COALESCE(bsl.TrxAmt, 0)=0
                                   AND COALESCE(bsl.InterestAmt, 0)<>COALESCE(bsl.StmtAmt, 0) THEN 0
+                             WHEN COALESCE(bsl.TrxAmt, 0)<>0 AND COALESCE(bsl.ChargeAmt, 0)=0
+                                  AND (COALESCE(bsl.C_Payment_ID, 0)=0 OR COALESCE(bsl.C_CashLine_ID, 0)=0) THEN 0
+                             WHEN COALESCE(bsl.TrxAmt, 0)<>0
+                                  AND (COALESCE(bsl.C_Payment_ID, 0)<>0 OR COALESCE(bsl.C_CashLine_ID, 0)<>0)
+                                  AND COALESCE(bsl.TrxAmt, 0)+COALESCE(bsl.ChargeAmt, 0)<>COALESCE(bsl.StmtAmt, 0) THEN 0
                              ELSE 1 END
                    ELSE 0 END";
 
         /// <summary>
         /// The C# twin of MATCHED_CASE, applied to one line row (see there for the
-        /// rule).
+        /// rule). Change one and you must change the other, or the aggregate's
+        /// counts and the per-line pill will disagree on the same statement.
+        ///
+        /// The four cases below are kept as written rather than folded together,
+        /// so they can be read against the SQL one for one. Two of them are
+        /// currently inert, which is worth knowing before relying on them: this
+        /// block is only reached when the line has neither a payment nor a cash
+        /// line, so
+        ///   - case4's reference test is always FALSE here - the case never fires;
+        ///   - case3's reference test is always TRUE here - it reduces to
+        ///     TrxAmt != 0 &amp;&amp; ChargeAmt == 0.
+        /// Together case1 and case3 therefore make ANY charge line with a non-zero
+        /// TrxAmt unmatched, whatever the amounts add up to. If case4 was meant to
+        /// judge lines that DO carry a reference, it has to move above the early
+        /// return at the top of this method - it can never be reached from here.
         /// </summary>
         /// <param name="row">Line with its references and amounts read.</param>
         /// <returns>True when the line is matched.</returns>
@@ -353,15 +396,84 @@ namespace VASLogic.Models
             }
             if (row.C_Charge_ID > 0)
             {
-                /* Case 1: a charged transaction whose statement amount does not add
-                   up to transaction + charge. */
+                /* Case 1: a charged transaction whose statement amount does not add up to transaction + charge. */
                 bool case1 = row.TrxAmt != 0 && row.ChargeAmt != 0 && row.C_Payment_ID == 0
                     /*&& row.StmtAmt != row.TrxAmt + row.ChargeAmt*/ ;
-                /* Case 2: an interest-only line whose interest does not equal the
-                   statement amount. */
+
+                /* Case 2: an interest-only line whose interest does not equal the statement amount. */
                 bool case2 = row.ChargeAmt == 0 && row.TrxAmt == 0 && row.InterestAmt != row.StmtAmt;
-                return !(case1 || case2);
+
+                /*When Trx Amount found then payment / cashline reference must required for reconcilation */
+                bool case3 = row.TrxAmt != 0 && row.ChargeAmt == 0 && (row.C_Payment_ID == 0 || row.C_CashLine_ID == 0);
+
+                /* When Trx Amount found, payment / cashline reference found, statement amount must match with trx + charge */
+                bool case4 = row.TrxAmt != 0 && (row.C_Payment_ID != 0 || row.C_CashLine_ID != 0) && row.TrxAmt + row.ChargeAmt != row.StmtAmt ;
+
+                return !(case1 || case2 || case3 || case4);
             }
+            return false;
+        }
+
+        /*
+         Pseudocode / Plan (detailed):
+         - Input: JournalLineRow row (assumed non-null).
+         - Goal: Decide whether the line is considered "reconciled" using the same
+           business rules as the original implementation but with simplified,
+           readable logic and minimal branching.
+         - Rules (restate and apply directly in a boolean expression):
+           1. If the line has a payment (C_Payment_ID > 0) => reconciled.
+           2. Else if the line has a cash-line (C_CashLine_ID > 0) => reconciled.
+           3. Else if the line has a charge (C_Charge_ID > 0) =>
+                - It is reconciled if either:
+                  a) ContraType == "BB" (explicit contra business case), OR
+                  b) ((VA009_PaymentMethod_ID != 0 && C_BPartner_ID == 0 && C_Payment_ID == 0)
+                     OR (C_BPartner_ID != 0 && C_Payment_ID > 0))
+                     AND StmtAmt == TrxAmt
+           4. Otherwise (no payment, no cash line, no charge, and empty TrxNo) => not reconciled.
+           5. Default => not reconciled.
+         - Implementation strategy:
+           - Translate the rules into a single boolean return expression that
+             short-circuits for the common true cases (payment / cash).
+           - Group the charge-related conditions clearly so the intent is obvious.
+           - Preserve existing comparisons and semantics (string literal checks,
+             numeric comparisons).
+         - Output: Single-line boolean return expression implementing the rules above.
+        */
+        private static bool IsLineReconciled(JournalLineRow row)
+        {
+            if (row == null)
+            {
+                return false;
+            }
+
+            // Quick positive cases: explicit payment or cash-line settlement
+            if (row.C_Payment_ID > 0 || row.C_CashLine_ID > 0)
+            {
+                return true;
+            }
+
+            // Charge-based reconciliation rules
+            if (row.C_Charge_ID > 0)
+            {
+                bool hasLinePaymentMethodMatch =
+                    (row.VA009_PaymentMethod_ID != 0 && row.C_BPartner_ID == 0 && row.C_Payment_ID == 0);
+
+                bool hasPartnerPaymentMatch =
+                    (row.C_BPartner_ID != 0 && row.C_Payment_ID > 0);
+
+                bool methodOrPartnerMatch = hasLinePaymentMethodMatch || hasPartnerPaymentMatch;
+
+                // Reconciled when contra "BB" or the method/partner rule and amounts match
+                return row.ContraType == "BB" || (methodOrPartnerMatch && row.StmtAmt == row.TrxAmt);
+            }
+
+            // If no charge and no transaction reference, it's not reconciled
+            if (row.C_Charge_ID == 0 && string.IsNullOrEmpty(row.TrxNo))
+            {
+                return false;
+            }
+
+            // Default: not reconciled
             return false;
         }
 
@@ -558,7 +670,8 @@ namespace VASLogic.Models
                                   bsl.VA012_VoucherType,
                                   bsl.VA012_ContraType,
                                   bsl.VA012_DifferenceType,
-                                  COALESCE(bsl.VA012_VoucherNo, N'') AS VA012_VoucherNo
+                                  COALESCE(bsl.VA012_VoucherNo, N'') AS VA012_VoucherNo,
+                                  bsl.TrxNo
                              FROM C_BankStatementLine bsl
                              LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID=bsl.C_Currency_ID)
                              LEFT OUTER JOIN C_Payment pay ON (pay.C_Payment_ID=bsl.C_Payment_ID)
@@ -683,6 +796,7 @@ namespace VASLogic.Models
                 row.DifferenceType = Util.GetValueOfString(r["VA012_DifferenceType"]);
                 row.DifferenceTypeName = LabelOf(differenceLabels, row.DifferenceType);
                 row.VoucherNo = Util.GetValueOfString(r["VA012_VoucherNo"]);
+                row.TrxNo = Util.GetValueOfString(r["TrxNo"]);
 
                 rows.Add(row);
             }
@@ -1498,6 +1612,7 @@ namespace VASLogic.Models
             public string DifferenceType { get; set; }
             public string DifferenceTypeName { get; set; }
             public string VoucherNo { get; set; }
+            public string TrxNo { get; set; }
 
             /// <summary>Accounts the line debited / credited (Actual posting);
             /// null when the statement is not posted or the line has no facts.</summary>
