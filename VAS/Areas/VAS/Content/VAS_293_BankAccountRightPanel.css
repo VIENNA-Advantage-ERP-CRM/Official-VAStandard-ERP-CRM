@@ -76,6 +76,10 @@
  *                        flow inline and wrap; the count sits in a quiet badge.
  *                        Detail cells gained an optional sub-line, which is how a
  *                        five-column table carries seven facts at panel width.
+ *   VAI145   2026-09-23  The expandable rows' bordered caret button is gone: every
+ *                        row wears the same chevron, and an open row is marked by
+ *                        its card's accent border plus the chevron's rotation.
+ *                        Detail tables are uniformly left-aligned.
  ***********************************************************/
 
 /* ----------------------------------------------------------- */
@@ -656,32 +660,12 @@
    its table, and a second signal would only add noise. */
 .vas_293-entity.vas_293-open { background: #FFFFFF; }
 
-/* The caret's bordered button - the affordance that says "this opens here",
-   as against the bare forward chevron on the rows that navigate away. */
-.vas_293-chevBtn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.75em;
-    height: 1.75em;
-    flex: 0 0 auto;
-    border: 1px solid var(--p293-card-bd);
-    border-radius: 8px;
-    background: #FFFFFF;
-    color: var(--p293-secondary);
-    transition: border-color .15s ease, background-color .15s ease;
-}
-.vas_293-entity:hover .vas_293-chevBtn {
-    border-color: var(--p293-action);
-    background: var(--p293-tile-bg);
-}
-/* Down when closed, up when open - and the caret is symmetric, so this reads
-   the same in RTL and needs no mirroring. */
-.vas_293-chevBtn .vas_293-chev { transition: transform .15s ease; }
-.vas_293-entity.vas_293-open .vas_293-chevBtn .vas_293-chev { transform: rotate(180deg); }
-.vas_293-entity.vas_293-open .vas_293-chevBtn {
-    border-color: var(--p293-action);
+/* An open row's chevron turns to point DOWN at the table it revealed. That
+   rotation is the only thing that distinguishes an expandable row's affordance
+   from a navigating one's - both wear the same plain chevron. */
+.vas_293-entity.vas_293-open .vas_293-chev {
     color: var(--p293-action);
+    transform: rotate(90deg);
 }
 
 /* The detail sits directly under its row inside the same card: no border and no
@@ -787,9 +771,6 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-/* Digit columns sit against the column edge so they scan down as a column. */
-.vas_293-cellEnd { text-align: right; }
-.vas_293-cellEnd .vas_293-cellText { font-variant-numeric: tabular-nums; }
 
 /* ----------------------------------------------------------- */
 /*  Narrow panel                                                */
@@ -811,15 +792,15 @@
 [dir="rtl"] .vas_293-reconValue { text-align: left; }
 [dir="rtl"] .vas_293-entity { text-align: right; }
 [dir="rtl"] .vas_293-table th { text-align: right; }
-[dir="rtl"] .vas_293-cellEnd { text-align: left; }
 /* The eyebrow's tracking is a Latin typesetting device; Arabic is a joined
    script, where letter-spacing breaks the word apart. */
 [dir="rtl"] .vas_293-eyebrow { letter-spacing: 0; }
-/* The FORWARD chevron points at the content it opens, so it mirrors with the
-   layout. The disclosure caret inside .vas_293-chevBtn must NOT: it is
-   horizontally symmetric, and mirroring it would fight its open/closed
-   rotation for no gain. */
-[dir="rtl"] .vas_293-entityTrail > .vas_293-chev svg { transform: scaleX(-1); }
+/* The chevron points at the content it opens, so it mirrors with the layout. */
+[dir="rtl"] .vas_293-chev svg { transform: scaleX(-1); }
+/* Mirrored, the closed chevron points LEFT (180deg). Opening it therefore has
+   to turn COUNTER-clockwise to reach "down" - the LTR +90deg would land it
+   pointing up. */
+[dir="rtl"] .vas_293-entity.vas_293-open .vas_293-chev { transform: rotate(-90deg); }
 /* The summary follows the title in both directions. */
 [dir="rtl"] .vas_293-entityMeta { margin-left: 0; margin-right: 0.5em; }
 

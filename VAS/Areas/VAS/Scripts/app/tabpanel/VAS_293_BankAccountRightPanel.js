@@ -38,8 +38,8 @@
  *                      account, so closing and reopening costs no request, and
  *                      opening one never reloads the panel;
  *                    - the row is the disclosure control: aria-expanded /
- *                      aria-controls, a highlighted open state, and a chevron that
- *                      turns to point down;
+ *                      aria-controls, an accented card while open, and the SAME
+ *                      chevron every other row wears, turned to point down;
  *                    - the detail reads active AND inactive rows, because the
  *                      tables carry a Status column.
  *
@@ -103,6 +103,11 @@
  *                        current number and the priority as cell sub-lines;
  *                        Statement Class detail adds the VA012_StatementClass
  *                        master name beside the row's own.
+ *   VAI145   2026-09-23  Expandable rows wear the same trailing chevron as every
+ *                        other row - the bordered caret button is gone, and the
+ *                        open state is carried by the card's accent and the
+ *                        chevron's rotation. Cheque series left-aligns with the
+ *                        rest of the table; no column is right-aligned any more.
  *
  * -- Labels / Message Keys ---------------------------------------------------
  *  Panel
@@ -270,8 +275,6 @@
         var SVG_ATTR = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
         var SVG = {
             chevron: '<svg ' + SVG_ATTR + '><path d="m9 18 6-6-6-6"/></svg>',
-            /* The disclosure caret: down when closed, flipped to up when open. */
-            chevronDown: '<svg ' + SVG_ATTR + '><path d="m6 9 6 6 6-6"/></svg>',
             /* The two states a configuration row can be in. The TILE carries them,
                so the row needs no status pill beside its title. */
             check: '<svg ' + SVG_ATTR + '><path d="M20 6 9 17l-5-5"/></svg>',
@@ -993,15 +996,10 @@
             var $trail = $('<span class="' + CLS + 'entityTrail"></span>');
             $trail.append($('<span class="' + CLS + 'countBadge"></span>')
                 .text(ltrToken(+cfg.RecordCount || 0)));
-            /* A caret in a bordered button on the rows that OPEN in place; the
-               plain forward chevron on the rows that navigate away. Two different
-               actions must not wear the same affordance. */
-            if (expandable) {
-                $trail.append($('<span class="' + CLS + 'chevBtn"></span>')
-                    .append(icon("chevronDown").addClass(CLS + "chev")));
-            } else {
-                $trail.append(icon("chevron").addClass(CLS + "chev"));
-            }
+            /* Every row wears the SAME chevron, expandable or not. On a row that
+               opens in place it turns to point down at the table it just revealed;
+               that rotation is the only thing that sets it apart. */
+            $trail.append(icon("chevron").addClass(CLS + "chev"));
             $r.append($trail);
 
             return $r;
@@ -1049,10 +1047,9 @@
 
         /* Everything that differs between the two expandable rows, in one place:
            the endpoint, the empty-state wording, and the columns. A column is
-           {label, cell, align}: `cell` turns one payload row into the jQuery
-           content of one td, so the column list is the ONLY place that knows the
-           shape of a row. `align:"end"` right-aligns a column carrying digits,
-           per the panel catalogue's Data Grid rule.
+           {label, cell}: `cell` turns one payload row into the jQuery content of
+           one td, so the column list is the ONLY place that knows the shape of a
+           row.
 
            The block carries no title of its own: it opens directly under the row
            that names it, inside the same card, and the record count is already on
@@ -1086,10 +1083,11 @@
                             /* The cheque book as ONE column: the SERIES it spans on
                                top, the number it is standing on underneath. Sequence
                                numbers are identifiers, not quantities - monospaced,
-                               never grouped, and each is a single left-to-right
-                               token so RTL cannot reverse a range's ends. */
+                               never grouped, LEFT-aligned like every other column
+                               (they are not figures to total down the column), and
+                               each is a single left-to-right token so RTL cannot
+                               reverse a range's ends. */
                             label: msg("VAS_293_ColChequeSeries", "Cheque series"),
-                            align: "end",
                             cell: function (row) {
                                 return cellText(chequeSeries(row), row.CurrentNext
                                     ? fmt(msg("VAS_293_CurrentNoMeta", "Current {0}"), ltrToken(row.CurrentNext))
@@ -1184,16 +1182,16 @@
             $host.append(detailTable(spec, rows));
         }
 
-        /* A nested Data Grid, one row per record. */
+        /* A nested Data Grid, one row per record. Every column reads from the same
+           edge - nothing here is a figure to be totalled down a column, so nothing
+           is right-aligned. */
         function detailTable(spec, rows) {
             var $table = $('<table class="' + CLS + 'table ' + spec.cls + '"></table>');
             var $headRow = $('<tr></tr>');
             var i;
             for (i = 0; i < spec.columns.length; i++) {
                 var col = spec.columns[i];
-                $headRow.append($('<th scope="col"></th>')
-                    .addClass(col.align === "end" ? CLS + "cellEnd" : "")
-                    .text(col.label).attr("title", col.label));
+                $headRow.append($('<th scope="col"></th>').text(col.label).attr("title", col.label));
             }
             $table.append($('<thead></thead>').append($headRow));
 
@@ -1201,10 +1199,7 @@
             for (i = 0; i < rows.length; i++) {
                 var $tr = $('<tr></tr>');
                 for (var c = 0; c < spec.columns.length; c++) {
-                    var column = spec.columns[c];
-                    $tr.append($('<td></td>')
-                        .addClass(column.align === "end" ? CLS + "cellEnd" : "")
-                        .append(column.cell(rows[i])));
+                    $tr.append($('<td></td>').append(spec.columns[c].cell(rows[i])));
                 }
                 $tbody.append($tr);
             }
