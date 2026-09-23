@@ -16,6 +16,13 @@
 ///                   hosting window, each carrying its active record count and a
 ///                   short configuration detail.
 ///
+///               Two of those rows expand inline in the panel rather than
+///               navigating, and each has its own on-demand read:
+///                 - GetBankAccountDocDetail   (C_BankAccountDoc)
+///                 - GetStatementClassDetail   (VA012_BankStatementClass)
+///               Both are separate from the overview: the panel asks only when the
+///               user expands the row, and only once per account.
+///
 ///               C_BankAccount is the primary record table. Every other table is
 ///               read only to describe it.
 ///
@@ -59,6 +66,19 @@
 ///               state leaves as a CODE, never as text - the client owns its wording.
 /// Chronological development:
 ///   VAI145   2026-09-22  Created.
+///   VAI145   2026-09-23  Inline detail reads added for the two configuration rows
+///                        that expand in place (Bank Account Document, Statement
+///                        Class). Both read active AND inactive rows, because the
+///                        tables carry a Status column.
+///   VAI145   2026-09-23  Bank Account Document detail carries EndChkNumber and the
+///                        translated name of its AD_Process. Statement Class detail
+///                        keeps VA012_BankStatementClassName as the class name and
+///                        no longer reads VA012_IsFileReq.
+///   VAI145   2026-09-23  Bank Account Document detail adds StartChkNumber and
+///                        Priority; Statement Class detail adds the name of the
+///                        VA012_StatementClass master alongside the row's own,
+///                        resolved through the dictionary since that table is not
+///                        source here.
 /// </summary>
 
 using System;
@@ -96,10 +116,6 @@ namespace VASLogic.Models
         public const string TBL_STATEMENT_CLASS = "VA012_BankStatementClass";
         public const string TBL_DEFAULT_ACCOUNTING = "FRPT_BankAccount_Acct";
 
-        /// <summary>How many configuration names the Bank Account Document row spells
-        /// out before it falls back to a "+n" remainder.</summary>
-        private const int DOC_NAMES_SHOWN = 2;
-
         /// <summary>AD dictionary answers for "does this column exist", keyed
         /// TableName.ColumnName. The dictionary does not change between requests, and
         /// the check guards a column that is present in some environments only, so the
@@ -107,6 +123,20 @@ namespace VASLogic.Models
         private static readonly Dictionary<string, bool> _columnExists =
             new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
         private static readonly object _columnExistsLock = new object();
+
+        /// <summary>AD dictionary answers for "which column NAMES a record of this
+        /// table", keyed TableName. Cached for the same reason as _columnExists: the
+        /// dictionary does not change between requests.</summary>
+        private static readonly Dictionary<string, string> _nameColumn =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly object _nameColumnLock = new object();
+
+        /// <summary>Statement Class master behind
+        /// VA012_BankStatementClass.VA012_StatementClass_ID. It belongs to an optional
+        /// module and is not source in this repository, so both its existence and the
+        /// name of its name column are asked of the dictionary, never assumed.</summary>
+        private const string TBL_STATEMENT_CLASS_MASTER = "VA012_StatementClass";
+
 
         // ----------------------------------------------------------------- //
         //  Entry point                                                       //
@@ -608,16 +638,23 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Bank Account Document: active count, and the first two document names as
-        /// the detail ("SEPA Transfer · Cheque"), with a "+n" remainder beyond that.
+        /// Bank Account Document: active count, and the first document as the detail
+        /// ("HDFC Cheque Book · Check - Batch" - its name and its payment method),
+        /// with a "+n" remainder when the account carries more than one.
+        ///
+        /// The payment method rides along because it is what actually distinguishes
+        /// two documents on the same account; the name alone repeats what the
+        /// expanded table's first column already says.
         /// </summary>
         /// <param name="ctx">User context.</param>
         /// <param name="C_BankAccount_ID">Selected bank account id.</param>
         /// <param name="row">Configuration row filled in place.</param>
         private void FillAccountDoc(Ctx ctx, int C_BankAccount_ID, LinkedConfigRow row)
         {
-            string sql = @"SELECT COALESCE(bad.Name, N'') AS Name
+            string sql = @"SELECT COALESCE(bad.Name, N'') AS Name,
+                                  COALESCE(pm.VA009_Name, N'') AS PaymentMethod
                            FROM C_BankAccountDoc bad
+                           LEFT OUTER JOIN VA009_PaymentMethod pm ON (pm.VA009_PaymentMethod_ID=bad.VA009_PaymentMethod_ID)
                            WHERE bad.C_BankAccount_ID=@C_BankAccount_ID
                              AND bad.IsActive='Y'
                              AND bad.AD_Client_ID=@AD_Client_ID";
@@ -630,20 +667,16 @@ namespace VASLogic.Models
 
             DataRowCollection all = ds.Tables[0].Rows;
             row.RecordCount = all.Count;
-
-            List<string> names = new List<string>();
-            for (int i = 0; i < all.Count && i < DOC_NAMES_SHOWN; i++)
+            if (all.Count == 0)
             {
-                string name = Util.GetValueOfString(all[i]["Name"]);
-                if (!string.IsNullOrEmpty(name))
-                {
-                    names.Add(name);
-                }
+                return;
             }
-            row.Detail = string.Join(" · ", names.ToArray());
 
-            /* "+2" tells the user the list is longer without spelling every name out. */
-            int remaining = all.Count - DOC_NAMES_SHOWN;
+            row.Detail = JoinBits(Util.GetValueOfString(all[0]["Name"]),
+                                  Util.GetValueOfString(all[0]["PaymentMethod"]));
+
+            /* "+2" tells the user the list is longer without spelling every one out. */
+            int remaining = all.Count - 1;
             if (remaining > 0 && row.Detail.Length > 0)
             {
                 row.Detail += " +" + remaining;
@@ -722,9 +755,11 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Statement Class (VA012): active count and the first class name. The table
-        /// belongs to an optional module, so a missing table surfaces as the caller's
-        /// logged exception and the row degrades to "not configured".
+        /// Statement Class (VA012): active count and the first class name, which is the
+        /// same VA012_BankStatementClassName the expanded detail table shows - the
+        /// collapsed summary and the open table never disagree. The table belongs to an
+        /// optional module, so a missing table surfaces as the caller's logged
+        /// exception and the row degrades to "not configured".
         /// </summary>
         /// <param name="ctx">User context.</param>
         /// <param name="C_BankAccount_ID">Selected bank account id.</param>
@@ -815,6 +850,206 @@ namespace VASLogic.Models
         }
 
         // ----------------------------------------------------------------- //
+        //  4. Inline configuration detail (expanded rows)                    //
+        // ----------------------------------------------------------------- //
+
+        /// <summary>
+        /// Rows behind the Bank Account Document configuration row, for the panel's
+        /// inline detail table. Fetched on demand - the panel only asks once the
+        /// user expands the row, and caches the answer for that account.
+        ///
+        /// Unlike the configuration COUNT, this reads active AND inactive rows: the
+        /// table carries a Status column, so an inactive document is a fact the user
+        /// asked to see rather than a row to hide. The panel only offers the
+        /// expansion when the active count is above zero.
+        ///
+        /// The payment-method join is optional in two ways, and both are settled
+        /// through the dictionary rather than by letting the statement fail: the
+        /// VA009 module may not be installed, and where it is, the name column is
+        /// VA009_Name on current schemas and Name on older ones.
+        /// </summary>
+        /// <param name="ctx">User context.</param>
+        /// <param name="C_BankAccount_ID">Selected bank account id.</param>
+        /// <returns>Populated result; <see cref="ConfigDetail{T}.Ok"/> is false when
+        /// the read failed, which the panel reports instead of an empty table.</returns>
+        public ConfigDetail<BankAccountDocDetailRow> GetBankAccountDocDetail(Ctx ctx, int C_BankAccount_ID)
+        {
+            ConfigDetail<BankAccountDocDetailRow> result = new ConfigDetail<BankAccountDocDetailRow>();
+            result.Rows = new List<BankAccountDocDetailRow>();
+
+            if (ctx == null || C_BankAccount_ID <= 0)
+            {
+                return result;
+            }
+
+            /* The process is shown by NAME, translated for the session language -
+               the panel never renders an AD_Process_ID. Join order matters twice
+               over: the translation join carries the only parameter that appears
+               before the WHERE clause, and the LAST join keeps a plain single
+               equality, which is what the AddAccessSQL parser needs. */
+            string sql = @"SELECT bad.C_BankAccountDoc_ID,
+                                  COALESCE(bad.Name, N'') AS Name,
+                                  COALESCE(pm.VA009_Name, N'') AS PaymentMethod,
+                                  bad.StartChkNumber,
+                                  bad.CurrentNext,
+                                  bad.EndChkNumber,
+                                  bad.Priority,
+                                  COALESCE(prctrl.Name, prc.Name, N'') AS ProcessName,
+                                  COALESCE(bad.IsActive, 'N') AS IsActive
+                           FROM C_BankAccountDoc bad
+                           LEFT OUTER JOIN AD_Process_Trl prctrl ON (prctrl.AD_Process_ID=bad.AD_Process_ID
+                                                                     AND prctrl.AD_Language=@Language
+                                                                     AND prctrl.IsActive='Y')
+                           LEFT OUTER JOIN VA009_PaymentMethod pm ON (pm.VA009_PaymentMethod_ID=bad.VA009_PaymentMethod_ID)
+                           LEFT OUTER JOIN AD_Process prc ON (prc.AD_Process_ID=bad.AD_Process_ID)
+                           WHERE bad.C_BankAccount_ID=@C_BankAccount_ID
+                             AND bad.AD_Client_ID=@AD_Client_ID";
+
+            /* Not routed through ReadConfig: that helper binds the two standard
+               parameters only, and SqlParameter binds by POSITION - @Language occurs
+               FIRST here, so the array has to be built for this statement. */
+            string accessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                sql, "bad", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + " ORDER BY bad.Name";
+
+            /* Three binds, each occurring once, in the order they appear. */
+            SqlParameter[] param = new SqlParameter[]
+            {
+                new SqlParameter("@Language", ctx.GetAD_Language()),
+                new SqlParameter("@C_BankAccount_ID", C_BankAccount_ID),
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+            };
+
+            DataSet ds = null;
+            try
+            {
+                ds = DB.ExecuteDataset(accessSql, param, null);
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("VAS_293 GetBankAccountDocDetail(" + C_BankAccount_ID + "): " + ex.Message);
+                return result;      // Ok stays false
+            }
+
+            result.Ok = true;
+            if (ds == null || ds.Tables.Count == 0)
+            {
+                return result;
+            }
+
+            foreach (DataRow r in ds.Tables[0].Rows)
+            {
+                BankAccountDocDetailRow row = new BankAccountDocDetailRow();
+                row.C_BankAccountDoc_ID = Util.GetValueOfInt(r["C_BankAccountDoc_ID"]);
+                row.Name = Util.GetValueOfString(r["Name"]);
+                row.PaymentMethod = Util.GetValueOfString(r["PaymentMethod"]);
+                row.StartChkNumber = FormatSequence(r["StartChkNumber"]);
+                row.CurrentNext = FormatSequence(r["CurrentNext"]);
+                row.EndChkNumber = FormatSequence(r["EndChkNumber"]);
+                row.Priority = FormatSequence(r["Priority"]);
+                row.ProcessName = Util.GetValueOfString(r["ProcessName"]);
+                row.IsActive = Util.GetValueOfString(r["IsActive"]) == "Y";
+                result.Rows.Add(row);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Rows behind the Statement Class configuration row, for the panel's inline
+        /// detail table. Active AND inactive, for the same reason as the Bank Account
+        /// Document detail above. The table belongs to an optional module, so a
+        /// missing table is logged and reported as a failed read rather than thrown.
+        /// </summary>
+        /// <param name="ctx">User context.</param>
+        /// <param name="C_BankAccount_ID">Selected bank account id.</param>
+        /// <returns>Populated result; <see cref="ConfigDetail{T}.Ok"/> is false when
+        /// the read failed.</returns>
+        public ConfigDetail<StatementClassDetailRow> GetStatementClassDetail(Ctx ctx, int C_BankAccount_ID)
+        {
+            ConfigDetail<StatementClassDetailRow> result = new ConfigDetail<StatementClassDetailRow>();
+            result.Rows = new List<StatementClassDetailRow>();
+
+            if (ctx == null || C_BankAccount_ID <= 0)
+            {
+                return result;
+            }
+
+            /* The row's own name is the configuration's name; the MASTER behind
+               VA012_StatementClass_ID names the statement class itself. Both are
+               shown, in their own columns - they answer different questions. The
+               master is only joined where the dictionary says it can be. */
+            string masterColumn = StatementClassNameColumn();
+
+            StringBuilder sql = new StringBuilder();
+            sql.Append(@"SELECT bsc.VA012_BankStatementClass_ID,
+                                COALESCE(bsc.VA012_BankStatementClassName, N'') AS ClassName,
+                                COALESCE(bsc.IsActive, 'N') AS IsActive");
+            sql.Append((masterColumn.Length > 0)
+                ? (@",
+                                COALESCE(" + masterColumn + @", N'') AS MasterClassName")
+                : @",
+                                N'' AS MasterClassName");
+            sql.Append(@"
+                         FROM VA012_BankStatementClass bsc");
+            if (masterColumn.Length > 0)
+            {
+                /* The LAST join's ON stays a plain equality - a function call there
+                   breaks the AddAccessSQL parser. */
+                sql.Append(@"
+                         LEFT OUTER JOIN VA012_StatementClass sc ON (sc.VA012_StatementClass_ID=bsc.VA012_StatementClass_ID)");
+            }
+            sql.Append(@"
+                         WHERE bsc.C_BankAccount_ID=@C_BankAccount_ID
+                           AND bsc.AD_Client_ID=@AD_Client_ID");
+
+            DataSet ds = null;
+            try
+            {
+                ds = ReadConfig(ctx, sql.ToString(), "bsc", " ORDER BY bsc.VA012_BankStatementClassName",
+                                C_BankAccount_ID, TBL_STATEMENT_CLASS);
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("VAS_293 GetStatementClassDetail(" + C_BankAccount_ID + "): " + ex.Message);
+                return result;      // Ok stays false
+            }
+
+            result.Ok = true;
+            if (ds == null || ds.Tables.Count == 0)
+            {
+                return result;
+            }
+
+            foreach (DataRow r in ds.Tables[0].Rows)
+            {
+                StatementClassDetailRow row = new StatementClassDetailRow();
+                row.VA012_BankStatementClass_ID = Util.GetValueOfInt(r["VA012_BankStatementClass_ID"]);
+                row.ClassName = Util.GetValueOfString(r["ClassName"]);
+                row.MasterClassName = Util.GetValueOfString(r["MasterClassName"]);
+                row.IsActive = Util.GetValueOfString(r["IsActive"]) == "Y";
+                result.Rows.Add(row);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Formats a document sequence number as plain invariant digits - no grouping,
+        /// no decimals, no locale. A null or empty value leaves as "", which the panel
+        /// renders as an em dash.
+        /// </summary>
+        /// <param name="value">Raw column value.</param>
+        /// <returns>Digits, or "".</returns>
+        private static string FormatSequence(object value)
+        {
+            if (value == null || value == DBNull.Value)
+            {
+                return "";
+            }
+            return Util.GetValueOfInt(value).ToString(CultureInfo.InvariantCulture);
+        }
+
+        // ----------------------------------------------------------------- //
         //  Helpers                                                           //
         // ----------------------------------------------------------------- //
 
@@ -871,6 +1106,102 @@ namespace VASLogic.Models
                 _columnExists[key] = exists;
             }
             return exists;
+        }
+
+        /// <summary>
+        /// The column that NAMES a record of the given table, as the AD dictionary
+        /// defines it: the first active identifier column (AD_Column.IsIdentifier),
+        /// which is the framework's own answer to "what does this record read as".
+        ///
+        /// Used for a table that is not source in this repository, so its name column
+        /// cannot be read off a model class. Asking the dictionary beats guessing:
+        /// naming a column that does not exist fails the WHOLE query.
+        ///
+        /// Falls back to the candidate names in order when the table declares no
+        /// identifier, and to "" when none of them exists either - the caller then
+        /// leaves the join out altogether. Cached for the application's lifetime.
+        /// </summary>
+        /// <param name="tableName">Physical table to name.</param>
+        /// <param name="fallbacks">Candidate column names, best first; may be null.</param>
+        /// <returns>Unqualified column name, or "" when the table cannot be named.</returns>
+        private static string NameColumnOf(string tableName, string[] fallbacks)
+        {
+            lock (_nameColumnLock)
+            {
+                string cached;
+                if (_nameColumn.TryGetValue(tableName, out cached))
+                {
+                    return cached;
+                }
+            }
+
+            string sql = @"SELECT col.ColumnName,
+                                  col.SeqNo
+                           FROM AD_Column col
+                           INNER JOIN AD_Table tbl ON (tbl.AD_Table_ID=col.AD_Table_ID)
+                           WHERE tbl.TableName=@TableName
+                             AND col.IsIdentifier='Y'
+                             AND col.IsActive='Y'
+                             AND tbl.IsActive='Y'
+                           ORDER BY col.SeqNo,col.AD_Column_ID";
+
+            string column = "";
+            try
+            {
+                /* One bind, occurring once. */
+                DataSet ds = DB.ExecuteDataset(sql, new SqlParameter[]
+                {
+                    new SqlParameter("@TableName", tableName)
+                }, null);
+
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    /* The FIRST identifier only. A multi-column identifier would have
+                       to be concatenated, and string concatenation is exactly what
+                       does not port between Oracle and PostgreSQL. */
+                    column = Util.GetValueOfString(ds.Tables[0].Rows[0]["ColumnName"]);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("VAS_293 NameColumnOf(" + tableName + "): " + ex.Message);
+            }
+
+            if (column.Length == 0 && fallbacks != null)
+            {
+                for (int i = 0; i < fallbacks.Length; i++)
+                {
+                    if (HasColumn(tableName, fallbacks[i]))
+                    {
+                        column = fallbacks[i];
+                        break;
+                    }
+                }
+            }
+
+            lock (_nameColumnLock)
+            {
+                _nameColumn[tableName] = column;
+            }
+            return column;
+        }
+
+        /// <summary>
+        /// The qualified Statement Class master NAME expression for the alias "sc", or
+        /// "" when that master cannot be joined at all (module not installed, link
+        /// column absent, or no nameable column). The caller leaves the join - and the
+        /// column it feeds - out in that case.
+        /// </summary>
+        /// <returns>"sc.&lt;column&gt;", or "".</returns>
+        private static string StatementClassNameColumn()
+        {
+            if (!HasColumn(TBL_STATEMENT_CLASS, "VA012_StatementClass_ID"))
+            {
+                return "";
+            }
+            string column = NameColumnOf(TBL_STATEMENT_CLASS_MASTER,
+                new string[] { "VA012_Name", "Name", "VA012_StatementClassName" });
+            return (column.Length > 0) ? ("sc." + column) : "";
         }
 
         /// <summary>
@@ -1069,6 +1400,61 @@ namespace VASLogic.Models
             /// <summary>ISO yyyy-MM-dd qualifier for the detail (statement loader's last
             /// run); blank when there is none.</summary>
             public string DetailDate { get; set; }
+        }
+
+        /// <summary>Envelope for an inline configuration detail table. Ok separates
+        /// "the read worked and there is nothing" from "the read failed" - the panel
+        /// says different things about the two.</summary>
+        /// <typeparam name="T">Row type of the table.</typeparam>
+        public class ConfigDetail<T>
+        {
+            /// <summary>True when the query ran. False means the table could not be
+            /// read at all (absent module table, no access), NOT that it is empty.</summary>
+            public bool Ok { get; set; }
+            public List<T> Rows { get; set; }
+        }
+
+        /// <summary>One row of the Bank Account Document inline detail table. Check
+        /// number ranges, the process id and every internal id beyond the row key are
+        /// deliberately absent - the panel does not display them.</summary>
+        public class BankAccountDocDetailRow
+        {
+            public int C_BankAccountDoc_ID { get; set; }
+            /// <summary>C_BankAccountDoc.Name - the Document column.</summary>
+            public string Name { get; set; }
+            /// <summary>VA009_PaymentMethod name; "" when the module, the link column
+            /// or the row's own reference is absent.</summary>
+            public string PaymentMethod { get; set; }
+            /// <summary>StartChkNumber - the first cheque number of the book - as plain
+            /// digits; "" when the column is null.</summary>
+            public string StartChkNumber { get; set; }
+            /// <summary>CurrentNext - the cheque number the book is standing on - as
+            /// plain digits; "" when the column is null.</summary>
+            public string CurrentNext { get; set; }
+            /// <summary>EndChkNumber - the last cheque number of the range - as plain
+            /// digits; "" when the column is null.</summary>
+            public string EndChkNumber { get; set; }
+            /// <summary>Priority as plain digits; "" when the column is null.</summary>
+            public string Priority { get; set; }
+            /// <summary>Translated AD_Process.Name of the document's print/export
+            /// process; "" when the row names no process. The id itself never
+            /// leaves the server - the panel shows the process by name.</summary>
+            public string ProcessName { get; set; }
+            public bool IsActive { get; set; }
+        }
+
+        /// <summary>One row of the Statement Class inline detail table.</summary>
+        public class StatementClassDetailRow
+        {
+            public int VA012_BankStatementClass_ID { get; set; }
+            /// <summary>VA012_BankStatementClassName - the configuration row's own
+            /// name.</summary>
+            public string ClassName { get; set; }
+            /// <summary>Name of the VA012_StatementClass master the row points at;
+            /// "" when the module, the link column or the row's own reference is
+            /// absent.</summary>
+            public string MasterClassName { get; set; }
+            public bool IsActive { get; set; }
         }
     }
 }

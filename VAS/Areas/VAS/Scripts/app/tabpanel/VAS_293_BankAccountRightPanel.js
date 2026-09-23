@@ -23,7 +23,25 @@
  *                       configuration       hosting window, with its record count
  *                                           and a short detail. Clicking a row
  *                                           switches the window to that tab with
- *                                           this account still selected.
+ *                                           this account still selected - EXCEPT
+ *                                           for Bank Account Document and Statement
+ *                                           Class, which expand a detail table in
+ *                                           place instead of navigating.
+ *
+ *                  Inline detail (rows 5a):
+ *                    - only C_BankAccountDoc and VA012_BankStatementClass expand;
+ *                      the other four rows keep their tab navigation untouched;
+ *                    - a row with no active record does not expand at all - it
+ *                      stays in its "Not configured" state;
+ *                    - tables start hidden and are never auto-opened;
+ *                    - the rows are fetched on the FIRST open and cached for the
+ *                      account, so closing and reopening costs no request, and
+ *                      opening one never reloads the panel;
+ *                    - the row is the disclosure control: aria-expanded /
+ *                      aria-controls, a highlighted open state, and a chevron that
+ *                      turns to point down;
+ *                    - the detail reads active AND inactive rows, because the
+ *                      tables carry a Status column.
  *
  *                  The panel is a tab panel: the framework loads it by the
  *                  AD_Tab class name, so it is NOT imported by VASjs.js on its
@@ -65,6 +83,26 @@
  *                        grid gains monospaced identifiers and ends on the bank
  *                        address, and the statement facts read as a dashed
  *                        label / value list.
+ *   VAI145   2026-09-23  Linked configuration: Bank Account Document and Statement
+ *                        Class now expand an inline detail table instead of
+ *                        navigating, loaded on demand and cached per account.
+ *   VAI145   2026-09-23  Bank Account Document detail gains the process name;
+ *                        Statement Class keeps VA012_BankStatementClassName and
+ *                        drops File required.
+ *   VAI145   2026-09-23  Expanded rows redrawn to the approved reference: the row
+ *                        and its table share one bordered card, Next no. and End
+ *                        check no. merge into a single Cheque series column, the
+ *                        block's own title strip is gone (the row above it already
+ *                        names it and carries the count), and the caret sits in a
+ *                        bordered button.
+ *   VAI145   2026-09-23  Linked configuration redrawn for EVERY row: each row is
+ *                        its own card, the status pill gives way to a check / dash
+ *                        state tile, title and summary flow inline, and the count
+ *                        sits in a badge. Bank Account Document detail adds the
+ *                        cheque series (StartChkNumber - EndChkNumber) with the
+ *                        current number and the priority as cell sub-lines;
+ *                        Statement Class detail adds the VA012_StatementClass
+ *                        master name beside the row's own.
  *
  * -- Labels / Message Keys ---------------------------------------------------
  *  Panel
@@ -117,6 +155,26 @@
  *   Never run                                   | VAS_293_NeverRun
  *   Open this tab                               | VAS_293_OpenTab
  *   No linked configuration tabs are active.    | VAS_293_NoLinkedTabs
+ *
+ *  Inline configuration detail
+ *   Show details                                | VAS_293_ShowDetail
+ *   Hide details                                | VAS_293_HideDetail
+ *   Loading...                                  | VAS_293_Loading
+ *   Could not load the configuration details.   | VAS_293_DetailLoadFailed
+ *   Status                                      | VAS_293_ColStatus
+ *   Active / Inactive  (shared with the header) | VAS_293_Active / _Inactive
+ *    Bank account document details
+ *     Document                                  | VAS_293_ColDocument
+ *     Payment method                            | VAS_293_ColPaymentMethod
+ *     Cheque series                             | VAS_293_ColChequeSeries
+ *     Process                                   | VAS_293_ColProcess
+ *     Priority {0}        (cell sub-line)       | VAS_293_PriorityMeta
+ *     Current {0}         (cell sub-line)       | VAS_293_CurrentNoMeta
+ *     No Bank Account Document configuration…   | VAS_293_NoDocDetail
+ *    Statement class details
+ *     Statement class                           | VAS_293_ColStatementClass
+ *     Class                                     | VAS_293_ColClass
+ *     No Statement Class configuration found.   | VAS_293_NoClassDetail
  * ---------------------------------------------------------------------------
  ***********************************************************/
 ; VAS = window.VAS || {};
@@ -175,6 +233,12 @@
         var $root, $busy, $body, $emptyState;
         var data = null;
 
+        /* Rows of the inline detail tables, keyed by table name, for the account
+           currently on screen. Opening a row fills its entry; closing and reopening
+           it costs nothing more. Emptied whenever the panel changes record, so a
+           table can never show the previous account's configuration. */
+        var detailCache = {};
+
         var CLS = "vas_293-";
 
         var disposed = false;
@@ -205,33 +269,17 @@
 
         var SVG_ATTR = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
         var SVG = {
-            /* One glyph per configuration table, so a row is recognisable before
-               its label is read. */
-            lines: '<svg ' + SVG_ATTR + '><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>',
-            doc: '<svg ' + SVG_ATTR + '><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v5h6"/></svg>',
-            processor: '<svg ' + SVG_ATTR + '><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>',
-            loader: '<svg ' + SVG_ATTR + '><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>',
-            statementClass: '<svg ' + SVG_ATTR + '><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>',
-            accounting: '<svg ' + SVG_ATTR + '><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8"/><path d="M8 11h3"/><path d="M13 11h3"/><path d="M8 16h3"/><path d="M13 16h3"/></svg>',
-            config: '<svg ' + SVG_ATTR + '><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>',
-            chevron: '<svg ' + SVG_ATTR + '><path d="m9 18 6-6-6-6"/></svg>'
+            chevron: '<svg ' + SVG_ATTR + '><path d="m9 18 6-6-6-6"/></svg>',
+            /* The disclosure caret: down when closed, flipped to up when open. */
+            chevronDown: '<svg ' + SVG_ATTR + '><path d="m6 9 6 6 6-6"/></svg>',
+            /* The two states a configuration row can be in. The TILE carries them,
+               so the row needs no status pill beside its title. */
+            check: '<svg ' + SVG_ATTR + '><path d="M20 6 9 17l-5-5"/></svg>',
+            dash: '<svg ' + SVG_ATTR + '><path d="M5 12h14"/></svg>'
         };
 
         function icon(name) {
             return $('<span class="' + CLS + 'ic"></span>').html(SVG[name] || "");
-        }
-
-        /* The configuration tables, in the order the panel lists them, with the
-           glyph each row wears. A table the window does not expose as an active
-           tab never reaches here - the server only sends rows it found. */
-        function configIcon(tableName) {
-            if (tableName === TBL_ACCOUNT_LINE) return "lines";
-            if (tableName === TBL_ACCOUNT_DOC) return "doc";
-            if (tableName === TBL_PAYMENT_PROCESSOR) return "processor";
-            if (tableName === TBL_STATEMENT_LOADER) return "loader";
-            if (tableName === TBL_STATEMENT_CLASS) return "statementClass";
-            if (tableName === TBL_DEFAULT_ACCOUNTING) return "accounting";
-            return "config";
         }
 
         /* ---------------------------------------------------------------- */
@@ -432,6 +480,7 @@
         function runAction(name, $btn) {
             try {
                 if (name === "open-tab") openLinkedTab($btn.attr("data-tab"));
+                else if (name === "toggle-detail") toggleDetail($btn);
             } catch (e) { if (window.console) console.log(e); }
         }
 
@@ -492,6 +541,7 @@
                record is loading. The "no account" placeholder is NOT raised: this
                is a load, not an empty selection. */
             data = null;
+            detailCache = {};
             if ($body) {
                 $body.empty();
                 $emptyState.hide();
@@ -536,6 +586,7 @@
         this.clear = function () {
             invalidateFetch();
             data = null;
+            detailCache = {};
             shownRecordId = 0;
             render();
             /* A discarded reply never reaches its own showBusy(false), so the
@@ -862,48 +913,108 @@
                 return $sec;
             }
 
+            /* Every row is its own card, expandable or not - an expandable one just
+               also holds its table. The list itself stays flat and only spaces the
+               cards, which is the "outer containers never carry borders, per-item
+               cards do" rule. */
             var $list = $('<div class="' + CLS + 'entities"></div>');
             for (var i = 0; i < list.length; i++) {
-                $list.append(configRow(list[i], i === list.length - 1));
+                var cfg = list[i];
+                var $card = $('<div class="' + CLS + 'entityCard"></div>').append(configRow(cfg));
+                if (isExpandable(cfg)) {
+                    $card.append(detailHost(cfg));
+                }
+                $list.append($card);
             }
             $sec.append($list);
             return $sec;
         }
 
-        /* One Entity List row: type tile, identity + status pill + detail, then
-           the record count and the navigation chevron. The whole row is a button
-           - clicking it switches the hosting window to that tab. */
-        function configRow(cfg, isLast) {
-            var label = msg("VAS_293_OpenTab", "Open this tab");
-            var $r = $('<button type="button" class="' + CLS + 'entity' + (isLast ? " " + CLS + "last" : "") + '"></button>')
-                .attr("data-action", "open-tab")
+        /* True when this row opens a detail table in place instead of switching the
+           window to its tab. Only the two tables the specification names, and only
+           when there is something to show: a row with no active record stays in its
+           "Not configured" state and is NOT expandable. */
+        function isExpandable(cfg) {
+            if (!cfg) return false;
+            if (cfg.TableName !== TBL_ACCOUNT_DOC && cfg.TableName !== TBL_STATEMENT_CLASS) return false;
+            return (+cfg.RecordCount || 0) > 0;
+        }
+
+        /* DOM id of a row's detail container. Unique per window AND per tab, so two
+           instances of the panel on screen cannot point their aria-controls at each
+           other's table. */
+        function detailId(cfg) {
+            return CLS + "detail_" + ($self.windowNo || 0) + "_" + (+cfg.AD_Tab_ID || 0);
+        }
+
+        /* One Entity List row: type tile, identity + status pill + detail, then the
+           record count and the chevron. The whole row is a button. Clicking it
+           switches the hosting window to that tab - except on the two expandable
+           rows, where it opens the detail table in place. */
+        function configRow(cfg) {
+            var expandable = isExpandable(cfg);
+            var label = expandable ? msg("VAS_293_ShowDetail", "Show details")
+                                   : msg("VAS_293_OpenTab", "Open this tab");
+            var $r = $('<button type="button" class="' + CLS + 'entity"></button>')
+                .attr("data-action", expandable ? "toggle-detail" : "open-tab")
                 .attr("data-tab", cfg.AD_Tab_ID)
+                .attr("data-table", cfg.TableName || "")
                 .attr("title", label);
 
-            /* One tone for the whole section (entity type = configuration); row
-               status rides on the pill, not on the tile. */
-            var $tile = $('<span class="' + CLS + 'tile"></span>');
-            $tile.append(icon(configIcon(cfg.TableName)));
+            if (expandable) {
+                /* The row IS the disclosure control, so it says so: screen readers
+                   announce the state and the table it governs. */
+                $r.attr("aria-expanded", "false").attr("aria-controls", detailId(cfg));
+            }
+
+            /* The TILE carries the row's state - a green check when the tab holds
+               something for this account, a grey dash when it does not. It replaces
+               the status pill beside the title: one signal, read before any word
+               is. The state is still spelled out for assistive technology, which
+               cannot see a tint. */
+            var state = cfg.IsConfigured ? msg("VAS_293_Configured", "Configured")
+                                         : msg("VAS_293_NotConfigured", "Not configured");
+            var $tile = $('<span class="' + CLS + 'tile ' + CLS
+                          + (cfg.IsConfigured ? "tileOk" : "tileOff") + '"></span>')
+                .attr("title", state).attr("aria-label", state);
+            $tile.append(icon(cfg.IsConfigured ? "check" : "dash"));
             $r.append($tile);
 
+            /* Title and summary FLOW: the summary follows the title on the same
+               line while it fits and wraps beneath it when it does not, so a short
+               detail ("MT940 Statement") costs no second line. */
             var $id = $('<span class="' + CLS + 'entityMain"></span>');
-            var $titleRow = $('<span class="' + CLS + 'entityTitle"></span>');
-            $titleRow.append($('<span class="' + CLS + 'entityName"></span>').text(cfg.TabName || "").attr("title", cfg.TabName || ""));
-            $titleRow.append(pill(cfg.IsConfigured ? msg("VAS_293_Configured", "Configured")
-                                                   : msg("VAS_293_NotConfigured", "Not configured"),
-                                  cfg.IsConfigured ? "success" : "neutral"));
-            $id.append($titleRow);
-
+            $id.append($('<span class="' + CLS + 'entityName"></span>')
+                .text(cfg.TabName || "").attr("title", cfg.TabName || ""));
             var detail = configDetail(cfg);
             $id.append($('<span class="' + CLS + 'entityMeta"></span>').text(detail).attr("title", detail));
             $r.append($id);
 
             var $trail = $('<span class="' + CLS + 'entityTrail"></span>');
-            $trail.append($('<span class="' + CLS + 'entityValue"></span>').text(ltrToken(+cfg.RecordCount || 0)));
-            $trail.append(icon("chevron").addClass(CLS + "chev"));
+            $trail.append($('<span class="' + CLS + 'countBadge"></span>')
+                .text(ltrToken(+cfg.RecordCount || 0)));
+            /* A caret in a bordered button on the rows that OPEN in place; the
+               plain forward chevron on the rows that navigate away. Two different
+               actions must not wear the same affordance. */
+            if (expandable) {
+                $trail.append($('<span class="' + CLS + 'chevBtn"></span>')
+                    .append(icon("chevronDown").addClass(CLS + "chev")));
+            } else {
+                $trail.append(icon("chevron").addClass(CLS + "chev"));
+            }
             $r.append($trail);
 
             return $r;
+        }
+
+        /* The empty, hidden container a row's detail table is rendered into. It is
+           built with the list so the toggle has somewhere to draw; its rows are not
+           fetched until the user opens it. */
+        function detailHost(cfg) {
+            return $('<div class="' + CLS + 'detail"></div>')
+                .attr("id", detailId(cfg))
+                .attr("data-table", cfg.TableName || "")
+                .attr("hidden", "hidden");
         }
 
         /* The row's secondary line. Account Line is composed here rather than on
@@ -934,9 +1045,267 @@
             return cfg.Detail || msg("VAS_293_Configured", "Configured");
         }
 
+        /* 5a · Inline detail ------------------------------------------------ */
+
+        /* Everything that differs between the two expandable rows, in one place:
+           the endpoint, the empty-state wording, and the columns. A column is
+           {label, cell, align}: `cell` turns one payload row into the jQuery
+           content of one td, so the column list is the ONLY place that knows the
+           shape of a row. `align:"end"` right-aligns a column carrying digits,
+           per the panel catalogue's Data Grid rule.
+
+           The block carries no title of its own: it opens directly under the row
+           that names it, inside the same card, and the record count is already on
+           that row. A heading would only repeat both. */
+        function detailSpec(tableName) {
+            if (tableName === TBL_ACCOUNT_DOC) {
+                return {
+                    action: "GetBankAccountDocDetail",
+                    /* Column widths live in the stylesheet, keyed off this class -
+                       a fixed table needs them, and CSS is where they belong. */
+                    cls: CLS + "tblDoc",
+                    empty: msg("VAS_293_NoDocDetail", "No Bank Account Document configuration found."),
+                    columns: [
+                        {
+                            /* Priority rides UNDER the document name rather than
+                               taking a column of its own: five columns is already
+                               what a right panel affords, and a one-or-two digit
+                               figure does not earn a sixth. */
+                            label: msg("VAS_293_ColDocument", "Document"),
+                            cell: function (row) {
+                                return cellText(row.Name, row.Priority
+                                    ? fmt(msg("VAS_293_PriorityMeta", "Priority {0}"), ltrToken(row.Priority))
+                                    : "");
+                            }
+                        },
+                        {
+                            label: msg("VAS_293_ColPaymentMethod", "Payment method"),
+                            cell: function (row) { return cellText(row.PaymentMethod); }
+                        },
+                        {
+                            /* The cheque book as ONE column: the SERIES it spans on
+                               top, the number it is standing on underneath. Sequence
+                               numbers are identifiers, not quantities - monospaced,
+                               never grouped, and each is a single left-to-right
+                               token so RTL cannot reverse a range's ends. */
+                            label: msg("VAS_293_ColChequeSeries", "Cheque series"),
+                            align: "end",
+                            cell: function (row) {
+                                return cellText(chequeSeries(row), row.CurrentNext
+                                    ? fmt(msg("VAS_293_CurrentNoMeta", "Current {0}"), ltrToken(row.CurrentNext))
+                                    : "").addClass(CLS + "mono");
+                            }
+                        },
+                        {
+                            /* The PROCESS by name - the panel never shows an
+                               AD_Process_ID, and the server already translated it. */
+                            label: msg("VAS_293_ColProcess", "Process"),
+                            cell: function (row) { return cellText(row.ProcessName); }
+                        },
+                        {
+                            label: msg("VAS_293_ColStatus", "Status"),
+                            cell: function (row) { return statusPill(row.IsActive); }
+                        }
+                    ]
+                };
+            }
+
+            return {
+                action: "GetStatementClassDetail",
+                cls: CLS + "tblClass",
+                empty: msg("VAS_293_NoClassDetail", "No Statement Class configuration found."),
+                columns: [
+                    {
+                        /* Two different names: the configuration row's own, and the
+                           VA012_StatementClass master it points at. They answer
+                           different questions, so each gets its own column. */
+                        label: msg("VAS_293_ColStatementClass", "Statement class"),
+                        cell: function (row) { return cellText(row.ClassName); }
+                    },
+                    {
+                        label: msg("VAS_293_ColClass", "Class"),
+                        cell: function (row) { return cellText(row.MasterClassName); }
+                    },
+                    {
+                        label: msg("VAS_293_ColStatus", "Status"),
+                        cell: function (row) { return statusPill(row.IsActive); }
+                    }
+                ]
+            };
+        }
+
+        /* "1 – 50" from the two ends of the cheque book. Either end may be absent,
+           in which case the one that is known stands alone rather than reading as
+           an open-ended range. */
+        function chequeSeries(row) {
+            var from = row.StartChkNumber || "";
+            var to = row.EndChkNumber || "";
+            if (from.length && to.length) return ltrToken(from + " – " + to);
+            return ltrToken(from.length ? from : to);
+        }
+
+        /* A truncating cell that carries its full value as a tooltip - a right panel
+           is never wide enough to promise a column will fit. An optional `meta` adds
+           a smaller second line, which is how a cell carries a second fact without
+           the table growing a column it has no room for. */
+        function cellText(value, meta) {
+            var v = orDash(value);
+            var $c = $('<span class="' + CLS + 'cellText"></span>');
+            $c.append($('<span class="' + CLS + 'cellMain"></span>').text(v).attr("title", v));
+            if (meta) {
+                $c.append($('<span class="' + CLS + 'cellMeta"></span>').text(meta).attr("title", meta));
+            }
+            return $c;
+        }
+
+        function statusPill(isActive) {
+            return pill(isActive ? msg("VAS_293_Active", "Active") : msg("VAS_293_Inactive", "Inactive"),
+                        isActive ? "success" : "neutral");
+        }
+
+        /* Paints a loaded detail payload into its container: the table, or the
+           block's empty state. */
+        function renderDetail($host, tableName, payload) {
+            var spec = detailSpec(tableName);
+            var rows = (payload && payload.Rows) || [];
+
+            $host.empty();
+
+            if (!rows.length) {
+                /* Two different silences: the read came back with nothing, or it
+                   could not run at all. The user is told which. */
+                var empty = (payload && payload.Ok)
+                    ? spec.empty
+                    : msg("VAS_293_DetailLoadFailed", "Could not load the configuration details.");
+                $host.append($('<div class="' + CLS + 'detailEmpty"></div>').text(empty));
+                return;
+            }
+
+            $host.append(detailTable(spec, rows));
+        }
+
+        /* A nested Data Grid, one row per record. */
+        function detailTable(spec, rows) {
+            var $table = $('<table class="' + CLS + 'table ' + spec.cls + '"></table>');
+            var $headRow = $('<tr></tr>');
+            var i;
+            for (i = 0; i < spec.columns.length; i++) {
+                var col = spec.columns[i];
+                $headRow.append($('<th scope="col"></th>')
+                    .addClass(col.align === "end" ? CLS + "cellEnd" : "")
+                    .text(col.label).attr("title", col.label));
+            }
+            $table.append($('<thead></thead>').append($headRow));
+
+            var $tbody = $('<tbody></tbody>');
+            for (i = 0; i < rows.length; i++) {
+                var $tr = $('<tr></tr>');
+                for (var c = 0; c < spec.columns.length; c++) {
+                    var column = spec.columns[c];
+                    $tr.append($('<td></td>')
+                        .addClass(column.align === "end" ? CLS + "cellEnd" : "")
+                        .append(column.cell(rows[i])));
+                }
+                $tbody.append($tr);
+            }
+            $table.append($tbody);
+            return $table;
+        }
+
         /* ---------------------------------------------------------------- */
         /*  Actions                                                         */
         /* ---------------------------------------------------------------- */
+
+        /* Opens or closes one row's detail table. Nothing here reloads the panel:
+           the rows are fetched once per account and kept, so a row that is opened,
+           closed and opened again costs no second request. */
+        function toggleDetail($btn) {
+            var tableName = $btn.attr("data-table");
+            var $host = $root.find("#" + cssEscape(detailIdOf($btn)));
+            if (!$host.length) return;
+
+            var open = $btn.attr("aria-expanded") === "true";
+            if (open) {
+                closeDetail($btn, $host);
+                return;
+            }
+
+            $btn.attr("aria-expanded", "true").addClass(CLS + "open")
+                .attr("title", msg("VAS_293_HideDetail", "Hide details"));
+            /* The CARD takes the open state too - its border is what groups the
+               row with the table below it. Set here rather than with :has(), which
+               this application's browser baseline cannot be relied on to support. */
+            $btn.closest("." + CLS + "entityCard").addClass(CLS + "open");
+            $host.removeAttr("hidden");
+
+            if (detailCache.hasOwnProperty(tableName)) {
+                renderDetail($host, tableName, detailCache[tableName]);
+                return;
+            }
+            loadDetail($btn, $host, tableName);
+        }
+
+        function closeDetail($btn, $host) {
+            $btn.attr("aria-expanded", "false").removeClass(CLS + "open")
+                .attr("title", msg("VAS_293_ShowDetail", "Show details"));
+            $btn.closest("." + CLS + "entityCard").removeClass(CLS + "open");
+            $host.attr("hidden", "hidden");
+        }
+
+        /* The id the row's aria-controls names. Read back off the button rather than
+           recomposed, so the row and its container can never drift apart. */
+        function detailIdOf($btn) {
+            return $btn.attr("aria-controls") || "";
+        }
+
+        /* The ids here are ours (prefix + digits), so this only has to survive being
+           handed to a selector - CSS.escape where the browser has it, and a plain
+           passthrough otherwise. */
+        function cssEscape(id) {
+            try {
+                if (window.CSS && typeof window.CSS.escape === "function") return window.CSS.escape(id);
+            } catch (e) { }
+            return id;
+        }
+
+        /* Fetches one detail table. The account id is captured at request time and
+           re-checked on the reply: the user can move to another bank account while a
+           detail is in flight, and that reply must not paint over the new one. */
+        function loadDetail($btn, $host, tableName) {
+            var spec = detailSpec(tableName);
+            var token = fetchToken;
+            var recordID = shownRecordId;
+
+            $host.empty().append($('<div class="' + CLS + 'detailEmpty"></div>')
+                .text(msg("VAS_293_Loading", "Loading...")));
+
+            $.ajax({
+                url: VIS.Application.contextUrl + "VAS/VAS_293_BankAccountRightPanel/" + spec.action,
+                type: "GET",
+                dataType: "json",
+                data: { C_BankAccount_ID: recordID },
+                success: function (raw) {
+                    if (token !== fetchToken || recordID !== shownRecordId) return;
+                    var payload;
+                    try {
+                        payload = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
+                    } catch (e) {
+                        payload = null;
+                    }
+                    if (!payload) payload = { Ok: false, Rows: [] };
+                    /* Only a read that actually RAN is worth keeping. A server-side
+                       failure is cached nowhere, so the next open tries again. */
+                    if (payload.Ok) detailCache[tableName] = payload;
+                    renderDetail($host, tableName, payload);
+                },
+                error: function (err) {
+                    if (token !== fetchToken || recordID !== shownRecordId) return;
+                    if (window.console) console.log(err);
+                    /* NOT cached: a failed read is worth retrying on the next open. */
+                    renderDetail($host, tableName, { Ok: false, Rows: [] });
+                }
+            });
+        }
 
         /* The hosting window, read from the panel's own tab. Window ids differ
            per environment, so this is the only acceptable source. */

@@ -49,9 +49,13 @@
  *                    value 0.8125em/700, metric meta 0.6875em/400, stat label
  *                    0.6875em/400, stat value 0.9375em/700, recon label
  *                    0.75em/400, recon value 0.8125em/700, entity row primary
- *                    0.875em/700, entity meta 0.75em/400, entity trailing
- *                    0.9375em/700, badge / pill 0.6875em/700.
- *                  Nothing below 0.6875em; weights are 400 / 500 / 700 only.
+ *                    0.875em/700, entity meta 0.75em/400, entity count badge
+ *                    0.75em/700, badge / pill 0.6875em/700, detail header cell
+ *                    0.6875em/500, detail body cell 0.6875em/400.
+ *                  Nothing below 0.6875em; weights are 400 / 500 / 700 only. The
+ *                  detail table's cells already sit AT the floor, so anything
+ *                  nested in a cell takes 1em of the cell - never another 0.6875em
+ *                  (see .vas_293-table td .vas_293-pill).
  * Chronological development:
  *   VAI145   2026-09-22  Created.
  *   VAI145   2026-09-23  Header, Bank & account details, Account position and
@@ -59,6 +63,19 @@
  *                        the tinted hero card and the compact lists are gone,
  *                        replaced by the identity header, the Stat Grid and the
  *                        dashed reconciliation list.
+ *   VAI145   2026-09-23  Expanded-row state and the inline detail table (a nested
+ *                        Data Grid in a per-item card) added for the two
+ *                        configuration rows that open in place.
+ *   VAI145   2026-09-23  Expandable rows redrawn to the reference: the row and its
+ *                        table share ONE bordered card, the open state drops its
+ *                        tint, the detail loses its own title strip, and the caret
+ *                        moves into a bordered button that flips on open.
+ *   VAI145   2026-09-23  Linked configuration redrawn for EVERY row: each row is
+ *                        its own card in a gapped, flat list; the status pill is
+ *                        replaced by a check / dash state tile; title and summary
+ *                        flow inline and wrap; the count sits in a quiet badge.
+ *                        Detail cells gained an optional sub-line, which is how a
+ *                        five-column table carries seven facts at panel width.
  ***********************************************************/
 
 /* ----------------------------------------------------------- */
@@ -91,11 +108,8 @@
     --p293-pill-risk-bg:    #FCEFEF;
     --p293-pill-neutral-bg: #F1F4F8;
 
-    /* Entity type tile - one tone for the whole Linked Configuration section
-       (the tone signals the ENTITY TYPE, not the row's status; row status is on
-       the pill). Configuration reads as Info / blue. */
+    /* Action tint - the currency pill and the caret button's hover ground. */
     --p293-tile-bg: #EAF8FF;
-    --p293-tile-tx: #0083DA;
 
     /* THE ROOT IS THE SCROLLER (see header comment). */
     position: relative;
@@ -532,90 +546,250 @@
 /* ----------------------------------------------------------- */
 /*  Primitive 7 - Entity list (linked configuration)            */
 /* ----------------------------------------------------------- */
-/* Flat container, dividers only: outer list containers never carry borders -
-   only per-item cards do. Each row is a real <button> so it answers the
-   keyboard; the button chrome is stripped back to a row. */
-.vas_293-entities { display: flex; flex-direction: column; min-width: 0; }
+/* Every configuration row is its OWN card. The list container stays flat and
+   only spaces them - "outer list containers never carry borders, per-item cards
+   do". Each row is a real <button> so it answers the keyboard; the button chrome
+   is stripped back to a row. */
+.vas_293-entities {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+    min-width: 0;
+}
+.vas_293-entityCard {
+    border: 1px solid var(--p293-card-bd);
+    border-radius: 11px;
+    overflow: hidden;
+    background: #FFFFFF;
+    min-width: 0;
+    transition: border-color .15s ease;
+}
+.vas_293-entityCard:hover { border-color: #C5D2DD; }
 
 .vas_293-entity {
     display: flex;
-    align-items: flex-start;
-    gap: 0.75em;
+    align-items: center;
+    gap: 0.6875em;
     width: 100%;
     min-width: 0;
-    padding: 0.625em 0.125em;
+    padding: 0.6875em 0.75em;
     border: 0;
-    border-bottom: 1px solid var(--p293-divider);
-    border-radius: 6px;
+    border-radius: 0;
     background: none;
     text-align: left;
     cursor: pointer;
     transition: background-color .15s ease;
 }
-.vas_293-entity.vas_293-last { border-bottom: 0; }
-.vas_293-entity:hover { background: #F7FBFF; }
+.vas_293-entity:hover { background: #FBFDFF; }
 
-/* Type Icon Tile: one tone for the whole section. */
+/* State Tile: a green check when the tab holds something for this account, a
+   grey dash when it does not. This is the row's ONLY status signal - there is
+   no pill beside the title. */
 .vas_293-tile {
-    width: 2.25em;
-    height: 2.25em;
-    border-radius: 8px;
+    width: 2.125em;
+    height: 2.125em;
+    border-radius: 9px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex: 0 0 auto;
-    background: var(--p293-tile-bg);
-    color: var(--p293-tile-tx);
 }
-.vas_293-tile .vas_293-ic svg { width: 1.25em; height: 1.25em; }
+.vas_293-tile .vas_293-ic svg { width: 1.125em; height: 1.125em; stroke-width: 2.5; }
+.vas_293-tileOk  { background: var(--p293-pill-success-bg); color: var(--p293-success); }
+.vas_293-tileOff { background: var(--p293-pill-neutral-bg); color: var(--p293-muted); }
 
+/* Title and summary FLOW in one block: the summary follows the title while it
+   fits and wraps beneath it when it does not. Hence inline, not flex - a flex
+   row cannot put a wrapped child back under its sibling. */
 .vas_293-entityMain { min-width: 0; flex: 1 1 auto; display: block; }
-.vas_293-entityTitle {
-    display: flex;
-    align-items: center;
-    gap: 0.5em;
-    flex-wrap: wrap;
-    min-width: 0;
-}
 .vas_293-entityName {
     font-size: 0.875em;
     font-weight: 700;
-    line-height: 1.35;
+    line-height: 1.4;
     color: var(--p293-text);
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
 }
 .vas_293-entityMeta {
-    display: block;
     font-size: 0.75em;
     font-weight: 400;
-    line-height: 1.4;
-    margin-top: 0.1875em;
+    line-height: 1.5;
+    margin-left: 0.5em;
     color: var(--p293-muted);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
 }
 
 /* Trailing column: the record count, then the navigation affordance. */
 .vas_293-entityTrail {
     display: flex;
     align-items: center;
-    gap: 0.375em;
+    gap: 0.5em;
     flex: 0 0 auto;
-    padding-top: 0.0625em;
 }
-.vas_293-entityValue {
-    font-size: 0.9375em;
+/* The count sits in a quiet badge rather than reading as loose text beside the
+   chevron. */
+.vas_293-countBadge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.75em;
+    height: 1.5em;
+    padding: 0 0.4375em;
+    border-radius: 999px;
+    background: var(--p293-pill-neutral-bg);
+    color: var(--p293-secondary);
+    font-size: 0.75em;
     font-weight: 700;
-    line-height: 1.3;
-    color: var(--p293-text);
+    line-height: 1;
     font-variant-numeric: tabular-nums;
 }
-.vas_293-chev { color: var(--p293-disabled); }
+.vas_293-chev { color: var(--p293-disabled); transition: transform .15s ease, color .15s ease; }
 .vas_293-entity:hover .vas_293-chev { color: var(--p293-action); }
+
+/* ----------------------------------------------------------- */
+/*  Expandable configuration row + its inline detail table      */
+/* ----------------------------------------------------------- */
+/* An expandable row's card also holds its table - they are one object. The open
+   card takes the action colour so the eye can tell, at a glance down the list,
+   which row the table below belongs to. */
+.vas_293-entityCard.vas_293-open { border-color: var(--p293-action); }
+/* No tint on the row itself when open: the card's border already groups it with
+   its table, and a second signal would only add noise. */
+.vas_293-entity.vas_293-open { background: #FFFFFF; }
+
+/* The caret's bordered button - the affordance that says "this opens here",
+   as against the bare forward chevron on the rows that navigate away. */
+.vas_293-chevBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75em;
+    height: 1.75em;
+    flex: 0 0 auto;
+    border: 1px solid var(--p293-card-bd);
+    border-radius: 8px;
+    background: #FFFFFF;
+    color: var(--p293-secondary);
+    transition: border-color .15s ease, background-color .15s ease;
+}
+.vas_293-entity:hover .vas_293-chevBtn {
+    border-color: var(--p293-action);
+    background: var(--p293-tile-bg);
+}
+/* Down when closed, up when open - and the caret is symmetric, so this reads
+   the same in RTL and needs no mirroring. */
+.vas_293-chevBtn .vas_293-chev { transition: transform .15s ease; }
+.vas_293-entity.vas_293-open .vas_293-chevBtn .vas_293-chev { transform: rotate(180deg); }
+.vas_293-entity.vas_293-open .vas_293-chevBtn {
+    border-color: var(--p293-action);
+    color: var(--p293-action);
+}
+
+/* The detail sits directly under its row inside the same card: no border and no
+   radius of its own, only the rule that separates it from the row. Hidden
+   through the HTML `hidden` attribute, which the base theme's display rules
+   must not be able to defeat. */
+.vas_293-detail[hidden] { display: none; }
+.vas_293-detail {
+    border-top: 1px solid var(--p293-card-bd);
+    background: #FFFFFF;
+    min-width: 0;
+}
+
+/* Carries the loading line and both silences (nothing found / could not read). */
+.vas_293-detailEmpty {
+    padding: 0.75em 0.625em;
+    font-size: 0.75em;
+    font-weight: 400;
+    line-height: 1.4;
+    color: var(--p293-muted);
+}
+
+/* Data Grid, nested. `table-layout: fixed` is what keeps a long document name
+   from stealing the whole row: every column holds its share and truncates,
+   with the full value on the cell's title. The catalogue's leading icon column
+   is deliberately NOT drawn here - this grid is a disclosure under the row that
+   already names it, and a 1.75em affordance column would cost a quarter of the
+   width in a right panel. */
+.vas_293-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+/* Column shares per table. Each set adds to 100%, and every cell truncates, so
+   no column can be squeezed out by a long value in another. The document table
+   runs five columns wide in a right panel, so it also buys width back from its
+   own cell padding - the cheque series is the cell that cannot afford to lose
+   characters. */
+.vas_293-tblDoc   th:nth-child(1), .vas_293-tblDoc   td:nth-child(1) { width: 24%; }
+.vas_293-tblDoc   th:nth-child(2), .vas_293-tblDoc   td:nth-child(2) { width: 20%; }
+.vas_293-tblDoc   th:nth-child(3), .vas_293-tblDoc   td:nth-child(3) { width: 19%; }
+.vas_293-tblDoc   th:nth-child(4), .vas_293-tblDoc   td:nth-child(4) { width: 20%; }
+.vas_293-tblDoc   th:nth-child(5), .vas_293-tblDoc   td:nth-child(5) { width: 17%; }
+.vas_293-tblDoc   th,
+.vas_293-tblDoc   td { padding-left: 0.4375em; padding-right: 0.4375em; }
+.vas_293-tblClass th:nth-child(1), .vas_293-tblClass td:nth-child(1) { width: 40%; }
+.vas_293-tblClass th:nth-child(2), .vas_293-tblClass td:nth-child(2) { width: 36%; }
+.vas_293-tblClass th:nth-child(3), .vas_293-tblClass td:nth-child(3) { width: 24%; }
+
+/* The header WRAPS rather than truncating: a two-line "Payment / method" still
+   names its column, where "Payment m…" does not. Body cells are the opposite -
+   see .vas_293-cellText. */
+.vas_293-table th {
+    padding: 0.4375em 0.625em;
+    text-align: left;
+    font-size: 0.6875em;
+    font-weight: 500;
+    line-height: 1.4;
+    color: var(--p293-secondary);
+    background: #FBFCFE;
+    border-bottom: 1px solid #C5D2DD;
+    white-space: normal;
+    overflow-wrap: break-word;
+}
+.vas_293-table td {
+    padding: 0.5em 0.625em;
+    font-size: 0.6875em;
+    font-weight: 400;
+    line-height: 1.4;
+    color: var(--p293-text);
+    border-bottom: 1px solid var(--p293-divider);
+    vertical-align: middle;
+    min-width: 0;
+}
+.vas_293-table tbody tr:last-child td { border-bottom: 0; }
+/* The cell already sits at the 0.6875em token floor, so a pill inside it must
+   NOT take another 0.6875em of that - 1em of the cell IS the floor. */
+.vas_293-table td .vas_293-pill { font-size: 1em; }
+
+/* Cells truncate rather than wrap: a wrapped cell makes every other row in the
+   table taller for one long value. */
+.vas_293-cellText { display: block; min-width: 0; }
+.vas_293-cellMain {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* A cell's second fact, carried as a sub-line so the table does not have to
+   grow a column it has no room for. The cell already sits AT the 0.6875em token
+   floor, so the sub-line cannot be made smaller - colour and weight separate it
+   from the value above, not size. */
+.vas_293-cellMeta {
+    display: block;
+    min-width: 0;
+    margin-top: 0.125em;
+    font-size: 1em;
+    font-weight: 400;
+    line-height: 1.4;
+    color: var(--p293-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* Digit columns sit against the column edge so they scan down as a column. */
+.vas_293-cellEnd { text-align: right; }
+.vas_293-cellEnd .vas_293-cellText { font-variant-numeric: tabular-nums; }
 
 /* ----------------------------------------------------------- */
 /*  Narrow panel                                                */
@@ -625,6 +799,10 @@
 @container (max-width: 320px) {
     .vas_293-metrics { grid-template-columns: minmax(0, 1fr); }
     .vas_293-stats   { grid-template-columns: minmax(0, 1fr); }
+    /* A fixed table cannot restack, so it buys its width back from the cell
+       padding instead - the columns keep their shares and keep truncating. */
+    .vas_293-table th,
+    .vas_293-table td { padding-left: 0.375em; padding-right: 0.375em; }
 }
 
 /* ----------------------------------------------------------- */
@@ -632,11 +810,18 @@
 /* ----------------------------------------------------------- */
 [dir="rtl"] .vas_293-reconValue { text-align: left; }
 [dir="rtl"] .vas_293-entity { text-align: right; }
+[dir="rtl"] .vas_293-table th { text-align: right; }
+[dir="rtl"] .vas_293-cellEnd { text-align: left; }
 /* The eyebrow's tracking is a Latin typesetting device; Arabic is a joined
    script, where letter-spacing breaks the word apart. */
 [dir="rtl"] .vas_293-eyebrow { letter-spacing: 0; }
-/* The chevron points at the content it opens, so it mirrors with the layout. */
-[dir="rtl"] .vas_293-chev svg { transform: scaleX(-1); }
+/* The FORWARD chevron points at the content it opens, so it mirrors with the
+   layout. The disclosure caret inside .vas_293-chevBtn must NOT: it is
+   horizontally symmetric, and mirroring it would fight its open/closed
+   rotation for no gain. */
+[dir="rtl"] .vas_293-entityTrail > .vas_293-chev svg { transform: scaleX(-1); }
+/* The summary follows the title in both directions. */
+[dir="rtl"] .vas_293-entityMeta { margin-left: 0; margin-right: 0.5em; }
 
 /* --- RTL: the scrollbar keeps the left edge, the handle keeps its strip -----
    The root IS the scroller, so in Arabic its vertical scrollbar renders on the
