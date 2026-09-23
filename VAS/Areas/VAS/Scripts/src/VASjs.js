@@ -301,6 +301,7 @@ import "../app/tabpanel/VAS_189_ARInvoiceDetailPanel.js";
 import "../app/tabpanel/VAS_191_APPaymentDetailPanel.js";
 import "../app/tabpanel/VAS_291_GLJournalRightPanel.js";
 import "../app/tabpanel/VAS_292_BankingJournalRightPanel.js";
+import "../app/tabpanel/VAS_293_BankAccountRightPanel.js";
 import "../app/widgets/VAS_156_CountedMTDWidget.js";
 import "../app/widgets/VAS_157_VarianceLinesWidget.js";
 import "../app/widgets/VAS_158_OpenCountSheetsWidget.js";

@@ -1,0 +1,664 @@
+/************************************************************
+ * Module Name    : VAS
+ * Purpose        : Styles for the Bank Account overview right panel
+ *                  (VAS.VAS_293_BankAccountRightPanel). Every class is panel
+ *                  prefixed (vas_293-) and scoped under .vas_293-root so it can
+ *                  neither collide with another panel nor repaint a base-theme
+ *                  selector.
+ *
+ *                  Panel Foundation (windows-and-panels.md > Panel Foundation):
+ *                    1. root     - solid white working surface. In THIS host the
+ *                                  root IS the panel body: it owns height:100% +
+ *                                  overflow-y:auto (the scroller), the
+ *                                  container-type and the canonical anchor
+ *                                  --panel-anchor: clamp(16px, 1vw, 18px).
+ *                                  Putting the scroller on an inner element does
+ *                                  not work here - the host's container has no
+ *                                  definite height for a percentage child to
+ *                                  resolve against. Same arrangement as
+ *                                  VAS_189 / VAS_191 / VAS_291 / VAS_292.
+ *                    2. header   - the CHROME header (title, close, collapse
+ *                                  strip) is owned by the VIS tab-panel host and
+ *                                  is not styled here. .vas_293-head is a
+ *                                  different thing: the record's identity, drawn
+ *                                  full-bleed at the top of the BODY, carrying no
+ *                                  window affordance of its own.
+ *                    3. body     - a plain flow child: padding + column gap only,
+ *                                  no height and no overflow of its own
+ *                    4. reset    - nested form controls inherit the anchor, so a
+ *                                  pill inside a button is the same size as one
+ *                                  outside it
+ *                    5. units    - px for borders, dividers, radii, dot markers
+ *                                  and shadow offsets; em for every text size,
+ *                                  padding, margin, gap and scalable height
+ *
+ *                  COMPOSITION and SURFACES come from the approved reference
+ *                  (bank-account-right-panel.html), minus its harness: the flat
+ *                  identity header with its eyebrow and dotted status badge, the
+ *                  soft-ground identity card with monospaced identifiers, the
+ *                  emphasis balance with its currency pill over a grid of stat
+ *                  cards, and the dashed statement list.
+ *
+ *                  SIZES come from design.md (Right Panel Body > Typography Quick
+ *                  Reference), NOT from the reference, whose 19px title / 25px
+ *                  balance / 11px-13px cells and weights 650/750/800 all drift
+ *                  from the token table:
+ *                    section title 1em/700, section summary 0.75em/400,
+ *                    header title 1.125em/700, header subtitle 0.75em/400,
+ *                    emphasis value 1.5em/700, metric label 0.6875em/400, metric
+ *                    value 0.8125em/700, metric meta 0.6875em/400, stat label
+ *                    0.6875em/400, stat value 0.9375em/700, recon label
+ *                    0.75em/400, recon value 0.8125em/700, entity row primary
+ *                    0.875em/700, entity meta 0.75em/400, entity trailing
+ *                    0.9375em/700, badge / pill 0.6875em/700.
+ *                  Nothing below 0.6875em; weights are 400 / 500 / 700 only.
+ * Chronological development:
+ *   VAI145   2026-09-22  Created.
+ *   VAI145   2026-09-23  Header, Bank & account details, Account position and
+ *                        Statement & reconciliation restyled to the reference:
+ *                        the tinted hero card and the compact lists are gone,
+ *                        replaced by the identity header, the Stat Grid and the
+ *                        dashed reconciliation list.
+ ***********************************************************/
+
+/* ----------------------------------------------------------- */
+/*  1. Panel wrapper                                            */
+/* ----------------------------------------------------------- */
+.vas_293-root {
+    /* Canonical palette (foundations.md) */
+    --p293-text:        #102C3F;
+    --p293-secondary:   #41576A;
+    --p293-muted:       #5F7283;
+    --p293-divider:     #E2EAF1;
+    --p293-card-bd:     #D9E2EB;
+    --p293-action:      #0083DA;
+    --p293-action-deep: #005FA3;
+    --p293-disabled:    #9AB0C0;
+
+    /* Soft working ground - the reference's identity card and stat cards sit on
+       a tint rather than on plain white, so a grouped block reads as one object
+       against the panel surface. */
+    --p293-soft:        #F8FAFC;
+
+    /* Semantic text tones */
+    --p293-success: #0B6B45;
+    --p293-warning: #9A6500;
+    --p293-risk:    #A33F3F;
+
+    /* Pill grounds */
+    --p293-pill-success-bg: #E7F7EF;
+    --p293-pill-warning-bg: #FFF6E2;
+    --p293-pill-risk-bg:    #FCEFEF;
+    --p293-pill-neutral-bg: #F1F4F8;
+
+    /* Entity type tile - one tone for the whole Linked Configuration section
+       (the tone signals the ENTITY TYPE, not the row's status; row status is on
+       the pill). Configuration reads as Info / blue. */
+    --p293-tile-bg: #EAF8FF;
+    --p293-tile-tx: #0083DA;
+
+    /* THE ROOT IS THE SCROLLER (see header comment). */
+    position: relative;
+    height: 100%;
+    width: 100%;
+    /* min-width:0 lets the fr-based grid shrink to the host instead of forcing
+       a horizontal scrollbar on the whole window. */
+    min-width: 0;
+    max-width: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: auto;
+    box-sizing: border-box;
+
+    /* The canonical panel anchor + container context live here for the same
+       reason: this element IS the panel body in this host. */
+    container-type: inline-size;
+    --panel-anchor: clamp(16px, 1vw, 18px);
+    font-size: var(--panel-anchor);
+
+    background: #FFFFFF;
+    font-family: Roboto, "Segoe UI", Arial, sans-serif;
+    color: var(--p293-text);
+}
+.vas_293-root * { box-sizing: border-box; }
+
+/* ----------------------------------------------------------- */
+/*  3. Panel body - sections stack, the root scrolls them        */
+/* ----------------------------------------------------------- */
+.vas_293-body {
+    min-width: 0;
+    padding: 1.125em 0.875em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875em;
+    background: #FFFFFF;
+}
+
+/* ----------------------------------------------------------- */
+/*  4. Body reset - nested controls inherit the anchor          */
+/* ----------------------------------------------------------- */
+/* Scoped to the panel, never to '*': without it every em inside a button
+   resolves against the user agent's ~13.33px default instead of the anchor. */
+.vas_293-root button,
+.vas_293-root input,
+.vas_293-root select,
+.vas_293-root textarea,
+.vas_293-root optgroup {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    color: inherit;
+}
+.vas_293-root button:focus-visible {
+    outline: 2px solid var(--p293-action);
+    outline-offset: 2px;
+}
+
+/* Empty selection */
+.vas_293-empty {
+    padding: 2em 1em;
+    text-align: center;
+    font-size: 0.875em;
+    color: var(--p293-muted);
+}
+
+/* ----------------------------------------------------------- */
+/*  Icons - inline SVG only                                     */
+/* ----------------------------------------------------------- */
+.vas_293-ic { display: inline-flex; align-items: center; justify-content: center; line-height: 1; flex-shrink: 0; }
+.vas_293-ic svg { width: 1em; height: 1em; display: block; }
+
+/* Semantic text tones - one class, used by the hero value and any metric. */
+.vas_293-tx-success { color: var(--p293-success); }
+.vas_293-tx-warning { color: var(--p293-warning); }
+.vas_293-tx-risk    { color: var(--p293-risk); }
+.vas_293-tx-muted   { color: var(--p293-muted); }
+
+/* ----------------------------------------------------------- */
+/*  Primitive 2 - Section header                                */
+/* ----------------------------------------------------------- */
+.vas_293-sec { min-width: 0; }
+
+.vas_293-secHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    margin: 0.5em 0;
+    padding-bottom: 0.375em;
+    border-bottom: 1px solid var(--p293-divider);
+}
+/* A section that opens the body sits flush with its top. The identity header
+   normally takes that place, so this only bites if the header is ever dropped -
+   it is kept as the guard for that case. */
+.vas_293-body > .vas_293-sec:first-child .vas_293-secHead { margin-top: 0; }
+
+.vas_293-secTitle {
+    font-size: 1em;
+    font-weight: 700;
+    color: var(--p293-text);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_293-secRight {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    min-width: 0;
+    flex-shrink: 0;
+}
+.vas_293-secSum {
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--p293-muted);
+    white-space: nowrap;
+}
+
+/* Section empty state - a data section is never left blank. */
+.vas_293-secEmpty {
+    padding: 0.75em 0;
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--p293-muted);
+}
+
+/* ----------------------------------------------------------- */
+/*  Status badge - the header's state lozenge                   */
+/* ----------------------------------------------------------- */
+/* The leading dot is drawn from currentColor, so the marker and the word can
+   never disagree about the state they report. The dot is a physical marker and
+   stays in px; everything else scales with the anchor. */
+.vas_293-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375em;
+    border-radius: 999px;
+    padding: 0.3125em 0.625em;
+    font-size: 0.6875em;
+    font-weight: 700;
+    line-height: 1.4;
+    white-space: nowrap;
+    flex-shrink: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.vas_293-badge::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+    flex: 0 0 auto;
+}
+.vas_293-badge.vas_293-tone-success { background: var(--p293-pill-success-bg); color: var(--p293-success); }
+.vas_293-badge.vas_293-tone-warning { background: var(--p293-pill-warning-bg); color: var(--p293-warning); }
+.vas_293-badge.vas_293-tone-risk    { background: var(--p293-pill-risk-bg);    color: var(--p293-risk); }
+.vas_293-badge.vas_293-tone-neutral { background: var(--p293-pill-neutral-bg); color: var(--p293-secondary); }
+
+/* ----------------------------------------------------------- */
+/*  Panel header - the record's identity (content, not chrome)  */
+/* ----------------------------------------------------------- */
+/* Full-bleed across the body padding, so it reads as the panel's masthead
+   rather than as one more card in the stack. The negative inline margins undo
+   the body's 0.875em side padding and the top margin undoes its 1.125em, both
+   of which the header then re-applies as its own padding. */
+.vas_293-head {
+    min-width: 0;
+    margin: -1.125em -0.875em 0;
+    padding: 1.125em 0.875em 0.875em;
+    border-bottom: 1px solid var(--p293-divider);
+    background: linear-gradient(180deg, #FFFFFF 0%, #FBFCFE 100%);
+}
+
+.vas_293-eyebrow {
+    font-size: 0.6875em;
+    font-weight: 700;
+    line-height: 1.4;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--p293-muted);
+    margin-bottom: 0.375em;
+}
+
+.vas_293-headRow {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.625em;
+    min-width: 0;
+}
+.vas_293-headId { min-width: 0; }
+.vas_293-headTitle {
+    /* A real heading, so the user agent's own margins have to go. */
+    margin: 0;
+    font-size: 1.125em;
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--p293-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_293-headSub {
+    font-size: 0.75em;
+    font-weight: 400;
+    line-height: 1.4;
+    margin-top: 0.25em;
+    color: var(--p293-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ----------------------------------------------------------- */
+/*  Primitive 4a - Metric grid, detail-card wrap                */
+/* ----------------------------------------------------------- */
+.vas_293-card {
+    border: 1px solid var(--p293-card-bd);
+    border-radius: 12px;
+    background: var(--p293-soft);
+    padding: 0.875em;
+    min-width: 0;
+}
+.vas_293-metrics {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 0.875em;
+    row-gap: 0.625em;
+}
+.vas_293-metric { min-width: 0; }
+.vas_293-metricLabel {
+    font-size: 0.6875em;
+    font-weight: 400;
+    line-height: 1.4;
+    color: var(--p293-muted);
+}
+.vas_293-metricValue {
+    font-size: 0.8125em;
+    font-weight: 700;
+    line-height: 1.35;
+    color: var(--p293-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+/* Optional qualifier under a cell's value - used where the value itself needs
+   explaining ("Not defined in this environment"). */
+.vas_293-metricMeta {
+    font-size: 0.6875em;
+    font-weight: 400;
+    line-height: 1.4;
+    margin-top: 0.125em;
+    color: var(--p293-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* IBAN and the bank address span both columns: they are long single strings
+   that would otherwise ellipsis away to nothing in a half-width cell. The
+   address wraps (it is the only place it is shown); the IBAN keeps its single
+   line and breaks anywhere rather than overflowing. */
+.vas_293-metricWide { grid-column: 1 / -1; }
+.vas_293-metricWide .vas_293-metricValue {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.45;
+}
+
+/* Machine identifiers - account no., IBAN, routing no., SWIFT/BIC. Monospaced
+   so digit groups line up between cells and a transposed character shows. */
+.vas_293-mono {
+    font-family: Consolas, Menlo, Monaco, "Courier New", monospace;
+    letter-spacing: 0.01em;
+}
+
+/* ----------------------------------------------------------- */
+/*  Account position - emphasis figure + currency pill          */
+/* ----------------------------------------------------------- */
+/* The labelled balance on the left, the currency code beside it on the right.
+   Top-aligned, so the pill sits against the label rather than drifting down
+   with a value that wraps. */
+.vas_293-balance {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75em;
+    margin-bottom: 0.875em;
+    min-width: 0;
+}
+.vas_293-balanceMain { min-width: 0; }
+.vas_293-balanceLabel {
+    font-size: 0.6875em;
+    font-weight: 400;
+    line-height: 1.4;
+    color: var(--p293-muted);
+}
+.vas_293-balanceValue {
+    font-size: 1.5em;
+    font-weight: 700;
+    line-height: 1.15;
+    margin-top: 0.125em;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+.vas_293-curPill {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 8px;
+    padding: 0.3125em 0.5em;
+    margin-top: 0.1875em;
+    font-size: 0.6875em;
+    font-weight: 700;
+    line-height: 1.4;
+    white-space: nowrap;
+    flex-shrink: 0;
+    background: var(--p293-tile-bg);
+    color: var(--p293-action-deep);
+}
+
+/* ----------------------------------------------------------- */
+/*  Primitive 4b - Stat grid (per-item cards)                   */
+/* ----------------------------------------------------------- */
+.vas_293-stats {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.625em;
+}
+.vas_293-stat {
+    border: 1px solid var(--p293-card-bd);
+    border-radius: 10px;
+    background: var(--p293-soft);
+    padding: 0.625em 0.6875em;
+    min-width: 0;
+}
+/* An odd card closes the grid across both columns rather than leaving a hole
+   beside itself. */
+.vas_293-statWide { grid-column: 1 / -1; }
+.vas_293-statLabel {
+    font-size: 0.6875em;
+    font-weight: 400;
+    line-height: 1.4;
+    margin-bottom: 0.25em;
+    color: var(--p293-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_293-statValue {
+    font-size: 0.9375em;
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--p293-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+/* The stat qualifier is a short SENTENCE, not an identifier - it wraps rather
+   than ellipsising, because "Not defined in this en…" tells the user nothing. */
+.vas_293-statMeta {
+    font-size: 0.6875em;
+    font-weight: 400;
+    line-height: 1.4;
+    margin-top: 0.125em;
+    color: var(--p293-muted);
+    overflow-wrap: anywhere;
+}
+
+/* ----------------------------------------------------------- */
+/*  Statement & reconciliation - dashed label / value list      */
+/* ----------------------------------------------------------- */
+/* Flat container, dividers only. The rule is DASHED and sits BETWEEN rows
+   (never under the last one), which reads as a specification list rather than
+   as a table with a closing rule. */
+.vas_293-recon { display: flex; flex-direction: column; min-width: 0; }
+.vas_293-reconRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    padding: 0.4375em 0.125em;
+    min-width: 0;
+}
+.vas_293-reconRow + .vas_293-reconRow { border-top: 1px dashed var(--p293-divider); }
+.vas_293-reconLabel {
+    font-size: 0.75em;
+    font-weight: 400;
+    line-height: 1.4;
+    color: var(--p293-secondary);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_293-reconValue {
+    font-size: 0.8125em;
+    font-weight: 700;
+    line-height: 1.4;
+    color: var(--p293-text);
+    text-align: right;
+    white-space: nowrap;
+    flex-shrink: 0;
+    max-width: 60%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Status pill on a row - tinted ground, semantic text. */
+.vas_293-pill {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.1875em 0.5em;
+    font-size: 0.6875em;
+    font-weight: 700;
+    line-height: 1.4;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.vas_293-pill.vas_293-tone-success { background: var(--p293-pill-success-bg); color: var(--p293-success); }
+.vas_293-pill.vas_293-tone-warning { background: var(--p293-pill-warning-bg); color: var(--p293-warning); }
+.vas_293-pill.vas_293-tone-risk    { background: var(--p293-pill-risk-bg);    color: var(--p293-risk); }
+.vas_293-pill.vas_293-tone-neutral { background: var(--p293-pill-neutral-bg); color: var(--p293-secondary); }
+
+/* ----------------------------------------------------------- */
+/*  Primitive 7 - Entity list (linked configuration)            */
+/* ----------------------------------------------------------- */
+/* Flat container, dividers only: outer list containers never carry borders -
+   only per-item cards do. Each row is a real <button> so it answers the
+   keyboard; the button chrome is stripped back to a row. */
+.vas_293-entities { display: flex; flex-direction: column; min-width: 0; }
+
+.vas_293-entity {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75em;
+    width: 100%;
+    min-width: 0;
+    padding: 0.625em 0.125em;
+    border: 0;
+    border-bottom: 1px solid var(--p293-divider);
+    border-radius: 6px;
+    background: none;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color .15s ease;
+}
+.vas_293-entity.vas_293-last { border-bottom: 0; }
+.vas_293-entity:hover { background: #F7FBFF; }
+
+/* Type Icon Tile: one tone for the whole section. */
+.vas_293-tile {
+    width: 2.25em;
+    height: 2.25em;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    background: var(--p293-tile-bg);
+    color: var(--p293-tile-tx);
+}
+.vas_293-tile .vas_293-ic svg { width: 1.25em; height: 1.25em; }
+
+.vas_293-entityMain { min-width: 0; flex: 1 1 auto; display: block; }
+.vas_293-entityTitle {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+.vas_293-entityName {
+    font-size: 0.875em;
+    font-weight: 700;
+    line-height: 1.35;
+    color: var(--p293-text);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_293-entityMeta {
+    display: block;
+    font-size: 0.75em;
+    font-weight: 400;
+    line-height: 1.4;
+    margin-top: 0.1875em;
+    color: var(--p293-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Trailing column: the record count, then the navigation affordance. */
+.vas_293-entityTrail {
+    display: flex;
+    align-items: center;
+    gap: 0.375em;
+    flex: 0 0 auto;
+    padding-top: 0.0625em;
+}
+.vas_293-entityValue {
+    font-size: 0.9375em;
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--p293-text);
+    font-variant-numeric: tabular-nums;
+}
+.vas_293-chev { color: var(--p293-disabled); }
+.vas_293-entity:hover .vas_293-chev { color: var(--p293-action); }
+
+/* ----------------------------------------------------------- */
+/*  Narrow panel                                                */
+/* ----------------------------------------------------------- */
+/* Two metric columns are too cramped below this - a single stack keeps the
+   values readable instead of ellipsising every one of them. */
+@container (max-width: 320px) {
+    .vas_293-metrics { grid-template-columns: minmax(0, 1fr); }
+    .vas_293-stats   { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ----------------------------------------------------------- */
+/*  RTL                                                         */
+/* ----------------------------------------------------------- */
+[dir="rtl"] .vas_293-reconValue { text-align: left; }
+[dir="rtl"] .vas_293-entity { text-align: right; }
+/* The eyebrow's tracking is a Latin typesetting device; Arabic is a joined
+   script, where letter-spacing breaks the word apart. */
+[dir="rtl"] .vas_293-eyebrow { letter-spacing: 0; }
+/* The chevron points at the content it opens, so it mirrors with the layout. */
+[dir="rtl"] .vas_293-chev svg { transform: scaleX(-1); }
+
+/* --- RTL: the scrollbar keeps the left edge, the handle keeps its strip -----
+   The root IS the scroller, so in Arabic its vertical scrollbar renders on the
+   inline-start = physical LEFT edge of the panel, which is where an Arabic
+   reader expects it and where it stays.
+
+   The trouble is only that the VIS host hangs the tab-panel resize handle over
+   that same strip (APanel calls `.resizable({handles: ...})` on the panel
+   cell). The handle is on top, so the pointer there turns into the resize
+   cursor and a drag resizes the panel instead of moving the thumb.
+
+   So the SCROLLER is stepped in from the panel's left edge rather than flipped
+   to LTR. A margin moves the root's whole border box, and a scrollbar is laid
+   at its box's inline-start edge, so the thumb moves in with it and clears the
+   handle - while still reading as the left-hand scrollbar RTL calls for. The
+   width is reduced by the same amount so the step-in cannot overflow the host
+   and grow a horizontal scrollbar.
+
+   --p293-rtl-scroll-inset is the single number to tune: it has to be at least
+   as wide as the handle (7px by jQuery UI's default) with room to grab. */
+[dir="rtl"] .vas_293-root {
+    --p293-rtl-scroll-inset: 16px;
+    margin-left: var(--p293-rtl-scroll-inset);
+    width: calc(100% - var(--p293-rtl-scroll-inset));
+}
