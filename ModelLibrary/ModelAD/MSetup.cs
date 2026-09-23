@@ -13,12 +13,6 @@ using System.Data;
 using VAdvantage.Print;
 using System.ServiceModel;
 using ViennaAdvantage.Model;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Threading.Tasks;
-using Newtonsoft.Json;
-using System.Web.Hosting;
-using Task = System.Threading.Tasks.Task;
 
 namespace VAdvantage.Model
 {
@@ -47,10 +41,6 @@ namespace VAdvantage.Model
         private StringBuilder m_info;
         //
         private String m_clientName;
-        /** Packages selected on the setup screen - installed at the end of CreateEntities	*/
-        private object m_packageInfo = null;
-        /** Module install runs once per setup, whoever calls InstallPackageModules first	*/
-        private bool m_modulesInstalled = false;
         //	private String          m_orgName;
         //
         private String m_stdColumns = "AD_Client_ID,AD_Org_ID,IsActive,Created,CreatedBy,Updated,UpdatedBy";
@@ -85,7 +75,7 @@ namespace VAdvantage.Model
         /// <param name="bp">optional bp</param>
         /// <param name="clientName">optional client</param>
         /// <returns>info</returns>
-        public TenantInfoM CreateClient(String clientName, String orgName, String userClient, String userOrg)
+        public TenantInfoM CreateClient(String clientName, String orgName, String userClient, String userOrg, object PKInfo = null)
         {
             TenantInfoM tInfo = new TenantInfoM();
             log.Info(clientName);
@@ -448,189 +438,31 @@ namespace VAdvantage.Model
         }
         //createClient
 
-        public static string NormalizeGuid(object value)
-        {
-            if (value == null || value == DBNull.Value)
-                return string.Empty;
-
-            byte[] bytes = value as byte[];              // Oracle RAW(16) / Postgres bytea
-            if (bytes != null)                           // strips BitConverter's byte separators,
-                return BitConverter.ToString(bytes).Replace("-", string.Empty); // not UUID dashes
-
-            if (value is Guid)                           // driver handed back a Guid directly
-                return ((Guid)value).ToString("D");
-
-            return value.ToString();                     // already a hex/uuid string
-        }
-
-        /// <summary>
-        /// Install the modules selected on the tenant setup screen through the Market Module API (RequestType = MD).
-        /// Must only be called once the setup transaction is committed - the Market service runs on its own
-        /// connection and blocks on the rows/DDL this transaction still holds.
-        /// Called at the end of CreateEntities, and safe for the setup screen to call itself once the setup
-        /// steps are through - the guard keeps a second call from installing the same modules twice.
-        /// </summary>
-        /// <param name="packageInfo">
-        /// SelectedPackageInfo, or a list of them. Only the Modules collection is used - each entry carries
-        /// Name and LatestAvailableVersion. Typed as object because the type lives outside this assembly.
-        /// Optional - the selection handed to CreateClient is used when nothing is passed.
-        /// </param>
-        /// <param name="logKey">
-        /// Identifies the install log on the Market side, so the caller can read the progress back with
-        /// RequestType = GL. Optional - a key is generated when the caller does not supply one, but then
-        /// only this log file records it and the progress cannot be followed.
-        /// </param>
-        /// <returns>true when the modules were installed, or when there was nothing to install</returns>
-        public bool InstallPackageModules(object packageInfo = null, string logKey = null)
-        {
-            if (m_modulesInstalled)
-            {
-                log.Info("Modules already installed for this setup - skipped");
-                return true;
-            }
-
-            object selection = packageInfo != null ? packageInfo : m_packageInfo;
-            if (selection == null)
-                return true;
-            //	The screen can call this without going through CreateClient
-            if (m_info == null)
-                m_info = new StringBuilder();
-
-            try
-            {
-                List<InstallModuleInfo> moduleList = GetModulesToInstall(selection);
-                if (moduleList.Count == 0)
-                {
-                    log.Info("No module selected for installation");
-                    return true;
-                }
-
-                //	Set before the call - a retry is the caller's decision, a double call must not install twice
-                m_modulesInstalled = true;
-
-                InstallModuleRequest request = new InstallModuleRequest();
-                request.RequestType = "MD";
-                request.IsModuleSeqRestrict = true;
-                request.LogKey = String.IsNullOrEmpty(logKey) ? DateTime.Now.ToString("yyyyMMddHHmmssfff") : logKey;
-                request.ModuleList = moduleList;
-                request.ReplaceAllModuleFilesTogether = true;
-                request.SessionGUID = NormalizeGuid(DB.ExecuteScalar("SELECT AD_Session_GUID FROM AD_Session WHERE AD_Session_ID = " + m_ctx.GetAD_Session_ID(), null, null));
-
-                String json = JsonConvert.SerializeObject(request,
-                    new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
-
-                string baseUrl = Env.GetApplicationURL(m_ctx);
-                string url = baseUrl.TrimEnd('/') + "/api/Market_ModuleAPI";
-                using (HttpClient client = new HttpClient())
-                {
-                    //	Long enough for a few modules, short enough that a dead endpoint fails instead of
-                    //	holding the setup screen. The Market side keeps installing after a timeout here.
-                    client.Timeout = TimeSpan.FromMinutes(5);
-                    StringContent content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                    log.Info("Installing modules - LogKey=" + request.LogKey + ", url=" + url);
-
-                    //	The setup runs synchronously - Task.Run keeps the wait off the request SynchronizationContext
-                    HttpResponseMessage response = Task.Run(() => client.PostAsync(url, content)).GetAwaiter().GetResult();
-                    String responseBody = Task.Run(() => response.Content.ReadAsStringAsync()).GetAwaiter().GetResult();
-
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        String err = "Module installation failed (" + (int)response.StatusCode + ") - " + responseBody;
-                        log.Log(Level.SEVERE, err);
-                        m_info.Append(err).Append("\n");
-                        return false;
-                    }
-
-                    log.Info("Modules installed - " + responseBody);
-                    m_info.Append("Modules installed: ")
-                        .Append(String.Join(", ", moduleList.Select(m => m.Name + " " + m.Version).ToArray()))
-                        .Append("\n");
-                }
-                return true;
-            }
-            catch (Exception ex)
-            {
-                //	A failed module install must not break tenant creation
-                log.Log(Level.SEVERE, "InstallPackageModules", ex);
-                m_info.Append("Module installation failed - ").Append(ex.Message).Append("\n");
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Flatten the selected package(s) into the ModuleList of the Market request, keeping the selection order
-        /// (the API honours it when IsModuleSeqRestrict is true) and dropping duplicates across packages.
-        /// </summary>
-        private List<InstallModuleInfo> GetModulesToInstall(object packageInfo)
-        {
-            List<InstallModuleInfo> moduleList = new List<InstallModuleInfo>();
-
-            //	One package, or a list of packages
-            System.Collections.IEnumerable packages = packageInfo as System.Collections.IEnumerable;
-            if (packages == null || packageInfo is String)
-                packages = new object[] { packageInfo };
-
-            //	Tenant to install into, plus SYSTEM for the dictionary part
-            List<String> tenantSearchKeys = new List<String>() { m_clientName };
-
-            foreach (object package in packages)
-            {
-                System.Collections.IEnumerable modules = GetMemberValue(package, "Modules") as System.Collections.IEnumerable;
-                if (modules == null)
-                    continue;
-
-                foreach (object module in modules)
-                {
-                    String name = Util.GetValueOfString(GetMemberValue(module, "Name"));
-                    String version = Util.GetValueOfString(GetMemberValue(module, "LatestAvailableVersion"));
-                    if (String.IsNullOrEmpty(name) || String.IsNullOrEmpty(version))
-                    {
-                        log.Log(Level.WARNING, "Module skipped - Name/Version not available");
-                        continue;
-                    }
-
-                    if (moduleList.Any(m => m.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
-                        continue;
-
-                    moduleList.Add(new InstallModuleInfo()
-                    {
-                        Name = name,
-                        Version = version,
-                        TenantSearchKeys = tenantSearchKeys,
-                        InstallOnlyAppFiles = false,
-                        RunSyncTerminology = false
-                    });
-                }
-            }
-            return moduleList;
-        }
-
         /// <summary>
         /// Read a field or property by name. SelectedPackageInfo/SelectedModuleInfo expose public fields and are
         /// declared outside this assembly, so they are read reflectively instead of through the dynamic binder.
         /// </summary>
-        private static object GetMemberValue(object obj, String memberName)
-        {
-            if (obj == null)
-                return null;
+        //private static object GetMemberValue(object obj, String memberName)
+        //{
+        //    if (obj == null)
+        //        return null;
 
-            System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance
-                | System.Reflection.BindingFlags.Public
-                | System.Reflection.BindingFlags.NonPublic
-                | System.Reflection.BindingFlags.IgnoreCase;
+        //    System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance
+        //        | System.Reflection.BindingFlags.Public
+        //        | System.Reflection.BindingFlags.NonPublic
+        //        | System.Reflection.BindingFlags.IgnoreCase;
 
-            Type type = obj.GetType();
-            System.Reflection.FieldInfo field = type.GetField(memberName, flags);
-            if (field != null)
-                return field.GetValue(obj);
+        //    Type type = obj.GetType();
+        //    System.Reflection.FieldInfo field = type.GetField(memberName, flags);
+        //    if (field != null)
+        //        return field.GetValue(obj);
 
-            System.Reflection.PropertyInfo property = type.GetProperty(memberName, flags);
-            if (property != null)
-                return property.GetValue(obj, null);
+        //    System.Reflection.PropertyInfo property = type.GetProperty(memberName, flags);
+        //    if (property != null)
+        //        return property.GetValue(obj, null);
 
-            return null;
-        }
+        //    return null;
+        //}
 
         private void CreateDefaultRoles(int adminUserID)
         {
@@ -4148,7 +3980,7 @@ namespace VAdvantage.Model
 
             //	Tenant and entities are committed now, so the Market service can see them on its own connection.
             //	Harmless if the setup screen calls InstallPackageModules itself - the guard makes it run once.
-            InstallPackageModules();
+            //InstallPackageModules();
 
             log.Info("fini");
             return true;
@@ -4395,81 +4227,5 @@ namespace VAdvantage.Model
             get;
             set;
         }
-    }
-
-    /// <summary>
-    /// Request body of Market_ModuleAPI
-    /// </summary>
-    public class InstallModuleRequest
-    {
-        /// <summary>Auth token - when empty, UserName/Password are sent instead</summary>
-        public string Token { get; set; }
-
-        public string UserName { get; set; }
-
-        public string Password { get; set; }
-
-        /// <summary>ML = List Modules, MD = Install/Download Modules, see the Market API collection for the other types</summary>
-        public string RequestType { get; set; }
-
-        /// <summary>Module prefixes to act on, empty = all. RequestType = ML</summary>
-        public List<string> ModuleNames { get; set; }
-
-        public string VendorKey { get; set; }
-
-        /// <summary>RequestType = MD - install the modules in the order they are listed</summary>
-        public bool? IsModuleSeqRestrict { get; set; }
-
-        /// <summary>RequestType = MD - identifies the install log on the Market side</summary>
-        public string LogKey { get; set; }
-
-        /// <summary>Modules to install. RequestType = MD</summary>
-        public List<InstallModuleInfo> ModuleList { get; set; }
-
-        public string SessionGUID { get; set; }
-
-        public bool? ReplaceAllModuleFilesTogether { get; set; }
-    }
-
-    /// <summary>
-    /// One module to install, entry of InstallModuleRequest.ModuleList
-    /// </summary>
-    public class InstallModuleInfo
-    {
-        public string Name { get; set; }
-
-        public string Version { get; set; }
-
-        /// <summary>Tenants to install into - the new tenant and SYSTEM</summary>
-        public List<string> TenantSearchKeys { get; set; }
-
-        public bool InstallOnlyAppFiles { get; set; }
-
-        public bool RunSyncTerminology { get; set; }
-    }
-
-    /// <summary>
-    /// Response body of Market_ModuleAPI, RequestType=ML
-    /// </summary>
-    public class MarketModuleResponse
-    {
-        public List<MarketModuleInfo> ListModule { get; set; }
-    }
-
-    /// <summary>
-    /// One module as published on Market
-    /// </summary>
-    public class MarketModuleInfo
-    {
-        public string Name { get; set; }
-
-        public string Prefix { get; set; }
-
-        public string LatestAvailableVersion { get; set; }
-
-        /// <summary>null when the module is not installed - name matches the API casing</summary>
-        public string Installedversion { get; set; }
-
-        public List<string> AvailableVersions { get; set; }
     }
 }
