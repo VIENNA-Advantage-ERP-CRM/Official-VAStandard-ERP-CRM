@@ -115,6 +115,11 @@
  *                        instance, so they survive the host rebuilding the panel
  *                        on a tab switch; filter and page always restart at
  *                        All / page 1 on a load.
+ *   VAI145   2026-09-22  RTL (Arabic): amounts and the pager range emitted as
+ *                        bidi-isolated LTR tokens, so the sign stays in front
+ *                        of the figure instead of being pushed to the far end
+ *                        ("C$2,497.08-"). The scrollbar is moved off the host's
+ *                        resize edge in the stylesheet.
  *
  * -- Labels / Message Keys ---------------------------------------------------
  *  Panel
@@ -399,9 +404,39 @@
         /*  Formatting                                                      */
         /* ---------------------------------------------------------------- */
 
+        /* An amount is ONE left-to-right token: "-C$2,497.08". Its sign and its
+           separators are bidi-neutral characters, so in an Arabic (RTL) panel
+           the bidi algorithm resolves them to the paragraph direction and parks
+           them at the far end - the figure renders "C$2,497.08-", with the sign
+           reading as if it were a trailing mark. LRI … PDI (U+2066 … U+2069)
+           lays the token out left-to-right and isolates it from whatever sits
+           around it.
+
+           Done here rather than with `direction: ltr` in the stylesheet because
+           an amount is not always alone in its element: it is composed into
+           translated sentences ("Interest {0}", "Tax · 12.00") where pinning
+           the whole element to LTR would mis-lay the Arabic words with it. The
+           marks are invisible and inert in an LTR UI. */
+        /* Built from the code points rather than pasted in: both marks are
+           zero-width, so as literals in the source they are invisible to a
+           reviewer and easy for an editor or a re-encode to drop. */
+        var LRI = String.fromCharCode(0x2066);  /* LEFT-TO-RIGHT ISOLATE */
+        var PDI = String.fromCharCode(0x2069);  /* POP DIRECTIONAL ISOLATE */
+
+        function ltrToken(text) {
+            var s = (text === null || text === undefined) ? "" : String(text);
+            return s.length ? LRI + s + PDI : "";
+        }
+
         /* Amounts carry the bank account currency's symbol and precision; the
            user's locale decides the grouping and decimal separators. */
         function fmtMoney(value, symbol, precision) {
+            return ltrToken(rawMoney(value, symbol, precision));
+        }
+
+        /* The bare token, for the callers that put something in front of it and
+           have to isolate the result as a whole rather than twice. */
+        function rawMoney(value, symbol, precision) {
             var v = (+value) || 0;
             var p = (precision >= 0 && precision <= 10) ? precision : 2;
             var sign = v < 0 ? "-" : "";
@@ -429,7 +464,10 @@
             var v = (+value) || 0;
             /* Sign sits flush against the symbol - "−$100.00", not "− $100.00". */
             var prefix = v < 0 ? "−" : (v > 0 ? "+" : "");
-            return prefix + fmtMoney(Math.abs(v), symbol, precision);
+            /* Isolated as ONE token, sign included: isolating the figure on its
+               own would leave the leading "−" / "+" outside the run, which is
+               the very character RTL pushes to the far end. */
+            return ltrToken(prefix + rawMoney(Math.abs(v), symbol, precision));
         }
 
         /* A line keeps its own currency when it carries one that differs from
@@ -1368,7 +1406,11 @@
             var of = msg("VAS_292_Of", "of");
 
             var $p = $('<div class="' + CLS + 'pager"></div>');
-            var showing = msg("VAS_292_Showing", "Showing") + " " + from + "–" + to + " " + of + " " + total;
+            /* The range is isolated for the same reason an amount is: the en
+               dash between two numbers is bidi-neutral, so in Arabic it would be
+               dragged out of the pair and "1–20" would read "20–1". The wording
+               around it stays prose and lays itself out in the UI direction. */
+            var showing = msg("VAS_292_Showing", "Showing") + " " + ltrToken(from + "–" + to) + " " + of + " " + total;
             $p.append($('<span class="' + CLS + 'pgInfo"></span>').text(showing).attr("title", showing));
 
             var $nav = $('<div class="' + CLS + 'pgNav"></div>');
