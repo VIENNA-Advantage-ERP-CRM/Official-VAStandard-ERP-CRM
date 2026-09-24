@@ -65,17 +65,21 @@
     var ZOOM_WINDOW_NAME_NEW = 'VAS_CustomerMaster';
     var ZOOM_WINDOW_NAME_OLD = CUSTOMER_WINDOW_NAME;
 
+    // 2026-09-23: ".vis-widget-container" is the dashboard's outer 9-column grid
+    // wrapper shared by every widget on the page, not this widget's own cell -
+    // measuring it pinned the font clamp at its max regardless of this widget's
+    // real (narrower, window-embedded) column width, which squeezed
+    // .vas140-col-val down to zero height (see .vas140-col-val's flex-shrink: 0
+    // fix in the CSS). Fixed by measuring the widget's own root element directly.
     function ensureDashInlineSizeVar($el) {
-        if (window.__vasDashInlineSizeObserver) { return; }
         if (typeof ResizeObserver === 'undefined') { return; }
-        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
-        if (!container) { return; }
-        var write = function () {
-            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
-        };
-        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
-        window.__vasDashInlineSizeObserver.observe(container);
+        var el = $el[0];
+        if (!el) { return; }
+        var write = function () { el.style.setProperty('--dash-inline-size', el.clientWidth + 'px'); };
+        var observer = new ResizeObserver(write);
+        observer.observe(el);
         write();
+        $el.data('vas140-size-observer', observer);
     }
 
     VAS.VAS_140_ContractsExpiringWidget = function () {
@@ -403,6 +407,8 @@
         this.getRoot = function () { return $root; };
         this.disposeComponent = function () {
             if ($list) { $list.remove(); $list = null; }
+            var sizeObserver = $root.data('vas140-size-observer');
+            if (sizeObserver) { sizeObserver.disconnect(); }
             $('body').removeClass('vas140-modal-open');
             $root.remove();
         };
