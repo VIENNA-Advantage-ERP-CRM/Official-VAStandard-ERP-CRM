@@ -119,6 +119,15 @@
 @import "../VAS_139_HighValuePipelineWidget.css";
 @import "../VAS_140_ContractsExpiringWidget.css";
 @import "../VAS_141_CustomersBySegmentWidget.css";
+@import "../VAS_294_DelayedProjectsWidget.css";
+@import "../VAS_295_UnrespondedEmailsWidget.css";
+@import "../VAS_296_OpenProposalsWidget.css";
+@import "../VAS_297_RecentNewCustomersWidget.css";
+@import "../VAS_298_RecentUpdatesWidget.css";
+@import "../VAS_299_RevenueAtAGlanceWidget.css";
+@import "../VAS_300_BusinessBySourceWidget.css";
+@import "../VAS_301_SalesRepPortfolioWidget.css";
+@import "../VAS_302_NotSegmentedWidget.css";
 
 @import "../VAS_073_LowStockCountWidget.css";
 @import "../VAS_074_PendingGRNsWidget.css";

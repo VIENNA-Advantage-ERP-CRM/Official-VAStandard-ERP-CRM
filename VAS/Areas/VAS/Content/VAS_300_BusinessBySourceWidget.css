@@ -1,13 +1,15 @@
 /* ─────────────────────────────────────────────────────────────────────────
- * VAS_140 Contracts Expiring — 3x1 glass widget (Customers dashboard) + modal.
- * Design: contracts-expiring.html (attached) + Design Specs/dashboard-widgets.md.
- * Glass surface, icon-well header, three tinted urgency columns (<=30 red, 31-60
- * amber, 61-90 blue) each showing count + value + high-value; drill-down contract
- * list modal with the shared circular pager. Widget scales in em against the widget
- * root; modal is a px overlay. Borders/radii/strokes in px. All selectors MPC-prefixed.
+ * VAS_300 Business by Source — 3x2 glass distribution (Customers dashboard) +
+ * drill-down list modal. Design: business-by-source.html (attached) + Design
+ * Specs/dashboard-widgets.md. Glass surface, icon-well header, a compact
+ * 3mo/6mo pill toggle on the header's right (active segment filled blue,
+ * inactive transparent with muted text), coloured distribution rows + share
+ * bars, source drill-down list modal. Row/bar/pager structure matches VAS_141
+ * (the codebase's other distribution widget) closely. Widget scales in em
+ * against the widget root; modals are px overlays. MPC-prefixed.
  * ───────────────────────────────────────────────────────────────────────── */
 
-.vas140-root {
+.vas300-root {
     width: 100%;
     height: 100%;
     min-width: 0;
@@ -17,12 +19,12 @@
     font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 20px);
 }
 
-    .vas140-root,
-    .vas140-root * {
+    .vas300-root,
+    .vas300-root * {
         box-sizing: border-box;
     }
 
-.vas140-card {
+.vas300-card {
     width: 100%;
     height: 100%;
     min-width: 0;
@@ -39,7 +41,7 @@
 }
 
 /* Header. */
-.vas140-head {
+.vas300-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -48,14 +50,14 @@
     flex-shrink: 0;
 }
 
-.vas140-head-l {
+.vas300-head-l {
     display: flex;
     align-items: center;
     gap: 0.625em;
     min-width: 0;
 }
 
-.vas140-iconwell {
+.vas300-iconwell {
     width: 2em;
     height: 2em;
     flex-shrink: 0;
@@ -67,16 +69,16 @@
     color: #0083DA;
 }
 
-    .vas140-iconwell svg {
+    .vas300-iconwell svg {
         width: 1.05em;
         height: 1.05em;
     }
 
-.vas140-head-txt {
+.vas300-head-txt {
     min-width: 0;
 }
 
-.vas140-title {
+.vas300-title {
     font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
     font-weight: 500;
     color: #000000;
@@ -86,7 +88,7 @@
     text-overflow: ellipsis;
 }
 
-.vas140-sub {
+.vas300-sub {
     font-size: 0.7em;
     color: #717182;
     margin-top: 1px;                            /* px */
@@ -95,27 +97,37 @@
     text-overflow: ellipsis;
 }
 
-.vas140-hvlink {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;                                   /* px */
-    background: transparent;
-    border: none;
-    color: #0083DA;
-    font-family: inherit;
-    font-weight: 500;
-    font-size: 0.78em;
-    cursor: pointer;
+/* Period toggle: compact pill-group, active segment filled blue, inactive
+   transparent with muted text. */
+.vas300-togwrap {
     flex-shrink: 0;
 }
 
-    .vas140-hvlink svg {
-        width: 0.8em;
-        height: 0.8em;
+.vas300-tog {
+    display: inline-flex;
+    border: 1px solid #E4EDF4;                  /* px */
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.vas300-togbtn {
+    border: none;
+    background: transparent;
+    color: #5F7283;
+    font-family: inherit;
+    font-size: 0.72em;
+    font-weight: 600;
+    padding: 0.3em 0.7em;
+    cursor: pointer;
+}
+
+    .vas300-togbtn.is-active {
+        background: #1F83FF;
+        color: #FFFFFF;
     }
 
-/* Body + urgency columns. */
-.vas140-body {
+/* Body + distribution rows. */
+.vas300-body {
     flex: 1;
     min-height: 0;
     display: flex;
@@ -123,74 +135,163 @@
     overflow: hidden;
 }
 
-.vas140-band {
+/* Body split into `srcPageSize` equal-height tracks (grid-template-rows set
+ * inline in JS). Each record is body/pageSize tall regardless of how many
+ * are on the page, so rows fill top-to-bottom and a partial page leaves the
+ * trailing tracks empty instead of stretching the rows. */
+.vas300-srclist {
+    display: grid;
+    grid-auto-rows: minmax(0, 1fr);
     flex: 1;
     min-height: 0;
-    display: flex;
-    gap: 0.5em;
 }
 
-.vas140-col {
-    flex: 1;
-    min-width: 0;
+.vas300-src {
+    min-height: 0;
     display: flex;
     flex-direction: column;
+    justify-content: center;
+}
+
+/* Widget-body pager (5 sources per page), em-sized against the widget root.
+   dashboard-widgets.md §"Widget Footer Pager": result-range helper on the
+   left, compact prev · "N of M" · next control on the right. */
+.vas300-wpager {
+    display: flex;
+    align-items: center;
     justify-content: space-between;
-    gap: 0.4em;
-    border: 1px solid #E4EDF4;                  /* px — overridden inline per urgency */
-    border-radius: 11px;                        /* px */
-    padding: 0.7em 0.75em;
+    gap: 1em;
+    padding-top: 0.5em;
+    margin-top: 0.25em;
+    flex-shrink: 0;
+}
+
+.vas300-wpglabel {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.75em;
+    color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas300-wpgctl {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-shrink: 0;
+}
+
+.vas300-wpgtext {
+    min-width: 3em;
+    text-align: center;
+    font-size: 0.8125em;
+    font-weight: 500;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.vas300-wpgbtn {
+    width: 1.5em;                               /* 24px */
+    height: 1.5em;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #E4EDF4;                  /* px */
+    border-radius: 6px;                         /* px */
+    background: #FBFDFF;
+    color: #0083DA;
     cursor: pointer;
+}
+
+    .vas300-wpgbtn:hover:not(:disabled) {
+        background: #EAF8FF;
+        border-color: #BFE4FF;
+    }
+
+    .vas300-wpgbtn:disabled {
+        color: #B8C6D2;
+        cursor: default;
+    }
+
+    .vas300-wpgbtn svg {
+        width: 0.875em;                         /* 14px */
+        height: 0.875em;
+        stroke: currentColor;
+    }
+
+.vas300-src-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5em;
+    margin-bottom: 0.3125em;
+}
+
+.vas300-src-l {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4375em;
+    min-width: 0;
+    background: transparent;
+    border: none;
+    padding: 0;
     font-family: inherit;
+    color: #102C3F;
+    font-size: 0.8em;
+    cursor: pointer;
     text-align: left;
 }
 
-/* 2026-08-06 — the hover lift (translateY(-2px) + 0 10px 22px rgba(15,61,97,.10))
-   was removed on request; the column no longer moves or re-elevates on hover, and
-   the transition went with it since nothing is left to animate. The pointer
-   cursor and the focus ring stay — they are affordances for the click target,
-   not hover decoration. Matches VAS_137, VAS_126 and VAS_122/124/125. */
-
-    .vas140-col:focus-visible {
-        outline: 2px solid #1F83FF;
-        outline-offset: 1px;
+    .vas300-src-l:hover .vas300-src-name {
+        text-decoration: underline;
     }
 
-.vas140-col-win {
-    font-size: 0.72em;
-    color: #5F7283;
+.vas300-sw {
+    width: 0.5625em;
+    height: 0.5625em;
+    border-radius: 3px;                         /* px */
+    flex-shrink: 0;
+}
+
+.vas300-src-name {
+    min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.vas140-col-n {
-    font-size: 1.5em;
+.vas300-src-v {
+    font-size: 0.8em;
     font-weight: 700;
-    line-height: 1;
-    margin-top: 0.25em;
-    font-variant-numeric: tabular-nums;
-}
-
-.vas140-col-val {
-    flex-shrink: 0;                             /* never let the column-flex squeeze this line to 0 height */
-    font-size: 0.72em;
-    color: #5F7283;
+    color: #102C3F;
+    flex-shrink: 0;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
-.vas140-state {
+.vas300-bar {
+    height: 0.5em;
+    border-radius: 999px;
+    background: rgba(15, 61, 97, 0.07);
+    overflow: hidden;
+}
+
+    .vas300-bar > div {
+        height: 100%;
+        border-radius: 999px;
+    }
+
+.vas300-state {
     padding: 0.9em 0.25em;
     font-size: 0.82em;
     color: #748494;
     text-align: center;
-    width: 100%;
-    align-self: center;
 }
 
-.vas140-retry {
+.vas300-retry {
     margin-left: 6px;                           /* px */
     border: 1px solid #BFE4FF;                  /* px */
     background: #FFFFFF;
@@ -202,18 +303,9 @@
     cursor: pointer;
 }
 
-/* Temporary diagnostic: raw server error under the error state. */
-.vas140-errdetail {
-    margin-top: 0.5em;
-    font-size: 0.72em;
-    color: #8F2D2D;
-    word-break: break-word;
-    white-space: normal;
-}
+/* ── Source drill-down list modal ─────────────────────────────────────────── */
 
-/* ── Drill-down contract list modal ───────────────────────────────────────── */
-
-.vas140-dialog {
+.vas300-dialog {
     position: fixed;
     inset: 0;
     z-index: 5000;
@@ -225,26 +317,26 @@
     color: #102C3F;
 }
 
-    .vas140-dialog.is-open {
+    .vas300-dialog.is-open {
         display: flex;
     }
 
-    .vas140-dialog *,
-    .vas140-dialog {
+    .vas300-dialog *,
+    .vas300-dialog {
         box-sizing: border-box;
     }
 
-.vas140-scrim {
+.vas300-scrim {
     position: absolute;
     inset: 0;
     background: rgba(2, 20, 34, 0.42);
     backdrop-filter: blur(2px);
 }
 
-.vas140-panel {
+.vas300-panel {
     position: relative;
     width: 100%;
-    max-width: 620px;                           /* px */
+    max-width: 560px;                           /* px */
     max-height: 84vh;
     display: flex;
     flex-direction: column;
@@ -254,7 +346,7 @@
     overflow: hidden;
 }
 
-.vas140-phead {
+.vas300-phead {
     flex-shrink: 0;
     height: 56px;                               /* px */
     display: flex;
@@ -264,7 +356,7 @@
     border-bottom: 1px solid #E4EDF4;           /* px */
 }
 
-.vas140-ptitle {
+.vas300-ptitle {
     font-size: 16px;                            /* px */
     font-weight: 700;
     color: #102C3F;
@@ -273,7 +365,7 @@
     white-space: nowrap;
 }
 
-.vas140-close {
+.vas300-close {
     width: 32px;
     height: 32px;
     border-radius: 8px;                         /* px */
@@ -286,16 +378,16 @@
     flex-shrink: 0;
 }
 
-    .vas140-close:hover {
+    .vas300-close:hover {
         background: #F1F4F8;
     }
 
-    .vas140-close svg {
+    .vas300-close svg {
         width: 20px;
         height: 20px;
     }
 
-.vas140-pbody {
+.vas300-pbody {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
@@ -303,17 +395,17 @@
     padding: 6px 14px 8px;                      /* px */
 }
 
-.vas140-list {
+.vas300-list {
     display: flex;
     flex-direction: column;
 }
 
-.vas140-row {
+.vas300-row {
     display: flex;
     align-items: center;
     gap: 12px;                                  /* px */
     width: 100%;
-    padding: 11px 8px;                          /* px */
+    padding: 10px 8px;                          /* px */
     border: none;
     border-bottom: 1px solid #EDF2F6;           /* px */
     background: transparent;
@@ -322,39 +414,34 @@
     font-family: inherit;
 }
 
-    .vas140-row:last-child {
+    .vas300-row:last-child {
         border-bottom: none;
     }
 
-    .vas140-row:hover {
+    .vas300-row:hover {
         background: rgba(31, 131, 255, 0.05);
     }
 
-.vas140-row-ic {
-    width: 30px;
-    height: 30px;
-    border-radius: 9px;                         /* px */
+.vas300-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;                        /* px */
     display: grid;
     place-items: center;
     flex-shrink: 0;
+    font-size: 12px;                            /* px */
+    font-weight: 700;
+    color: #FFFFFF;
 }
 
-    .vas140-row-ic svg {
-        width: 15px;
-        height: 15px;
-    }
-
-.vas140-row-main {
+.vas300-row-main {
     flex: 1;
     min-width: 0;
     display: flex;
     flex-direction: column;
 }
 
-.vas140-row-title {
-    display: flex;
-    align-items: center;
-    gap: 5px;                                   /* px */
+.vas300-row-title {
     font-size: 14px;                            /* px */
     font-weight: 700;
     color: #102C3F;
@@ -363,19 +450,7 @@
     white-space: nowrap;
 }
 
-.vas140-hv {
-    display: inline-grid;
-    place-items: center;
-    color: #D78B10;
-    flex-shrink: 0;
-}
-
-    .vas140-hv svg {
-        width: 13px;
-        height: 13px;
-    }
-
-.vas140-row-meta {
+.vas300-row-meta {
     font-size: 12px;                            /* px */
     color: #5F7283;
     overflow: hidden;
@@ -383,48 +458,29 @@
     white-space: nowrap;
 }
 
-.vas140-row-right {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    gap: 10px;                                  /* px */
-}
-
-.vas140-row-val {
+.vas300-row-val {
     font-size: 13px;                            /* px */
     font-weight: 700;
     color: #102C3F;
+    flex-shrink: 0;
     white-space: nowrap;
 }
 
-.vas140-row-days {
-    font-size: 12px;                            /* px */
-    font-weight: 600;
-    padding: 2px 8px;                           /* px */
-    border-radius: 999px;
-    white-space: nowrap;
-}
-
-.vas140-pfoot {
+.vas300-pfoot {
     flex-shrink: 0;
     padding: 10px 20px 16px;                    /* px */
     border-top: 1px solid #E4EDF4;              /* px */
     background: #FBFDFF;
 }
 
-/* Footer pager — dashboard-widgets.md §"Widget Footer Pager": two zones, the
-   result-range helper on the left and a compact prev · "N of M" · next control
-   on the right. 2026-08-06: replaced the centred solid-blue 34px circles with
-   the shared 24px rounded-square buttons / 14px chevrons from §Pager Buttons.
-   Sizes stay px — this pager is modal chrome, like the rest of this panel. */
-.vas140-pager {
+.vas300-pager {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 14px;                                  /* px */
 }
 
-.vas140-pglabel {
+.vas300-pglabel {
     flex: 1 1 auto;
     min-width: 0;
     font-size: 12px;                            /* px */
@@ -434,14 +490,14 @@
     text-overflow: ellipsis;
 }
 
-.vas140-pgctl {
+.vas300-pgctl {
     display: inline-flex;
     align-items: center;
     gap: 8px;                                   /* px */
     flex-shrink: 0;
 }
 
-.vas140-pgtext {
+.vas300-pgtext {
     min-width: 48px;                            /* px */
     text-align: center;
     font-size: 13px;                            /* px */
@@ -451,7 +507,7 @@
     white-space: nowrap;
 }
 
-.vas140-pgbtn {
+.vas300-pgbtn {
     width: 24px;                                /* px */
     height: 24px;
     padding: 0;
@@ -465,22 +521,22 @@
     cursor: pointer;
 }
 
-    .vas140-pgbtn:hover:not(:disabled) {
+    .vas300-pgbtn:hover:not(:disabled) {
         background: #EAF8FF;
         border-color: #BFE4FF;
     }
 
-    .vas140-pgbtn:disabled {
+    .vas300-pgbtn:disabled {
         color: #B8C6D2;
         cursor: default;
     }
 
-    .vas140-pgbtn svg {
+    .vas300-pgbtn svg {
         width: 14px;                            /* px */
         height: 14px;
         stroke: currentColor;
     }
 
-body.vas140-modal-open {
+body.vas300-modal-open {
     overflow: hidden;
 }
