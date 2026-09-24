@@ -223,6 +223,15 @@ import "../app/widgets/VAS_138_DelayedPaymentsListWidget.js";
 import "../app/widgets/VAS_139_HighValuePipelineWidget.js";
 import "../app/widgets/VAS_140_ContractsExpiringWidget.js";
 import "../app/widgets/VAS_141_CustomersBySegmentWidget.js";
+import "../app/widgets/VAS_294_DelayedProjectsWidget.js";
+import "../app/widgets/VAS_295_UnrespondedEmailsWidget.js";
+import "../app/widgets/VAS_296_OpenProposalsWidget.js";
+import "../app/widgets/VAS_297_RecentNewCustomersWidget.js";
+import "../app/widgets/VAS_298_RecentUpdatesWidget.js";
+import "../app/widgets/VAS_299_RevenueAtAGlanceWidget.js";
+import "../app/widgets/VAS_300_BusinessBySourceWidget.js";
+import "../app/widgets/VAS_301_SalesRepPortfolioWidget.js";
+import "../app/widgets/VAS_302_NotSegmentedWidget.js";
 
 import "../app/widgets/VAS_073_LowStockCountWidget.js";
 import "../app/widgets/VAS_074_PendingGRNsWidget.js";
