@@ -286,6 +286,39 @@
         // this installation actually has. With none of them every issue line is spares/consumables
         // (the production KPI is a hard 0%), so the drill carries no work-order clause at all -
         // an unresolved column would make the grid query throw instead of opening.
+        // Home-page fallback for openSparesConsumablesList(): there is no host window to relay
+        // a multi-record TabWhereClause to off-window, and VAS.ZoomUtil only supports zooming
+        // to a SINGLE record (see VAS_184/186/187's zoomToInventoryRecord). Landing on the
+        // newest matching document (ids[0], per GetSparesConsumablesIdsData's own ordering) is
+        // the closest available stand-in for "see the list" without inventing a new zoom
+        // capability. Resolves the Inventory Use window id once via VAS_178's existing
+        // GetMaterialIssueWindowId endpoint (shared with VAS_181/184/186/187), then caches it.
+        var inventoryUseWindowId = 0;
+
+        function zoomToFirstSparesConsumable(ids) {
+            var firstId = Number((ids && ids[0]) || 0);
+            if (!firstId || !window.VAS || !VAS.ZoomUtil) { return; }
+
+            if (inventoryUseWindowId > 0) {
+                VAS.ZoomUtil.zoomToRecord('M_Inventory_ID', firstId, inventoryUseWindowId, null, null);
+                return;
+            }
+
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_178_NewMaterialIssueQuickAction/GetMaterialIssueWindowId',
+                type: 'GET',
+                dataType: 'json',
+                cache: false,
+                success: function (res) {
+                    var data = parseResponse(res);
+                    inventoryUseWindowId = Number((data && data.windowId) || 0);
+                    if (inventoryUseWindowId > 0) {
+                        VAS.ZoomUtil.zoomToRecord('M_Inventory_ID', firstId, inventoryUseWindowId, null, null);
+                    }
+                }
+            });
+        }
+
         function openSparesConsumablesList() {
             // Keep in lock-step with GetSparesConsumablesIdsData in the controller.
             // The TabWhereClause is a flat M_Inventory_ID IN (...) list, NOT a
@@ -306,15 +339,21 @@
                     var data = parseResponse(res);
                     if (data.error) { return; }
                     var ids = data.ids || [];
-                    var idList = ids.length ? ids.join(',') : '-1';
-                    var where = "M_Inventory.M_Inventory_ID IN (" + idList + ")";
-                    $self.widgetFirevalueChanged({
-                        "TabWhereClause": where,
-                        "TabLayout": "N",
-                        "TabIndex": "0",
-                        "ActionName": hostWindowName() || "VAS_InternalUseInventory",
-                        "ActionType": "W"
-                    }); 
+
+                    if ($self.windowNo >= 0) {
+                        var idList = ids.length ? ids.join(',') : '-1';
+                        var where = "M_Inventory.M_Inventory_ID IN (" + idList + ")";
+                        $self.widgetFirevalueChanged({
+                            "TabWhereClause": where,
+                            "TabLayout": "N",
+                            "TabIndex": "0",
+                            "ActionName": hostWindowName() || "VAS_InternalUseInventory",
+                            "ActionType": "W"
+                        });
+                        return;
+                    }
+
+                    zoomToFirstSparesConsumable(ids);
                 }
             });
         }

@@ -236,6 +236,39 @@
             if ($card) { $card.prop('disabled', true); }
         }
 
+        // Home-page fallback for openProductionIssuesList(): there is no host window to relay
+        // a multi-record TabWhereClause to off-window, and VAS.ZoomUtil only supports zooming
+        // to a SINGLE record (see VAS_184/186/187's zoomToInventoryRecord). Landing on the
+        // newest matching document (ids[0], per GetProductionIssueIdsData's own ordering) is
+        // the closest available stand-in for "see the list" without inventing a new zoom
+        // capability. Resolves the Inventory Use window id once via VAS_178's existing
+        // GetMaterialIssueWindowId endpoint (shared with VAS_184/186/187/182), then caches it.
+        var inventoryUseWindowId = 0;
+
+        function zoomToFirstProductionIssue(ids) {
+            var firstId = Number((ids && ids[0]) || 0);
+            if (!firstId || !window.VAS || !VAS.ZoomUtil) { return; }
+
+            if (inventoryUseWindowId > 0) {
+                VAS.ZoomUtil.zoomToRecord('M_Inventory_ID', firstId, inventoryUseWindowId, null, null);
+                return;
+            }
+
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_178_NewMaterialIssueQuickAction/GetMaterialIssueWindowId',
+                type: 'GET',
+                dataType: 'json',
+                cache: false,
+                success: function (res) {
+                    var data = parseResponse(res);
+                    inventoryUseWindowId = Number((data && data.windowId) || 0);
+                    if (inventoryUseWindowId > 0) {
+                        VAS.ZoomUtil.zoomToRecord('M_Inventory_ID', firstId, inventoryUseWindowId, null, null);
+                    }
+                }
+            });
+        }
+
         function openProductionIssuesList() {
             // Keep in lock-step with GetProductionIssueIdsData in the controller. The
             // TabWhereClause is a flat M_Inventory_ID IN (...) list, NOT a correlated
@@ -255,13 +288,19 @@
                     var data = parseResponse(res);
                     if (data.error) { return; }
                     var ids = data.ids || [];
-                    var idList = ids.length ? ids.join(',') : '-1';
-                    var where = "M_Inventory.M_Inventory_ID IN (" + idList + ")";
-                    $self.widgetFirevalueChanged({
-                        "TabWhereClause": where,
-                        "TabLayout": "N",
-                        "TabIndex": "0"
-                    });
+
+                    if ($self.windowNo >= 0) {
+                        var idList = ids.length ? ids.join(',') : '-1';
+                        var where = "M_Inventory.M_Inventory_ID IN (" + idList + ")";
+                        $self.widgetFirevalueChanged({
+                            "TabWhereClause": where,
+                            "TabLayout": "N",
+                            "TabIndex": "0"
+                        });
+                        return;
+                    }
+
+                    zoomToFirstProductionIssue(ids);
                 }
             });
         }

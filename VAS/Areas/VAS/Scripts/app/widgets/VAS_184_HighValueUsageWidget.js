@@ -3,6 +3,7 @@
  * 2x2 List Widget for Inventory Use dashboard.
  * Displays top 10 products consumed ranked by current cost price descending.
  * Row click opens Product Issues Modal paginated at 6 entries per page (scroll-free).
+ * Modal's Doc No. column is a zoom link to the underlying Inventory Use record.
  *
  * Summary Message Table
  *  # | Current Text                           | Message Key
@@ -180,6 +181,59 @@
         function showBusy(show) {
             if (!$busy || !$busy[0]) { return; }
             $busy.toggleClass('vas-hvu-hidden', !show);
+        }
+
+        /* Doc No -> real Inventory Use record navigation. Mirrors VAS_186's own zoom-to-record
+           pattern exactly: when hosted on a window, relay through widgetFirevalueChanged /
+           ActionName so the host resolves the window BY NAME (a hardcoded AD_Window_ID has
+           previously resolved to the wrong window on a real install - see VAS_244); otherwise
+           (Home-page placement) fall back to VAS.ZoomUtil.zoomToRecord with a window id resolved
+           once via VAS_178's existing GetMaterialIssueWindowId endpoint (same Inventory Use /
+           Internal Use window every widget on this dashboard already targets - reused rather
+           than re-deriving the same multi-name AD_Window lookup here). */
+        var INVENTORY_USE_WINDOW_NAME = 'Inventory Use';
+        var inventoryUseWindowId = 0;
+
+        function hostWindowName() {
+            try {
+                var listener = $self.listener;
+                for (var i = 0; i < 6 && listener; i++) {
+                    if (listener.apanel && listener.apanel.gridWindow && listener.apanel.gridWindow.getName) { return listener.apanel.gridWindow.getName(); }
+                    if (listener.gridWindow && listener.gridWindow.getName) { return listener.gridWindow.getName(); }
+                    listener = listener.listener;
+                }
+            } catch (e) { /* best-effort */ }
+            return '';
+        }
+
+        function zoomToInventoryRecord(inventoryId) {
+            if (!inventoryId) { return; }
+            try {
+                if ($self.windowNo >= 0) {
+                    $self.widgetFirevalueChanged({
+                        "TabWhereClause": "M_Inventory.M_Inventory_ID=" + Number(inventoryId),
+                        "TabLayout": "Y", "TabIndex": "0",
+                        "ActionName": hostWindowName() || INVENTORY_USE_WINDOW_NAME,
+                        "ActionType": "W"
+                    });
+                    return;
+                }
+                if (inventoryUseWindowId > 0) {
+                    if (window.VAS && VAS.ZoomUtil) { VAS.ZoomUtil.zoomToRecord('M_Inventory_ID', Number(inventoryId), inventoryUseWindowId, null, null); }
+                    return;
+                }
+                $.ajax({
+                    url: VIS.Application.contextUrl + 'VAS_178_NewMaterialIssueQuickAction/GetMaterialIssueWindowId',
+                    type: 'GET', dataType: 'json', cache: false,
+                    success: function (res) {
+                        var data = parseResponse(res);
+                        inventoryUseWindowId = Number((data && data.windowId) || 0);
+                        if (inventoryUseWindowId > 0 && window.VAS && VAS.ZoomUtil) {
+                            VAS.ZoomUtil.zoomToRecord('M_Inventory_ID', Number(inventoryId), inventoryUseWindowId, null, null);
+                        }
+                    }
+                });
+            } catch (e) { /* best-effort */ }
         }
 
         this.Initalize = function () {
@@ -462,7 +516,11 @@
                     var recValFormatted = formatMoney(rec.value, false);
                     tbodyHtml +=
                         '<tr>' +
-                        '<td title="' + escapeHtml(rec.documentNo) + '">' + escapeHtml(rec.documentNo) + '</td>' +
+                        '<td title="' + escapeHtml(rec.documentNo) + '">' +
+                        (rec.inventoryId
+                            ? '<button type="button" class="vas-hvu-m-doclink" data-invid="' + rec.inventoryId + '">' + escapeHtml(rec.documentNo) + '</button>'
+                            : escapeHtml(rec.documentNo)) +
+                        '</td>' +
                         '<td>' + escapeHtml(rec.movementDate) + '</td>' +
                         '<td title="' + escapeHtml(rec.warehouseLoc) + '">' + escapeHtml(rec.warehouseLoc) + '</td>' +
                         '<td>' + escapeHtml(formatQty(rec.qty)) + '</td>' +
@@ -504,6 +562,13 @@
             $modal.find('.vas-hvu-modal-close').on('click', function (e) {
                 e.stopPropagation();
                 closeModal();
+            });
+
+            $modal.on('click', '.vas-hvu-m-doclink', function (e) {
+                e.stopPropagation();
+                var invId = Number($(this).data('invid') || 0);
+                closeModal();
+                zoomToInventoryRecord(invId);
             });
 
             $modal.find('.vas-hvu-m-prev').on('click', function () {

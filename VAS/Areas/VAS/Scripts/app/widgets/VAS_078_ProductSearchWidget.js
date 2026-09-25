@@ -645,7 +645,7 @@
             var overview = productDetail.Overview;
             var status = productStatusLabel();
             var isItem = overview.ProductType === 'I';
-            var uomDisplay = overview.UomName ? overview.UomName.toUpperCase() : '';
+            var uomDisplay = overview.UomName ? overview.UomName : '';
 
             $dialogTitle.text(overview.ProductName);
             $dialogBadge.text(overview.ProductCode || '').toggle(!!overview.ProductCode);
@@ -780,7 +780,7 @@
         function renderOverview() {
             var overview = productDetail.Overview;
             var isItem = overview.ProductType === 'I';
-            var uomUpper = overview.UomName ? overview.UomName.toUpperCase() : '-';
+            var uomUpper = overview.UomName ? overview.UomName : '-';
 
             var fields = [
                 [label('VAS_078_ProductCode', 'Product Code'), overview.ProductCode],

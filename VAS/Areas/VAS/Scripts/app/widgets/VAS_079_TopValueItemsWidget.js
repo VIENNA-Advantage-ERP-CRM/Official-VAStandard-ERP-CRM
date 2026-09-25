@@ -40,6 +40,13 @@
         var loading = false;
         var rowResizeObserver = null;
 
+        var $self = this;
+        // Product Master zoom target (Home-page fallback) - same window names VAS_078
+        // uses, cached after the first resolve so later clicks skip the lookup.
+        var ZOOM_WINDOW_NAME_NEW = 'VAS_ProductMaster';
+        var ZOOM_WINDOW_NAME_OLD = 'Product';
+        var productWindowId = 0;
+
         function label(key, fallback) {
             return VIS.Msg.getMsg(key);
         }
@@ -278,6 +285,38 @@
             });
         }
 
+        /* Navigate to the product record on the Product Master screen. Self-contained
+           (does not depend on VAS_078's widget instance being present on the same
+           dashboard - see the row click handler below) so this keeps working whether
+           or not the Product Search widget is also on this page.
+             - Hosted inside a window (windowNo >= 0): fire the host's value-changed
+               channel with a TabWhereClause; the host re-queries the window it is
+               ALREADY in and switches to single/form layout.
+             - Home / Landing page: VAS.ZoomUtil.zoomToRecord opens (or reuses) the
+               Product Master window directly. */
+        function zoomProductRecord(productId) {
+            var recordId = Number(productId || 0);
+            if (recordId <= 0) { return; }
+
+            if ($self.windowNo >= 0) {
+                try {
+                    $self.widgetFirevalueChanged({
+                        "TabWhereClause": "M_Product.M_Product_ID=" + recordId,
+                        "TabLayout": "Y",
+                        "TabIndex": "0"
+                    });
+                } catch (e) { }
+                return;
+            }
+
+            if (!window.VAS || !VAS.ZoomUtil || typeof VAS.ZoomUtil.zoomToRecord !== 'function') { return; }
+            VAS.ZoomUtil.zoomToRecord('M_Product_ID', recordId, productWindowId,
+                                      ZOOM_WINDOW_NAME_NEW, ZOOM_WINDOW_NAME_OLD)
+                .done(function (id) {
+                    if (id > 0) { productWindowId = id; }
+                });
+        }
+
         function createWidget() {
             var $card = $(
                 '<div class="MPC-tv-card">' +
@@ -312,12 +351,21 @@
             });
 
             $root.on('click', '.MPC-tv-row', function () {
-                if (!VAS.openOverallInventoryProductDetail) { return; }
-                VAS.openOverallInventoryProductDetail(
-                    Number($(this).attr('data-product-id')),
-                    $(this).attr('data-product-name'),
-                    ''
-                );
+                var productId = Number($(this).attr('data-product-id'));
+                // Prefer the richer Product Detail modal when VAS_078 (Product Search)
+                // is also on this dashboard and has initialized; otherwise this row's
+                // click used to silently no-op (the global is only defined while that
+                // OTHER widget's instance is alive). zoomProductRecord is self-contained
+                // and always works, on a window or on the Home page.
+                if (VAS.openOverallInventoryProductDetail) {
+                    VAS.openOverallInventoryProductDetail(
+                        productId,
+                        $(this).attr('data-product-name'),
+                        ''
+                    );
+                    return;
+                }
+                zoomProductRecord(productId);
             });
 
             if (window.ResizeObserver) {
@@ -346,6 +394,14 @@
             if (rowResizeObserver) { rowResizeObserver.disconnect(); rowResizeObserver = null; }
             $root.remove();
         };
+    };
+
+    VAS.VAS_079_TopValueItemsWidget.prototype.widgetFirevalueChanged = function (value) {
+        if (this.listener) { this.listener.widgetFirevalueChanged(value); }
+    };
+
+    VAS.VAS_079_TopValueItemsWidget.prototype.addChangeListener = function (listener) {
+        this.listener = listener;
     };
 
     VAS.VAS_079_TopValueItemsWidget.prototype.init = function (windowNo, frame) {

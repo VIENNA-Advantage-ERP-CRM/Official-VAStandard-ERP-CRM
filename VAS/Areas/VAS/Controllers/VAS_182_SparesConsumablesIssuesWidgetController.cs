@@ -23,6 +23,15 @@ namespace VIS.Controllers
     ///                          "not linked to a work order" complement of VAS_181 -- that
     ///                          heuristic pushed this KPI to ~99% on installs where few
     ///                          internal-use lines carry a work order link at all.
+    ///   Claude      2026-09-24 Reclassified again per the confirmed-correct query: the
+    ///                          Spares/Consumables predicate is M_Product_Category.
+    ///                          DTD001_IsConsumable = 'Y', not ProductGroup = 'C'. Also
+    ///                          replaced the dynamic AD_Column-resolved work-order-line
+    ///                          test in GetSparesConsumablesPercentageData with the same
+    ///                          two explicit columns (VA075_WorkOrder_ID,
+    ///                          VAMFG_M_WorkOrder_ID) GetSparesConsumablesIdsData already
+    ///                          used - the two endpoints previously disagreed on what
+    ///                          counted as a work-order line.
     /// </summary>
     public class VAS_182_SparesConsumablesIssuesWidgetController : Controller
     {
@@ -184,8 +193,8 @@ namespace VIS.Controllers
             string nmsl = ToSqlDate(nextMonthStart);
 
             // Same population as GetSparesConsumablesPercentageData's SparesValue
-            // branch (Product Category group 'C' + line-level NOT-work-order
-            // classification), just DISTINCT header ids instead of a SUM.
+            // branch (Product Category DTD001_IsConsumable = 'Y' + line-level
+            // NOT-work-order classification), just DISTINCT header ids instead of a SUM.
             string sql = @"
                 SELECT DISTINCT inv.M_Inventory_ID
                   FROM M_Inventory inv
@@ -193,7 +202,7 @@ namespace VIS.Controllers
                   INNER JOIN M_Product mp ON ( mp.M_Product_ID = line.M_Product_ID )
                   INNER JOIN M_Product_Category mpc ON ( mpc.M_Product_Category_ID = mp.M_Product_Category_ID )
                  WHERE inv.IsActive = 'Y'
-                   AND mpc.ProductGroup = 'C'
+                   AND mpc.DTD001_IsConsumable = 'Y'
                    AND line.IsActive = 'Y'
                    AND mp.IsActive = 'Y'
                    AND mpc.IsActive = 'Y'
@@ -219,42 +228,6 @@ namespace VIS.Controllers
             return ids;
         }
 
-        /// <summary>
-        /// The line-level production-order column, per the source specification
-        /// (03-use-c-production-issues-copilot-prompt.txt, "DATABASE TABLE MAPPING"):
-        ///   "Production order on line: M_InventoryLine.VAMFG_M_WorkOrder_ID"
-        ///   "Use the production order on the line level only ... Do not use the production-order
-        ///    field from M_Inventory header."
-        /// </summary>
-        private const string ProductionOrderColumn = "VAMFG_M_WorkOrder_ID";
-
-        /// <summary>
-        /// Returns the line-level production-order columns that this installation actually has
-        /// (never null; empty when the manufacturing module is not installed), same resolution
-        /// VAS_181 uses so both widgets agree on what counts as a work-order line.
-        /// </summary>
-        private static List<string> ResolveProductionOrderColumns()
-        {
-            string sql = @"
-                SELECT c.ColumnName
-                FROM AD_Column c
-                INNER JOIN AD_Table t ON t.AD_Table_ID = c.AD_Table_ID
-                WHERE t.TableName = 'M_InventoryLine'
-                  AND c.IsActive = 'Y'
-                  AND UPPER(c.ColumnName) LIKE '%WORKORDER%'
-                ORDER BY CASE WHEN UPPER(c.ColumnName) = UPPER('" + ProductionOrderColumn + @"') THEN 0 ELSE 1 END, c.ColumnName";
-
-            var columns = new List<string>();
-            using (IDataReader dr = DB.ExecuteReader(sql, null, null))
-            {
-                while (dr != null && dr.Read())
-                {
-                    columns.Add(Util.GetValueOfString(dr["ColumnName"]));
-                }
-            }
-            return columns;
-        }
-
         private int GetSparesConsumablesPercentageData(Ctx ctx, DateTime monthStart, DateTime nextMonthStart)
         {
             if (ctx == null) { return 0; }
@@ -263,34 +236,24 @@ namespace VIS.Controllers
             string nmsl = ToSqlDate(nextMonthStart);
 
             // Spares / consumables share = value of issue lines for products whose Product
-            // Category is in the "Consumables/Spares" group (M_Product_Category.ProductGroup
-            // = 'C'), as a share of the SAME group's total issued value for the period.
+            // Category is flagged Consumable (M_Product_Category.DTD001_IsConsumable = 'Y'),
+            // as a share of the SAME category's total issued value for the period.
             //
-            // Previously this widget classified "spares" as "any line NOT raised against a
-            // work order" -- an exact complement of VAS_181_ProductionIssuesWidget with no
-            // actual product classification behind it. On installs where few internal-use
-            // lines carry a work order link at all, that heuristic pushed this KPI to ~99-100%
-            // regardless of what was actually issued. Product Category is the real source of
-            // truth for what counts as a spare/consumable part.
+            // Earlier versions classified "spares" as "any line NOT raised against a work
+            // order" (an exact complement of VAS_181_ProductionIssuesWidget with no actual
+            // product classification behind it, ~99-100% on installs where few internal-use
+            // lines carry a work order link), then as ProductGroup = 'C'. Confirmed against a
+            // known-good query that the real predicate is DTD001_IsConsumable = 'Y', and that
+            // the work-order-line test itself is just the two explicit line columns
+            // (VA075_WorkOrder_ID, VAMFG_M_WorkOrder_ID) - matching what
+            // GetSparesConsumablesIdsData already used, rather than a dynamically-resolved
+            // list of every "*WORKORDER*"-named column on M_InventoryLine.
             //
             // Cost fallback must end in 0: NVL(CurrentCostPrice, PriceCost) yields NULL when both
             // are null, and SUM() silently drops those lines from the total.
-            //
-            // Without any work-order column the installation cannot classify a production issue,
-            // so every issue line counts as spares / consumables (production KPI reads 0%).
-            List<string> workOrderColumns = ResolveProductionOrderColumns();
-            var woTests = new List<string>();
-            foreach (string column in workOrderColumns)
-            {
-                woTests.Add("COALESCE(line." + column + ", 0) > 0");
-            }
-            string isNotWorkOrderLine = woTests.Count > 0
-                ? "NOT (" + string.Join(" OR ", woTests) + ")"
-                : "1 = 1";
-
             string sql = @"
                 SELECT
-                  COALESCE(SUM(CASE WHEN " + isNotWorkOrderLine + @"
+                  COALESCE(SUM(CASE WHEN COALESCE(line.VA075_WorkOrder_ID, 0) = 0 AND COALESCE(line.VAMFG_M_WorkOrder_ID, 0) = 0
                                     THEN (line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0))
                                     ELSE 0 END), 0) AS SparesValue,
                   COALESCE(SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0)), 0) AS TotalValue
@@ -299,7 +262,7 @@ namespace VIS.Controllers
                 INNER JOIN M_Product mp ON ( mp.M_Product_ID = line.M_Product_ID )
                 INNER JOIN M_Product_Category mpc ON ( mpc.M_Product_Category_ID = mp.M_Product_Category_ID )
                 WHERE inv.IsActive = 'Y'
-                  AND mpc.ProductGroup = 'C'
+                  AND mpc.DTD001_IsConsumable = 'Y'
                   AND inv.DocStatus IN ('CO', 'CL')
                   AND COALESCE(inv.IsInternalUse, 'N') = 'Y'
                   AND line.IsActive = 'Y'

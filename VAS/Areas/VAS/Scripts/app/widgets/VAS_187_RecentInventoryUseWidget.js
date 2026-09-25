@@ -414,12 +414,62 @@
             if ($nextBtn) { $nextBtn.prop('disabled', pageNo >= totalPages); }
         }
 
+        /* Row click -> real Inventory Use record navigation. Mirrors VAS_184/VAS_186's own
+           zoom-to-record pattern exactly: when hosted on a window, relay through
+           widgetFirevalueChanged/ActionName so the host resolves the window BY NAME (a
+           hardcoded AD_Window_ID has previously resolved to the wrong window on a real
+           install - see VAS_244); otherwise (Home-page placement) fall back to
+           VAS.ZoomUtil.zoomToRecord with a window id resolved once via VAS_178's existing
+           GetMaterialIssueWindowId endpoint (same Inventory Use / Internal Use window every
+           widget on this dashboard already targets - reused rather than re-deriving the same
+           multi-name AD_Window lookup here).
+           Replaces the previous openInventoryRecord(), which only sent
+           {Record_ID, TabIndex} - no TabWhereClause/ActionName, and no fallback at all when
+           windowNo < 0 - so the click did nothing on Home-page placement and, even on a
+           window, had nothing to key off. */
+        var INVENTORY_USE_WINDOW_NAME = 'Inventory Use';
+        var inventoryUseWindowId = 0;
+
+        function hostWindowName() {
+            try {
+                var listener = $self.listener;
+                for (var i = 0; i < 6 && listener; i++) {
+                    if (listener.apanel && listener.apanel.gridWindow && listener.apanel.gridWindow.getName) { return listener.apanel.gridWindow.getName(); }
+                    if (listener.gridWindow && listener.gridWindow.getName) { return listener.gridWindow.getName(); }
+                    listener = listener.listener;
+                }
+            } catch (e) { /* best-effort */ }
+            return '';
+        }
+
         function openInventoryRecord(inventoryId) {
-            var windowParam = {
-                "Record_ID": inventoryId,
-                "TabIndex": "0"
-            };
-            $self.widgetFirevalueChanged(windowParam);
+            if (!inventoryId) { return; }
+            try {
+                if ($self.windowNo >= 0) {
+                    $self.widgetFirevalueChanged({
+                        "TabWhereClause": "M_Inventory.M_Inventory_ID=" + Number(inventoryId),
+                        "TabLayout": "Y", "TabIndex": "0",
+                        "ActionName": hostWindowName() || INVENTORY_USE_WINDOW_NAME,
+                        "ActionType": "W"
+                    });
+                    return;
+                }
+                if (inventoryUseWindowId > 0) {
+                    if (window.VAS && VAS.ZoomUtil) { VAS.ZoomUtil.zoomToRecord('M_Inventory_ID', Number(inventoryId), inventoryUseWindowId, null, null); }
+                    return;
+                }
+                $.ajax({
+                    url: VIS.Application.contextUrl + 'VAS_178_NewMaterialIssueQuickAction/GetMaterialIssueWindowId',
+                    type: 'GET', dataType: 'json', cache: false,
+                    success: function (res) {
+                        var data = parseResponse(res);
+                        inventoryUseWindowId = Number((data && data.windowId) || 0);
+                        if (inventoryUseWindowId > 0 && window.VAS && VAS.ZoomUtil) {
+                            VAS.ZoomUtil.zoomToRecord('M_Inventory_ID', Number(inventoryId), inventoryUseWindowId, null, null);
+                        }
+                    }
+                });
+            } catch (e) { /* best-effort */ }
         }
 
         function createWidget() {
@@ -439,14 +489,16 @@
                 '</div>' +
                 '</div>' +
                 '<div class="vas-riu-filter-wrap">' +
-                '<button type="button" class="vas-riu-filter-btn">' +
+                '<button type="button" class="vas-riu-filter-btn" aria-label="' + escapeHtml(label("VAS_187_Filter", "Filter")) + '" title="' + escapeHtml(label("VAS_187_Filter", "Filter")) + '">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>' +
-                '<span>' + escapeHtml(label("VAS_187_Filter", "Filter")) + '</span>' +
                 '</button>' +
                 '<div class="vas-riu-filter-menu vas-riu-hidden">' +
                 '<button type="button" class="vas-riu-filter-opt active" data-status="ALL">' + escapeHtml(label("VAS_187_AllStatuses", "All Statuses")) + '</button>' +
                 '<button type="button" class="vas-riu-filter-opt" data-status="CO">' + escapeHtml(label("VAS_187_Completed", "Completed")) + '</button>' +
                 '<button type="button" class="vas-riu-filter-opt" data-status="DR">' + escapeHtml(label("VAS_187_Drafted", "Drafted")) + '</button>' +
+                '<button type="button" class="vas-riu-filter-opt" data-status="IP">' + escapeHtml(label("VAS_187_InProcess", "In Process")) + '</button>' +
+                '<button type="button" class="vas-riu-filter-opt" data-status="RE">' + escapeHtml(label("VAS_187_Reversed", "Reversed")) + '</button>' +
+                '<button type="button" class="vas-riu-filter-opt" data-status="VO">' + escapeHtml(label("VAS_187_Voided", "Voided")) + '</button>' +
                 '</div>' +
                 '</div>' +
                 '</div>' +
