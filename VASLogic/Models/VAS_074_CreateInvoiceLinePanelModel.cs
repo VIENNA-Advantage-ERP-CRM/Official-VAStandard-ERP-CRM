@@ -542,7 +542,6 @@ namespace VASLogic.Models
             string taxSql = @"SELECT t.C_Tax_ID, t.Name, t.Rate
                               FROM C_Tax t
                               WHERE t.IsActive = 'Y'
-                                AND COALESCE(t.IsSummary, 'N') = 'N'
                                 AND t.AD_Client_ID IN (0, " + ctx.GetAD_Client_ID() + ")";
             string taxPred = GetValRulePredicate(ctx, "C_Tax_ID", "C_Tax", "t", C_Invoice_ID, rowVars);
             if (taxPred.Length > 0) taxSql += " AND (" + taxPred + ")";
