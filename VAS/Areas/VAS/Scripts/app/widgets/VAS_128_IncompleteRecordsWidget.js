@@ -111,6 +111,12 @@
         var lastFocusedRow = null;
         var disposed = false;
 
+        // Product Master zoom target (Home-page fallback) - same window names VAS_078
+        // uses, cached after the first resolve so later clicks skip the lookup.
+        var ZOOM_WINDOW_NAME_NEW = 'VAS_ProductMaster';
+        var ZOOM_WINDOW_NAME_OLD = 'Product';
+        var productWindowId = 0;
+
         // Serial queue for preference writes. Two things depend on it:
         // (1) writes land in the order the user made them, so the last click on a
         //     checkbox is the value that survives; and
@@ -695,18 +701,34 @@
         function openActiveRecord() {
             var item = state.activeItem;
             if (!item || !item.productId) { return; }
-            // Navigate to the Product Master record through the widget framework's
-            // value-changed channel (the host opens the configured product window
-            // at this record). Not a prototype hash URL.
-            var windowParam = {
-                "TabWhereClause": "M_Product.M_Product_ID=" + Number(item.productId),
-                "TabLayout": "Y",
-                "TabIndex": "0",
-                "ActionName": hostWindowName() || "VAS_ProductMaster",
-                "ActionType": "W"
-            };
-            try { $self.widgetFirevalueChanged(windowParam); } catch (e) { }
-            closeModal();
+            var recordId = Number(item.productId);
+
+            // Hosted inside a window: navigate the host IN-PLACE through the widget
+            // framework's value-changed channel (the host opens the configured
+            // product window at this record). Not a prototype hash URL.
+            if ($self.windowNo >= 0) {
+                var windowParam = {
+                    "TabWhereClause": "M_Product.M_Product_ID=" + recordId,
+                    "TabLayout": "Y",
+                    "TabIndex": "0",
+                    "ActionName": hostWindowName() || ZOOM_WINDOW_NAME_NEW,
+                    "ActionType": "W"
+                };
+                try { $self.widgetFirevalueChanged(windowParam); } catch (e) { }
+                closeModal();
+                return;
+            }
+
+            // Home / Landing page: there is no host window listener chain for
+            // widgetFirevalueChanged to reach, so it silently did nothing here -
+            // open (or reuse) the Product Master window directly instead.
+            if (!window.VAS || !VAS.ZoomUtil || typeof VAS.ZoomUtil.zoomToRecord !== 'function') { return; }
+            VAS.ZoomUtil.zoomToRecord('M_Product_ID', recordId, productWindowId,
+                                      ZOOM_WINDOW_NAME_NEW, ZOOM_WINDOW_NAME_OLD)
+                .done(function (id) {
+                    if (id > 0) { productWindowId = id; }
+                    closeModal();
+                });
         }
 
         /* ---- Lifecycle ---- */

@@ -14,11 +14,14 @@
 
 .vas-riu-card {
     font-family: Roboto, Arial, sans-serif;
-    /* Container-query scaling first (cqi resolves against the root, which sets
-       container-type: inline-size), with the JS-driven --widget-inline-size as the
-       fallback for engines without container queries. Same scale in both: 4cqi == 0.04. */
-    font-size: clamp(15px, 4cqi, 24px);
-    font-size: clamp(15px, calc(var(--widget-inline-size, var(--dash-inline-size, 480px)) * 0.04), 24px);
+    /* Design Specs (dashboard-widgets.md > "Widget Root Anchor"): every widget root
+       must use clamp(16px, 1.2cqi, 20px) - was clamp(15px, 4cqi, 24px) here, well
+       past the canonical rate. Container-query scaling first (cqi resolves against
+       the root, which sets container-type: inline-size), with the JS-driven
+       --widget-inline-size as the fallback for engines without container queries.
+       Same rate in both: 1.2cqi == 0.012. */
+    font-size: clamp(16px, 1.2cqi, 20px);
+    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 480px)) * 0.012), 20px);
     width: 100%;
     height: 100%;
     display: flex;
@@ -30,7 +33,9 @@
     box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
     background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
     backdrop-filter: blur(10px);
-    padding: .875em;
+    /* Design Specs (dashboard-widgets.md > "Widget Edge Spacing"): default inner
+       padding is 0.85em, not 0.875em. */
+    padding: .85em;
     overflow: hidden;
 }
 
@@ -47,11 +52,21 @@
 .vas-riu-head-left {
     display: flex;
     align-items: center;
-    gap: .5em;
+    /* Design Specs (dashboard-widgets.md > "Widget Header"): icon-to-title gap is 0.625em. */
+    gap: .625em;
     min-width: 0;
 }
 
+/* Design Specs (dashboard-widgets.md > "Widget Header"): icon well is a soft glass
+   tile sized ~2x the title clamp, not a bare colored glyph. Sizes read off the same
+   --dash-inline-size lever as the title so the well never shrinks next to a
+   growing title on wide dashboards. */
 .vas-riu-ico {
+    width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    height: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(232, 244, 255, 0.96));
+    box-shadow: inset 0 0 0 1px #BFE4FF;
     color: #0083DA;
     display: inline-flex;
     align-items: center;
@@ -60,13 +75,19 @@
 }
 
     .vas-riu-ico svg {
-        width: 1.15em;
-        height: 1.15em;
+        width: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
+        height: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
     }
 
+/* Design Specs (dashboard-widgets.md > "Widget Header"): title/subtitle use their
+   own --dash-inline-size clamps, not em against the (widget-scoped) root - this is
+   what keeps the title in lockstep with every other widget's header on the same
+   dashboard regardless of this widget's own internal em scale. Weight is Regular
+   (400), not bold - was .9em/700 here. */
 .vas-riu-title {
-    font-size: .9em;
-    font-weight: 700;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
     color: #102C3F;
     line-height: 1.2;
     overflow: hidden;
@@ -75,10 +96,12 @@
 }
 
 .vas-riu-sub {
-    font-size: .6875em;
+    font-family: 'Roboto', sans-serif;
     font-weight: 400;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
     color: #717182;
-    line-height: 1.2;
+    line-height: 1.3;
+    margin-top: 2px;
 }
 
 .vas-riu-filter-wrap {
@@ -86,25 +109,28 @@
     flex: 0 0 auto;
 }
 
+/* Icon-only control (label removed per explicit instruction - the funnel glyph alone
+   is enough, and the accessible name still lives in aria-label/title on the button). */
 .vas-riu-filter-btn {
     font-family: inherit;
-    font-size: .6875em;
-    font-weight: 500;
     color: #41576A;
     background: #fff;
     border: 1px solid #D9E2EB;
     border-radius: 8px;
-    padding: .4em .7em;
+    width: 2em;
+    height: 2em;
+    padding: 0;
     outline: none;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
-    gap: .4em;
+    justify-content: center;
+    flex: 0 0 auto;
 }
 
     .vas-riu-filter-btn svg {
-        width: 1em;
-        height: 1em;
+        width: 1.0625em;
+        height: 1.0625em;
         flex: 0 0 auto;
     }
 
@@ -165,14 +191,19 @@
     align-items: center;
     justify-content: space-between;
     gap: .5em;
-    /* Rows share the body height evenly and may shrink (flex: 1 1 0 + min-height: 0).
-       Previously there was NO flex property here, so rows defaulted to flex: 0 1 auto and kept
-       their natural two-line height while pageSize is hard-coded to 4. Whenever 4 natural rows
-       were taller than the body, the surplus rows were pushed past the bottom edge and clipped by
-       overflow:hidden on .vas-riu-body - the pager promised 4 rows but fewer were visible.
-       min-height: 0 is what actually permits the shrink; without it a flex item refuses to go
-       below its content height and the overflow returns. Same fix as .vas-mcw-row (VAS_183). */
-    flex: 1 1 0;
+    /* Fixed height, not a stretchy share: 25% of the body = 1/pageSize (pageSize is
+       hard-coded to 4 in the JS). flex: 1 1 0 used to divide the body EVENLY among
+       however many rows actually rendered, so a page with only 1-2 records (e.g. a
+       status filter with few matches) stretched that single row across the whole
+       body - it read as floating in the middle of an empty card instead of sitting
+       at the top like a full page of 4 does. flex-grow: 0 stops that: every row is
+       always exactly 1/4 of the body regardless of row count, rows stack from the
+       top (.vas-riu-body's default flex-start), and any leftover slots are simply
+       blank space below the last row rather than redistributed into it.
+       min-height: 0 is still required so a row can shrink below its content's
+       natural height on a short/laptop-height dashboard - see the row-clipping
+       history this replaced (flex: 1 1 0), same fix as .vas-mcw-row (VAS_183). */
+    flex: 0 0 25%;
     min-height: 0;
     /* Row content must not exceed this shrunk height: the row itself has no overflow
        clipping of its own (only .vas-riu-body does), so taller-than-allotted content
@@ -215,8 +246,13 @@
     gap: .5em;
 }
 
+/* Design Specs (dashboard-widgets.md > "List / Grid Hierarchy Rule"): row/list item
+   text must resolve smaller than the widget title at every dashboard width - the sm
+   token (0.75em), not .85em (which can tie or exceed the title's own clamp on wide
+   dashboards). Weight/color still differentiate this primary cell from secondary
+   ones at the shared sm size. */
 .vas-riu-doc-no {
-    font-size: .85em;
+    font-size: .75em;
     font-weight: 700;
     color: #102C3F;
 }
@@ -321,7 +357,9 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border-top: 1px solid #EDF2F6;
+    /* foundations.md > Dividers: footer band is #D9E2EB, not the non-canonical
+       #EDF2F6 this used to read. */
+    border-top: 1px solid #D9E2EB;
     padding-top: .4em;
     margin-top: .25em;
     flex: 0 0 auto;
@@ -345,7 +383,10 @@
     width: 24px;
     height: 24px;
     border: 1px solid #D9E2EB;
-    border-radius: 50%;
+    /* Design Specs (dashboard-widgets.md > "Pager Buttons"): "do not use circular-only
+       arrow buttons as the only option; prefer the compact rounded-square/capsule
+       treatment" - was 50% (fully circular). */
+    border-radius: 6px;
     background: #fff;
     color: #0083DA;
     display: inline-flex;

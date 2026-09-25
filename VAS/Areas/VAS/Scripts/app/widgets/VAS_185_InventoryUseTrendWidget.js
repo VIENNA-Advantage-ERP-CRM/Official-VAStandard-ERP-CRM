@@ -9,7 +9,7 @@
  * ---+----------------------------------------+-----------------------------------
  *  1 | Inventory Use Trend                    | VAS_185_InventoryUseTrend
  *  2 | Monthly quantity and value             | VAS_185_MonthlyQuantityAndValue
- *  3 | Click a month for details              | VAS_185_ClickMonthForDetails
+ *  3 | Select a month to view details         | VAS_185_ClickMonthForDetails
  *  4 | Couldn't load                           | VAS_185_CouldntLoad
  *  5 | Quantity                               | VAS_185_Quantity
  *  6 | Value                                  | VAS_185_Value
@@ -146,6 +146,75 @@
         function formatINR(value) {
             return formatFullValue(value);
         }
+
+        // Whole-number currency with thousands separator, no decimals - used for the
+        // above-point/bar inline data labels (e.g. "₹42,000"), distinct from
+        // formatCompactValue's k/L/Cr abbreviation (kept for hover tooltips) and from
+        // formatFullValue's 2-decimal popover figure.
+        function formatFullCurrency(value) {
+            var v = Math.round(Number(value || 0));
+            var sign = v < 0 ? '-' : '';
+            var sym = currencySymbol || '';
+            return sign + sym + Math.abs(v).toLocaleString(window.navigator.language);
+        }
+
+        // Compact, whole-number axis tick label (e.g. "₹10K", never "₹10.0k") - the
+        // right (Value) axis's own formatter, separate from the data-label/tooltip ones.
+        function formatAxisValue(value) {
+            var v = Math.round(Number(value || 0));
+            var sym = currencySymbol || '';
+            if (v === 0) { return sym + '0'; }
+            var sign = v < 0 ? '-' : '';
+            var absV = Math.abs(v);
+            if (isIndianIso(currencyIso)) {
+                if (absV >= 10000000) { return sign + sym + Math.round(absV / 10000000) + 'Cr'; }
+                if (absV >= 100000) { return sign + sym + Math.round(absV / 100000) + 'L'; }
+                if (absV >= 1000) { return sign + sym + Math.round(absV / 1000) + 'K'; }
+            } else {
+                if (absV >= 1000000000) { return sign + sym + Math.round(absV / 1000000000) + 'B'; }
+                if (absV >= 1000000) { return sign + sym + Math.round(absV / 1000000) + 'M'; }
+                if (absV >= 1000) { return sign + sym + Math.round(absV / 1000) + 'K'; }
+            }
+            return sign + sym + absV.toLocaleString(window.navigator.language);
+        }
+
+        // Left (Quantity) axis tick label - whole number, thousands separator.
+        function formatAxisQty(value) {
+            return Math.round(Number(value || 0)).toLocaleString(window.navigator.language);
+        }
+
+        // "Nice" rounded axis max + step for tickCount intervals (standard chart-axis
+        // algorithm: 1/2/5/10 x a power of ten), so gridlines land on round numbers
+        // (0/500/1,000/... or 0/10K/20K/...) instead of the raw data max.
+        function niceTicks(maxValue, tickCount) {
+            var safeMax = Math.max(Number(maxValue) || 0, 1);
+            var rawStep = safeMax / tickCount;
+            var magnitude = Math.pow(10, Math.floor(Math.log(rawStep) / Math.LN10));
+            var residual = rawStep / magnitude;
+            var niceResidual;
+            if (residual > 5) { niceResidual = 10; }
+            else if (residual > 2) { niceResidual = 5; }
+            else if (residual > 1) { niceResidual = 2; }
+            else { niceResidual = 1; }
+            var step = niceResidual * magnitude;
+            var niceMax = step * tickCount;
+            while (niceMax < safeMax) { niceMax += step; }
+            return { max: niceMax, step: step };
+        }
+
+        function svgText(x, y, text, opts) {
+            var o = opts || {};
+            var t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            t.setAttribute('x', x);
+            t.setAttribute('y', y);
+            t.setAttribute('text-anchor', o.anchor || 'middle');
+            t.setAttribute('font-size', o.size || '9');
+            t.setAttribute('font-weight', o.weight || '400');
+            t.setAttribute('fill', o.fill || '#5F7283');
+            if (o.transform) { t.setAttribute('transform', o.transform); }
+            t.textContent = text;
+            return t;
+        }
 // ===== NEW CODE END — currency format =====
 // ----- OLD CODE (kept for rollback, do not delete) -----
 //      function formatINR(value) {
@@ -231,24 +300,39 @@
 
             if (seriesData.length === 0) { return; }
 
-            var padLeft = 12;
-            var padRight = 12;
-            var padTop = 20;
-            var padBottom = 22;
+            // Raw maxima from the data, then rounded up to "nice" axis ticks (0/500/
+            // 1,000/... and 0/10K/20K/...) so both axes' gridlines land on round numbers
+            // instead of the series' own max.
+            var maxQtyRaw = 0;
+            var maxValRaw = 0;
+            for (var i = 0; i < seriesData.length; i++) {
+                if (seriesData[i].qty > maxQtyRaw) { maxQtyRaw = seriesData[i].qty; }
+                if (seriesData[i].val > maxValRaw) { maxValRaw = seriesData[i].val; }
+            }
+            var TICK_COUNT = 5;
+            var qtyTicks = niceTicks(maxQtyRaw, TICK_COUNT);
+            var valTicks = niceTicks(maxValRaw, TICK_COUNT);
+            var maxQty = qtyTicks.max;
+            var maxVal = valTicks.max;
+
+            // Layout: [rotated title][tick labels] chart area [tick labels][rotated title]
+            var leftAxisTitleW = 11;
+            var leftTickLabelW = 32;
+            var rightTickLabelW = 30;
+            var rightAxisTitleW = 11;
+            var padLeft = leftAxisTitleW + leftTickLabelW + 4;
+            var padRight = rightAxisTitleW + rightTickLabelW + 4;
+            var padTop = 22;
+            var padBottom = 18;
             var chartW = width - padLeft - padRight;
             var chartH = height - padTop - padBottom;
+            if (chartW <= 0 || chartH <= 0) { return; }
 
-            // Compute scales
-            var maxQty = 1;
-            var maxVal = 1;
-            for (var i = 0; i < seriesData.length; i++) {
-                if (seriesData[i].qty > maxQty) { maxQty = seriesData[i].qty; }
-                if (seriesData[i].val > maxVal) { maxVal = seriesData[i].val; }
-            }
+            // Horizontal gridlines (0..TICK_COUNT) + both axes' tick labels.
+            for (var g = 0; g <= TICK_COUNT; g++) {
+                var frac = g / TICK_COUNT;
+                var gy = padTop + chartH - (chartH * frac);
 
-            // Horizontal Gridlines (25%, 50%, 75%, 100%)
-            for (var g = 1; g <= 4; g++) {
-                var gy = padTop + chartH - (chartH * (g / 4));
                 var gridLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
                 gridLine.setAttribute('x1', padLeft);
                 gridLine.setAttribute('y1', gy);
@@ -257,58 +341,76 @@
                 gridLine.setAttribute('stroke', '#E2EAF1');
                 gridLine.setAttribute('stroke-width', '1');
                 $svg.append(gridLine);
+
+                $svg.append(svgText(padLeft - 4, gy + 3, formatAxisQty(qtyTicks.step * g), {
+                    anchor: 'end', size: '9', fill: '#5F7283'
+                }));
+                $svg.append(svgText(width - padRight + 4, gy + 3, formatAxisValue(valTicks.step * g), {
+                    anchor: 'start', size: '9', fill: '#5F7283'
+                }));
             }
+
+            // Rotated axis titles.
+            var leftTitleX = leftAxisTitleW - 2;
+            var midY = padTop + chartH / 2;
+            $svg.append(svgText(leftTitleX, midY, label("VAS_185_Quantity", "Quantity"), {
+                anchor: 'middle', size: '9', weight: '600', fill: '#41576A',
+                transform: 'rotate(-90 ' + leftTitleX + ' ' + midY + ')'
+            }));
+            var rightTitleX = width - (rightAxisTitleW - 2);
+            $svg.append(svgText(rightTitleX, midY, label("VAS_185_Value", "Value"), {
+                anchor: 'middle', size: '9', weight: '600', fill: '#41576A',
+                transform: 'rotate(90 ' + rightTitleX + ' ' + midY + ')'
+            }));
 
             var numSlots = seriesData.length;
             var slotW = chartW / numSlots;
             var barW = Math.min(38, Math.max(10, slotW * 0.44));
 
             var points = [];
+            // Candidate label positions are collected per month first and only appended to
+            // the SVG after a collision pass (below) - the qty label (anchored to the bar
+            // top) and the value label (anchored to the line point) both default to sitting
+            // just above their own anchor, and when a month's bar height and line height are
+            // proportionally close, those two "just above" positions land on top of each
+            // other and render as unreadable overlapping text.
+            var qtyLabelCandidates = [];
+            var valLabelCandidates = [];
 
             // Draw Quantity Bars
             for (var j = 0; j < numSlots; j++) {
                 var item = seriesData[j];
                 var centerX = padLeft + (j + 0.5) * slotW;
                 var barX = centerX - (barW / 2);
-                var barH = Math.max(2, (item.qty / maxQty) * chartH);
+                var hasQty = item.qty > 0;
+                var barH = hasQty ? Math.max(2, (item.qty / maxQty) * chartH) : 0;
                 var barY = padTop + chartH - barH;
 
-                var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-                rect.setAttribute('x', barX);
-                rect.setAttribute('y', barY);
-                rect.setAttribute('width', barW);
-                rect.setAttribute('height', barH);
-                rect.setAttribute('rx', '3');
-                rect.setAttribute('fill', '#0083DA');
-                rect.setAttribute('fill-opacity', '0.85');
-                rect.setAttribute('cursor', 'pointer');
-                rect.setAttribute('data-idx', j);
+                // No bar drawn for a zero-qty month (matches the reference design - a flat
+                // baseline with no bar, not a fake sliver). The value-line point below still
+                // renders and stays clickable, so the month is never a dead zone.
+                if (hasQty) {
+                    var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    rect.setAttribute('x', barX);
+                    rect.setAttribute('y', barY);
+                    rect.setAttribute('width', barW);
+                    rect.setAttribute('height', barH);
+                    rect.setAttribute('rx', '3');
+                    rect.setAttribute('fill', '#0083DA');
+                    rect.setAttribute('fill-opacity', '0.85');
+                    rect.setAttribute('cursor', 'pointer');
+                    rect.setAttribute('data-idx', j);
 
-// ===== NEW CODE START — currency format (agent A07, 2026-08-19) =====
-                var titleEl = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-                titleEl.textContent = item.fullMonth + ': ' + label("VAS_185_Qty", "Qty") + ' ' + formatQty(item.qty)
-                    + ', ' + label("VAS_185_Value", "Value") + ' ' + formatCompactValue(item.val);
-                rect.appendChild(titleEl);
-                $svg.append(rect);
-// ===== NEW CODE END — currency format =====
-// ----- OLD CODE (kept for rollback, do not delete) -----
-//              var titleEl = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-//              titleEl.textContent = item.fullMonth + ': Qty ' + formatQty(item.qty) + ', Value ' + formatINR(item.val);
-//              rect.appendChild(titleEl);
-//              $svg.append(rect);
-// ----- END OLD CODE -----
+                    var titleEl = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+                    titleEl.textContent = item.fullMonth + ': ' + label("VAS_185_Qty", "Qty") + ' ' + formatQty(item.qty)
+                        + ', ' + label("VAS_185_Value", "Value") + ' ' + formatCompactValue(item.val);
+                    rect.appendChild(titleEl);
+                    $svg.append(rect);
+                }
 
-                // Qty inline label on 3M/6M
-                if (selectedMonthsWindow <= 6 && item.qty > 0) {
-                    var textQty = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                    textQty.setAttribute('x', centerX);
-                    textQty.setAttribute('y', Math.max(padTop - 4, barY - 4));
-                    textQty.setAttribute('text-anchor', 'middle');
-                    textQty.setAttribute('font-size', '9');
-                    textQty.setAttribute('font-weight', '700');
-                    textQty.setAttribute('fill', '#0F69AC');
-                    textQty.textContent = formatQty(item.qty);
-                    $svg.append(textQty);
+                // Qty inline label candidate on 3M/6M (only when there is a bar to label)
+                if (selectedMonthsWindow <= 6 && hasQty) {
+                    qtyLabelCandidates[j] = { x: centerX, y: Math.max(padTop - 4, barY - 4), text: formatQty(item.qty) };
                 }
 
                 // Calculate Value Line coordinates
@@ -317,14 +419,7 @@
                 points.push({ x: centerX, y: valY, item: item, idx: j });
 
                 // Bottom Month Label
-                var textMonth = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                textMonth.setAttribute('x', centerX);
-                textMonth.setAttribute('y', height - 4);
-                textMonth.setAttribute('text-anchor', 'middle');
-                textMonth.setAttribute('font-size', '10');
-                textMonth.setAttribute('fill', '#5F7283');
-                textMonth.textContent = item.label;
-                $svg.append(textMonth);
+                $svg.append(svgText(centerX, height - 2, item.label, { anchor: 'middle', size: '10', fill: '#5F7283' }));
             }
 
             // Draw Value Polyline
@@ -363,18 +458,14 @@
                 circle.appendChild(titlePt);
                 $svg.append(circle);
 
-                // Value inline label on 3M/6M
-                if (selectedMonthsWindow <= 6 && pt.item.val > 0) {
-                    var textVal = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                // Value inline label candidate on 3M/6M - always shown, including zero
+                // (matches the reference design's "₹0" labels on empty months), full
+                // currency with thousands separator rather than the compact k/L/Cr tooltip
+                // format. Collected as a candidate, not appended yet - see the collision
+                // pass below, which resolves overlaps against this same month's qty label.
+                if (selectedMonthsWindow <= 6) {
                     var textY = (pt.y - 8 < padTop) ? pt.y + 14 : pt.y - 6;
-                    textVal.setAttribute('x', pt.x);
-                    textVal.setAttribute('y', textY);
-                    textVal.setAttribute('text-anchor', 'middle');
-                    textVal.setAttribute('font-size', '9');
-                    textVal.setAttribute('font-weight', '700');
-                    textVal.setAttribute('fill', '#9A6500');
-                    textVal.textContent = formatCompactValue(pt.item.val);
-                    $svg.append(textVal);
+                    valLabelCandidates[pt.idx] = { x: pt.x, y: textY, text: formatFullCurrency(pt.item.val) };
                 }
 // ===== NEW CODE END — currency format =====
 // ----- OLD CODE (kept for rollback, do not delete) -----
@@ -383,6 +474,36 @@
 //              circle.appendChild(titlePt);
 //              $svg.append(circle);
 // ----- END OLD CODE -----
+            }
+
+            // Collision pass: a month's qty label (anchored above the bar top) and value
+            // label (anchored above/below the line point) are computed independently, so
+            // when that month's bar height and line height are proportionally close, both
+            // labels land at nearly the same Y and overlap into unreadable text. Force at
+            // least MIN_LABEL_GAP of vertical separation by pushing whichever of the two is
+            // already higher (smaller y) further up, leaving the lower one at its natural,
+            // correctly-anchored position.
+            var MIN_LABEL_GAP = 12;
+            for (var m = 0; m < numSlots; m++) {
+                var qtyC = qtyLabelCandidates[m];
+                var valC = valLabelCandidates[m];
+                if (qtyC && valC && Math.abs(valC.y - qtyC.y) < MIN_LABEL_GAP) {
+                    if (qtyC.y <= valC.y) {
+                        qtyC.y = valC.y - MIN_LABEL_GAP;
+                    } else {
+                        valC.y = qtyC.y - MIN_LABEL_GAP;
+                    }
+                }
+            }
+            for (var n = 0; n < numSlots; n++) {
+                if (qtyLabelCandidates[n]) {
+                    var qc = qtyLabelCandidates[n];
+                    $svg.append(svgText(qc.x, qc.y, qc.text, { anchor: 'middle', size: '9', weight: '700', fill: '#0F69AC' }));
+                }
+                if (valLabelCandidates[n]) {
+                    var vc = valLabelCandidates[n];
+                    $svg.append(svgText(vc.x, vc.y, vc.text, { anchor: 'middle', size: '9', weight: '700', fill: '#9A6500' }));
+                }
             }
         }
 
@@ -459,7 +580,7 @@
                 '<div class="vas-iut-legend">' +
                 '<div class="vas-iut-leg-item"><span class="vas-iut-swatch-bar"></span><span>' + escapeHtml(label("VAS_185_Quantity", "Quantity")) + '</span></div>' +
                 '<div class="vas-iut-leg-item"><span class="vas-iut-swatch-line"></span><span>' + escapeHtml(label("VAS_185_Value", "Value")) + '</span></div>' +
-                '<div class="vas-iut-leg-hint">' + escapeHtml(label("VAS_185_ClickMonthForDetails", "Click a month for details")) + '</div>' +
+                '<div class="vas-iut-leg-hint">' + escapeHtml(label("VAS_185_ClickMonthForDetails", "Select a month to view details")) + '</div>' +
                 '</div>' +
                 '<div class="vas-iut-chart-wrap">' +
                 '<svg class="vas-iut-svg"></svg>' +

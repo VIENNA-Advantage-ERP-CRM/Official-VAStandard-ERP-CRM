@@ -27,6 +27,18 @@ namespace VAS.Controllers
     ///               data to the Overall Inventory Product Search widget.
     /// Chronological development:
     ///   VAI154      2026-06-21 Created
+    ///   Claude      2026-09-25 Every query in this controller additionally restricted its
+    ///                          main table to "AD_Org_ID IN (0, session's currently selected
+    ///                          org)" on top of MRole.AddAccessSQL - so a user whose ROLE has
+    ///                          access to multiple orgs could only search/view products (and
+    ///                          their stock, orders, movements, requisitions, reorder point,
+    ///                          preferred supplier) in org 0 (shared/"*") and whichever single
+    ///                          org happened to be selected, not every org the role actually
+    ///                          grants access to. Removed that manual restriction everywhere
+    ///                          (search, overview, stock, orders, movements, requisitions,
+    ///                          reorder point, preferred supplier) per explicit instruction -
+    ///                          MRole.AddAccessSQL, already applied to each of these tables,
+    ///                          is the correct (and only needed) org-access check.
     /// </summary>
     public class VAS_078_ProductSearchWidgetController : Controller
     {
@@ -130,7 +142,6 @@ namespace VAS.Controllers
             if (maxRows <= 0 || maxRows > 7) { maxRows = 7; }
 
             int clientId = ctx.GetAD_Client_ID();
-            int orgId = ctx.GetAD_Org_ID();
             string likeValue = "%" + searchText.ToUpperInvariant() + "%";
 
             string searchProductsSql = @"
@@ -144,7 +155,6 @@ namespace VAS.Controllers
                 FROM M_Product Product
                 LEFT OUTER JOIN M_Product_Category ProductCategory ON (ProductCategory.M_Product_Category_ID=Product.M_Product_Category_ID AND ProductCategory.IsActive=N'Y')
                 WHERE Product.AD_Client_ID=@Product_Client_ID
-                  AND Product.AD_Org_ID IN (0,COALESCE(NULLIF(@Product_Org_ID,0),Product.AD_Org_ID))
                   AND (
                       UPPER(COALESCE(Product.Name,N'')) LIKE @Product_Name
                       OR UPPER(COALESCE(Product.Value,N'')) LIKE @Product_Code
@@ -168,8 +178,7 @@ namespace VAS.Controllers
                 FROM M_Storage Storage
                 INNER JOIN M_Locator Locator ON (Locator.M_Locator_ID=Storage.M_Locator_ID AND Locator.IsActive=N'Y')
                 WHERE Storage.IsActive=N'Y'
-                  AND Storage.AD_Client_ID=@Storage_Client_ID
-                  AND Storage.AD_Org_ID IN (0,COALESCE(NULLIF(@Storage_Org_ID,0),Storage.AD_Org_ID))";
+                  AND Storage.AD_Client_ID=@Storage_Client_ID";
 
             storageRowsSql = AddAccessSql(ctx, storageRowsSql, "Storage");
             storageRowsSql += @"
@@ -221,7 +230,6 @@ namespace VAS.Controllers
             SqlParameter[] parameters = new SqlParameter[]
             {
                 new SqlParameter("@Product_Client_ID", clientId),
-                new SqlParameter("@Product_Org_ID", orgId),
                 new SqlParameter("@Product_Name", likeValue),
                 new SqlParameter("@Product_Code", likeValue),
                 new SqlParameter("@Product_SKU", likeValue),
@@ -233,8 +241,7 @@ namespace VAS.Controllers
                 new SqlParameter("@Cost_Client_ID", clientId),
                 new SqlParameter("@Element_Client_ID1", clientId),
                 new SqlParameter("@Element_Client_ID2", clientId),
-                new SqlParameter("@Storage_Client_ID", clientId),
-                new SqlParameter("@Storage_Org_ID", orgId)
+                new SqlParameter("@Storage_Client_ID", clientId)
             };
 
             IDataReader dr = null;
@@ -323,16 +330,14 @@ namespace VAS.Controllers
                 LEFT OUTER JOIN C_UOM UOM ON (UOM.C_UOM_ID=Product.C_UOM_ID AND UOM.IsActive=N'Y')
                 LEFT OUTER JOIN AD_Image ProductImage ON (ProductImage.AD_Image_ID=Product.AD_Image_ID AND ProductImage.IsActive=N'Y')
                 WHERE Product.M_Product_ID=@M_Product_ID
-                  AND Product.AD_Client_ID=@AD_Client_ID
-                  AND Product.AD_Org_ID IN (0,COALESCE(NULLIF(@AD_Org_ID,0),Product.AD_Org_ID))";
+                  AND Product.AD_Client_ID=@AD_Client_ID";
 
             sql = AddAccessSql(ctx, sql, "Product");
 
             SqlParameter[] parameters = new SqlParameter[]
             {
                 new SqlParameter("@M_Product_ID", productId),
-                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
-                new SqlParameter("@AD_Org_ID", ctx.GetAD_Org_ID())
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
             };
 
             IDataReader dr = null;
@@ -551,8 +556,7 @@ namespace VAS.Controllers
                 LEFT OUTER JOIN M_AttributeSetInstance AttributeInstance ON (AttributeInstance.M_AttributeSetInstance_ID=Storage.M_AttributeSetInstance_ID)
                 WHERE Storage.IsActive=N'Y'
                   AND Storage.M_Product_ID=@Storage_Product_ID
-                  AND Storage.AD_Client_ID=@Storage_Client_ID
-                  AND Storage.AD_Org_ID IN (0,COALESCE(NULLIF(@Storage_Org_ID,0),Storage.AD_Org_ID))";
+                  AND Storage.AD_Client_ID=@Storage_Client_ID";
 
             storageRowsSql = AddAccessSql(ctx, storageRowsSql, "Storage");
             storageRowsSql += @"
@@ -596,8 +600,7 @@ namespace VAS.Controllers
                 new SqlParameter("@Element_Client_ID2", ctx.GetAD_Client_ID()),
                 new SqlParameter("@Cost_Product_ID", productId),
                 new SqlParameter("@Storage_Product_ID", productId),
-                new SqlParameter("@Storage_Client_ID", ctx.GetAD_Client_ID()),
-                new SqlParameter("@Storage_Org_ID", ctx.GetAD_Org_ID())
+                new SqlParameter("@Storage_Client_ID", ctx.GetAD_Client_ID())
             };
 
             List<ProductStockRow> rows = new List<ProductStockRow>();
@@ -638,16 +641,14 @@ namespace VAS.Controllers
                 WHERE Replenish.M_Product_ID=@M_Product_ID
                   AND Replenish.IsActive=N'Y'
                   AND Replenish.ReplenishType IN (N'1',N'2')
-                  AND Replenish.AD_Client_ID=@AD_Client_ID
-                  AND Replenish.AD_Org_ID IN (0,COALESCE(NULLIF(@AD_Org_ID,0),Replenish.AD_Org_ID))";
+                  AND Replenish.AD_Client_ID=@AD_Client_ID";
 
             sql = AddAccessSql(ctx, sql, "Replenish");
 
             SqlParameter[] parameters = new SqlParameter[]
             {
                 new SqlParameter("@M_Product_ID", productId),
-                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
-                new SqlParameter("@AD_Org_ID", ctx.GetAD_Org_ID())
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
             };
 
             decimal reorderPoint = 0;
@@ -677,8 +678,7 @@ namespace VAS.Controllers
                 INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=ProductPO.C_BPartner_ID AND BPartner.IsActive=N'Y')
                 WHERE ProductPO.M_Product_ID=@M_Product_ID
                   AND ProductPO.IsActive=N'Y'
-                  AND ProductPO.AD_Client_ID=@AD_Client_ID
-                  AND ProductPO.AD_Org_ID IN (0,COALESCE(NULLIF(@AD_Org_ID,0),ProductPO.AD_Org_ID))";
+                  AND ProductPO.AD_Client_ID=@AD_Client_ID";
 
             sql = AddAccessSql(ctx, sql, "ProductPO");
             sql += @"
@@ -688,8 +688,7 @@ namespace VAS.Controllers
             SqlParameter[] parameters = new SqlParameter[]
             {
                 new SqlParameter("@M_Product_ID", productId),
-                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
-                new SqlParameter("@AD_Org_ID", ctx.GetAD_Org_ID())
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
             };
 
             IDataReader dr = null;
@@ -730,8 +729,7 @@ namespace VAS.Controllers
                 WHERE OrderLine.M_Product_ID=@M_Product_ID
                   AND OrderHeader.IsSOTrx=@IsSOTrx
                   AND OrderLine.IsActive=N'Y'
-                  AND OrderLine.AD_Client_ID=@AD_Client_ID
-                  AND OrderLine.AD_Org_ID IN (0,COALESCE(NULLIF(@AD_Org_ID,0),OrderLine.AD_Org_ID))";
+                  AND OrderLine.AD_Client_ID=@AD_Client_ID";
 
             sql = AddAccessSql(ctx, sql, "OrderLine");
             sql += @"
@@ -744,7 +742,6 @@ namespace VAS.Controllers
                 new SqlParameter("@M_Product_ID", productId),
                 new SqlParameter("@IsSOTrx", SqlDbType.VarChar) { Value = isSales ? "Y" : "N" },
                 new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
-                new SqlParameter("@AD_Org_ID", ctx.GetAD_Org_ID()),
                 new SqlParameter("@PageSize", pageSize)
             };
 
@@ -802,8 +799,7 @@ namespace VAS.Controllers
                 LEFT OUTER JOIN AD_Ref_List MovementTypeList ON (MovementTypeList.AD_Reference_ID=189 AND MovementTypeList.Value=Movement.MovementType AND MovementTypeList.IsActive=N'Y')
                 WHERE Movement.M_Product_ID=@M_Product_ID
                   AND Movement.IsActive=N'Y'
-                  AND Movement.AD_Client_ID=@AD_Client_ID
-                  AND Movement.AD_Org_ID IN (0,COALESCE(NULLIF(@AD_Org_ID,0),Movement.AD_Org_ID))";
+                  AND Movement.AD_Client_ID=@AD_Client_ID";
 
             // Review #36: filter reversed movements only where the column exists.
             if (TransactionHasIsReversed())
@@ -822,7 +818,6 @@ namespace VAS.Controllers
             {
                 new SqlParameter("@M_Product_ID", productId),
                 new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
-                new SqlParameter("@AD_Org_ID", ctx.GetAD_Org_ID()),
                 new SqlParameter("@PageSize", pageSize)
             };
 
@@ -868,8 +863,7 @@ namespace VAS.Controllers
                 LEFT OUTER JOIN M_AttributeSetInstance AttributeInstance ON (AttributeInstance.M_AttributeSetInstance_ID=RequisitionLine.M_AttributeSetInstance_ID)
                 WHERE RequisitionLine.M_Product_ID=@M_Product_ID
                   AND RequisitionLine.IsActive=N'Y'
-                  AND RequisitionLine.AD_Client_ID=@AD_Client_ID
-                  AND RequisitionLine.AD_Org_ID IN (0,COALESCE(NULLIF(@AD_Org_ID,0),RequisitionLine.AD_Org_ID))";
+                  AND RequisitionLine.AD_Client_ID=@AD_Client_ID";
 
             sql = AddAccessSql(ctx, sql, "RequisitionLine");
             sql += @"
@@ -881,7 +875,6 @@ namespace VAS.Controllers
             {
                 new SqlParameter("@M_Product_ID", productId),
                 new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
-                new SqlParameter("@AD_Org_ID", ctx.GetAD_Org_ID()),
                 new SqlParameter("@PageSize", pageSize)
             };
 

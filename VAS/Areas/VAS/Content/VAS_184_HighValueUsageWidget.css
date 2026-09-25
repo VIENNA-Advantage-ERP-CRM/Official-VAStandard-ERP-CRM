@@ -14,11 +14,17 @@
 
 .vas-hvu-card {
     font-family: Roboto, Arial, sans-serif;
-    /* Widget root anchor per Global VA Design Standards ("Dashboard Widgets").
-       cqi resolves against .vas-hvu-root, which declares container-type: inline-size, so this
-       needs no JS-populated variable and no px fallback. The previous value capped at 24px,
-       which stopped the text scaling on 2K/4K dashboards while the cell kept growing. */
-    font-size: clamp(14px, 4.5cqi, 36px);
+    /* Design Specs (dashboard-widgets.md > "Widget Root Anchor"): the canonical widget
+       root is clamp(16px, 1.2cqi, 20px) - this was clamp(14px, 4.5cqi, 36px), a
+       ceiling nearly 2x the spec's 20px and a rate ~3.75x steeper, introduced by a
+       prior pass whose own comment incorrectly asserted 4.5cqi was "the standard".
+       It is not; the 2K Calibration section explicitly documents 20px as the
+       intended ceiling so widget content doesn't read oversized on wide dashboards.
+       cqi resolves against .vas-hvu-root (container-type: inline-size); the
+       JS-driven --widget-inline-size is the fallback for engines without container
+       queries, same as every other widget in this codebase. */
+    font-size: clamp(16px, 1.2cqi, 20px);
+    font-size: clamp(16px, calc(var(--widget-inline-size, 480px) * 0.012), 20px);
     width: 100%;
     height: 100%;
     display: flex;
@@ -30,7 +36,7 @@
     box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
     background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
     backdrop-filter: blur(10px);
-    padding: .875em;
+    padding: .85em;
     overflow: hidden;
 }
 
@@ -42,7 +48,16 @@
     flex: 0 0 auto;
 }
 
+/* Design Specs (dashboard-widgets.md > "Widget Header"): icon well is a soft glass
+   tile sized ~2x the title clamp, not a bare colored glyph - sizes read off the same
+   --dash-inline-size lever as the title so the well never shrinks next to a growing
+   title on wide dashboards. */
 .vas-hvu-ico {
+    width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    height: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(232, 244, 255, 0.96));
+    box-shadow: inset 0 0 0 1px #BFE4FF;
     color: #0083DA;
     display: inline-flex;
     align-items: center;
@@ -50,18 +65,19 @@
     flex: 0 0 auto;
 }
 
-/* Header chrome is kept visually identical to the sibling widgets (183/185/186/187/188).
-   Those anchor at 4% of cell width while this widget anchors at the standard's 4.5cqi, so their
-   em ratios are divided by 4.5/4 here: 1.15 -> 1.022, .85 -> .756, .6875 -> .611. The factor is
-   constant wherever both anchors are inside their clamp range, i.e. across 1080p and 2K. */
     .vas-hvu-ico svg {
-        width: 1.022em;
-        height: 1.022em;
+        width: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
+        height: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
     }
 
+/* Design Specs (dashboard-widgets.md > "Widget Header"): title uses its own
+   --dash-inline-size clamp, not em against the (widget-scoped) root - this keeps it
+   in lockstep with every other widget's title on the same dashboard regardless of
+   this widget's own internal em scale. */
 .vas-hvu-title {
-    font-size: .756em;
-    font-weight: 500;
+    font-family: 'Roboto', sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    font-weight: 400;
     color: #102C3F;
     line-height: 1.2;
     overflow: hidden;
@@ -78,12 +94,14 @@
     flex: 0 0 auto;
 }
 
-/* Select Filter Dropdowns, per Global VA Design Standards: native arrow removed so the value can
-   sit centred (the arrow otherwise reserves space on the right and pushes text off-centre), with
-   min-width sized so a 4-digit year never clips. Font ratio matched to the sibling widgets. */
+/* Select Filter Dropdowns: native arrow removed so the value can sit centred (the arrow
+   otherwise reserves space on the right and pushes text off-centre), with min-width
+   sized so a 4-digit year never clips. Font-size is the "xs" token (0.6875em) - was
+   .611em, a value derived from the same now-removed 4.5/4 ratio scheme as the old
+   root clamp; restored to the plain token now that the root itself is correct. */
 .vas-hvu-select {
     font-family: inherit;
-    font-size: .611em;
+    font-size: .6875em;
     font-weight: 500;
     color: #41576A;
     background: #fff;
@@ -93,17 +111,17 @@
     -webkit-appearance: none !important;
     -moz-appearance: none !important;
     background-image: none !important;
-    text-align: center;
-    text-align-last: center;
+    text-align: left;
+    text-align-last: left;
     padding: 0.35em 0.75em;
     min-width: 4.5em;
     outline: none;
     cursor: pointer;
 }
 
-    /* Centre each option row too, so the open list matches the closed control. */
+    /* Left-align each option row too, so the open list matches the closed control. */
     .vas-hvu-select option {
-        text-align: center;
+        text-align: left;
     }
 
     .vas-hvu-select:focus {
@@ -187,7 +205,9 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border-top: 1px solid #EDF2F6;
+    /* foundations.md: Light border / footer band token is #D9E2EB - was the
+       non-canonical #EDF2F6. */
+    border-top: 1px solid #D9E2EB;
     padding-top: .4em;
     margin-top: .25em;
     flex: 0 0 auto;
@@ -207,11 +227,16 @@
     font-weight: 500;
 }
 
+/* Design Specs (dashboard-widgets.md > "Pager Buttons"): pager button size (24px)
+   and chevron size (14px) are given as fixed px, not em - unlike widget typography,
+   pager controls are meant to stay a consistent physical touch-target size across
+   every dashboard width rather than scale with the root clamp. Was 1.6em (which,
+   under the old 36px-ceiling root, resolved as large as ~58px). */
 .vas-hvu-pager-btn {
-    width: 1.6em;
-    height: 1.6em;
+    width: 24px;
+    height: 24px;
     border: 1px solid #D9E2EB;
-    border-radius: .4em;
+    border-radius: 6px;
     background: #fff;
     color: #0083DA;
     display: inline-flex;
@@ -219,7 +244,7 @@
     justify-content: center;
     cursor: pointer;
     padding: 0;
-    font-size: 1em;
+    font-size: 14px;
     line-height: 1;
 }
 
@@ -375,7 +400,7 @@
 
 .vas-hvu-modal-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: .4em 1em;
     flex: 0 0 auto;
 }
@@ -468,6 +493,28 @@
 
     .vas-hvu-issues-table tbody tr.vas-hvu-m-filler td {
         border-bottom-color: #F1F5F9;
+    }
+
+/* Doc No. zoom link -> real Inventory Use record (see zoomToInventoryRecord in the JS) */
+.vas-hvu-m-doclink {
+    border: 0;
+    background: none;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    font-weight: 700;
+    color: #0083DA;
+    cursor: pointer;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+}
+
+    .vas-hvu-m-doclink:hover {
+        color: #0069AE;
+        text-decoration: underline;
     }
 
 /* Loading / empty state cell */
