@@ -56,19 +56,45 @@ namespace VAS.Controllers
             return _transactionHasIsReversed.Value;
         }
 
+        // M_Locator.LocatorCombination is not present on every database release (same guard
+        // VAS_146/161-165/184/186/188 already use) - check first and fall back to Value.
+        private static bool? _locatorHasCombination;
+
+        private static bool LocatorHasCombination()
+        {
+            if (_locatorHasCombination.HasValue) { return _locatorHasCombination.Value; }
+
+            string sql = @"
+                SELECT COUNT(1)
+                FROM AD_Column ColumnInfo
+                INNER JOIN AD_Table TableInfo ON (TableInfo.AD_Table_ID=ColumnInfo.AD_Table_ID AND TableInfo.IsActive='Y')
+                WHERE ColumnInfo.IsActive='Y'
+                  AND UPPER(TableInfo.TableName)='M_LOCATOR'
+                  AND UPPER(ColumnInfo.ColumnName)='LOCATORCOMBINATION'";
+
+            _locatorHasCombination = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null)) > 0;
+            return _locatorHasCombination.Value;
+        }
+
         /*
-         * AGING BASIS (user instruction 2026-08-29: "Fetch inventory aging details from the
-         * M_Transaction table and calculate the quantity under the slabs based on the MovementDate
-         * and MovementQty fields").
+         * AGING BASIS (user instruction 2026-08-29, reconfirmed 2026-09-25: "Fetch inventory
+         * aging details from the M_Transaction table and calculate/display the quantity under
+         * the Fresh Stock (0-30), Normal Turnover (31-90), Slow Moving (91-180) and Dead Stock
+         * (180+) slabs based on the MovementDate and MovementQty fields, for the selected
+         * warehouse").
          *
          * The age of one stock position is the age of the OLDEST INBOUND MOVEMENT that put stock
          * into it: MIN(M_Transaction.MovementDate) over rows with MovementQty > 0 for the same
-         * Product + AttributeSetInstance + Locator.
+         * Product + AttributeSetInstance + Locator - implemented below via AgingTransactionSql,
+         * which both GetAgingSummary and GetBucketDetail share so the two can never disagree.
          *
-         * This REPLACES COALESCE(s.DateLastInventory, s.Created), which is what the widget used
-         * before and is the reported "incorrect data": DateLastInventory is when the position was
-         * last COUNTED and Created is when the storage row was first written - neither is when the
-         * stock actually arrived, so a long-held item could look fresh and vice versa.
+         * This REPLACES COALESCE(s.DateLastInventory, s.Created), which the widget used before
+         * this basis was chosen and is the original "incorrect data" report: DateLastInventory is
+         * when a position was last COUNTED and Created is when the storage row was first written -
+         * neither is when the stock actually arrived, so a long-held item could look fresh and
+         * vice versa. (An earlier GetAgingJoin() helper carried this old M_Storage-joined
+         * approach; it was dead code - never called - and has been removed so it cannot be
+         * mistaken for the active implementation.)
          *
          * The source prompt specifies a fuller FIFO/LIFO algorithm using M_TransactionAllocation
          * remaining layers. That allocator does not exist: M_TransactionAllocation is referenced
@@ -76,31 +102,9 @@ namespace VAS.Controllers
          * 2026-08-29 rather than have it built blind. Recorded so the prompt is not "restored"
          * later by mistake.
          *
-         * s.Created remains the fallback when a position has no inbound transaction at all, which
-         * is the fallback the prompt itself names.
+         * Created remains the fallback (via GetAgeDaysExpression's COALESCE) when a position has
+         * no inbound transaction at all, which is the fallback the prompt itself names.
          */
-        private static string GetAgingJoin()
-        {
-            string reversedFilter = TransactionHasIsReversed()
-                ? " AND COALESCE(t.IsReversed, 'N') = 'N'"
-                : "";
-
-            return @"
-                LEFT JOIN (
-                    SELECT t.M_Product_ID,
-                           COALESCE(t.M_AttributeSetInstance_ID, 0) AS M_AttributeSetInstance_ID,
-                           t.M_Locator_ID,
-                           MIN(t.MovementDate) AS FirstInboundDate
-                    FROM M_Transaction t
-                    WHERE t.MovementQty > 0" + reversedFilter + @"
-                    GROUP BY t.M_Product_ID,
-                             COALESCE(t.M_AttributeSetInstance_ID, 0),
-                             t.M_Locator_ID
-                ) tx ON (tx.M_Product_ID = s.M_Product_ID
-                     AND tx.M_AttributeSetInstance_ID = COALESCE(s.M_AttributeSetInstance_ID, 0)
-                     AND tx.M_Locator_ID = s.M_Locator_ID)";
-        }
-
         private static string GetAgeDaysExpression(string dateCol)
         {
             string dateVal = "COALESCE(" + dateCol + ")";
@@ -115,20 +119,28 @@ namespace VAS.Controllers
         /// Aging source per the source specification: M_Transaction, slabs by
         /// MovementDate age, quantities summed from MovementQty. Only inbound
         /// movements (MovementQty &gt; 0) carry stock into a slab - issues,
-        /// shipments and internal use are consumption, not aging stock.
+        /// shipments and internal use are consumption, not aging stock. A reversed movement
+        /// (IsReversed = 'Y', where the column exists) is excluded the same way - it was
+        /// cancelled and never actually put stock into the position.
+        /// M_Locator_ID is carried through (not just M_Warehouse_ID) so GetBucketDetail can join
+        /// back to the transaction's ACTUAL locator instead of every locator in the warehouse.
         /// </summary>
         private static string AgingTransactionSql(string warehouseFilter, string extraWhere)
         {
             string ageExpr = GetAgeDaysExpression("t.MovementDate, t.Created");
+            string reversedFilter = TransactionHasIsReversed()
+                ? " AND COALESCE(t.IsReversed, 'N') = 'N'"
+                : "";
 
             return @"SELECT t.M_Product_ID,
                            COALESCE(t.M_AttributeSetInstance_ID, 0) AS M_AttributeSetInstance_ID,
+                           t.M_Locator_ID,
                            loc.M_Warehouse_ID,
                            t.MovementQty,
                            " + ageExpr + @" AS AgeDays
                     FROM M_Transaction t
                     JOIN M_Locator loc ON (t.M_Locator_ID = loc.M_Locator_ID)" +
-                    " WHERE t.IsActive = 'Y' AND t.MovementQty > 0" + warehouseFilter + extraWhere;
+                    " WHERE t.IsActive = 'Y' AND t.MovementQty > 0" + reversedFilter + warehouseFilter + extraWhere;
         }
 
         /// <summary>
@@ -277,7 +289,15 @@ namespace VAS.Controllers
                     whFilter = " AND loc.M_Warehouse_ID = " + warehouseId.Value;
                 }
 
-                string ageExpr = GetAgeDaysExpression("t.MovementDate");
+                // Must match AgingTransactionSql's own internal AgeDays expression (and therefore
+                // GetAgingSummary's bucketing) exactly: COALESCE(MovementDate, Created), not
+                // MovementDate alone. A transaction row with a null MovementDate (Created still
+                // set) ages correctly in the summary via that fallback, but this filter's bucket
+                // comparison (e.g. "AND ageExpr > 30 AND ageExpr <= 90") evaluates to NULL - not
+                // true - for such a row when the fallback is missing, silently dropping it from
+                // the WHERE clause. That is what made a bucket read real quantity on the summary
+                // card (878/120,888/151/23,983) yet return "0 products" in this drill-down.
+                string ageExpr = GetAgeDaysExpression("t.MovementDate, t.Created");
 
                 string ageClause = "";
                 if (bucketId == "0-30")
@@ -308,18 +328,35 @@ namespace VAS.Controllers
                 // empty list - which the modal renders as a blank popup. The fallback is applied in
                 // C# instead: no charset mixing, and it stays portable to PostgreSQL (which has
                 // neither Oracle's N'' literal nor a to_char(text) overload).
+                // LocatorCombination is the full "Warehouse.Aisle.Bin.Level"-style locator name;
+                // Value alone is the numeric surrogate code, which read like a raw locator id to
+                // the user. Matches the class header's own documented mapping (COALESCE
+                // LocatorCombination/Value), which this query had not actually been applying.
+                string locatorSql = LocatorHasCombination()
+                    ? "COALESCE(whLoc.LocatorCombination, whLoc.Value)"
+                    : "whLoc.Value";
+
+                // Claude, 2026-09-25: whLoc used to join ON (whLoc.M_Warehouse_ID =
+                // aged.M_Warehouse_ID) - every locator in the warehouse, not the transaction's
+                // OWN locator (aged never carried M_Locator_ID at all). That fanned each
+                // product/attribute out across every locator the warehouse has, duplicating its
+                // full summed quantity onto each one (e.g. "Lenovo Laptop" showing qty 40 under
+                // BOTH Locator 1234 and Locator 4321, when the real stock sits in only one).
+                // AgingTransactionSql now carries M_Locator_ID through, so this joins to the
+                // exact locator instead, and SUM(aged.MovementQty) aggregates per-locator
+                // correctly.
                 string sql = @"SELECT p.Name AS ProductName,
                                       asi.Description AS AttributeDesc,
                                       w.Name AS WarehouseName,
-                                      whLoc.Value AS LocatorValue,
+                                      " + locatorSql + @" AS LocatorValue,
                                       SUM(aged.MovementQty) AS SlabQty,
                                       MIN(aged.AgeDays) AS AgeDays
                                FROM (" + txSql + @") aged
                                JOIN M_Product p ON (aged.M_Product_ID = p.M_Product_ID)
-                               JOIN M_Locator whLoc ON (whLoc.M_Warehouse_ID = aged.M_Warehouse_ID)
+                               JOIN M_Locator whLoc ON (whLoc.M_Locator_ID = aged.M_Locator_ID)
                                JOIN M_Warehouse w ON (aged.M_Warehouse_ID = w.M_Warehouse_ID)
                                LEFT JOIN M_AttributeSetInstance asi ON (aged.M_AttributeSetInstance_ID = asi.M_AttributeSetInstance_ID)
-                               GROUP BY p.Name, asi.Description, w.Name, whLoc.Value
+                               GROUP BY p.Name, asi.Description, w.Name, " + locatorSql + @"
                                ORDER BY AgeDays DESC, p.Name ASC";
 
                 dr = DB.ExecuteReader(sql, null, null);

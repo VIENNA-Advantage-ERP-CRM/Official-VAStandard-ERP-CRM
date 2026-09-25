@@ -12,6 +12,7 @@
  *  3  | product counted this month                       | VAS_156_ProductCountedMonth
  *  4  | products counted this month                      | VAS_156_ProductsCountedMonth
  *  5  | Unable to load count data                        | VAS_156_UnableToLoadData
+ *  6  | Status                                            | VAS_156_StatusHeader
  */
 ; VAS = window.VAS || {};
 
@@ -273,7 +274,7 @@
                 '<div class="vas-counted-mtd-th">' + escapeHtml(lbl("VAS_Date", "Date")) + '</div>' +
                 '<div class="vas-counted-mtd-th vas-counted-mtd-th-right">' + escapeHtml(lbl("VAS_Lines", "Lines")) + '</div>' +
                 '<div class="vas-counted-mtd-th vas-counted-mtd-th-right">' + escapeHtml(lbl("VAS_156_Products", "Products")) + '</div>' +
-                '<div class="vas-counted-mtd-th">' + escapeHtml(lbl("VAS_Status", "Status")) + '</div>' +
+                '<div class="vas-counted-mtd-th">' + escapeHtml(lbl("VAS_156_StatusHeader", "Status")) + '</div>' +
                 '</div>' +
                 '<div class="vas-counted-mtd-rows"></div>' +
                 '<div class="vas-counted-mtd-modal-footer">' +

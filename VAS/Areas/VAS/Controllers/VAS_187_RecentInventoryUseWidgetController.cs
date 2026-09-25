@@ -18,10 +18,30 @@ namespace VIS.Controllers
     /// Chronological development:
     ///   AI-Dev      2026-08-02 Created
     ///   Agent A09   2026-08-19 Added GetCurrencyInfo and currency payload for organization-aware formatting
+    ///   Claude      2026-09-25 GetRecentIssues now only lists issues from the last 7 days
+    ///                          (M_Inventory.MovementDate), per explicit instruction.
     /// </summary>
     public class VAS_187_RecentInventoryUseWidgetController : Controller
     {
         private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_187_RecentInventoryUseWidgetController).FullName);
+
+        /// <summary>A record is "recent" within this many days of M_Inventory.MovementDate.</summary>
+        private const int RecentWindowDays = 7;
+
+        /// <summary>
+        /// The date RecentWindowDays ago, dialect-specific. Deliberately NOT
+        /// "CAST(CURRENT_DATE AS DATE) - N": the framework rewrites "AS DATE" casts to
+        /// "AS TIMESTAMP" for PostgreSQL (ADempiere date columns are uniformly TIMESTAMP),
+        /// and Postgres has no "timestamp - integer" operator, only "date - integer" -
+        /// same SQLSTATE 42883 bug found and fixed in VAS_297/298. Bare CURRENT_DATE is not
+        /// touched by that rewrite, so "CURRENT_DATE - N" stays valid date arithmetic.
+        /// </summary>
+        private string RecentSinceExpr()
+        {
+            return DB.IsPostgreSQL()
+                ? "(CURRENT_DATE - " + RecentWindowDays + ")"
+                : "(TRUNC(SYSDATE) - " + RecentWindowDays + ")";
+        }
 
 // ===== NEW CODE START — currency format (agent A09, 2026-08-19) =====
         /// <summary>
@@ -121,7 +141,8 @@ namespace VIS.Controllers
                     SELECT COUNT(DISTINCT inv.M_Inventory_ID)
                     FROM M_Inventory inv
                     WHERE inv.IsActive = 'Y'
-                      AND COALESCE(inv.IsInternalUse, 'N') = 'Y'";
+                      AND COALESCE(inv.IsInternalUse, 'N') = 'Y'
+                      AND inv.MovementDate >= " + RecentSinceExpr();
 
                 if (!string.IsNullOrEmpty(status) && status != "ALL")
                 {
@@ -138,7 +159,8 @@ namespace VIS.Controllers
                            inv.AD_Org_ID, inv.M_Warehouse_ID
                     FROM M_Inventory inv
                     WHERE inv.IsActive = 'Y'
-                      AND COALESCE(inv.IsInternalUse, 'N') = 'Y'";
+                      AND COALESCE(inv.IsInternalUse, 'N') = 'Y'
+                      AND inv.MovementDate >= " + RecentSinceExpr();
 
                 if (!string.IsNullOrEmpty(status) && status != "ALL")
                 {

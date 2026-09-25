@@ -24,6 +24,16 @@ namespace VAS.Controllers
     ///               reassign on hand-off.
     /// Chronological development:
     ///   113         2026-07-16 Created
+    ///   Claude      2026-09-25 Category counts (and the drill-in item list) were
+    ///                          under-reporting against the Product window's own
+    ///                          category picklist counts - both GetCategoryMixData and
+    ///                          GetCategoryItemsData restricted M_Product to
+    ///                          "AD_Org_ID IN (0, session's currently selected org)",
+    ///                          which silently excluded products the ROLE can see in
+    ///                          other orgs. Both now scope M_Product through
+    ///                          AddAccessSql (MRole's real, possibly multi-org access)
+    ///                          instead, matching how the Product window itself
+    ///                          authorizes rows.
     /// </summary>
     public class VAS_113_CategoryMixWidgetController : Controller
     {
@@ -96,6 +106,21 @@ namespace VAS.Controllers
             CategoryMixResult result = new CategoryMixResult { rows = new List<CategoryShare>() };
             if (ctx == null) { return result; }
 
+            // Product scope matches how the Product window itself authorizes rows: every
+            // active product the ROLE can see (MRole.AddAccessSQL on M_Product), not just
+            // the ones in the session's CURRENTLY SELECTED org. The previous inline join
+            // additionally required "Prod.AD_Org_ID IN (0, current-org)", which under-counted
+            // every category that has products in an org the role can access but that isn't
+            // the one currently selected - e.g. "Standard" read 157 here against the Product
+            // window's own 167. AddAccessSql resolves the role's real (possibly multi-org)
+            // access instead of that single-org guess.
+            string productScopeSql = @"
+                SELECT Prod.M_Product_ID, Prod.M_Product_Category_ID
+                FROM M_Product Prod
+                WHERE Prod.IsActive='Y'
+                  AND Prod.AD_Client_ID=@Prod_Client_ID";
+            productScopeSql = AddAccessSql(ctx, productScopeSql, "Prod");
+
             // MRole on the main table (Category); GROUP BY / ORDER BY appended
             // after the access predicate (ORA-00907 lesson). The item join
             // predicate lives in the ON clause so categories with zero
@@ -105,10 +130,7 @@ namespace VAS.Controllers
                        Category.Name AS Category_Name,
                        COUNT(Prod.M_Product_ID) AS Active_Items
                 FROM M_Product_Category Category
-                LEFT OUTER JOIN M_Product Prod ON (Prod.M_Product_Category_ID=Category.M_Product_Category_ID
-                    AND Prod.IsActive='Y'
-                    AND Prod.AD_Client_ID=@Prod_Client_ID
-                    AND Prod.AD_Org_ID IN (0,COALESCE(NULLIF(@Prod_Org_ID,0),Prod.AD_Org_ID)))
+                LEFT OUTER JOIN (" + productScopeSql + @") Prod ON (Prod.M_Product_Category_ID=Category.M_Product_Category_ID)
                 WHERE Category.IsActive='Y'
                   AND Category.AD_Client_ID=@Cat_Client_ID
                   AND Category.AD_Org_ID IN (0,COALESCE(NULLIF(@Cat_Org_ID,0),Category.AD_Org_ID))";
@@ -122,7 +144,6 @@ namespace VAS.Controllers
             SqlParameter[] parameters = new SqlParameter[]
             {
                 new SqlParameter("@Prod_Client_ID", ctx.GetAD_Client_ID()),
-                new SqlParameter("@Prod_Org_ID", ctx.GetAD_Org_ID()),
                 new SqlParameter("@Cat_Client_ID", ctx.GetAD_Client_ID()),
                 new SqlParameter("@Cat_Org_ID", ctx.GetAD_Org_ID())
             };
@@ -193,6 +214,10 @@ namespace VAS.Controllers
                   AND Locator.AD_Client_ID=@Locator_Client_ID
                   AND Locator.AD_Org_ID IN (0,COALESCE(NULLIF(@Locator_Org_ID,0),Locator.AD_Org_ID))";
 
+            // Same product scope as GetCategoryMixData: every active product the ROLE can
+            // see (MRole.AddAccessSQL), not just the session's currently selected org - so
+            // this drill-in list's row count always matches the category's own count above
+            // rather than silently disagreeing with it again.
             string productSql = @"
                 SELECT Product.M_Product_ID,
                        Product.Value AS Product_Code,
@@ -201,8 +226,7 @@ namespace VAS.Controllers
                 FROM M_Product Product
                 WHERE Product.IsActive='Y'
                   AND Product.M_Product_Category_ID=@Category_ID
-                  AND Product.AD_Client_ID=@Product_Client_ID
-                  AND Product.AD_Org_ID IN (0,COALESCE(NULLIF(@Product_Org_ID,0),Product.AD_Org_ID))";
+                  AND Product.AD_Client_ID=@Product_Client_ID";
 
             string costSql = @"
                 SELECT Cost.AD_Org_ID,
@@ -305,7 +329,6 @@ namespace VAS.Controllers
                 new SqlParameter("@Locator_Org_ID", ctx.GetAD_Org_ID()),
                 new SqlParameter("@Category_ID", categoryId),
                 new SqlParameter("@Product_Client_ID", ctx.GetAD_Client_ID()),
-                new SqlParameter("@Product_Org_ID", ctx.GetAD_Org_ID()),
                 new SqlParameter("@Element_Costing_Method", SqlDbType.VarChar) { Value = currency.CostingMethod },
                 new SqlParameter("@C_AcctSchema_ID", currency.AcctSchemaId),
                 new SqlParameter("@M_CostType_ID", currency.CostTypeId),

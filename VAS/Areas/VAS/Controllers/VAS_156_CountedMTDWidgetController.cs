@@ -17,25 +17,25 @@ namespace VIS.Controllers
     ///               (M_Inventory, M_InventoryLine) and distinct products counted.
     /// Prefix      : VAS_000_
     ///
-    /// ORGANISATION SCOPE
-    /// Both endpoints filter on the logged-in organisation. The source prompt
-    /// (01-counted-mtd-claude-prompt.txt) requires it in three places - the approved mapping
-    /// ("Organization: M_Inventory.AD_Org_ID"), the reference SQL ("AND i.AD_Org_ID = :p_org_id")
-    /// and the acceptance checks ("Both metrics use CO/CL, MovementDate, client, organization,
-    /// active, and IsInternalUse filters identically") - but it was missing from both queries,
-    /// which therefore aggregated across every organisation the ROLE can read rather than the one
-    /// the user is logged into.
+    /// The HEADLINE REMAINS A COUNT OF LINES, not of documents. A count-sheet screen listing
+    /// 46 documents and this card reading 53 is therefore not automatically a contradiction - 46
+    /// documents can carry 53 lines between them. But the card should never read FEWER lines than
+    /// the window has documents when each document typically carries only 1-2 lines, which is
+    /// exactly what "16 lines" against the Inventory Count window's own 32 completed/closed
+    /// documents (2026-09) turned out to mean - a real undercount, not a lines-vs-documents
+    /// mismatch.
     ///
-    /// The literal "= :p_org_id" is not usable as written: a login on the "*" organisation has
-    /// AD_Org_ID 0, and an equality test would then match only records literally owned by org 0.
-    /// The IN (0, COALESCE(NULLIF(...))) form is the idiom already used by VAS_073, VAS_078,
-    /// VAS_079 and VAS_080 - it scopes to the login organisation, and falls through to no
-    /// restriction when the login organisation is "*".
-    ///
-    /// The HEADLINE REMAINS A COUNT OF LINES, not of documents. The prompt states this three
-    /// times (goal, approved business rules, acceptance checks). A count-sheet screen listing
-    /// 46 documents and this card reading 53 is therefore not a contradiction - 46 documents
-    /// carry 53 lines between them.
+    /// ORGANISATION SCOPE (Claude, 2026-09-25 - corrected)
+    /// Both endpoints previously restricted M_Inventory to "AD_Org_ID IN (0, session's currently
+    /// selected org)" on top of MRole.AddAccessSQL (already applied to the same alias) - the same
+    /// mistake already found and corrected in VAS_078/VAS_113 this session. A role with access to
+    /// MULTIPLE orgs (this tenant's counts span at least "Main Warehouse" and "John Warehouse",
+    /// evidently different orgs) could then only ever be counted for the one org currently
+    /// selected in session context, not every org the role can actually see - which is exactly
+    /// what the Inventory Count WINDOW itself shows, since a window's tab is scoped by
+    /// MRole.AddAccessSQL alone, never by "current org selection only". Removed the manual
+    /// restriction from both queries; MRole.AddAccessSQL is the only (and correct) org-access
+    /// check needed.
     /// </summary>
     public class VAS_156_CountedMTDWidgetController : Controller
     {
@@ -73,8 +73,7 @@ namespace VIS.Controllers
                   AND COALESCE(i.IsInternalUse, 'N') = 'N'
                   AND i.DocStatus IN ('CO', 'CL')
                   AND i.MovementDate >= @MonthStart
-                  AND i.MovementDate < @NextMonthStart
-                  AND i.AD_Org_ID IN (0, COALESCE(NULLIF(@OrgId, 0), i.AD_Org_ID))";
+                  AND i.MovementDate < @NextMonthStart";
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(
                 sql,
@@ -86,8 +85,7 @@ namespace VIS.Controllers
             SqlParameter[] parameters =
             {
                 new SqlParameter("@MonthStart", monthStart),
-                new SqlParameter("@NextMonthStart", nextMonthStart),
-                new SqlParameter("@OrgId", ctx.GetAD_Org_ID())
+                new SqlParameter("@NextMonthStart", nextMonthStart)
             };
 
             IDataReader dr = null;
@@ -157,8 +155,7 @@ namespace VIS.Controllers
                       AND COALESCE(inv.IsInternalUse, 'N') = 'N'
                       AND inv.DocStatus IN ('CO', 'CL')
                       AND inv.MovementDate >= @MonthStart
-                      AND inv.MovementDate < @NextMonthStart
-                      AND inv.AD_Org_ID IN (0, COALESCE(NULLIF(@OrgId, 0), inv.AD_Org_ID))";
+                      AND inv.MovementDate < @NextMonthStart";
 
             accessibleHeaders = MRole.GetDefault(ctx).AddAccessSQL(accessibleHeaders, "inv", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
@@ -183,8 +180,7 @@ namespace VIS.Controllers
             SqlParameter[] parameters =
             {
                 new SqlParameter("@MonthStart", monthStart),
-                new SqlParameter("@NextMonthStart", nextMonthStart),
-                new SqlParameter("@OrgId", ctx.GetAD_Org_ID())
+                new SqlParameter("@NextMonthStart", nextMonthStart)
             };
 
             IDataReader dr = null;
