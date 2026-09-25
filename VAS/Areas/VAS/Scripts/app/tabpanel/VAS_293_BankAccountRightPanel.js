@@ -9,7 +9,7 @@
  *                                           its subtitle, and the active state as
  *                                           a dotted status badge.
  *                    2. Bank & account    - account no., currency, IBAN, routing
- *                       details              no., SWIFT/BIC, organisation, default
+ *                       details              no., Swift code, organisation, default
  *                                           account, and the bank ADDRESS LAST.
  *                    3. Account position  - the CURRENT BALANCE as the panel's
  *                                           headline figure with the currency
@@ -42,10 +42,9 @@
  *                      chevron every other row wears, turned to point down;
  *                    - the detail reads active AND inactive rows, because the
  *                      tables carry a Status column;
- *                    - the NAME cell of each detail row is a link that opens that
- *                      record in its own window through VIS.AEnv.zoom, which
- *                      resolves the target window from the AD_Table_ID server
- *                      side - no window id is named anywhere in this panel.
+ *                    - the NAME cell of each detail row is a link that switches
+ *                      this window to the record's own tab and selects its row
+ *                      - no window or tab id is named anywhere in this panel.
  *
  *                  Row order is the PANEL's, set by the model's DISPLAY_ORDER:
  *                  Account Line, Bank Account Document, Statement Class, Payment
@@ -130,6 +129,15 @@
  *   VAI145   2026-09-23  Payment Processor and Statement Loader are hidden when
  *                        they hold no record; the section summary counts only the
  *                        rows drawn. Detail links are underlined at rest.
+ *   VAI145   2026-09-25  Detail links fixed: VIS.AEnv.zoom did nothing for child
+ *                        tables (AD_Table.AD_Window_ID is empty for them). They
+ *                        now switch the current window to the record's own tab
+ *                        and select its row - no new window is opened.
+ *   VAI145   2026-09-25  Returning to the Bank Account tab re-reads the panel
+ *                        (refreshPanelData now reloads a record already on
+ *                        screen), so rows added on the Bank Account Document /
+ *                        Statement Class tabs show up. Expanded detail tables
+ *                        stay open across that reload and are re-read too.
  *
  * -- Labels / Message Keys ---------------------------------------------------
  *  Panel
@@ -563,10 +571,25 @@
                    && (data !== null || inFlight || pendingFetch !== null);
         }
 
+        /* True only while this record is WAITING or LOADING - not once it is on
+           screen. */
+        function isLoading(recordID) {
+            var id = +recordID || 0;
+            return id > 0 && id === shownRecordId && (inFlight || pendingFetch !== null);
+        }
+
         /* An explicit reload (the platform Refresh button) calls fetchData
-           directly and so is never blocked by the guard above. */
-        this.scheduleFetch = function (recordID) {
-            if (isCurrent(recordID)) return;
+           directly and so is never blocked by the guard above.
+
+           `reload` = the framework asked for this record again (refreshPanelData).
+           It re-reads a record that is already on screen - coming back from the
+           Bank Account Document or Statement Class tab after adding a row there
+           re-selects the SAME account, and the panel must show the new count.
+           Only a load already on its way for that record is left alone, which
+           still collapses the data-status event and refreshPanelData of one row
+           click into a single request (the event fires first and schedules). */
+        this.scheduleFetch = function (recordID, reload) {
+            if (reload ? isLoading(recordID) : isCurrent(recordID)) return;
 
             invalidateFetch();
             var token = fetchToken;
@@ -588,6 +611,11 @@
         };
 
         this.fetchData = function (recordID) {
+            /* Re-reading the account already on screen: the detail tables the
+               user had open are opened again once it has loaded - re-read too,
+               the cache is emptied below - rather than collapsing under them. */
+            var reopen = (data && +data.C_BankAccount_ID === (+recordID || 0)) ? openDetailTables() : [];
+
             invalidateFetch();
             var token = fetchToken;
             shownRecordId = +recordID || 0;
@@ -623,6 +651,7 @@
                     data = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     if (data && !(+data.C_BankAccount_ID > 0)) data = null;   // not accessible / not found
                     render();
+                    reopenDetailTables(reopen);
                     showBusy(false);
                 },
                 error: function (err) {
@@ -1126,7 +1155,7 @@
                                     row.Priority
                                         ? fmt(msg("VAS_293_PriorityMeta", "Priority {0}"), ltrToken(row.Priority))
                                         : "",
-                                    { tableId: configTableId(TBL_ACCOUNT_DOC), recordId: row.C_BankAccountDoc_ID });
+                                    { tableName: TBL_ACCOUNT_DOC, recordId: row.C_BankAccountDoc_ID });
                             }
                         },
                         {
@@ -1175,7 +1204,7 @@
                         label: msg("VAS_293_ColStatementClass", "Statement class"),
                         cell: function (row) {
                             return cellText(row.ClassName, "",
-                                { tableId: configTableId(TBL_STATEMENT_CLASS),
+                                { tableName: TBL_STATEMENT_CLASS,
                                   recordId: row.VA012_BankStatementClass_ID });
                         }
                     },
@@ -1206,18 +1235,18 @@
            a smaller second line, which is how a cell carries a second fact without
            the table growing a column it has no room for.
 
-           `zoom` = {tableId, recordId} turns the value into a link that opens that
+           `zoom` = {tableName, recordId} turns the value into a link that opens that
            record in its own window. It degrades to plain text whenever the zoom
            cannot be performed - a dead link is worse than no link. */
         function cellText(value, meta, zoom) {
             var v = orDash(value);
             var $c = $('<span class="' + CLS + 'cellText"></span>');
-            var linkable = zoom && canZoom() && (+zoom.tableId > 0) && (+zoom.recordId > 0)
+            var linkable = zoom && canZoom(zoom.tableName) && (+zoom.recordId > 0)
                            && v !== "—";
             var $main = linkable
                 ? $('<button type="button" class="' + CLS + 'cellMain ' + CLS + 'link"></button>')
                     .attr("data-action", "zoom")
-                    .attr("data-zoom-table", zoom.tableId)
+                    .attr("data-zoom-table", zoom.tableName)
                     .attr("data-zoom-id", zoom.recordId)
                 : $('<span class="' + CLS + 'cellMain"></span>');
             $main.text(v).attr("title", linkable
@@ -1230,23 +1259,19 @@
             return $c;
         }
 
-        /* The framework's own record zoom, which resolves the target window from
-           the TABLE id on the server (Form/GetZoomWindowID) and honours a
-           zoom-across choice. No window id is ever named here - they differ per
-           environment, and the table id already came from the window's metadata. */
-        function canZoom() {
-            try {
-                return !!(window.VIS && VIS.AEnv && typeof VIS.AEnv.zoom === "function");
-            } catch (e) { return false; }
+        /* The zoom stays in the hosting window: it switches to the record's own
+           tab and selects the row (see zoomToRecord). So it only needs that tab
+           to exist in this window. */
+        function canZoom(tableName) {
+            return configTabId(tableName) > 0;
         }
 
-        /* The AD_Table_ID the server sent with a configuration row. Looked up by
-           table name rather than threaded through the detail spec, so a column
-           renderer needs to know nothing about which row it belongs to. */
-        function configTableId(tableName) {
+        /* The AD_Tab_ID of the hosting window's tab over this table, as the
+           server sent it with the configuration rows - never a constant. */
+        function configTabId(tableName) {
             var list = (data && data.LinkedConfigs) || [];
             for (var i = 0; i < list.length; i++) {
-                if (list[i] && list[i].TableName === tableName) return +list[i].AD_Table_ID || 0;
+                if (list[i] && list[i].TableName === tableName) return +list[i].AD_Tab_ID || 0;
             }
             return 0;
         }
@@ -1333,6 +1358,29 @@
                 return;
             }
             loadDetail($btn, $host, tableName);
+        }
+
+        /* Table names of the detail rows currently expanded. */
+        function openDetailTables() {
+            var names = [];
+            if (!$root) return names;
+            $root.find('[data-action="toggle-detail"][aria-expanded="true"]').each(function () {
+                var name = $(this).attr("data-table");
+                if (name) names.push(name);
+            });
+            return names;
+        }
+
+        /* Expands those rows again after a re-render. A row that is no longer
+           expandable (its last record was removed) is simply skipped. */
+        function reopenDetailTables(names) {
+            if (!$root || !names || !names.length) return;
+            for (var i = 0; i < names.length; i++) {
+                var $btn = $root.find('[data-action="toggle-detail"]').filter(function () {
+                    return $(this).attr("data-table") === names[i];
+                }).first();
+                if ($btn.length && $btn.attr("aria-expanded") !== "true") toggleDetail($btn);
+            }
         }
 
         function closeDetail($btn, $host) {
@@ -1428,19 +1476,72 @@
             return null;
         }
 
-        /* Opens ONE record of a detail table in its own window. The framework
-           resolves which window that is from the AD_Table_ID - the same route its
-           own Zoom action takes - so no window id is named here and a zoom-across
-           choice is still offered where the table has several targets. The table
-           id came from the hosting window's metadata, never from a constant.
+        /* How long zoomToRecord waits for the target tab to load its rows, and
+           how often it looks. The tab change re-queries asynchronously and gives
+           no callback, so the row can only be selected once it has arrived. */
+        var ZOOM_POLL_MS = 100;
+        var ZOOM_TIMEOUT_MS = 6000;
+
+        /* Opens ONE record of a detail table IN THIS WINDOW: switches the hosting
+           window to that record's tab - the same tab change a row click makes,
+           so the bank account stays the parent - then selects the record's row.
+
+           VIS.AEnv.zoom is not used: it opens a NEW window, and only for tables
+           with their own AD_Table.AD_Window_ID, which child tables such as
+           C_BankAccountDoc and VA012_BankStatementClass do not have.
+
+           The row is selected through the tab's GridController.navigate, the
+           same call a click on the grid row makes, so the grid, the card view
+           and the tab panels all follow. The query has not finished when the
+           tab change returns, so the row is looked for until it appears; a
+           re-query landing after the first selection moves the current row
+           back, which is why the record must read as current on two checks in
+           a row before the wait ends. A record that never shows up (e.g. not
+           on the tab's first page) leaves the user on the tab, unselected.
            Degrades silently: a click can never throw. */
-        function zoomToRecord(tableId, recordId) {
-            var table = +tableId || 0;
+        function zoomToRecord(tableName, recordId) {
             var record = +recordId || 0;
-            if (table <= 0 || record <= 0 || !canZoom()) return;
+            var tabId = configTabId(tableName);
+            if (record <= 0 || tabId <= 0) return;
+
+            var aPanel = hostPanel();
+            if (!aPanel) {
+                if (window.console) console.log("VAS_293: hosting window not found for tab " + tabId);
+                return;
+            }
             try {
-                VIS.AEnv.zoom(table, record);
-            } catch (e) { if (window.console) console.log(e); }
+                aPanel.onTabChange($self.windowNo + "_" + tabId);
+            } catch (e) {
+                if (window.console) console.log(e);
+                return;
+            }
+
+            var waited = 0;
+            var settled = 0;
+            (function poll() {
+                try {
+                    var tab = aPanel.curTab;
+                    var gc = aPanel.curGC;
+                    if (tab && gc && typeof gc.navigate === "function"
+                        && +tab.getAD_Tab_ID() === tabId) {
+                        if (+tab.getRecord_ID() === record) {
+                            if (++settled >= 2) return;        // selected and stayed
+                        } else {
+                            settled = 0;
+                            var count = +tab.getRowCount() || 0;
+                            for (var i = 0; i < count; i++) {
+                                if (+tab.getKeyID(i) === record) {
+                                    gc.navigate(i);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                } catch (e) { if (window.console) console.log(e); }
+
+                waited += ZOOM_POLL_MS;
+                if (waited < ZOOM_TIMEOUT_MS) setTimeout(poll, ZOOM_POLL_MS);
+            })();
         }
 
         /* Switches the HOSTING window to the configuration tab the row names -
@@ -1502,8 +1603,10 @@
         this.record_ID = recordID;
         this.selectedRow = selectedRow;
         /* Held rather than fetched outright: the insert flag is not always up yet
-           when we get here, so scheduleFetch asks once more before loading. */
-        this.scheduleFetch(recordID);
+           when we get here, so scheduleFetch asks once more before loading.
+           `true` = re-read even when this record is already on screen, so the
+           panel is current again after a trip to one of its child tabs. */
+        this.scheduleFetch(recordID, true);
     };
 
     /* The platform Refresh button - exposed on the prototype as well as on the
