@@ -40,6 +40,23 @@
  *                          so its first row is no longer cut off.
  *                        - Newest line first (model orders Line DESC).
  *                        - One panel per window (LIVE_BY_WINDOW, as VAS_247/248/249).
+ *   VAI163   2026-09-25  Requisition round (as VAS_247 / VAS_249 the same day):
+ *                        - New Record: plain white panel, no message.
+ *                        - Quantity (and every amount cell) opens fully selected, as
+ *                          the purchase order panel: Tab in and type to replace.
+ *                        - Additional Info read-only unless the requisition is Drafted;
+ *                          on a locked one the "..." says so and opens for reading.
+ *                        - Date Required is out of Additional Info (it comes from the
+ *                          header) - it was also what turned every new line's "..."
+ *                          blue. "..." white when empty (explicit fill, CSS).
+ *                        - "Additional Details" opens collapsed on every modal open.
+ *                        - No dash under the product for a line raised from a
+ *                          production / sales order (instance 0): only a real attribute
+ *                          instance is captioned (model + client).
+ *                        - Refresh with unsaved lines is refused with a message.
+ *                        - Ctrl+Alt+Z: uncommitted editor text counts as an undo, the
+ *                          removed editor cannot re-commit its value, and a second answer
+ *                          to one press stays silent.
  ************************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -48,6 +65,13 @@
        does not paint a second copy of the grid (and answer every shortcut a second time).
        See startPanel / dispose. */
     var LIVE_BY_WINDOW = {};
+
+    /* When an undo last SUCCEEDED, per windowNo (Date.now()). A press that has already
+       been answered by a revert must not also be answered "Nothing to undo" - whoever
+       answers second (a twin instance, a repeat dispatch of the same key) reads this and
+       stays silent. Shared across instances on purpose. See onUndo. */
+    var LAST_UNDO_BY_WINDOW = {};
+    var UNDO_ECHO_MS = 500;
 
     VAS.VAS_240_RequisitionBottomPanel = function () {
         this.record_ID = 0;
@@ -270,6 +294,9 @@
 
         /* rAF token for the host-width re-fit (a zoom or splitter drag emits a burst). */
         var fitRaf = null;
+        /* True while the tab sits on a new, unsaved header: the panel is plain white and
+           says nothing (clear(true)); a load or a plain clear ends it. */
+        var newRecordMode = false;
 
         /** Exposed so the prototype's sizeChanged (a framework callback) can re-fit. */
         this.fitHostWidth = function () { fitHostWidth(); };
@@ -338,6 +365,7 @@
                     if (mySeq !== fetchSeq) { if (isPageChange) showBusy(false); return; }
                     var data = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     parent = data || null;
+                    newRecordMode = false;
                     linesTotal = (parent && parent.LinesTotal) || 0;
                     linePage = (parent && +parent.LinePage) || 0;
                     linePageSize = (parent && +parent.LinePageSize) || 10;
@@ -388,14 +416,18 @@
             // Also tear down any open dialog so a fixed backdrop isn't orphaned over the page.
             closeDialogs();
             try { if (window.VIS && VIS.AttributeControl && VIS.AttributeControl.close) VIS.AttributeControl.close(); } catch (e) { }
-            parent = null; lines = []; lastLockState = null;
+            parent = null; lines = []; lastLockState = null; lastAddlLockState = null;
+            // Whoever calls, a tab that is inserting IS a new record: the framework can
+            // report New Record as "no row" before its insert flag is up.
+            if (!isNewRecord && isTabInserting()) isNewRecord = true;
+            newRecordMode = !!isNewRecord;
             if (isNewRecord) {
                 // New, unsaved header: no line details until it has been saved - a line
                 // cannot attach to a record that does not exist yet. The root keeps its
-                // own white surface (CSS) and says what to do next, rather than going
-                // blank and letting the host's blue show through.
+                // own white surface (CSS) so the host's blue never shows through, and
+                // since 25-Sep-2026 it says nothing at all: no highlighted hint.
                 if ($body)       $body.hide();
-                if ($emptyState) $emptyState.text(docMsg("VAS_240_SaveHeaderForLines", "Save the {0} header to add lines")).show();
+                if ($emptyState) $emptyState.hide();
             } else {
                 if ($emptyState) $emptyState.text(lbl("VAS_240_NoRequisition", "Select a record to add lines"));
                 // parent is already null here, so this reverts the heading to the neutral
@@ -436,7 +468,12 @@
                 display: {
                     productName: r.ProductName || "", chargeName: r.ChargeName || "",
                     uomName: r.UOMName || "",
-                    attrName: r.AttrName || "", hasAttributeSet: r.M_Product_ID > 0 && (!!r.AttrName || !!r.HasAttributeSet)
+                    // An attribute caption belongs to a REAL instance only (25-Sep-2026): a
+                    // line raised from a production or sales order holds instance 0, and the
+                    // description that row carries on some tenants is a dash - which printed
+                    // under the product as though it were the line's attribute.
+                    attrName: realAttrCaption(r),
+                    hasAttributeSet: r.M_Product_ID > 0 && (!!realAttrCaption(r) || !!r.HasAttributeSet)
                 }
             };
             // Pristine snapshot of the just-loaded/just-saved state, so the row Undo can
@@ -458,9 +495,17 @@
 
         /* Revert a dirty saved row to its last pristine (loaded/saved) snapshot. New
            (never-saved) rows have no snapshot - they are removed via Delete instead. */
+        /* The attribute caption a loaded row may show: a REAL instance's description only
+           - blank for instance 0 and for a caption that is nothing but dashes. */
+        function realAttrCaption(r) {
+            var s = $.trim(String((r && r.AttrName) || ""));
+            if (!(+(r && r.M_AttributeSetInstance_ID) > 0)) return "";
+            return /^[\s\-–—_]*$/.test(s) ? "" : s;
+        }
+
         function undoLine(line) {
             if (!line || !line._saved) return;
-            if (editing && editing.rowId === line.rowId) editing = null;
+            if (editing && editing.rowId === line.rowId) { editing = null; detachActiveEditor(); }
             commitMorePopover(); morePopoverFor = null;
             line.values = $.extend(true, {}, line._saved.values);
             line.display = $.extend(true, {}, line._saved.display);
@@ -470,12 +515,31 @@
             render();
         }
 
+        /* The open cell editor is about to be thrown away by an undo. Its blur handler
+           commits whatever the editor holds - and the browser can fire that blur while the
+           re-render removes it, which wrote the stale typed value straight back over the
+           revert (the line came back dirty, and the next Ctrl+Alt+Z found "nothing").
+           Unhook it first, so removal commits nothing (25-Sep-2026, as VAS_249). */
+        function detachActiveEditor() {
+            var ae = document.activeElement;
+            if (ae && $linesBody && $linesBody[0] && $linesBody[0].contains(ae)) $(ae).off("blur");
+        }
+
+        /* True when the focused cell editor holds text the user typed but has not
+           committed yet (it differs from what the editor opened with). */
+        function activeEditorHasPendingText() {
+            var ae = document.activeElement;
+            if (!ae || !$linesBody || !$linesBody[0] || !$linesBody[0].contains(ae)) return false;
+            var orig = $(ae).data("vasOrig");
+            return orig !== undefined && String($(ae).val()) !== String(orig);
+        }
+
         /* Undo for a NEW (never-saved) line = remove it entirely. It was never persisted,
            so this is a client-only discard (no DeleteLines call) and there is no pristine
            snapshot to revert to - mirrors deleteSelected's localOnly splice. */
         function discardNewLine(line) {
             if (!line) return;
-            if (editing && editing.rowId === line.rowId) editing = null;
+            if (editing && editing.rowId === line.rowId) { editing = null; detachActiveEditor(); }
             if (morePopoverFor === line.rowId) { morePopoverFor = null; closeDialogs(); }
             var i = lines.indexOf(line);
             if (i >= 0) lines.splice(i, 1);
@@ -569,7 +633,7 @@
 
             $header.on("click", "[data-action=open-scan]", openScanDialog);
             $header.on("click", "[data-action=add-line]", function () { addLine(); });
-            $header.on("click", "[data-action=refresh]", function () { if (parent && parent.M_Requisition_ID) $self.fetchData(parent.M_Requisition_ID, linePage); });
+            $header.on("click", "[data-action=refresh]", function () { refreshLines(); });
             // Save on mousedown (not click): mousedown fires BEFORE the focused cell
             // editor blurs, so we can flush that pending edit ourselves and the action
             // never gets lost to a blur/commit re-render happening between mousedown and
@@ -605,7 +669,12 @@
             // The catalog dropdown lives on <body> (see positionCatalog); it must not
             // outlive the primary cell that opened it.
             if (!(editing && (editing.field === "product" || editing.field === "charge"))) closeCatalog();
-            if (!parent || !parent.M_Requisition_ID) { lastLockState = null; $body.hide(); $emptyState.show(); return; }
+            if (!parent || !parent.M_Requisition_ID) {
+                lastLockState = null; $body.hide();
+                // A new, unsaved header shows a plain white panel - no message (clear).
+                $emptyState.toggle(!newRecordMode);
+                return;
+            }
             $emptyState.hide(); $body.show();
             // Read-only requisition (completed/void/closed): mark the panel so disabled
             // controls (checkbox, "...") show a not-allowed cursor via their (enabled)
@@ -613,6 +682,7 @@
             // the cell shows it instead.
             var locked = !panelEditable();
             lastLockState = locked;   // what this paint reflects - see onTabDataStatus
+            lastAddlLockState = !additionalInfoEditable();
             $body.toggleClass("vas-rbl-locked", locked);
             // The heading is built before the requisition data arrives, so it is written
             // once the header is known.
@@ -663,6 +733,61 @@
 
         /* Load another page of saved lines. Guards unsaved work so a page change never
            silently discards a new/edited row. */
+        /* Refresh button / Ctrl+Alt+Q: re-read the current page from the server. A reload
+           throws away every line the user has not saved, so with unsaved work on the page
+           the user is asked Save / Discard / Cancel instead (27-Sep-2026, as VAS_107 A7).
+           A value typed into a cell that is still open counts too, so it is committed
+           before the check. */
+        function refreshLines() {
+            if (!parent || !parent.M_Requisition_ID) return;
+            flushActiveEdit();
+            if (!unsavedLines().length) { $self.fetchData(parent.M_Requisition_ID, linePage); return; }
+            openRefreshConfirm();
+        }
+
+        function openRefreshConfirm() {
+            $("#vasRblConfirm").remove();
+            var $bd = $('<div class="vas-rbl-dialog-backdrop" id="vasRblConfirm"></div>');
+            var $dlg = $('<div class="vas-rbl-dialog vas-rbl-dialog--confirm" role="alertdialog" aria-modal="true"></div>');
+            $dlg.html(
+                '<header class="vas-rbl-dialog__header"><div class="vas-rbl-dialog__header-row">' +
+                '<h3 class="vas-rbl-dialog__title">' + esc(lbl("VAS_240_UnsavedTitle", "Unsaved changes")) + "</h3></div></header>" +
+                '<div class="vas-rbl-dialog__body"><p class="vas-rbl-confirm-text">' +
+                esc(lbl("VAS_240_UnsavedRefresh", "You have unsaved line changes. Save them before refreshing?")) + "</p></div>" +
+                '<footer class="vas-rbl-dialog__footer vas-rbl-dialog__footer--end">' +
+                '<button type="button" class="vas-rbl-btn vas-rbl-btn--ghost" data-act="cf-cancel">' + esc(lbl("VAS_240_Cancel", "Cancel")) + "</button>" +
+                '<button type="button" class="vas-rbl-btn vas-rbl-btn--outline" data-act="cf-discard">' + esc(lbl("VAS_240_Discard", "Discard")) + "</button>" +
+                '<button type="button" class="vas-rbl-btn vas-rbl-btn--primary" data-act="cf-save">' + esc(lbl("VAS_240_Save", "Save")) + "</button>" +
+                "</footer>");
+            $bd.append($dlg);
+            $("body").append($bd);
+            function close() { $("#vasRblConfirm").remove(); }
+            $dlg.on("click", "[data-act=cf-cancel]", function () { close(); });
+            $dlg.on("click", "[data-act=cf-discard]", function () {
+                close();
+                editing = null;
+                if (parent && parent.M_Requisition_ID) $self.fetchData(parent.M_Requisition_ID, linePage);
+            });
+            $dlg.on("click", "[data-act=cf-save]", function () {
+                close();
+                afterCallouts(function () {
+                    if (!parent || !parent.M_Requisition_ID) return;
+                    if (!unsavedLines().length) { $self.fetchData(parent.M_Requisition_ID, linePage); return; }
+                    // Refresh only once the save went through; a failed save (including a
+                    // dirty header, which saveRows refuses) leaves the rows on screen with
+                    // their errors, exactly as the Save button does.
+                    saveRows(function (ok) { if (ok && parent) $self.fetchData(parent.M_Requisition_ID, linePage); });
+                });
+            });
+            // Keep keys inside the dialog (the framework's own handlers would act on them);
+            // Escape = Cancel.
+            $bd.on("keydown", function (e) {
+                if (e.key === "Escape" || e.keyCode === 27) { e.preventDefault(); close(); }
+                e.stopPropagation();
+            });
+            setTimeout(function () { $dlg.find("[data-act=cf-save]").focus(); }, 0);
+        }
+
         function gotoLinePage(p) {
             if (!parent || !parent.M_Requisition_ID) return;
             var pageCount = Math.max(1, Math.ceil((linesTotal || 0) / (linePageSize || 10)));
@@ -749,9 +874,37 @@
             return !!parent.IsEditable;
         }
 
+        /* The requisition's DocStatus RIGHT NOW: the hosting tab's value when it is sitting
+           on the record the panel shows, else the snapshot from the last load. "" when
+           neither can say. */
+        function liveDocStatus() {
+            var t = $self.curTab;
+            try {
+                var tabId = (t && typeof t.getRecord_ID === "function") ? (+t.getRecord_ID() || 0) : 0;
+                var panelId = +(parent && parent.M_Requisition_ID) || 0;
+                if (t && typeof t.getValueAsString === "function" && !(tabId > 0 && panelId > 0 && tabId !== panelId)) {
+                    var st = $.trim(t.getValueAsString("DocStatus") || "");
+                    if (st) return st.toUpperCase();
+                }
+            } catch (e) { if (window.console) console.log(e); }
+            return String((parent && parent.DocStatus) || "").toUpperCase();
+        }
+
+        /* Additional Info can be changed only while the requisition is DRAFTED
+           (25-Sep-2026). In Progress, Completed, Closed, Voided, Reversed, Invalid,
+           Approved - any other status - the modal opens for reading: no field can be set,
+           changed or cleared. Stricter than panelEditable(), which still lets an In Progress
+           requisition take line edits. A status nobody can state is not taken as a lock. */
+        function additionalInfoEditable() {
+            if (!panelEditable()) return false;
+            var st = liveDocStatus();
+            return !st || st === "DR";
+        }
+
         /* Lock state the panel was last PAINTED for (set by render), so a data-status
-           event only repaints on a real transition. */
-        var lastLockState = null;
+           event only repaints on a real transition. lastAddlLockState is the same for the
+           Additional Info rule (additionalInfoEditable). */
+        var lastLockState = null, lastAddlLockState = null;
 
         /* The hosting tab reports "inserting" for a New Record the framework never tells
            a tab panel about (refreshPanelData is not called for it). */
@@ -773,6 +926,15 @@
                 return;
             }
             if (!parent) return;
+            // Additional Info locks sooner than the grid (anything past Drafted). A status
+            // move that crosses only THAT line - Prepare, say - leaves the grid alone but
+            // must not leave an editable modal open, so an open one is closed (its edits
+            // stay on the line, as Done would leave them) and reopens read-only.
+            var addlLocked = !additionalInfoEditable();
+            if (lastAddlLockState !== null && addlLocked !== lastAddlLockState) {
+                lastAddlLockState = addlLocked;
+                if (morePopoverFor) { closeDialogs(); render(); }
+            }
             var locked = !panelEditable();
             if (lastLockState === null || locked === lastLockState) return;
             closeDialogs();
@@ -947,6 +1109,7 @@
                 wrap.append(inner);
                 var $inp = $('<input type="text" class="vas-rbl-cell-edit__input" />');
                 $inp.val(editing.field === "product" ? line.display.productName : line.display.chargeName);
+                $inp.data("vasOrig", $inp.val());   // what Ctrl+Alt+Z reverts typed text to
                 $inp.attr("placeholder", editing.field === "product" ? lbl("VAS_240_SearchProduct", "Search product…") : lbl("VAS_240_SearchCharge", "Search charge…"));
                 $inp.on("input", function () { scheduleCatalog($(this).val(), inner, line, $inp); });
                 $inp.on("blur", function (e) {
@@ -1005,6 +1168,7 @@
             if (isEditing) {
                 var $inp = $('<input type="text" class="vas-rbl-cell-edit__input" />');
                 $inp.val(opts.amount ? fmtAmtInput(value, field === "quantity" ? 2 : precision()) : (value || ""));
+                $inp.data("vasOrig", $inp.val());   // what Ctrl+Alt+Z reverts typed text to
                 $inp.attr("placeholder", placeholder || "");
                 if (opts.maxLength > 0) $inp.attr("maxlength", opts.maxLength);   // AD_Column.FieldLength cap
                 if (opts.align === "right") $inp.css("text-align", "right");
@@ -1017,7 +1181,10 @@
                     if (e.key === "Escape") { editing = null; render(); }
                 });
                 wrap.append($inp);
-                setTimeout(function () { $inp.focus(); }, 0);
+                // An amount opens fully selected (25-Sep-2026, as the purchase order panel):
+                // tabbing in and typing replaces the figure instead of appending to it. A
+                // text cell (Description) keeps the caret - a description is amended.
+                setTimeout(function () { $inp.focus(); if (opts.amount) $inp.select(); }, 0);
             } else {
                 var disp = opts.amount ? (value ? fmtMoney(value) : "") : (value || "");
                 wrap.append(dispInput(line, field, disp, { align: opts.align, placeholder: placeholder }));
@@ -1039,6 +1206,7 @@
             // quantity (top)
             if (editQty) {
                 var $q = $('<input type="text" class="vas-rbl-cell-edit__input" inputmode="decimal" />').val(fmtAmtInput(v.QtyEntered, 2)).css("text-align", "right");
+                $q.data("vasOrig", $q.val());   // what Ctrl+Alt+Z reverts typed text to
                 var qLen = colFieldLength("QtyEntered"); if (qLen > 0) $q.attr("maxlength", qLen);   // AD_Column.FieldLength cap
                 bindAmountInput($q);
                 $q.on("blur", function () { commitField(line, "quantity", parseNum($q.val())); editing = null; render(); });
@@ -1049,7 +1217,9 @@
                     if (e.key === "Escape") { editing = null; render(); }
                 });
                 wrap.append($q);
-                setTimeout(function () { $q.focus(); }, 0);
+                // Quantity opens fully selected (25-Sep-2026, as the purchase order panel):
+                // Tab into it and type, and the figure is replaced, not appended to.
+                setTimeout(function () { $q.focus(); $q.select(); }, 0);
             } else {
                 var hasQ = v.QtyEntered !== undefined && v.QtyEntered !== "" && +v.QtyEntered !== 0;
                 wrap.append(dispInput(line, "quantity", hasQ ? fmtAmtInput(v.QtyEntered, 2) : "",
@@ -1077,8 +1247,19 @@
                 wrap.append($sel);
                 setTimeout(function () { $sel.focus(); }, 0);
             } else {
-                wrap.append(dispInput(line, "uom", line.display.uomName || "",
-                    { align: "right", placeholder: lbl("VAS_240_Uom", "UOM"), cls: "vas-rbl-uomsub vas-rbl-cell-disp--sub", readOnly: uomRO }));
+                // The resting unit is TEXT that wraps, not a one-line <input>
+                // (25-Sep-2026, as VAS_249 / 248 / 247): an input clips a unit longer
+                // than its box, so a new line - where the unit is labelled before
+                // anything is saved - showed a cut-off unit. The label is the unit's
+                // full name (model side); clicking still opens the unit dropdown.
+                var uomTxt = line.display.uomName || "";
+                var $u = $('<div class="vas-rbl-uomtext"></div>')
+                    .text(uomTxt || lbl("VAS_240_Uom", "UOM"))
+                    .toggleClass("vas-rbl-uomtext--empty", !uomTxt)
+                    .attr("title", uomTxt);
+                if (editable && !uomRO) $u.on("click", function () { startEdit(line, "uom"); });
+                else $u.addClass("vas-rbl-uomtext--ro");
+                wrap.append($u);
             }
             return cell;
         }
@@ -1137,6 +1318,14 @@
 
         function openMoreDialog(line) {
             closeDialogs();
+            // Past Drafted the modal opens for READING (additionalInfoEditable): every
+            // field is built non-editable, and the footer holds the same single Done
+            // button with a "View only" note above it (27-Sep-2026, as VAS_107).
+            var isRO = !additionalInfoEditable();
+            // "Additional Details" opens COLLAPSED every time the modal opens (25-Sep-2026):
+            // a link-style group's expanded state is not carried over from another line.
+            for (var lg = 0; lg < MORE_FIELD_GROUPS.length; lg++)
+                if (MORE_FIELD_GROUPS[lg].link) delete moreGroupCollapsed[MORE_FIELD_GROUPS[lg].anchor];
             morePopoverFor = line.rowId;
             // Snapshot the line's editable state BEFORE any field is touched. Dynamic
             // fields commit live to line.values/display on change, so closing via the
@@ -1160,6 +1349,7 @@
                 '<button type="button" class="vas-rbl-dialog__close" data-act="cancel-more" aria-label="' + esc(lbl("VAS_240_Close", "Close")) + '" title="' + esc(lbl("VAS_240_Close", "Close")) + '">' + icon("x", "✕") + "</button>" +
                 "</div></header>" +
                 '<div class="vas-rbl-dialog__body vas-rbl-more-body vas-rbl-more-grid" id="vasRblMoreBody"></div>' +
+                (isRO ? '<div class="vas-rbl-more-note" role="status">' + esc(lbl("VAS_240_DocLockedViewOnly", "View only – this document is no longer editable.")) + "</div>" : "") +
                 '<footer class="vas-rbl-dialog__footer vas-rbl-dialog__footer--end">' +
                 '<button type="button" class="vas-rbl-btn vas-rbl-btn--primary" data-act="close-more">' + esc(lbl("VAS_240_Done", "Done")) + "</button></footer>"
             );
@@ -1173,12 +1363,15 @@
             // lookup popup) must not close the modal and lose in-flight edits.
             // Both paths return focus to the row's "..." button so Tab continues.
             function done() {
-                commitMorePopover(); closeDialogs(); render(); focusMoreBtn(line);
+                // Read-only mode: nothing to commit - just close.
+                if (!isRO) commitMorePopover();
+                closeDialogs(); render(); focusMoreBtn(line);
             }
             // X = Cancel: discard everything changed in the modal and restore the line
             // to its pre-open snapshot. No mandatory validation — edits are thrown away.
+            // In read-only mode nothing was changed, so just close.
             function cancel() {
-                var l = lineById(line.rowId);
+                var l = isRO ? null : lineById(line.rowId);
                 if (l) {
                     l.values        = moreSnapshot.values;
                     l.display       = moreSnapshot.display;
@@ -2154,12 +2347,10 @@
             { col: "C_ProjectLine_ID" },
             { col: "C_Campaign_ID" },
             { col: "C_Activity_ID" },
-            // --- Requirement group: what is being asked for, and by when ---
-            // Date Required is DTD001_DateRequired on this line table (the DTD001 module's
-            // column, which the Lines tab shows); the plain name is kept for a schema
-            // that carries that instead. Whichever is absent is skipped silently.
-            { col: "DateRequired" },
-            { col: "DTD001_DateRequired" },
+            // --- Requirement group: what is being asked for ---
+            // Date Required (DateRequired / DTD001_DateRequired) is no longer offered here
+            // (25-Sep-2026): the line takes it from the header (seedHeaderDateRequired /
+            // SaveLines), so it is not something to key in per line.
             { col: "PriorityRule" },
             { col: "M_Warehouse_ID" },
             { col: "M_Locator_ID" },
@@ -2241,7 +2432,7 @@
            English fallback, `collapsed` = initial collapsed state. */
         var MORE_FIELD_GROUPS = [
             { anchor: "AD_OrgTrx_ID",    key: "VAS_240_GrpDimension",   def: "Dimension",   collapsed: false },
-            { anchor: "DateRequired",    key: "VAS_240_GrpRequirement", def: "Requirement", collapsed: false },
+            { anchor: "PriorityRule",    key: "VAS_240_GrpRequirement", def: "Requirement", collapsed: false },
             { anchor: "C_OrderLine_ID",  key: "VAS_240_GrpReferences",  def: "References",  collapsed: false },
             // "Additional Details" (17-Sep-2026): not a section bar but a LINK, closed until
             // clicked, that reveals the origin references the line carries. Its fields are
@@ -2480,9 +2671,9 @@
         }
 
         function buildDynField(line, m) {
-            // Read-only when the column says so, or when the whole requisition can no
-            // longer be edited (the modal opens for reading on a completed / closed one).
-            var ro = isColumnReadOnly(line, m.ColumnName) || !panelEditable();
+            // Read-only when the column says so, or when the requisition is past Drafted
+            // (the modal opens for reading - see additionalInfoEditable).
+            var ro = isColumnReadOnly(line, m.ColumnName) || !additionalInfoEditable();
             var kind = dynFieldKind(m);
             // Caption only - the framework renders the mandatory red asterisk itself.
             var caption = m.Name || m.ColumnName;
@@ -2857,7 +3048,7 @@
            loaded on the page and otherwise falls back to the server RunColumnCallout - so a
            modal field's callout fires even when its client class isn't present on the page. */
         function setDyn(line, col, value, refresh) {
-            if (!panelEditable()) return;   // the modal is read-only on a locked requisition
+            if (!additionalInfoEditable()) return;   // the modal is read-only past Drafted
             var prev = lineVal(line, col);
             setLineVal(line, col, value);
             // Keep the window context current so a dependent FK's val rule (and any control
@@ -2892,7 +3083,7 @@
            Like setDyn, records the column in _dynTouched so the server knows the null was
            intentional and does not re-apply the column's default value on save. */
         function clearDynValue(line, col) {
-            if (!columnMeta[col]) return;
+            if (!columnMeta[col] || !additionalInfoEditable()) return;
             var prev = lineVal(line, col);
             setLineVal(line, col, null);
             if (line._dynDisp) delete line._dynDisp[col];
@@ -3154,6 +3345,16 @@
                 // goods are being requested, so the instances in question mostly have no
                 // stock yet and a stock-only list would be empty. The user can untick it.
                 showAll: true,
+                // The same picker as the order panel (VAS_107), 25-Sep-2026: a "Code"
+                // column that states the Lot No for a lot-controlled set, the Serial No
+                // for a serial-controlled one, else the instance id - and translated
+                // captions, never a raw "Lot" / "GuaranteeDate" / "QtyOnHand".
+                codeByControl: true,
+                gridLabels: {
+                    code: lbl("VAS_240_Code", "Code"),
+                    guaranteeDate: lbl("VAS_240_GuaranteeDate", "Guarantee Date"),
+                    qtyOnHand: lbl("VAS_240_QtyOnHand", "On Hand")
+                },
                 lbl: lbl, esc: esc, icon: icon,
                 showBusy: showBusy, showToast: showToast,
                 dateStr: dateStr, fmtMoney: fmtMoney, parseNum: parseNum,
@@ -4048,7 +4249,9 @@
              */
             onUndo: function () {
                 if (!panelEditable()) return;
-                var target = (editing && lineById(editing.rowId)) || null;
+                var wKey = String($self.windowNo || 0);
+                var editLine = (editing && lineById(editing.rowId)) || null;
+                var target = editLine;
                 if (!target || !(target.status === "new" || target.dirty)) {
                     target = selectedLines().filter(function (l) { return !l._saving && (l.status === "new" || l.dirty); })[0] || null;
                 }
@@ -4057,17 +4260,28 @@
                         if (!lines[i]._saving && (lines[i].status === "new" || lines[i].dirty)) { target = lines[i]; break; }
                     }
                 }
-                if (!target) { showToast(lbl("VAS_240_NothingToUndo", "Nothing to undo")); return; }
+                if (!target) {
+                    // Text typed into the open cell but not committed yet IS a change: the
+                    // undo drops it and leaves the cell on its committed value (25-Sep-2026).
+                    if (editLine && activeEditorHasPendingText()) {
+                        editing = null; detachActiveEditor(); render();
+                        LAST_UNDO_BY_WINDOW[wKey] = Date.now();
+                        return;
+                    }
+                    // Only a press nobody has answered is "nothing to undo". An echo of a
+                    // press that has just reverted something stays silent.
+                    if (Date.now() - (LAST_UNDO_BY_WINDOW[wKey] || 0) < UNDO_ECHO_MS) return;
+                    showToast(lbl("VAS_240_NothingToUndo", "Nothing to undo"));
+                    return;
+                }
                 if (target.status === "new") { discardNewLine(target); } else { undoLine(target); }
+                LAST_UNDO_BY_WINDOW[wKey] = Date.now();
             },
             /**
-             * Alt+Ctrl+Q — refresh the current page for the loaded order, same
-             * as the Refresh button (re-fetches from the server, discards any
-             * unsaved client-side edits on this page).
+             * Alt+Ctrl+Q — refresh the current page, same as the Refresh button -
+             * refused while unsaved lines are on the page (refreshLines).
              */
-            onRefresh: function () {
-                if (parent && parent.M_Requisition_ID) $self.fetchData(parent.M_Requisition_ID, linePage);
-            }
+            onRefresh: function () { refreshLines(); }
         }; }
 
         this.getRoot = function () { return $root; };

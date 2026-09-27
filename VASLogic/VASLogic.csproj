@@ -151,6 +151,8 @@
     <Compile Include="Models\VAS_189_ARInvoiceDetailPanelModel.Recurring.cs" />
     <Compile Include="Models\VAS_074_CreateInvoiceLinePanelModel.cs" />
     <Compile Include="Models\VAS_107_CreateOrderBottomPanelModel.cs" />
+    <Compile Include="Models\VAS_303_PurchaseOrderBottomModel.cs" />
+    <Compile Include="Models\VAS_304_SalesOrderBottomModel.cs" />
     <Compile Include="Models\VAS_247_MaterialTransferBottomPanelModel.cs" />
     <Compile Include="Models\VAS_248_DeliveryOrderBottomPanelModel.cs" />
     <Compile Include="Models\VAS_249_GRNBottomPanelModel.cs" />

@@ -38,6 +38,11 @@
  *                    loaded line carries VASMTLDISP_ReqQty so the panel can say so
  *                    as the quantity is typed.
  *                  - UOM labels are the full name, never the symbol.
+ *   VAI163         25-Sep-2026  Locators are named, not coded: LocatorCombination,
+ *                  then Bin, then Value (LocatorNameExpr - the rule the overview
+ *                  panels use). Options still carry the warehouse ("WAREHOUSE -
+ *                  NAME") because a transfer's list spans warehouses; the bare name
+ *                  is sent as LocatorName for the grid cell.
  ******************************************************/
 
 using System;
@@ -549,6 +554,7 @@ namespace VASLogic.Models
         {
             List<MovementLocatorItem> list = new List<MovementLocatorItem>();
             string sql = @"SELECT l.M_Locator_ID, l.M_Warehouse_ID, l.Value,
+                                  " + LocatorNameExpr("l") + @" AS LocatorName,
                                   COALESCE(w.Name, N'') AS WarehouseName
                            FROM M_Locator l
                            INNER JOIN M_Warehouse w ON (w.M_Warehouse_ID = l.M_Warehouse_ID)
@@ -570,15 +576,29 @@ namespace VASLogic.Models
             {
                 string wh = Util.GetValueOfString(r["WarehouseName"]);
                 string val = Util.GetValueOfString(r["Value"]);
+                string name = Util.GetValueOfString(r["LocatorName"]).Trim();
+                if (name.Length == 0) name = val;
                 list.Add(new MovementLocatorItem
                 {
                     M_Locator_ID = Util.GetValueOfInt(r["M_Locator_ID"]),
                     M_Warehouse_ID = Util.GetValueOfInt(r["M_Warehouse_ID"]),
                     Value = val,
-                    Name = wh.Length > 0 ? wh + " - " + val : val
+                    LocatorName = name,
+                    Name = wh.Length > 0 ? wh + " - " + name : name
                 });
             }
             return list;
+        }
+
+        /// <summary>
+        /// What a locator is called on screen: its combination, then its bin, then its
+        /// search key - the naming the overview panels (VAS_099 / VAS_104) use.
+        /// </summary>
+        /// <param name="alias">M_Locator table alias</param>
+        /// <returns>SQL expression</returns>
+        private static string LocatorNameExpr(string alias)
+        {
+            return "COALESCE(" + alias + ".LocatorCombination, " + alias + ".Bin, " + alias + ".Value)";
         }
 
         /// <summary>
@@ -1012,8 +1032,8 @@ namespace VASLogic.Models
                 @"COALESCE(p.Value, N'') AS VASMTLDISP_ProductValue,
                   COALESCE(p.Name, N'') AS VASMTLDISP_ProductName,
                   COALESCE(uom.Name, N'') AS VASMTLDISP_UOMName,
-                  COALESCE(lf.Value, N'') AS VASMTLDISP_LocatorName,
-                  COALESCE(lt.Value, N'') AS VASMTLDISP_LocatorToName,
+                  COALESCE(" + LocatorNameExpr("lf") + @", N'') AS VASMTLDISP_LocatorName,
+                  COALESCE(" + LocatorNameExpr("lt") + @", N'') AS VASMTLDISP_LocatorToName,
                   COALESCE(asi.Description, N'') AS VASMTLDISP_AttrName,
                   COALESCE(p.M_AttributeSet_ID, 0) AS VASMTLDISP_HasAttrSet,
                   COALESCE(p.ProductType, '') AS VASMTLDISP_ProductType,
@@ -2527,9 +2547,11 @@ namespace VASLogic.Models
         public int M_Warehouse_ID { get; set; }
         /// <summary>Locator value (the aisle/bin key).</summary>
         public string Value { get; set; }
-        /// <summary>"WAREHOUSE - VALUE", ready to render.</summary>
+        /// <summary>The locator's own name (combination, bin, else value) - what the grid cell shows.</summary>
+        public string LocatorName { get; set; }
+        /// <summary>"WAREHOUSE - NAME", ready to render as a dropdown option.</summary>
         public string Name { get; set; }
-        public MovementLocatorItem() { Value = ""; Name = ""; }
+        public MovementLocatorItem() { Value = ""; LocatorName = ""; Name = ""; }
     }
 
     /// <summary>One product row in the catalog autocomplete.</summary>

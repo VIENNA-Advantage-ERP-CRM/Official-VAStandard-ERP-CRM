@@ -356,6 +356,15 @@
 ///                        test; the panel captions it Closed, naming the quantity
 ///                        not delivered. A closed line delivered in full has
 ///                        nothing written off and still reads Fully delivered.
+///   VAI163   2026-09-21  Deliveries carry IsShipConfirm: the flag on the delivery
+///                        order's OWN target document type (M_InOut.
+///                        C_DocTypeTarget_ID, else C_DocType_ID). The platform
+///                        raises a shipment confirmation off the shipment's type
+///                        (MInOut.CreateConfirmation), not off the order's, so a
+///                        delivery order parked In Progress on its confirmation
+///                        read as "nothing shipped" wherever the ORDER's target
+///                        type said 'N'. The panel's Shipped stage now treats a
+///                        delivery as under confirmation when either type says so.
 /// </summary>
 
 using System;
@@ -1691,6 +1700,31 @@ namespace VASLogic.Models
             List<DeliveryData> rows = new List<DeliveryData>();
             try
             {
+                // Whether THIS delivery order asks for a shipment confirmation:
+                // IsShipConfirm on its own target document type, the completed type
+                // answering only where the target is unset — the same reading
+                // LoadShipConfirmTarget gives the order. Guarded on both columns, so
+                // an older dictionary reports "no confirmation" rather than failing
+                // the whole delivery list.
+                bool hasShipConfirm = ColumnExists("C_DocType", "IsShipConfirm");
+                bool hasTargetType  = ColumnExists("M_InOut", "C_DocTypeTarget_ID");
+                string shipConfirmExpr = "'N'";
+                string docTypeJoin = "", docTypeGroup = "";
+                if (hasShipConfirm)
+                {
+                    docTypeJoin = "LEFT OUTER JOIN C_DocType dt ON (dt.C_DocType_ID = io.C_DocType_ID) ";
+                    docTypeGroup = ", dt.IsShipConfirm";
+                    shipConfirmExpr = "COALESCE(dt.IsShipConfirm, 'N')";
+                    if (hasTargetType)
+                    {
+                        docTypeJoin += "LEFT OUTER JOIN C_DocType dtt ON (dtt.C_DocType_ID = io.C_DocTypeTarget_ID) ";
+                        docTypeGroup += ", dtt.C_DocType_ID, dtt.IsShipConfirm";
+                        shipConfirmExpr = @"CASE WHEN dtt.C_DocType_ID IS NOT NULL
+                                                 THEN COALESCE(dtt.IsShipConfirm, 'N')
+                                                 ELSE COALESCE(dt.IsShipConfirm, 'N') END";
+                    }
+                }
+
                 string sql = @"SELECT
                                   io.M_InOut_ID,
                                   io.DocumentNo,
@@ -1700,6 +1734,7 @@ namespace VASLogic.Models
                                   io.Created,
                                   io.Updated,
                                   wh.Name AS WarehouseName,
+                                  " + shipConfirmExpr + @" AS IsShipConfirm,
                                   COALESCE(SUM(COALESCE(iol.MovementQty, 0)), 0) AS DeliveredQty,
                                   COUNT(iol.M_InOutLine_ID) AS LineCount,
                                   -- What the shipment was WORTH: each shipped line
@@ -1720,12 +1755,13 @@ namespace VASLogic.Models
                                 LEFT OUTER JOIN C_OrderLine ol
                                        ON (ol.C_OrderLine_ID = iol.C_OrderLine_ID)
                                 LEFT OUTER JOIN M_Warehouse wh ON (wh.M_Warehouse_ID = io.M_Warehouse_ID)
+                                " + docTypeJoin + @"
                                 WHERE io.C_Order_ID = @C_Order_ID
                                   AND io.IsActive   = 'Y'
                                   AND io.IsSOTrx    = 'Y'
                                   AND io.DocStatus NOT IN ('RE', 'VO')
                                 GROUP BY io.M_InOut_ID, io.DocumentNo, io.DocStatus, io.MovementDate,
-                                         io.TrackingNo, io.Created, io.Updated, wh.Name
+                                         io.TrackingNo, io.Created, io.Updated, wh.Name" + docTypeGroup + @"
                                 ORDER BY io.MovementDate DESC, io.DocumentNo DESC";
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
                 if (ds == null || ds.Tables.Count == 0) return rows;
@@ -1756,6 +1792,7 @@ namespace VASLogic.Models
                     // on which nothing had yet been entered. Follows VAS_092.
                     dv.Created       = Stamp(r["Created"]);
                     dv.DeliveredValue = Util.GetValueOfDecimal(r["DeliveredValue"]);
+                    dv.IsShipConfirm = Util.GetValueOfString(r["IsShipConfirm"]) == "Y";
                     // Null until the shipment is completed — the Delivered stage
                     // dates itself with this, and an open shipment has no such date.
                     dv.CompletedDate = CompletedOn(stamps, dv.M_InOut_ID, dv.DocStatus,
@@ -3456,6 +3493,12 @@ namespace VASLogic.Models
             /// In Progress, and to CompletedDate once it has completed; null
             /// while drafted.</summary>
             public DateTime? InProgressDate { get; set; }
+            /// <summary>IsShipConfirm on THIS delivery order's target document
+            /// type (falling back to its completed type) — whether it parks In
+            /// Progress awaiting a shipment confirmation. The platform decides
+            /// that off the shipment's own type, so the Shipped stage reads it
+            /// beside the order's <see cref="SalesOrderOverviewData.IsShipConfirmTarget"/>.</summary>
+            public bool     IsShipConfirm { get; set; }
             public string   TrackingNo    { get; set; }
             public string   WarehouseName { get; set; }
             public decimal  DeliveredQty  { get; set; }

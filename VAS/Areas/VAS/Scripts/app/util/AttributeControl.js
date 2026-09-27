@@ -88,7 +88,14 @@
             // Fired when the user DISMISSES the picker without choosing/creating an instance
             // (Cancel / ✕) so the host can restore focus. NOT fired on apply or on the
             // programmatic VIS.AttributeControl.close().
-            onClose: (typeof opts.onClose === "function") ? opts.onClose : function () { }
+            onClose: (typeof opts.onClose === "function") ? opts.onClose : function () { },
+            // OPT-IN (23-Sep-2026, the order panel): gridLabels = { code, guaranteeDate,
+            // qtyOnHand } - already-translated captions for those instance-list columns;
+            // codeByControl = true - the first column shows the Lot No on a lot-controlled
+            // set, the Serial No on a serial-controlled one, else the instance id. A host
+            // that passes neither keeps the "Lot No" column exactly as before.
+            gridLabels: opts.gridLabels || null,
+            codeByControl: !!opts.codeByControl
         };
         closeDialog();
         st = {
@@ -194,7 +201,7 @@
                     // reader and read as an "incorrect code" (16-Sep-2026); an instance
                     // with neither is simply blank here and identified by its
                     // description / guarantee date.
-                    code: r.Lot || r.SerNo || "",
+                    code: instanceCode(r),
                     label: r.Description || "",
                     spec: r.GuaranteeDate ? cfg.DSTR(r.GuaranteeDate) : "",
                     locator: r.Value || "",
@@ -207,6 +214,18 @@
             }
         }
         return out;
+    }
+
+    /* The instance list's first column. Default: the lot, else the serial number (never
+       the internal id). codeByControl (opt-in): what the product's attribute set controls
+       - Lot No for a lot-controlled set, Serial No for a serial-controlled one, and the
+       instance id for any other attribute set. */
+    function instanceCode(r) {
+        if (!cfg.codeByControl) return r.Lot || r.SerNo || "";
+        var info = st.info || {};
+        if (info.IsLot) return r.Lot || "";
+        if (info.IsSerNo) return r.SerNo || "";
+        return r.M_AttributeSetInstance_ID ? String(r.M_AttributeSetInstance_ID) : "";
     }
 
     /* Reload the existing-instance list after the "Show All" toggle changes. getJSONData is
@@ -225,6 +244,10 @@
 
     function buildDialog() {
         var L = cfg.L, E = cfg.E, IC = cfg.IC;
+        var gl = cfg.gridLabels || {};
+        var hdrCode = gl.code || L("Lot", "Lot No");
+        var hdrGuarantee = gl.guaranteeDate || L("GuaranteeDate", "Guarantee Date");
+        var hdrOnHand = gl.qtyOnHand || L("QtyOnHand", "On Hand");
         var backdrop = $('<div class="vas-cil-dialog-backdrop" id="vasCilAttr"></div>');
         var dialog = $('<div class="vas-cil-dialog vas-cil-dialog--wide"></div>');
         dialog.html(
@@ -248,8 +271,8 @@
             "</div>" +
             "</header>" +
             '<div class="vas-cil-dialog__body vas-cil-dialog__body--fixed">' +
-            '<div id="vasCilAttrList"' + (st.info && st.info.IsCanEdit ? ' class="vas-cil-attr-grid--editable"' : "") + '><div class="vas-cil-attr-grid__head"><div></div><div>' + E(L("Lot", "Lot No")) + "</div><div>" + E(L("Description", "Description")) +
-            "</div><div>" + E(L("GuaranteeDate", "Guarantee Date")) + "</div><div>" + E(L("M_Locator_ID", "Locator")) + '</div><div class="vas-cil-attr-h-right">' + E(L("QtyOnHand", "On Hand")) + "</div>" +
+            '<div id="vasCilAttrList"' + (st.info && st.info.IsCanEdit ? ' class="vas-cil-attr-grid--editable"' : "") + '><div class="vas-cil-attr-grid__head"><div></div><div>' + E(hdrCode) + "</div><div>" + E(L("Description", "Description")) +
+            "</div><div>" + E(hdrGuarantee) + "</div><div>" + E(L("M_Locator_ID", "Locator")) + '</div><div class="vas-cil-attr-h-right">' + E(hdrOnHand) + "</div>" +
             (st.info && st.info.IsCanEdit ? "<div>" + E(L("VAS_074_Edit", "Edit")) + "</div>" : "") +
             '</div><div class="vas-cil-attr-grid__body" id="vasCilAttrRows"></div></div>' +
             '<div id="vasCilAttrCreate" class="vas-cil-is-hidden">' + attrCreateForm() + "</div>" +

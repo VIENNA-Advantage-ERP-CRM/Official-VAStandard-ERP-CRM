@@ -42,6 +42,7 @@
 
 .vas-grn-root,
 .vas-grn-dialog-backdrop,
+.vas-grn-catalog-popover--floating,
 .vas-grn-toast {
     --grn-action-blue: #0083da;
     --grn-action-blue-hover: #0069ae;
@@ -779,6 +780,26 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* The resting UNIT under the quantity (25-Sep-2026): text that WRAPS, not a one-line
+   input - an input clipped any unit longer than its box, so the full unit was not
+   visible on a new line. Same size / weight / colour / alignment the input had. */
+.vas-grn-cell-edit .vas-grn-uomtext {
+    margin-top: 0.125em;
+    padding: 0.1em 0;
+    font-size: 0.85em;
+    font-weight: 500;
+    line-height: 1.3;
+    color: var(--grn-text-muted);
+    text-align: right;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    cursor: pointer;
+}
+.vas-grn-cell-edit .vas-grn-uomtext--empty { color: var(--grn-text-faint); }
+.vas-grn-cell-edit .vas-grn-uomtext--ro { cursor: not-allowed; }
+[dir="rtl"] .vas-grn-cell-edit .vas-grn-uomtext { text-align: left; }
+
 .vas-grn-cell-edit input.vas-grn-uomsub {
     text-align: right;
     margin-top: 0.125em;
@@ -821,6 +842,29 @@
     border-bottom: none;
     border-radius: var(--grn-r-md) var(--grn-r-md) 0 0;
 }
+
+/* The product list as a FIXED layer on <body> (25-Sep-2026). Inside the panel it was
+   clipped by the root's scroll box - a short bottom panel left it a sliver - and it was a
+   different size above the field than below. positionCatalog() sets left / width / top or
+   bottom / max-height (the same 16.25em either way) and the font size, so the list keeps
+   the panel's proportions; these rules only undo the in-cell anchoring above. */
+.vas-grn-catalog-popover--floating {
+    position: fixed;
+    top: auto;
+    right: auto;
+    bottom: auto;
+    min-width: 0;
+    max-width: none;
+    z-index: 1000;
+    font-family: var(--grn-font);
+    color: var(--grn-text);
+    text-align: left;
+}
+
+    .vas-grn-catalog-popover--floating,
+    .vas-grn-catalog-popover--floating * {
+        box-sizing: border-box;
+    }
 
 .vas-grn-catalog__hint {
     padding: 0.55em 0.75em;
@@ -1087,6 +1131,22 @@
 
     .vas-grn-dialog .vis-input-wrap:has(.vis-ev-col-readonly) {
         border-bottom: 1px solid #f3f3f3 !important;
+    }
+
+    /* No grey field fills in the modal (25-Sep-2026). The framework paints a read-only
+       control grey (.vis-ev-col-readonly { background: ... !important }) and the browser
+       greys a disabled one; its own edit view undoes that, the modal did not - so on a
+       locked GRN (or any read-only field) the whole form went grey. The read-only cue is
+       the muted text, the not-allowed cursor and the faint underline above. */
+    .vas-grn-dialog .vis-ev-col-readonly,
+    .vas-grn-dialog .vis-input-wrap,
+    .vas-grn-dialog .vis-control-wrap,
+    .vas-grn-dialog .vis-control-wrap input:disabled,
+    .vas-grn-dialog .vis-control-wrap input[readonly],
+    .vas-grn-dialog .vis-control-wrap select:disabled,
+    .vas-grn-dialog .vis-control-wrap textarea:disabled,
+    .vas-grn-dialog .vis-control-wrap textarea[readonly] {
+        background-color: transparent !important;
     }
 
     .vas-grn-dialog .vis-input-wrap:has(input:focus),
@@ -1840,4 +1900,28 @@
     .vas-grn-btn {
         padding: 0.5em 0.625em;
     }
+}
+
+/* ---------- VAS_107 patterns, 25-Sep-2026 ---------- */
+/* The Additional Info modal's "View only" note on a GRN past Drafted - above the
+   footer's single Done button, as the order panel (VAS_107) shows it. */
+.vas-grn-more-note {
+    margin: 0 1.25em;
+    padding: 0.5em 0.75em;
+    border-radius: var(--grn-r-sm);
+    background: #fdf3e2;
+    box-shadow: inset 0.1875em 0 0 var(--grn-warning);
+    color: #8a5a09;
+    font-size: 0.75em;
+}
+
+/* The Save / Discard / Cancel question in front of a refresh with unsaved lines. */
+.vas-grn-dialog--confirm {
+    max-width: 26em;
+}
+
+.vas-grn-confirm-text {
+    margin: 0;
+    color: var(--grn-text);
+    font-size: 0.875em;
 }

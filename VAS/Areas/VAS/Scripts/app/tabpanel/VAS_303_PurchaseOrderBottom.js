@@ -1,6 +1,6 @@
 /************************************************************
- * Module Name    : CRM Extension VAS_107
- * Purpose        : Create Order Bottom Panel — client logic
+ * Module Name    : CRM Extension VAS_303
+ * Purpose        : Purchase Order Bottom Panel — client logic
  * Employee Code  : VAI154
  * Date           : 09-Jul-2026
  *
@@ -8,7 +8,7 @@
  *   VAI163   2026-09-16  Purchase-order round of fixes. PURCHASE-ONLY SCOPE: every
  *                        item below applies when the header is a purchase order
  *                        (C_Order.IsSOTrx = 'N', so never a quotation) - gated on
- *                        docIsPurchase() in the code and on the .vas-obl-doc-purchase
+ *                        docIsPurchase() in the code and on the .vas-po303-doc-purchase
  *                        root class in the CSS. Sales orders and quotations keep the
  *                        behaviour they had before this date.
  *                        - Attribute picker opens with "Show All (include zero and
@@ -68,6 +68,11 @@
  *                          quotation too (the always-show override is gone).
  *                        - Quotation: no column is dropped at any width, newest line
  *                          first, tax list left-aligned, product list viewport-fixed.
+ *   VAI163   2026-09-24  Split out of VAS_107_CreateOrderBottomPanel, which keeps the
+ *                        Sales Quotation screen. This copy serves the Purchase Order screen
+ *                        only; Sales Order (VAS_304_SalesOrderBottom) has its own. Every global
+ *                        name (class, routes, CSS classes, DOM ids, event namespaces)
+ *                        is this panel's own; AD_Message keys stay VAS_107_* (read-only).
  ************************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -78,7 +83,7 @@
        on 23-Sep-2026 - see startPanel / dispose. */
     var LIVE_BY_WINDOW = {};
 
-    VAS.VAS_107_CreateOrderBottomPanel = function () {
+    VAS.VAS_303_PurchaseOrderBottom = function () {
         this.record_ID = 0;
         this.table_ID = 0;
         this.windowNo = 0;
@@ -115,7 +120,7 @@
            case-INSENSITIVE dictionary, and two variants throw "same key already added"). */
         var columnNameByLc = {};
         /* Column-name prefixes that belong to core AD/ERP modules and are always present.
-           Mirrors the C# _systemPrefixes set in VAS_107_CreateOrderBottomPanelModel. */
+           Mirrors the C# _systemPrefixes set in VAS_303_PurchaseOrderBottomModel. */
         var SYSTEM_PREFIXES = {
             "AD_": 1, "C_": 1, "M_": 1, "A_": 1, "G_": 1, "K_": 1, "R_": 1, "I_": 1,
             "B_": 1, "T_": 1, "S_": 1, "W_": 1, "U_": 1,
@@ -281,12 +286,12 @@
         function icon(name, glyph) {
             var paths = ICON_SVG[name];
             if (paths) {
-                return '<svg class="vas-obl-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"' +
+                return '<svg class="vas-po303-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"' +
                        ' fill="none" stroke="currentColor" stroke-width="2"' +
                        ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
                        paths + '</svg>';
             }
-            return '<span class="vas-obl-icon" data-icon="' + name + '">' + (glyph || "") + "</span>";
+            return '<span class="vas-po303-icon" data-icon="' + name + '">' + (glyph || "") + "</span>";
         }
 
         /* ---------- per-line calculation (mirrors the prototype formulas) ---------- */
@@ -369,20 +374,20 @@
 
         /* ---------- lifecycle ---------- */
         this.init = function () {
-            $root = $('<div class="vas-obl-root"></div>');
-            $body = $('<div class="vas-obl-body"></div>');
-            $emptyState = $('<div class="vas-obl-empty" style="display:none;"></div>');
+            $root = $('<div class="vas-po303-root"></div>');
+            $body = $('<div class="vas-po303-body"></div>');
+            $emptyState = $('<div class="vas-po303-empty" style="display:none;"></div>');
             $emptyState.text(lbl("VAS_107_NoOrder", "Select a record to add lines"));
             $root.append($body).append($emptyState);
             createBusyIndicator();
             buildShell();
             registerShortcuts();
-            $(document).on("mousedown.vascil", onDocMouseDown);
+            $(document).on("mousedown.vaspo303", onDocMouseDown);
             fitHostWidth();
             /* Browser zoom fires resize, so this is where a stale host width is re-released.
                Debounced through rAF - a zoom or a splitter drag emits a burst of events and
                the work is a DOM write. */
-            $(window).on("resize.vasobl107", function () {
+            $(window).on("resize.vaspo303", function () {
                 if (fitRaf) return;
                 var run = function () { fitRaf = null; fitHostWidth(); };
                 // Called through `window.` on purpose: a detached requestAnimationFrame
@@ -407,7 +412,7 @@
         }
 
         /* Fallback for browsers WITHOUT :has() - see the "Full-width host" block in
-           VAS_107_CreateOrderBottomPanel.css for the full explanation.
+           VAS_303_PurchaseOrderBottom.css for the full explanation.
 
            Short version: the framework's stylesheet sizes the tab-panel host at 250px (the
            right-dock width) and framework JS stretches a bottom-docked panel to its real
@@ -455,7 +460,7 @@
             // record - including after a save - and a still-open dialog's position:fixed
             // backdrop would otherwise be left orphaned over the page (morePopoverFor is
             // cleared below but the DOM node isn't), swallowing clicks/scroll ("scroll stops
-            // working after save"). closeDialogs() removes #vasOblMore/#vasOblScan/#vasOblAttr;
+            // working after save"). closeDialogs() removes #vasPo303More/#vasPo303Scan/#vasPo303Attr;
             // also reset the reusable AttributeControl's own state.
             closeDialogs();
             try { if (window.VIS && VIS.AttributeControl && VIS.AttributeControl.close) VIS.AttributeControl.close(); } catch (e) { }
@@ -465,7 +470,7 @@
             // per-panel $busy is kept for our own dialog AJAX (lot/serno/attribute/delete)
             // that the framework does not cover.
             $.ajax({
-                url: VIS.Application.contextUrl + "VAS_107_CreateOrderBottomPanel/GetPanelData",
+                url: VIS.Application.contextUrl + "VAS_303_PurchaseOrderBottom/GetPanelData",
                 type: "GET", dataType: "json", data: { C_Order_ID: recordID, AD_Window_ID: $self.AD_Window_ID || 0, page: reqPage },
                 success: function (raw) {
                     // Discard stale responses: a newer fetchData call has already started.
@@ -653,9 +658,9 @@
            header (and exposed as logic tokens) so a field's DisplayLogic can branch on
            them even though the heading does not. */
         function docKind() {
-            return docIsQuotation()
-                ? { key: "VAS_107_DocQuotation", def: "Quotation" }
-                : { key: "VAS_107_DocOrder",     def: "Order" };
+            // Purchase Order screen only: the quotation wording (VAS_107_DocQuotation)
+            // was removed in the 24-Sep-2026 split - a purchase order is never one.
+            return { key: "VAS_107_DocOrder", def: "Order" };
         }
 
         /* The document's own name, for use inside a sentence. Falls back to the neutral
@@ -684,9 +689,8 @@
            noun). Both keys still run through docMsg, so a customised message that keeps
            the {0} placeholder continues to get the document noun substituted. */
         function docTitle() {
-            return docIsQuotation()
-                ? docMsg("VAS_107_QuotationLinesSummary", "Quotation Lines & Summary")
-                : docMsg("VAS_107_LinesSummaryFor", "{0} Lines & Summary");
+            // Quotation heading removed in the 24-Sep-2026 split (Purchase Order screen only).
+            return docMsg("VAS_107_LinesSummaryFor", "{0} Lines & Summary");
         }
 
         /* Re-label everything that names the document. buildShell() builds the header
@@ -696,8 +700,8 @@
         function updateDocTypeLabels() {
             if (!$body) return;
             var title = docTitle();
-            $body.find(".vas-obl-panel__title").text(title);
-            $body.find(".vas-obl-panel").attr("aria-label", title);
+            $body.find(".vas-po303-panel__title").text(title);
+            $body.find(".vas-po303-panel").attr("aria-label", title);
             // The empty state is deliberately NOT document-flavoured: render() shows it
             // precisely when there is no record selected, so there is no kind to name.
         }
@@ -705,36 +709,36 @@
         /* ---------- shell ---------- */
         function buildShell() {
             $body.empty();
-            var $panel = $('<section class="vas-obl-panel" aria-label="' + esc(docTitle()) + '"></section>');
+            var $panel = $('<section class="vas-po303-panel" aria-label="' + esc(docTitle()) + '"></section>');
 
-            var $header = $('<header class="vas-obl-panel__header"></header>');
-            $header.append('<div><h2 class="vas-obl-panel__title">' + esc(docTitle()) + '</h2></div>');
+            var $header = $('<header class="vas-po303-panel__header"></header>');
+            $header.append('<div><h2 class="vas-po303-panel__title">' + esc(docTitle()) + '</h2></div>');
 
-            var $actions = $('<div class="vas-obl-panel__actions"></div>');
+            var $actions = $('<div class="vas-po303-panel__actions"></div>');
             // Scan hidden for now (handler/markup kept so it can be re-enabled by
-            // dropping the vas-obl-is-hidden class).
-            var $scanBtn = $('<button type="button" class="vas-obl-btn vas-obl-btn--outline vas-obl-is-hidden" data-action="open-scan">' + icon("scan-line", "▭") +
+            // dropping the vas-po303-is-hidden class).
+            var $scanBtn = $('<button type="button" class="vas-po303-btn vas-po303-btn--outline vas-po303-is-hidden" data-action="open-scan">' + icon("scan-line", "▭") +
                 "<span>" + esc(lbl("VAS_107_Scan", "Scan")) + "</span></button>");
-            $addBtn = $('<button type="button" class="vas-obl-btn vas-obl-btn--outline" data-action="add-line" title="' + esc(lbl("VAS_107_AddLine", "Add line")) + ' (Ctrl+Alt+N)">' + icon("plus", "+") +
+            $addBtn = $('<button type="button" class="vas-po303-btn vas-po303-btn--outline" data-action="add-line" title="' + esc(lbl("VAS_107_AddLine", "Add line")) + ' (Ctrl+Alt+N)">' + icon("plus", "+") +
                 "<span>" + esc(lbl("VAS_107_AddLine", "Add line")) + "</span></button>");
-            $saveBtn = $('<button type="button" class="vas-obl-btn vas-obl-btn--primary vas-obl-is-disabled" data-action="save-rows" title="' + esc(lbl("VAS_107_SaveRow", "Save row")) + ' (Ctrl+Alt+S)"></button>');
-            $deleteBtn = $('<button type="button" class="vas-obl-btn vas-obl-btn--danger vas-obl-is-disabled" data-action="delete-selected" title="' + esc(lbl("VAS_107_DeleteRecord", "Delete record")) + ' (Ctrl+Alt+D)" disabled>' +
-                icon("trash", "🗑") + "<span>" + esc(lbl("VAS_107_DeleteRecord", "Delete record")) + ' <span class="vas-obl-sel-count"></span></span></button>');
-            $refreshBtn = $('<button type="button" class="vas-obl-btn vas-obl-btn--outline" data-action="refresh" title="' + esc(lbl("VAS_107_Refresh", "Refresh")) + ' (Ctrl+Alt+Q)">' +
+            $saveBtn = $('<button type="button" class="vas-po303-btn vas-po303-btn--primary vas-po303-is-disabled" data-action="save-rows" title="' + esc(lbl("VAS_107_SaveRow", "Save row")) + ' (Ctrl+Alt+S)"></button>');
+            $deleteBtn = $('<button type="button" class="vas-po303-btn vas-po303-btn--danger vas-po303-is-disabled" data-action="delete-selected" title="' + esc(lbl("VAS_107_DeleteRecord", "Delete record")) + ' (Ctrl+Alt+D)" disabled>' +
+                icon("trash", "🗑") + "<span>" + esc(lbl("VAS_107_DeleteRecord", "Delete record")) + ' <span class="vas-po303-sel-count"></span></span></button>');
+            $refreshBtn = $('<button type="button" class="vas-po303-btn vas-po303-btn--outline" data-action="refresh" title="' + esc(lbl("VAS_107_Refresh", "Refresh")) + ' (Ctrl+Alt+Q)">' +
                 icon("refresh-cw", "↺") + "<span>" + esc(lbl("VAS_107_Refresh", "Refresh")) + "</span></button>");
             $actions.append($scanBtn, $addBtn, $saveBtn, $deleteBtn, $refreshBtn);
             $header.append($actions);
             $panel.append($header);
 
-            var $table = $('<div class="vas-obl-table" role="table"></div>');
+            var $table = $('<div class="vas-po303-table" role="table"></div>');
             $table.append(buildHeadRow());
-            $linesBody = $('<div class="vas-obl-tbody"></div>');
+            $linesBody = $('<div class="vas-po303-tbody"></div>');
             $table.append($linesBody);
-            $totalsRow = $('<div class="vas-obl-totals-block"></div>');
+            $totalsRow = $('<div class="vas-po303-totals-block"></div>');
             $table.append($totalsRow);
             $panel.append($table);
             // Server-side line pager (20/page): "X-Y of N" + prev/next.
-            $pager = $('<div class="vas-obl-linepager" style="display:none;"></div>');
+            $pager = $('<div class="vas-po303-linepager" style="display:none;"></div>');
             $pager.on("click", "[data-act=lp-prev]", function () { gotoLinePage(linePage - 1); });
             $pager.on("click", "[data-act=lp-next]", function () { gotoLinePage(linePage + 1); });
             $panel.append($pager);
@@ -756,26 +760,26 @@
         }
 
         function buildHeadRow() {
-            var $row = $('<div class="vas-obl-row vas-obl-row--head" role="row"></div>');
+            var $row = $('<div class="vas-po303-row vas-po303-row--head" role="row"></div>');
             $selectAll = $('<input type="checkbox" aria-label="' + esc(lbl("VAS_107_SelectAll", "Select all lines")) + '" />');
-            $row.append($('<div class="vas-obl-cell vas-obl-cell--check" role="columnheader"></div>').append($selectAll));
+            $row.append($('<div class="vas-po303-cell vas-po303-cell--check" role="columnheader"></div>').append($selectAll));
             $selectAll.on("change", function () {
                 if (selectedCount() === lines.length) clearSelection();
                 else for (var i = 0; i < lines.length; i++) lines[i]._sel = true;
                 render();
             });
-            $row.append('<div class="vas-obl-cell" role="columnheader">' + esc(lbl("VAS_107_ProductCharge", "Product / Charge")) + "</div>");
-            $row.append('<div class="vas-obl-cell" role="columnheader">' + esc(lbl("VAS_107_Description", "Description")) + "</div>");
-            $row.append('<div class="vas-obl-cell vas-obl-cell--right" role="columnheader">' + esc(lbl("VAS_107_QtyUom", "Quantity / UOM")) + "</div>");
-            $row.append('<div class="vas-obl-cell vas-obl-cell--right vas-obl-hdr-price" role="columnheader">' + priceHeaderHtml() + "</div>");
+            $row.append('<div class="vas-po303-cell" role="columnheader">' + esc(lbl("VAS_107_ProductCharge", "Product / Charge")) + "</div>");
+            $row.append('<div class="vas-po303-cell" role="columnheader">' + esc(lbl("VAS_107_Description", "Description")) + "</div>");
+            $row.append('<div class="vas-po303-cell vas-po303-cell--right" role="columnheader">' + esc(lbl("VAS_107_QtyUom", "Quantity / UOM")) + "</div>");
+            $row.append('<div class="vas-po303-cell vas-po303-cell--right vas-po303-hdr-price" role="columnheader">' + priceHeaderHtml() + "</div>");
             // Tax is right-aligned like the three figure columns around it. Left-aligned, its
             // heading sat one 0.75em gap from the RIGHT edge of the right-aligned Price
             // heading, so "Price" and "Tax" collided into what read as a single "Price Tax"
             // label. Right-aligning it puts a whole (empty) track between the two words and
             // makes Quantity / Price / Tax / Taxable Amount one tidy right-hand cluster.
-            $row.append('<div class="vas-obl-cell vas-obl-cell--right" role="columnheader">' + esc(lbl("VAS_107_Tax", "Tax")) + "</div>");
-            $row.append('<div class="vas-obl-cell vas-obl-cell--right" role="columnheader">' + esc(lbl("VAS_107_TaxableAmt", "Taxable Amount")) + "</div>");
-            $row.append('<div class="vas-obl-cell vas-obl-cell--more" role="columnheader" aria-label="' + esc(lbl("VAS_107_More", "More")) + '"></div>');
+            $row.append('<div class="vas-po303-cell vas-po303-cell--right" role="columnheader">' + esc(lbl("VAS_107_Tax", "Tax")) + "</div>");
+            $row.append('<div class="vas-po303-cell vas-po303-cell--right" role="columnheader">' + esc(lbl("VAS_107_TaxableAmt", "Taxable Amount")) + "</div>");
+            $row.append('<div class="vas-po303-cell vas-po303-cell--more" role="columnheader" aria-label="' + esc(lbl("VAS_107_More", "More")) + '"></div>');
             return $row;
         }
 
@@ -784,7 +788,7 @@
         function priceHeaderHtml() {
             var main = esc(lbl("VAS_107_Price", "Price"));
             if (parent && parent.IsTaxIncluded)
-                main += '<span class="vas-obl-hdr-price-sub">' + esc(lbl("VAS_107_InclTax", "(Incl. Tax)")) + "</span>";
+                main += '<span class="vas-po303-hdr-price-sub">' + esc(lbl("VAS_107_InclTax", "(Incl. Tax)")) + "</span>";
             return main;
         }
 
@@ -792,7 +796,7 @@
            Called from render() so the header tracks the order/price-list data that loads
            AFTER buildHeadRow ran. */
         function updatePriceHeader() {
-            if ($body) $body.find(".vas-obl-hdr-price").html(priceHeaderHtml());
+            if ($body) $body.find(".vas-po303-hdr-price").html(priceHeaderHtml());
         }
 
         /* ---------- render ---------- */
@@ -807,12 +811,12 @@
             // control ignores its own `cursor` in Chromium, so the cell shows it instead.
             var locked = !panelEditable();
             lastLockState = locked;   // what this paint reflects - see onTabDataStatus
-            $body.toggleClass("vas-obl-locked", locked);
+            $body.toggleClass("vas-po303-locked", locked);
             // The keep-every-column layout is the stylesheet's only layout now (quotations
             // included since 18-Sep-2026 - opening the right panel narrowed the grid past
             // the step that dropped Description and Tax), so no root class is needed. Any
             // earlier paint's flag is cleared so the stylesheet never sees a stale one.
-            $root.removeClass("vas-obl-doc-purchase");
+            $root.removeClass("vas-po303-doc-purchase");
             // The head row was built before the order data arrived, so refresh the Price
             // header now that parent.IsTaxIncluded (price-list tax mode) is known...
             updatePriceHeader();
@@ -822,7 +826,7 @@
 
             $linesBody.empty();
             if (!lines.length) {
-                $linesBody.append('<div class="vas-obl-emptyrow">' + esc(lbl("VAS_107_NoLines", "No lines yet - use Add line")) + "</div>");
+                $linesBody.append('<div class="vas-po303-emptyrow">' + esc(lbl("VAS_107_NoLines", "No lines yet - use Add line")) + "</div>");
             } else {
                 for (var i = 0; i < lines.length; i++) $linesBody.append(renderRow(lines[i]));
             }
@@ -843,12 +847,12 @@
             var showing = lbl("VAS_107_Showing", "Showing") + " " + start + "–" + end + " " + lbl("VAS_107_Of", "of") + " " + total;
             var pageInfo = (linePage + 1) + " " + lbl("VAS_107_Of", "of") + " " + pageCount;
             $pager.html(
-                '<span class="vas-obl-linepager__showing">' + esc(showing) + "</span>" +
-                '<div class="vas-obl-linepager__nav">' +
-                '<button type="button" class="vas-obl-attr-pagebtn" data-act="lp-prev"' + (linePage <= 0 ? " disabled" : "") +
+                '<span class="vas-po303-linepager__showing">' + esc(showing) + "</span>" +
+                '<div class="vas-po303-linepager__nav">' +
+                '<button type="button" class="vas-po303-attr-pagebtn" data-act="lp-prev"' + (linePage <= 0 ? " disabled" : "") +
                 ' aria-label="' + esc(lbl("VAS_107_Prev", "Previous")) + '">' + icon("chevron-left", "‹") + "</button>" +
-                '<span class="vas-obl-linepager__info">' + esc(pageInfo) + "</span>" +
-                '<button type="button" class="vas-obl-attr-pagebtn" data-act="lp-next"' + (linePage >= pageCount - 1 ? " disabled" : "") +
+                '<span class="vas-po303-linepager__info">' + esc(pageInfo) + "</span>" +
+                '<button type="button" class="vas-po303-attr-pagebtn" data-act="lp-next"' + (linePage >= pageCount - 1 ? " disabled" : "") +
                 ' aria-label="' + esc(lbl("VAS_107_Next", "Next")) + '">' + icon("chevron-right", "›") + "</button>" +
                 "</div>"
             ).show();
@@ -943,9 +947,9 @@
            the column isn't set; read case-insensitively (PG lowercases the key). */
         function lineTcs(line) { return +lineVal(line, "VA106_TCSAmount") || 0; }
         function totalsRow(label, value, grand) {
-            return '<div class="vas-obl-totals-row' + (grand ? " vas-obl-totals-row--grand" : "") + '">' +
-                '<span class="vas-obl-totals-row__label">' + label + '</span>' +
-                '<span class="vas-obl-totals-row__value">' + esc(value) + '</span></div>';
+            return '<div class="vas-po303-totals-row' + (grand ? " vas-po303-totals-row--grand" : "") + '">' +
+                '<span class="vas-po303-totals-row__label">' + label + '</span>' +
+                '<span class="vas-po303-totals-row__value">' + esc(value) + '</span></div>';
         }
         /* Fetches the per-tax breakdown for the whole order from C_OrderTax (all pages,
            all saved lines). Stores the result in taxSummary and re-renders the totals row.
@@ -954,11 +958,11 @@
             var id = parent && parent.C_Order_ID;
             if (!(id > 0)) { taxSummary = null; renderTotals(); return; }
             try {
-                // Use $.ajax (not getJSONData) to match VAS_107's established double-JSON
+                // Use $.ajax (not getJSONData) to match VAS_303's established double-JSON
                 // parse pattern: the controller returns Json(JsonConvert.SerializeObject(list)),
                 // so jQuery parses the outer wrapper to a string, then JSON.parse gives the array.
                 $.ajax({
-                    url: VIS.Application.contextUrl + "VAS_107_CreateOrderBottomPanel/GetTaxBreakdown",
+                    url: VIS.Application.contextUrl + "VAS_303_PurchaseOrderBottom/GetTaxBreakdown",
                     type: "GET", dataType: "json",
                     data: { C_Order_ID: id },
                     success: function (raw) {
@@ -1143,33 +1147,33 @@
         function renderHeaderButtons() {
             var n = unsavedLines().length;
             var locked = !panelEditable();
-            $addBtn.removeClass("vas-obl-is-hidden");
-            $saveBtn.removeClass("vas-obl-is-hidden");
+            $addBtn.removeClass("vas-po303-is-hidden");
+            $saveBtn.removeClass("vas-po303-is-hidden");
             var plural   = n > 1 ? lbl("VAS_107_PluralS", "s") : "";
             var countTxt = n > 0 ? " (" + n + ")" : "";
             // Save glyph: the framework icon font (vis vis-save), the SAME mark the invoice
             // line panel (VAS_074) uses, so Save reads identically across the document
             // panels instead of this one carrying its own hard-drive SVG.
-            $saveBtn.html('<i class="vis vis-save vas-obl-icon" aria-hidden="true"></i><span>' + esc(lbl("VAS_107_SaveRow", "Save row")) + plural + countTxt + "</span>");
+            $saveBtn.html('<i class="vis vis-save vas-po303-icon" aria-hidden="true"></i><span>' + esc(lbl("VAS_107_SaveRow", "Save row")) + plural + countTxt + "</span>");
             var sc = selectedCount();
-            $deleteBtn.find(".vas-obl-sel-count").text(sc > 0 ? "(" + sc + ")" : "");
+            $deleteBtn.find(".vas-po303-sel-count").text(sc > 0 ? "(" + sc + ")" : "");
             if ($selectAll) $selectAll.prop("checked", lines.length > 0 && sc === lines.length).prop("disabled", locked);
             // Save button: HTML-disable only when the document is locked (completed/void/etc)
             // so that mousedown still fires when n===0 (the user is editing a field that hasn't
             // been committed yet). Visual disabled state uses the CSS class only — matching
             // the VAS_074 pattern. Without this, clicking Save while a field is in edit mode
             // requires two clicks: the first click is swallowed by the disabled attribute.
-            $saveBtn.prop("disabled", locked).toggleClass("vas-obl-is-disabled", locked || n === 0);
+            $saveBtn.prop("disabled", locked).toggleClass("vas-po303-is-disabled", locked || n === 0);
             VAS.PanelUtil.applyButtonState([
-                { $el: $addBtn,     disabled: locked,              disabledCls: "vas-obl-is-disabled" },
-                { $el: $deleteBtn,  disabled: sc === 0 || locked,  disabledCls: "vas-obl-is-disabled" },
-                { $el: $refreshBtn, disabled: false,               disabledCls: "vas-obl-is-disabled" }
+                { $el: $addBtn,     disabled: locked,              disabledCls: "vas-po303-is-disabled", hiddenCls: "vas-po303-is-hidden" },
+                { $el: $deleteBtn,  disabled: sc === 0 || locked,  disabledCls: "vas-po303-is-disabled", hiddenCls: "vas-po303-is-hidden" },
+                { $el: $refreshBtn, disabled: false,               disabledCls: "vas-po303-is-disabled", hiddenCls: "vas-po303-is-hidden" }
             ]);
         }
 
         function renderRow(line) {
             var v = line.values;
-            var $row = $('<div class="vas-obl-row vas-obl-row--line" role="row" data-rowid="' + line.rowId + '"></div>');
+            var $row = $('<div class="vas-po303-row vas-po303-row--line" role="row" data-rowid="' + line.rowId + '"></div>');
             if (line._sel) $row.addClass("is-selected");
             if (line.status === "new" || line.dirty) $row.addClass("is-unsaved");
 
@@ -1177,7 +1181,7 @@
             // deleted, so its selection checkbox is disabled too.
             var cb = $('<input type="checkbox" />').prop("checked", !!line._sel).prop("disabled", !panelEditable());
             cb.on("change", function () { line._sel = this.checked; renderHeaderButtons(); $row.toggleClass("is-selected", this.checked); });
-            $row.append($('<div class="vas-obl-cell vas-obl-cell--check" role="cell"></div>').append(cb));
+            $row.append($('<div class="vas-po303-cell vas-po303-cell--check" role="cell"></div>').append(cb));
 
             // Clicking anywhere on the row toggles its selection checkbox, so the whole
             // record is easy to pick (e.g. for delete). Clicks that land on an interactive
@@ -1186,7 +1190,7 @@
             // edit / open control) and must NOT also toggle selection.
             $row.on("click", function (e) {
                 if (!panelEditable()) return;   // checkbox is disabled on a locked order
-                if ($(e.target).closest("input, select, textarea, button, a, [role=button], .vas-obl-attr-link").length) return;
+                if ($(e.target).closest("input, select, textarea, button, a, [role=button], .vas-po303-attr-link").length) return;
                 line._sel = !line._sel;
                 cb.prop("checked", line._sel);
                 $row.toggleClass("is-selected", line._sel);
@@ -1201,8 +1205,8 @@
 
             var amt = lineAmount(line);
             // Show any non-zero amount (negative is valid on discount/credit lines); mirrors VAS_074.
-            $row.append($('<div class="vas-obl-cell vas-obl-cell--right" role="cell"></div>')
-                .append('<span class="vas-obl-amt">' + (amt ? esc(fmtMoney(amt)) : "") + "</span>"));
+            $row.append($('<div class="vas-po303-cell vas-po303-cell--right" role="cell"></div>')
+                .append('<span class="vas-po303-amt">' + (amt ? esc(fmtMoney(amt)) : "") + "</span>"));
 
             $row.append(renderMoreCell(line));
             // Per-row inline validation error (set by validateUnsaved on Save) - shown as a
@@ -1210,7 +1214,7 @@
             // in a multi-row save is flagged in place.
             if (line._error) {
                 $row.addClass("is-invalid")
-                    .append('<div class="vas-obl-row-error" role="alert">' + esc(line._error) + "</div>");
+                    .append('<div class="vas-po303-row-error" role="alert">' + esc(line._error) + "</div>");
             }
             // Re-apply the per-row spinner after a re-render so an in-flight save (or
             // callout) keeps its indicator even if render() rebuilds the rows (e.g. the
@@ -1231,7 +1235,7 @@
             var editable = panelEditable();   // live tab status first, then the snapshot
             // draggable=false stops the browser starting a text-drag on the readonly
             // input (which flashes the "not-allowed" / no-drop cursor while dragging).
-            var $i = $('<input type="text" readonly tabindex="-1" draggable="false" class="vas-obl-cell-edit__input vas-obl-cell-disp" />');
+            var $i = $('<input type="text" readonly tabindex="-1" draggable="false" class="vas-po303-cell-edit__input vas-po303-cell-disp" />');
             $i.val(text || "");
             if (opts.placeholder) $i.attr("placeholder", opts.placeholder);
             if (opts.align === "right") $i.css("text-align", "right");
@@ -1239,7 +1243,7 @@
             $i.attr("title", text || "");
             if (editable && !opts.readOnly) $i.on("click", function () { startEdit(line, field); });
             else {
-                $i.addClass("vas-obl-cell-disp--ro");
+                $i.addClass("vas-po303-cell-disp--ro");
                 // A COLUMN-level read-only field (e.g. C_UOM_ID ReadOnlyLogic true) is rendered
                 // DISABLED, not just readonly: `readonly` has no effect on a <select> and a plain
                 // readonly text cell still looks editable, so disable + grey it so it's clearly
@@ -1254,15 +1258,15 @@
             var editable = panelEditable();   // live tab status first, then the snapshot
             var pField = primaryField(line);
             var isEditing = editing && editing.rowId === line.rowId && (editing.field === "product" || editing.field === "charge");
-            var cell = $('<div class="vas-obl-cell" role="cell"></div>');
-            var wrap = $('<div class="vas-obl-cell-edit"></div>');
+            var cell = $('<div class="vas-po303-cell" role="cell"></div>');
+            var wrap = $('<div class="vas-po303-cell-edit"></div>');
             if (isEditing) wrap.addClass("is-editing");
             cell.append(wrap);
 
             if (isEditing) {
                 var inner = $('<div style="position:relative"></div>');
                 wrap.append(inner);
-                var $inp = $('<input type="text" class="vas-obl-cell-edit__input" />');
+                var $inp = $('<input type="text" class="vas-po303-cell-edit__input" />');
                 $inp.val(editing.field === "product" ? line.display.productName : line.display.chargeName);
                 $inp.attr("placeholder", editing.field === "product" ? lbl("VAS_107_SearchProduct", "Search product…") : lbl("VAS_107_SearchCharge", "Search charge…"));
                 $inp.on("input", function () { scheduleCatalog($(this).val(), inner, line, $inp); });
@@ -1299,8 +1303,8 @@
                 if (line.values.M_Product_ID > 0 && (line.display.attrName || line.display.hasAttributeSet)) {
                     var hasAttr = !!line.display.attrName;
                     var attrTxt = hasAttr ? line.display.attrName : lbl("VAS_107_SetAttribute", "Set attribute…");
-                    var $attr = $('<span class="vas-obl-attr-link"></span>').text(attrTxt).attr("title", attrTxt);
-                    if (!hasAttr) $attr.addClass("vas-obl-attr-link--empty");
+                    var $attr = $('<span class="vas-po303-attr-link"></span>').text(attrTxt).attr("title", attrTxt);
+                    if (!hasAttr) $attr.addClass("vas-po303-attr-link--empty");
                     // Clickable only when the order is editable AND the product actually
                     // carries an attribute set (M_AttributeSet_ID > 0). On a read-only order,
                     // or on a saved line whose product has no attribute set defined (e.g. the
@@ -1308,7 +1312,7 @@
                     // still shows), the attribute is informational only - not a link (no click,
                     // no pointer cursor / hover underline).
                     if (editable && productHasAttributeSet(line)) $attr.on("click", function (e) { e.stopPropagation(); openAttrDialog(line); });
-                    else $attr.addClass("vas-obl-attr-link--disabled");
+                    else $attr.addClass("vas-po303-attr-link--disabled");
                     wrap.append($attr);
                 }
             }
@@ -1318,14 +1322,14 @@
         function renderEditableCell(line, field, value, placeholder, opts) {
             opts = opts || {};
             var editable = panelEditable();   // live tab status first, then the snapshot
-            var cell = $('<div class="vas-obl-cell' + (opts.align === "right" ? " vas-obl-cell--right" : "") + '" role="cell"></div>');
-            var wrap = $('<div class="vas-obl-cell-edit"></div>');
+            var cell = $('<div class="vas-po303-cell' + (opts.align === "right" ? " vas-po303-cell--right" : "") + '" role="cell"></div>');
+            var wrap = $('<div class="vas-po303-cell-edit"></div>');
             var isEditing = editing && editing.rowId === line.rowId && editing.field === field;
             if (isEditing) wrap.addClass("is-editing");
             cell.append(wrap);
 
             if (isEditing) {
-                var $inp = $('<input type="text" class="vas-obl-cell-edit__input" />');
+                var $inp = $('<input type="text" class="vas-po303-cell-edit__input" />');
                 $inp.val(opts.amount ? fmtAmtInput(value, field === "quantity" ? 2 : precision()) : (value || ""));
                 $inp.attr("placeholder", placeholder || "");
                 if (opts.maxLength > 0) $inp.attr("maxlength", opts.maxLength);   // AD_Column.FieldLength cap
@@ -1355,8 +1359,8 @@
         function renderQtyUomCell(line) {
             var v = line.values;
             var editable = panelEditable();   // live tab status first, then the snapshot
-            var cell = $('<div class="vas-obl-cell vas-obl-cell--right" role="cell"></div>');
-            var wrap = $('<div class="vas-obl-cell-edit"></div>');
+            var cell = $('<div class="vas-po303-cell vas-po303-cell--right" role="cell"></div>');
+            var wrap = $('<div class="vas-po303-cell-edit"></div>');
             var editQty = editing && editing.rowId === line.rowId && editing.field === "quantity";
             var uomRO = isColumnReadOnly(line, "C_UOM_ID");   // AD_Column.ReadOnlyLogic / IsReadOnly
             var editUom = editing && editing.rowId === line.rowId && editing.field === "uom" && !uomRO;
@@ -1365,7 +1369,7 @@
 
             // quantity (top)
             if (editQty) {
-                var $q = $('<input type="text" class="vas-obl-cell-edit__input" inputmode="decimal" />').val(fmtAmtInput(v.QtyEntered, 2)).css("text-align", "right");
+                var $q = $('<input type="text" class="vas-po303-cell-edit__input" inputmode="decimal" />').val(fmtAmtInput(v.QtyEntered, 2)).css("text-align", "right");
                 var qLen = colFieldLength("QtyEntered"); if (qLen > 0) $q.attr("maxlength", qLen);   // AD_Column.FieldLength cap
                 bindAmountInput($q);
                 $q.on("blur", function () { commitField(line, "quantity", parseNum($q.val())); editing = null; render(); });
@@ -1381,14 +1385,14 @@
             } else {
                 var hasQ = v.QtyEntered !== undefined && v.QtyEntered !== "" && +v.QtyEntered !== 0;
                 wrap.append(dispInput(line, "quantity", hasQ ? fmtAmtInput(v.QtyEntered, 2) : "",
-                    { align: "right", placeholder: lbl("VAS_107_Qty", "Qty"), cls: "vas-obl-qtyval", readOnly: isColumnReadOnly(line, "QtyEntered") }));
+                    { align: "right", placeholder: lbl("VAS_107_Qty", "Qty"), cls: "vas-po303-qtyval", readOnly: isColumnReadOnly(line, "QtyEntered") }));
             }
 
             // UOM (bottom) — real editable C_UOM dropdown, options filtered to this
             // line's context (C_UOM_ID AD_Val_Rule). Render with what is cached now,
             // then refine in place once the per-row list arrives.
             if (editUom) {
-                var $sel = $('<select class="vas-obl-cell-edit__select"></select>');
+                var $sel = $('<select class="vas-po303-cell-edit__select"></select>');
                 fillUomOptions($sel, line);
                 ensureRowLookups(line, function () {
                     if (editing && editing.rowId === line.rowId && editing.field === "uom" && $sel.closest("body").length)
@@ -1406,17 +1410,17 @@
                 setTimeout(function () { $sel.focus(); }, 0);
             } else {
                 // The resting unit is TEXT that wraps, not a one-line <input>
-                // (25-Sep-2026, as VAS_303 / 304 / 249 / 248 / 247 / 240): an input clips
-                // a unit longer than its box, so a new line - where the unit is labelled
+                // (25-Sep-2026, as VAS_304 / 249 / 248 / 247 / 240): an input clips a
+                // unit longer than its box, so a new line - where the unit is labelled
                 // before anything is saved - showed a cut-off unit. The label is the
                 // unit's full name (model side); clicking still opens the unit dropdown.
                 var uomTxt = line.display.uomName || "";
-                var $u = $('<div class="vas-obl-uomtext"></div>')
+                var $u = $('<div class="vas-po303-uomtext"></div>')
                     .text(uomTxt || lbl("VAS_107_Uom", "UOM"))
-                    .toggleClass("vas-obl-uomtext--empty", !uomTxt)
+                    .toggleClass("vas-po303-uomtext--empty", !uomTxt)
                     .attr("title", uomTxt);
                 if (panelEditable() && !uomRO) $u.on("click", function () { startEdit(line, "uom"); });
-                else $u.addClass("vas-obl-uomtext--ro");
+                else $u.addClass("vas-po303-uomtext--ro");
                 wrap.append($u);
             }
             return cell;
@@ -1426,8 +1430,8 @@
             var v = line.values;
             var editable = panelEditable();   // live tab status first, then the snapshot
             // Right-aligned to match its column header - see buildHeadRow.
-            var cell = $('<div class="vas-obl-cell vas-obl-cell--right" role="cell"></div>');
-            var wrap = $('<div class="vas-obl-cell-edit"></div>');
+            var cell = $('<div class="vas-po303-cell vas-po303-cell--right" role="cell"></div>');
+            var wrap = $('<div class="vas-po303-cell-edit"></div>');
             var isEditing = editing && editing.rowId === line.rowId && editing.field === "tax";
             if (isEditing) wrap.addClass("is-editing");
             cell.append(wrap);
@@ -1439,7 +1443,7 @@
                 // too since 18-Sep-2026 - right-aligned, the names opened against the
                 // right edge and read as though the list were RTL); the column's right
                 // alignment is for the resting figure-style cell, not for a list of names.
-                var $sel = $('<select class="vas-obl-cell-edit__select vas-obl-tax-select"></select>');
+                var $sel = $('<select class="vas-po303-cell-edit__select vas-po303-tax-select"></select>');
                 fillTaxOptions($sel, line);
                 ensureRowLookups(line, function () {
                     if (editing && editing.rowId === line.rowId && editing.field === "tax" && $sel.closest("body").length)
@@ -1456,14 +1460,14 @@
                 wrap.append($sel);
                 setTimeout(function () { $sel.focus(); }, 0);
             } else {
-                wrap.append(dispInput(line, "tax", line.display.taxName || "", { align: "right", placeholder: "—", cls: "vas-obl-taxval" }));
+                wrap.append(dispInput(line, "tax", line.display.taxName || "", { align: "right", placeholder: "—", cls: "vas-po303-taxval" }));
             }
             return cell;
         }
 
         function renderMoreCell(line) {
             var editable = panelEditable();   // live tab status first, then the snapshot
-            var cell = $('<div class="vas-obl-cell vas-obl-cell--more" role="cell" style="position:relative"></div>');
+            var cell = $('<div class="vas-po303-cell vas-po303-cell--more" role="cell" style="position:relative"></div>');
             // Undo affordance (↺). On a SAVED row with unsaved edits it reverts the row to
             // its last pristine snapshot; on a NEW (never-saved) row it removes the row
             // entirely (client-only discard - a new line has no snapshot to revert to).
@@ -1471,7 +1475,7 @@
             var canDiscardNew = line.status === "new";
             if (editable && !line._saving && (canUndoEdits || canDiscardNew)) {
                 var undoTitle = (canDiscardNew ? lbl("VAS_107_UndoNewLine", "Undo (remove line)") : lbl("VAS_107_UndoChanges", "Undo changes")) + " (Ctrl+Alt+Z)";
-                var $undo = $('<button type="button" class="vas-obl-undo-btn" title="' + esc(undoTitle) + '">' + icon("rotate-ccw", "↺") + "</button>");
+                var $undo = $('<button type="button" class="vas-po303-undo-btn" title="' + esc(undoTitle) + '">' + icon("rotate-ccw", "↺") + "</button>");
                 var undoAct = canDiscardNew ? discardNewLine : undoLine;
                 // Act on mousedown + preventDefault (like Save): a single click while a
                 // cell editor is focused would otherwise blur->commit->re-render and
@@ -1488,7 +1492,7 @@
             var _btnTitle = _hasVisible
                 ? esc(lbl("VAS_107_More", "More"))
                 : esc(lbl("VAS_107_NoAdditionalInfo", "No additional info for this line"));
-            var $btn = $('<button type="button" class="vas-obl-more-btn" title="' + _btnTitle + '">' + icon("more-horizontal", "⋯") + "</button>");
+            var $btn = $('<button type="button" class="vas-po303-more-btn" title="' + _btnTitle + '">' + icon("more-horizontal", "⋯") + "</button>");
             if (morePopoverFor === line.rowId) $btn.addClass("is-open");
             if (hasAdditionalValues(line, _addlCols)) $btn.addClass("has-values");
             // Disable only when no additional-info field is visible for this line.
@@ -1533,27 +1537,27 @@
             var primaryName = line.display.productName || line.display.chargeName ||
                 (lbl("VAS_107_Line", "Line") + " " + line.values.Line);
 
-            var $backdrop = $('<div class="vas-obl-dialog-backdrop" id="vasOblMore"></div>');
-            var $dialog   = $('<div class="vas-obl-dialog"></div>');
+            var $backdrop = $('<div class="vas-po303-dialog-backdrop" id="vasPo303More"></div>');
+            var $dialog   = $('<div class="vas-po303-dialog"></div>');
             // X = Cancel (discard; a plain close when view-only), Done = commit (a plain
             // close when view-only). One footer button in both modes.
-            var footerBtn = '<button type="button" class="vas-obl-btn vas-obl-btn--primary" data-act="close-more">' + esc(lbl("VAS_107_Done", "Done")) + "</button>";
+            var footerBtn = '<button type="button" class="vas-po303-btn vas-po303-btn--primary" data-act="close-more">' + esc(lbl("VAS_107_Done", "Done")) + "</button>";
             var lockNote = isRO
-                ? '<div class="vas-obl-more-note" role="status">' + esc(lbl("VAS_107_DocLockedViewOnly", "View only – this document is no longer editable.")) + "</div>"
+                ? '<div class="vas-po303-more-note" role="status">' + esc(lbl("VAS_107_DocLockedViewOnly", "View only – this document is no longer editable.")) + "</div>"
                 : "";
             $dialog.html(
-                '<header class="vas-obl-dialog__header"><div class="vas-obl-dialog__header-row">' +
-                '<h3 class="vas-obl-dialog__title">' + esc(primaryName) + " - " + esc(lbl("VAS_107_AdditionalInfo", "Additional Info")) + "</h3>" +
-                '<button type="button" class="vas-obl-dialog__close" data-act="cancel-more" aria-label="' + esc(lbl("VAS_107_Close", "Close")) + '" title="' + esc(lbl("VAS_107_Close", "Close")) + '">' + icon("x", "✕") + "</button>" +
+                '<header class="vas-po303-dialog__header"><div class="vas-po303-dialog__header-row">' +
+                '<h3 class="vas-po303-dialog__title">' + esc(primaryName) + " - " + esc(lbl("VAS_107_AdditionalInfo", "Additional Info")) + "</h3>" +
+                '<button type="button" class="vas-po303-dialog__close" data-act="cancel-more" aria-label="' + esc(lbl("VAS_107_Close", "Close")) + '" title="' + esc(lbl("VAS_107_Close", "Close")) + '">' + icon("x", "✕") + "</button>" +
                 "</div></header>" +
-                '<div class="vas-obl-dialog__body vas-obl-more-body vas-obl-more-grid' + (isRO ? " vas-obl-more-body--ro" : "") + '" id="vasOblMoreBody"></div>' +
+                '<div class="vas-po303-dialog__body vas-po303-more-body vas-po303-more-grid' + (isRO ? " vas-po303-more-body--ro" : "") + '" id="vasPo303MoreBody"></div>' +
                 lockNote +
-                '<footer class="vas-obl-dialog__footer vas-obl-dialog__footer--end">' + footerBtn + "</footer>"
+                '<footer class="vas-po303-dialog__footer vas-po303-dialog__footer--end">' + footerBtn + "</footer>"
             );
             $backdrop.append($dialog);
             $("body").append($backdrop);
 
-            var $body = $dialog.find("#vasOblMoreBody");
+            var $body = $dialog.find("#vasPo303MoreBody");
 
             // Close only via Done (commit) or the X cross (cancel/discard).
             // Never dismiss on backdrop click — an outside click (e.g. on a framework
@@ -1596,26 +1600,26 @@
             // Field-group Show More/Less toggle (delegated so it survives body rebuild).
             $dialog.on("click", "[data-act=fldgrp-toggle]", function (e) {
                 e.preventDefault(); e.stopPropagation();
-                toggleFieldGroup($(this).closest(".vas-obl-fldgrp"));
+                toggleFieldGroup($(this).closest(".vas-po303-fldgrp"));
             });
 
             // Building the curated fields is heavy (each FK builds a native VIS control
             // + lookup synchronously). Paint a spinner first, then build on the next
             // tick so the user sees a busy indicator rather than a frozen panel.
-            $body.removeClass("vas-obl-more-grid").addClass("vas-obl-dialog__body--loading")
-                .html('<div class="vas-obl-dialog-loading"><span class="vas-obl-dialog-spin" aria-label="' +
+            $body.removeClass("vas-po303-more-grid").addClass("vas-po303-dialog__body--loading")
+                .html('<div class="vas-po303-dialog-loading"><span class="vas-po303-dialog-spin" aria-label="' +
                       esc(lbl("VAS_107_Loading", "Loading…")) + '"></span></div>');
             setTimeout(function () {
                 if (morePopoverFor !== line.rowId || !$body.parent().length) return;
-                $body.removeClass("vas-obl-dialog__body--loading").addClass("vas-obl-more-grid").empty();
+                $body.removeClass("vas-po303-dialog__body--loading").addClass("vas-po303-more-grid").empty();
                 primeLineContext(line);
                 appendDynFields(line, $body, isRO);
                 applyFieldGroups($body);
-                if (!$body.children("[data-col]:not(.vas-obl-dyn-hidden)").length)
-                    $body.append('<p class="vas-obl-empty-message">' +
+                if (!$body.children("[data-col]:not(.vas-po303-dyn-hidden)").length)
+                    $body.append('<p class="vas-po303-empty-message">' +
                                  esc(lbl("VAS_107_NoAdditionalInfo", "No additional info for this line")) + "</p>");
                 // In read-only mode there is nothing to focus for editing.
-                if (!isRO) $body.find("[data-col]:not(.vas-obl-dyn-hidden)").find("input,select,textarea").first().focus();
+                if (!isRO) $body.find("[data-col]:not(.vas-po303-dyn-hidden)").find("input,select,textarea").first().focus();
             }, 0);
         }
 
@@ -1763,7 +1767,7 @@
             }
             line._lk = { sig: sig, loading: true, loaded: false, uom: null, tax: null, cbs: cb ? [cb] : [] };
             $.ajax({
-                url: VIS.Application.contextUrl + "VAS_107_CreateOrderBottomPanel/GetLookupData",
+                url: VIS.Application.contextUrl + "VAS_303_PurchaseOrderBottom/GetLookupData",
                 type: "POST", dataType: "json",
                 data: { payload: JSON.stringify({ C_Order_ID: parent.C_Order_ID, RowValues: compactCtx(line.values) }) },
                 success: function (raw) {
@@ -1788,7 +1792,7 @@
             if (!line) return;
             // Legacy Discount/Notes ids (only present if re-added to the curated list);
             // dynamic fields commit themselves on change, so don't force-dirty here.
-            var $d = $("#vasOblDisc-" + morePopoverFor), $n = $("#vasOblNotes-" + morePopoverFor);
+            var $d = $("#vasPo303Disc-" + morePopoverFor), $n = $("#vasPo303Notes-" + morePopoverFor);
             if ($d.length) { line.values.Discount = parseNum($d.val()); line.dirty = true; }
             if ($n.length) { line.values.Notes = $n.val(); line.dirty = true; }
         }
@@ -1828,7 +1832,7 @@
         /* Move keyboard focus to a row's "..." (More) button after a render. */
         function focusMoreBtn(line) {
             setTimeout(function () {
-                var $b = $linesBody.find('[data-rowid="' + line.rowId + '"] .vas-obl-more-btn');
+                var $b = $linesBody.find('[data-rowid="' + line.rowId + '"] .vas-po303-more-btn');
                 if ($b.length) $b.focus();
             }, 0);
         }
@@ -1881,16 +1885,16 @@
             // keep-every-column grid (cells clip) reached them. The in-row branch below is
             // kept for the flag's sake only.
             catalog.fixed = true;
-            catalog.$pop = $('<div class="vas-obl-catalog-popover' + (catalog.fixed ? " vas-obl-catalog-popover--fixed" : "") + '"></div>');
+            catalog.$pop = $('<div class="vas-po303-catalog-popover' + (catalog.fixed ? " vas-po303-catalog-popover--fixed" : "") + '"></div>');
             catalog.$pop.on("scroll", function () {
                 var el = this;
                 if (catalog.hasMore && !catalog.loading && el.scrollTop + el.clientHeight >= el.scrollHeight - 40) loadCatalogPage(inner, line, $inp, false);
             });
-            catalog.$pop.on("mousedown", ".vas-obl-catalog-popover__item", function (e) {
+            catalog.$pop.on("mousedown", ".vas-po303-catalog-popover__item", function (e) {
                 e.preventDefault();
                 commitCatalogItem(line, catalog.results[+$(this).attr("data-idx")]);
             });
-            catalog.$pop.on("mouseenter", ".vas-obl-catalog-popover__item", function () { setHighlight(+$(this).attr("data-idx")); });
+            catalog.$pop.on("mouseenter", ".vas-po303-catalog-popover__item", function () { setHighlight(+$(this).attr("data-idx")); });
             if (catalog.fixed) {
                 // Parked off-screen until it can be measured against the input (which is
                 // not in the document yet while the row is being built - see
@@ -1899,8 +1903,8 @@
                 $("body").append(catalog.$pop);
                 // Fixed positioning is relative to the viewport, so the list must follow
                 // the input when the panel scrolls or the window resizes / zooms.
-                if ($root && $root.length) $root.on("scroll.vasoblcat", positionCatalog);
-                $(window).on("resize.vasoblcat", positionCatalog);
+                if ($root && $root.length) $root.on("scroll.vaspo303cat", positionCatalog);
+                $(window).on("resize.vaspo303cat", positionCatalog);
             } else {
                 inner.append(catalog.$pop);
             }
@@ -1909,7 +1913,7 @@
             // Fire the server search immediately, even for an empty term: the server uses
             // LIKE '%' which returns all products and charges so the user sees the full list
             // on first click without having to type anything.
-            catalog.$pop.html('<div class="vas-obl-catalog__hint">' + esc(lbl("VAS_107_Loading", "Loading…")) + "</div>");
+            catalog.$pop.html('<div class="vas-po303-catalog__hint">' + esc(lbl("VAS_107_Loading", "Loading…")) + "</div>");
             loadCatalogPage(inner, line, $inp, true);
         }
 
@@ -1926,7 +1930,7 @@
            it. Width follows the input (with the CSS min-width behind it), so it lines up
            with the cell it drops from. Re-run as rows load (the first page changes the
            height from the Loading hint to the list) and on scroll / resize. */
-        var CATALOG_MAX_PX = 260;   // keep in sync with .vas-obl-catalog-popover max-height (16.25em)
+        var CATALOG_MAX_PX = 260;   // keep in sync with .vas-po303-catalog-popover max-height (16.25em)
         function positionCatalog() {
             if (!catalog.$pop || !catalog.$pop.length) return;
             var $inp = catalog.$inp;
@@ -1959,7 +1963,7 @@
                 top: above ? "auto" : (Math.round(r.bottom) + "px"),
                 bottom: above ? (Math.round(vh - r.top) + "px") : "auto"
             });
-            catalog.$pop.toggleClass("vas-obl-catalog-popover--above", above);
+            catalog.$pop.toggleClass("vas-po303-catalog-popover--above", above);
         }
 
         /* The in-row placement a SALES document keeps: never clipped by the panel root
@@ -1987,7 +1991,7 @@
             var avail = above ? spaceAbove : spaceBelow;
             var maxH = Math.min(CATALOG_MAX_PX, Math.max(avail, 0));
             catalog.$pop.css("max-height", maxH > 0 ? (maxH + "px") : "");
-            catalog.$pop.toggleClass("vas-obl-catalog-popover--above", above);
+            catalog.$pop.toggleClass("vas-po303-catalog-popover--above", above);
         }
 
         /* Remove the catalog dropdown immediately (used on commit, before the row's busy
@@ -1995,8 +1999,8 @@
         function closeCatalog() {
             if (catalog.debounce) { clearTimeout(catalog.debounce); catalog.debounce = null; }
             if (catalog.$pop) { catalog.$pop.remove(); catalog.$pop = null; }
-            if ($root && $root.length) $root.off("scroll.vasoblcat");
-            $(window).off("resize.vasoblcat");
+            if ($root && $root.length) $root.off("scroll.vaspo303cat");
+            $(window).off("resize.vaspo303cat");
             catalog.$inp = null;
             catalog.results = []; catalog.loading = false;
         }
@@ -2006,7 +2010,7 @@
             catalog.loading = true;
             var mySeq = catalog.seq;
             $.ajax({
-                url: VIS.Application.contextUrl + "VAS_107_CreateOrderBottomPanel/SearchCatalog",
+                url: VIS.Application.contextUrl + "VAS_303_PurchaseOrderBottom/SearchCatalog",
                 type: "GET", dataType: "json",
                 data: { C_Order_ID: parent.C_Order_ID, query: catalog.term, pageSize: CATALOG_PAGE_SIZE, offset: catalog.offset, rowContext: JSON.stringify(compactCtx(line.values)) },
                 success: function (raw) {
@@ -2032,7 +2036,7 @@
                 var hint = (docIsReleaseOrder() && !catalog.term)
                     ? lbl("VAS_107_NoBlanketItems", "No products or charges on the blanket order of this release")
                     : lbl("VAS_107_NoMatches", "No matches");
-                catalog.$pop.html('<div class="vas-obl-catalog__hint">' + esc(hint) + "</div>");
+                catalog.$pop.html('<div class="vas-po303-catalog__hint">' + esc(hint) + "</div>");
                 positionCatalog();
                 return;
             }
@@ -2050,10 +2054,10 @@
             var blabel = it.Kind === "C" ? lbl("VAS_107_Charge", "Charge") : lbl("VAS_107_Product", "Product");
             // Name + type only (the key/value line is intentionally omitted to keep
             // the dropdown rows compact). Full "name (key)" stays in the tooltip.
-            return '<button type="button" class="vas-obl-catalog-popover__item" data-catalog-item="true" data-idx="' + idx +
+            return '<button type="button" class="vas-po303-catalog-popover__item" data-catalog-item="true" data-idx="' + idx +
                 '" title="' + esc(it.DisplayName + (it.SearchKey ? " (" + it.SearchKey + ")" : "")) + '">' +
-                '<span class="vas-obl-catalog-popover__name">' + esc(it.DisplayName) + "</span>" +
-                '<span class="vas-obl-badge vas-obl-badge--' + badge + '">' + esc(blabel) + "</span></button>";
+                '<span class="vas-po303-catalog-popover__name">' + esc(it.DisplayName) + "</span>" +
+                '<span class="vas-po303-badge vas-po303-badge--' + badge + '">' + esc(blabel) + "</span></button>";
         }
 
         /* Move the highlight by class only (no rebuild) and keep it in view. */
@@ -2062,7 +2066,7 @@
             var n = catalog.results.length; if (!n) return;
             idx = Math.max(0, Math.min(idx, n - 1));
             catalog.highlight = idx;
-            var $items = catalog.$pop.children(".vas-obl-catalog-popover__item");
+            var $items = catalog.$pop.children(".vas-po303-catalog-popover__item");
             $items.removeClass("is-highlighted");
             var $sel = $items.eq(idx).addClass("is-highlighted");
             if ($sel.length && $sel[0].scrollIntoView) $sel[0].scrollIntoView({ block: "nearest" });
@@ -2236,7 +2240,7 @@
             });
         }
 
-        function rowSpinHtml(label) { return '<span class="vas-obl-row-spin" aria-label="' + esc(label || "") + '"></span>'; }
+        function rowSpinHtml(label) { return '<span class="vas-po303-row-spin" aria-label="' + esc(label || "") + '"></span>'; }
 
         /* Toggle a per-row spinner immediately (no full re-render, so it paints before a
            synchronous callout blocks the thread). Used for both callouts and per-row save. */
@@ -2244,7 +2248,7 @@
             line._busy = on;
             var $r = $linesBody.find('[data-rowid="' + line.rowId + '"]');
             $r.toggleClass("is-busy", on);
-            $r.find(".vas-obl-row-spin").remove();
+            $r.find(".vas-po303-row-spin").remove();
             if (on) $r.append(rowSpinHtml(label || lbl("VAS_107_Calculating", "Calculating…")));
         }
 
@@ -2421,7 +2425,7 @@
         function runCalloutServer(line, trigger, done) {
             var v = line.values;
             $.ajax({
-                url: VIS.Application.contextUrl + "VAS_107_CreateOrderBottomPanel/RunCallout",
+                url: VIS.Application.contextUrl + "VAS_303_PurchaseOrderBottom/RunCallout",
                 type: "GET", dataType: "json",
                 data: {
                     C_Order_ID: parent.C_Order_ID, TriggerColumn: trigger,
@@ -2522,7 +2526,7 @@
             return col ? isColumnReadOnly(line, col) : false;
         }
         /* Dynamic mandatory evaluation for Additional-Info modal fields. Mirrors VAS_074.
-           VAS_107 has no conditional-mandatory columns today; extend this function if any
+           VAS_303 has no conditional-mandatory columns today; extend this function if any
            are added (e.g. an asset-related column whose mandatory state depends on line values). */
         function dynMandatory(line, m) {
             if (!m) return false;
@@ -2642,17 +2646,7 @@
             { col: "C_ProjectPhase_ID", grp: "dim" },
             { col: "C_Activity_ID",     grp: "dim" },
             { col: "VAS_Opportunity_ID", grp: "dim" },
-            // --- Contract (SALES ORDERS only: IsSOTrx = 'Y' and not a quotation).
-            // Contract billing is raised against the customer document, so these never
-            // belong on a purchase order or a quotation. Each field still carries its own
-            // AD_Field DisplayLogic, which applyDynDisplay runs after the control is
-            // built, so the dictionary can narrow this further. ---
-            { col: "IsContract",     grp: "contract", when: "salesOrder" },
-            { col: "C_Frequency_ID", grp: "contract", when: "salesOrder" },   // "Billing Frequency"
-            { col: "NoofCycle",      grp: "contract", when: "salesOrder" },
-            { col: "QtyPerCycle",    grp: "contract", when: "salesOrder" },
-            { col: "StartDate",      grp: "contract", when: "salesOrder" },
-            { col: "EndDate",        grp: "contract", when: "salesOrder" },
+            // (Contract section - sales orders only - removed in the 24-Sep-2026 split.)
             // --- References ---
             // Blanket release link ("Order Line"). It records which BLANKET order line the
             // release came from, so it is meaningless on a quotation - a quotation is never
@@ -2663,12 +2657,8 @@
             { col: "C_OrderLine_Blanket_ID", grp: "ref", when: "order" },
             // A_Asset_ID excluded per design.
             { col: "VA106_TaxCollectedAtSource_ID", grp: "ref", when: "va106_" },
-            { col: "VA106_TCSAmount",               grp: "ref", when: "va106_" },
-            // Drop Shipment, read-only: stamped by the process that raised the line, never
-            // entered by hand (see FORCED_READONLY_COLS). SALES ORDER only (23-Sep-2026 -
-            // no longer on a purchase order or a quotation), and only when the order's
-            // HEADER is flagged C_Order.IsDropShip = 'Y'; otherwise it is not offered.
-            { col: "IsDropShip",       grp: "ref", when: "salesOrderDropShip" }
+            { col: "VA106_TCSAmount",               grp: "ref", when: "va106_" }
+            // (Drop Shipment - sales orders only - removed in the 24-Sep-2026 split.)
             // Plan Run (VAMRP_PlanRun_ID) and Original PO Line (Ref_C_Orderline_ID) were
             // dropped from References on 16-Sep-2026, and Quotation Line
             // (C_Quotation_Line_ID) on 17-Sep-2026: each is stamped by the process that
@@ -2679,7 +2669,7 @@
            THE one place that says which screen this panel is on. Every screen-specific
            rule goes through getPanelContext() - via the docIs* helpers below - and never
            through a window name or id. The decision itself is made once, on the server
-           (VAS_107_CreateOrderBottomPanelModel.ResolvePanelContext), from the order's
+           (VAS_303_PurchaseOrderBottomModel.ResolvePanelContext), from the order's
            IsSOTrx and its document type's DocBaseType + DocSubTypeSO (OB / ON = quotation),
            and arrives as parent.PanelContext. The fallback below only covers a response
            without it (an older server). */
@@ -2727,23 +2717,15 @@
             if (when === "purchaseDropShip") return docIsPurchase() && docIsDropShip();
             // Any real order (purchase or sales) whose header carries the drop-shipment flag.
             if (when === "orderDropShip") return docIsRealOrder() && docIsDropShip();
-            // Sales order whose header carries the drop-shipment flag (D1).
-            if (when === "salesOrderDropShip") return docIsSalesOrder() && docIsDropShip();
+            // (salesOrderDropShip / salesOrder / sales / quotation - sales-side only - were
+            // removed in the 24-Sep-2026 split; nothing in this panel asks for them.)
             // Release purchase order (target document type IsReleaseDocument).
             if (when === "releasePO") return docIsReleasePO();
             // Release order of either side.
             if (when === "releaseOrder") return docIsReleaseOrder();
-            // Sales order that is not a quotation (IsSOTrx = 'Y' AND IsSalesQuotation = 'N').
-            if (when === "salesOrder") return docIsSalesOrder();
             // Its exact complement - a purchase order or a quotation - so a column listed
             // under both lands in exactly one section whatever the document is.
             if (when === "notSalesOrder") return !docIsSalesOrder();
-            // Any SALES-side document (IsSOTrx = 'Y') - sales order OR quotation.
-            if (when === "sales") return !!(parent && parent.IsSOTrx);
-            // A quotation only (IsSOTrx = 'Y' AND IsSalesQuotation = 'Y'). The exact
-            // complement of "order", so a column listed under both lands in exactly one
-            // group whatever the document is.
-            if (when === "quotation") return docIsQuotation();
             // Any real order, sales or purchase - excludes quotations only.
             if (when === "order") return docIsOrder();
             if (when === "svcExpenseOrCharge") {
@@ -2779,7 +2761,7 @@
             // "Dimensions" (plural, 17-Sep-2026) - its own key, so a site that seeded the
             // old singular wording is not left showing it.
             { id: "dim",      key: "VAS_107_GrpDimensions", def: "Dimensions", collapsed: false },
-            { id: "contract", key: "VAS_107_GrpContract",   def: "Contract",   collapsed: false },
+            // (Contract group - sales orders only - removed in the 24-Sep-2026 split.)
             { id: "ref",      key: "VAS_107_GrpReferences", def: "References", collapsed: false }
         ];
         // Per-group collapsed state; persists across modal re-opens in the same session.
@@ -2804,7 +2786,7 @@
            actually present in the DOM, then apply the collapse state. */
         function applyFieldGroups($body) {
             if (!$body || !$body.length) return;
-            $body.children(".vas-obl-fldgrp").remove();
+            $body.children(".vas-po303-fldgrp").remove();
             for (var g = 0; g < MORE_FIELD_GROUPS.length; g++) {
                 var grp = MORE_FIELD_GROUPS[g];
                 var owned = groupCols(g), $anchor = null;
@@ -2815,11 +2797,11 @@
                 if (!$anchor) continue;
                 var collapsed = (grp.id in moreGroupCollapsed) ? moreGroupCollapsed[grp.id] : !!grp.collapsed;
                 $anchor.before(
-                    '<div class="vas-obl-fldgrp" data-grp="' + grp.id + '"' + (collapsed ? ' data-collapsed="1"' : "") + '>' +
-                    '<span class="vas-obl-fldgrp-name">' + esc(lbl(grp.key, grp.def)) + "</span>" +
-                    '<button type="button" class="vas-obl-fldgrp-toggle" data-act="fldgrp-toggle">' +
-                    '<span class="vas-obl-fldgrp-txt">' + esc(collapsed ? lbl("VAS_107_ShowMore", "Show More") : lbl("VAS_107_ShowLess", "Show Less")) + "</span>" +
-                    '<svg class="vas-obl-fldgrp-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 15 12 9 18 15"/></svg>' +
+                    '<div class="vas-po303-fldgrp" data-grp="' + grp.id + '"' + (collapsed ? ' data-collapsed="1"' : "") + '>' +
+                    '<span class="vas-po303-fldgrp-name">' + esc(lbl(grp.key, grp.def)) + "</span>" +
+                    '<button type="button" class="vas-po303-fldgrp-toggle" data-act="fldgrp-toggle">' +
+                    '<span class="vas-po303-fldgrp-txt">' + esc(collapsed ? lbl("VAS_107_ShowMore", "Show More") : lbl("VAS_107_ShowLess", "Show Less")) + "</span>" +
+                    '<svg class="vas-po303-fldgrp-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 15 12 9 18 15"/></svg>' +
                     "</button></div>");
             }
             applyGroupCollapse($body);
@@ -2828,19 +2810,19 @@
 
         /* Hide/show each group's member fields per the header's collapsed state. */
         function applyGroupCollapse($body) {
-            $body.children(".vas-obl-fldgrp").each(function () {
+            $body.children(".vas-po303-fldgrp").each(function () {
                 var $hdr = $(this);
-                $hdr.nextUntil(".vas-obl-fldgrp").toggleClass("vas-obl-grp-collapsed", $hdr.attr("data-collapsed") === "1");
+                $hdr.nextUntil(".vas-po303-fldgrp").toggleClass("vas-po303-grp-collapsed", $hdr.attr("data-collapsed") === "1");
             });
         }
 
         /* Hide a section header whose every owned field is hidden by DisplayLogic. */
         function syncGroupHeaders($body) {
             if (!$body || !$body.length) return;
-            $body.children(".vas-obl-fldgrp").each(function () {
+            $body.children(".vas-po303-fldgrp").each(function () {
                 var $hdr = $(this);
-                var live = $hdr.nextUntil(".vas-obl-fldgrp", "[data-col]").not(".vas-obl-dyn-hidden").length;
-                $hdr.toggleClass("vas-obl-fldgrp-empty", !live);
+                var live = $hdr.nextUntil(".vas-po303-fldgrp", "[data-col]").not(".vas-po303-dyn-hidden").length;
+                $hdr.toggleClass("vas-po303-fldgrp-empty", !live);
             });
         }
 
@@ -2850,8 +2832,8 @@
             var collapsed = $hdr.attr("data-collapsed") !== "1";
             $hdr.attr("data-collapsed", collapsed ? "1" : "0");
             moreGroupCollapsed[$hdr.attr("data-grp")] = collapsed;
-            $hdr.find(".vas-obl-fldgrp-txt").text(collapsed ? lbl("VAS_107_ShowMore", "Show More") : lbl("VAS_107_ShowLess", "Show Less"));
-            applyGroupCollapse($hdr.closest(".vas-obl-more-grid"));
+            $hdr.find(".vas-po303-fldgrp-txt").text(collapsed ? lbl("VAS_107_ShowMore", "Show More") : lbl("VAS_107_ShowLess", "Show Less"));
+            applyGroupCollapse($hdr.closest(".vas-po303-more-grid"));
         }
 
         /* Returns true when the module that owns columnName is installed.
@@ -2984,7 +2966,8 @@
            rule. "Blanket Order Line" on a SALES ORDER (17-Sep-2026): shown only where the
            header names a blanket order - the rule the Lines tab applies. */
         var DISPLAY_LOGIC_OVERRIDES = [
-            { col: "C_OrderLine_Blanket_ID", when: "salesOrder", logic: "@C_Order_Blanket@>0" }
+            // (The sales-order rule "@C_Order_Blanket@>0" was removed in the 24-Sep-2026
+            // split: on a purchase order the dictionary's own DisplayLogic decides.)
         ];
         /* True when this column's DisplayLogic is overridden for the current document. */
         function dynDisplayForced(m) {
@@ -3016,7 +2999,7 @@
         }
 
         /* Apply DisplayLogic to the ALREADY-BUILT modal fields: toggle each field's
-           visibility (display:none via .vas-obl-dyn-hidden) instead of adding/removing DOM,
+           visibility (display:none via .vas-po303-dyn-hidden) instead of adding/removing DOM,
            so a control - and its native lookup - is preserved across toggles. Returns the
            number of currently-visible fields (so the caller can show the empty message). */
         function applyDynDisplay(line, $body) {
@@ -3024,7 +3007,7 @@
             $body.children("[data-col]").each(function () {
                 var m = columnMeta[$(this).attr("data-col")];
                 var show = dynFieldVisible(line, m);
-                $(this).toggleClass("vas-obl-dyn-hidden", !show);
+                $(this).toggleClass("vas-po303-dyn-hidden", !show);
                 if (show) visible++;
             });
             syncGroupHeaders($body);   // hide empty group headers after toggling fields
@@ -3101,7 +3084,7 @@
                 $field.prepend($prep);
             }
             // Mirror VAS_074: mark mandatory fields so CSS can show the red asterisk indicator.
-            $field.toggleClass("vas-obl-dyn-mandatory", dynMandatory(line, m));
+            $field.toggleClass("vas-po303-dyn-mandatory", dynMandatory(line, m));
             return $field.attr("data-col", m.ColumnName);
         }
 
@@ -3306,7 +3289,7 @@
                 ctrl = makeViennaCtrl(dt, col, m.Name || col, m.AD_Reference_Value_ID, dynMandatory(line, m), ro, m.AD_Column_ID);
                 ctrl.getControl().css("width", "100%");
             }
-            catch (e) { if (window.console) console.log("VAS_107 vienna ctrl error " + col, e); return null; }
+            catch (e) { if (window.console) console.log("VAS_303 vienna ctrl error " + col, e); return null; }
             if (!ctrl || typeof ctrl.getControl !== "function") return null;
             try {
                 var iv = viennaSetVal(dt, lineVal(line, col));
@@ -3343,7 +3326,7 @@
                 }
                 // Non-lookup control: same framework container so vis-input-wrap styles it.
                 return $('<div class="input-group vis-input-wrap"></div>').append($cw);
-            } catch (e) { if (window.console) console.log("VAS_107 vienna wrap error " + col, e); return null; }
+            } catch (e) { if (window.console) console.log("VAS_303 vienna wrap error " + col, e); return null; }
         }
 
         function lineVal(line, col) {
@@ -3463,16 +3446,8 @@
                 applyBlanketLine(line, value);
                 return;
             }
-            // Contract (IsContract): the dictionary callout on this column opens the
-            // framework's own contract dialog - a second pop-up over the Additional Info
-            // modal (17-Sep-2026). The modal already holds the contract fields (Billing
-            // Frequency, cycles, quantity per cycle, start / end date), each gated by its
-            // DisplayLogic on this very flag, so ticking the box simply re-evaluates them
-            // in place: they appear under the checkbox, and disappear when it is cleared.
-            if (String(col).toLowerCase() === "iscontract") {
-                refreshMoreDialog(line);
-                return;
-            }
+            // (The IsContract in-place handler - sales orders only - was removed in the
+            // 24-Sep-2026 split: the Contract fields are never in this panel's modal.)
             if (m && m.Callout) {
                 // Snapshot the other modal fields so we can refresh just the ones the
                 // callout changed (e.g. VA106_TCSAmount after picking the TCS type).
@@ -3528,7 +3503,7 @@
             setRowBusy(line, true);
             calloutPending++;
             $.ajax({
-                url: VIS.Application.contextUrl + "VAS_107_CreateOrderBottomPanel/GetBlanketLine",
+                url: VIS.Application.contextUrl + "VAS_303_PurchaseOrderBottom/GetBlanketLine",
                 type: "GET", dataType: "json", data: { C_OrderLine_ID: id },
                 success: function (raw) {
                     var b = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
@@ -3620,7 +3595,7 @@
             setRowBusy(line, true);
             calloutPending++;
             $.ajax({
-                url: VIS.Application.contextUrl + "VAS_107_CreateOrderBottomPanel/FindBlanketLine",
+                url: VIS.Application.contextUrl + "VAS_303_PurchaseOrderBottom/FindBlanketLine",
                 type: "GET", dataType: "json",
                 data: { C_Order_ID: parent.C_Order_ID, M_Product_ID: v.M_Product_ID || 0, C_Charge_ID: v.C_Charge_ID || 0, Qty: String(+v.QtyEntered || 0) },
                 success: function (raw) {
@@ -3648,7 +3623,7 @@
            the modal. Mirrors VAS_074.rebuildDynField. Called after a callout updates a field
            value that may change the control's mandatory state or lookup filter. */
         function rebuildDynField(line, col) {
-            var $b = $("#vasOblMoreBody");
+            var $b = $("#vasPo303MoreBody");
             if (!$b.length || morePopoverFor !== line.rowId) return;
             var m = columnMeta[col];
             if (!m) return;
@@ -3670,7 +3645,7 @@
            Only changed fields are rebuilt, so a number field like VA106_TCSAmount refreshes
            without re-creating every lookup in the modal. */
         function syncMoreDialogValues(line, before, triggerCol) {
-            var $b = $("#vasOblMoreBody");
+            var $b = $("#vasPo303MoreBody");
             if (!$b.length || morePopoverFor !== line.rowId) return;
             var cols = additionalInfoColumns(line);
             for (var i = 0; i < cols.length; i++) {
@@ -3709,7 +3684,7 @@
            So toggling a field (e.g. Asset Related) doesn't rebuild the whole modal /
            re-create every lookup - which was the slow part. */
         function refreshMoreDialog(line) {
-            var $b = $("#vasOblMoreBody");
+            var $b = $("#vasPo303MoreBody");
             if (!$b.length || morePopoverFor !== line.rowId) return;
             primeLineContext(line);   // newly-visible FK controls validate against this line
             var cols = additionalInfoColumns(line);
@@ -3730,9 +3705,9 @@
             // The re-chaining above moves fields past the section headers, so the headers
             // are re-seated in front of the first field each section now owns.
             applyFieldGroups($b);
-            $b.children(".vas-obl-empty-message").remove();
+            $b.children(".vas-po303-empty-message").remove();
             if (!visible)
-                $b.append('<p class="vas-obl-empty-message">' + esc(lbl("VAS_107_NoAdditionalInfo", "No additional info for this line")) + "</p>");
+                $b.append('<p class="vas-po303-empty-message">' + esc(lbl("VAS_107_NoAdditionalInfo", "No additional info for this line")) + "</p>");
         }
 
         /* Resolve and cache an FK value's display label (existing value caption). */
@@ -3741,7 +3716,7 @@
             if (!v || +v <= 0) return;
             if (line._dynDisp && line._dynDisp[col] != null) { $input.val(line._dynDisp[col]); return; }
             $.ajax({
-                url: VIS.Application.contextUrl + "VAS_107_CreateOrderBottomPanel/GetRefLookup",
+                url: VIS.Application.contextUrl + "VAS_303_PurchaseOrderBottom/GetRefLookup",
                 type: "POST", dataType: "json",
                 data: { payload: JSON.stringify({ C_Order_ID: parent.C_Order_ID, ColumnName: col, Id: +v }) },
                 success: function (raw) {
@@ -3754,8 +3729,8 @@
 
         function buildFkControl(line, m) {
             var col = m.ColumnName;
-            var $wrap = $('<div class="vas-obl-fk" style="position:relative"></div>');
-            var $i = $('<input type="text" class="vas-obl-field__input" autocomplete="off" />').val(dynDisplay(line, m));
+            var $wrap = $('<div class="vas-po303-fk" style="position:relative"></div>');
+            var $i = $('<input type="text" class="vas-po303-field__input" autocomplete="off" />').val(dynDisplay(line, m));
             $wrap.append($i);
             ensureRefLabel(line, m, $i);
             var fk = { seq: 0, deb: null, $pop: null };
@@ -3775,7 +3750,7 @@
         function fkSearch(line, m, $wrap, $i, term, fk) {
             fk.seq++; var mySeq = fk.seq;
             $.ajax({
-                url: VIS.Application.contextUrl + "VAS_107_CreateOrderBottomPanel/GetRefLookup",
+                url: VIS.Application.contextUrl + "VAS_303_PurchaseOrderBottom/GetRefLookup",
                 type: "POST", dataType: "json",
                 data: { payload: JSON.stringify({ C_Order_ID: parent.C_Order_ID, ColumnName: m.ColumnName, Query: term, PageSize: CATALOG_PAGE_SIZE, Offset: 0, RowValues: compactCtx(line.values) }) },
                 success: function (raw) {
@@ -3789,16 +3764,16 @@
 
         function showFkPopover($wrap, $i, line, m, rows, fk) {
             if (fk.$pop) fk.$pop.remove();
-            fk.$pop = $('<div class="vas-obl-catalog-popover vas-obl-fk-popover"></div>');
+            fk.$pop = $('<div class="vas-po303-catalog-popover vas-po303-fk-popover"></div>');
             if (!rows.length) {
-                fk.$pop.html('<div class="vas-obl-catalog__hint">' + esc(lbl("VAS_107_NoMatches", "No matches")) + "</div>");
+                fk.$pop.html('<div class="vas-po303-catalog__hint">' + esc(lbl("VAS_107_NoMatches", "No matches")) + "</div>");
             } else {
                 for (var i = 0; i < rows.length; i++) {
-                    fk.$pop.append($('<button type="button" class="vas-obl-catalog-popover__item" data-fk-item="true"></button>')
+                    fk.$pop.append($('<button type="button" class="vas-po303-catalog-popover__item" data-fk-item="true"></button>')
                         .text(rows[i].Name).attr("data-id", rows[i].Id).attr("data-name", rows[i].Name));
                 }
             }
-            fk.$pop.on("mousedown", ".vas-obl-catalog-popover__item", function (e) {
+            fk.$pop.on("mousedown", ".vas-po303-catalog-popover__item", function (e) {
                 e.preventDefault();
                 var id = parseInt($(this).attr("data-id"), 10) || 0, name = $(this).attr("data-name") || "";
                 setDynDisplay(line, m.ColumnName, name);
@@ -3879,7 +3854,7 @@
             render();   // paint each row's inline error (and clear the ones that passed)
             if (anyBad) {
                 // Bring the first failing row into view so it isn't missed off-screen.
-                var $first = $linesBody.find(".vas-obl-row--line.is-invalid").first();
+                var $first = $linesBody.find(".vas-po303-row--line.is-invalid").first();
                 if ($first.length && $first[0].scrollIntoView) $first[0].scrollIntoView({ block: "nearest" });
             }
             return !anyBad;
@@ -4020,32 +3995,32 @@
         }
 
         function buildAttrDialog() {
-            var backdrop = $('<div class="vas-obl-dialog-backdrop" id="vasOblAttr"></div>');
-            var dialog = $('<div class="vas-obl-dialog vas-obl-dialog--wide"></div>');
+            var backdrop = $('<div class="vas-po303-dialog-backdrop" id="vasPo303Attr"></div>');
+            var dialog = $('<div class="vas-po303-dialog vas-po303-dialog--wide"></div>');
             dialog.html(
-                '<header class="vas-obl-dialog__header">' +
-                '<div class="vas-obl-dialog__header-row"><h3 class="vas-obl-dialog__title" id="vasOblAttrTitle">' + esc(lbl("VAS_107_SelectAttribute", "Select attribute")) + "</h3>" +
-                '<button type="button" class="vas-obl-btn vas-obl-btn--outline-pill vas-obl-is-hidden" data-act="attr-back">' + icon("arrow-left", "←") + "<span>" + esc(lbl("VAS_107_Back", "Back")) + "</span></button>" +
+                '<header class="vas-po303-dialog__header">' +
+                '<div class="vas-po303-dialog__header-row"><h3 class="vas-po303-dialog__title" id="vasPo303AttrTitle">' + esc(lbl("VAS_107_SelectAttribute", "Select attribute")) + "</h3>" +
+                '<button type="button" class="vas-po303-btn vas-po303-btn--outline-pill vas-po303-is-hidden" data-act="attr-back">' + icon("arrow-left", "←") + "<span>" + esc(lbl("VAS_107_Back", "Back")) + "</span></button>" +
                 (attrState.info && attrState.info.IsCanCreate ?
-                    '<button type="button" class="vas-obl-btn vas-obl-btn--outline-pill" data-act="attr-create">' + icon("plus", "+") + "<span>" + esc(lbl("VAS_107_NewAttribute", "New attribute")) + "</span></button>" : "") + "</div>" +
-                '<div class="vas-obl-dialog__type"><span class="vas-obl-badge vas-obl-badge--product">' + esc(lbl("VAS_107_Product", "Product")) + '</span><p class="vas-obl-dialog__primary-name">' + esc(attrState.product) + "</p></div>" +
-                '<div class="vas-obl-search-input" id="vasOblAttrSearchRow">' + icon("search", "🔍") + '<input type="text" id="vasOblAttrSearch" placeholder="' + esc(lbl("VAS_107_AttrSearch", "Search attribute values")) + '" /></div>' +
+                    '<button type="button" class="vas-po303-btn vas-po303-btn--outline-pill" data-act="attr-create">' + icon("plus", "+") + "<span>" + esc(lbl("VAS_107_NewAttribute", "New attribute")) + "</span></button>" : "") + "</div>" +
+                '<div class="vas-po303-dialog__type"><span class="vas-po303-badge vas-po303-badge--product">' + esc(lbl("VAS_107_Product", "Product")) + '</span><p class="vas-po303-dialog__primary-name">' + esc(attrState.product) + "</p></div>" +
+                '<div class="vas-po303-search-input" id="vasPo303AttrSearchRow">' + icon("search", "🔍") + '<input type="text" id="vasPo303AttrSearch" placeholder="' + esc(lbl("VAS_107_AttrSearch", "Search attribute values")) + '" /></div>' +
                 "</header>" +
-                '<div class="vas-obl-dialog__body vas-obl-dialog__body--fixed">' +
-                '<div id="vasOblAttrList"' + (attrState.info && attrState.info.IsCanEdit ? ' class="vas-obl-attr-grid--editable"' : "") + '><div class="vas-obl-attr-grid__head"><div></div><div>' + esc(lbl("Lot", "Lot No")) + "</div><div>" + esc(lbl("VAS_107_Description", "Description")) +
-                "</div><div>" + esc(lbl("GuaranteeDate", "Guarantee Date")) + "</div><div>" + esc(lbl("M_Locator_ID", "Locator")) + '</div><div class="vas-obl-attr-h-right">' + esc(lbl("QtyOnHand", "On Hand")) + "</div>" +
+                '<div class="vas-po303-dialog__body vas-po303-dialog__body--fixed">' +
+                '<div id="vasPo303AttrList"' + (attrState.info && attrState.info.IsCanEdit ? ' class="vas-po303-attr-grid--editable"' : "") + '><div class="vas-po303-attr-grid__head"><div></div><div>' + esc(lbl("Lot", "Lot No")) + "</div><div>" + esc(lbl("VAS_107_Description", "Description")) +
+                "</div><div>" + esc(lbl("GuaranteeDate", "Guarantee Date")) + "</div><div>" + esc(lbl("M_Locator_ID", "Locator")) + '</div><div class="vas-po303-attr-h-right">' + esc(lbl("QtyOnHand", "On Hand")) + "</div>" +
                 (attrState.info && attrState.info.IsCanEdit ? "<div>" + esc(lbl("VAS_107_Edit", "Edit")) + "</div>" : "") +
-                '</div><div class="vas-obl-attr-grid__body" id="vasOblAttrRows"></div></div>' +
-                '<div id="vasOblAttrCreate" class="vas-obl-is-hidden">' + attrCreateForm() + "</div>" +
+                '</div><div class="vas-po303-attr-grid__body" id="vasPo303AttrRows"></div></div>' +
+                '<div id="vasPo303AttrCreate" class="vas-po303-is-hidden">' + attrCreateForm() + "</div>" +
                 "</div>" +
-                '<footer class="vas-obl-dialog__footer vas-obl-dialog__footer--end">' +
-                '<div id="vasOblAttrListFoot">' +
-                '<div class="vas-obl-attr-pager"><button type="button" class="vas-obl-attr-pagebtn" data-act="attr-prev" aria-label="' + esc(lbl("VAS_107_Prev", "Previous")) + '">' + icon("chevron-left", "‹") + '</button>' +
-                '<span class="vas-obl-attr-pageinfo" id="vasOblAttrPageInfo"></span>' +
-                '<button type="button" class="vas-obl-attr-pagebtn" data-act="attr-next" aria-label="' + esc(lbl("VAS_107_Next", "Next")) + '">' + icon("chevron-right", "›") + "</button></div>" +
-                '<button type="button" class="vas-obl-btn vas-obl-btn--primary" data-act="attr-ok">' + esc(lbl("VAS_107_OK", "OK")) + "</button></div>" +
-                '<div id="vasOblAttrCreateFoot" class="vas-obl-is-hidden"><button type="button" class="vas-obl-btn vas-obl-btn--ghost" data-act="attr-cancel">' + esc(lbl("VAS_107_Cancel", "Cancel")) +
-                '</button><button type="button" class="vas-obl-btn vas-obl-btn--primary" data-act="attr-submit" disabled>' + esc(lbl("VAS_107_AddAttribute", "Add attribute")) + "</button></div></footer>");
+                '<footer class="vas-po303-dialog__footer vas-po303-dialog__footer--end">' +
+                '<div id="vasPo303AttrListFoot">' +
+                '<div class="vas-po303-attr-pager"><button type="button" class="vas-po303-attr-pagebtn" data-act="attr-prev" aria-label="' + esc(lbl("VAS_107_Prev", "Previous")) + '">' + icon("chevron-left", "‹") + '</button>' +
+                '<span class="vas-po303-attr-pageinfo" id="vasPo303AttrPageInfo"></span>' +
+                '<button type="button" class="vas-po303-attr-pagebtn" data-act="attr-next" aria-label="' + esc(lbl("VAS_107_Next", "Next")) + '">' + icon("chevron-right", "›") + "</button></div>" +
+                '<button type="button" class="vas-po303-btn vas-po303-btn--primary" data-act="attr-ok">' + esc(lbl("VAS_107_OK", "OK")) + "</button></div>" +
+                '<div id="vasPo303AttrCreateFoot" class="vas-po303-is-hidden"><button type="button" class="vas-po303-btn vas-po303-btn--ghost" data-act="attr-cancel">' + esc(lbl("VAS_107_Cancel", "Cancel")) +
+                '</button><button type="button" class="vas-po303-btn vas-po303-btn--primary" data-act="attr-submit" disabled>' + esc(lbl("VAS_107_AddAttribute", "Add attribute")) + "</button></div></footer>");
             backdrop.append(dialog);
             $("body").append(backdrop);
 
@@ -4065,9 +4040,9 @@
             dialog.on("click", "[data-act=attr-genserno]", generateSerNo);
             dialog.on("click", "[data-act=attr-prev]", function () { if (attrState.page > 0) { attrState.page--; renderAttrRows(); } });
             dialog.on("click", "[data-act=attr-next]", function () { attrState.page++; renderAttrRows(); });
-            dialog.find("#vasOblAttrSearch").on("input", function () { attrState.search = $(this).val(); attrState.page = 0; renderAttrRows(); });
+            dialog.find("#vasPo303AttrSearch").on("input", function () { attrState.search = $(this).val(); attrState.page = 0; renderAttrRows(); });
             renderAttr();
-            setTimeout(function () { dialog.find("#vasOblAttrSearch").focus(); }, 0);
+            setTimeout(function () { dialog.find("#vasPo303AttrSearch").focus(); }, 0);
         }
 
         /* Dynamic create-mode form, generated from the product's M_AttributeSet
@@ -4080,13 +4055,13 @@
            (label above value, bottom-border-only, primary-blue utility actions). */
         function attrCreateForm() {
             var info = attrState.info || { Attributes: [] };
-            var html = '<div class="vas-obl-attr-form vas-obl-more-grid">';
+            var html = '<div class="vas-po303-attr-form vas-po303-more-grid">';
             var any = false;
             var attrs = (info.Attributes || []).filter(function (a) { return a.IsInstanceAttribute; });
             for (var i = 0; i < attrs.length; i++) {
                 var a = attrs[i];
                 any = true;
-                var id = "vasOblAttrF_" + a.M_Attribute_ID;
+                var id = "vasPo303AttrF_" + a.M_Attribute_ID;
                 var ctrl;
                 if (a.ValueType === "L") {
                     ctrl = '<select id="' + id + '" placeholder=" " data-placeholder=""><option value=""> </option>';
@@ -4102,12 +4077,12 @@
                 }
                 html += attrField(ctrl, a.Name, null, a.IsMandatory);
             }
-            if (info.IsLot) { any = true; html += attrField(attrTextInput("vasOblAttrLot", true), lbl("VAS_107_Lot", "Lot"), attrFieldBtn("attr-newlot", lbl("VAS_107_NewLot", "New")), false); }
-            if (info.IsSerNo) { any = true; html += attrField(attrTextInput("vasOblAttrSerNo", true), lbl("VAS_107_SerialNo", "Serial No"), attrFieldBtn("attr-genserno", lbl("VAS_107_Generate", "Generate")), false); }
-            if (info.IsGuaranteeDate) { any = true; html += attrField('<input type="date" id="vasOblAttrGuarantee" placeholder=" " data-placeholder="" />', lbl("VAS_107_GuaranteeDate", "Guarantee Date"), null, false); }
+            if (info.IsLot) { any = true; html += attrField(attrTextInput("vasPo303AttrLot", true), lbl("VAS_107_Lot", "Lot"), attrFieldBtn("attr-newlot", lbl("VAS_107_NewLot", "New")), false); }
+            if (info.IsSerNo) { any = true; html += attrField(attrTextInput("vasPo303AttrSerNo", true), lbl("VAS_107_SerialNo", "Serial No"), attrFieldBtn("attr-genserno", lbl("VAS_107_Generate", "Generate")), false); }
+            if (info.IsGuaranteeDate) { any = true; html += attrField('<input type="date" id="vasPo303AttrGuarantee" placeholder=" " data-placeholder="" />', lbl("VAS_107_GuaranteeDate", "Guarantee Date"), null, false); }
             html += "</div>";
-            if (!any) html = '<p class="vas-obl-empty-message">' + esc(lbl("VAS_107_NoInstanceAttr", "No instance attributes to capture")) + "</p>";
-            return html + '<p class="vas-obl-form-error vas-obl-is-hidden" id="vasOblAttrCreateError"></p>';
+            if (!any) html = '<p class="vas-po303-empty-message">' + esc(lbl("VAS_107_NoInstanceAttr", "No instance attributes to capture")) + "</p>";
+            return html + '<p class="vas-po303-form-error vas-po303-is-hidden" id="vasPo303AttrCreateError"></p>';
         }
 
         /* Wrap a control (HTML string) in the framework borderless floating-label field
@@ -4116,7 +4091,7 @@
            reserves room for it). The framework CSS renders the floating <label>; the
            mandatory asterisk is added manually for these non-dictionary controls. */
         function attrField(ctrlHtml, caption, btnHtml, mandatory) {
-            var cap = esc(caption) + (mandatory ? ' <em class="vas-obl-req">*</em>' : "");
+            var cap = esc(caption) + (mandatory ? ' <em class="vas-po303-req">*</em>' : "");
             var inner = '<div class="vis-control-wrap">' + ctrlHtml + "<label>" + cap + "</label></div>";
             if (btnHtml) return '<div class="input-group vis-input-wrap">' + inner + '<div class="input-group-append">' + btnHtml + "</div></div>";
             return '<div class="input-group vis-input-wrap">' + inner + "</div>";
@@ -4127,7 +4102,7 @@
         // Trailing utility action button (Lot + New, Serial No + Generate) - primary-blue
         // text action per design.md's Right Utility Icons / action-link guidance.
         function attrFieldBtn(act, label) {
-            return '<button type="button" class="vas-obl-attr-fieldbtn" data-act="' + act + '">' + esc(label) + "</button>";
+            return '<button type="button" class="vas-po303-attr-fieldbtn" data-act="' + act + '">' + esc(label) + "</button>";
         }
 
         /* Create a new lot for the product via the framework PAttributes/CreateLot
@@ -4145,7 +4120,7 @@
                 success: function (res) {
                     showBusy(false);
                     var r = (res && typeof res.result !== "undefined") ? res.result : res;
-                    if (r && r.Name != null) { $("#vasOblAttrLot").val(r.Name); attrState.newLotId = r.Key; }
+                    if (r && r.Name != null) { $("#vasPo303AttrLot").val(r.Name); attrState.newLotId = r.Key; }
                     else showToast(lbl("VAS_107_LotFailed", "Could not create lot"));
                 },
                 error: function (e) { console.log(e); showBusy(false); showToast(lbl("VAS_107_LotFailed", "Could not create lot")); }
@@ -4166,7 +4141,7 @@
                 success: function (res) {
                     showBusy(false);
                     var r = (res && typeof res.result !== "undefined") ? res.result : res;
-                    if (r != null && String(r).length) $("#vasOblAttrSerNo").val(r);
+                    if (r != null && String(r).length) $("#vasPo303AttrSerNo").val(r);
                     else showToast(lbl("VAS_107_SerNoFailed", "Could not generate serial number"));
                 },
                 error: function (e) { console.log(e); showBusy(false); showToast(lbl("VAS_107_SerNoFailed", "Could not generate serial number")); }
@@ -4174,28 +4149,28 @@
         }
 
         function renderAttr() {
-            var d = $("#vasOblAttr");
+            var d = $("#vasPo303Attr");
             var isCreate = attrState.mode === "create";
-            d.find("#vasOblAttrSearchRow").toggleClass("vas-obl-is-hidden", isCreate);
-            d.find("#vasOblAttrTitle").toggleClass("vas-obl-is-hidden", isCreate);
-            d.find("[data-act=attr-back]").toggleClass("vas-obl-is-hidden", !isCreate);
-            d.find("[data-act=attr-create]").toggleClass("vas-obl-is-hidden", isCreate);
-            d.find("#vasOblAttrList").toggleClass("vas-obl-is-hidden", isCreate);
-            d.find("#vasOblAttrCreate").toggleClass("vas-obl-is-hidden", !isCreate);
-            d.find("#vasOblAttrListFoot").toggleClass("vas-obl-is-hidden", isCreate);
-            d.find("#vasOblAttrCreateFoot").toggleClass("vas-obl-is-hidden", !isCreate);
+            d.find("#vasPo303AttrSearchRow").toggleClass("vas-po303-is-hidden", isCreate);
+            d.find("#vasPo303AttrTitle").toggleClass("vas-po303-is-hidden", isCreate);
+            d.find("[data-act=attr-back]").toggleClass("vas-po303-is-hidden", !isCreate);
+            d.find("[data-act=attr-create]").toggleClass("vas-po303-is-hidden", isCreate);
+            d.find("#vasPo303AttrList").toggleClass("vas-po303-is-hidden", isCreate);
+            d.find("#vasPo303AttrCreate").toggleClass("vas-po303-is-hidden", !isCreate);
+            d.find("#vasPo303AttrListFoot").toggleClass("vas-po303-is-hidden", isCreate);
+            d.find("#vasPo303AttrCreateFoot").toggleClass("vas-po303-is-hidden", !isCreate);
             if (isCreate) {
                 // Submit button reflects edit (update existing) vs add (new) mode.
                 d.find("[data-act=attr-submit]").text(attrState.editAsi ? lbl("VAS_107_UpdateAttribute", "Update attribute") : lbl("VAS_107_AddAttribute", "Add attribute"));
                 updateAttrError(); updateAttrSubmit();
-                setTimeout(function () { d.find("#vasOblAttrCreate").find("input, select").first().focus(); }, 0);
+                setTimeout(function () { d.find("#vasPo303AttrCreate").find("input, select").first().focus(); }, 0);
             }
             else renderAttrRows();
         }
 
         var ATTR_PAGE_SIZE = 20;
         function renderAttrRows() {
-            var body = $("#vasOblAttrRows"); body.empty();
+            var body = $("#vasPo303AttrRows"); body.empty();
             var canEdit = !!(attrState.info && attrState.info.IsCanEdit);
             var q = (attrState.search || "").trim().toLowerCase();
             var matched = attrState.options.filter(function (o) {
@@ -4209,19 +4184,19 @@
             var start = attrState.page * ATTR_PAGE_SIZE;
             var visible = matched.slice(start, start + ATTR_PAGE_SIZE);
             renderAttrPager(matched.length, pageCount, start, visible.length);
-            if (!matched.length) { body.append('<p class="vas-obl-empty-message">' + esc(lbl("VAS_107_NoMatches", "No matches")) + "</p>"); return; }
+            if (!matched.length) { body.append('<p class="vas-po303-empty-message">' + esc(lbl("VAS_107_NoMatches", "No matches")) + "</p>"); return; }
             // Row is a div (not a <button>) so the per-row Edit button can nest legally.
             visible.forEach(function (o) {
-                var $row = $('<div class="vas-obl-attr-grid__row" role="button" tabindex="0"></div>');
+                var $row = $('<div class="vas-po303-attr-grid__row" role="button" tabindex="0"></div>');
                 var key = optionKey(o);
                 if (key === attrState.selected) $row.addClass("is-selected");
                 var editCell = (canEdit && o.M_AttributeSetInstance_ID > 0) ?
-                    '<span class="vas-obl-attr-edit"><button type="button" class="vas-obl-attr-editbtn" data-act="attr-edit" data-key="' + esc(key) +
+                    '<span class="vas-po303-attr-edit"><button type="button" class="vas-po303-attr-editbtn" data-act="attr-edit" data-key="' + esc(key) +
                     '" title="' + esc(lbl("VAS_107_Edit", "Edit")) + '">' + icon("pencil", "✎") + "</button></span>" : (canEdit ? "<span></span>" : "");
-                $row.html('<span class="vas-obl-attr-radio">' + (key === attrState.selected ? '<span class="vas-obl-attr-radio__dot"></span>' : "") + "</span>" +
-                    '<span class="vas-obl-attr-code">' + esc(o.code) + '</span><span class="vas-obl-attr-label">' + esc(o.label) + "</span>" +
-                    '<span class="vas-obl-attr-spec">' + esc(o.spec) + '</span><span class="vas-obl-attr-delta">' + esc(o.locator || "—") + "</span>" +
-                    '<span class="vas-obl-attr-avail">' + esc(o.availability) + "</span>" + editCell);
+                $row.html('<span class="vas-po303-attr-radio">' + (key === attrState.selected ? '<span class="vas-po303-attr-radio__dot"></span>' : "") + "</span>" +
+                    '<span class="vas-po303-attr-code">' + esc(o.code) + '</span><span class="vas-po303-attr-label">' + esc(o.label) + "</span>" +
+                    '<span class="vas-po303-attr-spec">' + esc(o.spec) + '</span><span class="vas-po303-attr-delta">' + esc(o.locator || "—") + "</span>" +
+                    '<span class="vas-po303-attr-avail">' + esc(o.availability) + "</span>" + editCell);
                 // Ignore clicks on the Edit button - the row's re-render would detach it
                 // before the delegated attr-edit handler runs, so let that handler take it.
                 $row.on("click", function (e) { if ($(e.target).closest("[data-act=attr-edit]").length) return; attrState.selected = key; renderAttrRows(); });
@@ -4232,12 +4207,12 @@
 
         /* Update the list pager: "start-end of total" + prev/next enabled state. */
         function renderAttrPager(total, pageCount, start, shown) {
-            var info = $("#vasOblAttrPageInfo");
+            var info = $("#vasPo303AttrPageInfo");
             if (!info.length) return;
             if (!total) { info.text(lbl("VAS_107_NoRecords", "No records")); }
             else { info.text((start + 1) + "-" + (start + shown) + " " + lbl("VAS_107_Of", "of") + " " + total); }
-            $("#vasOblAttr [data-act=attr-prev]").prop("disabled", attrState.page <= 0);
-            $("#vasOblAttr [data-act=attr-next]").prop("disabled", attrState.page >= pageCount - 1);
+            $("#vasPo303Attr [data-act=attr-prev]").prop("disabled", attrState.page <= 0);
+            $("#vasPo303Attr [data-act=attr-next]").prop("disabled", attrState.page >= pageCount - 1);
         }
 
         /* Switch the dialog into create/edit mode. Rebuilds the create form fresh (so a
@@ -4248,7 +4223,7 @@
             attrState.editAsi = editAsi || null;
             attrState.mode = "create";
             attrState.error = "";
-            $("#vasOblAttrCreate").html(attrCreateForm());   // fresh, empty controls
+            $("#vasPo303AttrCreate").html(attrCreateForm());   // fresh, empty controls
             renderAttr();
             if (editAsi) prefillCreateForm(editAsi);
         }
@@ -4264,14 +4239,14 @@
 
         /* Autofill the (already-rendered) create form from an existing instance. */
         function prefillCreateForm(o) {
-            if (o.lot) $("#vasOblAttrLot").val(o.lot);
-            if (o.serno) $("#vasOblAttrSerNo").val(o.serno);
-            if (o.guaranteeDate) $("#vasOblAttrGuarantee").val(o.guaranteeDate);
+            if (o.lot) $("#vasPo303AttrLot").val(o.lot);
+            if (o.serno) $("#vasPo303AttrSerNo").val(o.serno);
+            if (o.guaranteeDate) $("#vasPo303AttrGuarantee").val(o.guaranteeDate);
             var asi = parseInt(o.M_AttributeSetInstance_ID, 10) || 0;
             if (asi <= 0) return;
             showBusy(true);
             $.ajax({
-                url: VIS.Application.contextUrl + "VAS_107_CreateOrderBottomPanel/GetInstanceValues",
+                url: VIS.Application.contextUrl + "VAS_303_PurchaseOrderBottom/GetInstanceValues",
                 type: "GET", dataType: "json", data: { M_AttributeSetInstance_ID: asi },
                 success: function (raw) {
                     showBusy(false);
@@ -4279,7 +4254,7 @@
                     var vals = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     if (!vals || !vals.length) return;
                     for (var i = 0; i < vals.length; i++) {
-                        var v = vals[i], $el = $("#vasOblAttrF_" + v.M_Attribute_ID);
+                        var v = vals[i], $el = $("#vasPo303AttrF_" + v.M_Attribute_ID);
                         if (!$el.length) continue;
                         if (v.ValueType === "L") $el.val(v.M_AttributeValue_ID > 0 ? String(v.M_AttributeValue_ID) : "");
                         else if (v.ValueType === "N") $el.val(v.NumberValue != null ? String(v.NumberValue) : "");
@@ -4291,11 +4266,11 @@
         }
 
         function updateAttrError() {
-            var el = $("#vasOblAttrCreateError");
-            el.text(attrState.error).toggleClass("vas-obl-is-hidden", !attrState.error);
+            var el = $("#vasPo303AttrCreateError");
+            el.text(attrState.error).toggleClass("vas-po303-is-hidden", !attrState.error);
         }
         // The dynamic form validates on submit, so the button stays enabled.
-        function updateAttrSubmit() { $("#vasOblAttr [data-act=attr-submit]").prop("disabled", false); }
+        function updateAttrSubmit() { $("#vasPo303Attr [data-act=attr-submit]").prop("disabled", false); }
         function attrErr(name) { attrState.error = lbl("VAS_107_FieldRequired", "Required") + ": " + name; updateAttrError(); }
 
         function commitAttribute() {
@@ -4329,7 +4304,7 @@
             }
             showBusy(true);
             $.ajax({
-                url: VIS.Application.contextUrl + "VAS_107_CreateOrderBottomPanel/SaveAttribute",
+                url: VIS.Application.contextUrl + "VAS_303_PurchaseOrderBottom/SaveAttribute",
                 type: "POST", dataType: "json",
                 data: { payload: JSON.stringify({ M_Product_ID: line.values.M_Product_ID, Lot: "", SerNo: "", GuaranteeDate: "",
                     Values: [{ M_Attribute_ID: sel.M_Attribute_ID, ValueType: "L", M_AttributeValue_ID: sel.M_AttributeValue_ID, DisplayValue: sel.label }] }) },
@@ -4358,7 +4333,7 @@
             var attrs = (info.Attributes || []).filter(function (a) { return a.IsInstanceAttribute; });
             for (var i = 0; i < attrs.length; i++) {
                 var a = attrs[i];
-                var $el = $("#vasOblAttrF_" + a.M_Attribute_ID);
+                var $el = $("#vasPo303AttrF_" + a.M_Attribute_ID);
                 var raw = $el.val();
                 var empty = (raw == null || String(raw).trim() === "");
                 if (a.ValueType === "L") {
@@ -4378,9 +4353,9 @@
                     labelParts.push(String(raw));
                 }
             }
-            var lot = info.IsLot ? ($("#vasOblAttrLot").val() || "") : "";
-            var serno = info.IsSerNo ? ($("#vasOblAttrSerNo").val() || "") : "";
-            var guarantee = info.IsGuaranteeDate ? ($("#vasOblAttrGuarantee").val() || "") : "";
+            var lot = info.IsLot ? ($("#vasPo303AttrLot").val() || "") : "";
+            var serno = info.IsSerNo ? ($("#vasPo303AttrSerNo").val() || "") : "";
+            var guarantee = info.IsGuaranteeDate ? ($("#vasPo303AttrGuarantee").val() || "") : "";
             if (lot) labelParts.push(lbl("VAS_107_Lot", "Lot") + ": " + lot);
             if (serno) labelParts.push(lbl("VAS_107_SerialNo", "Serial No") + ": " + serno);
             if (!values.length && !lot && !serno && !guarantee) {
@@ -4389,7 +4364,7 @@
 
             showBusy(true);
             $.ajax({
-                url: VIS.Application.contextUrl + "VAS_107_CreateOrderBottomPanel/SaveAttribute",
+                url: VIS.Application.contextUrl + "VAS_303_PurchaseOrderBottom/SaveAttribute",
                 type: "POST", dataType: "json",
                 // editAsi set -> UPDATE that instance in place; else create a new one.
                 data: { payload: JSON.stringify({ M_Product_ID: line.values.M_Product_ID,
@@ -4414,34 +4389,34 @@
             if (blockedByDirtyHeader()) return;       // unsaved header edit — save the tab first
             closeDialogs();
             scanState = { rows: [], input: "", error: "" };
-            var backdrop = $('<div class="vas-obl-dialog-backdrop" id="vasOblScan"></div>');
-            var dialog = $('<div class="vas-obl-dialog vas-obl-dialog--wide"></div>');
+            var backdrop = $('<div class="vas-po303-dialog-backdrop" id="vasPo303Scan"></div>');
+            var dialog = $('<div class="vas-po303-dialog vas-po303-dialog--wide"></div>');
             dialog.html(
-                '<header class="vas-obl-dialog__header">' +
-                '<div class="vas-obl-dialog__header-row"><div class="vas-obl-dialog__title-block">' + icon("scan-line", "▭") + '<h3 class="vas-obl-dialog__title">' + esc(lbl("VAS_107_QuickAddBarcode", "Quick add by barcode")) + "</h3></div>" +
-                '<p class="vas-obl-dialog__hint">' + esc(lbl("VAS_107_ScanToReviewSubmit", "Scan to add · review · submit")) + "</p></div>" +
-                '<p class="vas-obl-dialog__sub">' + esc(lbl("VAS_107_ScanHint", "Scan a product barcode; items collect below. Duplicate scans increase quantity.")) + "</p>" +
-                '<div class="vas-obl-scan-input"><button type="button" class="vas-obl-scan-input__icon" data-act="sim-scan" title="' + esc(lbl("VAS_107_SimulateScan", "Simulate scan")) + '">' + icon("scan-line", "▭") + "</button>" +
-                '<input type="text" id="vasOblScanInput" placeholder="' + esc(lbl("VAS_107_ListeningScans", "Listening for scans… (type a code + Enter)")) + '" autocomplete="off" /></div>' +
-                '<p class="vas-obl-dialog__error vas-obl-is-hidden" id="vasOblScanError"></p></header>' +
-                '<div class="vas-obl-dialog__body vas-obl-dialog__body--fixed">' +
-                '<div class="vas-obl-scan-empty" id="vasOblScanEmpty"><div class="vas-obl-scan-empty__badge">' + icon("scan-line", "▭") + "</div>" +
-                '<p class="vas-obl-scan-empty__title">' + esc(lbl("VAS_107_ScanToBegin", "Scan a barcode to begin")) + '</p><p class="vas-obl-scan-empty__hint">e.g. PRD-BLW-001 · CHG-INS-001</p></div>' +
-                '<div class="vas-obl-scan-grid vas-obl-is-hidden" id="vasOblScanGrid"><div class="vas-obl-scan-grid__head"><div>' + esc(lbl("VAS_107_Code", "Code")) + "</div><div>" + esc(lbl("VAS_107_ProductCharge", "Product / Charge")) +
-                "</div><div>" + esc(lbl("VAS_107_Status", "Status")) + "</div><div>" + esc(lbl("VAS_107_Qty", "Qty")) + '</div><div></div></div><div class="vas-obl-scan-grid__body" id="vasOblScanRows"></div></div></div>' +
-                '<footer class="vas-obl-dialog__footer"><p class="vas-obl-dialog__summary" id="vasOblScanSummary">' + esc(lbl("VAS_107_NoScans", "No scans yet")) + "</p>" +
-                '<div class="vas-obl-dialog__actions"><button type="button" class="vas-obl-btn vas-obl-btn--ghost" data-act="close-scan">' + esc(lbl("VAS_107_Cancel", "Cancel")) +
-                '</button><button type="button" class="vas-obl-btn vas-obl-btn--primary" data-act="submit-scan" disabled>' + esc(lbl("VAS_107_AddLines", "Add lines")) + "</button></div></footer>");
+                '<header class="vas-po303-dialog__header">' +
+                '<div class="vas-po303-dialog__header-row"><div class="vas-po303-dialog__title-block">' + icon("scan-line", "▭") + '<h3 class="vas-po303-dialog__title">' + esc(lbl("VAS_107_QuickAddBarcode", "Quick add by barcode")) + "</h3></div>" +
+                '<p class="vas-po303-dialog__hint">' + esc(lbl("VAS_107_ScanToReviewSubmit", "Scan to add · review · submit")) + "</p></div>" +
+                '<p class="vas-po303-dialog__sub">' + esc(lbl("VAS_107_ScanHint", "Scan a product barcode; items collect below. Duplicate scans increase quantity.")) + "</p>" +
+                '<div class="vas-po303-scan-input"><button type="button" class="vas-po303-scan-input__icon" data-act="sim-scan" title="' + esc(lbl("VAS_107_SimulateScan", "Simulate scan")) + '">' + icon("scan-line", "▭") + "</button>" +
+                '<input type="text" id="vasPo303ScanInput" placeholder="' + esc(lbl("VAS_107_ListeningScans", "Listening for scans… (type a code + Enter)")) + '" autocomplete="off" /></div>' +
+                '<p class="vas-po303-dialog__error vas-po303-is-hidden" id="vasPo303ScanError"></p></header>' +
+                '<div class="vas-po303-dialog__body vas-po303-dialog__body--fixed">' +
+                '<div class="vas-po303-scan-empty" id="vasPo303ScanEmpty"><div class="vas-po303-scan-empty__badge">' + icon("scan-line", "▭") + "</div>" +
+                '<p class="vas-po303-scan-empty__title">' + esc(lbl("VAS_107_ScanToBegin", "Scan a barcode to begin")) + '</p><p class="vas-po303-scan-empty__hint">e.g. PRD-BLW-001 · CHG-INS-001</p></div>' +
+                '<div class="vas-po303-scan-grid vas-po303-is-hidden" id="vasPo303ScanGrid"><div class="vas-po303-scan-grid__head"><div>' + esc(lbl("VAS_107_Code", "Code")) + "</div><div>" + esc(lbl("VAS_107_ProductCharge", "Product / Charge")) +
+                "</div><div>" + esc(lbl("VAS_107_Status", "Status")) + "</div><div>" + esc(lbl("VAS_107_Qty", "Qty")) + '</div><div></div></div><div class="vas-po303-scan-grid__body" id="vasPo303ScanRows"></div></div></div>' +
+                '<footer class="vas-po303-dialog__footer"><p class="vas-po303-dialog__summary" id="vasPo303ScanSummary">' + esc(lbl("VAS_107_NoScans", "No scans yet")) + "</p>" +
+                '<div class="vas-po303-dialog__actions"><button type="button" class="vas-po303-btn vas-po303-btn--ghost" data-act="close-scan">' + esc(lbl("VAS_107_Cancel", "Cancel")) +
+                '</button><button type="button" class="vas-po303-btn vas-po303-btn--primary" data-act="submit-scan" disabled>' + esc(lbl("VAS_107_AddLines", "Add lines")) + "</button></div></footer>");
             backdrop.append(dialog);
             $("body").append(backdrop);
 
             backdrop.on("mousedown", function (e) { if (e.target === backdrop[0]) closeDialogs(); });
-            var $field = dialog.find("#vasOblScanInput");
+            var $field = dialog.find("#vasPo303ScanInput");
             $field.on("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); handleScan($field.val()); $field.val(""); } });
             dialog.on("click", "[data-act=sim-scan]", function () { $field.focus(); });
             dialog.on("click", "[data-act=close-scan]", closeDialogs);
             dialog.on("click", "[data-act=submit-scan]", submitScan);
-            dialog.on("click", ".vas-obl-scan-del", function () { var id = $(this).attr("data-id"); scanState.rows = scanState.rows.filter(function (r) { return r.id !== id; }); renderScanRows(); });
+            dialog.on("click", ".vas-po303-scan-del", function () { var id = $(this).attr("data-id"); scanState.rows = scanState.rows.filter(function (r) { return r.id !== id; }); renderScanRows(); });
             dialog.on("click", "[data-qminus]", function () { stepScan($(this).attr("data-qminus"), -1); });
             dialog.on("click", "[data-qplus]", function () { stepScan($(this).attr("data-qplus"), 1); });
             dialog.on("input", "[data-qinput]", function () { var r = scanRow($(this).attr("data-qinput")); if (r) r.qty = ($(this).val().replace(/[^0-9]/g, "") || "1"); });
@@ -4455,7 +4430,7 @@
             var existing = scanState.rows.filter(function (r) { return r.code.toLowerCase() === code.toLowerCase(); })[0];
             if (existing) { existing.qty = String((parseInt(existing.qty || "1", 10) || 1) + 1); renderScanRows(); return; }
             $.ajax({
-                url: VIS.Application.contextUrl + "VAS_107_CreateOrderBottomPanel/ScanLookup",
+                url: VIS.Application.contextUrl + "VAS_303_PurchaseOrderBottom/ScanLookup",
                 type: "GET", dataType: "json", data: { C_Order_ID: parent.C_Order_ID, code: code },
                 success: function (raw) {
                     var it = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
@@ -4468,32 +4443,32 @@
         }
 
         function renderScanRows() {
-            var d = $("#vasOblScan"); if (!d.length) return;
-            var err = d.find("#vasOblScanError");
-            err.toggleClass("vas-obl-is-hidden", !scanState.error).text(scanState.error);
-            var empty = d.find("#vasOblScanEmpty"), grid = d.find("#vasOblScanGrid");
-            if (!scanState.rows.length) { empty.removeClass("vas-obl-is-hidden"); grid.addClass("vas-obl-is-hidden"); }
+            var d = $("#vasPo303Scan"); if (!d.length) return;
+            var err = d.find("#vasPo303ScanError");
+            err.toggleClass("vas-po303-is-hidden", !scanState.error).text(scanState.error);
+            var empty = d.find("#vasPo303ScanEmpty"), grid = d.find("#vasPo303ScanGrid");
+            if (!scanState.rows.length) { empty.removeClass("vas-po303-is-hidden"); grid.addClass("vas-po303-is-hidden"); }
             else {
-                empty.addClass("vas-obl-is-hidden"); grid.removeClass("vas-obl-is-hidden");
-                var body = d.find("#vasOblScanRows"); body.empty();
+                empty.addClass("vas-po303-is-hidden"); grid.removeClass("vas-po303-is-hidden");
+                var body = d.find("#vasPo303ScanRows"); body.empty();
                 scanState.rows.forEach(function (r) {
                     var matched = !!r.item;
                     var badge = matched ? (r.item.Kind === "C" ? "charge" : "product") : "danger";
                     var blabel = matched ? (r.item.Kind === "C" ? lbl("VAS_107_Charge", "Charge") : lbl("VAS_107_Product", "Product")) : lbl("VAS_107_Unknown", "Unknown");
-                    var row = $('<div class="vas-obl-scan-grid__row' + (matched ? "" : " is-unknown") + '"></div>');
-                    row.html('<span class="vas-obl-scan-grid__code">' + esc(r.code) + '</span><span class="vas-obl-scan-grid__name">' + esc(matched ? r.item.DisplayName : "—") +
-                        '</span><span class="vas-obl-badge vas-obl-badge--' + badge + '">' + esc(blabel) + "</span>" +
-                        '<div class="vas-obl-qty-stepper"><button type="button" data-qminus="' + r.id + '" ' + (!matched || parseInt(r.qty, 10) <= 1 ? "disabled" : "") + ">−</button>" +
+                    var row = $('<div class="vas-po303-scan-grid__row' + (matched ? "" : " is-unknown") + '"></div>');
+                    row.html('<span class="vas-po303-scan-grid__code">' + esc(r.code) + '</span><span class="vas-po303-scan-grid__name">' + esc(matched ? r.item.DisplayName : "—") +
+                        '</span><span class="vas-po303-badge vas-po303-badge--' + badge + '">' + esc(blabel) + "</span>" +
+                        '<div class="vas-po303-qty-stepper"><button type="button" data-qminus="' + r.id + '" ' + (!matched || parseInt(r.qty, 10) <= 1 ? "disabled" : "") + ">−</button>" +
                         '<input type="text" inputmode="numeric" data-qinput="' + r.id + '" value="' + esc(r.qty) + '" ' + (matched ? "" : "disabled") + ' />' +
                         '<button type="button" data-qplus="' + r.id + '" ' + (matched ? "" : "disabled") + ">+</button></div>" +
-                        '<button type="button" class="vas-obl-icon-btn--danger vas-obl-scan-del" data-id="' + r.id + '">' + icon("trash", "🗑") + "</button>");
+                        '<button type="button" class="vas-po303-icon-btn--danger vas-po303-scan-del" data-id="' + r.id + '">' + icon("trash", "🗑") + "</button>");
                     body.append(row);
                 });
             }
             var matched = scanState.rows.filter(function (r) { return !!r.item; });
             var units = matched.reduce(function (a, r) { return a + (parseInt(r.qty || "0", 10) || 0); }, 0);
             var unknown = scanState.rows.length - matched.length;
-            d.find("#vasOblScanSummary").text(!scanState.rows.length ? lbl("VAS_107_NoScans", "No scans yet")
+            d.find("#vasPo303ScanSummary").text(!scanState.rows.length ? lbl("VAS_107_NoScans", "No scans yet")
                 : matched.length + " " + lbl("VAS_107_Matched", "matched") + " · " + units + " " + lbl("VAS_107_Units", "unit(s)") + (unknown > 0 ? " · " + unknown + " " + lbl("VAS_107_Unknown", "unknown") : ""));
             d.find("[data-act=submit-scan]").prop("disabled", matched.length === 0).text(lbl("VAS_107_AddLines", "Add lines") + (matched.length ? " (" + matched.length + ")" : ""));
         }
@@ -4629,7 +4604,7 @@
             batch.forEach(function (l) { l._saving = true; setRowBusy(l, true, lbl("VAS_107_Saving", "Saving…")); });
             renderHeaderButtons();   // the batch no longer counts as "unsaved" -> Save mutes
             $.ajax({
-                url: VIS.Application.contextUrl + "VAS_107_CreateOrderBottomPanel/SaveLines",
+                url: VIS.Application.contextUrl + "VAS_303_PurchaseOrderBottom/SaveLines",
                 type: "POST", dataType: "json", data: { payload: JSON.stringify({ C_Order_ID: parent.C_Order_ID, AD_Window_ID: $self.AD_Window_ID || 0, Page: linePage, Lines: rows }) },
                 success: function (raw) {
                     batch.forEach(function (l) { l._saving = false; });
@@ -4669,7 +4644,7 @@
                 if (batch.length) batch[0]._error = msg; else showToast(msg);
             }
             render();
-            var $first = $linesBody.find(".vas-obl-row--line.is-invalid").first();
+            var $first = $linesBody.find(".vas-po303-row--line.is-invalid").first();
             if ($first.length && $first[0].scrollIntoView) $first[0].scrollIntoView({ block: "nearest" });
         }
 
@@ -4747,7 +4722,7 @@
             if (!ids.length) { render(); return; }
             showBusy(true);
             $.ajax({
-                url: VIS.Application.contextUrl + "VAS_107_CreateOrderBottomPanel/DeleteLines",
+                url: VIS.Application.contextUrl + "VAS_303_PurchaseOrderBottom/DeleteLines",
                 type: "POST", dataType: "json", data: { payload: JSON.stringify({ C_Order_ID: parent.C_Order_ID, AD_Window_ID: $self.AD_Window_ID || 0, Page: linePage, LineIds: ids }) },
                 success: function (raw) {
                     showBusy(false);
@@ -4760,11 +4735,23 @@
         }
 
         /* ---------- misc ---------- */
+        /* Own copy of VAS.PanelUtil.showToast: the shared helper's fallback toast carries
+           the VAS_107 class, which only VAS_107's stylesheet styles. */
         function showToast(msg) {
-            VAS.PanelUtil.showToast(msg);
+            if (window.VIS && VIS.ADD && typeof VIS.ADD.Notification === "function") {
+                VIS.ADD.Notification(msg);
+                return;
+            }
+            var $t = $('<div class="vas-po303-toast"></div>').text(msg);
+            $("body").append($t);
+            setTimeout(function () { $t.addClass("vas-po303-toast--show"); }, 10);
+            setTimeout(function () {
+                $t.removeClass("vas-po303-toast--show");
+                setTimeout(function () { $t.remove(); }, 300);
+            }, 2600);
         }
 
-        function closeDialogs() { $("#vasOblAttr, #vasOblScan, #vasOblMore, #vasOblConfirm").remove(); attrState = null; scanState = null; morePopoverFor = null; }
+        function closeDialogs() { $("#vasPo303Attr, #vasPo303Scan, #vasPo303More, #vasPo303Confirm").remove(); attrState = null; scanState = null; morePopoverFor = null; }
 
         function onDocMouseDown(e) {
             // The additional-fields modal manages its own outside-click (backdrop); no
@@ -4772,7 +4759,7 @@
         }
 
         // Escape closes the top-most open dialog / popover.
-        $(document).on("keydown.vascil", function (e) {
+        $(document).on("keydown.vaspo303", function (e) {
             if (e.key !== "Escape") return;
             if (scanState) { closeDialogs(); return; }
             if (attrState) { closeDialogs(); return; }
@@ -4788,7 +4775,7 @@
             if (!line || !editing || editing.rowId !== line.rowId) return false;
             var f = editing.field;
             if (f !== "description" && f !== "quantity" && f !== "price") return false;
-            var $inp = $linesBody.find('[data-rowid="' + line.rowId + '"] .vas-obl-cell-edit.is-editing input').first();
+            var $inp = $linesBody.find('[data-rowid="' + line.rowId + '"] .vas-po303-cell-edit.is-editing input').first();
             if (!$inp.length) return false;
             var raw = $inp.val(), v = line.values;
             if (f === "description") return !sameVal(v.Description, raw);
@@ -4807,22 +4794,22 @@
         }
 
         function openRefreshConfirm() {
-            $("#vasOblConfirm").remove();
-            var $bd = $('<div class="vas-obl-dialog-backdrop" id="vasOblConfirm"></div>');
-            var $dlg = $('<div class="vas-obl-dialog vas-obl-dialog--confirm" role="alertdialog" aria-modal="true"></div>');
+            $("#vasPo303Confirm").remove();
+            var $bd = $('<div class="vas-po303-dialog-backdrop" id="vasPo303Confirm"></div>');
+            var $dlg = $('<div class="vas-po303-dialog vas-po303-dialog--confirm" role="alertdialog" aria-modal="true"></div>');
             $dlg.html(
-                '<header class="vas-obl-dialog__header"><div class="vas-obl-dialog__header-row">' +
-                '<h3 class="vas-obl-dialog__title">' + esc(lbl("VAS_107_UnsavedTitle", "Unsaved changes")) + "</h3></div></header>" +
-                '<div class="vas-obl-dialog__body"><p class="vas-obl-confirm-text">' +
+                '<header class="vas-po303-dialog__header"><div class="vas-po303-dialog__header-row">' +
+                '<h3 class="vas-po303-dialog__title">' + esc(lbl("VAS_107_UnsavedTitle", "Unsaved changes")) + "</h3></div></header>" +
+                '<div class="vas-po303-dialog__body"><p class="vas-po303-confirm-text">' +
                 esc(lbl("VAS_107_UnsavedRefresh", "You have unsaved line changes. Save them before refreshing?")) + "</p></div>" +
-                '<footer class="vas-obl-dialog__footer vas-obl-dialog__footer--end">' +
-                '<button type="button" class="vas-obl-btn vas-obl-btn--ghost" data-act="cf-cancel">' + esc(lbl("VAS_107_Cancel", "Cancel")) + "</button>" +
-                '<button type="button" class="vas-obl-btn vas-obl-btn--outline" data-act="cf-discard">' + esc(lbl("VAS_107_Discard", "Discard")) + "</button>" +
-                '<button type="button" class="vas-obl-btn vas-obl-btn--primary" data-act="cf-save">' + esc(lbl("VAS_107_Save", "Save")) + "</button>" +
+                '<footer class="vas-po303-dialog__footer vas-po303-dialog__footer--end">' +
+                '<button type="button" class="vas-po303-btn vas-po303-btn--ghost" data-act="cf-cancel">' + esc(lbl("VAS_107_Cancel", "Cancel")) + "</button>" +
+                '<button type="button" class="vas-po303-btn vas-po303-btn--outline" data-act="cf-discard">' + esc(lbl("VAS_107_Discard", "Discard")) + "</button>" +
+                '<button type="button" class="vas-po303-btn vas-po303-btn--primary" data-act="cf-save">' + esc(lbl("VAS_107_Save", "Save")) + "</button>" +
                 "</footer>");
             $bd.append($dlg);
             $("body").append($bd);
-            function close() { $("#vasOblConfirm").remove(); }
+            function close() { $("#vasPo303Confirm").remove(); }
             $dlg.on("click", "[data-act=cf-cancel]", function () { close(); });
             $dlg.on("click", "[data-act=cf-discard]", function () {
                 close();
@@ -4873,9 +4860,9 @@
              */
             hasBlockingDialog: function () {
                 return !!(attrState || scanState || morePopoverFor ||
-                          document.getElementById("vasOblAttr") ||
-                          document.getElementById("vasOblScan") ||
-                          document.getElementById("vasOblConfirm"));
+                          document.getElementById("vasPo303Attr") ||
+                          document.getElementById("vasPo303Scan") ||
+                          document.getElementById("vasPo303Confirm"));
             },
             /** Alt+Ctrl+N — add a new line, same as the Add button. */
             onNew: function () { addLine(); },
@@ -4943,7 +4930,7 @@
         this.unpark = function () {
             if (!$self._parked) return;
             $self._parked = false;
-            if ($root) $root.removeClass("vas-obl-is-hidden");
+            if ($root) $root.removeClass("vas-po303-is-hidden");
             registerShortcuts();
             var rec = $self._parkedRecord;
             $self._parkedRecord = null;
@@ -4951,7 +4938,7 @@
         };
     };
 
-    VAS.VAS_107_CreateOrderBottomPanel.prototype.startPanel = function (windowNo, curTab) {
+    VAS.VAS_303_PurchaseOrderBottom.prototype.startPanel = function (windowNo, curTab) {
         this.windowNo = windowNo;
         this.curTab = curTab;
         if (curTab && typeof curTab.getAD_Table_ID === "function") this.table_ID = curTab.getAD_Table_ID();
@@ -4976,7 +4963,7 @@
         this._disposed = false;
         this.init();
         if (this._parked) {
-            this.getRoot().addClass("vas-obl-is-hidden");
+            this.getRoot().addClass("vas-po303-is-hidden");
             if (!live._parkedTwins) live._parkedTwins = [];
             live._parkedTwins.push(this);
         } else {
@@ -4989,7 +4976,7 @@
         }
     };
 
-    VAS.VAS_107_CreateOrderBottomPanel.prototype.refreshPanelData = function (recordID, selectedRow) {
+    VAS.VAS_303_PurchaseOrderBottom.prototype.refreshPanelData = function (recordID, selectedRow) {
         this._everRefreshed = true;   // the host has shown this panel (see startPanel's stale test)
         if (this._parked) {
             // Remember only, for a take-over: > 0 a record, 0 a new unsaved row, -1 none.
@@ -5013,13 +5000,13 @@
        resize the framework calls viewManager.sizeChanged(h, window.innerwidth) - lower-case
        "w", so the value is undefined. Both are recorded for completeness, but the actual
        re-fit re-measures from the DOM instead of believing either number. */
-    VAS.VAS_107_CreateOrderBottomPanel.prototype.sizeChanged = function (height, width) {
+    VAS.VAS_303_PurchaseOrderBottom.prototype.sizeChanged = function (height, width) {
         this.panelHeight = height;
         this.panelWidth = width;
         if (typeof this.fitHostWidth === "function") this.fitHostWidth();
     };
 
-    VAS.VAS_107_CreateOrderBottomPanel.prototype.dispose = function () {
+    VAS.VAS_303_PurchaseOrderBottom.prototype.dispose = function () {
         var wasParked = !!this._parked;
         this._disposed = true;
         // Remove the capture-phase shortcut listener registered during init (VAI154 12-Aug-2026).
@@ -5044,9 +5031,9 @@
         // A parked twin owns none of the shared document / dialog state - leave the live
         // panel's handlers and dialogs alone.
         if (!wasParked) {
-            $(document).off("mousedown.vascil").off("keydown.vascil");
-            $(window).off("resize.vasobl107").off("resize.vasoblcat");
-            $("#vasOblAttr, #vasOblScan, #vasOblMore, #vasOblConfirm, .vas-obl-toast, .vas-obl-catalog-popover--fixed").remove();
+            $(document).off("mousedown.vaspo303").off("keydown.vaspo303");
+            $(window).off("resize.vaspo303").off("resize.vaspo303cat");
+            $("#vasPo303Attr, #vasPo303Scan, #vasPo303More, #vasPo303Confirm, .vas-po303-toast, .vas-po303-catalog-popover--fixed").remove();
         }
         if (next) { try { next.unpark(); } catch (e) { if (window.console) console.log(e); } }
         this.record_ID = 0; this.table_ID = 0; this.windowNo = 0;

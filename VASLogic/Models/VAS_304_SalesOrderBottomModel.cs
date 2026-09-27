@@ -1,6 +1,6 @@
 /******************************************************
  * Module Name    : VASLogic
- * Purpose        : Backing model for the VAS_107_CreateOrderBottomPanel tab
+ * Purpose        : Backing model for the VAS_304_SalesOrderBottom tab
  *                  panel. Provides parent-order context and existing lines,
  *                  paged Product / Charge catalog search (50 rows / scroll),
  *                  the server-side line callout (price / tax / amount), product
@@ -9,6 +9,12 @@
  *                  write actions (always through the MOrderLine business class).
  * Chronological  : Development
  *   VAI154         Created  09-Jul-2026
+ *   VAI163         24-Sep-2026 Split out of VAS_107_CreateOrderBottomPanelModel for the
+ *                  Sales Order screen only. Lives in VASLogic.Models.VAS_304 so its data
+ *                  classes never collide with VAS_107's in VASLogic.Models.
+ *   VAI163         25-Sep-2026 C_DocTypeTarget_ID carried on the panel data, so the
+ *                  panel re-fetches when a saved header changes the document type
+ *                  (IsReleaseDocument drives the blanket catalog / line match).
  ******************************************************/
 
 using System;
@@ -24,7 +30,7 @@ using VAdvantage.Model;
 using VAdvantage.Utility;
 using VIS.Models;
 
-namespace VASLogic.Models
+namespace VASLogic.Models.VAS_304
 {
     /// <summary>
     /// Module Name : VASLogic
@@ -37,9 +43,9 @@ namespace VASLogic.Models
     /// Chronological development:
     ///   VAI154         Created  09-Jul-2026
     /// </summary>
-    public class VAS_107_CreateOrderBottomPanelModel
+    public class VAS_304_SalesOrderBottomModel
     {
-        private static VLogger log = VLogger.GetVLogger(typeof(VAS_107_CreateOrderBottomPanelModel).FullName);
+        private static VLogger log = VLogger.GetVLogger(typeof(VAS_304_SalesOrderBottomModel).FullName);
 
         /// <summary>First page size for the Product / Charge catalog search.</summary>
         private const int CATALOG_PAGE_SIZE = 50;
@@ -906,6 +912,7 @@ namespace VASLogic.Models
                               o.C_BPartner_ID,
                               o.C_BPartner_Location_ID,
                               o.M_PriceList_ID,
+                              COALESCE(o.C_DocTypeTarget_ID, 0) AS C_DocTypeTarget_ID,
                               o.C_Currency_ID,
                               o.DateOrdered,
                               o.DateAcct,
@@ -936,6 +943,7 @@ namespace VASLogic.Models
             data.C_BPartner_ID = Util.GetValueOfInt(r["C_BPartner_ID"]);
             data.C_BPartner_Location_ID = Util.GetValueOfInt(r["C_BPartner_Location_ID"]);
             data.M_PriceList_ID = Util.GetValueOfInt(r["M_PriceList_ID"]);
+            data.C_DocTypeTarget_ID = Util.GetValueOfInt(r["C_DocTypeTarget_ID"]);
             data.C_Currency_ID = Util.GetValueOfInt(r["C_Currency_ID"]);
             data.DateOrdered = Util.GetValueOfDateTime(r["DateOrdered"]);
             data.DateAcct = Util.GetValueOfDateTime(r["DateAcct"]);
@@ -1426,7 +1434,7 @@ namespace VASLogic.Models
             }, null);
             if (ds == null || ds.Tables.Count == 0)
             {
-                log.Severe("VAS_107 SearchProductsCharges SQL failed. Term: " + like);
+                log.Severe("VAS_304 SearchProductsCharges SQL failed. Term: " + like);
                 return items;
             }
 
@@ -1627,7 +1635,7 @@ namespace VASLogic.Models
                     id = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_Order_Blanket FROM C_Order WHERE C_Order_ID = @id",
                         new SqlParameter[] { new SqlParameter("@id", C_Order_ID) }, null));
                 }
-                catch (Exception e) { _blanketHeaderFailed = true; log.Warning("VAS_107 C_Order_Blanket unreadable: " + e.Message); }
+                catch (Exception e) { _blanketHeaderFailed = true; log.Warning("VAS_304 C_Order_Blanket unreadable: " + e.Message); }
             }
             if (id > 0) return id;
             try
@@ -1638,7 +1646,7 @@ namespace VASLogic.Models
                       WHERE ol.C_Order_ID = @id",
                     new SqlParameter[] { new SqlParameter("@id", C_Order_ID) }, null));
             }
-            catch (Exception e) { log.Warning("VAS_107 blanket from lines: " + e.Message); return 0; }
+            catch (Exception e) { log.Warning("VAS_304 blanket from lines: " + e.Message); return 0; }
         }
 
         /// <summary>
@@ -1755,7 +1763,7 @@ namespace VASLogic.Models
 
             if (frag.IndexOf('@') >= 0)
             {
-                log.Warning("VAS_107 val rule skipped for " + columnName + " (unresolved context): " + code);
+                log.Warning("VAS_304 val rule skipped for " + columnName + " (unresolved context): " + code);
                 return "";
             }
             return frag;
@@ -2089,7 +2097,7 @@ namespace VASLogic.Models
                     }
                     line.Set_Value(col, val);
                 }
-                catch (Exception ex) { log.Warning("VAS_107 SaveLines: skip column " + col + " - " + ex.Message); }
+                catch (Exception ex) { log.Warning("VAS_304 SaveLines: skip column " + col + " - " + ex.Message); }
             }
         }
 
@@ -2441,7 +2449,7 @@ namespace VASLogic.Models
                 return res;
             }
 
-            Trx trx = Trx.GetTrx(Trx.CreateTrxName("VAS107Save_" + C_Order_ID));
+            Trx trx = Trx.GetTrx(Trx.CreateTrxName("VAS304Save_" + C_Order_ID));
             try
             {
                 MOrder order = new MOrder(ctx, C_Order_ID, trx);
@@ -2521,7 +2529,7 @@ namespace VASLogic.Models
                                 val = Msg.GetMsg(ctx, pp.GetValue());
                             err = val;
                         }
-                        log.Warning("VAS_107 SaveLines: line save failed (Line " + input.Line + ") - " + err);
+                        log.Warning("VAS_304 SaveLines: line save failed (Line " + input.Line + ") - " + err);
                         res.LineErrors.Add(new OrderLineSaveError
                         {
                             RowKey = input.RowKey,
@@ -2545,7 +2553,7 @@ namespace VASLogic.Models
             catch (Exception ex)
             {
                 trx.Rollback();
-                log.Log(Level.SEVERE, "VAS_107 SaveLines failed", ex);
+                log.Log(Level.SEVERE, "VAS_304 SaveLines failed", ex);
                 res.ErrorKey = "VAS_107_SaveFailed";
                 res.ErrorDetail = ex.Message;
                 return res;
@@ -2584,7 +2592,7 @@ namespace VASLogic.Models
             if (ctxData.C_Order_ID <= 0) { res.ErrorKey = "VAS_107_NoAccess"; return res; }
             if (!ctxData.IsEditable) { res.ErrorKey = "VAS_107_OrderNotEditable"; return res; }
 
-            Trx trx = Trx.GetTrx(Trx.CreateTrxName("VAS107Delete_" + C_Order_ID));
+            Trx trx = Trx.GetTrx(Trx.CreateTrxName("VAS304Delete_" + C_Order_ID));
             try
             {
                 foreach (int id in lineIds)
@@ -2608,7 +2616,7 @@ namespace VASLogic.Models
                             else
                                 err = val;
                         }
-                        log.Warning("VAS_107 DeleteLines: delete failed for line " + id);
+                        log.Warning("VAS_304 DeleteLines: delete failed for line " + id);
                         res.ErrorKey = err;
                         return res;
                     }
@@ -2618,7 +2626,7 @@ namespace VASLogic.Models
             catch (Exception ex)
             {
                 trx.Rollback();
-                log.Log(Level.SEVERE, "VAS_107 DeleteLines failed", ex);
+                log.Log(Level.SEVERE, "VAS_304 DeleteLines failed", ex);
                 res.ErrorKey = "VAS_107_DeleteFailed";
                 res.ErrorDetail = ex.Message;
                 return res;
@@ -2651,7 +2659,7 @@ namespace VASLogic.Models
         #endregion
     }
 
-    #region Data contracts — VAS_107 specific
+    #region Data contracts — VAS_304 specific
 
     /// <summary>Parent order context + saved lines returned to the panel on load.</summary>
     public class CreateOrderPanelData
@@ -2662,6 +2670,12 @@ namespace VASLogic.Models
         public int C_BPartner_ID { get; set; }
         public int C_BPartner_Location_ID { get; set; }
         public int M_PriceList_ID { get; set; }
+        /// <summary>
+        /// C_Order.C_DocTypeTarget_ID as loaded. The panel compares it with the tab's live
+        /// value and re-fetches when a SAVED header changed it, so the release-order rules
+        /// (IsReleaseDoc) never run on a stale document type.
+        /// </summary>
+        public int C_DocTypeTarget_ID { get; set; }
         public int C_Currency_ID { get; set; }
         public DateTime? DateOrdered { get; set; }
         public DateTime? DateAcct { get; set; }

@@ -124,6 +124,51 @@ namespace VAS.Controllers
         }
 
         /// <summary>
+        /// One line of the delivery's sales order, for the panel to fill a delivery line
+        /// from once it is picked as the Order Line (25-Sep-2026). Empty when the line is
+        /// not on the delivery's own order.
+        /// </summary>
+        /// <param name="M_InOut_ID">delivery</param>
+        /// <param name="C_OrderLine_ID">order line picked</param>
+        /// <returns>serialized DeliveryOrderLineData</returns>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetOrderLine(int M_InOut_ID, int C_OrderLine_ID)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                VAS_248_DeliveryOrderBottomPanelModel model = new VAS_248_DeliveryOrderBottomPanelModel();
+                retJSON = JsonConvert.SerializeObject(model.GetOrderLine(ctx, M_InOut_ID, C_OrderLine_ID));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>
+        /// The delivery's sales-order line a product / charge and quantity ship against
+        /// (25-Sep-2026) - see the model's FindOrderLine for the choice.
+        /// </summary>
+        /// <param name="M_InOut_ID">delivery</param>
+        /// <param name="M_Product_ID">product on the line, or 0</param>
+        /// <param name="C_Charge_ID">charge on the line, or 0</param>
+        /// <param name="QtyEntered">quantity entered on the line</param>
+        /// <returns>serialized DeliveryOrderLineData (C_OrderLine_ID 0 when none)</returns>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult FindOrderLine(int M_InOut_ID, int M_Product_ID, int C_Charge_ID, decimal QtyEntered)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                VAS_248_DeliveryOrderBottomPanelModel model = new VAS_248_DeliveryOrderBottomPanelModel();
+                retJSON = JsonConvert.SerializeObject(model.FindOrderLine(ctx, M_InOut_ID, M_Product_ID, C_Charge_ID, QtyEntered));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>
         /// Reads the changed column's AD_Column.Callout and returns the values the framework
         /// derives — the line's unit and the base-unit MovementQty — as a patch the client
         /// applies back onto the line. No row is written.
