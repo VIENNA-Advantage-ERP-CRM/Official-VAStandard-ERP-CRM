@@ -9,6 +9,13 @@
  *  1 | Spares / Consumables            | VAS_182_SparesConsumables
  *  2 | Of issued value MTD             | VAS_182_OfIssuedValueMTD
  *  3 | Couldn't load                   | VAS_182_CouldntLoad
+ *
+ * NOTE (2026-09-18, Claude): setupResizeObserver()/--widget-inline-size removed from
+ * Initalize() to match VAS_180_IssuedMTDWidget's label/value/meta size. VAS_180 never
+ * scopes --widget-inline-size to its own card, so its font-size clamp() falls through
+ * to the dashboard-wide --dash-inline-size and lands near the clamp's midpoint
+ * (~18.4px); this widget's own --widget-inline-size was scoped to its ~300px card,
+ * which is small enough that the clamp always bottomed out at its 16px floor instead.
  */
 ; VAS = window.VAS || {};
 
@@ -109,11 +116,13 @@
 // ===== NEW CODE START — currency format (agent A04, 2026-08-19) =====
         var currencyIso = '';
         var currencySymbol = '';
+        // Work-order columns this installation actually has, reported by the KPI endpoint
+        // (they are manufacturing-module only and are absent on some databases).
+        var workOrderColumns = [];
 // ===== NEW CODE END — currency format =====
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return (translated && translated.charAt(0) !== '[') ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -139,7 +148,6 @@
 
         this.Initalize = function () {
             createWidget();
-            setupResizeObserver();
             loadKpi();
         };
 
@@ -185,6 +193,7 @@
                 success: function (res) {
                     var data = parseResponse(res);
                     if (data.error) { setError(); return; }
+                    if (data.workOrderColumns) { workOrderColumns = data.workOrderColumns; }
                     renderMetric(data);
                 },
                 error: function () { setError(); },
@@ -232,7 +241,7 @@
                 $valueEl.attr('title', pct + '%');
             }
             if ($metaEl) {
-                $metaEl.text(label("VAS_OfIssuedValueMTD", "Of issued value MTD"));
+                $metaEl.text(label("VAS_182_OfIssuedValueMTD", "Of issued value MTD"));
             }
             if ($card) { $card.prop('disabled', false); }
         }
@@ -272,26 +281,80 @@
         // current month that carry at least one spares / consumables line. The EXISTS predicate
         // mirrors the line-level classification in GetSparesConsumablesPercentageData() one-for-one,
         // so the list can never drift from the percentage on the tile.
-        // Portability: only columns present on every target DB are used here - the work-order
-        // columns (VA075_WorkOrder_ID / VAMFG_M_WorkOrder_ID) are module-specific and absent on
-        // DB 1, and an unresolved column makes the grid query throw instead of opening.
+        // Portability: the work-order columns (VA075_WorkOrder_ID / VAMFG_M_WorkOrder_ID) are
+        // manufacturing-module only and are absent on DB 1, so the controller reports which ones
+        // this installation actually has. With none of them every issue line is spares/consumables
+        // (the production KPI is a hard 0%), so the drill carries no work-order clause at all -
+        // an unresolved column would make the grid query throw instead of opening.
+        // Home-page fallback for openSparesConsumablesList(): there is no host window to relay
+        // a multi-record TabWhereClause to off-window, and VAS.ZoomUtil only supports zooming
+        // to a SINGLE record (see VAS_184/186/187's zoomToInventoryRecord). Landing on the
+        // newest matching document (ids[0], per GetSparesConsumablesIdsData's own ordering) is
+        // the closest available stand-in for "see the list" without inventing a new zoom
+        // capability. Resolves the Inventory Use window id once via VAS_178's existing
+        // GetMaterialIssueWindowId endpoint (shared with VAS_181/184/186/187), then caches it.
+        var inventoryUseWindowId = 0;
+
+        function zoomToFirstSparesConsumable(ids) {
+            var firstId = Number((ids && ids[0]) || 0);
+            if (!firstId || !window.VAS || !VAS.ZoomUtil) { return; }
+
+            if (inventoryUseWindowId > 0) {
+                VAS.ZoomUtil.zoomToRecord('M_Inventory_ID', firstId, inventoryUseWindowId, null, null);
+                return;
+            }
+
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_178_NewMaterialIssueQuickAction/GetMaterialIssueWindowId',
+                type: 'GET',
+                dataType: 'json',
+                cache: false,
+                success: function (res) {
+                    var data = parseResponse(res);
+                    inventoryUseWindowId = Number((data && data.windowId) || 0);
+                    if (inventoryUseWindowId > 0) {
+                        VAS.ZoomUtil.zoomToRecord('M_Inventory_ID', firstId, inventoryUseWindowId, null, null);
+                    }
+                }
+            });
+        }
+
         function openSparesConsumablesList() {
-            // Keep in lock-step with GetSparesConsumablesPercentageData in the controller, and the
-            // exact complement of the VAS_181 drill-through. The classification is line-level but
-            // this drills through at DOCUMENT level, so it is expressed as an EXISTS over the
-            // non-work-order issue lines.
-            var where = "M_Inventory.IsActive = 'Y' AND M_Inventory.DocStatus IN ('CO', 'CL')"
-                + " AND COALESCE(M_Inventory.IsInternalUse, 'N') = 'Y'"
-                + " AND EXISTS (SELECT 1 FROM M_InventoryLine il WHERE il.M_Inventory_ID = M_Inventory.M_Inventory_ID"
-                + " AND il.IsActive = 'Y' AND COALESCE(il.QtyInternalUse, 0) > 0"
-                + " AND COALESCE(il.VA075_WorkOrder_ID, 0) = 0 AND COALESCE(il.VAMFG_M_WorkOrder_ID, 0) = 0)"
-                + " AND M_Inventory.MovementDate >= TRUNC(SYSDATE, 'MM') AND M_Inventory.MovementDate < ADD_MONTHS(TRUNC(SYSDATE, 'MM'), 1)";
-            $self.widgetFirevalueChanged({
-                "TabWhereClause": where,
-                "TabLayout": "Y",
-                "TabIndex": "0",
-                "ActionName": hostWindowName() || "VAS_InternalUseInventory",
-                "ActionType": "W"
+            // Keep in lock-step with GetSparesConsumablesIdsData in the controller.
+            // The TabWhereClause is a flat M_Inventory_ID IN (...) list, NOT a
+            // correlated EXISTS(SELECT 1 FROM M_InventoryLine ...) subquery - the
+            // host window's own "duplicate DocumentNo" grid diagnostic does naive,
+            // parenthesis-unaware text surgery on the TabWhereClause looking for a
+            // FROM to lift out, and it mishandled the nested EXISTS(...) (confirmed
+            // via the app log: it produced malformed SQL and Oracle rejected it with
+            // ORA-00933, which is what was actually hanging this drill-through, the
+            // same bug VAS_181 hit and fixed the same way). A flat ID list has no
+            // FROM/subquery in it at all, so there is nothing for that diagnostic
+            // query to mishandle.
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_182_SparesConsumablesIssuesWidget/GetSparesConsumablesIds',
+                type: 'GET',
+                cache: false,
+                success: function (res) {
+                    var data = parseResponse(res);
+                    if (data.error) { return; }
+                    var ids = data.ids || [];
+
+                    if ($self.windowNo >= 0) {
+                        var idList = ids.length ? ids.join(',') : '-1';
+                        var where = "M_Inventory.M_Inventory_ID IN (" + idList + ")";
+                        $self.widgetFirevalueChanged({
+                            "TabWhereClause": where,
+                            "TabLayout": "N",
+                            "TabIndex": "0",
+                            "ActionName": hostWindowName() || "VAS_InternalUseInventory",
+                            "ActionType": "W"
+                        });
+                        return;
+                    }
+
+                    zoomToFirstSparesConsumable(ids);
+                }
             });
         }
 

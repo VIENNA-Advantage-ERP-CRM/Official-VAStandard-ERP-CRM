@@ -233,9 +233,7 @@
         // in '[...]'; when that happens we use `fallback` if one was supplied,
         // otherwise the raw '[KEY]' is kept.
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            if (t && t.charAt(0) !== '[') return t;
-            return (fallback !== undefined) ? fallback : t;
+            return VIS.Msg.getMsg(key);
         }
 
         function fmtAmount(value, precision) {
@@ -1754,7 +1752,7 @@
             var $head = $(
                 '<div class="' + CLS + 'm-head">' +
                 '<div><h2 class="js-title"></h2><div class="ms js-sub"></div></div>' +
-                '<button type="button" class="' + CLS + 'm-x" aria-label="Close"><i class="fa fa-times"></i></button>' +
+                '<button type="button" class="' + CLS + 'm-x" aria-label="' + escapeHtml(lbl("VAS_189_Close", "Close")) + '"><i class="fa fa-times"></i></button>' +
                 '</div>'
             );
             $head.find(".js-title").text(isCN ? lbl("VAS_189_AllocateCreditNote", "Allocate Credit Note")

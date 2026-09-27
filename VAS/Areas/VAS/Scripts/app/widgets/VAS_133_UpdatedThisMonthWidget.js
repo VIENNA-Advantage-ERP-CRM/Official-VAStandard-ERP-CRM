@@ -85,8 +85,7 @@
         var lastFocusedEl = null;
 
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            return (t && t.charAt(0) !== '[') ? t : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function pluralize(n, singularKey, singularFallback, pluralKey, pluralFallback) {
@@ -233,9 +232,7 @@
             panel.appendChild(foot);
             overlay.appendChild(panel);
 
-            overlay.addEventListener('mousedown', function (e) { if (e.target === overlay) { closeModal(); } });
             overlay.addEventListener('keydown', function (e) {
-                if (e.key === 'Escape') { closeModal(); return; }
                 if (e.key === 'Tab') {
                     var focusables = panel.querySelectorAll('button');
                     if (!focusables.length) { return; }
@@ -266,6 +263,9 @@
             summaryController = (typeof AbortController !== 'undefined') ? new AbortController() : null;
 
             var url = VIS.Application.contextUrl + 'VAS_133_UpdatedThisMonthWidget/GetSummary';
+            // Browser offset ((UTC - local) minutes) so the server resolves
+            // "this month" / "today" in the user's local time, not server time.
+            url += '?clientTzOffsetMinutes=' + encodeURIComponent(new Date().getTimezoneOffset());
             fetch(url, {
                 method: 'GET',
                 credentials: 'same-origin',
@@ -341,7 +341,10 @@
             pageController = (typeof AbortController !== 'undefined') ? new AbortController() : null;
             var myToken = ++pageToken;
 
-            var url = VIS.Application.contextUrl + 'VAS_133_UpdatedThisMonthWidget/GetPagedUpdates?offset=' + encodeURIComponent(offset) + '&pageSize=' + encodeURIComponent(PAGE_SIZE);
+            var url = VIS.Application.contextUrl + 'VAS_133_UpdatedThisMonthWidget/GetPagedUpdates?offset=' + encodeURIComponent(offset) + '&pageSize=' + encodeURIComponent(PAGE_SIZE)
+                // Same user-local time window as the tile, and displayed times
+                // shifted onto the user's clock by the server.
+                + '&clientTzOffsetMinutes=' + encodeURIComponent(new Date().getTimezoneOffset());
             fetch(url, {
                 method: 'GET',
                 credentials: 'same-origin',

@@ -72,16 +72,16 @@
  *                   5 | No budget variances found for the  | VAS_254_NoVariances
  *                     |   selected financial year.         |
  *                   6 | Budget                             | VAS_254_Budget
- *                   7 | Financial year                     | VAS_256_FinancialYear   (reuse)
- *                   8 | No financial years available       | VAS_256_NoYears         (reuse)
- *                   9 | No primary calendar is configured  | VAS_256_NoCalendar      (reuse)
- *                  10 | No primary accounting schema is    | VAS_256_NoAcctSchema    (reuse)
+ *                   7 | Financial year                     | VAS_254_FinancialYear   (reuse)
+ *                   8 | No financial years available       | VAS_254_NoYears         (reuse)
+ *                   9 | No primary calendar is configured  | VAS_254_NoCalendar      (reuse)
+ *                  10 | No primary accounting schema is    | VAS_254_NoAcctSchema    (reuse)
  *                     |   configured                       |
- *                  11 | Showing                            | VAS_020_Showing         (reuse)
- *                  12 | of                                 | VAS_020_Of              (reuse)
- *                  13 | Previous                           | VAS_020_Prev            (reuse)
- *                  14 | Next                               | VAS_020_Next            (reuse)
- *                  15 | Couldn't load                      | VAS_192_CouldntLoad     (reuse)
+ *                  11 | Showing                            | VAS_254_Showing         (reuse)
+ *                  12 | of                                 | VAS_254_Of              (reuse)
+ *                  13 | Previous                           | VAS_254_Prev            (reuse)
+ *                  14 | Next                               | VAS_254_Next            (reuse)
+ *                  15 | Couldn't load                      | VAS_254_CouldntLoad     (reuse)
  *
  * Chronological development:
  *   VAI154         Created  Date 2026-09-08
@@ -336,7 +336,7 @@
 
                     var data = parseResponse(raw);
                     if (!data || data.error) {
-                        renderState(label('VAS_192_CouldntLoad', "Couldn't load"));
+                        renderState(label('VAS_254_CouldntLoad', "Couldn't load"));
                         return;
                     }
 
@@ -348,7 +348,7 @@
                     }
 
                     if (!data.Loaded) {
-                        renderState(label('VAS_192_CouldntLoad', "Couldn't load"));
+                        renderState(label('VAS_254_CouldntLoad', "Couldn't load"));
                         return;
                     }
 
@@ -376,7 +376,7 @@
                     /* The overlay comes down on failure too - a spinner left running over
                        an error the user cannot see is the worst of both. */
                     hideBusyIndicator();
-                    renderState(label('VAS_192_CouldntLoad', "Couldn't load"));
+                    renderState(label('VAS_254_CouldntLoad', "Couldn't load"));
                 }
             });
         }
@@ -403,21 +403,21 @@
 
         function errorLabel(code) {
             if (code === 'NOCALENDAR') {
-                return label('VAS_256_NoCalendar', 'No primary calendar is configured');
+                return label('VAS_254_NoCalendar', 'No primary calendar is configured');
             }
             if (code === 'NOACCTSCHEMA') {
-                return label('VAS_256_NoAcctSchema', 'No primary accounting schema is configured');
+                return label('VAS_254_NoAcctSchema', 'No primary accounting schema is configured');
             }
             if (code === 'NOYEAR') {
-                return label('VAS_256_NoYears', 'No financial years available');
+                return label('VAS_254_NoYears', 'No financial years available');
             }
-            return label('VAS_192_CouldntLoad', "Couldn't load");
+            return label('VAS_254_CouldntLoad', "Couldn't load");
         }
 
         function paintYearLabel() {
             var text = _fiscalYear || yearNameOf(_yearId);
             $yearBtn.find('.vas-254-year-label').text(text);
-            $yearBtn.attr('title', label('VAS_256_FinancialYear', 'Financial year') + ': ' + text);
+            $yearBtn.attr('title', label('VAS_254_FinancialYear', 'Financial year') + ': ' + text);
         }
 
         function yearNameOf(id) {
@@ -534,8 +534,8 @@
             var from = (_page - 1) * _pageSize + 1;
             var to = Math.min(_page * _pageSize, _totalRows);
 
-            var showing = label('VAS_020_Showing', 'Showing') + ' ' + from + '–' + to + ' ' +
-                label('VAS_020_Of', 'of') + ' ' + _totalRows;
+            var showing = label('VAS_254_Showing', 'Showing') + ' ' + from + '–' + to + ' ' +
+                label('VAS_254_Of', 'of') + ' ' + _totalRows;
 
             var prevDis = _page <= 1 ? ' disabled' : '';
             var nextDis = _page >= _totalPages ? ' disabled' : '';
@@ -546,11 +546,11 @@
                         escapeHtml(showing) + '</span>' +
                     '<div class="vas-254-pager-nav">' +
                         '<button type="button" class="vas-254-pgbtn vas-254-pg-prev" aria-label="' +
-                            escapeHtml(label('VAS_020_Prev', 'Previous')) + '"' + prevDis + '>' + ICONS.prev + '</button>' +
+                            escapeHtml(label('VAS_254_Prev', 'Previous')) + '"' + prevDis + '>' + ICONS.prev + '</button>' +
                         '<span class="vas-254-pager-label">' + _page + ' ' +
-                            escapeHtml(label('VAS_020_Of', 'of')) + ' ' + _totalPages + '</span>' +
+                            escapeHtml(label('VAS_254_Of', 'of')) + ' ' + _totalPages + '</span>' +
                         '<button type="button" class="vas-254-pgbtn vas-254-pg-next" aria-label="' +
-                            escapeHtml(label('VAS_020_Next', 'Next')) + '"' + nextDis + '>' + ICONS.next + '</button>' +
+                            escapeHtml(label('VAS_254_Next', 'Next')) + '"' + nextDis + '>' + ICONS.next + '</button>' +
                     '</div>' +
                 '</div>'
             );
@@ -622,7 +622,7 @@
         /* ------------------------------------------------------------ */
         function buildPicker() {
             $picker = $('<div class="vas-254-pp vas-254-hidden" role="listbox" aria-label="' +
-                escapeHtml(label('VAS_256_FinancialYear', 'Financial year')) + '"></div>');
+                escapeHtml(label('VAS_254_FinancialYear', 'Financial year')) + '"></div>');
             $('body').append($picker);
 
             $picker.on('click', '.vas-254-pp-opt', function () {
@@ -634,11 +634,11 @@
 
         function fillPicker() {
             var html = '<div class="vas-254-pp-h">' +
-                escapeHtml(label('VAS_256_FinancialYear', 'Financial year')) + '</div>';
+                escapeHtml(label('VAS_254_FinancialYear', 'Financial year')) + '</div>';
 
             if (_years.length === 0) {
                 html += '<div class="vas-254-pp-empty">' +
-                    escapeHtml(label('VAS_256_NoYears', 'No financial years available')) + '</div>';
+                    escapeHtml(label('VAS_254_NoYears', 'No financial years available')) + '</div>';
             }
 
             for (var i = 0; i < _years.length; i++) {
@@ -863,14 +863,7 @@
         /* Every user-facing string goes through AD_Message; the fallback keeps the card
            readable when a key has not been seeded yet. */
         function label(key, fallback) {
-            try {
-                if (VIS.Msg && typeof VIS.Msg.getMsg === 'function') {
-                    var v = VIS.Msg.getMsg(key);
-                    if (v && v !== key && v.charAt(0) !== '[') { return v; }
-                }
-            }
-            catch (e) { /* ignore */ }
-            return fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         this.getRoot = function () { return $root; };

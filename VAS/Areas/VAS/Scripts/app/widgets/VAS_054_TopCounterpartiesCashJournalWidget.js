@@ -21,6 +21,7 @@
  * 14  | Cashbook                             | VAS_054_Cashbook
  * 15  | Other                                | VAS_054_Other
  * 16  | Unknown                              | VAS_054_Unknown
+ * 17  | Empty response                       | VAS_054_EmptyResponse
  * ─────────────────────────────────────────────────────────────────────
  */
 
@@ -77,8 +78,7 @@
         var totalRecords = 0;
 
         function lbl(key, fallback) {
-            var text = VIS.Msg.getMsg(key);
-            return text && text !== key && text !== '[' + key + ']' ? text : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function safeNumber(value) {
@@ -503,7 +503,7 @@
             $list.empty();
 
             if (!items.length) {
-                setState('No data');
+                setState(lbl('VAS_054_NoData', 'No counterparties found'));
                 return;
             }
 
@@ -612,7 +612,7 @@
                     var data = parseResponse(response);
 
                     if (!data) {
-                        setState('Empty response');
+                        setState(lbl('VAS_054_EmptyResponse', 'Empty response'));
                         return;
                     }
 

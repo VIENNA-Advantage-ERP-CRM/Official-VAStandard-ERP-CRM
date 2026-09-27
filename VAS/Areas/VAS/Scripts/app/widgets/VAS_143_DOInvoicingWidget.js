@@ -33,6 +33,7 @@
  * 14 | Showing / of                                     | VAS_Showing / VAS_Of
  * 15 | Previous page / Next page                        | VAS_PreviousPage / VAS_NextPage
  * 16 | Couldn't load / Close                             | VAS_CouldntLoad / Close
+ * 17 | Previous period / Next period                    | VAS_143_PrevPeriod / VAS_143_NextPeriod
  */
 ; VAS = window.VAS || {};
 
@@ -107,8 +108,7 @@
         };
 
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            return (t && t.charAt(0) !== '[') ? t : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function el(tag, className, text) {
@@ -215,7 +215,7 @@
             var foot = el('div', 'MPC-dis-foot');
             $footHelper = $('<span class="MPC-dis-foot-helper"></span>');
             var switcher = el('div', 'MPC-dis-switcher');
-            $prevPeriodBtn = $('<button type="button" class="MPC-dis-chev" aria-label="Previous period"></button>');
+            $prevPeriodBtn = $('<button type="button" class="MPC-dis-chev"></button>').attr('aria-label', lbl('VAS_143_PrevPeriod'));
             $prevPeriodBtn.append(svg('<path d="m15 18-6-6 6-6"/>'));
             $periodLabels = $('<span class="MPC-dis-period-labels"></span>');
             PERIODS.forEach(function (p) {
@@ -223,7 +223,7 @@
                 var btn = $('<button type="button" class="MPC-dis-period-btn"></button>').attr('data-period', p).text(lbl(meta.msgKey, meta.fallback));
                 $periodLabels.append(btn);
             });
-            $nextPeriodBtn = $('<button type="button" class="MPC-dis-chev" aria-label="Next period"></button>');
+            $nextPeriodBtn = $('<button type="button" class="MPC-dis-chev"></button>').attr('aria-label', lbl('VAS_143_NextPeriod'));
             $nextPeriodBtn.append(svg('<path d="m9 18 6-6-6-6"/>'));
             switcher.appendChild($prevPeriodBtn[0]);
             switcher.appendChild($periodLabels[0]);
@@ -264,7 +264,7 @@
             $modalTitle = $('<div class="MPC-dis-m-title"></div>');
             $modalSubtitle = $('<div class="MPC-dis-m-subtitle"></div>');
             $titleGroup.append($modalTitle, $modalSubtitle);
-            $modalClose = $('<button type="button" class="MPC-dis-m-close" aria-label="Close"></button>');
+            $modalClose = $('<button type="button" class="MPC-dis-m-close"></button>').attr('aria-label', lbl('Close', 'Close'));
             $modalClose.append(svg('<path d="M18 6 6 18"/><path d="m6 6 12 12"/>'));
             $head.append($titleGroup, $modalClose);
 
@@ -273,10 +273,10 @@
             var $footer = $('<div class="MPC-dis-m-foot"></div>');
             $modalFootHelper = $('<span class="MPC-dis-m-foot-helper"></span>');
             $modalPager = $('<span class="MPC-dis-pager"></span>');
-            $modalPrev = $('<button type="button" class="MPC-dis-pgbtn" aria-label="Previous page"></button>');
+            $modalPrev = $('<button type="button" class="MPC-dis-pgbtn"></button>').attr('aria-label', lbl('VAS_PreviousPage', 'Previous page'));
             $modalPrev.append(svg('<path d="m15 18-6-6 6-6"/>'));
             $modalPageText = $('<span class="MPC-dis-pgtext"></span>');
-            $modalNext = $('<button type="button" class="MPC-dis-pgbtn" aria-label="Next page"></button>');
+            $modalNext = $('<button type="button" class="MPC-dis-pgbtn"></button>').attr('aria-label', lbl('VAS_NextPage', 'Next page'));
             $modalNext.append(svg('<path d="m9 18 6-6-6-6"/>'));
             $modalPager.append($modalPrev, $modalPageText, $modalNext);
             $footer.append($modalFootHelper, $modalPager);
@@ -287,10 +287,6 @@
             $modal.data('overlay', $overlay);
 
             $modalClose.on('click', closeModal);
-            $overlay.on('mousedown', function (e) { if (e.target === $overlay[0]) { closeModal(); } });
-            $(document).on('keydown' + modalEventNamespace, function (e) {
-                if (e.key === 'Escape' && $overlay.hasClass('MPC-dis-open')) { closeModal(); }
-            });
             $modalPrev.on('click', function () { if (modalState.page > 0) { modalState.page--; loadDrillDown(); } });
             $modalNext.on('click', function () {
                 var pageCount = Math.max(1, Math.ceil(modalState.total / modalState.pageSize));

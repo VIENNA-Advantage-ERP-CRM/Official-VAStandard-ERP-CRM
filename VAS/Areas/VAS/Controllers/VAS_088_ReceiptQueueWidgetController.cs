@@ -71,6 +71,14 @@ namespace VIS.Controllers
             DateTime monthStart = new DateTime(year, month, 1);
             DateTime monthEndExclusive = monthStart.AddMonths(1);
 
+            /* QA sheet GRN #39 (2026-09-15): the popup's "Created on" is the receipt's creation moment in
+               the viewer's local time. Created is stamped by the database clock (DB 2 runs in UTC, users in
+               +03), so the server sends how many hours ago it was created - measured on that same clock -
+               and the browser subtracts it from its own now. */
+            string createdAgeExpr = DB.IsPostgreSQL()
+                ? "(EXTRACT(EPOCH FROM (LOCALTIMESTAMP - InOut.Created)) / 3600)"
+                : "((SYSDATE - InOut.Created) * 24)";
+
             string headerSql = @"
                 SELECT InOut.M_InOut_ID AS GRN_ID,
                        InOut.DocumentNo AS GRN_No,
@@ -79,7 +87,8 @@ namespace VIS.Controllers
                        InOut.DocStatus AS Doc_Status,
                        COALESCE(UserInfo.Name, " + NLiteral("-") + @") AS Received_By,
                        COALESCE(InOut.DateReceived, InOut.MovementDate, InOut.Created) AS Received_Time,
-                       COALESCE(InOut.MovementDate, InOut.DateReceived, InOut.Created) AS Movement_Date
+                       COALESCE(InOut.MovementDate, InOut.DateReceived, InOut.Created) AS Movement_Date,
+                       " + createdAgeExpr + @" AS Created_Hours_Ago
                 FROM M_InOut InOut
                 INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=InOut.C_BPartner_ID AND BPartner.IsActive='Y')
                 LEFT OUTER JOIN C_Order PurchaseOrder ON (PurchaseOrder.C_Order_ID=InOut.C_Order_ID AND PurchaseOrder.IsActive='Y')
@@ -106,6 +115,7 @@ namespace VIS.Controllers
                        QueueData.Doc_Status,
                        QueueData.Received_By,
                        QueueData.Received_Time,
+                       QueueData.Created_Hours_Ago,
                        QueueData.TotalRecords
                 FROM (
                     SELECT HeaderData.GRN_ID,
@@ -117,6 +127,7 @@ namespace VIS.Controllers
                            HeaderData.Received_By,
                            HeaderData.Received_Time,
                            HeaderData.Movement_Date,
+                           HeaderData.Created_Hours_Ago,
                            COUNT(1) OVER () AS TotalRecords
                     FROM (
                         " + headerSql + @"
@@ -129,7 +140,8 @@ namespace VIS.Controllers
                              HeaderData.Doc_Status,
                              HeaderData.Received_By,
                              HeaderData.Received_Time,
-                             HeaderData.Movement_Date
+                             HeaderData.Movement_Date,
+                             HeaderData.Created_Hours_Ago
                 ) QueueData
                 ORDER BY QueueData.Movement_Date ASC, QueueData.GRN_No ASC
                 OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
@@ -166,7 +178,8 @@ namespace VIS.Controllers
                         statusCode = docStatus,
                         statusText = GetDocStatusName(ctx, docStatus),
                         receivedBy = Util.GetValueOfString(dr["Received_By"]),
-                        receivedTime = receivedTime.HasValue ? receivedTime.Value.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture) : ""
+                        receivedTime = receivedTime.HasValue ? receivedTime.Value.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture) : "",
+                        createdHoursAgo = Math.Round(Math.Max(0, Util.GetValueOfDecimal(dr["Created_Hours_Ago"])), 4)
                     });
                 }
 
@@ -216,15 +229,27 @@ namespace VIS.Controllers
 
             Ctx ctx = Session["ctx"] as Ctx;
 
+            /* QA sheet GRN #38/#41/#42 (2026-09-15):
+               - Attribute_Name feeds the popup's Attribute column (shown only when a line has one);
+               - Ordered / Received are in the line's own UOM (QtyEntered, e.g. 3,000 ml) with that UOM
+                 returned beside them - OrderLine.QtyOrdered and MovementQty are product-UOM quantities;
+               - the line status needs the quantity received against the PO line across ALL its GRNs,
+                 which is read in a second query below. */
             string linesSql = @"
                 SELECT InOutLine.M_InOutLine_ID AS GRN_Line_ID,
+                       InOutLine.C_OrderLine_ID AS Order_Line_ID,
                        COALESCE(Product.Name, " + NLiteral("-") + @") AS Item_Name,
-                       COALESCE(OrderLine.QtyOrdered, 0) AS Ordered_Qty,
-                       COALESCE(InOutLine.MovementQty, 0) AS Received_Qty
+                       AttrInstance.Description AS Attribute_Name,
+                       COALESCE(UOM.UOMSymbol, UOM.Name) AS Uom,
+                       COALESCE(OrderLine.QtyEntered, OrderLine.QtyOrdered, 0) AS Ordered_Qty,
+                       COALESCE(OrderLine.QtyOrdered, 0) AS Ordered_Base_Qty,
+                       COALESCE(InOutLine.QtyEntered, InOutLine.MovementQty, 0) AS Received_Qty
                 FROM M_InOut InOut
                 INNER JOIN M_InOutLine InOutLine ON (InOutLine.M_InOut_ID=InOut.M_InOut_ID AND InOutLine.IsActive='Y')
                 LEFT OUTER JOIN C_OrderLine OrderLine ON (OrderLine.C_OrderLine_ID=InOutLine.C_OrderLine_ID AND OrderLine.IsActive='Y')
                 LEFT OUTER JOIN M_Product Product ON (Product.M_Product_ID=InOutLine.M_Product_ID AND Product.IsActive='Y')
+                LEFT OUTER JOIN C_UOM UOM ON (UOM.C_UOM_ID=InOutLine.C_UOM_ID)
+                LEFT OUTER JOIN M_AttributeSetInstance AttrInstance ON (AttrInstance.M_AttributeSetInstance_ID=InOutLine.M_AttributeSetInstance_ID)
                 WHERE InOut.IsActive='Y'
                   AND InOut.MovementType='V+'
                   AND InOut.M_InOut_ID=@GRN_ID
@@ -245,21 +270,81 @@ namespace VIS.Controllers
             parameters.Add(new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()));
 
             List<object> rows = new List<object>();
-            IDataReader dr = null;
 
             try
             {
-                dr = DB.ExecuteReader(linesSql, parameters.ToArray());
+                DataSet lineDs = DB.ExecuteDataset(linesSql, parameters.ToArray(), null);
+                DataRowCollection lineRows = (lineDs != null && lineDs.Tables.Count > 0) ? lineDs.Tables[0].Rows : null;
 
-                while (dr != null && dr.Read())
+                // Quantity received per PO line over every GRN (reversed / voided excluded), in the product UOM.
+                // Order line ids are integers read from the database - safe to inline.
+                Dictionary<int, decimal> cumulativeBaseByOrderLine = new Dictionary<int, decimal>();
+                List<string> orderLineIds = new List<string>();
+                if (lineRows != null)
                 {
-                    rows.Add(new
+                    foreach (DataRow row in lineRows)
                     {
-                        grnLineId = Util.GetValueOfInt(dr["GRN_Line_ID"]),
-                        itemName = Util.GetValueOfString(dr["Item_Name"]),
-                        orderedQty = Util.GetValueOfDecimal(dr["Ordered_Qty"]),
-                        receivedQty = Util.GetValueOfDecimal(dr["Received_Qty"])
-                    });
+                        int orderLineId = Util.GetValueOfInt(row["Order_Line_ID"]);
+                        if (orderLineId > 0 && !orderLineIds.Contains(orderLineId.ToString(CultureInfo.InvariantCulture)))
+                        {
+                            orderLineIds.Add(orderLineId.ToString(CultureInfo.InvariantCulture));
+                        }
+                    }
+                }
+                if (orderLineIds.Count > 0)
+                {
+                    string cumulativeSql = @"
+                        SELECT ReceiptLine.C_OrderLine_ID AS Order_Line_ID,
+                               SUM(COALESCE(ReceiptLine.MovementQty, 0)) AS Cumulative_Qty
+                        FROM M_InOutLine ReceiptLine
+                        INNER JOIN M_InOut Receipt ON (Receipt.M_InOut_ID=ReceiptLine.M_InOut_ID)
+                        WHERE ReceiptLine.IsActive='Y'
+                          AND Receipt.IsActive='Y'
+                          AND Receipt.IsSOTrx='N'
+                          AND Receipt.MovementType='V+'
+                          AND Receipt.DocStatus NOT IN ('RE','VO')
+                          AND ReceiptLine.C_OrderLine_ID IN (" + string.Join(",", orderLineIds) + @")
+                        GROUP BY ReceiptLine.C_OrderLine_ID";
+                    DataSet cumulativeDs = DB.ExecuteDataset(cumulativeSql, null, null);
+                    if (cumulativeDs != null && cumulativeDs.Tables.Count > 0)
+                    {
+                        foreach (DataRow row in cumulativeDs.Tables[0].Rows)
+                        {
+                            cumulativeBaseByOrderLine[Util.GetValueOfInt(row["Order_Line_ID"])] = Util.GetValueOfDecimal(row["Cumulative_Qty"]);
+                        }
+                    }
+                }
+
+                if (lineRows != null)
+                {
+                    foreach (DataRow row in lineRows)
+                    {
+                        int orderLineId = Util.GetValueOfInt(row["Order_Line_ID"]);
+                        decimal orderedQty = Util.GetValueOfDecimal(row["Ordered_Qty"]);
+                        decimal orderedBaseQty = Util.GetValueOfDecimal(row["Ordered_Base_Qty"]);
+                        decimal receivedQty = Util.GetValueOfDecimal(row["Received_Qty"]);
+
+                        // Cumulative quantity rescaled into the PO line's UOM; without a PO line only this GRN counts.
+                        decimal cumulativeQty = receivedQty;
+                        decimal cumulativeBase;
+                        if (orderLineId > 0 && cumulativeBaseByOrderLine.TryGetValue(orderLineId, out cumulativeBase))
+                        {
+                            cumulativeQty = orderedBaseQty != 0
+                                ? Math.Round(cumulativeBase * orderedQty / orderedBaseQty, 6, MidpointRounding.AwayFromZero)
+                                : cumulativeBase;
+                        }
+
+                        rows.Add(new
+                        {
+                            grnLineId = Util.GetValueOfInt(row["GRN_Line_ID"]),
+                            itemName = Util.GetValueOfString(row["Item_Name"]),
+                            attributeName = Util.GetValueOfString(row["Attribute_Name"]),
+                            uom = Util.GetValueOfString(row["Uom"]),
+                            orderedQty = orderedQty,
+                            receivedQty = receivedQty,
+                            cumulativeReceivedQty = cumulativeQty
+                        });
+                    }
                 }
 
                 return Json(JsonConvert.SerializeObject(new { rows = rows }), JsonRequestBehavior.AllowGet);
@@ -267,14 +352,6 @@ namespace VIS.Controllers
             catch (Exception ex)
             {
                 return Json(new { error = ex.Message }, JsonRequestBehavior.AllowGet);
-            }
-            finally
-            {
-                if (dr != null)
-                {
-                    dr.Close();
-                    dr.Dispose();
-                }
             }
         }
 

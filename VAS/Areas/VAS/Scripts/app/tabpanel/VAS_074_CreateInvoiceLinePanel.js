@@ -198,9 +198,7 @@
 
         /* ---------- short helpers ---------- */
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            if (t && t.charAt(0) !== "[") return t;
-            return (fallback !== undefined) ? fallback : t;
+            return VIS.Msg.getMsg(key);
         }
 
         function precision() { return (parent && parent.StdPrecision >= 0) ? parent.StdPrecision : 2; }
@@ -568,7 +566,8 @@
         /* ---------- shell ---------- */
         function buildShell() {
             $body.empty();
-            var $panel = $('<section class="vas-cil-panel" aria-label="Invoice Lines and Summary"></section>');
+            var $panel = $('<section class="vas-cil-panel"></section>')
+                .attr("aria-label", lbl("VAS_074_InvoiceLinesSummary", "Invoice Lines & Summary"));
 
             var $header = $('<header class="vas-cil-panel__header"></header>');
             $header.append('<div><h2 class="vas-cil-panel__title">' + esc(lbl("VAS_074_InvoiceLinesSummary", "Invoice Lines & Summary")) +
@@ -4104,7 +4103,7 @@
                 '<p class="vas-cil-dialog__error vas-cil-is-hidden" id="vasCilScanError"></p></header>' +
                 '<div class="vas-cil-dialog__body vas-cil-dialog__body--fixed">' +
                 '<div class="vas-cil-scan-empty" id="vasCilScanEmpty"><div class="vas-cil-scan-empty__badge">' + icon("scan-line", "▭") + "</div>" +
-                '<p class="vas-cil-scan-empty__title">' + esc(lbl("VAS_074_ScanToBegin", "Scan a barcode to begin")) + '</p><p class="vas-cil-scan-empty__hint">e.g. PRD-BLW-001 · CHG-INS-001</p></div>' +
+                '<p class="vas-cil-scan-empty__title">' + esc(lbl("VAS_074_ScanToBegin", "Scan a barcode to begin")) + '</p><p class="vas-cil-scan-empty__hint">' + esc(lbl("VAS_074_ScanExampleHint", "e.g. PRD-BLW-001 · CHG-INS-001")) + '</p></div>' +
                 '<div class="vas-cil-scan-grid vas-cil-is-hidden" id="vasCilScanGrid"><div class="vas-cil-scan-grid__head"><div>' + esc(lbl("VAS_074_Code", "Code")) + "</div><div>" + esc(lbl("VAS_074_ProductCharge", "Product / Charge")) +
                 "</div><div>" + esc(lbl("VAS_074_Status", "Status")) + "</div><div>" + esc(lbl("VAS_074_Qty", "Qty")) + '</div><div></div></div><div class="vas-cil-scan-grid__body" id="vasCilScanRows"></div></div></div>' +
                 '<footer class="vas-cil-dialog__footer"><p class="vas-cil-dialog__summary" id="vasCilScanSummary">' + esc(lbl("VAS_074_NoScans", "No scans yet")) + "</p>" +

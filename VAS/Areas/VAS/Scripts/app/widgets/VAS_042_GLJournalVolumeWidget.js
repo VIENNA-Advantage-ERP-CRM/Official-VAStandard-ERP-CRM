@@ -16,6 +16,7 @@
  *  9  | Entries                              | VAS_042_GLJEntries
  * 10  | No Data                              | VIS_NoData
  * 11  | Error Loading Data                   | VIS_Error
+ * 12  | Period                               | VAS_042_Period
  * ---------------------------------------------------------------------
  */
 
@@ -50,8 +51,7 @@
     // ───────────────────────────────────────────────────────────────────────────
 
     function lbl(key, fallback) {
-        var t = VIS.Msg.getMsg(key);
-        return (t && t.charAt(0) !== '[') ? t : fallback;
+        return VIS.Msg.getMsg(key);
     }
 
     function esc(str) {
@@ -255,7 +255,7 @@
                 +     '<div class="VAS-gljv-subtitle">' + lbl('VAS_042_PrimaryBookSubtitle', 'Showing data from Primary Accounting Book') + '</div>'
                 +   '</div>'
                 +   '<span class="VAS-gljv-sub" id="VAS-gljv-sub-' + id + '">—</span>'
-                +   '<div class="VAS-gljv-period-group" role="group" aria-label="Period">'
+                +   '<div class="VAS-gljv-period-group" role="group" aria-label="' + esc(lbl('VAS_042_Period', 'Period')) + '">'
                 +     '<button type="button" class="VAS-gljv-period-btn" data-period="week">'
                 +       lbl('VAS_042_Week', 'Week')
                 +     '</button>'

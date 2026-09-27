@@ -49,6 +49,7 @@
  * 35  | Journal Process Failed                      | VAS_045_JournalProcessFailed
  * 36  | Of                                          | VIS_Of
  * 37  | Could Not Load Pending Queue                | VAS_045_LoadPendingQueueFailed
+ * 38  | Showing                                      | VAS_045_Showing
  * ─────────────────────────────────────────────────────────────────────
  */
 
@@ -133,15 +134,7 @@
         };
 
         function lbl(key, fallback) {
-            var text =
-                VIS.Msg.getMsg(key);
-
-            return (
-                text &&
-                text !== "[" + key + "]"
-            )
-                ? text
-                : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function esc(value) {
@@ -318,11 +311,14 @@
                 );
 
             return (
-                "Showing " +
+                lbl("VAS_045_Showing") +
+                " " +
                 start +
                 "-" +
                 end +
-                " of " +
+                " " +
+                lbl("VIS_Of") +
+                " " +
                 total
             );
         }

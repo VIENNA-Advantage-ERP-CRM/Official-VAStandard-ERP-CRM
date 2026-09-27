@@ -168,8 +168,7 @@
         var currentCfg = null;
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return (translated && translated.charAt(0) !== '[') ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -431,9 +430,6 @@
 
             $closeBtn.on('click', closeModal);
             $mBack.on('click', backModal);
-            $mask.on('mousedown', function (event) {
-                if (event.target === $mask[0]) { closeModal(); }
-            });
             $mBody.on('click', function (event) {
                 var pageBtn = event.target.closest ? event.target.closest('[data-dir]') : null;
                 if (pageBtn) { turnPage(pageBtn.getAttribute('data-table'), Number(pageBtn.getAttribute('data-dir'))); return; }
@@ -447,10 +443,6 @@
         function bindDocumentLevelEvents() {
             var ns = '.vas284-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget');
 
-            $(document).on('keydown' + ns, function (event) {
-                if (event.key !== 'Escape') { return; }
-                if ($mask.hasClass('is-open')) { closeModal(); }
-            });
             $(window).on('resize' + ns, function () {
                 if ($mask.hasClass('is-open')) { fitAllTables(); }
             });

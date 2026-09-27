@@ -22,8 +22,7 @@
     }
 
     function lbl(key, fallback) {
-        var t = VIS.Msg.getMsg(key);
-        return (t && t.charAt(0) !== '[') ? t : fallback;
+        return VIS.Msg.getMsg(key);
     }
 
     function escapeHtml(v) {
@@ -75,16 +74,16 @@
 
     function deriveLineStatus(confirmed, target) {
         if (confirmed === null || confirmed === undefined) {
-            return { status: 'Pending', cls: 'vas-172-pill--amber', text: 'Pending' };
+            return { status: 'Pending', cls: 'vas-172-pill--amber', text: lbl('VAS_172_Pending') };
         }
         var c = Number(confirmed);
         var t = Number(target);
         if (c === t) {
-            return { status: 'Matched', cls: 'vas-172-pill--ok', text: 'Matched' };
+            return { status: 'Matched', cls: 'vas-172-pill--ok', text: lbl('VAS_172_Matched') };
         } else if (c < t) {
-            return { status: 'Short', cls: 'vas-172-pill--bad', text: 'Short (' + (t - c) + ')' };
+            return { status: 'Short', cls: 'vas-172-pill--bad', text: lbl('VAS_172_Short') + ' (' + (t - c) + ')' };
         } else {
-            return { status: 'Over', cls: 'vas-172-pill--amber', text: 'Over (+' + (c - t) + ')' };
+            return { status: 'Over', cls: 'vas-172-pill--amber', text: lbl('VAS_172_Over') + ' (+' + (c - t) + ')' };
         }
     }
 
@@ -147,8 +146,8 @@
             var html = '<div class="vas-172-queue">';
             for (var i = 0; i < slice.length; i++) {
                 var item = slice[i];
-                var routeStr = (item.SourceLocator || item.SourceWarehouse || 'Src') + ' → ' + (item.DestLocator || item.DestWarehouse || 'Dst') + ' · ' + (item.LineCount || 0) + ' ' + (item.LineCount === 1 ? 'line' : 'lines');
-                var statusPill = '<span class="vas-172-pill vas-172-pill--amber">Pending</span>';
+                var routeStr = (item.SourceLocator || item.SourceWarehouse || 'Src') + ' → ' + (item.DestLocator || item.DestWarehouse || 'Dst') + ' · ' + (item.LineCount || 0) + ' ' + (item.LineCount === 1 ? lbl('VAS_172_LineCountSingular') : lbl('VAS_172_LineCountPlural'));
+                var statusPill = '<span class="vas-172-pill vas-172-pill--amber">' + escapeHtml(lbl('VAS_172_Pending')) + '</span>';
 
                 html += '<button type="button" class="vas-172-row' + (i === slice.length - 1 ? ' vas-172-row--last' : '') + '" data-idx="' + (start + i) + '">' +
                     '<div class="vas-172-row-top">' +
@@ -229,8 +228,8 @@
                 linesHtml +=
                     '<button type="button" class="vas-172-line-row" data-lidx="' + i + '">' +
                         '<div class="vas-172-line-left">' +
-                            '<div class="vas-172-line-no">' + escapeHtml('Line ' + (l.LineNo || (i + 1))) + '</div>' +
-                            '<div class="vas-172-line-sub">' + escapeHtml((l.ItemName || 'Item') + ' · ' + (l.UOM || '')) + '</div>' +
+                            '<div class="vas-172-line-no">' + escapeHtml(lbl('VAS_172_LineNoPrefix') + ' ' + (l.LineNo || (i + 1))) + '</div>' +
+                            '<div class="vas-172-line-sub">' + escapeHtml((l.ItemName || lbl('VAS_172_Item')) + ' · ' + (l.UOM || '')) + '</div>' +
                         '</div>' +
                         '<div class="vas-172-line-count">' + confStr + ' / ' + l.TargetQty + '</div>' +
                         '<span class="vas-172-pill ' + s.cls + '">' + escapeHtml(s.text) + '</span>' +
@@ -242,36 +241,36 @@
                 '<div class="vas-172-modal-scrim">' +
                     '<div class="vas-172-modal">' +
                         '<div class="vas-172-modal-header">' +
-                            '<span class="vas-172-modal-title">' + escapeHtml((tr.TransferNo || 'TR') + ' · Transfer Confirmation') + '</span>' +
-                            '<span class="vas-172-pill vas-172-pill--amber">Pending</span>' +
+                            '<span class="vas-172-modal-title">' + escapeHtml((tr.TransferNo || 'TR') + ' · ' + lbl('VAS_172_TransferConfirmation')) + '</span>' +
+                            '<span class="vas-172-pill vas-172-pill--amber">' + escapeHtml(lbl('VAS_172_Pending')) + '</span>' +
                             '<button type="button" class="vas-172-modal-close" id="vas172-m-close">&#215;</button>' +
                         '</div>' +
                         '<div class="vas-172-modal-body">' +
-                            '<button type="button" class="vas-172-back-link" id="vas172-b1">&#8249; Back to pending confirmations</button>' +
+                            '<button type="button" class="vas-172-back-link" id="vas172-b1">&#8249; ' + escapeHtml(lbl('VAS_172_BackToPendingConfirmations')) + '</button>' +
                             '<div class="vas-172-field-grid">' +
                                 '<div class="vas-172-field">' +
-                                    '<div class="vas-172-field-label">Source Transfer</div>' +
+                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_SourceTransfer')) + '</div>' +
                                     '<div class="vas-172-field-value">' + escapeHtml(tr.TransferNo || '—') + '</div>' +
                                 '</div>' +
                                 '<div class="vas-172-field">' +
-                                    '<div class="vas-172-field-label">Route</div>' +
+                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_Route')) + '</div>' +
                                     '<div class="vas-172-field-value">' + escapeHtml((tr.SourceLocator || '') + ' → ' + (tr.DestLocator || '')) + '</div>' +
                                 '</div>' +
                                 '<div class="vas-172-field">' +
-                                    '<div class="vas-172-field-label">From → To Warehouse</div>' +
+                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_FromToWarehouse')) + '</div>' +
                                     '<div class="vas-172-field-value">' + escapeHtml((tr.SourceWarehouse || '') + ' → ' + (tr.DestWarehouse || '')) + '</div>' +
                                 '</div>' +
                                 '<div class="vas-172-field">' +
-                                    '<div class="vas-172-field-label">Date</div>' +
+                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_Date')) + '</div>' +
                                     '<div class="vas-172-field-value">' + escapeHtml(formatDate(tr.MovementDate)) + '</div>' +
                                 '</div>' +
                             '</div>' +
-                            '<div class="vas-172-section-heading">Confirmation Lines</div>' +
+                            '<div class="vas-172-section-heading">' + escapeHtml(lbl('VAS_172_ConfirmationLines')) + '</div>' +
                             '<div class="vas-172-lines-list-container">' +
                                 '<div class="vas-172-lines-list">' + linesHtml + '</div>' +
                             '</div>' +
                             '<div class="vas-172-action-bar">' +
-                                '<button type="button" class="vas-172-btn-complete' + (!allMatched ? ' vas-172-btn-complete--disabled' : '') + '" id="vas172-btn-comp"' + (!allMatched ? ' disabled' : '') + '>Complete Transfer Confirmation</button>' +
+                                '<button type="button" class="vas-172-btn-complete' + (!allMatched ? ' vas-172-btn-complete--disabled' : '') + '" id="vas172-btn-comp"' + (!allMatched ? ' disabled' : '') + '>' + escapeHtml(lbl('VAS_172_CompleteTransferConfirmation')) + '</button>' +
                             '</div>' +
                         '</div>' +
                     '</div>' +
@@ -283,7 +282,6 @@
 
             $modal.find('#vas172-m-close').on('click', closeModal);
             $modal.find('#vas172-b1').on('click', closeModal);
-            $modal.find('.vas-172-modal-scrim').on('click', function (e) { if (e.target === this) { closeModal(); } });
 
             $modal.find('.vas-172-line-row').on('click', function () {
                 var lidx = parseInt($(this).attr('data-lidx'), 10);
@@ -309,51 +307,51 @@
                 '<div class="vas-172-modal-scrim">' +
                     '<div class="vas-172-modal">' +
                         '<div class="vas-172-modal-header">' +
-                            '<span class="vas-172-modal-title">Review Confirmation Line</span>' +
+                            '<span class="vas-172-modal-title">' + escapeHtml(lbl('VAS_172_ReviewConfirmationLine')) + '</span>' +
                             '<button type="button" class="vas-172-modal-close" id="vas172-m-close2">&#215;</button>' +
                         '</div>' +
                         '<div class="vas-172-modal-body">' +
-                            '<button type="button" class="vas-172-back-link" id="vas172-b2">&#8249; Back to ' + escapeHtml(tr.TransferNo || 'TR') + '</button>' +
+                            '<button type="button" class="vas-172-back-link" id="vas172-b2">&#8249; ' + escapeHtml(lbl('VAS_172_BackTo')) + ' ' + escapeHtml(tr.TransferNo || 'TR') + '</button>' +
                             '<div class="vas-172-v2-grid">' +
                                 '<div class="vas-172-v2-field vas-172-v2-readonly">' +
-                                    '<div class="vas-172-field-label">Transfer Line</div>' +
-                                    '<div class="vas-172-field-value">' + escapeHtml('Line ' + (l.LineNo || 1) + ' · ' + (l.ItemName || 'Item')) + '</div>' +
+                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_TransferLine')) + '</div>' +
+                                    '<div class="vas-172-field-value">' + escapeHtml(lbl('VAS_172_LineNoPrefix') + ' ' + (l.LineNo || 1) + ' · ' + (l.ItemName || lbl('VAS_172_Item'))) + '</div>' +
                                 '</div>' +
                                 '<div class="vas-172-v2-field vas-172-v2-readonly">' +
-                                    '<div class="vas-172-field-label">UOM</div>' +
+                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_UOM')) + '</div>' +
                                     '<div class="vas-172-field-value">' + escapeHtml(l.UOM || '—') + '</div>' +
                                 '</div>' +
                                 '<div class="vas-172-v2-field vas-172-v2-readonly">' +
-                                    '<div class="vas-172-field-label">Attribute Set Instance</div>' +
+                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_AttributeSetInstance')) + '</div>' +
                                     '<div class="vas-172-field-value">' + escapeHtml(l.AttributeSetInstance || '—') + '</div>' +
                                 '</div>' +
                                 '<div class="vas-172-v2-field vas-172-v2-readonly">' +
-                                    '<div class="vas-172-field-label">Scrap Locator</div>' +
+                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_ScrapLocator')) + '</div>' +
                                     '<div class="vas-172-field-value">' + escapeHtml(l.ScrapLocator || '—') + '</div>' +
                                 '</div>' +
                                 '<div class="vas-172-v2-field vas-172-v2-readonly">' +
-                                    '<div class="vas-172-field-label">Target Quantity</div>' +
+                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_TargetQuantity')) + '</div>' +
                                     '<div class="vas-172-field-value" style="font-weight:700;">' + l.TargetQty + '</div>' +
                                 '</div>' +
                                 '<div class="vas-172-v2-field vas-172-v2-editable">' +
-                                    '<div class="vas-172-field-label">Confirmed Quantity *</div>' +
+                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_ConfirmedQuantity')) + '</div>' +
                                     '<input type="number" step="any" class="vas-172-input" id="vas172-inp-conf" value="' + prefillConf + '">' +
                                 '</div>' +
                                 '<div class="vas-172-v2-field vas-172-v2-readonly">' +
-                                    '<div class="vas-172-field-label">Difference</div>' +
+                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_Difference')) + '</div>' +
                                     '<div class="vas-172-field-value ' + diffCls + '" id="vas172-diff-val">' + initialDiff + '</div>' +
                                 '</div>' +
                                 '<div class="vas-172-v2-field vas-172-v2-editable vas-172-v2-span2" style="grid-row: span 2;">' +
-                                    '<div class="vas-172-field-label">Description / Note</div>' +
-                                    '<textarea class="vas-172-textarea" id="vas172-inp-desc" placeholder="Add a note (optional)">' + escapeHtml(l.Description || '') + '</textarea>' +
+                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_DescriptionNote')) + '</div>' +
+                                    '<textarea class="vas-172-textarea" id="vas172-inp-desc" placeholder="' + escapeHtml(lbl('VAS_172_AddNoteOptional')) + '">' + escapeHtml(l.Description || '') + '</textarea>' +
                                 '</div>' +
                                 '<div class="vas-172-v2-field vas-172-v2-editable">' +
-                                    '<div class="vas-172-field-label">Scrapped Quantity</div>' +
+                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_ScrappedQuantity')) + '</div>' +
                                     '<input type="number" step="any" class="vas-172-input" id="vas172-inp-scrap" value="' + (l.ScrappedQty || 0) + '">' +
                                 '</div>' +
                             '</div>' +
                             '<div style="margin-top:0.75rem; text-align:right;">' +
-                                '<button type="button" class="vas-172-btn-save" id="vas172-btn-save">Save Line</button>' +
+                                '<button type="button" class="vas-172-btn-save" id="vas172-btn-save">' + escapeHtml(lbl('VAS_172_SaveLine')) + '</button>' +
                             '</div>' +
                         '</div>' +
                     '</div>' +
@@ -365,7 +363,6 @@
 
             $modal.find('#vas172-m-close2').on('click', closeModal);
             $modal.find('#vas172-b2').on('click', function () { renderModalView1(); });
-            $modal.find('.vas-172-modal-scrim').on('click', function (e) { if (e.target === this) { closeModal(); } });
 
             var calcDiff = function () {
                 var target = Number(l.TargetQty || 0);
@@ -389,7 +386,7 @@
                 var descVal = $modal.find('#vas172-inp-desc').val();
 
                 if (isNaN(confVal) || confVal < 0) {
-                    alert('Confirmed Quantity must be a valid non-negative number.');
+                    alert(lbl('VAS_172_ConfirmedQtyValidation'));
                     return;
                 }
                 if (isNaN(scrapVal) || scrapVal < 0) { scrapVal = 0; }

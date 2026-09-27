@@ -134,8 +134,7 @@
         var COL_TMPL = '1fr 1.4fr minmax(60px,0.8fr) minmax(80px,1.1fr) minmax(70px,0.9fr)';
 
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            return (t && t.charAt(0) !== '[') ? t : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         /* Escape DB-sourced text before inserting it as HTML (XSS-safe). */
@@ -1163,9 +1162,8 @@
                 else if (act === 'void') { doReverseNewer(set); }
             });
 
-            /* X and backdrop dismiss the dialog. */
+            /* Only the explicit Close (X) button dismisses the dialog. */
             overlay.on('click', '.vas-dup-close', function () { closeReview(); });
-            overlay.on('click', function (e) { if (e.target === overlay[0]) closeReview(); });
 
             return overlay;
         }
@@ -1178,13 +1176,9 @@
             /* Force a reflow so the open transition runs, then reveal. */
             if ($review[0]) { void $review[0].offsetHeight; }
             $review.addClass('is-open');
-            $(document).on('keydown.vasInvDup', function (e) {
-                if (e.key === 'Escape' || e.keyCode === 27) closeReview();
-            });
         }
 
         function closeReview() {
-            $(document).off('keydown.vasInvDup');
             if ($review) {
                 $review.remove();
                 $review = null;

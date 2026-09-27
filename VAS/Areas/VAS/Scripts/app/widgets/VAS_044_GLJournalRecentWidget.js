@@ -47,9 +47,10 @@
  * VAS_044_DetailsNotLoaded             Journal details are not loaded.      لم يتم تحميل تفاصيل القيد
  * VAS_044_DetailsNotAvailable          Journal details are not available.   تفاصيل القيد غير متوفرة
  * VAS_044_PrintWindowFailed            Could not open the print window.     تعذر فتح نافذة ال�\u00B7باعة
- * VAS_044_LoadFailed                   Could Not Load Recent Entries        
- * VAS_044_InvalidJournalID             Invalid Journal ID                   
- * VAS_044_DetailsLoadFailed            Could Not Load Journal Details       
+ * VAS_044_LoadFailed                   Could Not Load Recent Entries
+ * VAS_044_InvalidJournalID             Invalid Journal ID
+ * VAS_044_DetailsLoadFailed            Could Not Load Journal Details
+ * VAS_044_Showing                      Showing
  *
  * Shared Messages:
  *
@@ -112,15 +113,7 @@
     }
 
     function lbl(key, fallback) {
-        var text =
-            VIS.Msg.getMsg(key);
-
-        return (
-            text &&
-            text !== "[" + key + "]"
-        )
-            ? text
-            : fallback;
+        return VIS.Msg.getMsg(key);
     }
 
     function esc(value) {
@@ -357,11 +350,14 @@
             );
 
         return (
-            "Showing " +
+            lbl("VAS_044_Showing", "Showing") +
+            " " +
             start +
             "-" +
             end +
-            " of " +
+            " " +
+            lbl("VIS_Of", "of") +
+            " " +
             total
         );
     }

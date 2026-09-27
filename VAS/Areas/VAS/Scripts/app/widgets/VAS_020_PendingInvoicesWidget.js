@@ -18,6 +18,18 @@
  *   VAS_020_Of                  => "of"
  *   VAS_020_Prev                => "Previous"
  *   VAS_020_Next                => "Next"
+ *   VAS_020_Due                 => "Due"
+ *   VAS_020_StatusCompleted     => "Completed"
+ *   VAS_020_StatusClosed        => "Closed"
+ *   VAS_020_StatusApproved      => "Approved"
+ *   VAS_020_StatusDraft         => "Draft"
+ *   VAS_020_StatusInProcess     => "In Process"
+ *   VAS_020_StatusWaitingConfirm => "Waiting Confirm"
+ *   VAS_020_StatusWaitingPayment => "Waiting Payment"
+ *   VAS_020_StatusNotApproved   => "Not Approved"
+ *   VAS_020_StatusInvalid       => "Invalid"
+ *   VAS_020_StatusVoided        => "Voided"
+ *   VAS_020_StatusReversed      => "Reversed"
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -25,8 +37,7 @@
     /* ---- Message helper: returns the AD_Message text, or the inline default
          when the system has no message for the key. ---- */
     function msg(key, fallback) {
-        var value = VIS.Msg.getMsg(key);
-        return value && value !== key && value !== '[' + key + ']' ? value : fallback;
+        return VIS.Msg.getMsg(key);
     }
 
     /* Keep --dash-inline-size on :root equal to the dashboard container's current
@@ -220,7 +231,7 @@
                         '<span class="vas-piawdg-due-dot ' + urgentCls + '"></span>' +
                         '<div class="vas-piawdg-due-info">' +
                             '<div class="vas-piawdg-due-name">' + piEsc(item.VendorName) + '</div>' +
-                            '<div class="vas-piawdg-due-date">Due ' + piEsc(item.DueDateStr) + '</div>' +
+                            '<div class="vas-piawdg-due-date">' + piEsc(msg('VAS_020_Due')) + ' ' + piEsc(item.DueDateStr) + '</div>' +
                         '</div>' +
                         '<div class="vas-piawdg-due-amt ' + urgentCls + '">' +
                             piMetric(item.OpenAmt) +
@@ -571,10 +582,10 @@
 
         function piStatusMeta(code) {
             var map = {
-                CO: ['Completed', 'ok'], CL: ['Closed', 'ok'], AP: ['Approved', 'info'],
-                DR: ['Draft', 'muted'], IP: ['In Process', 'warn'], WC: ['Waiting Confirm', 'warn'],
-                WP: ['Waiting Payment', 'warn'], NA: ['Not Approved', 'err'], IN: ['Invalid', 'err'],
-                VO: ['Voided', 'err'], RE: ['Reversed', 'err']
+                CO: [msg('VAS_020_StatusCompleted'), 'ok'], CL: [msg('VAS_020_StatusClosed'), 'ok'], AP: [msg('VAS_020_StatusApproved'), 'info'],
+                DR: [msg('VAS_020_StatusDraft'), 'muted'], IP: [msg('VAS_020_StatusInProcess'), 'warn'], WC: [msg('VAS_020_StatusWaitingConfirm'), 'warn'],
+                WP: [msg('VAS_020_StatusWaitingPayment'), 'warn'], NA: [msg('VAS_020_StatusNotApproved'), 'err'], IN: [msg('VAS_020_StatusInvalid'), 'err'],
+                VO: [msg('VAS_020_StatusVoided'), 'err'], RE: [msg('VAS_020_StatusReversed'), 'err']
             };
             var c = String(code || '').toUpperCase();
             var m = map[c] || [code || '', 'muted'];

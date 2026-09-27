@@ -3,28 +3,28 @@
  * Summary Message Table
  *  # | Current Text                         | Message Key
  * ---+--------------------------------------+-------------------------------
- *  1 | Warehouse Stock                      | VAS_WarehouseStock
- *  2 | Locator                              | VAS_Locator
+ *  1 | Warehouse Stock                      | VAS_080_WarehouseStock
+ *  2 | Locator                              | VAS_080_Locator
  *  3 | Qty                                  | VAS_Qty
  *  4 | Value                                | VAS_Value
- *  5 | locators                             | VAS_Locators
+ *  5 | locators                             | VAS_080_Locators
  *  6 | Showing                              | VAS_Showing
  *  7 | of                                   | VAS_Of
- *  8 | Inventory Value by Age               | VAS_InventoryValueByAge
- *  9 | 0-30 days                            | VAS_Age0To30Days
- * 10 | 31-90 days                           | VAS_Age31To90Days
- * 11 | 91-365 days                          | VAS_Age91To365Days
- * 12 | >365 days                            | VAS_AgeOver365Days
- * 13 | of value                             | VAS_OfValue
- * 14 | total carrying value in this locator | VAS_TotalCarryingValueLocator
- * 15 | units                                | VAS_Units
- * 16 | No stock found for this warehouse.   | VAS_NoWarehouseStock
+ *  8 | Inventory Value by Age               | VAS_080_InventoryValueByAge
+ *  9 | 0-30 days                            | VAS_080_Age0To30Days
+ * 10 | 31-90 days                           | VAS_080_Age31To90Days
+ * 11 | 91-365 days                          | VAS_080_Age91To365Days
+ * 12 | >365 days                            | VAS_080_AgeOver365Days
+ * 13 | of value                             | VAS_080_OfValue
+ * 14 | total carrying value in this locator | VAS_080_TotalCarryingValueLocator
+ * 15 | units                                | VAS_080_Units
+ * 16 | No stock found for this warehouse.   | VAS_080_NoWarehouseStock
  * 17 | Previous page                        | VAS_PreviousPage
  * 18 | Next page                            | VAS_NextPage
  * 19 | Close                                | Close
  * 20 | Couldn't load                        | VAS_CouldntLoad
- * 21 | Default                              | VAS_Default
- * 22 | Use this warehouse as my default     | VAS_DefaultWarehouseHint
+ * 21 | Default                              | VAS_080_Default
+ * 22 | Use this warehouse as my default     | VAS_080_DefaultWarehouseHint
  */
 ; VAS = window.VAS || {};
 
@@ -61,15 +61,14 @@
         };
 
         var ageBands = [
-            { key: 'value_0_30', messageKey: 'VAS_Age0To30Days', fallback: '0\u201330 days', className: 'MPC-ws-band-0' },
-            { key: 'value_31_90', messageKey: 'VAS_Age31To90Days', fallback: '31\u201390 days', className: 'MPC-ws-band-1' },
-            { key: 'value_91_365', messageKey: 'VAS_Age91To365Days', fallback: '91\u2013365 days', className: 'MPC-ws-band-2' },
-            { key: 'value_over_365', messageKey: 'VAS_AgeOver365Days', fallback: '>365 days', className: 'MPC-ws-band-3' }
+            { key: 'value_0_30', messageKey: 'VAS_080_Age0To30Days', fallback: '0\u201330 days', className: 'MPC-ws-band-0' },
+            { key: 'value_31_90', messageKey: 'VAS_080_Age31To90Days', fallback: '31\u201390 days', className: 'MPC-ws-band-1' },
+            { key: 'value_91_365', messageKey: 'VAS_080_Age91To365Days', fallback: '91\u2013365 days', className: 'MPC-ws-band-2' },
+            { key: 'value_over_365', messageKey: 'VAS_080_AgeOver365Days', fallback: '>365 days', className: 'MPC-ws-band-3' }
         ];
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return translated && translated.charAt(0) !== '[' ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function parseResponse(response) {
@@ -294,7 +293,7 @@
             var pageRows = rows.slice(start, start + warehouseStockState.pageSize);
 
             $summary.html(
-                '<span><strong>' + formatQty(summary.locators) + '</strong> ' + escapeHtml(label('VAS_Locators', 'locators')) + '</span>' +
+                '<span><strong>' + formatQty(summary.locators) + '</strong> ' + escapeHtml(label('VAS_080_Locators', 'locators')) + '</span>' +
                 '<i></i>' +
                 '<span><strong>' + formatQty(summary.quantity) + '</strong> ' + escapeHtml(label('VAS_Qty', 'qty')) + '</span>' +
                 '<i></i>' +
@@ -302,7 +301,7 @@
             );
 
             if (!pageRows.length) {
-                $list.html('<div class="MPC-ws-empty">' + escapeHtml(label('VAS_NoWarehouseStock', 'No stock found for this warehouse.')) + '</div>');
+                $list.html('<div class="MPC-ws-empty">' + escapeHtml(label('VAS_080_NoWarehouseStock', 'No stock found for this warehouse.')) + '</div>');
             } else {
                 var html = '';
                 pageRows.forEach(function (row) {
@@ -357,13 +356,13 @@
                 return '<div class="MPC-ws-age-row">' +
                     '<span class="MPC-ws-age-label"><i class="' + band.className + '"></i>' + escapeHtml(label(band.messageKey, band.fallback)) + '</span>' +
                     '<span class="MPC-ws-age-track">' + renderBandBar(shares[index], band) + '</span>' +
-                    '<span class="MPC-ws-age-value"><strong title="' + escapeHtml(amount) + '">' + escapeHtml(amount) + '</strong><small>' + Math.round(shares[index]) + '% ' + escapeHtml(label('VAS_OfValue', 'of value')) + '</small></span>' +
+                    '<span class="MPC-ws-age-value"><strong title="' + escapeHtml(amount) + '">' + escapeHtml(amount) + '</strong><small>' + Math.round(shares[index]) + '% ' + escapeHtml(label('VAS_080_OfValue', 'of value')) + '</small></span>' +
                 '</div>';
             }).join('');
 
-            $modalBadge.text(formatQty(row.total_qty) + ' ' + label('VAS_Units', 'units'));
+            $modalBadge.text(formatQty(row.total_qty) + ' ' + label('VAS_080_Units', 'units'));
             $modalBody.html(
-                '<div class="MPC-ws-age-total"><strong title="' + escapeHtml(formatAmount(totalValue)) + '">' + escapeHtml(formatAmount(totalValue)) + '</strong><span>' + escapeHtml(label('VAS_TotalCarryingValueLocator', 'total carrying value in this locator')) + '</span></div>' +
+                '<div class="MPC-ws-age-total"><strong title="' + escapeHtml(formatAmount(totalValue)) + '">' + escapeHtml(formatAmount(totalValue)) + '</strong><span>' + escapeHtml(label('VAS_080_TotalCarryingValueLocator', 'total carrying value in this locator')) + '</span></div>' +
                 '<div class="MPC-ws-age-stack">' + stack + '</div>' +
                 '<div class="MPC-ws-age-rows">' + rows + '</div>'
             );
@@ -456,15 +455,15 @@
                 '<div class="MPC-ws-card">' +
                     '<div class="MPC-ws-header">' +
                         '<span class="MPC-ws-icon">' + warehouseIcon() + '</span>' +
-                        '<span class="MPC-ws-title">' + escapeHtml(label('VAS_WarehouseStock', 'Warehouse Stock')) + '</span>' +
+                        '<span class="MPC-ws-title">' + escapeHtml(label('VAS_080_WarehouseStock', 'Warehouse Stock')) + '</span>' +
                         '<span class="MPC-ws-select-wrap"><select class="MPC-ws-select" aria-label="' + escapeHtml(label('Warehouse', 'Warehouse')) + '"></select></span>' +
-                        '<label class="MPC-ws-default" title="' + escapeHtml(label('VAS_DefaultWarehouseHint', 'Use this warehouse as my default')) + '">' +
+                        '<label class="MPC-ws-default" title="' + escapeHtml(label('VAS_080_DefaultWarehouseHint', 'Use this warehouse as my default')) + '">' +
                             '<input type="checkbox" class="MPC-ws-default-check">' +
-                            '<span>' + escapeHtml(label('VAS_Default', 'Default')) + '</span>' +
+                            '<span>' + escapeHtml(label('VAS_080_Default', 'Default')) + '</span>' +
                         '</label>' +
                     '</div>' +
                     '<div class="MPC-ws-summary"></div>' +
-                    '<div class="MPC-ws-table-head"><span>' + escapeHtml(label('VAS_Locator', 'Locator')) + '</span><span>' + escapeHtml(label('VAS_Qty', 'Qty')) + '</span><span>' + escapeHtml(label('VAS_Value', 'Value')) + '</span><span></span></div>' +
+                    '<div class="MPC-ws-table-head"><span>' + escapeHtml(label('VAS_080_Locator', 'Locator')) + '</span><span>' + escapeHtml(label('VAS_Qty', 'Qty')) + '</span><span>' + escapeHtml(label('VAS_Value', 'Value')) + '</span><span></span></div>' +
                     '<div class="MPC-ws-list"></div>' +
                     '<div class="MPC-ws-footer"></div>' +
                 '</div>'
@@ -482,7 +481,7 @@
                     '<div class="MPC-ws-modal-scrim"></div>' +
                     '<div class="MPC-ws-modal-dialog">' +
                         '<div class="MPC-ws-modal-header">' +
-                            '<span id="MPC-ws-modal-title-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '">' + escapeHtml(label('VAS_InventoryValueByAge', 'Inventory Value by Age')) + '</span>' +
+                            '<span id="MPC-ws-modal-title-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '">' + escapeHtml(label('VAS_080_InventoryValueByAge', 'Inventory Value by Age')) + '</span>' +
                             '<span class="MPC-ws-modal-badge"></span>' +
                             '<button type="button" class="MPC-ws-modal-close" aria-label="' + escapeHtml(label('Close', 'Close')) + '">\u00d7</button>' +
                         '</div>' +
@@ -520,10 +519,7 @@
                 if (row) { openAgeModal(row); }
             });
 
-            $modal.on('click', '.MPC-ws-modal-close, .MPC-ws-modal-scrim', closeAgeModal);
-            $(document).on('keydown.MPCWarehouseStock-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget'), function (event) {
-                if (event.key === 'Escape') { closeAgeModal(); }
-            });
+            $modal.on('click', '.MPC-ws-modal-close', closeAgeModal);
         }
 
         this.Initalize = function () {

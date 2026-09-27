@@ -74,8 +74,7 @@
         var capacitySyncPending = false;
 
         function lbl(key, fallback) {
-            var text = VIS.Msg.getMsg(key);
-            return text && text !== key && text !== '[' + key + ']' ? text : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function getPrecision(precision) {

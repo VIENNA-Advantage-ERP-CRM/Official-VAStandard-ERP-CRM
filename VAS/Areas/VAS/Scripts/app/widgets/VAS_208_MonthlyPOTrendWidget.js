@@ -7,16 +7,16 @@
  * Summary Message Table
  *  #  | Current Text                           | Message Key
  * ----+----------------------------------------+-----------------------------------
- *  1  | Monthly Purchase Order Trend           | VAS_MonthlyPurchaseOrderTrend
- *  2  | PO value in                            | VAS_POValueIn
- *  3  | months                                 | VAS_Months
- *  4  | Range limited to 12 months             | VAS_RangeLimited12Months
+ *  1  | Monthly Purchase Order Trend           | VAS_208_MonthlyPurchaseOrderTrend
+ *  2  | PO value in                            | VAS_208_POValueIn
+ *  3  | months                                 | VAS_208_Months
+ *  4  | Range limited to 12 months             | VAS_208_RangeLimited12Months
  *  5  | Purchase Orders                        | VAS_PurchaseOrders
- *  6  | All POs raised in the selected month   | VAS_AllPOsRaisedInSelectedMonth
- *  7  | PO count                               | VAS_POCount
+ *  6  | All POs raised in the selected month   | VAS_208_AllPOsRaisedInSelectedMonth
+ *  7  | PO count                               | VAS_208_POCount
  *  8  | PO value                               | VAS_POValue
- *  9  | Vendors                                | VAS_Vendors
- *  10 | Avg PO value                           | VAS_AvgPOValue
+ *  9  | Vendors                                | VAS_208_Vendors
+ *  10 | Avg PO value                           | VAS_208_AvgPOValue
  *  11 | PO No                                  | VAS_PONo
  *  12 | PO date                                | VAS_PODate
  *  13 | Vendor                                 | VAS_Vendor
@@ -39,8 +39,10 @@
  *  30 | Back                                   | Back
  *  31 | Showing                                | Showing
  *  32 | of                                     | Of
- *  33 | No purchase orders found for this month| VAS_NoPOsFoundForMonth
+ *  33 | No purchase orders found for this month| VAS_208_NoPOsFoundForMonth
  *  34 | Purchase order lines                   | VAS_PurchaseOrderLines
+ *  35 | From month                             | VAS_208_FromMonth
+ *  36 | To month                               | VAS_208_ToMonth
  */
 ; VAS = window.VAS || {};
 
@@ -63,8 +65,7 @@
     }
 
     function lbl(key, fallback) {
-        var translated = VIS.Msg.getMsg(key);
-        return (translated && translated.charAt(0) !== '[') ? translated : fallback;
+        return VIS.Msg.getMsg(key);
     }
 
     function escapeHtml(value) {
@@ -130,6 +131,9 @@
 
         var trendSeries = [];
         var currencyInfo = { symbol: '₹', iso: 'INR', precision: 2 };
+        // Months that actually hold PO data, as [{ y, m }] from the server.
+        // Null until the first load: the pickers then fall back to the calendar range.
+        var availableMonths = null;
 
         // Modal engine state
         var $mask = null;
@@ -187,14 +191,57 @@
 
         function populateSelectOptions($sel, selectedVal) {
             var html = '';
-            for (var i = minIdx; i <= maxIdx; i++) {
-                html += '<option value="' + i + '"' + (i === selectedVal ? ' selected' : '') + '>' + escapeHtml(idxToLabel(i)) + '</option>';
+            var values = [];
+            if (availableMonths && availableMonths.length > 0) {
+                for (var a = 0; a < availableMonths.length; a++) {
+                    values.push(availableMonths[a].y * 12 + (availableMonths[a].m - 1));
+                }
+                values.sort(function (x, y2) { return x - y2; });
+            } else {
+                for (var i = minIdx; i <= maxIdx; i++) {
+                    values.push(i);
+                }
+            }
+            for (var v = 0; v < values.length; v++) {
+                html += '<option value="' + values[v] + '"' + (values[v] === selectedVal ? ' selected' : '') + '>' + escapeHtml(idxToLabel(values[v])) + '</option>';
             }
             $sel.html(html);
+            return values;
+        }
+
+        /* Re-fill both pickers from the months that hold PO data and keep the
+           current window sensible: a selection that fell on an empty month moves
+           to the nearest month that has one. */
+        function refreshFilterOptions() {
+            var fromValues = populateSelectOptions($fromSel, fromIdx);
+            var toValues = populateSelectOptions($toSel, toIdx);
+
+            if (fromValues.length > 0 && fromValues.indexOf(fromIdx) < 0) {
+                fromIdx = nearestValue(fromValues, fromIdx);
+                $fromSel.val(String(fromIdx));
+            }
+            if (toValues.length > 0 && toValues.indexOf(toIdx) < 0) {
+                toIdx = nearestValue(toValues, toIdx);
+                $toSel.val(String(toIdx));
+            }
+            if (fromIdx > toIdx) {
+                fromIdx = toIdx;
+                $fromSel.val(String(fromIdx));
+            }
+        }
+
+        function nearestValue(values, target) {
+            var best = values[0];
+            for (var i = 1; i < values.length; i++) {
+                if (Math.abs(values[i] - target) < Math.abs(best - target)) {
+                    best = values[i];
+                }
+            }
+            return best;
         }
 
         function buildWidget() {
-            var title = lbl("VAS_MonthlyPurchaseOrderTrend", "Monthly Purchase Order Trend");
+            var title = lbl("VAS_208_MonthlyPurchaseOrderTrend", "Monthly Purchase Order Trend");
 
             $card = $(
                 '<div class="vas-mpt-card">' +
@@ -204,9 +251,9 @@
                             '<p class="vas-mpt-sub"></p>' +
                         '</div>' +
                         '<div class="vas-mpt-filter">' +
-                            '<select class="vas-mpt-sel vas-mpt-from" aria-label="From month"></select>' +
+                            '<select class="vas-mpt-sel vas-mpt-from" aria-label="' + escapeHtml(lbl("VAS_208_FromMonth")) + '"></select>' +
                             '<span class="vas-mpt-arrow">→</span>' +
-                            '<select class="vas-mpt-sel vas-mpt-to" aria-label="To month"></select>' +
+                            '<select class="vas-mpt-sel vas-mpt-to" aria-label="' + escapeHtml(lbl("VAS_208_ToMonth")) + '"></select>' +
                         '</div>' +
                     '</div>' +
                     '<div class="vas-mpt-colchart">' +
@@ -273,7 +320,7 @@
             populateSelectOptions($toSel, toIdx);
 
             if (clamped) {
-                showToast(lbl("VAS_RangeLimited12Months", "Range limited to 12 months"));
+                showToast(lbl("VAS_208_RangeLimited12Months", "Range limited to 12 months"));
             }
 
             loadTrendData();
@@ -305,6 +352,13 @@
                         if (data.currency) {
                             currencyInfo = data.currency;
                         }
+                        // Restrict the From/To pickers to months that actually
+                        // hold PO data (server reports them; falls back to the
+                        // calendar range when absent).
+                        if (data.availableMonths && data.availableMonths.length > 0) {
+                            availableMonths = data.availableMonths;
+                            refreshFilterOptions();
+                        }
                     } else {
                         trendSeries = [];
                     }
@@ -328,11 +382,11 @@
             var toLabel = idxToLabel(toIdx);
             var monthCount = trendSeries.length || 1;
 
-            var subTxt = fromLabel + ' – ' + toLabel + ' · ' + monthCount + ' ' + lbl("VAS_Months", "months") + ' · ' + lbl("VAS_POValueIn", "PO value in") + ' ' + curSym;
+            var subTxt = fromLabel + ' – ' + toLabel + ' · ' + monthCount + ' ' + lbl("VAS_208_Months", "months") + ' · ' + lbl("VAS_208_POValueIn", "PO value in") + ' ' + curSym;
             $subLabel.text(subTxt);
 
             if (!trendSeries || trendSeries.length === 0) {
-                $plot.html('<div class="vas-mpt-empty">' + escapeHtml(lbl("VAS_NoPOsFoundForMonth", "No purchase orders found for this period")) + '</div>');
+                $plot.html('<div class="vas-mpt-empty">' + escapeHtml(lbl("VAS_208_NoPOsFoundForMonth", "No purchase orders found for this period")) + '</div>');
                 $axis.empty();
                 return;
             }
@@ -413,15 +467,6 @@
 
             $mask.find('.vas-mpt-close-btn').on('click', closeModal);
             $mask.find('.vas-mpt-back-btn').on('click', backModal);
-            $mask.on('click', function (e) {
-                if (e.target === $mask[0]) { closeModal(); }
-            });
-
-            $(document).on('keydown.vas-mpt', function (e) {
-                if (e.key === 'Escape' && $mask.hasClass('vas-mpt-mask-open')) {
-                    closeModal();
-                }
-            });
 
             $('body').append($mask);
         }
@@ -499,7 +544,7 @@
         function openMonthPODrilldown(year, month) {
             var monthLabel = MONTH_SHORT[month - 1] + ' ' + year;
             var title = lbl("VAS_PurchaseOrders", "Purchase Orders") + ' — ' + monthLabel;
-            var sub = lbl("VAS_AllPOsRaisedInSelectedMonth", "All POs raised in the selected month");
+            var sub = lbl("VAS_208_AllPOsRaisedInSelectedMonth", "All POs raised in the selected month");
 
             showBusy(true);
 
@@ -544,10 +589,10 @@
             function buildBodyHtml() {
                 var statsHtml =
                     '<div class="vas-mpt-mstats">' +
-                        '<div class="vas-mpt-mstat"><div class="l">' + escapeHtml(lbl("VAS_POCount", "PO count")) + '</div><div class="v">' + formatNumber(poCount) + '</div></div>' +
+                        '<div class="vas-mpt-mstat"><div class="l">' + escapeHtml(lbl("VAS_208_POCount", "PO count")) + '</div><div class="v">' + formatNumber(poCount) + '</div></div>' +
                         '<div class="vas-mpt-mstat"><div class="l">' + escapeHtml(lbl("VAS_POValue", "PO value")) + '</div><div class="v">' + formatCompactMoney(poVal, curSym) + '</div></div>' +
-                        '<div class="vas-mpt-mstat"><div class="l">' + escapeHtml(lbl("VAS_Vendors", "Vendors")) + '</div><div class="v">' + formatNumber(vendorCount) + '</div></div>' +
-                        '<div class="vas-mpt-mstat"><div class="l">' + escapeHtml(lbl("VAS_AvgPOValue", "Avg PO value")) + '</div><div class="v">' + formatCompactMoney(avgPoVal, curSym) + '</div></div>' +
+                        '<div class="vas-mpt-mstat"><div class="l">' + escapeHtml(lbl("VAS_208_Vendors", "Vendors")) + '</div><div class="v">' + formatNumber(vendorCount) + '</div></div>' +
+                        '<div class="vas-mpt-mstat"><div class="l">' + escapeHtml(lbl("VAS_208_AvgPOValue", "Avg PO value")) + '</div><div class="v">' + formatCompactMoney(avgPoVal, curSym) + '</div></div>' +
                     '</div>' +
                     '<div class="vas-mpt-msec">' + escapeHtml(lbl("VAS_PurchaseOrders", "Purchase Orders")) + '</div>' +
                     '<div class="vas-mpt-mtwrap" id="vas-mpt-table-wrap">' +
@@ -576,7 +621,7 @@
                 var rowsHtml = '';
 
                 if (slice.length === 0) {
-                    rowsHtml = '<div class="vas-mpt-empty" style="padding: 2em 0;">' + escapeHtml(lbl("VAS_NoPOsFoundForMonth", "No purchase orders found for this month")) + '</div>';
+                    rowsHtml = '<div class="vas-mpt-empty" style="padding: 2em 0;">' + escapeHtml(lbl("VAS_208_NoPOsFoundForMonth", "No purchase orders found for this month")) + '</div>';
                 } else {
                     for (var i = 0; i < slice.length; i++) {
                         var p = slice[i];
@@ -729,7 +774,7 @@
                 var html = '';
 
                 if (slice.length === 0) {
-                    html = '<div class="vas-mpt-empty" style="padding: 2em 0;">' + escapeHtml(lbl("VAS_NoPOsFoundForMonth", "No lines found")) + '</div>';
+                    html = '<div class="vas-mpt-empty" style="padding: 2em 0;">' + escapeHtml(lbl("VAS_208_NoPOsFoundForMonth", "No lines found")) + '</div>';
                 } else {
                     for (var i = 0; i < slice.length; i++) {
                         var l = slice[i];
@@ -812,7 +857,6 @@
             closeModal();
             if ($toast) { $toast.remove(); $toast = null; }
             if ($mask) { $mask.remove(); $mask = null; }
-            $(document).off('keydown.vas-mpt');
             $root.remove();
         };
     };

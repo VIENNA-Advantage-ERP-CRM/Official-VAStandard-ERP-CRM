@@ -126,10 +126,15 @@ namespace VAS.Controllers
                   AND Product.AD_Client_ID=@Product_Client_ID
                   AND Product.AD_Org_ID IN (0,COALESCE(NULLIF(@Product_Org_ID,0),Product.AD_Org_ID))";
 
+            // LocatorCombination is the full "Warehouse.Aisle.Bin.Level"-style locator name;
+            // Value alone is often just an auto-generated numeric code, which read like a raw
+            // ID to the user. Not present on every database release, so check first and fall
+            // back to Value - same pattern as VAS_146/VAS_164/VAS_165/VAS_186/VAS_188.
+            bool hasLocatorCombination = HasColumn("M_Locator", "LocatorCombination");
             string locatorSql = @"
                 SELECT Locator.M_Locator_ID,
                        Locator.M_Warehouse_ID,
-                       Locator.Value
+                       Locator.Value" + (hasLocatorCombination ? ",\n                       Locator.LocatorCombination" : "") + @"
                 FROM M_Locator Locator
                 WHERE Locator.IsActive='Y'
                   AND Locator.AD_Client_ID=@Locator_Client_ID
@@ -176,7 +181,7 @@ namespace VAS.Controllers
                        MovementRows.MovementType,
                        MovementRows.MovementQty,
                        WarehouseRows.Name AS Warehouse_Name,
-                       LocatorRows.Value AS Locator_Value,
+                       {4} AS Locator_Value,
                        MovementRows.MovementDate,
                        COALESCE(StorageRows.QtyOnHand, 0) AS QtyOnHand,
                        COUNT(*) OVER() AS Total_Rows
@@ -196,7 +201,8 @@ namespace VAS.Controllers
                 movementSql,
                 productSql,
                 locatorSql,
-                warehouseSql
+                warehouseSql,
+                hasLocatorCombination ? "COALESCE(LocatorRows.LocatorCombination, LocatorRows.Value)" : "LocatorRows.Value"
             );
 
             DateTime today = DateTime.Now.Date;
@@ -247,6 +253,24 @@ namespace VAS.Controllers
             if (result.total_records > MaxTodaysTransactions) { result.total_records = MaxTodaysTransactions; }
 
             return result;
+        }
+
+        /// <summary>Same AD_Column-dictionary existence check as TransactionHasIsReversed, reused to guard M_Locator.LocatorCombination (not present on every database release).</summary>
+        private bool HasColumn(string tableName, string columnName)
+        {
+            string sql = @"
+                SELECT COUNT(1)
+                FROM AD_Column ColumnInfo
+                INNER JOIN AD_Table TableInfo ON (TableInfo.AD_Table_ID=ColumnInfo.AD_Table_ID AND TableInfo.IsActive='Y')
+                WHERE ColumnInfo.IsActive='Y'
+                  AND UPPER(TableInfo.TableName)=UPPER(@TableName)
+                  AND UPPER(ColumnInfo.ColumnName)=UPPER(@ColumnName)";
+
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql, new SqlParameter[]
+            {
+                new SqlParameter("@TableName", tableName),
+                new SqlParameter("@ColumnName", columnName)
+            }, null)) > 0;
         }
 
         private string AddAccessSql(Ctx ctx, string sql, string tableAlias)

@@ -2146,13 +2146,7 @@
                     newAttribute:              false,
                     showAll:                   false,
                     lbl: function (key, def) {
-                        // VAS_218 msg() ignores the second argument; use this wrapper so that
-                        // AttributeControl's built-in column keys (GuaranteeDate, QtyOnHand …)
-                        // fall back to the caller-supplied default when the AD_Message row is
-                        // missing — otherwise VIS.Msg.getMsg returns "[key]" with brackets.
-                        var m = VIS.Msg.getMsg ? VIS.Msg.getMsg(key) : null;
-                        if (m && m.charAt(0) !== "[") return m;
-                        return def != null ? def : key;
+                        return VIS.Msg.getMsg(key);
                     },
                     esc:       esc,
                     icon:      icon,

@@ -66,19 +66,19 @@
  *                   4 | Used                               | VAS_255_Used
  *                   5 | No budgets are near the configured | VAS_255_NoNearLimit
  *                     |   limit.                           |
- *                   6 | Account                            | VAS_234_Account         (reuse)
- *                   7 | Budget                             | VAS_254_Budget          (reuse)
- *                   8 | Actual                             | VAS_252_Actual          (reuse)
- *                   9 | Financial year                     | VAS_256_FinancialYear   (reuse)
- *                  10 | No financial years available       | VAS_256_NoYears         (reuse)
- *                  11 | No primary calendar is configured  | VAS_256_NoCalendar      (reuse)
- *                  12 | No primary accounting schema is    | VAS_256_NoAcctSchema    (reuse)
+ *                   6 | Account                            | VAS_255_Account         (reuse)
+ *                   7 | Budget                             | VAS_255_Budget          (reuse)
+ *                   8 | Actual                             | VAS_255_Actual          (reuse)
+ *                   9 | Financial year                     | VAS_255_FinancialYear   (reuse)
+ *                  10 | No financial years available       | VAS_255_NoYears         (reuse)
+ *                  11 | No primary calendar is configured  | VAS_255_NoCalendar      (reuse)
+ *                  12 | No primary accounting schema is    | VAS_255_NoAcctSchema    (reuse)
  *                     |   configured                       |
- *                  13 | Showing                            | VAS_020_Showing         (reuse)
- *                  14 | of                                 | VAS_020_Of              (reuse)
- *                  15 | Previous                           | VAS_020_Prev            (reuse)
- *                  16 | Next                               | VAS_020_Next            (reuse)
- *                  17 | Couldn't load                      | VAS_192_CouldntLoad     (reuse)
+ *                  13 | Showing                            | VAS_255_Showing         (reuse)
+ *                  14 | of                                 | VAS_255_Of              (reuse)
+ *                  15 | Previous                           | VAS_255_Prev            (reuse)
+ *                  16 | Next                               | VAS_255_Next            (reuse)
+ *                  17 | Couldn't load                      | VAS_255_CouldntLoad     (reuse)
  *
  * Chronological development:
  *   VAI145         Created  Date 2026-09-09
@@ -322,13 +322,13 @@
            sit over the wrong column. */
         function paintHead() {
             $card.find('.vas-255-ghead').html(
-                '<span role="columnheader">' + escapeHtml(label('VAS_234_Account', 'Account')) + '</span>' +
+                '<span role="columnheader">' + escapeHtml(label('VAS_255_Account', 'Account')) + '</span>' +
                 /* The three figure columns are right-aligned - they are what a reader scans
                    vertically, and a column of numbers is read against its own edge. */
                 '<span class="vas-255-num" role="columnheader">' +
-                    escapeHtml(label('VAS_254_Budget', 'Budget')) + '</span>' +
+                    escapeHtml(label('VAS_255_Budget', 'Budget')) + '</span>' +
                 '<span class="vas-255-num" role="columnheader">' +
-                    escapeHtml(label('VAS_252_Actual', 'Actual')) + '</span>' +
+                    escapeHtml(label('VAS_255_Actual', 'Actual')) + '</span>' +
                 '<span class="vas-255-num" role="columnheader">' +
                     escapeHtml(label('VAS_255_Used', 'Used')) + '</span>'
             );
@@ -357,7 +357,7 @@
 
                     var data = parseResponse(raw);
                     if (!data || data.error) {
-                        renderState(label('VAS_192_CouldntLoad', "Couldn't load"));
+                        renderState(label('VAS_255_CouldntLoad', "Couldn't load"));
                         return;
                     }
 
@@ -369,7 +369,7 @@
                     }
 
                     if (!data.Loaded) {
-                        renderState(label('VAS_192_CouldntLoad', "Couldn't load"));
+                        renderState(label('VAS_255_CouldntLoad', "Couldn't load"));
                         return;
                     }
 
@@ -400,7 +400,7 @@
                        error the user cannot see is the worst of both. And no stale row is left
                        standing as though it were current: renderState takes the body over. */
                     hideBusyIndicator();
-                    renderState(label('VAS_192_CouldntLoad', "Couldn't load"));
+                    renderState(label('VAS_255_CouldntLoad', "Couldn't load"));
                 }
             });
         }
@@ -427,15 +427,15 @@
 
         function errorLabel(code) {
             if (code === 'NOCALENDAR') {
-                return label('VAS_256_NoCalendar', 'No primary calendar is configured');
+                return label('VAS_255_NoCalendar', 'No primary calendar is configured');
             }
             if (code === 'NOACCTSCHEMA') {
-                return label('VAS_256_NoAcctSchema', 'No primary accounting schema is configured');
+                return label('VAS_255_NoAcctSchema', 'No primary accounting schema is configured');
             }
             if (code === 'NOYEAR') {
-                return label('VAS_256_NoYears', 'No financial years available');
+                return label('VAS_255_NoYears', 'No financial years available');
             }
-            return label('VAS_192_CouldntLoad', "Couldn't load");
+            return label('VAS_255_CouldntLoad', "Couldn't load");
         }
 
         /* "23 accounts between 80% and 100% of approved budget" - the count is the WHOLE
@@ -464,7 +464,7 @@
         function paintYearLabel() {
             var text = _fiscalYear || yearNameOf(_yearId);
             $yearBtn.find('.vas-255-year-label').text(text);
-            $yearBtn.attr('title', label('VAS_256_FinancialYear', 'Financial year') + ': ' + text);
+            $yearBtn.attr('title', label('VAS_255_FinancialYear', 'Financial year') + ': ' + text);
         }
 
         function yearNameOf(id) {
@@ -554,8 +554,8 @@
                cell carries it. */
             lines.push(isBlank(account) ? NIL : account);
 
-            lines.push(label('VAS_254_Budget', 'Budget') + ': ' + fullAmount(Number(item.Budget) || 0));
-            lines.push(label('VAS_252_Actual', 'Actual') + ': ' + fullAmount(Number(item.Actual) || 0));
+            lines.push(label('VAS_255_Budget', 'Budget') + ': ' + fullAmount(Number(item.Budget) || 0));
+            lines.push(label('VAS_255_Actual', 'Actual') + ': ' + fullAmount(Number(item.Actual) || 0));
             lines.push(label('VAS_255_Used', 'Used') + ': ' + percentText(Number(item.UsedPct) || 0, 1));
 
             return lines.join('\n');
@@ -570,8 +570,8 @@
             var from = (_page - 1) * _pageSize + 1;
             var to = Math.min(_page * _pageSize, _totalRows);
 
-            var showing = label('VAS_020_Showing', 'Showing') + ' ' + from + '–' + to + ' ' +
-                label('VAS_020_Of', 'of') + ' ' + _totalRows;
+            var showing = label('VAS_255_Showing', 'Showing') + ' ' + from + '–' + to + ' ' +
+                label('VAS_255_Of', 'of') + ' ' + _totalRows;
 
             var prevDis = _page <= 1 ? ' disabled' : '';
             var nextDis = _page >= _totalPages ? ' disabled' : '';
@@ -582,11 +582,11 @@
                         escapeHtml(showing) + '</span>' +
                     '<div class="vas-255-pager-nav">' +
                         '<button type="button" class="vas-255-pgbtn vas-255-pg-prev" aria-label="' +
-                            escapeHtml(label('VAS_020_Prev', 'Previous')) + '"' + prevDis + '>' + ICONS.prev + '</button>' +
+                            escapeHtml(label('VAS_255_Prev', 'Previous')) + '"' + prevDis + '>' + ICONS.prev + '</button>' +
                         '<span class="vas-255-pager-label">' + _page + ' ' +
-                            escapeHtml(label('VAS_020_Of', 'of')) + ' ' + _totalPages + '</span>' +
+                            escapeHtml(label('VAS_255_Of', 'of')) + ' ' + _totalPages + '</span>' +
                         '<button type="button" class="vas-255-pgbtn vas-255-pg-next" aria-label="' +
-                            escapeHtml(label('VAS_020_Next', 'Next')) + '"' + nextDis + '>' + ICONS.next + '</button>' +
+                            escapeHtml(label('VAS_255_Next', 'Next')) + '"' + nextDis + '>' + ICONS.next + '</button>' +
                     '</div>' +
                 '</div>'
             );
@@ -658,7 +658,7 @@
         /* ------------------------------------------------------------ */
         function buildPicker() {
             $picker = $('<div class="vas-255-pp vas-255-hidden" role="listbox" aria-label="' +
-                escapeHtml(label('VAS_256_FinancialYear', 'Financial year')) + '"></div>');
+                escapeHtml(label('VAS_255_FinancialYear', 'Financial year')) + '"></div>');
             $('body').append($picker);
 
             $picker.on('click', '.vas-255-pp-opt', function () {
@@ -670,11 +670,11 @@
 
         function fillPicker() {
             var html = '<div class="vas-255-pp-h">' +
-                escapeHtml(label('VAS_256_FinancialYear', 'Financial year')) + '</div>';
+                escapeHtml(label('VAS_255_FinancialYear', 'Financial year')) + '</div>';
 
             if (_years.length === 0) {
                 html += '<div class="vas-255-pp-empty">' +
-                    escapeHtml(label('VAS_256_NoYears', 'No financial years available')) + '</div>';
+                    escapeHtml(label('VAS_255_NoYears', 'No financial years available')) + '</div>';
             }
 
             for (var i = 0; i < _years.length; i++) {
@@ -890,14 +890,7 @@
         /* Every user-facing string goes through AD_Message; the fallback keeps the card
            readable when a key has not been seeded yet. */
         function label(key, fallback) {
-            try {
-                if (VIS.Msg && typeof VIS.Msg.getMsg === 'function') {
-                    var v = VIS.Msg.getMsg(key);
-                    if (v && v !== key && v.charAt(0) !== '[') { return v; }
-                }
-            }
-            catch (e) { /* ignore */ }
-            return fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         this.getRoot = function () { return $root; };

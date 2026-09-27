@@ -23,7 +23,19 @@ namespace VIS.Controllers
         private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_180_IssuedMTDWidgetController).FullName);
 
 // ===== NEW CODE START — currency format (agent A02, 2026-08-19) =====
-        /// <summary>Returns the aggregate count of material issue lines posted month-to-date along with currency info.</summary>
+        /// <summary>
+        /// Returns the aggregate count of material issue lines posted month-to-date
+        /// along with currency info, plus the same month-window boundaries as
+        /// DB-ready SQL date literals (monthStartSql/nextMonthStartSql via
+        /// <see cref="ToSqlDate"/>) - the widget's own click-through reuses these
+        /// verbatim in its TabWhereClause instead of reconstructing the month
+        /// window with Oracle-only SYSDATE/TRUNC/ADD_MONTHS syntax (broke the
+        /// drill-through on this install's actual Postgres backend - stuck on
+        /// loading, never actually filtered - the same class of bug VAS_140/
+        /// VAS_181/VAS_182 already hit; this endpoint's own data query already
+        /// avoided it via bound @MonthStart/@NextMonthStart parameters, but those
+        /// bound values never reached the client for the TabWhereClause to reuse).
+        /// </summary>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
         public JsonResult GetIssuedMTDCount()
@@ -33,12 +45,18 @@ namespace VIS.Controllers
 
             try
             {
-                int count = GetIssuedMTDCountData(ctx);
+                DateTime now = DateTime.Now;
+                DateTime monthStart = new DateTime(now.Year, now.Month, 1);
+                DateTime nextMonthStart = monthStart.AddMonths(1);
+
+                int count = GetIssuedMTDCountData(ctx, monthStart, nextMonthStart);
                 object currencyInfo = GetCurrencyInfo(ctx);
                 string json = JsonConvert.SerializeObject(new
                 {
                     count = count,
                     currency = currencyInfo,
+                    monthStartSql = ToSqlDate(monthStart),
+                    nextMonthStartSql = ToSqlDate(nextMonthStart),
                     success = true
                 });
                 return Json(json, JsonRequestBehavior.AllowGet);
@@ -49,6 +67,16 @@ namespace VIS.Controllers
                 string json = JsonConvert.SerializeObject(new { error = Msg.GetMsg(ctx, "Error") ?? "Error" });
                 return Json(json, JsonRequestBehavior.AllowGet);
             }
+        }
+
+        /// <summary>Date literal for the target DB - Oracle needs TO_DATE(...), every other supported DB accepts CAST(...AS DATE). Used only for the client's TabWhereClause text; the data query itself binds @MonthStart/@NextMonthStart as real parameters.</summary>
+        private static string ToSqlDate(DateTime date)
+        {
+            if (DB.IsOracle())
+            {
+                return "TO_DATE('" + date.ToString("yyyy-MM-dd") + "', 'YYYY-MM-DD')";
+            }
+            return "CAST('" + date.ToString("yyyy-MM-dd") + "' AS DATE)";
         }
 
         /// <summary>Standalone endpoint for retrieving organizational currency info.</summary>
@@ -72,13 +100,9 @@ namespace VIS.Controllers
             }
         }
 
-        private int GetIssuedMTDCountData(Ctx ctx)
+        private int GetIssuedMTDCountData(Ctx ctx, DateTime monthStart, DateTime nextMonthStart)
         {
             if (ctx == null) { return 0; }
-
-            DateTime now = DateTime.Now;
-            DateTime monthStart = new DateTime(now.Year, now.Month, 1);
-            DateTime nextMonthStart = monthStart.AddMonths(1);
 
             // An "issue line" is a line on an INTERNAL USE document carrying an internal-use
             // quantity. M_Inventory also backs Physical Inventory, and M_InventoryLine also
@@ -87,8 +111,8 @@ namespace VIS.Controllers
             // IsInternalUse filter this KPI counted 34 lines for the current month instead of 12.
             string sql = @"
                 SELECT COUNT(line.M_InventoryLine_ID)
-                FROM M_InventoryLine line
-                INNER JOIN M_Inventory inv ON inv.M_Inventory_ID = line.M_Inventory_ID
+                FROM M_Inventory inv
+                INNER JOIN M_InventoryLine line ON ( line.M_Inventory_ID = inv.M_Inventory_ID )
                 WHERE inv.IsActive = 'Y'
                   AND line.IsActive = 'Y'
                   AND COALESCE(inv.IsInternalUse, 'N') = 'Y'

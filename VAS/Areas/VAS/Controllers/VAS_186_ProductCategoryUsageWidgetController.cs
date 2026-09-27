@@ -17,6 +17,12 @@ namespace VIS.Controllers
     /// Purpose     : Supplies category-wise consumption data (quantity and value) and category drill-down issue lines.
     /// Chronological development:
     ///   AI-Dev      2026-08-02 Created
+    ///   Claude      2026-09-18 GetCategoryIssueLines Qty column now sources
+    ///                          M_InventoryLine.QtyEntered instead of QtyInternalUse.
+    ///   Claude      2026-09-21 GetCategoryIssueLines: fixed a PR #1167 merge-conflict
+    ///                          resolution bug where the UOM join label came from the
+    ///                          product's UOM while the displayed qty (QtyEntered) is
+    ///                          in the line's own UOM - joins on line.C_UOM_ID now.
     /// </summary>
     public class VAS_186_ProductCategoryUsageWidgetController : Controller
     {
@@ -111,6 +117,35 @@ namespace VIS.Controllers
                       AND ce.CostingMethod = acs.CostingMethod
                     GROUP BY c.M_Product_ID";
 
+        /// <summary>
+        /// Factor that converts an issue-line quantity from the line's entered UOM to the
+        /// product's own (selected) UOM, so quantities are always reported in the UOM the
+        /// product is defined with - e.g. a line issued in Litres reads as millilitres when the
+        /// product's UOM is MILLILITRE.
+        ///
+        /// C_UOM_Conversion stores the product-specific rate with C_UOM_ID = product UOM and
+        /// C_UOM_To_ID = entered UOM; qty(product UOM) = qty(entered) * DivideRate (1 BOX = 126
+        /// Each is stored as DivideRate 126). Same UOM short-circuits to 1, and an issue line
+        /// with no conversion defined is left unchanged rather than dropped.
+        /// Client/org-specific rows win, matching MUOMConversion's lookup order.
+        /// Expects the line aliased as "line" and the product as "p".
+        /// </summary>
+        private const string UomToProductFactorSql = @"
+                      COALESCE(
+                        CASE WHEN COALESCE(line.C_UOM_ID, 0) = COALESCE(p.C_UOM_ID, 0) THEN 1 END,
+                        (SELECT conv.DivideRate
+                         FROM (SELECT conv0.DivideRate
+                               FROM C_UOM_Conversion conv0
+                               WHERE conv0.IsActive = 'Y'
+                                 AND conv0.M_Product_ID = p.M_Product_ID
+                                 AND conv0.C_UOM_ID = p.C_UOM_ID
+                                 AND conv0.C_UOM_To_ID = line.C_UOM_ID
+                                 AND COALESCE(conv0.DivideRate, 0) <> 0
+                               ORDER BY conv0.AD_Client_ID DESC, conv0.AD_Org_ID DESC
+                              ) conv
+                         WHERE ROWNUM = 1),
+                        1)";
+
 
 
         /// <summary>Endpoint A: Category usage aggregates for selected month and year.</summary>
@@ -145,7 +180,7 @@ namespace VIS.Controllers
                     SELECT
                       pc.M_Product_Category_ID,
                       pc.Name AS CategoryName,
-                      SUM(line.QtyInternalUse) AS TotalQty,
+                      SUM(line.QtyInternalUse * " + UomToProductFactorSql + @") AS TotalQty,
                       SUM(line.QtyInternalUse * COALESCE(NULLIF(line.CurrentCostPrice, 0), NULLIF(line.PriceCost, 0), NULLIF(line.VA024_CostPrice, 0), pcst.CurrentCostPrice, 0)) AS TotalValue
                     FROM M_InventoryLine line
                     INNER JOIN (" + invAccessSql + @") ai ON ai.M_Inventory_ID = line.M_Inventory_ID
@@ -261,20 +296,29 @@ namespace VIS.Controllers
 
                 string invAccessSql = BuildAccessibleInventorySql(ctx, msl, nmsl);
 
+                // LocatorCombination is the full "Warehouse.Aisle.Bin.Level"-style locator name;
+                // Value alone is often just an auto-generated numeric code (e.g. "1000007"), which
+                // read like a raw ID to the user. Not present on every database release, so check
+                // first and fall back to Value - same pattern as VAS_146/VAS_164/VAS_165 etc.
+                string locatorSql = HasColumn("M_Locator", "LocatorCombination")
+                    ? "COALESCE(loc.LocatorCombination, loc.Value)"
+                    : "loc.Value";
+
                 string sql = @"
                     SELECT
+                      ai.M_Inventory_ID AS InventoryId,
                       ai.DocumentNo,
                       p.Name AS ProductName,
                       asi.Description AS Attribute,
-                      uom.Name AS UomName,
+                      lineUom.Name AS UomName,
                       wh.Name AS WarehouseName,
-                      loc.Value AS LocatorCode,
-                      line.QtyInternalUse,
+                      " + locatorSql + @" AS LocatorCode,
+                      line.QtyEntered,
                       ai.MovementDate
                     FROM M_InventoryLine line
                     INNER JOIN (" + invAccessSql + @") ai ON ai.M_Inventory_ID = line.M_Inventory_ID
                     INNER JOIN M_Product p ON p.M_Product_ID = line.M_Product_ID
-                    LEFT JOIN C_UOM uom ON uom.C_UOM_ID = line.C_UOM_ID
+                    LEFT JOIN C_UOM lineUom ON lineUom.C_UOM_ID = line.C_UOM_ID
                     LEFT JOIN M_AttributeSetInstance asi ON asi.M_AttributeSetInstance_ID = line.M_AttributeSetInstance_ID
                     LEFT JOIN M_Locator loc ON loc.M_Locator_ID = line.M_Locator_ID
                     LEFT JOIN M_Warehouse wh ON wh.M_Warehouse_ID = loc.M_Warehouse_ID
@@ -289,12 +333,13 @@ namespace VIS.Controllers
                     {
                         lines.Add(new
                         {
+                            inventoryId = Util.GetValueOfInt(dr["InventoryId"]),
                             documentNo = Util.GetValueOfString(dr["DocumentNo"]),
                             productName = Util.GetValueOfString(dr["ProductName"]),
                             attribute = NormalizeAttributes(Util.GetValueOfString(dr["Attribute"])),
                             uomName = Util.GetValueOfString(dr["UomName"]),
                             whLoc = BuildWarehouseLocator(Util.GetValueOfString(dr["WarehouseName"]), Util.GetValueOfString(dr["LocatorCode"])),
-                            qty = Util.GetValueOfDecimal(dr["QtyInternalUse"]),
+                            qty = Util.GetValueOfDecimal(dr["QtyEntered"]),
                             movementDate = Convert.ToDateTime(dr["MovementDate"]).ToString("dd MMM")
                         });
                     }
@@ -362,6 +407,41 @@ namespace VIS.Controllers
             if (hasWarehouse) { return warehouseName; }
             if (hasLocator) { return locatorCode; }
             return "";
+        }
+
+        /// <summary>Same dynamic column-existence check VAS_146/VAS_161-165 already use to guard LocatorCombination.</summary>
+        private bool HasColumn(string tableName, string columnName)
+        {
+            string sql;
+            if (DB.IsPostgreSQL())
+            {
+                sql = @"
+                    SELECT COUNT(1)
+                    FROM information_schema.columns
+                    WHERE UPPER(table_name)=UPPER(@TableName)
+                      AND UPPER(column_name)=UPPER(@ColumnName)";
+            }
+            else
+            {
+                sql = @"
+                    SELECT COUNT(1)
+                    FROM USER_TAB_COLUMNS
+                    WHERE TABLE_NAME=UPPER(@TableName)
+                      AND COLUMN_NAME=UPPER(@ColumnName)";
+            }
+
+            try
+            {
+                return Util.GetValueOfInt(DB.ExecuteScalar(sql, new SqlParameter[]
+                {
+                    new SqlParameter("@TableName", tableName),
+                    new SqlParameter("@ColumnName", columnName)
+                }, null)) > 0;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private static string ToSqlDate(DateTime date)

@@ -94,7 +94,7 @@ namespace VIS.Controllers
                        l.Name AS Address_Line,
                        w.Name AS Warehouse_Name,
                        o.DatePromised AS Promise_Date,
-                       COALESCE(CURRENCYCONVERT(o.GrandTotal, o.C_Currency_ID, @Base_Currency_ID, o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID), 0) AS PO_Value,
+                       COALESCE(CURRENCYCONVERT(CASE WHEN o.IsTaxIncluded='Y' THEN o.TotalLines - COALESCE(OrderTax.Tax_Amt, 0) ELSE o.TotalLines END, o.C_Currency_ID, @Base_Currency_ID, o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID), 0) AS PO_Value,
                        ol.C_OrderLine_ID AS PO_Line_ID
                 FROM C_Order o
                 INNER JOIN C_OrderLine ol ON (ol.C_Order_ID=o.C_Order_ID)"
@@ -103,6 +103,7 @@ namespace VIS.Controllers
                 INNER JOIN M_Warehouse w ON (w.M_Warehouse_ID=o.M_Warehouse_ID)
                 INNER JOIN C_BPartner cb ON (cb.C_BPartner_ID=o.C_BPartner_ID)
                 INNER JOIN C_BPartner_Location l ON (l.C_BPartner_Location_ID=o.C_BPartner_Location_ID)
+                LEFT OUTER JOIN (SELECT OrdTax.C_Order_ID, SUM(OrdTax.TaxAmt) AS Tax_Amt FROM C_OrderTax OrdTax GROUP BY OrdTax.C_Order_ID) OrderTax ON (OrderTax.C_Order_ID=o.C_Order_ID)
                 WHERE o.AD_Client_ID=@AD_Client_ID
                   AND o.DocStatus='CO'
                   AND o.DatePromised" + (pendingMode ? "<" : ">=") + @"@Promised_From
@@ -261,14 +262,24 @@ namespace VIS.Controllers
             // netted off - the line stays receivable until actually delivered.
             bool allowNonItem = Util.GetValueOfString(ctx.GetContext("$AllowNonItem")).Equals("Y");
 
+            // QA sheet GRN #23 (2026-09-15): quantities are shown in the PO line's own UOM (the UOM label
+            // already was) - QtyOrdered / QtyDelivered are product-UOM quantities, so 5,000 ml ordered
+            // used to read "5 Milliliter". Product-UOM values are rescaled by QtyEntered / QtyOrdered;
+            // CreateGRN converts the entered quantity back.
             string lineSql = @"
                 SELECT ol.C_OrderLine_ID AS PO_Line_ID,
                        p.Name AS Item_Name,
                        asi.Description AS Attribute_Name,
-                       COALESCE(ol.QtyOrdered, 0) AS PO_Qty,
-                       COALESCE(ol.QtyDelivered, 0) AS Already_Received_Qty,
-                       COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) AS Default_Received_Qty,
-                       u.Name AS UOM
+                       COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) AS PO_Qty,
+                       /* ROUND: a non-terminating ratio (e.g. 1/3) yields a 40-digit Oracle NUMBER that does not fit .NET decimal. */
+                       CASE WHEN COALESCE(ol.QtyOrdered, 0) <> 0
+                            THEN ROUND(COALESCE(ol.QtyDelivered, 0) * COALESCE(ol.QtyEntered, ol.QtyOrdered) / ol.QtyOrdered, 12)
+                            ELSE COALESCE(ol.QtyDelivered, 0) END AS Already_Received_Qty,
+                       CASE WHEN COALESCE(ol.QtyOrdered, 0) <> 0
+                            THEN ROUND((COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0)) * COALESCE(ol.QtyEntered, ol.QtyOrdered) / ol.QtyOrdered, 12)
+                            ELSE 0 END AS Default_Received_Qty,
+                       COALESCE(u.UOMSymbol, u.Name) AS UOM,
+                       COALESCE(u.StdPrecision, 0) AS UOM_Precision
                 FROM C_Order o
                 INNER JOIN C_OrderLine ol ON (ol.C_Order_ID=o.C_Order_ID)
                 INNER JOIN M_Product p ON (p.M_Product_ID=ol.M_Product_ID" + (!allowNonItem ? " AND p.ProductType='I'" : "") + @")
@@ -316,7 +327,8 @@ namespace VIS.Controllers
                         alreadyReceivedQty = alreadyReceivedQty,
                         defaultReceivedQty = defaultReceivedQty,
                         openQty = defaultReceivedQty,
-                        uom = Util.GetValueOfString(dr["UOM"])
+                        uom = Util.GetValueOfString(dr["UOM"]),
+                        uomPrecision = Util.GetValueOfInt(dr["UOM_Precision"])
                     });
                 }
 
@@ -466,18 +478,35 @@ namespace VIS.Controllers
                         return Fail("One or more selected PO lines are no longer available.");
                     }
 
-                    decimal receivedQty = selectedLine.Value;
+                    // The received quantity is entered in the PO line's own UOM (the modal shows 5,000 ml, not 5 l).
+                    // MovementQty stays in the product UOM (rescaled by QtyOrdered / QtyEntered); QtyEntered is
+                    // what the user typed.
+                    decimal enteredQty = selectedLine.Value;
+
+                    // QA sheet GRN #25 (2026-09-15): no more decimal places than the line UOM's standard precision
+                    // (Each / Milliliter: whole numbers, Liter: 3). Shared with Pending GRN, which posts here too.
+                    int uomPrecision = MUOM.GetPrecision(ctx, orderLine.GetC_UOM_ID());
+                    if (uomPrecision >= 0 && decimal.Round(enteredQty, uomPrecision, MidpointRounding.AwayFromZero) != enteredQty)
+                    {
+                        trx.Rollback();
+                        return Fail(uomPrecision == 0
+                            ? "Enter a whole number as the received quantity."
+                            : "The received quantity allows only " + uomPrecision.ToString(CultureInfo.InvariantCulture) + " decimal places.");
+                    }
+
+                    decimal receivedQty = enteredQty;
+                    if (orderLine.GetQtyEntered() != 0 && orderLine.GetQtyEntered() != orderLine.GetQtyOrdered())
+                    {
+                        receivedQty = decimal.Round(
+                            decimal.Divide(decimal.Multiply(enteredQty, orderLine.GetQtyOrdered()), orderLine.GetQtyEntered()),
+                            12,
+                            MidpointRounding.AwayFromZero);
+                    }
+
                     MInOutLine receiptLine = new MInOutLine(receipt);
                     receiptLine.SetOrderLine(orderLine, locatorId, receivedQty);
                     receiptLine.SetQty(receivedQty);
-
-                    if (orderLine.GetQtyOrdered() != 0 && orderLine.GetQtyEntered() != orderLine.GetQtyOrdered())
-                    {
-                        receiptLine.SetQtyEntered(decimal.Round(
-                            decimal.Divide(decimal.Multiply(receivedQty, orderLine.GetQtyEntered()), orderLine.GetQtyOrdered()),
-                            12,
-                            MidpointRounding.AwayFromZero));
-                    }
+                    receiptLine.SetQtyEntered(enteredQty);
 
                     if (receiptLine.Get_ColumnIndex("PrintDescription") >= 0)
                     {
@@ -579,7 +608,9 @@ namespace VIS.Controllers
             string sql = @"
                 SELECT ol.C_OrderLine_ID AS PO_Line_ID,
                        COALESCE(ol.M_Warehouse_ID, o.M_Warehouse_ID) AS Warehouse_ID,
-                       COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) AS Open_Qty
+                       CASE WHEN COALESCE(ol.QtyOrdered, 0) <> 0
+                            THEN ROUND((COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0)) * COALESCE(ol.QtyEntered, ol.QtyOrdered) / ol.QtyOrdered, 12)
+                            ELSE 0 END AS Open_Qty
                 FROM C_Order o
                 INNER JOIN C_OrderLine ol ON (ol.C_Order_ID=o.C_Order_ID)
                 INNER JOIN M_Product p ON (p.M_Product_ID=ol.M_Product_ID AND p.IsActive='Y')

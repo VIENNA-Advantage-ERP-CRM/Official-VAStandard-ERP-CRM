@@ -89,6 +89,35 @@
     white-space: nowrap;
 }
 
+.MPC-product-search-clear {
+    flex: 0 0 auto;
+    width: 1.125em;
+    height: 1.125em;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: #748494;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+    .MPC-product-search-clear[hidden] {
+        display: none;
+    }
+
+    .MPC-product-search-clear svg {
+        width: 100%;
+        height: 100%;
+    }
+
+    .MPC-product-search-clear:hover {
+        color: #102C3F;
+        background: rgba(16, 44, 63, 0.08);
+    }
+
 .MPC-product-search-suggest {
     position: fixed;
     z-index: 10050;

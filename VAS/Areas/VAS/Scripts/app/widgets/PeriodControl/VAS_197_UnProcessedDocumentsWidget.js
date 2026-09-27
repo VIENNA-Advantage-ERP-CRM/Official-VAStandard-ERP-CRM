@@ -66,21 +66,21 @@
  *  5 | documents not completed                  | VAS_197_DocumentsNotCompleted
  *  6 | Nothing open in this period              | VAS_197_NothingOpen
  *  7 | Status                                   | VAS_197_Status
- *  8 | Document Amount                          | VAS_198_DocumentAmount    (reuse)
- *  9 | No accounting value for this transaction type (tooltip) | VAS_198_NoAmountStrategy (reuse)
- * 10 | Account Date                             | VAS_200_DateAcct          (reuse)
- * 11 | Business Partner                         | VAS_201_BusinessPartner   (reuse)
+ *  8 | Document Amount                          | VAS_197_DocumentAmount
+ *  9 | No accounting value for this transaction type (tooltip) | VAS_197_NoAmountStrategy
+ * 10 | Account Date                             | VAS_197_DateAcct
+ * 11 | Business Partner                         | VAS_197_BusinessPartner
  * 12 | Document Type                            | VIS_DocumentType          (reuse)
- * 13 | No open accounting period                | VAS_201_NoOpenPeriod      (reuse)
- * 14 | Dashboard period                         | VAS_201_DashboardPeriod   (reuse)
- * 15 | No records in this category              | VAS_201_NoRecords         (reuse)
+ * 13 | No open accounting period                | VAS_197_NoOpenPeriod
+ * 14 | Dashboard period                         | VAS_197_DashboardPeriod
+ * 15 | No records in this category              | VAS_197_NoRecords
  * 16 | Document No                              | DocumentNo                (reuse)
- * 17 | Close                                    | VAS_018_Close             (reuse)
- * 18 | Couldn't load                            | VAS_192_CouldntLoad       (reuse)
- * 19 | Showing                                  | VAS_026_Showing           (reuse)
- * 20 | of                                       | VAS_026_Of                (reuse)
- * 21 | Previous                                 | VAS_026_Prev              (reuse)
- * 22 | Next                                     | VAS_026_Next              (reuse)
+ * 17 | Close                                    | VAS_197_Close
+ * 18 | Couldn't load                            | VAS_197_CouldntLoad
+ * 19 | Showing                                  | VAS_197_Showing
+ * 20 | of                                       | VAS_197_Of
+ * 21 | Previous                                 | VAS_197_Prev
+ * 22 | Next                                     | VAS_197_Next
  */
 ; VAS = window.VAS || {};
 
@@ -177,8 +177,7 @@
         // ── Small helpers ────────────────────────────────────────────────────
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return (translated && translated.charAt(0) !== '[' && translated !== key) ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         /* Column captions: prefer the framework's own translated element name so a
@@ -408,7 +407,7 @@
                 success: function (res) {
                     var data = null;
                     try { data = parseResponse(res); } catch (e) { }
-                    if (!data || data.error) { renderState(label('VAS_192_CouldntLoad', "Couldn't load"), true); return; }
+                    if (!data || data.error) { renderState(label('VAS_197_CouldntLoad', "Couldn't load"), true); return; }
 
                     _periods = data.Periods || [];
                     _periodId = data.C_Period_ID || 0;
@@ -417,13 +416,13 @@
                     paintPeriod();
 
                     if (_periods.length === 0 || _periodId <= 0) {
-                        renderState(label('VAS_201_NoOpenPeriod', 'No open accounting period.'), false);
+                        renderState(label('VAS_197_NoOpenPeriod', 'No open accounting period.'), false);
                         return;
                     }
 
                     applyData(data.Data);
                 },
-                error: function () { renderState(label('VAS_192_CouldntLoad', "Couldn't load"), true); },
+                error: function () { renderState(label('VAS_197_CouldntLoad', "Couldn't load"), true); },
                 complete: function () { showBusy(false); }
             });
         }
@@ -438,7 +437,7 @@
                 success: function (res) {
                     var data = null;
                     try { data = parseResponse(res); } catch (e) { }
-                    if (!data || data.error) { renderState(label('VAS_192_CouldntLoad', "Couldn't load"), true); return; }
+                    if (!data || data.error) { renderState(label('VAS_197_CouldntLoad', "Couldn't load"), true); return; }
 
                     /* A late response for a period the user has already moved away
                        from must not overwrite the current card. */
@@ -453,7 +452,7 @@
 
                     applyData(data);
                 },
-                error: function () { renderState(label('VAS_192_CouldntLoad', "Couldn't load"), true); },
+                error: function () { renderState(label('VAS_197_CouldntLoad', "Couldn't load"), true); },
                 complete: function () { showBusy(false); }
             });
         }
@@ -510,7 +509,7 @@
 
             var docsTxt = label('VAS_197_Docs', 'docs');
             var oldestTxt = label('VAS_197_Oldest', 'oldest');
-            var noValueTip = label('VAS_198_NoAmountStrategy',
+            var noValueTip = label('VAS_197_NoAmountStrategy',
                 'No accounting value for this transaction type');
 
             var html = '';
@@ -566,16 +565,16 @@
                 escapeHtml(hint) + '</span>';
 
             if (totalPages > 1) {
-                var ofTxt = label('VAS_026_Of', 'of');
+                var ofTxt = label('VAS_197_Of', 'of');
                 var prevDis = _cardPage <= 1 ? ' disabled' : '';
                 var nextDis = _cardPage >= totalPages ? ' disabled' : '';
 
                 html += '<span class="vas-197-pager-nav">' +
                     '<button type="button" class="vas-197-pgbtn" data-dir="prev" aria-label="' +
-                        escapeHtml(label('VAS_026_Prev', 'Previous')) + '"' + prevDis + '>' + icon('chevL') + '</button>' +
+                        escapeHtml(label('VAS_197_Prev', 'Previous')) + '"' + prevDis + '>' + icon('chevL') + '</button>' +
                     '<span class="vas-197-pager-label">' + _cardPage + ' ' + escapeHtml(ofTxt) + ' ' + totalPages + '</span>' +
                     '<button type="button" class="vas-197-pgbtn" data-dir="next" aria-label="' +
-                        escapeHtml(label('VAS_026_Next', 'Next')) + '"' + nextDis + '>' + icon('chevNext') + '</button>' +
+                        escapeHtml(label('VAS_197_Next', 'Next')) + '"' + nextDis + '>' + icon('chevNext') + '</button>' +
                 '</span>';
             }
 
@@ -634,7 +633,7 @@
            detail modal it closes on an outside click - it is a menu, not a dialog. */
         function buildPicker() {
             $picker = $('<div class="vas-197-pp vas-197-hidden" role="listbox" aria-label="' +
-                escapeHtml(label('VAS_201_DashboardPeriod', 'Dashboard period')) + '">');
+                escapeHtml(label('VAS_197_DashboardPeriod', 'Dashboard period')) + '">');
             $('body').append($picker);
 
             $picker.on('click', '.vas-197-pp-opt', function () {
@@ -646,7 +645,7 @@
 
         function fillPicker() {
             var html = '<div class="vas-197-pp-h">' +
-                escapeHtml(label('VAS_201_DashboardPeriod', 'Dashboard period')) + '</div>';
+                escapeHtml(label('VAS_197_DashboardPeriod', 'Dashboard period')) + '</div>';
 
             for (var i = 0; i < _periods.length; i++) {
                 var p = _periods[i];
@@ -794,7 +793,7 @@
                                 '<div class="vas-197-modal-sub"></div>' +
                             '</div>' +
                             '<button type="button" class="vas-197-modal-close" aria-label="' +
-                                escapeHtml(label('VAS_018_Close', 'Close')) + '">' + icon('close') + '</button>' +
+                                escapeHtml(label('VAS_197_Close', 'Close')) + '">' + icon('close') + '</button>' +
                         '</div>' +
                         '<div class="vas-197-modal-body"></div>' +
                         '<div class="vas-197-modal-foot"></div>' +
@@ -863,8 +862,6 @@
             _modalOpen = true;
             closePicker();
 
-            $(document).on('keydown' + _ns + 'm', onModalKeyDown);
-
             loadModalPage();
         }
 
@@ -874,11 +871,6 @@
             _detailSeq++;                       // drop any page still in flight
             showModalBusy(false);
             if ($overlay) { $overlay.addClass('vas-197-hidden'); }
-            $(document).off('keydown' + _ns + 'm');
-        }
-
-        function onModalKeyDown(e) {
-            if (e.key === 'Escape' || e.keyCode === 27) { closeModal(); }
         }
 
         function showModalBusy(show) {
@@ -915,7 +907,7 @@
                     try { data = parseResponse(res); } catch (e) { }
 
                     if (!data || data.error || data.ErrorCode) {
-                        renderModalState(label('VAS_192_CouldntLoad', "Couldn't load"), true);
+                        renderModalState(label('VAS_197_CouldntLoad', "Couldn't load"), true);
                         return;
                     }
 
@@ -924,7 +916,7 @@
                 },
                 error: function () {
                     if (mySeq !== _detailSeq) { return; }
-                    renderModalState(label('VAS_192_CouldntLoad', "Couldn't load"), true);
+                    renderModalState(label('VAS_197_CouldntLoad', "Couldn't load"), true);
                 },
                 complete: function () {
                     /* Only the newest request may clear the indicator - an overtaken
@@ -963,18 +955,18 @@
 
             var captions = [
                 colLabel('DocumentNo', 'VAS_197_DocumentNo', 'Document No'),
-                colLabel(dateColumn, 'VAS_200_DateAcct', 'Account Date')
+                colLabel(dateColumn, 'VAS_197_DateAcct', 'Account Date')
             ];
 
             if (data.HasBPartner) {
-                captions.push(colLabel('C_BPartner_ID', 'VAS_201_BusinessPartner', 'Business Partner'));
+                captions.push(colLabel('C_BPartner_ID', 'VAS_197_BusinessPartner', 'Business Partner'));
             }
             if (data.HasDocType) {
                 captions.push(colLabel('C_DocType_ID', 'VIS_DocumentType', 'Document Type'));
             }
 
             captions.push(colLabel('DocStatus', 'VAS_197_Status', 'Status'));
-            captions.push(label('VAS_198_DocumentAmount', 'Document Amount'));
+            captions.push(label('VAS_197_DocumentAmount', 'Document Amount'));
 
             return captions;
         }
@@ -998,7 +990,7 @@
             var rows = data.Rows || [];
 
             if (rows.length === 0) {
-                renderModalState(label('VAS_201_NoRecords', 'No records in this category.'), false);
+                renderModalState(label('VAS_197_NoRecords', 'No records in this category.'), false);
                 return;
             }
 
@@ -1141,8 +1133,8 @@
             var from = rows > 0 ? ((pageNo - 1) * pageSize) + 1 : 0;
             var to = rows > 0 ? from + rows - 1 : 0;
 
-            var ofTxt = label('VAS_026_Of', 'of');
-            var showing = label('VAS_026_Showing', 'Showing') + ' ' + from + '–' + to + ' ' +
+            var ofTxt = label('VAS_197_Of', 'of');
+            var showing = label('VAS_197_Showing', 'Showing') + ' ' + from + '–' + to + ' ' +
                 ofTxt + ' ' + formatCount(total);
 
             var prevDis = pageNo <= 1 ? ' disabled' : '';
@@ -1153,10 +1145,10 @@
                     escapeHtml(showing) + '</span>' +
                 '<span class="vas-197-pager-nav">' +
                     '<button type="button" class="vas-197-pgbtn" data-dir="prev" aria-label="' +
-                        escapeHtml(label('VAS_026_Prev', 'Previous')) + '"' + prevDis + '>' + icon('chevL') + '</button>' +
+                        escapeHtml(label('VAS_197_Prev', 'Previous')) + '"' + prevDis + '>' + icon('chevL') + '</button>' +
                     '<span class="vas-197-pager-label">' + pageNo + ' ' + escapeHtml(ofTxt) + ' ' + totalPages + '</span>' +
                     '<button type="button" class="vas-197-pgbtn" data-dir="next" aria-label="' +
-                        escapeHtml(label('VAS_026_Next', 'Next')) + '"' + nextDis + '>' + icon('chevNext') + '</button>' +
+                        escapeHtml(label('VAS_197_Next', 'Next')) + '"' + nextDis + '>' + icon('chevNext') + '</button>' +
                 '</span>'
             );
         }
@@ -1175,7 +1167,7 @@
                 VAS.ZoomUtil.zoomToRecord(keyColumn, recordId, windowId, '', '');
             } catch (e) {
                 if (window.console) { console.log(e); }
-                showError(label('VAS_192_CouldntLoad', "Couldn't load"));
+                showError(label('VAS_197_CouldntLoad', "Couldn't load"));
             }
         }
 

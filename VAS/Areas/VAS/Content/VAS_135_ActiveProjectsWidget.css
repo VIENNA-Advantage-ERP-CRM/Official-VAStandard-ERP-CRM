@@ -187,6 +187,7 @@
 }
 
 .vas135-row-title {
+    max-width: 12em;                            /* ~240px at the 20px root max, per DevTools measurement */
     font-size: 0.85em;
     font-weight: 700;
     color: #102C3F;
@@ -237,6 +238,23 @@
 .vas135-tag-ontime { background: #E7F7EF; color: #0B6B45; }
 .vas135-tag-ongoing { background: #DFF1FF; color: #0E5DA8; }
 .vas135-tag-upcoming { background: #EFEAFF; color: #5F4AA6; }
+
+/* 2026-09-23: in the widget row specifically (not the project-status tag inside
+   the modal, which always has room), the status tag was flex-shrink: 0 - same as
+   the "View" button beside it. When the row's real column is narrow (this widget
+   embedded in a window dashboard, sized the same as VAS_127's "On track" tag +
+   "View" button don't both fit at once, the flex line overflowed .vas135-card's
+   overflow: hidden and "View" got visually clipped, since neither fixed-width
+   sibling would give up space. Letting the tag (a secondary label) shrink and
+   ellipsize first guarantees the "View" button - the row's actual action - is
+   always shown in full, regardless of container width or font size. */
+.vas135-row .vas135-tag {
+    flex-shrink: 1;
+    min-width: 0;
+    max-width: 6em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 
 /* Footer pager — dashboard-widgets.md §"Widget Footer Pager": two zones, the
    result-range helper on the left and a compact prev · "N of M" · next control

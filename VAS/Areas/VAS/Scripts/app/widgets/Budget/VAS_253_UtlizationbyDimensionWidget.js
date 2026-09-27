@@ -81,19 +81,19 @@
  *                     |   the selected year and dimension. |
  *                   7 | (Not assigned)                     | VAS_253_NotAssigned
  *                   8 | sorted by utilization              | VAS_253_SortedByUtilization
- *                   9 | Budget                             | VAS_254_Budget          (reuse)
- *                  10 | Actual                             | VAS_252_Actual          (reuse)
- *                  11 | Utilized                           | VAS_252_Utilized        (reuse)
- *                  12 | of                                 | VAS_020_Of              (reuse)
- *                  13 | Financial year                     | VAS_256_FinancialYear   (reuse)
- *                  14 | No financial years available       | VAS_256_NoYears         (reuse)
- *                  15 | No primary calendar is configured  | VAS_256_NoCalendar      (reuse)
- *                  16 | No primary accounting schema is    | VAS_256_NoAcctSchema    (reuse)
+ *                   9 | Budget                             | VAS_253_Budget          (reuse)
+ *                  10 | Actual                             | VAS_253_Actual          (reuse)
+ *                  11 | Utilized                           | VAS_253_Utilized        (reuse)
+ *                  12 | of                                 | VAS_253_Of              (reuse)
+ *                  13 | Financial year                     | VAS_253_FinancialYear   (reuse)
+ *                  14 | No financial years available       | VAS_253_NoYears         (reuse)
+ *                  15 | No primary calendar is configured  | VAS_253_NoCalendar      (reuse)
+ *                  16 | No primary accounting schema is    | VAS_253_NoAcctSchema    (reuse)
  *                     |   configured                       |
- *                  17 | Showing                            | VAS_020_Showing         (reuse)
- *                  18 | Previous                           | VAS_020_Prev            (reuse)
- *                  19 | Next                               | VAS_020_Next            (reuse)
- *                  20 | Couldn't load                      | VAS_192_CouldntLoad     (reuse)
+ *                  17 | Showing                            | VAS_253_Showing         (reuse)
+ *                  18 | Previous                           | VAS_253_Prev            (reuse)
+ *                  19 | Next                               | VAS_253_Next            (reuse)
+ *                  20 | Couldn't load                      | VAS_253_CouldntLoad     (reuse)
  *
  * Chronological development:
  *   VAI154         Created  Date 2026-09-09
@@ -382,7 +382,7 @@
 
                     var data = parseResponse(raw);
                     if (!data || data.error) {
-                        renderState(label('VAS_192_CouldntLoad', "Couldn't load"));
+                        renderState(label('VAS_253_CouldntLoad', "Couldn't load"));
                         return;
                     }
 
@@ -400,7 +400,7 @@
                     }
 
                     if (!data.Loaded) {
-                        renderState(label('VAS_192_CouldntLoad', "Couldn't load"));
+                        renderState(label('VAS_253_CouldntLoad', "Couldn't load"));
                         return;
                     }
 
@@ -428,7 +428,7 @@
                     /* The overlay comes down on failure too - a spinner left running over
                        an error the user cannot see is the worst of both. */
                     hideBusyIndicator();
-                    renderState(label('VAS_192_CouldntLoad', "Couldn't load"));
+                    renderState(label('VAS_253_CouldntLoad', "Couldn't load"));
                 }
             });
         }
@@ -455,24 +455,24 @@
 
         function errorLabel(code) {
             if (code === 'NOCALENDAR') {
-                return label('VAS_256_NoCalendar', 'No primary calendar is configured');
+                return label('VAS_253_NoCalendar', 'No primary calendar is configured');
             }
             if (code === 'NOACCTSCHEMA') {
-                return label('VAS_256_NoAcctSchema', 'No primary accounting schema is configured');
+                return label('VAS_253_NoAcctSchema', 'No primary accounting schema is configured');
             }
             if (code === 'NOYEAR') {
-                return label('VAS_256_NoYears', 'No financial years available');
+                return label('VAS_253_NoYears', 'No financial years available');
             }
             if (code === 'NODIMENSION') {
                 return label('VAS_253_NoDimensions', 'No accounting dimensions are configured');
             }
-            return label('VAS_192_CouldntLoad', "Couldn't load");
+            return label('VAS_253_CouldntLoad', "Couldn't load");
         }
 
         function paintYearLabel() {
             var text = _fiscalYear || yearNameOf(_yearId);
             $yearBtn.find('.vas-253-pill-label').text(text);
-            $yearBtn.attr('title', label('VAS_256_FinancialYear', 'Financial year') + ': ' + text);
+            $yearBtn.attr('title', label('VAS_253_FinancialYear', 'Financial year') + ': ' + text);
         }
 
         /* The dimension pill carries the ELEMENT'S OWN NAME, never a word from this file -
@@ -620,7 +620,7 @@
            percentage from, so the line and the bar can never disagree. */
         function measureText(item) {
             return compactAmount(Number(item.Actual) || 0) + ' ' +
-                label('VAS_020_Of', 'of') + ' ' +
+                label('VAS_253_Of', 'of') + ' ' +
                 compactAmount(Number(item.Budget) || 0) + ' · ' +
                 percentText(Number(item.UtilizedPct) || 0);
         }
@@ -630,9 +630,9 @@
             var lines = [];
 
             lines.push(isBlank(name) ? NIL : name);
-            lines.push(label('VAS_254_Budget', 'Budget') + ': ' + fullAmount(Number(item.Budget) || 0));
-            lines.push(label('VAS_252_Actual', 'Actual') + ': ' + fullAmount(Number(item.Actual) || 0));
-            lines.push(label('VAS_252_Utilized', 'Utilized') + ': ' +
+            lines.push(label('VAS_253_Budget', 'Budget') + ': ' + fullAmount(Number(item.Budget) || 0));
+            lines.push(label('VAS_253_Actual', 'Actual') + ': ' + fullAmount(Number(item.Actual) || 0));
+            lines.push(label('VAS_253_Utilized', 'Utilized') + ': ' +
                 percentText(Number(item.UtilizedPct) || 0));
 
             return lines.join('\n');
@@ -649,8 +649,8 @@
             /* "Showing 1-4 of 11 · sorted by utilization" - the note says what the order
                means, which a list ranked by something other than its label needs to state
                somewhere. */
-            var showing = label('VAS_020_Showing', 'Showing') + ' ' + from + '-' + to + ' ' +
-                label('VAS_020_Of', 'of') + ' ' + _totalRows + ' · ' +
+            var showing = label('VAS_253_Showing', 'Showing') + ' ' + from + '-' + to + ' ' +
+                label('VAS_253_Of', 'of') + ' ' + _totalRows + ' · ' +
                 label('VAS_253_SortedByUtilization', 'sorted by utilization');
 
             var prevDis = _page <= 1 ? ' disabled' : '';
@@ -662,11 +662,11 @@
                         escapeHtml(showing) + '</span>' +
                     '<div class="vas-253-pager-nav">' +
                         '<button type="button" class="vas-253-pgbtn vas-253-pg-prev" aria-label="' +
-                            escapeHtml(label('VAS_020_Prev', 'Previous')) + '"' + prevDis + '>' + ICONS.prev + '</button>' +
+                            escapeHtml(label('VAS_253_Prev', 'Previous')) + '"' + prevDis + '>' + ICONS.prev + '</button>' +
                         '<span class="vas-253-pager-label">' + _page + ' ' +
-                            escapeHtml(label('VAS_020_Of', 'of')) + ' ' + _totalPages + '</span>' +
+                            escapeHtml(label('VAS_253_Of', 'of')) + ' ' + _totalPages + '</span>' +
                         '<button type="button" class="vas-253-pgbtn vas-253-pg-next" aria-label="' +
-                            escapeHtml(label('VAS_020_Next', 'Next')) + '"' + nextDis + '>' + ICONS.next + '</button>' +
+                            escapeHtml(label('VAS_253_Next', 'Next')) + '"' + nextDis + '>' + ICONS.next + '</button>' +
                     '</div>' +
                 '</div>'
             );
@@ -762,7 +762,7 @@
             var isYear = _pickerKind === PICK_YEAR;
 
             var heading = isYear
-                ? label('VAS_256_FinancialYear', 'Financial year')
+                ? label('VAS_253_FinancialYear', 'Financial year')
                 : label('VAS_253_Dimension', 'Dimension');
 
             var html = '<div class="vas-253-pp-h">' + escapeHtml(heading) + '</div>';
@@ -771,7 +771,7 @@
             if (isYear) {
                 if (_years.length === 0) {
                     html += '<div class="vas-253-pp-empty">' +
-                        escapeHtml(label('VAS_256_NoYears', 'No financial years available')) + '</div>';
+                        escapeHtml(label('VAS_253_NoYears', 'No financial years available')) + '</div>';
                 }
 
                 for (i = 0; i < _years.length; i++) {
@@ -1010,14 +1010,7 @@
         /* Every user-facing string goes through AD_Message; the fallback keeps the card
            readable when a key has not been seeded yet. */
         function label(key, fallback) {
-            try {
-                if (VIS.Msg && typeof VIS.Msg.getMsg === 'function') {
-                    var v = VIS.Msg.getMsg(key);
-                    if (v && v !== key && v.charAt(0) !== '[') { return v; }
-                }
-            }
-            catch (e) { /* ignore */ }
-            return fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         this.getRoot = function () { return $root; };

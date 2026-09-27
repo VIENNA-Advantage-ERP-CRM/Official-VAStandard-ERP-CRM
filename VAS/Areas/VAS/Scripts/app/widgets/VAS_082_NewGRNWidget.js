@@ -31,6 +31,7 @@
  * 20  | Received quantity cannot be greater than open... | VAS_082_ReceivedQtyTooHigh
  * 21  | GRN could not be created.                        | VAS_082_GRNCouldNotBeCreated
  * 22  | Unable to open the GRN window.                   | VAS_082_CouldntOpenWindow
+ * 23  | Received quantity                                | VAS_082_ReceivedQuantity
  */
 ; VAS = window.VAS || {};
 
@@ -76,8 +77,7 @@
         var loading = false;
 
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            return (t && t.charAt(0) !== '[') ? t : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -325,7 +325,6 @@
             $dialogBusy = $dialog.find('.vas-ngrn-busy');
 
             $dialog.find('.vas-ngrn-close').on('click', closeDialog);
-            $dialog.find('.vas-ngrn-scrim').on('click', closeDialog);
             $dialog.find('.vas-ngrn-back').on('click', showPOStep);
 
             $dialogBody.on('click', '.vas-ngrn-po-row', function () {
@@ -340,9 +339,6 @@
                 if (pageNo < totalPages) { loadPOs(pageNo + 1); }
             });
 
-            $(document).on('keydown.vas-ngrn', function (e) {
-                if (e.key === 'Escape' && !$dialog.hasClass('vas-ngrn-hidden')) { closeDialog(); }
-            });
             $(window).on('resize.vas-ngrn', syncPOPageSize);
 
             $('body').append($dialog);
@@ -543,7 +539,7 @@
                     '<div class="vas-ngrn-rcv-name" title="' + escapeHtml(line.itemName) + '">' + escapeHtml(line.itemName) + '</div>' +
                     '<div class="vas-ngrn-rcv-po">' + escapeHtml(formatQty(line.poQty)) + '</div>' +
                     '<div class="vas-ngrn-rcv-po">' + escapeHtml(formatQty(line.alreadyReceivedQty)) + '</div>' +
-                    '<input class="vas-ngrn-rcv-in" type="number" min="0" max="' + escapeHtml(line.openQty) + '" step="any" value="' + escapeHtml(toInputValue(line.defaultReceivedQty)) + '" aria-label="Received quantity"/>' +
+                    '<input class="vas-ngrn-rcv-in" type="number" min="0" max="' + escapeHtml(line.openQty) + '" step="any" value="' + escapeHtml(toInputValue(line.defaultReceivedQty)) + '" aria-label="' + escapeHtml(lbl("VAS_082_ReceivedQuantity")) + '"/>' +
                     '<div class="vas-ngrn-rcv-uom">' + escapeHtml(line.uom) + '</div>' +
                     '</div>';
             }

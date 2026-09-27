@@ -1,0 +1,825 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_295 Unresponded Emails — 3x1 compact glass list (Customers dashboard) +
+ * customer detail modal (shared with VAS_126/138) + shared VAS_135 projects
+ * modal. Design: unresponded-emails.html (attached) + Design Specs/
+ * dashboard-widgets.md "Grid Data Widget". Glass surface, icon-well header,
+ * ranked rows (paged 3), circular pager; customer detail with identity block,
+ * fact grid and signal list; project modal with five activity-state cells,
+ * per-project progress bars and an activity-detail filter; "All" full-list
+ * modal. Widget scales in em against the widget root; modals are px/rem
+ * overlays (not bound by the host widget's compact grid cell). MPC-prefixed.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas295-root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    color: #102C3F;
+    font-family: Roboto, sans-serif;
+    /* Single grid-row (3x1) cell, so the whole card (header + 3 rows + pager)
+       must fit ~1 block - matches VAS_294's compact ceiling. */
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .0095), 15px);
+}
+
+    .vas295-root,
+    .vas295-root * {
+        box-sizing: border-box;
+    }
+
+.vas295-card {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0.625em 0.75em 0.75em;
+    border: 2px solid #FFFFFF;                  /* px */
+    border-radius: 14px;                        /* px */
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.49));
+    backdrop-filter: blur(10px);
+}
+
+.vas295-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    margin-bottom: 0.375em;
+    flex-shrink: 0;
+}
+
+.vas295-head-l {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    min-width: 0;
+}
+
+.vas295-iconwell {
+    width: 1.75em;
+    height: 1.75em;
+    flex-shrink: 0;
+    border-radius: 9px;                         /* px */
+    display: grid;
+    place-items: center;
+    background: linear-gradient(180deg, #FFFFFF, #F1F8FF);
+    border: 1px solid #BFE4FF;                  /* px */
+    color: #0083DA;
+}
+
+    .vas295-iconwell svg {
+        width: 1em;
+        height: 1em;
+    }
+
+.vas295-head-txt {
+    min-width: 0;
+}
+
+.vas295-title {
+    font-size: 1.05em;
+    font-weight: 500;
+    color: #000000;
+    line-height: 1.15;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas295-sub {
+    font-size: 0.68em;
+    color: #717182;
+    margin-top: 1px;                            /* px */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas295-alllink {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;                                   /* px */
+    background: transparent;
+    border: none;
+    color: #0083DA;
+    font-family: inherit;
+    font-weight: 500;
+    font-size: 0.75em;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+    .vas295-alllink svg {
+        width: 0.8em;
+        height: 0.8em;
+    }
+
+.vas295-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.vas295-list {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+    /* Widget body: split the available height into `pageSize` (3) equal rows so
+     * the records fill the compact card top-to-bottom (grid-template-rows set
+     * inline in JS). Partial pages leave empty tracks at the bottom rather than
+     * stretching. The "All" modal list keeps the flex layout above, since this
+     * only targets the direct child of the widget body. Matches VAS_135/138/294. */
+    .vas295-body > .vas295-list {
+        display: grid;
+        grid-auto-rows: minmax(0, 1fr);
+    }
+
+.vas295-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    width: 100%;
+    padding: 0.3em 0.2em;
+    border: none;
+    border-bottom: 1px solid #EDF2F6;           /* px */
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    flex-shrink: 0;
+}
+
+    .vas295-row:last-child {
+        border-bottom: none;
+    }
+
+    .vas295-row:hover {
+        background: rgba(215, 139, 16, 0.06);
+    }
+
+.vas295-row-ic {
+    width: 1.6em;
+    height: 1.6em;
+    border-radius: 8px;                         /* px */
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    color: #D78B10;
+    background: rgba(215, 139, 16, 0.12);
+}
+
+    .vas295-row-ic svg {
+        width: 0.9em;
+        height: 0.9em;
+    }
+
+.vas295-row-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas295-row-title {
+    font-size: 0.82em;
+    font-weight: 700;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas295-row-meta {
+    font-size: 0.7em;
+    color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas295-open {
+    flex-shrink: 0;
+    border-radius: 999px;
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 0.7em;
+    padding: 0.24em 0.6em;
+    background: #FFFFFF;
+    border: 1px solid #BFE4FF;                  /* px */
+    color: #0083DA;
+    cursor: pointer;
+}
+
+    .vas295-open:hover {
+        background: #EAF8FF;
+    }
+
+/* Tags: row days-waiting (delayed/warn), tier (customer detail), project status. */
+.vas295-tag {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.66em;
+    font-weight: 600;
+    padding: 0.1875em 0.5em;
+    border-radius: 6px;                         /* px */
+    line-height: 1.2;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.vas295-tag-delayed { background: #FAD7D7; color: #8F2D2D; }
+.vas295-tag-warn { background: #FCEBD3; color: #9A6500; }
+.vas295-tag-ontime { background: #E7F7EF; color: #0B6B45; }
+.vas295-tag-ongoing { background: #DFF1FF; color: #0E5DA8; }
+.vas295-tag-upcoming { background: #EFEAFF; color: #5F4AA6; }
+.vas295-tag-violet { background: #EFEAFF; color: #5F4AA6; }
+.vas295-tag-amber { background: #FCEBD3; color: #9A6500; }
+.vas295-tag-info { background: #DFF1FF; color: #0E5DA8; }
+.vas295-tag-neutral { background: #EEF2F6; color: #5F7283; }
+
+/* Footer pager — dashboard-widgets.md §"Widget Footer Pager": two zones, the
+   result-range helper on the left and a compact prev · "N of M" · next control
+   on the right. Matches VAS_135/294's shared rounded-square pager buttons. */
+.vas295-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    padding-top: 0.3em;
+    margin-top: 0.15em;
+    flex-shrink: 0;
+}
+
+.vas295-pglabel {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.7em;
+    color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas295-pgctl {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    flex-shrink: 0;
+}
+
+.vas295-pgtext {
+    min-width: 2.8em;
+    text-align: center;
+    font-size: 0.78em;
+    font-weight: 500;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.vas295-pgbtn {
+    width: 1.4em;                               /* ~21px */
+    height: 1.4em;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #E4EDF4;                  /* px */
+    border-radius: 6px;                         /* px */
+    background: #FBFDFF;
+    color: #0083DA;
+    cursor: pointer;
+}
+
+    .vas295-pgbtn:hover:not(:disabled) {
+        background: #EAF8FF;
+        border-color: #BFE4FF;
+    }
+
+    .vas295-pgbtn:disabled {
+        color: #B8C6D2;
+        cursor: default;
+    }
+
+    .vas295-pgbtn svg {
+        width: 0.8em;
+        height: 0.8em;
+        stroke: currentColor;
+    }
+
+.vas295-state {
+    padding: 0.7em 0.2em;
+    font-size: 0.8em;
+    color: #748494;
+    text-align: center;
+}
+
+/* ── Shared modal chrome (same scale as VAS_135/138 - a modal overlay is not
+   bound by the host widget's compact grid cell) ──────────────────────────── */
+
+.vas295-dialog,
+.vas295-detail,
+.vas295-proj-modal {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;                              /* px */
+    font-family: Roboto, sans-serif;
+    color: #102C3F;
+}
+
+.vas295-dialog { z-index: 5000; }
+.vas295-detail { z-index: 5100; }
+.vas295-proj-modal { z-index: 5150; }
+
+    .vas295-dialog.is-open,
+    .vas295-detail.is-open,
+    .vas295-proj-modal.is-open {
+        display: flex;
+    }
+
+    .vas295-dialog *, .vas295-detail *, .vas295-proj-modal *,
+    .vas295-dialog, .vas295-detail, .vas295-proj-modal {
+        box-sizing: border-box;
+    }
+
+.vas295-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(2, 20, 34, 0.42);
+    backdrop-filter: blur(2px);
+}
+
+.vas295-panel,
+.vas295-dpanel,
+.vas295-ppanel {
+    position: relative;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    background: #FFFFFF;
+    border-radius: 18px;                        /* px */
+    box-shadow: 0 30px 80px rgba(2, 20, 34, 0.35);
+    overflow: hidden;
+    max-height: 86vh;
+}
+
+.vas295-panel { max-width: 640px; }         /* px */
+.vas295-dpanel { max-width: 760px; }        /* px */
+.vas295-ppanel { max-width: 720px; }        /* px */
+
+.vas295-phead {
+    flex-shrink: 0;
+    height: 56px;                               /* px */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;                            /* px */
+    border-bottom: 1px solid #E4EDF4;           /* px */
+}
+
+.vas295-ptitle {
+    font-size: 16px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas295-phead-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;                                  /* px */
+}
+
+.vas295-pcount,
+.vas295-dsummary,
+.vas295-psummary {
+    font-size: 13px;                            /* px */
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 260px;                           /* px */
+}
+
+.vas295-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;                         /* px */
+    display: grid;
+    place-items: center;
+    background: transparent;
+    border: none;
+    color: #102C3F;
+    cursor: pointer;
+}
+
+    .vas295-close:hover {
+        background: #F1F4F8;
+    }
+
+    .vas295-close svg {
+        width: 20px;
+        height: 20px;
+    }
+
+.vas295-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;                                   /* px */
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 13px;                            /* px */
+    font-weight: 600;
+    padding: 8px 16px;                          /* px */
+    border: none;
+    cursor: pointer;
+}
+
+    .vas295-btn svg {
+        width: 14px;
+        height: 14px;
+    }
+
+.vas295-btn-ghost {
+    background: #FFFFFF;
+    border: 1px solid #BFE4FF;                  /* px */
+    color: #0083DA;
+}
+
+    .vas295-btn-ghost:hover {
+        background: #EAF8FF;
+    }
+
+.vas295-btn-primary {
+    background: #1F83FF;
+    color: #FFFFFF;
+}
+
+    .vas295-btn-primary:hover {
+        background: #1F83FF;
+    }
+
+/* All-list modal. */
+.vas295-pbody {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 6px 20px 8px;                      /* px */
+    font-size: 16px;                            /* px — modal rows use fixed sizing */
+}
+
+.vas295-pfoot {
+    flex-shrink: 0;
+    padding: 10px 20px 16px;                    /* px */
+    border-top: 1px solid #E4EDF4;              /* px */
+    background: #FBFDFF;
+}
+
+    /* Spec §Alignment Rules: helper stays left, control stays right — the modal
+       footer no longer centres the pager. */
+    .vas295-pfoot .vas295-pager {
+        padding-top: 0;
+        margin-top: 0;
+    }
+
+    .vas295-pbody .vas295-row {
+        padding: 0.7em 0.5em;
+    }
+
+/* ── Customer detail modal ────────────────────────────────────────────────── */
+
+.vas295-dbody {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 20px 24px;                         /* px */
+}
+
+.vas295-dfoot {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;                                  /* px */
+    padding: 14px 24px;                         /* px */
+    border-top: 1px solid #E4EDF4;              /* px */
+    background: #FBFDFF;
+}
+
+.vas295-id {
+    display: flex;
+    align-items: center;
+    gap: 14px;                                  /* px */
+    padding-bottom: 18px;                       /* px */
+    border-bottom: 1px solid #E4EDF4;           /* px */
+    margin-bottom: 18px;                        /* px */
+}
+
+.vas295-id-avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 12px;                        /* px */
+    display: grid;
+    place-items: center;
+    font-size: 16px;                            /* px */
+    font-weight: 700;
+    color: #FFFFFF;
+    flex-shrink: 0;
+}
+
+.vas295-id-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.vas295-id-name {
+    font-size: 22px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas295-id-sub {
+    font-size: 13px;                            /* px */
+    color: #5F7283;
+    margin-top: 2px;                            /* px */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas295-id-tier {
+    flex-shrink: 0;
+}
+
+.vas295-factgrid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px 18px;                             /* px */
+    padding-bottom: 18px;                       /* px */
+    border-bottom: 1px solid #E4EDF4;           /* px */
+}
+
+.vas295-fl {
+    font-size: 11px;                            /* px */
+    color: #748494;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;                      /* px */
+}
+
+.vas295-fv {
+    font-size: 15px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    margin-top: 3px;                            /* px */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas295-signals {
+    padding-top: 16px;                          /* px */
+}
+
+.vas295-sig-title {
+    font-size: 14px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    margin-bottom: 6px;                         /* px */
+}
+
+.vas295-signal {
+    display: flex;
+    align-items: center;
+    gap: 12px;                                  /* px */
+    padding: 11px 0;                            /* px */
+    border-bottom: 1px solid #EDF2F6;           /* px */
+}
+
+    .vas295-signal:last-child {
+        border-bottom: none;
+    }
+
+.vas295-sig-ic {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;                         /* px */
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+}
+
+    .vas295-sig-ic svg {
+        width: 16px;
+        height: 16px;
+    }
+
+.vas295-sig-name {
+    font-size: 14px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas295-sig-detail {
+    font-size: 12px;                            /* px */
+    color: #5F7283;
+}
+
+/* ── Projects modal (shared VAS_135 shape) ────────────────────────────────── */
+
+.vas295-projbody {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 18px 24px;                         /* px */
+}
+
+/* Five activity-state cells. */
+.vas295-statgrid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;                                   /* px */
+    margin-bottom: 16px;                        /* px */
+}
+
+.vas295-astat {
+    border: 1px solid #E4EDF4;                  /* px */
+    border-radius: 10px;                        /* px */
+    padding: 9px;                               /* px */
+    text-align: center;
+    cursor: pointer;
+    background: #FFFFFF;
+    font-family: inherit;
+}
+
+    .vas295-astat:hover {
+        border-color: #BFE4FF;
+    }
+
+    .vas295-astat.is-active {
+        border-color: #1F83FF;
+        box-shadow: 0 0 0 1px #1F83FF inset;
+    }
+
+    .vas295-astat b {
+        display: block;
+        font-size: 1.25rem;                     /* px-ish */
+        line-height: 1;
+    }
+
+    .vas295-astat span {
+        font-size: 11px;                        /* px */
+        color: #5F7283;
+    }
+
+.MPC-astat-delayed b { color: #ED1C24; }
+.MPC-astat-ontime b { color: #20A464; }
+.MPC-astat-ongoing b { color: #0083DA; }
+.MPC-astat-upcoming b { color: #5F4AA6; }
+.MPC-astat-completed b { color: #20A464; }
+
+/* Activity-detail list (state filter). */
+.vas295-actdetail:empty {
+    display: none;
+}
+
+.vas295-actlist {
+    border: 1px solid #E4EDF4;                  /* px */
+    border-radius: 10px;                        /* px */
+    padding: 4px 12px;                          /* px */
+    margin-bottom: 16px;                        /* px */
+    background: #FBFDFF;
+}
+
+.vas295-act {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;                                  /* px */
+    padding: 9px 0;                             /* px */
+    border-bottom: 1px solid #EDF2F6;           /* px */
+}
+
+    .vas295-act:last-child {
+        border-bottom: none;
+    }
+
+.vas295-act-main {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas295-act-name {
+    font-size: 13px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas295-act-proj {
+    font-size: 11px;                            /* px */
+    color: #748494;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas295-act-due {
+    font-size: 12px;                            /* px */
+    color: #5F7283;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.vas295-proj {
+    padding: 12px 0;                            /* px */
+    border-bottom: 1px solid #EDF2F6;           /* px */
+}
+
+    .vas295-proj:last-child {
+        border-bottom: none;
+    }
+
+.vas295-proj-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;                                  /* px */
+    margin-bottom: 8px;                         /* px */
+}
+
+.vas295-proj-name {
+    font-size: 14px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.vas295-proj-bd {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;                                   /* px */
+    margin-bottom: 8px;                         /* px */
+}
+
+.vas295-bd {
+    font-size: 11px;                            /* px */
+    font-weight: 600;
+    padding: 2px 7px;                           /* px */
+    border-radius: 6px;                         /* px */
+    white-space: nowrap;
+}
+
+.MPC-bd-delayed { background: #FAD7D7; color: #8F2D2D; }
+.MPC-bd-ontime { background: #E7F7EF; color: #0B6B45; }
+.MPC-bd-ongoing { background: #DFF1FF; color: #0E5DA8; }
+.MPC-bd-upcoming { background: #EFEAFF; color: #5F4AA6; }
+.MPC-bd-completed { background: #E7F7EF; color: #0B6B45; }
+
+.vas295-bar {
+    height: 8px;                                /* px */
+    border-radius: 999px;
+    background: rgba(15, 61, 97, 0.07);
+    overflow: hidden;
+}
+
+    .vas295-bar > div {
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #0083DA, #1F83FF);
+    }
+
+.vas295-proj-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;                                  /* px */
+    margin-top: 6px;                            /* px */
+    font-size: 12px;                            /* px */
+    color: #5F7283;
+}
+
+body.vas295-modal-open {
+    overflow: hidden;
+}

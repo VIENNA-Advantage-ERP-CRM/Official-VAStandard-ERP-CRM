@@ -113,8 +113,7 @@
         /* An unseeded AD_Message can come back bracketed OR as the key itself - both mean
            "missing", so the readable English fallback wins in either case. */
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            return (t && t !== key && t.charAt(0) !== '[') ? t : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(s) {

@@ -26,17 +26,17 @@
  *  # | Current Text                    | Message Key
  * ---+---------------------------------+-----------------------------------
  *  1 | Previous Period                 | VAS_193_PreviousPeriod        (new)
- *  2 | Open                            | VAS_192_Open
- *  3 | Partially Open                  | VAS_192_PartiallyOpen
- *  4 | Closed                          | VAS_192_Closed
- *  5 | Permanently Closed              | VAS_192_PermanentlyClosed
- *  6 | Never Opened                    | VAS_192_NeverOpened
- *  7 | Not Configured                  | VAS_192_NotConfigured
- *  8 | No Period Found                 | VAS_192_NoPeriodFound
- *  9 | Check accounting calendar setup | VAS_192_CheckCalendarSetup
- * 10 | Period                          | VAS_192_Period
- * 11 | Couldn't load                   | VAS_192_CouldntLoad
- * 12 | Overlapping periods configured  | VAS_192_OverlappingPeriods
+ *  2 | Open                            | VAS_193_Open
+ *  3 | Partially Open                  | VAS_193_PartiallyOpen
+ *  4 | Closed                          | VAS_193_Closed
+ *  5 | Permanently Closed              | VAS_193_PermanentlyClosed
+ *  6 | Never Opened                    | VAS_193_NeverOpened
+ *  7 | Not Configured                  | VAS_193_NotConfigured
+ *  8 | No Period Found                 | VAS_193_NoPeriodFound
+ *  9 | Check accounting calendar setup | VAS_193_CheckCalendarSetup
+ * 10 | Period                          | VAS_193_Period
+ * 11 | Couldn't load                   | VAS_193_CouldntLoad
+ * 12 | Overlapping periods configured  | VAS_193_OverlappingPeriods
  */
 ; VAS = window.VAS || {};
 
@@ -64,13 +64,13 @@
        VASLogic.Models.VAS_193_PreviousPeriodModel through the shared
        VAS_192_CurrentPeriodModel status rule - keep all three sides in lock-step. */
     var STATUS_MAP = {
-        'OPEN': { key: 'VAS_192_Open', text: 'Open', tone: 'ok' },
-        'PARTIAL': { key: 'VAS_192_PartiallyOpen', text: 'Partially Open', tone: 'warn' },
-        'CLOSED': { key: 'VAS_192_Closed', text: 'Closed', tone: 'plain' },
-        'PERMCLOSED': { key: 'VAS_192_PermanentlyClosed', text: 'Permanently Closed', tone: 'dark' },
-        'NEVER': { key: 'VAS_192_NeverOpened', text: 'Never Opened', tone: 'muted' },
-        'NOTCONFIG': { key: 'VAS_192_NotConfigured', text: 'Not Configured', tone: 'warn' },
-        'NOPERIOD': { key: 'VAS_192_NotConfigured', text: 'Not Configured', tone: 'warn' }
+        'OPEN': { key: 'VAS_193_Open', text: 'Open', tone: 'ok' },
+        'PARTIAL': { key: 'VAS_193_PartiallyOpen', text: 'Partially Open', tone: 'warn' },
+        'CLOSED': { key: 'VAS_193_Closed', text: 'Closed', tone: 'plain' },
+        'PERMCLOSED': { key: 'VAS_193_PermanentlyClosed', text: 'Permanently Closed', tone: 'dark' },
+        'NEVER': { key: 'VAS_193_NeverOpened', text: 'Never Opened', tone: 'muted' },
+        'NOTCONFIG': { key: 'VAS_193_NotConfigured', text: 'Not Configured', tone: 'warn' },
+        'NOPERIOD': { key: 'VAS_193_NotConfigured', text: 'Not Configured', tone: 'warn' }
     };
 
     VAS.VAS_193_PreviousPeriodWidget = function () {
@@ -86,8 +86,7 @@
         var $busy;
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return (translated && translated.charAt(0) !== '[') ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -168,11 +167,11 @@
                    current period is the first period of the calendar and nothing
                    precedes it. Say so plainly - do not substitute the current
                    period, the latest closed period or the previous calendar month. */
-                var noPeriod = label("VAS_192_NoPeriodFound", "No Period Found");
+                var noPeriod = label("VAS_193_NoPeriodFound", "No Period Found");
                 $valueEl.text(noPeriod).attr('title', noPeriod);
                 setPill('NOPERIOD');
 
-                var hint = label("VAS_192_CheckCalendarSetup", "Check accounting calendar setup");
+                var hint = label("VAS_193_CheckCalendarSetup", "Check accounting calendar setup");
                 $metaEl.text(hint).attr('title', hint);
                 return;
             }
@@ -190,7 +189,7 @@
             if (data.CalendarName) { parts.push(data.CalendarName); }
             if (data.FiscalYear) { parts.push(data.FiscalYear); }
             if (data.PeriodNoDisplay) {
-                parts.push(label("VAS_192_Period", "Period") + ' ' + data.PeriodNoDisplay);
+                parts.push(label("VAS_193_Period", "Period") + ' ' + data.PeriodNoDisplay);
             }
 
             var meta = parts.join(' · ');
@@ -200,7 +199,7 @@
                to hide behind a silently chosen record. */
             $card.toggleClass('vas-193-warn-overlap', !!data.HasOverlap);
             if (data.HasOverlap) {
-                var warn = label("VAS_192_OverlappingPeriods", "Overlapping periods configured");
+                var warn = label("VAS_193_OverlappingPeriods", "Overlapping periods configured");
                 $metaEl.attr('title', meta + ' · ' + warn);
             }
         }
@@ -210,7 +209,7 @@
             $valueEl.text(dash).removeAttr('title');
             setPill('NOTCONFIG');
 
-            var msg = label("VAS_192_CouldntLoad", "Couldn't load");
+            var msg = label("VAS_193_CouldntLoad", "Couldn't load");
             $metaEl.text(msg).attr('title', msg);
             $card.removeClass('vas-193-warn-overlap');
         }

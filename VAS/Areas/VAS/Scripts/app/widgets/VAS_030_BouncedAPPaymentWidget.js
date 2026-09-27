@@ -22,7 +22,7 @@
  * 13  | Bank Account                                      | VAS_BankAccount
  * 14  | Payment Currency                                  | VAS_PaymentCurrency
  * 15  | Amount                                            | VAS_Amount
- * 16  | Payment Method                                    | VAS_Method
+ * 16  | Payment Method                                    | VAS_030_Method
  * 17  | Execution Status                                  | VAS_030_Status
  * 18  | Previous                                          | VAS_Previous
  * 19  | Next                                              | VAS_Next
@@ -88,12 +88,7 @@
          * Returns translated message or fallback.
          */
         function lbl(key, fallback) {
-            var text = VIS.Msg.getMsg(key);
-
-            return text &&
-                text !== '[' + key + ']'
-                ? text
-                : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         /**
@@ -938,7 +933,7 @@
                         totalPages = 0;
 
                         renderErrorRow(
-                            lbl('VAS_ErrorInvalidResponse', 'Invalid response from server')
+                            lbl('VAS_030_ErrorInvalidResponse', 'Invalid response from server')
                         );
 
                         return;
@@ -1764,7 +1759,7 @@
                 '<th>' +
                 escapeHtml(
                     lbl(
-                        'VAS_Method',
+                        'VAS_030_Method',
                         'Payment Method'
                     )
                 ) +
@@ -1898,16 +1893,6 @@
                     closeDialog
                 );
 
-            $dialog
-                .find(
-                    '.vas-bounced-ap-payment-dialog-scrim'
-                )
-                .off('click.vas030')
-                .on(
-                    'click.vas030',
-                    closeDialog
-                );
-
             $pagerPrev
                 .off('click.vas030')
                 .on(
@@ -1946,25 +1931,6 @@
 
                         pageNo++;
                         loadRows();
-                    }
-                );
-
-            $(document)
-                .off(
-                    'keydown.vas-bounced-ap-payment-' +
-                    self.AD_UserHomeWidgetID
-                )
-                .on(
-                    'keydown.vas-bounced-ap-payment-' +
-                    self.AD_UserHomeWidgetID,
-                    function (e) {
-                        if (
-                            e.key === 'Escape' &&
-                            $dialog &&
-                            $dialog.is(':visible')
-                        ) {
-                            closeDialog(e);
-                        }
                     }
                 );
 

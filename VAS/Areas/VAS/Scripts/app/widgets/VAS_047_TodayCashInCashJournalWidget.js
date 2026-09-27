@@ -101,8 +101,7 @@
 
         /* ── Label helper ───────────────────────────────────────────── */
         function lbl(key, fallback) {
-            var text = VIS.Msg.getMsg(key);
-            return text && text !== '[' + key + ']' ? text : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function getPrecision(precision) {
@@ -234,7 +233,7 @@
             $dialogTbody.empty();
 
             if (!rows || rows.length === 0) {
-                renderDialogMessage('No data');
+                renderDialogMessage(lbl('VAS_047_NoData', 'No data available'));
                 return;
             }
 
@@ -543,7 +542,6 @@
             }
 
             $dialog.find('.VAS-047-cash-in-dialog-close').on('click', closeDialog);
-            $dialog.find('.VAS-047-cash-in-dialog-scrim').on('click', closeDialog);
 
             $pagerPrev.on('click', function () {
                 if (rowsLoading || pageNo <= 1) {
@@ -561,13 +559,6 @@
 
                 pageNo++;
                 loadDialogRows();
-            });
-
-            eventNamespace = '.VAS047CashIn' + String(uid).replace(/[^A-Za-z0-9]/g, '');
-            $(document).on('keydown' + eventNamespace, function (event) {
-                if (event.key === 'Escape' && $dialog && $dialog.is(':visible')) {
-                    closeDialog();
-                }
             });
 
             $('body').append($dialog);
@@ -739,7 +730,7 @@
                     }
 
                     if (!response.hasData) {
-                        showState(true, 'No data');
+                        showState(true, lbl('VAS_047_NoData', 'No data available'));
                         return;
                     }
 

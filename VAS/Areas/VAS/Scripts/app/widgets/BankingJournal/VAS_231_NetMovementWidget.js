@@ -58,8 +58,8 @@
  *                   4 | out                           | VAS_231_Out
  *                   5 | Receipts                      | VAS_231_Receipts
  *                   6 | Payments                      | VAS_231_Payments
- *                   7 | Dashboard period              | VAS_201_DashboardPeriod (reuse)
- *                   8 | Couldn't load                 | VAS_192_CouldntLoad     (reuse)
+ *                   7 | Dashboard period              | VAS_231_DashboardPeriod
+ *                   8 | Couldn't load                 | VAS_231_CouldntLoad
  *
  *                  VAS_231_NoPeriod is RETIRED - a tenant with no started period now
  *                  reads as a zero in its own currency rather than as a sentence, and
@@ -255,7 +255,7 @@
                     if (_disposed) { return; }
 
                     var data = parseResponse(raw);
-                    if (!data || data.error) { renderState(label('VAS_192_CouldntLoad', "Couldn't load")); return; }
+                    if (!data || data.error) { renderState(label('VAS_231_CouldntLoad', "Couldn't load")); return; }
 
                     _periods = data.Periods || [];
                     _currency = data.Currency || null;
@@ -278,7 +278,7 @@
                 },
                 error: function () {
                     if (_disposed) { return; }
-                    renderState(label('VAS_192_CouldntLoad', "Couldn't load"));
+                    renderState(label('VAS_231_CouldntLoad', "Couldn't load"));
                 }
             });
         }
@@ -299,7 +299,7 @@
 
                     var data = parseResponse(raw);
                     if (!data || data.error || !data.Loaded) {
-                        renderState(label('VAS_192_CouldntLoad', "Couldn't load"));
+                        renderState(label('VAS_231_CouldntLoad', "Couldn't load"));
                         return;
                     }
 
@@ -308,7 +308,7 @@
                 },
                 error: function () {
                     if (_disposed || periodId !== _periodId) { return; }
-                    renderState(label('VAS_192_CouldntLoad', "Couldn't load"));
+                    renderState(label('VAS_231_CouldntLoad', "Couldn't load"));
                 }
             });
         }
@@ -449,7 +449,7 @@
         /* ------------------------------------------------------------ */
         function buildPicker() {
             $picker = $('<div class="vas-231-pp vas-231-hidden" role="listbox" aria-label="' +
-                escapeHtml(label('VAS_201_DashboardPeriod', 'Dashboard period')) + '"></div>');
+                escapeHtml(label('VAS_231_DashboardPeriod', 'Dashboard period')) + '"></div>');
             $('body').append($picker);
 
             $picker.on('click', '.vas-231-pp-opt', function () {
@@ -461,7 +461,7 @@
 
         function fillPicker() {
             var html = '<div class="vas-231-pp-h">' +
-                escapeHtml(label('VAS_201_DashboardPeriod', 'Dashboard period')) + '</div>';
+                escapeHtml(label('VAS_231_DashboardPeriod', 'Dashboard period')) + '</div>';
 
             for (var i = 0; i < _periods.length; i++) {
                 var p = _periods[i];
@@ -599,14 +599,7 @@
         /* Every user-facing string goes through AD_Message; the fallback keeps the card
            readable when a key has not been seeded yet. */
         function label(key, fallback) {
-            try {
-                if (VIS.Msg && typeof VIS.Msg.getMsg === 'function') {
-                    var v = VIS.Msg.getMsg(key);
-                    if (v && v !== key && v.charAt(0) !== '[') { return v; }
-                }
-            }
-            catch (e) { /* ignore */ }
-            return fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         this.getRoot = function () { return $root; };

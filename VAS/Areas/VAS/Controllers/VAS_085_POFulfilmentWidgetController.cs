@@ -13,23 +13,20 @@ namespace VIS.Controllers
 {
     /// <summary>
     /// Module Name : PO Fulfilment % (Material Receipt / GRN dashboard KPI)
-    /// Purpose     : KPI = overall purchase-order fulfilment percentage
-    ///               (SUM(QtyDelivered) / SUM(QtyOrdered) * 100) across COMPLETED
-    ///               purchase orders whose effective date (line promised, else
-    ///               header promised, else order date) falls in the current
-    ///               financial year through the active period, plus the
-    ///               percentage-point change vs the previous period. Read-only.
-    ///               MRole is applied to the C_Order body inside EACH CTE (the
-    ///               main physical table); never to the CTE aliases nor the outer
-    ///               query (shared Prompt_Instructions CTE rule).
+    /// Purpose     : KPI = purchase-order fulfilment percentage for purchase orders raised in
+    ///               the current calendar month (received qty / ordered qty over Item-type
+    ///               lines, received capped at ordered per line), plus the point change vs the
+    ///               POs raised in the previous calendar month. Completed / closed vendor POs,
+    ///               no returns, no blanket orders. Read-only. MRole on C_Order.
     /// Chronological development:
     ///   &lt;EmpCode&gt;   2026-06-18 Created
+    ///   2026-09-15 QA sheet GRN #4/#5: month of the PO instead of a financial year-to-date window,
+    ///              Item lines only, received capped at ordered, one-decimal result
     /// </summary>
     public class VAS_085_POFulfilmentWidgetController : Controller
     {
         /// <summary>
-        /// KPI tile data: current overall PO fulfilment % and the point change
-        /// versus last month.
+        /// KPI tile data: current-month PO fulfilment % and the point change versus last month.
         /// </summary>
         /// <returns>JSON { currentPercent, changePercent }.</returns>
         [AjaxAuthorizeAttribute]
@@ -46,95 +43,73 @@ namespace VIS.Controllers
 
             Ctx ctx = Session["ctx"] as Ctx;
 
-            FulfilmentPeriods periods = GetFulfilmentPeriods(ctx);
-            if (periods == null)
-            {
-                return Json(new
-                {
-                    error = Msg.GetMsg(ctx, "VAS_PeriodNotFound") ?? "No active financial period found"
-                }, JsonRequestBehavior.AllowGet);
-            }
-
-            /* Per-CTE body: ordered + delivered totals over completed POs in a
-               date window. The effective date prefers the line promised date,
-               then the header promised date, then the order date. */
-            string currentOverallSql = @"
-                SELECT SUM(COALESCE(OrdLine.QtyOrdered, 0)) AS Ordered_Qty,
-                       SUM(COALESCE(OrdLine.QtyDelivered, 0)) AS Delivered_Qty
-                FROM C_Order Ord
-                INNER JOIN C_OrderLine OrdLine ON (OrdLine.C_Order_ID=Ord.C_Order_ID)
-                WHERE Ord.IsActive='Y'
-                  AND OrdLine.IsActive='Y'
-                  AND Ord.IsSOTrx='N'
-                  AND Ord.DocStatus='CO'
-                  AND COALESCE(OrdLine.DatePromised, Ord.DatePromised, Ord.DateOrdered) >= @YearStart
-                  AND COALESCE(OrdLine.DatePromised, Ord.DatePromised, Ord.DateOrdered) < @CurrentPeriodEndNext";
-
-            currentOverallSql = MRole.GetDefault(ctx).AddAccessSQL(
-                currentOverallSql, "Ord", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-
-            string lastMonthSql = @"
-                SELECT SUM(COALESCE(OrdLine.QtyOrdered, 0)) AS Ordered_Qty,
-                       SUM(COALESCE(OrdLine.QtyDelivered, 0)) AS Delivered_Qty
-                FROM C_Order Ord
-                INNER JOIN C_OrderLine OrdLine ON (OrdLine.C_Order_ID=Ord.C_Order_ID)
-                WHERE Ord.IsActive='Y'
-                  AND OrdLine.IsActive='Y'
-                  AND Ord.IsSOTrx='N'
-                  AND Ord.DocStatus='CO'
-                  AND COALESCE(OrdLine.DatePromised, Ord.DatePromised, Ord.DateOrdered) >= @PreviousPeriodStart
-                  AND COALESCE(OrdLine.DatePromised, Ord.DatePromised, Ord.DateOrdered) < @PreviousPeriodEndNext";
-
-            lastMonthSql = MRole.GetDefault(ctx).AddAccessSQL(
-                lastMonthSql, "Ord", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            /* The old window was the whole financial year to date by promised date, rounded to a
+               whole percent: one new PO or one completed GRN could not move the figure, a PO promised
+               beyond the current period was ignored, and a tenant without C_Period rows got no value.
+               Now: POs raised this calendar month versus those raised last calendar month. */
+            DateTime today = DateTime.Today;
+            DateTime currentStart = new DateTime(today.Year, today.Month, 1);
+            DateTime currentEndNext = today.AddDays(1);
+            DateTime previousStart = currentStart.AddMonths(-1);
+            DateTime previousEndNext = currentStart;
 
             string sql = @"
-                WITH CurrentOverall AS (
-                    " + currentOverallSql + @"
-                ),
-                LastMonth AS (
-                    " + lastMonthSql + @"
-                ),
-                Calculated AS (
-                    SELECT CASE WHEN COALESCE(CurrentOverall.Ordered_Qty, 0)=0 THEN 0
-                                ELSE ROUND((COALESCE(CurrentOverall.Delivered_Qty, 0)*100)/CurrentOverall.Ordered_Qty, 0)
-                           END AS Current_Fulfillment_Percent,
-                           CASE WHEN COALESCE(LastMonth.Ordered_Qty, 0)=0 THEN 0
-                                ELSE ROUND((COALESCE(LastMonth.Delivered_Qty, 0)*100)/LastMonth.Ordered_Qty, 0)
-                           END AS Last_Month_Fulfillment_Percent
-                    FROM CurrentOverall
-                    CROSS JOIN LastMonth
-                )
-                SELECT Calculated.Current_Fulfillment_Percent,
-                       Calculated.Current_Fulfillment_Percent - Calculated.Last_Month_Fulfillment_Percent AS Fulfillment_Change_Percent
-                FROM Calculated";
+                SELECT SUM(CASE WHEN Ord.DateOrdered >= @CurrentStart1 AND Ord.DateOrdered < @CurrentEndNext1
+                                THEN COALESCE(OrdLine.QtyOrdered, 0) ELSE 0 END) AS Current_Ordered,
+                       SUM(CASE WHEN Ord.DateOrdered >= @CurrentStart2 AND Ord.DateOrdered < @CurrentEndNext2
+                                THEN LEAST(COALESCE(OrdLine.QtyDelivered, 0), COALESCE(OrdLine.QtyOrdered, 0)) ELSE 0 END) AS Current_Delivered,
+                       SUM(CASE WHEN Ord.DateOrdered >= @PreviousStart1 AND Ord.DateOrdered < @PreviousEndNext1
+                                THEN COALESCE(OrdLine.QtyOrdered, 0) ELSE 0 END) AS Previous_Ordered,
+                       SUM(CASE WHEN Ord.DateOrdered >= @PreviousStart2 AND Ord.DateOrdered < @PreviousEndNext2
+                                THEN LEAST(COALESCE(OrdLine.QtyDelivered, 0), COALESCE(OrdLine.QtyOrdered, 0)) ELSE 0 END) AS Previous_Delivered
+                FROM C_Order Ord
+                INNER JOIN C_OrderLine OrdLine ON (OrdLine.C_Order_ID=Ord.C_Order_ID)
+                INNER JOIN M_Product Product ON (Product.M_Product_ID=OrdLine.M_Product_ID)
+                WHERE Ord.IsActive='Y'
+                  AND OrdLine.IsActive='Y'
+                  AND Ord.IsSOTrx='N'
+                  AND COALESCE(Ord.IsReturnTrx, 'N')='N'
+                  AND COALESCE(Ord.IsBlanketTrx, 'N')='N'
+                  AND Ord.DocStatus IN ('CO', 'CL')
+                  AND Product.ProductType='I'
+                  AND Ord.DateOrdered >= @RangeStart
+                  AND Ord.DateOrdered < @RangeEndNext";
 
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "Ord", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+            /* The database layer binds positionally: one parameter per placeholder occurrence, in order. */
             SqlParameter[] parameters =
             {
-                new SqlParameter("@YearStart", periods.YearStart),
-                new SqlParameter("@CurrentPeriodEndNext", periods.CurrentEndNext),
-                new SqlParameter("@PreviousPeriodStart", periods.PreviousStart),
-                new SqlParameter("@PreviousPeriodEndNext", periods.PreviousEndNext)
+                new SqlParameter("@CurrentStart1", currentStart),
+                new SqlParameter("@CurrentEndNext1", currentEndNext),
+                new SqlParameter("@CurrentStart2", currentStart),
+                new SqlParameter("@CurrentEndNext2", currentEndNext),
+                new SqlParameter("@PreviousStart1", previousStart),
+                new SqlParameter("@PreviousEndNext1", previousEndNext),
+                new SqlParameter("@PreviousStart2", previousStart),
+                new SqlParameter("@PreviousEndNext2", previousEndNext),
+                new SqlParameter("@RangeStart", previousStart),
+                new SqlParameter("@RangeEndNext", currentEndNext)
             };
 
             IDataReader dr = null;
 
             try
             {
-                int currentPercent = 0;
-                int changePercent = 0;
+                decimal currentPercent = 0;
+                decimal previousPercent = 0;
 
                 dr = DB.ExecuteReader(sql, parameters);
                 if (dr != null && dr.Read())
                 {
-                    currentPercent = Util.GetValueOfInt(dr["Current_Fulfillment_Percent"]);
-                    changePercent = Util.GetValueOfInt(dr["Fulfillment_Change_Percent"]);
+                    currentPercent = Percent(Util.GetValueOfDecimal(dr["Current_Delivered"]), Util.GetValueOfDecimal(dr["Current_Ordered"]));
+                    previousPercent = Percent(Util.GetValueOfDecimal(dr["Previous_Delivered"]), Util.GetValueOfDecimal(dr["Previous_Ordered"]));
                 }
 
                 var result = new
                 {
                     currentPercent = currentPercent,
-                    changePercent = changePercent
+                    changePercent = Math.Round(currentPercent - previousPercent, 1, MidpointRounding.AwayFromZero)
                 };
 
                 return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
@@ -153,108 +128,14 @@ namespace VIS.Controllers
             }
         }
 
-        private static FulfilmentPeriods GetFulfilmentPeriods(Ctx ctx)
+        /// <summary>Received / ordered as a percentage with one decimal; 0 when nothing was ordered.</summary>
+        private static decimal Percent(decimal delivered, decimal ordered)
         {
-            string sql = @"
-                WITH CurrentPeriod AS (
-                    SELECT CalPeriod.C_Year_ID,
-                           CalPeriod.StartDate,
-                           CalPeriod.EndDate,
-                           CalYear.C_Calendar_ID,
-                           ROW_NUMBER() OVER (
-                               ORDER BY CalPeriod.StartDate DESC,
-                                        CalPeriod.C_Period_ID DESC
-                           ) AS SeqNo
-                    FROM AD_ClientInfo ClientInfo
-                    INNER JOIN C_Year CalYear ON (CalYear.C_Calendar_ID = ClientInfo.C_Calendar_ID)
-                    INNER JOIN C_Period CalPeriod ON (CalPeriod.C_Year_ID = CalYear.C_Year_ID)
-                    WHERE ClientInfo.IsActive = 'Y'
-                      AND CalYear.IsActive = 'Y'
-                      AND CalPeriod.IsActive = 'Y'
-                      AND ClientInfo.AD_Client_ID = @AD_Client_ID
-                      AND CURRENT_DATE BETWEEN CalPeriod.StartDate AND CalPeriod.EndDate
-                ),
-                YearBounds AS (
-                    SELECT MIN(YearPeriod.StartDate) AS Year_StartDate
-                    FROM CurrentPeriod CurPeriod
-                    INNER JOIN C_Period YearPeriod ON (YearPeriod.C_Year_ID = CurPeriod.C_Year_ID)
-                    WHERE CurPeriod.SeqNo = 1
-                      AND YearPeriod.IsActive = 'Y'
-                ),
-                PreviousPeriod AS (
-                    SELECT CalPeriod.StartDate,
-                           CalPeriod.EndDate,
-                           ROW_NUMBER() OVER (
-                               ORDER BY CalPeriod.EndDate DESC,
-                                        CalPeriod.StartDate DESC,
-                                        CalPeriod.C_Period_ID DESC
-                           ) AS SeqNo
-                    FROM CurrentPeriod CurPeriod
-                    INNER JOIN C_Year CalYear ON (CalYear.C_Calendar_ID = CurPeriod.C_Calendar_ID)
-                    INNER JOIN C_Period CalPeriod ON (CalPeriod.C_Year_ID = CalYear.C_Year_ID)
-                    WHERE CurPeriod.SeqNo = 1
-                      AND CalYear.IsActive = 'Y'
-                      AND CalPeriod.IsActive = 'Y'
-                      AND CalPeriod.EndDate < CurPeriod.StartDate
-                )
-                SELECT YearBounds.Year_StartDate,
-                       CurrentPeriod.StartDate AS Current_StartDate,
-                       CurrentPeriod.EndDate AS Current_EndDate,
-                       PreviousPeriod.StartDate AS Previous_StartDate,
-                       PreviousPeriod.EndDate AS Previous_EndDate
-                FROM CurrentPeriod
-                CROSS JOIN YearBounds
-                LEFT OUTER JOIN PreviousPeriod ON (PreviousPeriod.SeqNo = 1)
-                WHERE CurrentPeriod.SeqNo = 1";
-
-            SqlParameter[] parameters = { new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()) };
-            IDataReader dr = null;
-
-            try
+            if (ordered <= 0)
             {
-                dr = DB.ExecuteReader(sql, parameters);
-                if (dr == null || !dr.Read())
-                {
-                    return null;
-                }
-
-                DateTime? yearStart = Util.GetValueOfDateTime(dr["Year_StartDate"]);
-                DateTime? currentStart = Util.GetValueOfDateTime(dr["Current_StartDate"]);
-                DateTime? currentEnd = Util.GetValueOfDateTime(dr["Current_EndDate"]);
-                DateTime? previousStart = Util.GetValueOfDateTime(dr["Previous_StartDate"]);
-                DateTime? previousEnd = Util.GetValueOfDateTime(dr["Previous_EndDate"]);
-
-                if (!yearStart.HasValue || !currentStart.HasValue || !currentEnd.HasValue)
-                {
-                    return null;
-                }
-
-                DateTime currentStartDate = currentStart.Value.Date;
-
-                return new FulfilmentPeriods
-                {
-                    YearStart = yearStart.Value.Date,
-                    CurrentEndNext = currentEnd.Value.Date.AddDays(1),
-                    PreviousStart = previousStart.HasValue ? previousStart.Value.Date : currentStartDate,
-                    PreviousEndNext = previousEnd.HasValue ? previousEnd.Value.Date.AddDays(1) : currentStartDate
-                };
+                return 0;
             }
-            finally
-            {
-                if (dr != null)
-                {
-                    dr.Close();
-                    dr.Dispose();
-                }
-            }
-        }
-
-        private class FulfilmentPeriods
-        {
-            public DateTime YearStart { get; set; }
-            public DateTime CurrentEndNext { get; set; }
-            public DateTime PreviousStart { get; set; }
-            public DateTime PreviousEndNext { get; set; }
+            return Math.Round(delivered * 100 / ordered, 1, MidpointRounding.AwayFromZero);
         }
     }
 }

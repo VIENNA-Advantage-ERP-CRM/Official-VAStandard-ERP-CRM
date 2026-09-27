@@ -15,26 +15,26 @@
  * Labels / Message Keys
  *  #  | Current Text                                     | Message Key
  * ----+--------------------------------------------------+-----------------------------------
- *  1  | Expected GRN                                      | VAS_ExpectedGRN
- *  2  | GRN Count                                         | VAS_GRNCount
- *  3  | No of Lines                                       | VAS_NoOfLines
+ *  1  | Expected GRN                                      | VAS_097_ExpectedGRN
+ *  2  | GRN Count                                         | VAS_097_GRNCount
+ *  3  | No of Lines                                       | VAS_097_NoOfLines
  *  4  | Showing                                           | VAS_Showing
  *  5  | of                                                | VAS_Of
- *  6  | No data available                                | VAS_NoDataAvailable
+ *  6  | No data available                                | VAS_097_NoDataAvailable
  *  7  | Back                                              | VAS_Back
  *  8  | Close                                             | VAS_Close
- *  9  | Item                                              | VAS_Item
- * 10  | PO Qty                                            | VAS_POQty
+ *  9  | Item                                              | VAS_097_Item
+ * 10  | PO Qty                                            | VAS_097_POQty
  * 11  | Received                                          | VAS_Received
  * 12  | UOM                                               | VAS_Uom
- * 13  | Enter received quantity against each PO line...   | VAS_EnterReceivedQtyAgainstLine
+ * 13  | Enter received quantity against each PO line...   | VAS_097_EnterReceivedQtyAgainstLine
  * 14  | Create GRN                                       | VAS_097_CreateGRN
- * 15  | Received quantity cannot be negative.             | VAS_NegativeReceivedQty
- * 16  | Enter received quantity for at least one line.    | VAS_ReceivedQtyRequired
- * 17  | Received quantity cannot be greater than order... | VAS_ReceivedQtyTooHigh
- * 18  | GRN could not be created.                         | VAS_GRNCouldNotBeCreated
+ * 15  | Received quantity cannot be negative.             | VAS_097_NegativeReceivedQty
+ * 16  | Enter received quantity for at least one line.    | VAS_097_ReceivedQtyRequired
+ * 17  | Received quantity cannot be greater than order... | VAS_097_ReceivedQtyTooHigh
+ * 18  | GRN could not be created.                         | VAS_097_GRNCouldNotBeCreated
  * 19  | Attribute                                         | VAS_Attribute
- * 20  | Purchase Order (modal document field)             | PurchaseOrder
+ * 20  | Purchase Order (modal document field)             | VAS_097_PurchaseOrder
  *
  * Correction 2026-07-18: the modal never scrolls (line rows fit the space and
  * page instead), the line grid is tightened (attribute chip next to the item,
@@ -96,8 +96,7 @@
         var modalFitRaf = null;
 
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            return (t && t.charAt(0) !== '[') ? t : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -143,6 +142,40 @@
             var num = Number(value || 0);
             if (!isFinite(num)) { return "0"; }
             return String(Math.round(num * 1000000) / 1000000);
+        }
+
+        /* QA sheet GRN #25: the received quantity may carry at most as many decimal places as the
+           line UOM's standard precision (C_UOM.StdPrecision) allows - Each / Milliliter whole numbers,
+           Liter up to 3 decimals. */
+        function decimalPlaces(raw) {
+            var text = String(raw == null ? '' : raw).trim();
+            if (text === '') { return 0; }
+            var sci = text.match(/^[-+]?\d*(?:\.(\d*))?e([-+]?\d+)$/i);
+            if (sci) {
+                return Math.max(0, (sci[1] || '').replace(/0+$/, '').length - Number(sci[2]));
+            }
+            var dot = text.indexOf('.');
+            return dot < 0 ? 0 : text.substring(dot + 1).replace(/0+$/, '').length;
+        }
+
+        function exceedsUomPrecision(raw, precision) {
+            if (precision == null || !isFinite(Number(precision))) { return false; }
+            return decimalPlaces(raw) > Math.max(0, Number(precision));
+        }
+
+        function uomPrecisionMessage(line) {
+            var p = Math.max(0, Number(line.uomPrecision || 0));
+            var name = (line.itemName || '') + (line.uom ? ' (' + line.uom + ')' : '');
+            if (p === 0) {
+                return lbl("VAS_QtyWholeNumberOnly", "Enter a whole number as the received quantity for") + ' ' + name + '.';
+            }
+            return lbl("VAS_QtyDecimalPlacesAllowed", "Decimal places allowed in the received quantity for") + ' ' + name + ': ' + p + '.';
+        }
+
+        /* Input step matching the UOM precision: 1, 0.1, 0.01, 0.001 ... */
+        function uomStep(precision) {
+            var p = Math.max(0, Number(precision || 0));
+            return p === 0 ? '1' : '0.' + new Array(p).join('0') + '1';
         }
 
         function showBusy(show) {
@@ -203,7 +236,7 @@
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg>' +
                 '</span>' +
                 '<div class="vas-egrn-titles">' +
-                '<div class="vas-egrn-title">' + escapeHtml(lbl("VAS_ExpectedGRN", "Expected GRN")) + '</div>' +
+                '<div class="vas-egrn-title">' + escapeHtml(lbl("VAS_097_ExpectedGRN", "Expected GRN")) + '</div>' +
                 '</div>' +
                 '<span class="vas-egrn-count vas-egrn-hidden"></span>' +
                 '</div>'
@@ -304,7 +337,7 @@
 
             if ($countPill) {
                 if (totalRecords > 0) {
-                    $countPill.text(lbl("VAS_GRNCount", "GRN Count") + ' ' + totalRecords).removeClass('vas-egrn-hidden');
+                    $countPill.text(lbl("VAS_097_GRNCount", "GRN Count") + ' ' + totalRecords).removeClass('vas-egrn-hidden');
                 } else {
                     $countPill.addClass('vas-egrn-hidden').empty();
                 }
@@ -314,7 +347,7 @@
             $rows.empty();
 
             if (ROWS.length === 0) {
-                $rows.append('<div class="vas-egrn-empty">' + escapeHtml(lbl("VAS_NoDataAvailable", "No data available")) + '</div>');
+                $rows.append('<div class="vas-egrn-empty">' + escapeHtml(lbl("VAS_097_NoDataAvailable", "No data available")) + '</div>');
                 updatePager();
                 return;
             }
@@ -331,7 +364,7 @@
                     '<div class="vas-egrn-main">' +
                     '<div class="vas-egrn-top">' +
                     '<span class="vas-egrn-no" title="' + escapeHtml(r.poNo) + '">' + escapeHtml(r.poNo) + '</span>' +
-                    '<span class="vas-egrn-qty" title="' + escapeHtml(lbl("VAS_NoOfLines", "No of Lines")) + '">' + escapeHtml(r.lineCount) + '</span>' +
+                    '<span class="vas-egrn-qty" title="' + escapeHtml(lbl("VAS_097_NoOfLines", "No of Lines")) + '">' + escapeHtml(r.lineCount) + '</span>' +
                     '</div>' +
                     '<div class="vas-egrn-mid">' +
                     '<span class="vas-egrn-party" title="' + escapeHtml(r.supplier) + '">' + escapeHtml(r.supplier) + '</span>' +
@@ -395,7 +428,6 @@
             $dialogBusy = $dialog.find('.vas-egrn-modal-busy');
 
             $dialog.find('.vas-egrn-modal-close').on('click', closeDialog);
-            $dialog.find('.vas-egrn-scrim').on('click', closeDialog);
             $dialog.find('.vas-egrn-back').on('click', closeDialog);
 
             $dialogBody.on('input', '.vas-egrn-rcv-in', function () {
@@ -418,10 +450,6 @@
                 modalResizeObserver.observe($dialogBody[0]);
             }
 
-            $(document).on('keydown.vas-egrn', function (e) {
-                if (e.key === 'Escape' && !$dialog.hasClass('vas-egrn-hidden')) { closeDialog(); }
-            });
-
             $('body').append($dialog);
         }
 
@@ -433,7 +461,7 @@
             currentLines = [];
 
             $dialogTitle.text(po.poNo);
-            setBadge(lbl("VAS_NoOfLines", "No of Lines") + ' ' + po.lineCount, "info");
+            setBadge(lbl("VAS_097_NoOfLines", "No of Lines") + ' ' + po.lineCount, "info");
 
             $dialog.removeClass('vas-egrn-hidden');
             $('body').addClass('vas-egrn-body-lock');
@@ -506,11 +534,18 @@
             return '<div class="vas-egrn-rcv-attr" title="' + escapeHtml(text) + '"><span class="vas-egrn-attr-chip">' + escapeHtml(text) + '</span></div>';
         }
 
+        /* A line has an attribute only when its instance description is real text - empty,
+           whitespace and dash-only descriptions ("---") do not count. */
+        function hasAttributeText(attributeName) {
+            var text = String(attributeName == null ? '' : attributeName).trim();
+            return text !== '' && !/^-+$/.test(text);
+        }
+
         function renderLineEntry() {
             if (!currentPO) { return; }
 
             if (currentLines.length === 0) {
-                $dialogBody.html('<div class="vas-egrn-empty">' + escapeHtml(lbl("VAS_NoDataAvailable", "No data available")) + '</div>');
+                $dialogBody.html('<div class="vas-egrn-empty">' + escapeHtml(lbl("VAS_097_NoDataAvailable", "No data available")) + '</div>');
                 return;
             }
 
@@ -518,10 +553,10 @@
                Order" (core message key), not "Expected GRN". */
             var fields =
                 '<div class="vas-egrn-form-grid">' +
-                fieldHtml(lbl("PurchaseOrder", "Purchase Order"), currentPO.poNo, true) +
+                fieldHtml(lbl("VAS_097_PurchaseOrder", "Purchase Order"), currentPO.poNo, true) +
                 fieldHtml(lbl("Vendor", "Supplier"), currentPO.supplier) +
                 fieldHtml(lbl("VAS_VendorLocation", "Address"), currentPO.addressLine) +
-                fieldHtml(lbl("VAS_NoOfLines", "No of Lines"), String(currentLines.length)) +
+                fieldHtml(lbl("VAS_097_NoOfLines", "No of Lines"), String(currentLines.length)) +
                 '</div>';
 
             /* Show at most rcvPageSize rows per page; further lines are paged,
@@ -533,29 +568,40 @@
             var start = (rcvPageNo - 1) * rcvPageSize;
             var end = Math.min(start + rcvPageSize, currentLines.length);
 
+            /* QA sheet GRN #21/#22 (2026-09-15): the Attribute column is shown only when at least one
+               line of the PO has a real attribute (dash-only instance descriptions do not count), and
+               PO Qty / Received sit right after the item so the UOM column has room for full unit
+               names. Order: Item | PO Qty | Received | UOM | Attribute. The layout classes are
+               Expected-GRN-only - Pending GRN shares the base .vas-egrn-rcv-line grid. */
+            var showAttr = false;
+            for (var a = 0; a < currentLines.length; a++) {
+                if (hasAttributeText(currentLines[a].attributeName)) { showAttr = true; break; }
+            }
+            var layoutCls = ' vas-egrn-qtyfirst' + (showAttr ? '' : ' vas-egrn-noattr');
+
             var rows = '';
             for (var i = start; i < end; i++) {
                 var line = currentLines[i];
                 var qtyValue = lineEntry[line.poLineId] != null ? lineEntry[line.poLineId] : toInputValue(line.defaultReceivedQty);
                 rows +=
-                    '<div class="vas-egrn-rcv-line" data-lineid="' + escapeHtml(line.poLineId) + '" data-openqty="' + escapeHtml(line.openQty) + '">' +
+                    '<div class="vas-egrn-rcv-line' + layoutCls + '" data-lineid="' + escapeHtml(line.poLineId) + '" data-openqty="' + escapeHtml(line.openQty) + '">' +
                     '<div class="vas-egrn-rcv-name" title="' + escapeHtml(line.itemName) + '">' + escapeHtml(line.itemName) + '</div>' +
-                    attrCellHtml(line.attributeName) +
-                    '<div class="vas-egrn-rcv-po">' + escapeHtml(formatQty(line.poQty)) + '</div>' +
-                    '<input class="vas-egrn-rcv-in" type="number" min="0" max="' + escapeHtml(line.openQty) + '" step="any" value="' + escapeHtml(qtyValue) + '" aria-label="' + escapeHtml(lbl("VAS_Received", "Received")) + '"/>' +
+                    '<div class="vas-egrn-rcv-po">' + escapeHtml(Number(line.poQty || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: Math.max(0, Number(line.uomPrecision || 0)) })) + '</div>' +
+                    '<input class="vas-egrn-rcv-in" type="number" min="0" max="' + escapeHtml(line.openQty) + '" step="' + uomStep(line.uomPrecision) + '" value="' + escapeHtml(qtyValue) + '" aria-label="' + escapeHtml(lbl("VAS_Received", "Received")) + '"/>' +
                     '<div class="vas-egrn-rcv-uom" title="' + escapeHtml(line.uom) + '">' + escapeHtml(line.uom) + '</div>' +
+                    (showAttr ? attrCellHtml(line.attributeName) : '') +
                     '</div>';
             }
 
             $dialogBody.html(
                 fields +
-                '<div class="vas-egrn-note">' + fileIcon() + '<span>' + escapeHtml(lbl("VAS_EnterReceivedQtyAgainstLine", "Enter received quantity against each PO line, then create the GRN.")) + '</span></div>' +
-                '<div class="vas-egrn-rcv-line vas-egrn-rcv-head">' +
-                '<div>' + escapeHtml(lbl("VAS_Item", "Item")) + '</div>' +
-                '<div>' + escapeHtml(lbl("VAS_Attribute", "Attribute")) + '</div>' +
-                '<div>' + escapeHtml(lbl("VAS_POQty", "PO Qty")) + '</div>' +
+                '<div class="vas-egrn-note">' + fileIcon() + '<span>' + escapeHtml(lbl("VAS_097_EnterReceivedQtyAgainstLine", "Enter received quantity against each PO line, then create the GRN.")) + '</span></div>' +
+                '<div class="vas-egrn-rcv-line' + layoutCls + ' vas-egrn-rcv-head">' +
+                '<div>' + escapeHtml(lbl("VAS_097_Item", "Item")) + '</div>' +
+                '<div>' + escapeHtml(lbl("VAS_097_POQty", "PO Qty")) + '</div>' +
                 '<div>' + escapeHtml(lbl("VAS_Received", "Received")) + '</div>' +
                 '<div>' + escapeHtml(lbl("VAS_Uom", "UOM")) + '</div>' +
+                (showAttr ? '<div>' + escapeHtml(lbl("VAS_Attribute", "Attribute")) + '</div>' : '') +
                 '</div>' +
                 '<div class="vas-egrn-rcv-viewport"><div class="vas-egrn-lines">' + rows + '</div></div>' +
                 linePagerHtml(rcvPageNo, totalPages, currentLines.length, rcvPageSize) +
@@ -619,12 +665,17 @@
 
                 if (!isFinite(qty) || qty < 0) {
                     invalid = true;
-                    message = lbl("VAS_NegativeReceivedQty", "Received quantity cannot be negative.");
+                    message = lbl("VAS_097_NegativeReceivedQty", "Received quantity cannot be negative.");
+                    break;
+                }
+                if (exceedsUomPrecision(raw, line.uomPrecision)) {
+                    invalid = true;
+                    message = uomPrecisionMessage(line);
                     break;
                 }
                 if (qty > openQty) {
                     invalid = true;
-                    message = lbl("VAS_ReceivedQtyTooHigh", "Received quantity cannot be greater than ordered quantity.");
+                    message = lbl("VAS_097_ReceivedQtyTooHigh", "Received quantity cannot be greater than ordered quantity.");
                     break;
                 }
                 if (qty > 0) {
@@ -644,8 +695,14 @@
             $dialogBody.find('.vas-egrn-rcv-line[data-lineid]').each(function () {
                 var $row = $(this);
                 var openQty = Number($row.data('openqty') || 0);
-                var qty = Number($row.find('.vas-egrn-rcv-in').val() || 0);
-                $row.toggleClass('invalid', !isFinite(qty) || qty < 0 || qty > openQty);
+                var rawValue = $row.find('.vas-egrn-rcv-in').val();
+                var qty = Number(rawValue || 0);
+                var lineId = Number($row.data('lineid') || 0);
+                var precision = null;
+                for (var li = 0; li < currentLines.length; li++) {
+                    if (Number(currentLines[li].poLineId) === lineId) { precision = currentLines[li].uomPrecision; break; }
+                }
+                $row.toggleClass('invalid', !isFinite(qty) || qty < 0 || qty > openQty || exceedsUomPrecision(rawValue, precision));
             });
 
             if (result.invalid) {
@@ -655,7 +712,7 @@
             }
 
             if (result.lines.length === 0) {
-                $error.text(lbl("VAS_ReceivedQtyRequired", "Enter received quantity for at least one line.")).removeClass('vas-egrn-hidden');
+                $error.text(lbl("VAS_097_ReceivedQtyRequired", "Enter received quantity for at least one line.")).removeClass('vas-egrn-hidden');
                 $button.prop('disabled', true);
                 return false;
             }
@@ -685,7 +742,7 @@
                     var data = parseResponse(res);
                     showDialogBusy(false);
                     if (data.error || data.success === false) {
-                        VIS.ADialog.error("", false, data.message || data.error || lbl("VAS_GRNCouldNotBeCreated", "GRN could not be created."), "");
+                        VIS.ADialog.error("", false, data.message || data.error || lbl("VAS_097_GRNCouldNotBeCreated", "GRN could not be created."), "");
                         $button.prop('disabled', false);
                         return;
                     }
@@ -693,10 +750,16 @@
                     closeDialog();
                     $self.refreshWidget();
                     $(document).trigger('VAS_GRNCreated', [data]);
+
+                    /* QA sheet GRN #24: confirm the creation with the generated GRN document number. */
+                    var confirmText = lbl("VAS_GRNCreatedWithDocNo", "GRN created successfully with Document No.:") + ' ' + (data.grnNo || '');
+                    if (VIS.ADialog && VIS.ADialog.info) {
+                        VIS.ADialog.info("", "", confirmText);
+                    }
                 },
                 error: function () {
                     showDialogBusy(false);
-                    VIS.ADialog.error("", false, lbl("VAS_GRNCouldNotBeCreated", "GRN could not be created."), "");
+                    VIS.ADialog.error("", false, lbl("VAS_097_GRNCouldNotBeCreated", "GRN could not be created."), "");
                     $button.prop('disabled', false);
                 }
             });
@@ -721,7 +784,6 @@
         this.getRoot = function () { return $root; };
 
         this.disposeComponent = function () {
-            $(document).off('keydown.vas-egrn');
             $('body').removeClass('vas-egrn-body-lock');
             if (rowResizeObserver) { rowResizeObserver.disconnect(); rowResizeObserver = null; }
             if (modalResizeObserver) { modalResizeObserver.disconnect(); modalResizeObserver = null; }

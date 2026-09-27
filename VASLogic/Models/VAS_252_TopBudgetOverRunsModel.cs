@@ -28,8 +28,10 @@ namespace VASLogic.Models
     ///                           that pair and matched at it, so a budget posted for one
     ///                           transaction organization is NEVER compared against actuals
     ///                           belonging to another.
-    ///                 Budget    SUM(AmtAcctDr - AmtAcctCr) over PostingType 'B'.
-    ///                 Actual    SUM(AmtAcctDr - AmtAcctCr) over PostingType 'A'.
+    ///                 Budget    SUM of the natural-balance net over PostingType 'B':
+    ///                           AmtAcctCr - AmtAcctDr for Liability / Revenue accounts,
+    ///                           AmtAcctDr - AmtAcctCr for every other account type.
+    ///                 Actual    the same over PostingType 'A'.
     ///                 Variance  Budget - Actual, always NEGATIVE on this card by
     ///                           construction - a row only qualifies when actual exceeds
     ///                           budget.
@@ -62,14 +64,16 @@ namespace VASLogic.Models
     ///               with the '*' organization as its TRANSACTION organization is a
     ///               posting that was never attributed to one.
     ///
-    ///               SIGNED AS POSTED, WITH NO NATURAL-SIDE CORRECTION. Both sides are
-    ///               AmtAcctDr - AmtAcctCr exactly as the specification states, with no
-    ///               per-account-type flip. That is not an oversight and it is not a gap:
-    ///               combined with the Budget &gt; 0 test below it is what confines the
-    ///               card to debit-natural spending. A revenue or liability budget is
-    ///               credit-natural, so it sums NEGATIVE under Dr - Cr and fails Budget
-    ///               &gt; 0 - which is the right outcome, because a revenue account that
-    ///               beats its budget is good news and has no place on an overruns card.
+    ///               SIGNED BY THE ACCOUNT'S NATURAL BALANCE. Both sides are netted as
+    ///               Cr - Dr when C_ElementValue.AccountType is Liability ('L') or
+    ///               Revenue ('R') and as Dr - Cr for every other type, so a credit-natural
+    ///               budget and its actual both come out positive and are compared the
+    ///               same way round as an expense. A revenue or liability account whose
+    ///               actual has passed its budget therefore DOES appear on this card, as
+    ///               does the credit-natural offsetting side of a budget journal when it
+    ///               is posted to a Liability / Revenue account - the Budget &gt; 0
+    ///               predicate no longer drops those. The rule is applied inside
+    ///               SumExpression, so SELECT, HAVING and ORDER BY all carry it.
     ///
     ///               THE OVERRUN TEST IS Budget &gt; 0 AND Actual &gt; Budget, applied in
     ///               SQL as a HAVING clause so only qualifying groups ever cross the wire.
@@ -77,13 +81,8 @@ namespace VASLogic.Models
     ///               spend against no budget is UNBUDGETED, not over-budget, it is
     ///               reported by its own card (VAS_256) on the same dashboard, and it
     ///               would make Utilized a division by zero. The test is strict, so an
-    ///               account at exactly 100% does not qualify.
-    ///
-    ///               No balancing-account exclusion list is needed here. The offsetting
-    ///               side of a budget journal is a credit, so it sums negative under
-    ///               Dr - Cr and is dropped by Budget &gt; 0 like any other credit-natural
-    ///               total - the predicate does the work a configured exclusion would have
-    ///               done, without reading C_AcctSchema_GL at all.
+    ///               account at exactly 100% does not qualify. A budget posted against
+    ///               its account's nature still sums negative and is dropped here.
     ///
     ///               PHASE 1 IS ACTUAL ONLY. Commitments are not included until commitment
     ///               accounting is defined. The basis is returned to the client as a token
@@ -115,6 +114,9 @@ namespace VASLogic.Models
     ///                          AD_OrgTrx dimension specification; natural-side sign
     ///                          correction and the balancing-account exclusion removed,
     ///                          both subsumed by the Budget &gt; 0 predicate.
+    ///   VAI145      2026-09-18 Budget / Actual signed by account nature again: Cr - Dr
+    ///                          for Liability and Revenue, Dr - Cr otherwise, applied in
+    ///                          SumExpression so SELECT / HAVING / ORDER BY agree.
     /// </summary>
     public class VAS_252_TopBudgetOverRunsModel
     {
@@ -431,13 +433,20 @@ namespace VASLogic.Models
         /// The Budget aggregate expression, and the Actual one. Built once and reused in the
         /// SELECT list, the HAVING clause and the ORDER BY so the three can never drift
         /// apart - if the sum ever changes, it changes in all three places at once.
+        ///
+        /// The net follows the account's natural balance (C_ElementValue.AccountType, a
+        /// stored code compared bare): Liability 'L' and Revenue 'R' are credit-natural, so
+        /// their figure is Cr - Dr; every other type is Dr - Cr. ev is the C_ElementValue
+        /// alias joined on the same scan.
         /// </summary>
         /// <param name="postingType">POSTINGTYPE_Budget or POSTINGTYPE_Actual.</param>
         /// <returns>A flat SUM(CASE WHEN ...) expression over Fact_Acct fa.</returns>
         private string SumExpression(string postingType)
         {
             return "SUM(CASE WHEN fa.PostingType='" + postingType +
-                "' THEN COALESCE(fa.AmtAcctDr,0)-COALESCE(fa.AmtAcctCr,0) ELSE 0 END)";
+                "' THEN (CASE WHEN ev.AccountType IN ('L','R')" +
+                " THEN COALESCE(fa.AmtAcctCr,0)-COALESCE(fa.AmtAcctDr,0)" +
+                " ELSE COALESCE(fa.AmtAcctDr,0)-COALESCE(fa.AmtAcctCr,0) END) ELSE 0 END)";
         }
 
         /// <summary>
@@ -565,9 +574,10 @@ namespace VASLogic.Models
         /// <summary>
         /// Materialises one account / transaction-organization group.
         ///
-        /// Both sides are AmtAcctDr - AmtAcctCr exactly as posted, with no natural-side
-        /// correction - see the class note. Utilized is safe to divide here because the
-        /// HAVING clause guaranteed Budget &gt; 0 before the row was returned at all.
+        /// Both sides are netted by the account's natural balance (Cr - Dr for Liability /
+        /// Revenue, Dr - Cr otherwise) - see the class note. Utilized is safe to divide here
+        /// because the HAVING clause guaranteed Budget &gt; 0 before the row was returned at
+        /// all.
         /// </summary>
         /// <param name="row">Row carrying the group aliases.</param>
         /// <returns>Populated <see cref="OverRunRow"/>.</returns>

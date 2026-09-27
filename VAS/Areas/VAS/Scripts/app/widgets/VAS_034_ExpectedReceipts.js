@@ -23,7 +23,7 @@
  * ----+------------------------------+--------------------------------
  *  1  | Expected Receipts            | VAS_034_ExpectedReceipts
  *  3  | No data                      | VIS_NoData
- *  4  | Expected                     | VIS_Expected
+ *  4  | Expected                     | VAS_034_Expected
  * 4a  | NEFT expected                | VAS_034_NEFTExpected
  * 4b  | UPI auto-debit               | VAS_034_UPIAutoDebit
  * 4c  | Cheque expected              | VAS_034_ChequeExpected
@@ -31,14 +31,14 @@
  *  5  | Previous                     | VAS_Previous
  *  6  | Next                         | VAS_Next
  *  7  | Filter                       | VAS_034_Filter
- *  8  | Type                         | VAS_DocTypeExPayDiv
- *  9  | Financial Period             | VAS_FinancialPeriodDiv
- * 10  | Customer                     | VAS_CustomerPartner
- * 11  | From Date                    | VAS_FromDate
- * 12  | To Date                      | VAS_ToDate
- * 13  | Clear                        | VAS_Clear
- * 14  | Apply                        | VAS_Apply
- * 15  | Zoom                         | VAS_Zoom
+ *  8  | Type                         | VAS_034_DocTypeExPayDiv
+ *  9  | Financial Period             | VAS_034_FinancialPeriodDiv
+ * 10  | Customer                     | VAS_034_CustomerPartner
+ * 11  | From Date                    | VAS_034_FromDate
+ * 12  | To Date                      | VAS_034_ToDate
+ * 13  | Clear                        | VAS_034_Clear
+ * 14  | Apply                        | VAS_034_Apply
+ * 15  | Zoom                         | VAS_034_Zoom
  * ─────────────────────────────────────────────────────────────────────
  */
 
@@ -127,8 +127,7 @@
         var totalRecords = 0;
 
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            return (t && t.charAt(0) !== '[') ? t : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function showBusy(show) {
@@ -280,7 +279,7 @@
             }
 
             var $link = $('<a class="vas-er-doclink" role="link" tabindex="0">')
-                .attr('title', lbl("VAS_Zoom", "Zoom") + ': ' + documentNo)
+                .attr('title', lbl("VAS_034_Zoom", "Zoom") + ': ' + documentNo)
                 .text(documentNo);
 
             $link.on('click', function (e) {
@@ -348,7 +347,7 @@
 
         function normalizeMethodName(name) {
             if (!name) {
-                return lbl("VIS_Expected", "Expected");
+                return lbl("VAS_034_Expected", "Expected");
             }
 
             var n = name.toString().trim();
@@ -618,7 +617,7 @@
             $typeInner.append($typeWrap);
             $typeWrap
                 .append(vDocTypeList.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' '))
-                .append('<label style="top:-9px;background-color:#FFFFFF;background-image:linear-gradient(rgba(var(--v-c-on-secondary),.03),rgba(var(--v-c-on-secondary),.03));color:black;">' + lbl("VAS_DocTypeExPayDiv", "Type") + '</label>');
+                .append('<label style="top:-9px;background-color:#FFFFFF;background-image:linear-gradient(rgba(var(--v-c-on-secondary),.03),rgba(var(--v-c-on-secondary),.03));color:black;">' + lbl("VAS_034_DocTypeExPayDiv", "Type") + '</label>');
             typeDiv.append($typeInner);
 
             /* Financial period list. */
@@ -630,7 +629,7 @@
             $fpInner.append($fpWrap);
             $fpWrap
                 .append(vFinancialPeriodList.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' '))
-                .append('<label style="top:-9px;background-color:#FFFFFF;background-image:linear-gradient(rgba(var(--v-c-on-secondary),.03),rgba(var(--v-c-on-secondary),.03));color:black;">' + lbl("VAS_FinancialPeriodDiv", "Financial Period") + '</label>');
+                .append('<label style="top:-9px;background-color:#FFFFFF;background-image:linear-gradient(rgba(var(--v-c-on-secondary),.03),rgba(var(--v-c-on-secondary),.03));color:black;">' + lbl("VAS_034_FinancialPeriodDiv", "Financial Period") + '</label>');
             fpDiv.append($fpInner);
 
             /* Customer search. */
@@ -645,7 +644,7 @@
             $bpInner.append($bpWrap);
             $bpWrap
                 .append(vSearchBPartner.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' '))
-                .append('<label class="vas-exinvd-bpLabel" style="color:#000; left: 9px;">' + lbl("VAS_CustomerPartner", "Customer") + '</label>');
+                .append('<label class="vas-exinvd-bpLabel" style="color:#000; left: 9px;">' + lbl("VAS_034_CustomerPartner", "Customer") + '</label>');
             $bpBtnWrap.append(vSearchBPartner.getBtn(0));
             $bpInner.append($bpBtnWrap);
             bpDiv.append($bpInner);
@@ -661,7 +660,7 @@
             $fromInner.append($fromWrap);
             $fromWrap
                 .append($FromDate.getControl().attr('placeholder', ' ').attr('data-placeholder', ''))
-                .append('<label class="vas-expay-lablels" style="color:black;">' + lbl("VAS_FromDate", "From Date") + '</label>');
+                .append('<label class="vas-expay-lablels" style="color:black;">' + lbl("VAS_034_FromDate", "From Date") + '</label>');
             fromDiv.append($fromInner);
 
             var toDiv = $('<div class="vas-expay-dateWidth vas-todateDiv">');
@@ -671,7 +670,7 @@
             $toInner.append($toWrap);
             $toWrap
                 .append($ToDate.getControl().attr('placeholder', ' ').attr('data-placeholder', ''))
-                .append('<label class="vas-expay-lablels" style="color:black;">' + lbl("VAS_ToDate", "To Date") + '</label>');
+                .append('<label class="vas-expay-lablels" style="color:black;">' + lbl("VAS_034_ToDate", "To Date") + '</label>');
             toDiv.append($toInner);
 
             var $datesDiv = $('<div class="vas-expay-datefilter">');
@@ -679,8 +678,8 @@
 
             /* Clear / Apply. */
             var $btnDiv = $('<div class="vas-expay-btndiv">');
-            var $clear = $('<button type="button" class="VIS_Pref_btn-2 vas-expay-filtbtn vas-er-clear-btn">' + lbl("VAS_Clear", "Clear") + '</button>');
-            var $apply = $('<button type="button" class="VIS_Pref_btn-2 vas-expay-filtbtn vas-er-apply-btn">' + lbl("VAS_Apply", "Apply") + '</button>');
+            var $clear = $('<button type="button" class="VIS_Pref_btn-2 vas-expay-filtbtn vas-er-clear-btn">' + lbl("VAS_034_Clear", "Clear") + '</button>');
+            var $apply = $('<button type="button" class="VIS_Pref_btn-2 vas-expay-filtbtn vas-er-apply-btn">' + lbl("VAS_034_Apply", "Apply") + '</button>');
             $btnDiv.append($clear).append($apply);
 
             $filterPanel

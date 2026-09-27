@@ -49,10 +49,13 @@ namespace VAS.Controllers
         /// today's update count, and distinct product count - all from one
         /// query pass so they stay consistent with the modal's totals.
         /// </summary>
+        /// <param name="clientTzOffsetMinutes">Browser getTimezoneOffset() value
+        /// ((UTC - local) in minutes); when sent, "this month" / "today" are
+        /// resolved in the USER'S local time instead of the server clock.</param>
         /// <returns>JSON { updateCount, userCount, todayCount, productCount, monthStart }.</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetSummary()
+        public JsonResult GetSummary(int? clientTzOffsetMinutes = null)
         {
             if (Session["ctx"] == null)
             {
@@ -63,7 +66,7 @@ namespace VAS.Controllers
 
             try
             {
-                DateBounds bounds = ResolveDateBounds();
+                DateBounds bounds = ResolveDateBounds(clientTzOffsetMinutes);
 
                 string sql = @"
                     WITH updated_records AS (
@@ -109,7 +112,7 @@ namespace VAS.Controllers
                     userCount = userCount,
                     todayCount = todayCount,
                     productCount = productCount,
-                    monthStart = bounds.MonthStart.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                    monthStart = bounds.ClientMonthStart.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
                 });
             }
             catch (Exception)
@@ -124,10 +127,13 @@ namespace VAS.Controllers
         /// </summary>
         /// <param name="offset">Zero-based result offset.</param>
         /// <param name="pageSize">Requested page size; clamped to 2-8.</param>
+        /// <param name="clientTzOffsetMinutes">Browser getTimezoneOffset() value
+        /// ((UTC - local) in minutes); when sent, the month window follows the
+        /// USER'S local time and displayed timestamps are shifted to it.</param>
         /// <returns>JSON { total, offset, pageSize, rows[] }.</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetPagedUpdates(int offset = 0, int pageSize = MaxPageSize)
+        public JsonResult GetPagedUpdates(int offset = 0, int pageSize = MaxPageSize, int? clientTzOffsetMinutes = null)
         {
             if (Session["ctx"] == null)
             {
@@ -142,7 +148,7 @@ namespace VAS.Controllers
 
             try
             {
-                DateBounds bounds = ResolveDateBounds();
+                DateBounds bounds = ResolveDateBounds(clientTzOffsetMinutes);
 
                 string productBranch = @"
                     SELECT
@@ -294,6 +300,11 @@ namespace VAS.Controllers
                         total = Util.GetValueOfInt(dr["total_count"]);
                         DateTime? updatedAt = Util.GetValueOfDateTime(dr["updated_at"]);
                         string updatedByName = Util.GetValueOfString(dr["updated_by_name"]);
+                        // Shift the stored (server-clock) timestamp onto the user's
+                        // local clock before display.
+                        updatedAt = updatedAt.HasValue
+                            ? updatedAt.Value.AddMinutes(bounds.DisplayShiftMinutes)
+                            : updatedAt;
                         rows.Add(new
                         {
                             sourceType = Util.GetValueOfString(dr["source_type"]),
@@ -428,21 +439,41 @@ namespace VAS.Controllers
         }
 
         /// <summary>
-        /// Resolves current-month and today half-open date boundaries from
-        /// the server clock in C# (never with a DB-specific date function),
-        /// per the widget's portable-SQL requirement.
+        /// Resolves current-month and today half-open date boundaries. When the
+        /// browser offset is supplied, "this month" / "today" are what THEY mean
+        /// on the user's local clock - not on the server clock, which can sit in
+        /// a different timezone (or even a different month near month end).
+        ///
+        /// Sign conventions: the browser sends getTimezoneOffset() = (UTC - local)
+        /// in minutes (IST = -330); the server's own offset is (local - UTC)
+        /// (IST server = +330). Their sum is how many minutes the server wall
+        /// clock runs AHEAD of the user's wall clock.
+        ///
+        /// The DB stores Updated on the SERVER clock, so the user-local
+        /// boundaries are shifted back onto the server clock for the SQL
+        /// comparison, and DisplayShiftMinutes moves stored timestamps onto the
+        /// user's clock for display. Still no DB-specific date function - the
+        /// boundaries remain bind parameters.
         /// </summary>
-        private DateBounds ResolveDateBounds()
+        private DateBounds ResolveDateBounds(int? clientTzOffsetMinutes)
         {
-            DateTime now = DateTime.Now;
-            DateTime monthStart = new DateTime(now.Year, now.Month, 1);
-            DateTime todayStart = now.Date;
+            int serverOffset = (int)Math.Round((DateTime.Now - DateTime.UtcNow).TotalMinutes);
+            int delta = clientTzOffsetMinutes.HasValue ? serverOffset + clientTzOffsetMinutes.Value : 0;
+
+            // "now" on the user's wall clock
+            DateTime clientNow = DateTime.Now.AddMinutes(-delta);
+            DateTime clientMonthStart = new DateTime(clientNow.Year, clientNow.Month, 1);
+
             return new DateBounds
             {
-                MonthStart = monthStart,
-                NextMonthStart = monthStart.AddMonths(1),
-                TodayStart = todayStart,
-                TomorrowStart = todayStart.AddDays(1)
+                // user-local boundaries, expressed back on the server clock for SQL
+                MonthStart = clientMonthStart.AddMinutes(delta),
+                NextMonthStart = clientMonthStart.AddMonths(1).AddMinutes(delta),
+                TodayStart = clientNow.Date.AddMinutes(delta),
+                TomorrowStart = clientNow.Date.AddDays(1).AddMinutes(delta),
+                // server clock -> user clock shift for displayed timestamps
+                DisplayShiftMinutes = -delta,
+                ClientMonthStart = clientMonthStart
             };
         }
 
@@ -457,13 +488,17 @@ namespace VAS.Controllers
             return DB.IsPostgreSQL() ? "'" + text + "'" : "N'" + text + "'";
         }
 
-        /// <summary>Resolved current-month and today half-open date boundaries.</summary>
+        /// <summary>Resolved current-month and today half-open date boundaries
+        /// (MonthStart..TomorrowStart are on the server clock for SQL comparison;
+        /// ClientMonthStart is the user-local month start for display).</summary>
         private class DateBounds
         {
             public DateTime MonthStart;
             public DateTime NextMonthStart;
             public DateTime TodayStart;
             public DateTime TomorrowStart;
+            public int DisplayShiftMinutes;
+            public DateTime ClientMonthStart;
         }
 
         /// <summary>Wraps a success payload as a serialized JSON result.</summary>

@@ -175,6 +175,9 @@
     <Compile Include="Models\VAS_190_ProductOverviewRightPanelModel.cs" />
     <Compile Include="Models\VAS_191_APPaymentDetailPanelModel.cs" />
     <Compile Include="Models\VAS_191_APPaymentDetailPanelModel.Actions.cs" />
+    <Compile Include="Models\VAS_291_GLJournalRightPanelModel.cs" />
+    <Compile Include="Models\VAS_292_BankingJournalRightPanelModel.cs" />
+    <Compile Include="Models\VAS_293_BankAccountRightPanelModel.cs" />
     <Compile Include="Models\VAS_192_CurrentPeriodModel.cs" />
     <Compile Include="Models\VAS_193_PreviousPeriodModel.cs" />
     <Compile Include="Models\VAS_195_MandatoryChecklistModel.cs" />
@@ -194,6 +197,7 @@
     <Compile Include="Models\VAS_103_MaterialTransferModel.cs" />
     <Compile Include="Models\VAS_104_OverviewShipGRNConfirmationModel.cs" />
     <Compile Include="Models\VAS_105_AccountRightPanelModel.cs" />
+    <Compile Include="Models\VAS_290_ServiceContractRightPanelModel.cs" />
     <Compile Include="Models\VAS_106_OverviewSalesOrderModel.cs" />
     <Compile Include="Models\VAS_221_RecordGeneratedModel.cs" />
     <Compile Include="Models\VAS_222_UpcomingSchedulesModel.cs" />

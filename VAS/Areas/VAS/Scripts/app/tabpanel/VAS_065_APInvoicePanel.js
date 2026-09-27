@@ -38,9 +38,7 @@
         // keys in '[...]'; when that happens we use `fallback` if one was supplied,
         // otherwise the raw '[KEY]' is kept (so callers without a fallback are unchanged).
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            if (t && t.charAt(0) !== '[') return t;
-            return (fallback !== undefined) ? fallback : t;
+            return VIS.Msg.getMsg(key);
         }
 
         // A return transaction (IsReturnTrx = 'Y') is matched against a vendor return
@@ -1301,9 +1299,10 @@
             var $head = $(
                 '<div class="vas-apinv-m-head">' +
                 '<div><h2 class="js-title"></h2><div class="ms js-sub"></div></div>' +
-                '<button type="button" class="vas-apinv-m-x" aria-label="Close"><i class="fa fa-times"></i></button>' +
+                '<button type="button" class="vas-apinv-m-x"><i class="fa fa-times"></i></button>' +
                 '</div>'
             );
+            $head.find(".vas-apinv-m-x").attr("aria-label", lbl("VAS_065_Close"));
             $head.find(".js-title").text(isCN ? lbl("VAS_065_AllocateCreditNote", "Allocate Credit Note") : lbl("VAS_065_RecordPayment", "Record Payment"));
             $head.find(".js-sub").text((data.BPName || "") + " · " + (data.DocumentNo || ""));
             $head.find(".vas-apinv-m-x").on("click", closeModal);

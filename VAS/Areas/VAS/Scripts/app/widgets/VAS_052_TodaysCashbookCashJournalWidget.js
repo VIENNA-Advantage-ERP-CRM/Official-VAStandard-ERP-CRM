@@ -97,13 +97,7 @@
         var ZOOM_WINDOW_NAME_OLD = 'Cash Journal';
 
         function lbl(key, fallback) {
-            var text = VIS.Msg.getMsg(key);
-
-            return text &&
-                text !== key &&
-                text !== '[' + key + ']'
-                ? text
-                : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function safeNumber(value) {
@@ -1203,7 +1197,7 @@
                 data.hasData === false ||
                 entries.length === 0
             ) {
-                setState('No data');
+                setState(lbl('VAS_052_NoData', 'No Data'));
 
                 return;
             }

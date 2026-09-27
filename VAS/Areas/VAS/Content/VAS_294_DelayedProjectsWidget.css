@@ -1,0 +1,668 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_294 Delayed Projects — 3x1 compact glass list (Customers dashboard) +
+ * shared VAS_135 projects modal. Design: delayed-projects.html (attached) +
+ * Design Specs/dashboard-widgets.md "Grid Data Widget". Glass surface,
+ * icon-well header, ranked rows (paged 3), circular pager; project modal with
+ * five activity-state cells, per-project progress bars and an activity-detail
+ * filter; "All" full-list modal. Widget scales in em against the widget root;
+ * modals are px/rem overlays (same chrome as VAS_135 - a modal overlay is not
+ * bound by the host widget's grid cell). MPC-prefixed.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas294-root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    color: #102C3F;
+    font-family: Roboto, sans-serif;
+    /* Smaller ceiling than VAS_135's 3x2 card - this is a single grid-row (3x1)
+       cell, so the whole card (header + 3 rows + pager) must fit ~1 block. */
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .0095), 15px);
+}
+
+    .vas294-root,
+    .vas294-root * {
+        box-sizing: border-box;
+    }
+
+.vas294-card {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0.625em 0.75em 0.75em;
+    border: 2px solid #FFFFFF;                  /* px */
+    border-radius: 14px;                        /* px */
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.49));
+    backdrop-filter: blur(10px);
+}
+
+.vas294-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    margin-bottom: 0.375em;
+    flex-shrink: 0;
+}
+
+.vas294-head-l {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    min-width: 0;
+}
+
+.vas294-iconwell {
+    width: 1.75em;
+    height: 1.75em;
+    flex-shrink: 0;
+    border-radius: 9px;                         /* px */
+    display: grid;
+    place-items: center;
+    background: linear-gradient(180deg, #FFFFFF, #F1F8FF);
+    border: 1px solid #BFE4FF;                  /* px */
+    color: #0083DA;
+}
+
+    .vas294-iconwell svg {
+        width: 1em;
+        height: 1em;
+    }
+
+.vas294-head-txt {
+    min-width: 0;
+}
+
+.vas294-title {
+    font-size: 1.05em;
+    font-weight: 500;
+    color: #000000;
+    line-height: 1.15;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas294-sub {
+    font-size: 0.68em;
+    color: #717182;
+    margin-top: 1px;                            /* px */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas294-alllink {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;                                   /* px */
+    background: transparent;
+    border: none;
+    color: #0083DA;
+    font-family: inherit;
+    font-weight: 500;
+    font-size: 0.75em;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+    .vas294-alllink svg {
+        width: 0.8em;
+        height: 0.8em;
+    }
+
+.vas294-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.vas294-list {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+    /* Widget body: split the available height into `pageSize` (3) equal rows so
+     * the records fill the compact card top-to-bottom (grid-template-rows set
+     * inline in JS). Partial pages leave empty tracks at the bottom rather than
+     * stretching. The "All" modal list keeps the flex layout above, since this
+     * only targets the direct child of the widget body. Matches VAS_135/138. */
+    .vas294-body > .vas294-list {
+        display: grid;
+        grid-auto-rows: minmax(0, 1fr);
+    }
+
+.vas294-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    width: 100%;
+    padding: 0.3em 0.2em;
+    border: none;
+    border-bottom: 1px solid #EDF2F6;           /* px */
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    flex-shrink: 0;
+}
+
+    .vas294-row:last-child {
+        border-bottom: none;
+    }
+
+    .vas294-row:hover {
+        background: rgba(237, 28, 36, 0.05);
+    }
+
+.vas294-row-ic {
+    width: 1.6em;
+    height: 1.6em;
+    border-radius: 8px;                         /* px */
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    color: #ED1C24;
+    background: rgba(237, 28, 36, 0.12);
+}
+
+    .vas294-row-ic svg {
+        width: 0.9em;
+        height: 0.9em;
+    }
+
+.vas294-row-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas294-row-title {
+    font-size: 0.82em;
+    font-weight: 700;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas294-row-meta {
+    font-size: 0.7em;
+    color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas294-view {
+    flex-shrink: 0;
+    border-radius: 999px;
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 0.7em;
+    padding: 0.24em 0.6em;
+    background: #FFFFFF;
+    border: 1px solid #BFE4FF;                  /* px */
+    color: #0083DA;
+    cursor: pointer;
+}
+
+    .vas294-view:hover {
+        background: #EAF8FF;
+    }
+
+/* Tags (rows + project status). */
+.vas294-tag {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.66em;
+    font-weight: 600;
+    padding: 0.1875em 0.5em;
+    border-radius: 6px;                         /* px */
+    line-height: 1.2;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.vas294-tag-delayed { background: #FAD7D7; color: #8F2D2D; }
+.vas294-tag-ontime { background: #E7F7EF; color: #0B6B45; }
+.vas294-tag-ongoing { background: #DFF1FF; color: #0E5DA8; }
+.vas294-tag-upcoming { background: #EFEAFF; color: #5F4AA6; }
+
+/* Footer pager — dashboard-widgets.md §"Widget Footer Pager": two zones, the
+   result-range helper on the left and a compact prev · "N of M" · next control
+   on the right. Matches VAS_135's shared rounded-square pager buttons. */
+.vas294-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    padding-top: 0.3em;
+    margin-top: 0.15em;
+    flex-shrink: 0;
+}
+
+.vas294-pglabel {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.7em;
+    color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas294-pgctl {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    flex-shrink: 0;
+}
+
+.vas294-pgtext {
+    min-width: 2.8em;
+    text-align: center;
+    font-size: 0.78em;
+    font-weight: 500;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.vas294-pgbtn {
+    width: 1.4em;                               /* ~21px */
+    height: 1.4em;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #E4EDF4;                  /* px */
+    border-radius: 6px;                         /* px */
+    background: #FBFDFF;
+    color: #0083DA;
+    cursor: pointer;
+}
+
+    .vas294-pgbtn:hover:not(:disabled) {
+        background: #EAF8FF;
+        border-color: #BFE4FF;
+    }
+
+    .vas294-pgbtn:disabled {
+        color: #B8C6D2;
+        cursor: default;
+    }
+
+    .vas294-pgbtn svg {
+        width: 0.8em;
+        height: 0.8em;
+        stroke: currentColor;
+    }
+
+.vas294-state {
+    padding: 0.7em 0.2em;
+    font-size: 0.8em;
+    color: #748494;
+    text-align: center;
+}
+
+/* ── Shared modal chrome (same scale as VAS_135 - a modal overlay is not
+   bound by the host widget's compact grid cell) ──────────────────────────── */
+
+.vas294-dialog,
+.vas294-detail {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;                              /* px */
+    font-family: Roboto, sans-serif;
+    color: #102C3F;
+}
+
+.vas294-dialog { z-index: 5000; }
+.vas294-detail { z-index: 5100; }
+
+    .vas294-dialog.is-open,
+    .vas294-detail.is-open {
+        display: flex;
+    }
+
+    .vas294-dialog *, .vas294-detail *,
+    .vas294-dialog, .vas294-detail {
+        box-sizing: border-box;
+    }
+
+.vas294-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(2, 20, 34, 0.42);
+    backdrop-filter: blur(2px);
+}
+
+.vas294-panel,
+.vas294-dpanel {
+    position: relative;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    background: #FFFFFF;
+    border-radius: 18px;                        /* px */
+    box-shadow: 0 30px 80px rgba(2, 20, 34, 0.35);
+    overflow: hidden;
+    max-height: 86vh;
+}
+
+.vas294-panel { max-width: 640px; }         /* px */
+.vas294-dpanel { max-width: 720px; }        /* px */
+
+.vas294-phead {
+    flex-shrink: 0;
+    height: 56px;                               /* px */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;                            /* px */
+    border-bottom: 1px solid #E4EDF4;           /* px */
+}
+
+.vas294-ptitle {
+    font-size: 16px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas294-phead-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;                                  /* px */
+}
+
+.vas294-pcount {
+    font-size: 13px;                            /* px */
+    color: #748494;
+    white-space: nowrap;
+}
+
+.vas294-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;                         /* px */
+    display: grid;
+    place-items: center;
+    background: transparent;
+    border: none;
+    color: #102C3F;
+    cursor: pointer;
+}
+
+    .vas294-close:hover {
+        background: #F1F4F8;
+    }
+
+    .vas294-close svg {
+        width: 20px;
+        height: 20px;
+    }
+
+.vas294-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;                                   /* px */
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 13px;                            /* px */
+    font-weight: 600;
+    padding: 8px 16px;                          /* px */
+    border: none;
+    cursor: pointer;
+}
+
+    .vas294-btn svg {
+        width: 14px;
+        height: 14px;
+    }
+
+.vas294-btn-primary {
+    background: #1F83FF;
+    color: #FFFFFF;
+}
+
+    .vas294-btn-primary:hover {
+        background: #1F83FF;
+    }
+
+/* All-list modal. */
+.vas294-pbody {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 6px 20px 8px;                      /* px */
+    font-size: 16px;                            /* px */
+}
+
+.vas294-pfoot {
+    flex-shrink: 0;
+    padding: 10px 20px 16px;                    /* px */
+    border-top: 1px solid #E4EDF4;              /* px */
+    background: #FBFDFF;
+}
+
+    /* Spec §Alignment Rules: helper stays left, control stays right — the modal
+       footer no longer centres the pager. */
+    .vas294-pfoot .vas294-pager {
+        padding-top: 0;
+        margin-top: 0;
+    }
+
+    .vas294-pbody .vas294-row {
+        flex: none;
+    }
+
+/* Projects modal body. */
+.vas294-dbody {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 18px 24px;                         /* px */
+}
+
+.vas294-dfoot {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;                                  /* px */
+    padding: 14px 24px;                         /* px */
+    border-top: 1px solid #E4EDF4;              /* px */
+    background: #FBFDFF;
+}
+
+/* Five activity-state cells. */
+.vas294-statgrid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;                                   /* px */
+    margin-bottom: 16px;                        /* px */
+}
+
+.vas294-astat {
+    border: 1px solid #E4EDF4;                  /* px */
+    border-radius: 10px;                        /* px */
+    padding: 9px;                               /* px */
+    text-align: center;
+    cursor: pointer;
+    background: #FFFFFF;
+    font-family: inherit;
+}
+
+    .vas294-astat:hover {
+        border-color: #BFE4FF;
+    }
+
+    .vas294-astat.is-active {
+        border-color: #1F83FF;
+        box-shadow: 0 0 0 1px #1F83FF inset;
+    }
+
+    .vas294-astat b {
+        display: block;
+        font-size: 1.25rem;                     /* px-ish */
+        line-height: 1;
+    }
+
+    .vas294-astat span {
+        font-size: 11px;                        /* px */
+        color: #5F7283;
+    }
+
+.MPC-astat-delayed b { color: #ED1C24; }
+.MPC-astat-ontime b { color: #20A464; }
+.MPC-astat-ongoing b { color: #0083DA; }
+.MPC-astat-upcoming b { color: #5F4AA6; }
+.MPC-astat-completed b { color: #20A464; }
+
+/* Activity-detail list (state filter). */
+.vas294-actdetail:empty {
+    display: none;
+}
+
+.vas294-actlist {
+    border: 1px solid #E4EDF4;                  /* px */
+    border-radius: 10px;                        /* px */
+    padding: 4px 12px;                          /* px */
+    margin-bottom: 16px;                        /* px */
+    background: #FBFDFF;
+}
+
+.vas294-act {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;                                  /* px */
+    padding: 9px 0;                             /* px */
+    border-bottom: 1px solid #EDF2F6;           /* px */
+}
+
+    .vas294-act:last-child {
+        border-bottom: none;
+    }
+
+.vas294-act-main {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas294-act-name {
+    font-size: 13px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas294-act-proj {
+    font-size: 11px;                            /* px */
+    color: #748494;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas294-act-due {
+    font-size: 12px;                            /* px */
+    color: #5F7283;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+/* Project rows. */
+.vas294-proj {
+    padding: 12px 0;                            /* px */
+    border-bottom: 1px solid #EDF2F6;           /* px */
+}
+
+    .vas294-proj:last-child {
+        border-bottom: none;
+    }
+
+.vas294-proj-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;                                  /* px */
+    margin-bottom: 8px;                         /* px */
+}
+
+.vas294-proj-name {
+    font-size: 14px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.vas294-proj-bd {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;                                   /* px */
+    margin-bottom: 8px;                         /* px */
+}
+
+.vas294-bd {
+    font-size: 11px;                            /* px */
+    font-weight: 600;
+    padding: 2px 7px;                           /* px */
+    border-radius: 6px;                         /* px */
+    white-space: nowrap;
+}
+
+.MPC-bd-delayed { background: #FAD7D7; color: #8F2D2D; }
+.MPC-bd-ontime { background: #E7F7EF; color: #0B6B45; }
+.MPC-bd-ongoing { background: #DFF1FF; color: #0E5DA8; }
+.MPC-bd-upcoming { background: #EFEAFF; color: #5F4AA6; }
+.MPC-bd-completed { background: #E7F7EF; color: #0B6B45; }
+
+.vas294-bar {
+    height: 8px;                                /* px */
+    border-radius: 999px;
+    background: rgba(15, 61, 97, 0.07);
+    overflow: hidden;
+}
+
+    .vas294-bar > div {
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #0083DA, #1F83FF);
+    }
+
+.vas294-proj-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;                                  /* px */
+    margin-top: 6px;                            /* px */
+    font-size: 12px;                            /* px */
+    color: #5F7283;
+}
+
+body.vas294-modal-open {
+    overflow: hidden;
+}

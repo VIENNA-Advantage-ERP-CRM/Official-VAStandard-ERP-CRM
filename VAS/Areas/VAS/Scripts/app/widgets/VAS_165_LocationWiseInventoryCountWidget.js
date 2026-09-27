@@ -23,6 +23,25 @@
  * 14  | No location count records found                  | VAS_165_NoLocationCountRecords
  * 15  | Unable to load location count summary            | VAS_165_UnableToLoadLocationSummary
  * 16  | Locator                                          | M_Locator_ID (global VA element key)
+ * 17  | Location Wise Count                              | VAS_165_LocationWiseCount
+ * 18  | Locations with active inventory counts           | VAS_165_LocationsActiveCounts
+ * 19  | Warehouse                                        | VAS_165_Warehouse
+ * 20  | Counts                                           | VAS_165_Counts
+ * 21  | Previous page                                    | VAS_165_PreviousPage
+ * 22  | Next page                                        | VAS_165_NextPage
+ * 23  | No location counts recorded for this period.     | VAS_165_NoLocationCountsRecordedPeriod
+ *      Pick another month to review earlier counts.      |
+ * 24  | Showing                                          | VAS_165_Showing
+ * 25  | Open count details for locator                   | VAS_165_OpenCountDetailsForLocator
+ * 26  | Close modal                                      | VAS_165_CloseModal
+ * 27  | Loading location details...                      | VAS_165_LoadingLocationDetails
+ * 28  | records                                          | VAS_165_RecordsSuffix
+ * 29  | No count lines found for this location.          | VAS_165_NoCountLinesFoundLocation
+ * 30  | Unable to load count lines.                      | VAS_165_UnableToLoadCountLines
+ * 31  | Product / Attribute                              | VAS_165_ProductAttribute
+ * 32  | Qty                                              | VAS_165_Qty
+ * 33  | Total qty                                        | VAS_165_TotalQty
+ * 34  | count sessions                                   | VAS_165_CountSessionsSuffix
  */
 ; VAS = window.VAS || {};
 
@@ -33,8 +52,7 @@
        test for the leading '[' rather than rely on a null check. M_Locator_ID is the global VA
        element key for the word "Locator" and already exists in AD_Message. */
     function lbl(key, fallback) {
-        var t = VIS.Msg.getMsg(key);
-        return (t && t.charAt(0) !== '[') ? t : fallback;
+        return VIS.Msg.getMsg(key);
     }
 
     /* Copied verbatim from VAS_159/VAS_160. Locator names are free-text database values that get
@@ -118,8 +136,8 @@
             var $leftCluster = $('<div class="vas-locwisecount-left-cluster">');
             var $iconWell = $('<div class="vas-locwisecount-icon-well"><i class="fa fa-map-marker"></i></div>');
             var $titleBlock = $('<div class="vas-locwisecount-title-block">');
-            var $title = $('<h3 class="vas-locwisecount-title">Location Wise Count</h3>');
-            $subtitle = $('<span class="vas-locwisecount-subtitle">Locations with active inventory counts</span>');
+            var $title = $('<h3 class="vas-locwisecount-title">' + lbl("VAS_165_LocationWiseCount") + '</h3>');
+            $subtitle = $('<span class="vas-locwisecount-subtitle">' + lbl("VAS_165_LocationsActiveCounts") + '</span>');
             $titleBlock.append($title).append($subtitle);
             $leftCluster.append($iconWell).append($titleBlock);
 
@@ -144,10 +162,10 @@
             var $body = $('<div class="vas-locwisecount-body">');
             var $headerGrid = $(
                 '<div class="vas-locwisecount-grid-template vas-locwisecount-header-row">' +
-                '<div class="vas-locwisecount-th">Locator</div>' +
-                '<div class="vas-locwisecount-th">Warehouse</div>' +
-                '<div class="vas-locwisecount-th vas-locwisecount-th-right">Counts</div>' +
-                '<div class="vas-locwisecount-th vas-locwisecount-th-right">Qty Counted</div>' +
+                '<div class="vas-locwisecount-th">' + escapeHtml(lbl('M_Locator_ID', 'Locator')) + '</div>' +
+                '<div class="vas-locwisecount-th">' + lbl("VAS_165_Warehouse") + '</div>' +
+                '<div class="vas-locwisecount-th vas-locwisecount-th-right">' + lbl("VAS_165_Counts") + '</div>' +
+                '<div class="vas-locwisecount-th vas-locwisecount-th-right">' + lbl("VAS_165_QtyCounted") + '</div>' +
                 '</div>'
             );
             $body.append($headerGrid);
@@ -160,9 +178,9 @@
                 '<div class="vas-locwisecount-footer">' +
                 '<div class="vas-locwisecount-footer-text"></div>' +
                 '<div class="vas-locwisecount-pager">' +
-                '<button type="button" class="vas-locwisecount-pager-btn vas-prev" aria-label="Previous page">&lsaquo;</button>' +
+                '<button type="button" class="vas-locwisecount-pager-btn vas-prev" aria-label="' + lbl("VAS_165_PreviousPage") + '">&lsaquo;</button>' +
                 '<span class="vas-locwisecount-pager-info"></span>' +
-                '<button type="button" class="vas-locwisecount-pager-btn vas-next" aria-label="Next page">&rsaquo;</button>' +
+                '<button type="button" class="vas-locwisecount-pager-btn vas-next" aria-label="' + lbl("VAS_165_NextPage") + '">&rsaquo;</button>' +
                 '</div>' +
                 '</div>'
             );
@@ -241,7 +259,7 @@
         function loadSummary() {
             var monthsFull = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
             var mName = monthsFull[selectedMonth - 1] || "";
-            $subtitle.text("Locations with active inventory counts · " + mName + " " + selectedYear);
+            $subtitle.text(lbl("VAS_165_LocationsActiveCounts") + " · " + mName + " " + selectedYear);
 
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_165_LocationWiseInventoryCountWidget/GetLocationSummary?month=" + selectedMonth + "&year=" + selectedYear,
@@ -312,9 +330,9 @@
             $rowsContainer.empty();
 
             if (!summaryData || summaryData.length === 0) {
-                $rowsContainer.html('<div class="vas-locwisecount-message">No location counts recorded for this period. Pick another month to review earlier counts.</div>');
+                $rowsContainer.html('<div class="vas-locwisecount-message">' + lbl("VAS_165_NoLocationCountsRecordedPeriod") + '</div>');
                 appendFillerRows($rowsContainer, Math.max(0, pageSize - 1));
-                $footer.find('.vas-locwisecount-footer-text').text('Showing 0 of 0');
+                $footer.find('.vas-locwisecount-footer-text').text(lbl("VAS_165_Showing") + ' 0 ' + lbl("VAS_165_Of") + ' 0');
                 $footer.find('.vas-locwisecount-pager').hide();
                 return;
             }
@@ -339,7 +357,7 @@
                 var locName = item.locatorName || item.locator;
 
                 var $row = $(
-                    '<button type="button" class="vas-locwisecount-row-btn vas-locwisecount-grid-template" aria-label="Open count details for locator ' + locName + '">' +
+                    '<button type="button" class="vas-locwisecount-row-btn vas-locwisecount-grid-template" aria-label="' + lbl("VAS_165_OpenCountDetailsForLocator") + ' ' + locName + '">' +
                     '<div class="vas-locwisecount-cell vas-locwisecount-loc-title" title="' + locName + '">' + locName + '</div>' +
                     '<div class="vas-locwisecount-cell vas-locwisecount-wh-text" title="' + item.warehouse + '">' + item.warehouse + '</div>' +
                     '<div class="vas-locwisecount-cell vas-locwisecount-counts-num" title="' + item.sessionCount + '">' + item.sessionCount + '</div>' +
@@ -377,8 +395,8 @@
             var $btnPrev = $footer.find('.vas-prev');
             var $btnNext = $footer.find('.vas-next');
 
-            $footerText.text('Showing ' + (startIndex + 1) + '–' + endIndex + ' of ' + totalItems);
-            $pagerInfo.text(currentPage + ' of ' + totalPages);
+            $footerText.text(lbl("VAS_165_Showing") + ' ' + (startIndex + 1) + '–' + endIndex + ' ' + lbl("VAS_165_Of") + ' ' + totalItems);
+            $pagerInfo.text(currentPage + ' ' + lbl("VAS_165_Of") + ' ' + totalPages);
 
             $btnPrev.prop('disabled', currentPage === 1);
             $btnNext.prop('disabled', currentPage === totalPages);
@@ -428,13 +446,13 @@
             var $subtitle = $('<span class="vas-locwisecount-modal-subtitle">' + locItem.warehouse + ' · ' + monthName + ' ' + selectedYear + '</span>');
             $headerLeft.append($title).append($subtitle);
 
-            var $closeBtn = $('<button type="button" class="vas-locwisecount-modal-close" aria-label="Close modal">&times;</button>');
+            var $closeBtn = $('<button type="button" class="vas-locwisecount-modal-close" aria-label="' + lbl("VAS_165_CloseModal") + '">&times;</button>');
             $header.append($headerLeft).append($closeBtn);
             $dialog.append($header);
 
             // Modal Body
             var $body = $('<div class="vas-locwisecount-modal-body">');
-            $body.html('<div class="vas-locwisecount-message">Loading location details...</div>');
+            $body.html('<div class="vas-locwisecount-message">' + lbl("VAS_165_LoadingLocationDetails") + '</div>');
             $dialog.append($body);
 
             $overlay.append($dialog);
@@ -452,17 +470,6 @@
             };
 
             $closeBtn.on('click', closeModal);
-            $overlay.on('click', function (e) {
-                if ($(e.target).hasClass('vas-locwisecount-modal-overlay')) {
-                    closeModal();
-                }
-            });
-
-            $(document).off('keydown.vas-locwisecount').on('keydown.vas-locwisecount', function (e) {
-                if (e.key === 'Escape' && $modalOverlay) {
-                    closeModal();
-                }
-            });
 
             // Fetch Detail Lines
             $.ajax({
@@ -471,15 +478,15 @@
                 dataType: "json",
                 success: function (res) {
                     if (res && res.lines && res.lines.length > 0) {
-                        $subtitle.text(locItem.warehouse + ' · ' + monthName + ' ' + selectedYear + ' · ' + res.lines.length + ' records');
+                        $subtitle.text(locItem.warehouse + ' · ' + monthName + ' ' + selectedYear + ' · ' + res.lines.length + ' ' + lbl("VAS_165_RecordsSuffix"));
                         renderModalGrid($body, res);
                     } else {
-                        $body.html('<div class="vas-locwisecount-message">No count lines found for this location.</div>');
+                        $body.html('<div class="vas-locwisecount-message">' + lbl("VAS_165_NoCountLinesFoundLocation") + '</div>');
                     }
                 },
                 error: function (err) {
                     console.error("VAS_165_LocationWiseInventoryCountWidget: Error loading detail", err);
-                    $body.html('<div class="vas-locwisecount-message">Unable to load count lines.</div>');
+                    $body.html('<div class="vas-locwisecount-message">' + lbl("VAS_165_UnableToLoadCountLines") + '</div>');
                 }
             });
         }
@@ -500,10 +507,10 @@
 
             var $headerGrid = $(
                 '<div class="vas-locwisecount-modal-grid-template vas-locwisecount-header-row">' +
-                '<div class="vas-locwisecount-th">Product / Attribute</div>' +
-                '<div class="vas-locwisecount-th">Locator</div>' +
-                '<div class="vas-locwisecount-th">Inventory Type</div>' +
-                '<div class="vas-locwisecount-th vas-locwisecount-th-right">Qty</div>' +
+                '<div class="vas-locwisecount-th">' + lbl("VAS_165_ProductAttribute") + '</div>' +
+                '<div class="vas-locwisecount-th">' + escapeHtml(lbl('M_Locator_ID', 'Locator')) + '</div>' +
+                '<div class="vas-locwisecount-th">' + lbl("VAS_165_InventoryType") + '</div>' +
+                '<div class="vas-locwisecount-th vas-locwisecount-th-right">' + lbl("VAS_165_Qty") + '</div>' +
                 '</div>'
             );
             $body.append($headerGrid);
@@ -515,12 +522,12 @@
                 '<div class="vas-locwisecount-modal-footer">' +
                 '<div class="vas-locwisecount-modal-footer-left">' +
                 '<span class="vas-locwisecount-footer-text vas-modal-helper"></span>' +
-                '<span class="vas-locwisecount-modal-total-qty">Total qty ' + Number(totalQty).toLocaleString() + '</span>' +
+                '<span class="vas-locwisecount-modal-total-qty">' + lbl("VAS_165_TotalQty") + ' ' + Number(totalQty).toLocaleString() + '</span>' +
                 '</div>' +
                 '<div class="vas-locwisecount-pager">' +
-                '<button type="button" class="vas-locwisecount-pager-btn vas-m-prev" aria-label="Previous page">&lsaquo;</button>' +
+                '<button type="button" class="vas-locwisecount-pager-btn vas-m-prev" aria-label="' + lbl("VAS_165_PreviousPage") + '">&lsaquo;</button>' +
                 '<span class="vas-locwisecount-pager-info vas-m-info"></span>' +
-                '<button type="button" class="vas-locwisecount-pager-btn vas-m-next" aria-label="Next page">&rsaquo;</button>' +
+                '<button type="button" class="vas-locwisecount-pager-btn vas-m-next" aria-label="' + lbl("VAS_165_NextPage") + '">&rsaquo;</button>' +
                 '</div>' +
                 '</div>'
             );
@@ -577,8 +584,8 @@
                 // Hold the popup at MODAL_PAGE_ROWS lines regardless of how many this page has.
                 appendModalFillerRows($modalRowsContainer, Math.max(0, modalPageSize - paged.length));
 
-                $footer.find('.vas-modal-helper').text('Showing ' + (start + 1) + '–' + end + ' of ' + totalLines + ' · ' + sessionCount + ' count sessions');
-                $footer.find('.vas-m-info').text(modalPage + ' of ' + totalPages);
+                $footer.find('.vas-modal-helper').text(lbl("VAS_165_Showing") + ' ' + (start + 1) + '–' + end + ' ' + lbl("VAS_165_Of") + ' ' + totalLines + ' · ' + sessionCount + ' ' + lbl("VAS_165_CountSessionsSuffix"));
+                $footer.find('.vas-m-info').text(modalPage + ' ' + lbl("VAS_165_Of") + ' ' + totalPages);
 
                 var $mPrev = $footer.find('.vas-m-prev');
                 var $mNext = $footer.find('.vas-m-next');

@@ -115,8 +115,7 @@
         };
 
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            return (t && t.charAt(0) !== '[') ? t : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function el(tag, className, text) {
@@ -219,7 +218,7 @@
 
             var $head = $('<div class="MPC-wc-m-head"></div>');
             $modalTitleGroup = $('<div class="MPC-wc-m-titlegroup"></div>');
-            $modalClose = $('<button type="button" class="MPC-wc-m-close" aria-label="Close"></button>');
+            $modalClose = $('<button type="button" class="MPC-wc-m-close"></button>').attr('aria-label', lbl('Close', 'Close'));
             $modalClose.append(svg('<path d="M18 6 6 18"/><path d="m6 6 12 12"/>'));
             $head.append($modalTitleGroup, $modalClose);
 
@@ -233,10 +232,6 @@
             $modal.data('overlay', $overlay);
 
             $modalClose.on('click', closeModal);
-            $overlay.on('mousedown', function (e) { if (e.target === $overlay[0]) { closeModal(); } });
-            $(document).on('keydown' + modalEventNamespace, function (e) {
-                if (e.key === 'Escape' && $overlay.hasClass('MPC-wc-open')) { closeModal(); }
-            });
         }
 
         /* ---- Widget list ---- */
@@ -819,7 +814,6 @@
             if (locatorsRequest && typeof locatorsRequest.abort === 'function') { try { locatorsRequest.abort(); } catch (ignored) { } }
             $root.off('.' + eventNamespace);
             $body.off('.' + eventNamespace);
-            $(document).off('keydown' + modalEventNamespace);
             if ($modal) {
                 var $overlay = $modal.data('overlay');
                 if ($overlay) { $overlay.remove(); }

@@ -547,7 +547,10 @@ namespace VAS.Models
 
         /// <summary>
         /// Returns all active sales opportunities linked to the specified C_BPartner,
-        /// with values converted to the client's base currency.
+        /// including Won and Lost, with values converted to the client's base currency.
+        /// The open-opportunity count is computed client-side in renderOpps() by filtering
+        /// terminal stage codes so that Won/Lost/Closed records appear in the list but are
+        /// excluded from the open badge.
         /// </summary>
         /// <param name="ctx">Current session context.</param>
         /// <param name="bPartnerId">C_BPartner_ID of the customer account.</param>
@@ -602,9 +605,10 @@ namespace VAS.Models
                 sb.Append("       vo.Probability AS probability,");
                 sb.Append("       TO_CHAR(vo.VAS_DecisionDate,'YYYY-MM-DD') AS close_date,");
                 sb.Append("       TRIM(COALESCE(rep.Name,N'') || ' ' || COALESCE(rep.LastName,N'')) AS owner,");
-                sb.Append("       CURRENCYCONVERT(vo.PlannedAmt, vo.C_Currency_ID, cs.C_Currency_ID,");
-                sb.Append("           COALESCE(vo.VAS_DecisionDate, CURRENT_DATE), NULL,");
-                sb.Append("           vo.AD_Client_ID, vo.AD_Org_ID) AS value,");
+                sb.Append("       vo.PlannedAmt AS value,");
+                sb.Append("       CASE WHEN cur.CurSymbol IS NOT NULL THEN cur.CurSymbol ELSE cur.ISO_Code END AS cur_symbol,");
+                sb.Append("       cur.ISO_Code AS cur_iso,");
+                sb.Append("       COALESCE(cur.StdPrecision, 2) AS cur_precision,");
                 sb.Append("       COALESCE(vo.Description, N'') AS description,");
                 sb.Append("       pc.Name AS primary_contact,");
                 sb.Append("       ns.Name AS next_step,");
@@ -613,11 +617,9 @@ namespace VAS.Models
                 sb.Append("  LEFT OUTER JOIN AD_User rep ON (rep.AD_User_ID = vo.SalesRep_ID AND rep.IsActive = 'Y')");
                 sb.Append("  LEFT OUTER JOIN AD_User pc ON (pc.AD_User_ID = vo.AD_User_ID AND pc.IsActive = 'Y')");
                 sb.Append("  LEFT OUTER JOIN VAS_LeadNextStep ns ON (ns.VAS_LeadNextStep_ID = vo.VAS_LeadNextStep_ID AND ns.IsActive = 'Y')");
-                sb.Append("  INNER JOIN AD_ClientInfo ci ON (ci.AD_Client_ID = vo.AD_Client_ID)");
-                sb.Append("  INNER JOIN C_AcctSchema cs ON (cs.C_AcctSchema_ID = ci.C_AcctSchema1_ID)");
+                sb.Append("  LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID = vo.C_Currency_ID AND cur.IsActive = 'Y')");
                 sb.Append(" WHERE vo.IsActive = 'Y'");
                 sb.Append("   AND (vo.C_BPartner_ID = @bPartnerId OR vo.Ref_BPartner_ID = @bPartnerId2)");
-                sb.Append("   AND vo.VAS_OppStage NOT IN ('16', '17')");
 
                 string baseSql = sb.ToString();
                 string accessSql = MRole.GetDefault(ctx).AddAccessSQL(
@@ -649,7 +651,10 @@ namespace VAS.Models
                             ? Convert.ToDecimal(row["probability"]) : 0m;
                         item.closeDate = Util.GetValueOfString(row["close_date"]);
                         item.owner          = Util.GetValueOfString(row["owner"]);
-                        item.value          = row["value"] != DBNull.Value ? Convert.ToDecimal(row["value"]) : 0m;
+                        item.value            = row["value"] != DBNull.Value ? Convert.ToDecimal(row["value"]) : 0m;
+                        item.currencySymbol   = row["cur_symbol"] != DBNull.Value ? Util.GetValueOfString(row["cur_symbol"]) : "";
+                        item.currencyIso      = row["cur_iso"]    != DBNull.Value ? Util.GetValueOfString(row["cur_iso"])    : "";
+                        item.currencyPrecision = row["cur_precision"] != DBNull.Value ? Util.GetValueOfInt(row["cur_precision"]) : 2;
                         item.description    = Util.GetValueOfString(row["description"]);
                         item.primaryContact = Util.GetValueOfString(row["primary_contact"]);
                         item.nextStep       = Util.GetValueOfString(row["next_step"]);
@@ -754,16 +759,17 @@ namespace VAS.Models
                     sbCC.Append("                                            AND tbl.IsActive = 'Y')");
                     sbCC.Append("                                       WHERE col.ColumnName = 'RenewalType'");
                     sbCC.Append("                                         AND col.IsActive = 'Y')) AS renewal_name,");
-                    // TotalLines = net amount excluding tax (GrandTotal includes tax — show exclusive)
-                    sbCC.Append("       COALESCE(CURRENCYCONVERT(ct.TotalLines, ct.C_Currency_ID, cs.C_Currency_ID,");
-                    sbCC.Append("           COALESCE(ct.StartDate, CURRENT_DATE), NULL,");
-                    sbCC.Append("           ct.AD_Client_ID, ct.AD_Org_ID), ct.TotalLines) AS value,");
+                    // C_Contract has GrandTotal (includes tax) and LineNetAmt (net, excl. tax).
+                    // TotalLines does not exist on C_Contract — use GrandTotal here.
+                    sbCC.Append("       ct.GrandTotal AS value,");
+                    sbCC.Append("       CASE WHEN curCC.CurSymbol IS NOT NULL THEN curCC.CurSymbol ELSE curCC.ISO_Code END AS cur_symbol,");
+                    sbCC.Append("       curCC.ISO_Code AS cur_iso,");
+                    sbCC.Append("       COALESCE(curCC.StdPrecision, 2) AS cur_precision,");
                     sbCC.Append("       TRIM(COALESCE(salesrep.Name,N'') || ' ' || COALESCE(salesrep.LastName,N'')) AS owner_name,");
                     sbCC.Append("       p.Name AS product_name,");
                     sbCC.Append("       COALESCE(asi.Description, N'') AS attribute_desc");
                     sbCC.Append("  FROM C_Contract ct");
-                    sbCC.Append("  INNER JOIN AD_ClientInfo ci ON (ci.AD_Client_ID = ct.AD_Client_ID)");
-                    sbCC.Append("  INNER JOIN C_AcctSchema cs ON (cs.C_AcctSchema_ID = ci.C_AcctSchema1_ID)");
+                    sbCC.Append("  LEFT OUTER JOIN C_Currency curCC ON (curCC.C_Currency_ID = ct.C_Currency_ID AND curCC.IsActive = 'Y')");
                     sbCC.Append("  LEFT OUTER JOIN AD_User salesrep ON (salesrep.AD_User_ID = ct.SalesRep_ID)");
                     sbCC.Append("  LEFT OUTER JOIN M_Product p ON (p.M_Product_ID = ct.M_Product_ID)");
                     sbCC.Append("  LEFT OUTER JOIN M_AttributeSetInstance asi ON (asi.M_AttributeSetInstance_ID = ct.M_AttributeSetInstance_ID AND ct.M_AttributeSetInstance_ID > 0)");
@@ -794,7 +800,10 @@ namespace VAS.Models
                             item.statusCode  = Util.GetValueOfString(row["status_code"]);
                             item.renewalCode = Util.GetValueOfString(row["renewal_code"]);
                             item.renewalName = row["renewal_name"] != DBNull.Value ? Util.GetValueOfString(row["renewal_name"]) : "";
-                            item.value         = row["value"] != DBNull.Value ? Convert.ToDecimal(row["value"]) : 0m;
+                            item.value             = row["value"] != DBNull.Value ? Convert.ToDecimal(row["value"]) : 0m;
+                            item.currencySymbol    = row["cur_symbol"]    != DBNull.Value ? Util.GetValueOfString(row["cur_symbol"])    : "";
+                            item.currencyIso       = row["cur_iso"]       != DBNull.Value ? Util.GetValueOfString(row["cur_iso"])       : "";
+                            item.currencyPrecision = row["cur_precision"] != DBNull.Value ? Util.GetValueOfInt(row["cur_precision"])    : 2;
                             item.ownerName     = row["owner_name"] != DBNull.Value ? Util.GetValueOfString(row["owner_name"]) : "";
                             item.productName   = Util.GetValueOfString(row["product_name"]);
                             item.productCount  = 0;  // set in enrichment pass
@@ -933,13 +942,12 @@ namespace VAS.Models
                     sbVM.Append("                                            AND tbl.IsActive = 'Y')");
                     sbVM.Append("                                       WHERE col.ColumnName = 'RenewalType'");
                     sbVM.Append("                                         AND col.IsActive = 'Y')) AS renewal_name,");
-                    // COALESCE ensures the raw amount is shown when no conversion rate exists
-                    sbVM.Append("       COALESCE(CURRENCYCONVERT(vm.VAS_ContractAmount, vm.C_Currency_ID, cs.C_Currency_ID,");
-                    sbVM.Append("           COALESCE(vm.StartDate, CURRENT_DATE), NULL,");
-                    sbVM.Append("           vm.AD_Client_ID, vm.AD_Org_ID), vm.VAS_ContractAmount) AS value");
+                    sbVM.Append("       vm.VAS_ContractAmount AS value,");
+                    sbVM.Append("       CASE WHEN curVM.CurSymbol IS NOT NULL THEN curVM.CurSymbol ELSE curVM.ISO_Code END AS cur_symbol,");
+                    sbVM.Append("       curVM.ISO_Code AS cur_iso,");
+                    sbVM.Append("       COALESCE(curVM.StdPrecision, 2) AS cur_precision");
                     sbVM.Append("  FROM VAS_ContractMaster vm");
-                    sbVM.Append("  INNER JOIN AD_ClientInfo ci ON (ci.AD_Client_ID = vm.AD_Client_ID)");
-                    sbVM.Append("  INNER JOIN C_AcctSchema cs ON (cs.C_AcctSchema_ID = ci.C_AcctSchema1_ID)");
+                    sbVM.Append("  LEFT OUTER JOIN C_Currency curVM ON (curVM.C_Currency_ID = vm.C_Currency_ID AND curVM.IsActive = 'Y')");
                     sbVM.Append(" WHERE vm.IsActive = 'Y' AND vm.C_BPartner_ID = @bPartnerIdVM");
 
                     string accessVM = MRole.GetDefault(ctx).AddAccessSQL(
@@ -967,7 +975,10 @@ namespace VAS.Models
                             item.statusCode  = Util.GetValueOfString(row["status_code"]);
                             item.renewalCode = Util.GetValueOfString(row["renewal_code"]);
                             item.renewalName = row["renewal_name"] != DBNull.Value ? Util.GetValueOfString(row["renewal_name"]) : "";
-                            item.value         = row["value"] != DBNull.Value ? Convert.ToDecimal(row["value"]) : 0m;
+                            item.value             = row["value"] != DBNull.Value ? Convert.ToDecimal(row["value"]) : 0m;
+                            item.currencySymbol    = row["cur_symbol"]    != DBNull.Value ? Util.GetValueOfString(row["cur_symbol"])    : "";
+                            item.currencyIso       = row["cur_iso"]       != DBNull.Value ? Util.GetValueOfString(row["cur_iso"])       : "";
+                            item.currencyPrecision = row["cur_precision"] != DBNull.Value ? Util.GetValueOfInt(row["cur_precision"])    : 2;
                             item.ownerName     = ""; // VAS_ContractMaster has no SalesRep_ID column
                             item.productName   = "";
                             item.productCount  = 0;  // set in enrichment pass
@@ -1288,11 +1299,12 @@ namespace VAS.Models
                 if (metaDict.ContainsKey("precision"))
                     response.precision = currMeta.precision;
 
-                // Total count for pagination
+                int baseCurrId = Util.GetValueOfInt(currMeta.baseCurrId);
+
+                // Total count — no currency join needed; avoids duplicates if AD_ClientInfo
+                // has more than one row per AD_Client_ID in the current installation.
                 var cntSb = new StringBuilder();
                 cntSb.Append("SELECT COUNT(*) FROM C_Order o");
-                cntSb.Append("  INNER JOIN AD_ClientInfo ci ON (ci.AD_Client_ID = o.AD_Client_ID)");
-                cntSb.Append("  INNER JOIN C_AcctSchema cs ON (cs.C_AcctSchema_ID = ci.C_AcctSchema1_ID)");
                 cntSb.Append(" WHERE o.IsActive = 'Y' AND o.IsSOTrx = 'Y' AND o.C_BPartner_ID = @bPartnerId");
                 cntSb.Append("   AND COALESCE(o.IsSalesQuotation,'N') = 'N' AND COALESCE(o.IsBlanketTrx,'N') = 'N' AND COALESCE(o.IsReturnTrx,'N') = 'N'");
                 string cntAccessSql = MRole.GetDefault(ctx).AddAccessSQL(cntSb.ToString(), "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
@@ -1305,10 +1317,12 @@ namespace VAS.Models
                 sb.Append("       TO_CHAR(o.DateOrdered,'YYYY-MM-DD') AS order_date,");
                 sb.Append("       o.Description AS items,");
                 sb.Append("       o.DocStatus AS status_code,");
-                sb.Append("       CURRENCYCONVERT(o.GrandTotal, o.C_Currency_ID, cs.C_Currency_ID, o.DateOrdered, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID) AS amount");
+                sb.Append("       o.GrandTotal AS amount,");
+                sb.Append("       CASE WHEN cur.CurSymbol IS NOT NULL THEN cur.CurSymbol ELSE cur.ISO_Code END AS cur_symbol,");
+                sb.Append("       cur.ISO_Code AS cur_iso,");
+                sb.Append("       COALESCE(cur.StdPrecision, 2) AS cur_precision");
                 sb.Append("  FROM C_Order o");
-                sb.Append("  INNER JOIN AD_ClientInfo ci ON (ci.AD_Client_ID = o.AD_Client_ID)");
-                sb.Append("  INNER JOIN C_AcctSchema cs ON (cs.C_AcctSchema_ID = ci.C_AcctSchema1_ID)");
+                sb.Append("  LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID = o.C_Currency_ID AND cur.IsActive = 'Y')");
                 sb.Append(" WHERE o.IsActive = 'Y' AND o.IsSOTrx = 'Y' AND o.C_BPartner_ID = @bPartnerId");
                 sb.Append("   AND COALESCE(o.IsSalesQuotation,'N') = 'N' AND COALESCE(o.IsBlanketTrx,'N') = 'N' AND COALESCE(o.IsReturnTrx,'N') = 'N'");
 
@@ -1316,8 +1330,10 @@ namespace VAS.Models
                 string accessSql = MRole.GetDefault(ctx).AddAccessSQL(
                     baseSql, "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-                // ORDER BY + pagination appended after AddAccessSQL (RULE 5)
-                accessSql += " ORDER BY o.DateOrdered DESC OFFSET @pageOffset ROWS FETCH NEXT @pageSize ROWS ONLY";
+                // Secondary sort on C_Order_ID ensures stable pagination when multiple orders
+                // share the same DateOrdered — without it the tie-break is non-deterministic
+                // and the same row can appear on consecutive pages.
+                accessSql += " ORDER BY o.DateOrdered DESC, o.C_Order_ID DESC OFFSET @pageOffset ROWS FETCH NEXT @pageSize ROWS ONLY";
 
                 var sqlParams = new SqlParameter[]
                 {
@@ -1333,13 +1349,15 @@ namespace VAS.Models
                     foreach (DataRow row in ds.Tables[0].Rows)
                     {
                         dynamic item = new ExpandoObject();
-                        item.id = Util.GetValueOfInt(row["id"]);
-                        item.orderNo = Util.GetValueOfString(row["order_no"]);
-                        item.orderDate = Util.GetValueOfString(row["order_date"]);
-                        item.items = Util.GetValueOfString(row["items"]);
-                        item.statusCode = Util.GetValueOfString(row["status_code"]);
-                        item.amount = row["amount"] != DBNull.Value
-                            ? Convert.ToDecimal(row["amount"]) : 0m;
+                        item.id              = Util.GetValueOfInt(row["id"]);
+                        item.orderNo         = Util.GetValueOfString(row["order_no"]);
+                        item.orderDate       = Util.GetValueOfString(row["order_date"]);
+                        item.items           = Util.GetValueOfString(row["items"]);
+                        item.statusCode      = Util.GetValueOfString(row["status_code"]);
+                        item.amount          = row["amount"] != DBNull.Value ? Convert.ToDecimal(row["amount"]) : 0m;
+                        item.currencySymbol    = row["cur_symbol"]    != DBNull.Value ? Util.GetValueOfString(row["cur_symbol"])    : "";
+                        item.currencyIso       = row["cur_iso"]       != DBNull.Value ? Util.GetValueOfString(row["cur_iso"])       : "";
+                        item.currencyPrecision = row["cur_precision"] != DBNull.Value ? Util.GetValueOfInt(row["cur_precision"])    : 2;
                         items.Add(item);
                     }
                 }
@@ -1493,11 +1511,12 @@ namespace VAS.Models
                 if (metaDict.ContainsKey("precision"))
                     response.precision = currMeta.precision;
 
-                // Total count for pagination
+                int baseCurrId = Util.GetValueOfInt(currMeta.baseCurrId);
+
+                // Total count — no currency join needed; avoids duplicates if AD_ClientInfo
+                // has more than one row per AD_Client_ID in the current installation.
                 var cntSb = new StringBuilder();
                 cntSb.Append("SELECT COUNT(*) FROM C_Invoice i");
-                cntSb.Append("  INNER JOIN AD_ClientInfo ci ON (ci.AD_Client_ID = i.AD_Client_ID)");
-                cntSb.Append("  INNER JOIN C_AcctSchema cs ON (cs.C_AcctSchema_ID = ci.C_AcctSchema1_ID)");
                 cntSb.Append(" WHERE i.IsActive = 'Y' AND i.IsSOTrx = 'Y' AND i.DocStatus IN ('CO','CL') AND i.C_BPartner_ID = @bPartnerId");
                 string cntAccessSql = MRole.GetDefault(ctx).AddAccessSQL(cntSb.ToString(), "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
                 object cntResult = DB.ExecuteScalar(cntAccessSql, new SqlParameter[] { new SqlParameter("@bPartnerId", bPartnerId) }, null);
@@ -1512,21 +1531,24 @@ namespace VAS.Models
                 sb.Append("              FROM C_InvoicePaySchedule ps");
                 sb.Append("             WHERE ps.C_Invoice_ID = i.C_Invoice_ID AND ps.IsActive = 'Y'),");
                 sb.Append("           N'') AS due_date,");
-                sb.Append("       CURRENCYCONVERT(i.GrandTotal, i.C_Currency_ID, cs.C_Currency_ID,");
-                sb.Append("           i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID) AS amount,");
-                // VAI154 02-Sep-2026: Compute paid_amount — full GrandTotal when invoice is marked
-                // paid, otherwise sum of each allocation line converted to the client base currency.
+                sb.Append("       i.GrandTotal AS amount,");
+                // Paid amount in the invoice's own transaction currency.
+                // When fully paid: use GrandTotal directly.
+                // When partially paid: sum allocation lines converting each to i.C_Currency_ID
+                // so the paid figure is comparable to the amount figure on the same row.
                 sb.Append("       CASE WHEN i.IsPaid = 'Y'");
-                sb.Append("            THEN CURRENCYCONVERT(i.GrandTotal, i.C_Currency_ID, cs.C_Currency_ID,");
-                sb.Append("                     i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID)");
+                sb.Append("            THEN i.GrandTotal");
                 sb.Append("            ELSE COALESCE(");
-                sb.Append("                     (SELECT SUM(CURRENCYCONVERT(al.Amount, ah.C_Currency_ID, cs.C_Currency_ID,");
+                sb.Append("                     (SELECT SUM(CURRENCYCONVERT(al.Amount, ah.C_Currency_ID, i.C_Currency_ID,");
                 sb.Append("                                                  ah.DateTrx, ah.C_ConversionType_ID, ah.AD_Client_ID, ah.AD_Org_ID))");
                 sb.Append("                        FROM C_AllocationLine al");
                 sb.Append("                        INNER JOIN C_AllocationHdr ah ON (ah.C_AllocationHdr_ID = al.C_AllocationHdr_ID)");
                 sb.Append("                       WHERE al.C_Invoice_ID = i.C_Invoice_ID");
                 sb.Append("                         AND al.IsActive = 'Y' AND ah.IsActive = 'Y' AND ah.DocStatus = 'CO'), 0)");
                 sb.Append("            END AS paid_amount,");
+                sb.Append("       CASE WHEN cur.CurSymbol IS NOT NULL THEN cur.CurSymbol ELSE cur.ISO_Code END AS cur_symbol,");
+                sb.Append("       cur.ISO_Code AS cur_iso,");
+                sb.Append("       COALESCE(cur.StdPrecision, 2) AS cur_precision,");
                 // VAI154 02-Sep-2026: Added 'Partial' status — detected via EXISTS on confirmed
                 // allocation lines so a single pass identifies partially-paid invoices.
                 sb.Append("       CASE WHEN i.IsPaid = 'Y' THEN 'Paid'");
@@ -1538,16 +1560,17 @@ namespace VAS.Models
                 sb.Append("                   WHERE ps.C_Invoice_ID = i.C_Invoice_ID AND ps.IsActive = 'Y') < CURRENT_DATE THEN 'Overdue'");
                 sb.Append("            ELSE 'Open' END AS pay_status");
                 sb.Append("  FROM C_Invoice i");
-                sb.Append("  INNER JOIN AD_ClientInfo ci ON (ci.AD_Client_ID = i.AD_Client_ID)");
-                sb.Append("  INNER JOIN C_AcctSchema cs ON (cs.C_AcctSchema_ID = ci.C_AcctSchema1_ID)");
+                sb.Append("  LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID = i.C_Currency_ID AND cur.IsActive = 'Y')");
                 sb.Append(" WHERE i.IsActive = 'Y' AND i.IsSOTrx = 'Y' AND i.DocStatus IN ('CO','CL') AND i.C_BPartner_ID = @bPartnerId");
 
                 string baseSql = sb.ToString();
                 string accessSql = MRole.GetDefault(ctx).AddAccessSQL(
                     baseSql, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-                // ORDER BY + pagination appended after AddAccessSQL (RULE 5)
-                accessSql += " ORDER BY i.DateInvoiced DESC OFFSET @pageOffset ROWS FETCH NEXT @pageSize ROWS ONLY";
+                // ORDER BY + pagination appended after AddAccessSQL (RULE 5).
+                // Secondary sort on C_Invoice_ID ensures stable pagination when multiple invoices
+                // share the same DateInvoiced — without it the same row can appear on consecutive pages.
+                accessSql += " ORDER BY i.DateInvoiced DESC, i.C_Invoice_ID DESC OFFSET @pageOffset ROWS FETCH NEXT @pageSize ROWS ONLY";
 
                 var sqlParams = new SqlParameter[]
                 {
@@ -1563,15 +1586,16 @@ namespace VAS.Models
                     foreach (DataRow row in ds.Tables[0].Rows)
                     {
                         dynamic item = new ExpandoObject();
-                        item.id = Util.GetValueOfInt(row["id"]);
-                        item.invoiceNo = Util.GetValueOfString(row["invoice_no"]);
-                        item.invoiceDate = Util.GetValueOfString(row["invoice_date"]);
-                        item.dueDate = Util.GetValueOfString(row["due_date"]);
-                        item.amount = row["amount"] != DBNull.Value
-                            ? Convert.ToDecimal(row["amount"]) : 0m;
-                        item.paid = row["paid_amount"] != DBNull.Value
-                            ? Convert.ToDecimal(row["paid_amount"]) : 0m;
-                        item.payStatus = Util.GetValueOfString(row["pay_status"]);
+                        item.id                = Util.GetValueOfInt(row["id"]);
+                        item.invoiceNo         = Util.GetValueOfString(row["invoice_no"]);
+                        item.invoiceDate       = Util.GetValueOfString(row["invoice_date"]);
+                        item.dueDate           = Util.GetValueOfString(row["due_date"]);
+                        item.amount            = row["amount"]      != DBNull.Value ? Convert.ToDecimal(row["amount"])      : 0m;
+                        item.paid              = row["paid_amount"] != DBNull.Value ? Convert.ToDecimal(row["paid_amount"]) : 0m;
+                        item.payStatus         = Util.GetValueOfString(row["pay_status"]);
+                        item.currencySymbol    = row["cur_symbol"]    != DBNull.Value ? Util.GetValueOfString(row["cur_symbol"])    : "";
+                        item.currencyIso       = row["cur_iso"]       != DBNull.Value ? Util.GetValueOfString(row["cur_iso"])       : "";
+                        item.currencyPrecision = row["cur_precision"] != DBNull.Value ? Util.GetValueOfInt(row["cur_precision"])    : 2;
                         items.Add(item);
                     }
                 }
@@ -2646,6 +2670,7 @@ namespace VAS.Models
             response.startDate    = "";
             response.endDate      = "";
             response.location     = "";
+            response.description  = "";
             response.meetingUrl   = "";
             response.comments     = "";
             response.transcript   = "";
@@ -2661,6 +2686,7 @@ namespace VAS.Models
                 sb.Append("       TO_CHAR(a.StartDate,'YYYY-MM-DD HH24:MI') AS StartDate,");
                 sb.Append("       TO_CHAR(a.EndDate,'YYYY-MM-DD HH24:MI') AS EndDate,");
                 sb.Append("       a.Location AS Location,");
+                sb.Append("       COALESCE(a.Description, N'') AS Description,");
                 sb.Append("       a.MeetingUrl AS MeetingUrl,");
                 sb.Append("       SUBSTR(a.Comments, 1, 4000) AS Comments,");
                 sb.Append("       COALESCE(SUBSTR(a.AttendeeInfo, 1, 4000), CAST(a.AD_User_ID AS VARCHAR)) AS AttendeeInfo,");
@@ -2676,12 +2702,13 @@ namespace VAS.Models
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
                     var row = ds.Tables[0].Rows[0];
-                    response.subject    = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["Subject"]));
-                    response.startDate  = Util.GetValueOfString(row["StartDate"]);
-                    response.endDate    = Util.GetValueOfString(row["EndDate"]);
-                    response.location   = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["Location"]));
-                    response.meetingUrl = Util.GetValueOfString(row["MeetingUrl"]);
-                    response.comments   = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["Comments"]));
+                    response.subject     = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["Subject"]));
+                    response.startDate   = Util.GetValueOfString(row["StartDate"]);
+                    response.endDate     = Util.GetValueOfString(row["EndDate"]);
+                    response.location    = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["Location"]));
+                    response.description = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["Description"]));
+                    response.meetingUrl  = Util.GetValueOfString(row["MeetingUrl"]);
+                    response.comments    = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["Comments"]));
                     response.transcript = Util.GetValueOfString(row["Transcript"]);
 
                     try

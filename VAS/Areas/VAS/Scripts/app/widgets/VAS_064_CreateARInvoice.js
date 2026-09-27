@@ -143,14 +143,7 @@
         }
 
         function getMsg(key, fallback) {
-            try {
-                if (VIS.Msg && typeof VIS.Msg.getMsg === "function") {
-                    var v = VIS.Msg.getMsg(key);
-                    if (v && v !== key && v.charAt(0) !== "[") { return v; }
-                }
-            }
-            catch (e) { /* ignore */ }
-            return fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         this.getRoot = function () { return $root; };

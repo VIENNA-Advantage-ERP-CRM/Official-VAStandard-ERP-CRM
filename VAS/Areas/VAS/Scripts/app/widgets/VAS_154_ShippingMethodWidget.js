@@ -38,6 +38,8 @@
  * 21  | No delivery orders for this method in {p}. | VAS_154_SHM_NoRecords
  * 22  | Jan,Feb,...,Dec                           | VAS_154_SHM_MonthsShort
  * 23  | January,...,December                      | VAS_154_SHM_MonthsFull
+ * 24  | Filter by month                           | VAS_154_SHM_FilterByMonth
+ * 25  | Filter by year                            | VAS_154_SHM_FilterByYear
  */
 ; VAS = window.VAS || {};
 
@@ -87,8 +89,7 @@
         ];
 
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            return (t && t.charAt(0) !== '[') ? t : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -182,8 +183,8 @@
                 '</div>' +
                 '</div>' +
                 '<div class="vas-shm-filters">' +
-                '<span class="vas-shm-sel"><select class="vas-shm-month vas-shm-month-sel" aria-label="Filter by month"></select></span>' +
-                '<span class="vas-shm-sel"><select class="vas-shm-year vas-shm-year-sel" aria-label="Filter by year"></select></span>' +
+                '<span class="vas-shm-sel"><select class="vas-shm-month vas-shm-month-sel" aria-label="' + escapeHtml(lbl('VAS_154_SHM_FilterByMonth')) + '"></select></span>' +
+                '<span class="vas-shm-sel"><select class="vas-shm-year vas-shm-year-sel" aria-label="' + escapeHtml(lbl('VAS_154_SHM_FilterByYear')) + '"></select></span>' +
                 '</div>' +
                 '</div>' +
                 '<div class="vas-shm-body">' +
@@ -340,10 +341,6 @@
                 '</div>'
             );
             $dialog.find('.vas-shm-mclose').on('click', closeModal);
-            $dialog.on('click', function (e) { if (e.target === $dialog[0]) { closeModal(); } });
-            $(document).on('keydown.vas-shm', function (e) {
-                if (e.key === 'Escape' && $dialog && !$dialog.hasClass('vas-shm-hidden')) { closeModal(); }
-            });
             $('body').append($dialog);
         }
 
@@ -468,7 +465,6 @@
         this.refreshWidget = function () { loadSummary(selMonth, selYear); };
         this.getRoot = function () { return $root; };
         this.disposeComponent = function () {
-            $(document).off('keydown.vas-shm');
             $('body').removeClass('vas-shm-body-lock');
             if ($dialog) { $dialog.remove(); $dialog = null; }
             $root.remove();

@@ -89,8 +89,7 @@
         var $monthSelect, $yearSelect;
 
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            return (t && t.charAt(0) !== '[') ? t : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -380,16 +379,12 @@
             $dialogBusy = $dialog.find('.vas-mrr-modal-busy');
 
             $dialog.find('.vas-mrr-modal-close').on('click', function () { closeDetail(); });
-            $dialog.find('.vas-mrr-scrim').on('click', function () { closeDetail(); });
             // Review #22: pager for the modal line table.
             $dialog.on('click', '.vas-mrr-lprev', function () {
                 if (detailPage > 1) { detailPage--; renderLinesPage(); }
             });
             $dialog.on('click', '.vas-mrr-lnext', function () {
                 detailPage++; renderLinesPage();
-            });
-            $(document).on('keydown.vas-mrr', function (e) {
-                if (e.key === 'Escape' && !$dialog.hasClass('vas-mrr-hidden')) { closeDetail(); }
             });
             $('body').append($dialog);
         }

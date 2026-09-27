@@ -12,16 +12,16 @@
  * Summary Message Table
  *  # | Fallback Text                                      | Message Key
  * ---+----------------------------------------------------+-----------------------------------
- *  1 | POs Expected This Month                            | VAS_POsExpectedThisMonth
- *  2 | Delivery due in                                    | VAS_DeliveryDueIn
- *  3 | due in the next 7 days                             | VAS_DueInNext7Days
- *  4 | Expected POs                                       | VAS_ExpectedPOs
+ *  1 | POs Expected This Month                            | VAS_213_POsExpectedThisMonth
+ *  2 | Delivery due in                                    | VAS_213_DeliveryDueIn
+ *  3 | due in the next 7 days                             | VAS_213_DueInNext7Days
+ *  4 | Expected POs                                       | VAS_213_ExpectedPOs
  *  5 | Value                                              | VAS_Value
- *  6 | Due in 7 days                                      | VAS_DueIn7Days
- *  7 | Of open POs                                        | VAS_OfOpenPOs
- *  8 | pending                                            | VAS_PendingLabel
- *  9 | Expected deliveries                                | VAS_ExpectedDeliveries
- * 10 | earliest expected first                            | VAS_EarliestExpectedFirst
+ *  6 | Due in 7 days                                      | VAS_213_DueIn7Days
+ *  7 | Of open POs                                        | VAS_213_OfOpenPOs
+ *  8 | pending                                            | VAS_213_PendingLabel
+ *  9 | Expected deliveries                                | VAS_213_ExpectedDeliveries
+ * 10 | earliest expected first                            | VAS_213_EarliestExpectedFirst
  * 11 | PO No                                              | VAS_PONo
  * 12 | PO date                                            | VAS_PODate
  * 13 | Vendor                                             | VAS_Vendor
@@ -52,7 +52,7 @@
  * 38 | Close                                              | VAS_Close
  * 39 | Showing                                            | VAS_Showing
  * 40 | of                                                 | VAS_Of
- * 41 | No expected POs found for this month               | VAS_NoExpectedPOsFound
+ * 41 | No expected POs found for this month               | VAS_213_NoExpectedPOsFound
  * 42 | No lines found                                     | VAS_NoLinesFound
  * 43 | Loading...                                         | VAS_Loading
  * 44 | Couldn't load data                                 | VAS_CouldntLoad
@@ -64,6 +64,8 @@
  * 50 | In process                                         | VAS_InProcess
  * 51 | Drafted                                            | VAS_Drafted
  * 52 | Open in Window                                     | VAS_OpenInWindow
+ * 53 | Previous                                           | VAS_213_Previous
+ * 54 | Next                                                | VAS_213_Next
  */
 
 ; VAS = window.VAS || {};
@@ -88,16 +90,7 @@
     }
 
     function lbl(key, fallback) {
-        if (window.VIS && VIS.Msg && VIS.Msg.getMsg) {
-            var msg = VIS.Msg.getMsg(key);
-            // VIS.Msg.getMsg returns "[KEY]" when the AD_Message row is missing;
-            // that must fall through to the English fallback, not render as-is.
-            if (msg && msg !== key && msg !== '[' + key + ']' && msg.charAt(0) !== '['
-                && msg.indexOf('**') === -1) {
-                return msg;
-            }
-        }
-        return fallback;
+        return VIS.Msg.getMsg(key);
     }
 
     function esc(s) {
@@ -245,8 +238,8 @@
         }
 
         function createWidgetHtml() {
-            var title = lbl('VAS_POsExpectedThisMonth', 'POs Expected This Month');
-            var initialSub = lbl('VAS_DeliveryDueIn', 'Delivery due in') + ' ' + getPeriodLabel(currentMonth, currentYear);
+            var title = lbl('VAS_213_POsExpectedThisMonth', 'POs Expected This Month');
+            var initialSub = lbl('VAS_213_DeliveryDueIn', 'Delivery due in') + ' ' + getPeriodLabel(currentMonth, currentYear);
 
             $card = $(
                 '<section class="vas-213-card vas-213-glass">' +
@@ -331,7 +324,7 @@
             var records = data.records || [];
 
             var formattedValue = formatMoney(expectedVal, cur.CurSymbol, cur.ISO_Code, cur.StdPrecision);
-            var subText = lbl('VAS_DeliveryDueIn', 'Delivery due in') + ' ' + getPeriodLabel(data.targetMonth, data.targetYear);
+            var subText = lbl('VAS_213_DeliveryDueIn', 'Delivery due in') + ' ' + getPeriodLabel(data.targetMonth, data.targetYear);
 
             if ($subTitle) {
                 $subTitle.text(subText);
@@ -343,7 +336,7 @@
             }
 
             if ($kpiMeta) {
-                var metaStr = formattedValue + ' · ' + dueIn7 + ' ' + lbl('VAS_DueInNext7Days', 'due in the next 7 days');
+                var metaStr = formattedValue + ' · ' + dueIn7 + ' ' + lbl('VAS_213_DueInNext7Days', 'due in the next 7 days');
                 $kpiMeta.text(metaStr);
                 $kpiMeta.attr('title', metaStr);
             }
@@ -355,7 +348,7 @@
                 if (records.length === 0) {
                     $listContainer.html(
                         '<div class="vas-213-empty-state">' +
-                            esc(lbl('VAS_NoExpectedPOsFound', 'No expected POs found for this month')) +
+                            esc(lbl('VAS_213_NoExpectedPOsFound', 'No expected POs found for this month')) +
                         '</div>'
                     );
                 } else {
@@ -481,12 +474,7 @@
             $modalHost.find('.vas-213-back-btn').on('click', popModal);
 
             $modalHost.on('click', function (e) {
-                if (e.target === this) { closeModal(); }
                 if ($(e.target).closest('[data-vas-close]').length) { closeModal(); }
-            });
-
-            $(document).on('keydown.vas201', function (e) {
-                if (e.key === 'Escape') { closeModal(); }
             });
 
             $(window).on('resize.vas201', function () {
@@ -651,7 +639,7 @@
                  '<div class="vas-213-mbody">';
 
             if (slice.length === 0) {
-                h += '<div class="vas-213-empty-row">' + esc(lbl('VAS_NoExpectedPOsFound', 'No expected POs found for this month')) + '</div>';
+                h += '<div class="vas-213-empty-row">' + esc(lbl('VAS_213_NoExpectedPOsFound', 'No expected POs found for this month')) + '</div>';
             } else {
                 for (var ri = 0; ri < slice.length; ri++) {
                     var r = slice[ri];
@@ -675,9 +663,9 @@
 
             if (pages > 1) {
                 h += '<span class="vas-213-pager">' +
-                        '<button type="button" class="vas-213-pbtn" data-mt="' + id + '" data-dir="-1"' + (t.page === 0 ? ' disabled' : '') + ' aria-label="Previous">' + ICON_PREV + '</button>' +
+                        '<button type="button" class="vas-213-pbtn" data-mt="' + id + '" data-dir="-1"' + (t.page === 0 ? ' disabled' : '') + ' aria-label="' + esc(lbl('VAS_213_Previous')) + '">' + ICON_PREV + '</button>' +
                         '<span class="vas-213-ptxt">' + (t.page + 1) + ' ' + lbl('VAS_Of', 'of') + ' ' + pages + '</span>' +
-                        '<button type="button" class="vas-213-pbtn" data-mt="' + id + '" data-dir="1"' + (t.page >= pages - 1 ? ' disabled' : '') + ' aria-label="Next">' + ICON_NEXT + '</button>' +
+                        '<button type="button" class="vas-213-pbtn" data-mt="' + id + '" data-dir="1"' + (t.page >= pages - 1 ? ' disabled' : '') + ' aria-label="' + esc(lbl('VAS_213_Next')) + '">' + ICON_NEXT + '</button>' +
                      '</span>';
             } else {
                 h += '<span></span>';
@@ -729,10 +717,10 @@
             var periodStr = getPeriodLabel(widgetData.targetMonth, widgetData.targetYear);
 
             var statStrip = mstatsHtml([
-                { l: lbl('VAS_ExpectedPOs', 'Expected POs'), v: formatNumber(widgetData.expectedPOs) },
+                { l: lbl('VAS_213_ExpectedPOs', 'Expected POs'), v: formatNumber(widgetData.expectedPOs) },
                 { l: lbl('VAS_Value', 'Value'), v: formattedValue },
-                { l: lbl('VAS_DueIn7Days', 'Due in 7 days'), v: formatNumber(widgetData.dueIn7Days) },
-                { l: lbl('VAS_OfOpenPOs', 'Of open POs'), v: formatNumber(widgetData.totalOpenPendingPOs) + ' ' + lbl('VAS_PendingLabel', 'pending') }
+                { l: lbl('VAS_213_DueIn7Days', 'Due in 7 days'), v: formatNumber(widgetData.dueIn7Days) },
+                { l: lbl('VAS_213_OfOpenPOs', 'Of open POs'), v: formatNumber(widgetData.totalOpenPendingPOs) + ' ' + lbl('VAS_213_PendingLabel', 'pending') }
             ]);
 
             var cols = [
@@ -769,14 +757,14 @@
 
             var bodyHtml =
                 statStrip +
-                '<div class="vas-213-msec">' + esc(lbl('VAS_ExpectedDeliveries', 'Expected deliveries')) + '</div>' +
-                pagedTable(cols, rows, { label: lbl('VAS_EarliestExpectedFirst', 'earliest expected first') });
+                '<div class="vas-213-msec">' + esc(lbl('VAS_213_ExpectedDeliveries', 'Expected deliveries')) + '</div>' +
+                pagedTable(cols, rows, { label: lbl('VAS_213_EarliestExpectedFirst', 'earliest expected first') });
 
             openModal({
-                title: lbl('VAS_POsExpectedThisMonth', 'POs Expected This Month'),
-                subtitle: lbl('VAS_DeliveryDueIn', 'Delivery due in') + ' ' + periodStr,
+                title: lbl('VAS_213_POsExpectedThisMonth', 'POs Expected This Month'),
+                subtitle: lbl('VAS_213_DeliveryDueIn', 'Delivery due in') + ' ' + periodStr,
                 body: bodyHtml,
-                foot: '<span class="vas-213-foot-note">' + all.length + ' ' + esc(lbl('VAS_ExpectedPOs', 'Expected POs')) + ' · ' + esc(formattedValue) + '</span>' +
+                foot: '<span class="vas-213-foot-note">' + all.length + ' ' + esc(lbl('VAS_213_ExpectedPOs', 'Expected POs')) + ' · ' + esc(formattedValue) + '</span>' +
                       '<span><button type="button" class="vas-213-btn" data-vas-close="1">' + esc(lbl('VAS_Close', 'Close')) + '</button></span>'
             });
         }
@@ -1033,7 +1021,6 @@
                 widgetObserver.disconnect();
                 widgetObserver = null;
             }
-            $(document).off('keydown.vas201');
             $(window).off('resize.vas201');
             if ($modalHost) {
                 $modalHost.remove();

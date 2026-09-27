@@ -99,8 +99,7 @@
         var totalRecords = 0;
 
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            return (t && t.charAt(0) !== '[') ? t : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function showBusy(show) {
@@ -518,10 +517,6 @@
                 closeDialog();
             });
 
-            $dialog.find('.vas-etw-dialog-scrim').on('click', function () {
-                closeDialog();
-            });
-
             $pagerPrev.on('click', function () {
                 if (rowsLoading || pageNo <= 1) { return; }
                 pageNo--;
@@ -532,12 +527,6 @@
                 if (rowsLoading || pageNo >= totalPages) { return; }
                 pageNo++;
                 loadRows();
-            });
-
-            $(document).on('keydown.vas-etw', function (e) {
-                if (e.key === 'Escape' && $dialog.is(':visible')) {
-                    closeDialog();
-                }
             });
 
             $('body').append($dialog);

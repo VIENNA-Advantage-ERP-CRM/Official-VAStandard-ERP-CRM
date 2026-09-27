@@ -1,4 +1,4 @@
-namespace ModelLibrary.Model{
+namespace VAdvantage.Model{
 /** Generated Model - DO NOT CHANGE */
 using System;using System.Text;using VAdvantage.DataBase;using VAdvantage.Common;using VAdvantage.Classes;using VAdvantage.Process;using VAdvantage.Model;using VAdvantage.Utility;using System.Data;/** Generated Model for VAS_OppLines
  *  @author Raghu (Updated) 
@@ -24,8 +24,8 @@ public X_VAS_OppLines (Ctx ctx, IDataReader dr, Trx trxName) : base(ctx, dr, trx
  Set Table ID By Table Name
  added by ->Harwinder */
 static X_VAS_OppLines(){ Table_ID = Get_Table_ID(Table_Name); model = new KeyNamePair(Table_ID,Table_Name);}/** Serial Version No */
-static long serialVersionUID = 28062534297801L;/** Last Updated Timestamp 6/2/2026 7:33:01 PM */
-public static long updatedMS = 1780408981012L;/** AD_Table_ID=1000724 */
+static long serialVersionUID = 28071860543794L;/** Last Updated Timestamp 9/18/2026 6:10:27 PM */
+public static long updatedMS = 1789735227005L;/** AD_Table_ID=1000724 */
 public static int Table_ID; // =1000724;
 /** TableName=VAS_OppLines */
 public static String Table_Name="VAS_OppLines";
@@ -99,7 +99,11 @@ public Decimal GetPlannedPrice() {Object bd =Get_Value("PlannedPrice");if (bd ==
 @param PlannedQty Planned quantity for this project */
 public void SetPlannedQty (Decimal? PlannedQty){Set_Value ("PlannedQty", (Decimal?)PlannedQty);}/** Get Planned Quantity.
 @return Planned quantity for this project */
-public Decimal GetPlannedQty() {Object bd =Get_Value("PlannedQty");if (bd == null) return Env.ZERO;return  Convert.ToDecimal(bd);}/** Set List Price.
+public Decimal GetPlannedQty() {Object bd =Get_Value("PlannedQty");if (bd == null) return Env.ZERO;return  Convert.ToDecimal(bd);}/** Set Limit Price.
+@param PriceLimit Lowest price for a product */
+public void SetPriceLimit (Decimal? PriceLimit){Set_Value ("PriceLimit", (Decimal?)PriceLimit);}/** Get Limit Price.
+@return Lowest price for a product */
+public Decimal GetPriceLimit() {Object bd =Get_Value("PriceLimit");if (bd == null) return Env.ZERO;return  Convert.ToDecimal(bd);}/** Set List Price.
 @param PriceList List Price */
 public void SetPriceList (Decimal? PriceList){Set_Value ("PriceList", (Decimal?)PriceList);}/** Get List Price.
 @return List Price */

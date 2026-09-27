@@ -45,8 +45,7 @@
         var lastCount = 0;
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return (translated && translated.charAt(0) !== '[') ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -77,25 +76,14 @@
 
         this.Initalize = function () {
             createWidget();
-            setupResizeObserver();
             loadKpi();
         };
 
-        function setupResizeObserver() {
-            if (typeof ResizeObserver === 'undefined') { return; }
-            try {
-                var ro = new ResizeObserver(function (entries) {
-                    for (var i = 0; i < entries.length; i++) {
-                        var width = entries[i].contentRect.width;
-                        if (width > 0 && $root[0]) {
-                            $root[0].style.setProperty('--widget-inline-size', width + 'px');
-                        }
-                    }
-                });
-                ro.observe($root[0]);
-            } catch (e) { }
-        }
-
+        // No per-widget ResizeObserver here (unlike the VAS_168 reference family) -
+        // this card's font-size clamp() now falls back to the shared
+        // --dash-inline-size variable, same as VAS_180_IssuedMTDWidget, so the two
+        // tiles compute their base font-size the same way and render consistently
+        // side by side.
         function loadKpi() {
             showBusy(true);
 

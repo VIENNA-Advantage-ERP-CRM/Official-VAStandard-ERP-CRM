@@ -356,6 +356,7 @@
 
 .vas-adjwisecount-cell-doc {
     font-weight: 700;
+    font-size: 0.75em;
     color: #102C3F;
 }
 
@@ -436,7 +437,7 @@
 .vas-adjwisecount-cell-product {
     font-family: 'Roboto', sans-serif;
     font-weight: 700;
-    font-size: 0.8125em;
+    font-size: 0.75em;
     color: #102C3F;
 }
 

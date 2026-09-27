@@ -3,6 +3,7 @@
  * 2x2 List Widget for Inventory Use dashboard.
  * Displays top 10 products consumed ranked by current cost price descending.
  * Row click opens Product Issues Modal paginated at 6 entries per page (scroll-free).
+ * Modal's Doc No. column is a zoom link to the underlying Inventory Use record.
  *
  * Summary Message Table
  *  # | Current Text                           | Message Key
@@ -25,6 +26,9 @@
  * 16 | of                                     | VAS_184_Of
  * 17 | Page                                   | VAS_184_Page
  * 18 | lines                                  | VAS_184_Lines
+ * 19 | Nos                                    | VAS_184_UomFallback
+ * 20 | Cost price                             | VAS_184_CostPricePrefix
+ * 21 | Jan,Feb,Mar,...                        | VAS_184_Months
  */
 ; VAS = window.VAS || {};
 
@@ -74,6 +78,44 @@
         var isRefitting = false;
         var currencyInfo = { iso: "INR", symbol: "₹", stdPrecision: 2 };
 
+        // NOTE (2026-09-17): label/escapeHtml/parseResponse/formatQty/formatINR were called
+        // throughout this file but never defined anywhere in it - a pre-existing bug that made
+        // every code path throw ReferenceError. Added here to match the standard helper set
+        // used by the sibling Inventory Use widgets (VAS_182/183).
+        //
+        // NOTE (2026-09-18): DateTimeNowMonth/DateTimeNowYear were also called (at construction
+        // time, initializing selectedMonth/selectedYear above) but never defined in this file's
+        // own IIFE scope - each widget file is a separate closure with no shared scope between
+        // them, so the definitions in the sibling VAS_183/186/188 files did not cover this one.
+        // That threw a ReferenceError before createWidget() ever ran, leaving the tile blank.
+        function DateTimeNowMonth() { return new Date().getMonth() + 1; }
+        function DateTimeNowYear() { return new Date().getFullYear(); }
+
+        function label(key, fallback) {
+            return VIS.Msg.getMsg(key);
+        }
+
+        function escapeHtml(value) {
+            return String(value == null ? "" : value)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function parseResponse(res) {
+            var data = res;
+            if (typeof data === 'string') { data = JSON.parse(data); }
+            if (typeof data === 'string') { data = JSON.parse(data); }
+            return data || {};
+        }
+
+        function formatQty(value) {
+            var n = Number(value || 0);
+            return n.toLocaleString(window.navigator.language);
+        }
+
 // ===== NEW CODE START — currency format (agent A06, 2026-08-19) =====
         function formatMoney(value, isCompact) {
             var val = Number(value);
@@ -114,6 +156,10 @@
             var numStr = val.toLocaleString(locale, { minimumFractionDigits: 0, maximumFractionDigits: prec });
             return sym + space + numStr;
         }
+
+        function formatINR(value) {
+            return formatMoney(value, false);
+        }
 // ===== NEW CODE END — currency format =====
 // ----- OLD CODE (kept for rollback, do not delete) -----
 //        function formatINR(value) {
@@ -128,13 +174,66 @@
 // ----- END OLD CODE -----
 
         function formatMonthName(m) {
-            var monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            var monthNames = label("VAS_184_Months", "Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec").split(',');
             return monthNames[Math.max(0, Math.min(11, m - 1))];
         }
 
         function showBusy(show) {
             if (!$busy || !$busy[0]) { return; }
             $busy.toggleClass('vas-hvu-hidden', !show);
+        }
+
+        /* Doc No -> real Inventory Use record navigation. Mirrors VAS_186's own zoom-to-record
+           pattern exactly: when hosted on a window, relay through widgetFirevalueChanged /
+           ActionName so the host resolves the window BY NAME (a hardcoded AD_Window_ID has
+           previously resolved to the wrong window on a real install - see VAS_244); otherwise
+           (Home-page placement) fall back to VAS.ZoomUtil.zoomToRecord with a window id resolved
+           once via VAS_178's existing GetMaterialIssueWindowId endpoint (same Inventory Use /
+           Internal Use window every widget on this dashboard already targets - reused rather
+           than re-deriving the same multi-name AD_Window lookup here). */
+        var INVENTORY_USE_WINDOW_NAME = 'Inventory Use';
+        var inventoryUseWindowId = 0;
+
+        function hostWindowName() {
+            try {
+                var listener = $self.listener;
+                for (var i = 0; i < 6 && listener; i++) {
+                    if (listener.apanel && listener.apanel.gridWindow && listener.apanel.gridWindow.getName) { return listener.apanel.gridWindow.getName(); }
+                    if (listener.gridWindow && listener.gridWindow.getName) { return listener.gridWindow.getName(); }
+                    listener = listener.listener;
+                }
+            } catch (e) { /* best-effort */ }
+            return '';
+        }
+
+        function zoomToInventoryRecord(inventoryId) {
+            if (!inventoryId) { return; }
+            try {
+                if ($self.windowNo >= 0) {
+                    $self.widgetFirevalueChanged({
+                        "TabWhereClause": "M_Inventory.M_Inventory_ID=" + Number(inventoryId),
+                        "TabLayout": "Y", "TabIndex": "0",
+                        "ActionName": hostWindowName() || INVENTORY_USE_WINDOW_NAME,
+                        "ActionType": "W"
+                    });
+                    return;
+                }
+                if (inventoryUseWindowId > 0) {
+                    if (window.VAS && VAS.ZoomUtil) { VAS.ZoomUtil.zoomToRecord('M_Inventory_ID', Number(inventoryId), inventoryUseWindowId, null, null); }
+                    return;
+                }
+                $.ajax({
+                    url: VIS.Application.contextUrl + 'VAS_178_NewMaterialIssueQuickAction/GetMaterialIssueWindowId',
+                    type: 'GET', dataType: 'json', cache: false,
+                    success: function (res) {
+                        var data = parseResponse(res);
+                        inventoryUseWindowId = Number((data && data.windowId) || 0);
+                        if (inventoryUseWindowId > 0 && window.VAS && VAS.ZoomUtil) {
+                            VAS.ZoomUtil.zoomToRecord('M_Inventory_ID', Number(inventoryId), inventoryUseWindowId, null, null);
+                        }
+                    }
+                });
+            } catch (e) { /* best-effort */ }
         }
 
         this.Initalize = function () {
@@ -228,9 +327,9 @@
             if (pageNo > totalPages) { pageNo = totalPages; }
 
             if (productsData.length === 0) {
-                $body.html('<div class="vas-hvu-empty">No usage for ' + escapeHtml(formatMonthName(selectedMonth) + ' ' + selectedYear) + '.</div>');
-                if ($footHelper) { $footHelper.text('0 of 0'); }
-                if ($pagerText) { $pagerText.text('1 of 1'); }
+                $body.html('<div class="vas-hvu-empty">' + escapeHtml(label("VAS_184_NoUsageForPeriod", "No usage for") + ' ' + formatMonthName(selectedMonth) + ' ' + selectedYear + '.') + '</div>');
+                if ($footHelper) { $footHelper.text('0 ' + label("VAS_184_Of", "of") + ' 0'); }
+                if ($pagerText) { $pagerText.text('1 ' + label("VAS_184_Of", "of") + ' 1'); }
                 if ($prevBtn) { $prevBtn.prop('disabled', true); }
                 if ($nextBtn) { $nextBtn.prop('disabled', true); }
                 return;
@@ -243,19 +342,19 @@
             for (var i = startIndex; i < endIndex; i++) {
                 var item = productsData[i];
                 var attrMeta = item.attribute ? (item.attribute + ' · ') : '';
-                attrMeta += formatQty(item.issuedQty) + ' ' + (item.uomName || 'Nos');
+                attrMeta += formatQty(item.issuedQty) + ' ' + (item.uomName || label("VAS_184_UomFallback", "Nos"));
 
 // ===== NEW CODE START — currency format (agent A06, 2026-08-19) =====
                 var compactCost = formatMoney(item.costPrice, true);
                 var fullCost = formatMoney(item.costPrice, false);
 
                 rowsHtml +=
-                    '<button type="button" class="vas-hvu-row" data-pid="' + item.productId + '" data-pname="' + escapeHtml(item.productName) + '" data-cost="' + item.costPrice + '" data-attr="' + escapeHtml(item.attribute || "-") + '" data-uom="' + escapeHtml(item.uomName || "Nos") + '" data-qty="' + item.issuedQty + '" data-val="' + item.issuedValue + '">' +
+                    '<button type="button" class="vas-hvu-row" data-pid="' + item.productId + '" data-pname="' + escapeHtml(item.productName) + '" data-cost="' + item.costPrice + '" data-attr="' + escapeHtml(item.attribute || "-") + '" data-uom="' + escapeHtml(item.uomName || label("VAS_184_UomFallback", "Nos")) + '" data-qty="' + item.issuedQty + '" data-val="' + item.issuedValue + '">' +
                     '<div class="vas-hvu-row-left">' +
                     '<div class="vas-hvu-p-name" title="' + escapeHtml(item.productName) + '">' + escapeHtml(item.productName) + '</div>' +
                     '<div class="vas-hvu-p-meta" title="' + escapeHtml(attrMeta) + '">' + escapeHtml(attrMeta) + '</div>' +
                     '</div>' +
-                    '<div class="vas-hvu-p-cost" title="Cost price ' + escapeHtml(fullCost) + '">' + escapeHtml(compactCost) + '</div>' +
+                    '<div class="vas-hvu-p-cost" title="' + escapeHtml(label("VAS_184_CostPricePrefix", "Cost price") + ' ' + fullCost) + '">' + escapeHtml(compactCost) + '</div>' +
                     '</button>';
 // ===== NEW CODE END — currency format =====
 // ----- OLD CODE (kept for rollback, do not delete) -----
@@ -273,10 +372,10 @@
             $body.html(rowsHtml);
 
             if ($footHelper) {
-                $footHelper.text((startIndex + 1) + '–' + endIndex + ' of ' + productsData.length);
+                $footHelper.text((startIndex + 1) + '–' + endIndex + ' ' + label("VAS_184_Of", "of") + ' ' + productsData.length);
             }
             if ($pagerText) {
-                $pagerText.text(pageNo + ' of ' + totalPages);
+                $pagerText.text(pageNo + ' ' + label("VAS_184_Of", "of") + ' ' + totalPages);
             }
             if ($prevBtn) { $prevBtn.prop('disabled', pageNo <= 1); }
             if ($nextBtn) { $nextBtn.prop('disabled', pageNo >= totalPages); }
@@ -292,7 +391,7 @@
         }
 
         function openProductIssuesModal(pid, pname, cost, attr, uom, issuedQty, issuedValue) {
-            $(document).off("keydown.vas-hvu-modal"); if ($modal) { $modal.remove(); }
+            if ($modal) { $modal.remove(); }
 
             var monthFull = formatMonthName(selectedMonth) + ' ' + selectedYear;
 
@@ -307,7 +406,7 @@
                 '<div class="vas-hvu-modal-head">' +
                 '<div class="vas-hvu-modal-title-wrap">' +
                 '<h3 class="vas-hvu-modal-title" title="' + escapeHtml(pname) + '">' + escapeHtml(pname) + '</h3>' +
-                '<span class="vas-hvu-cost-chip" title="Cost price ' + escapeHtml(mFullCost) + '">' + escapeHtml(mCompactCost) + '</span>' +
+                '<span class="vas-hvu-cost-chip" title="' + escapeHtml(label("VAS_184_CostPricePrefix", "Cost price") + ' ' + mFullCost) + '">' + escapeHtml(mCompactCost) + '</span>' +
                 '</div>' +
                 '<button type="button" class="vas-hvu-modal-close" aria-label="' + escapeHtml(label("VAS_184_Close", "Close")) + '">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
@@ -317,8 +416,8 @@
                 '<div class="vas-hvu-modal-grid">' +
                 '<div class="vas-hvu-modal-field"><div class="vas-hvu-m-lbl">' + escapeHtml(label("VAS_184_Attribute", "Attribute")) + '</div><div class="vas-hvu-m-val" title="' + escapeHtml(attr) + '">' + escapeHtml(attr) + '</div></div>' +
                 '<div class="vas-hvu-modal-field"><div class="vas-hvu-m-lbl">' + escapeHtml(label("VAS_184_UoM", "UoM")) + '</div><div class="vas-hvu-m-val">' + escapeHtml(uom) + '</div></div>' +
-                '<div class="vas-hvu-modal-field"><div class="vas-hvu-m-lbl">' + escapeHtml(label("VAS_184_CurrentCostPrice", "Current Cost Price")) + '</div><div class="vas-hvu-m-val">' + escapeHtml(formatINR(cost)) + '</div></div>' +
-                '<div class="vas-hvu-modal-field"><div class="vas-hvu-m-lbl">' + escapeHtml(label("VAS_184_TotalIssued", "Total Issued")) + '</div><div class="vas-hvu-m-val">' + escapeHtml(formatQty(issuedQty) + ' ' + uom + ' · ' + formatINR(issuedValue)) + '</div></div>' +
+                '<div class="vas-hvu-modal-field"><div class="vas-hvu-m-lbl">' + escapeHtml(label("VAS_184_CurrentCostPrice", "Current Cost Price")) + '</div><div class="vas-hvu-m-val">' + escapeHtml(formatMoney(cost, false)) + '</div></div>' +
+                '<div class="vas-hvu-modal-field"><div class="vas-hvu-m-lbl">' + escapeHtml(label("VAS_184_TotalIssued", "Total Issued")) + '</div><div class="vas-hvu-m-val">' + escapeHtml(formatQty(issuedQty) + ' ' + uom + ' · ' + formatMoney(issuedValue, false)) + '</div></div>' +
                 '</div>' +
 // ===== NEW CODE END — currency format =====
 // ----- OLD CODE (kept for rollback, do not delete) -----
@@ -417,7 +516,11 @@
                     var recValFormatted = formatMoney(rec.value, false);
                     tbodyHtml +=
                         '<tr>' +
-                        '<td title="' + escapeHtml(rec.documentNo) + '">' + escapeHtml(rec.documentNo) + '</td>' +
+                        '<td title="' + escapeHtml(rec.documentNo) + '">' +
+                        (rec.inventoryId
+                            ? '<button type="button" class="vas-hvu-m-doclink" data-invid="' + rec.inventoryId + '">' + escapeHtml(rec.documentNo) + '</button>'
+                            : escapeHtml(rec.documentNo)) +
+                        '</td>' +
                         '<td>' + escapeHtml(rec.movementDate) + '</td>' +
                         '<td title="' + escapeHtml(rec.warehouseLoc) + '">' + escapeHtml(rec.warehouseLoc) + '</td>' +
                         '<td>' + escapeHtml(formatQty(rec.qty)) + '</td>' +
@@ -453,7 +556,6 @@
                the overlay with .find(), which only searches descendants -- $modal IS the overlay,
                so the scrim click never bound at all. */
             function closeModal() {
-                $(document).off('keydown.vas-hvu-modal');
                 if ($modal) { $modal.remove(); }
             }
 
@@ -462,12 +564,11 @@
                 closeModal();
             });
 
-            $modal.on('click', function (e) {
-                if (e.target === this) { closeModal(); }
-            });
-
-            $(document).on('keydown.vas-hvu-modal', function (e) {
-                if (e.key === 'Escape' || e.keyCode === 27) { closeModal(); }
+            $modal.on('click', '.vas-hvu-m-doclink', function (e) {
+                e.stopPropagation();
+                var invId = Number($(this).data('invid') || 0);
+                closeModal();
+                zoomToInventoryRecord(invId);
             });
 
             $modal.find('.vas-hvu-m-prev').on('click', function () {
@@ -520,10 +621,10 @@
                 '</div>' +
                 '<div class="vas-hvu-body"></div>' +
                 '<div class="vas-hvu-foot">' +
-                '<div class="vas-hvu-foot-helper">0 of 0</div>' +
+                '<div class="vas-hvu-foot-helper">0 ' + escapeHtml(label("VAS_184_Of", "of")) + ' 0</div>' +
                 '<div class="vas-hvu-pager">' +
                 '<button type="button" class="vas-hvu-pager-btn vas-hvu-prev">&lsaquo;</button>' +
-                '<span class="vas-hvu-pager-txt">1 of 1</span>' +
+                '<span class="vas-hvu-pager-txt">1 ' + escapeHtml(label("VAS_184_Of", "of")) + ' 1</span>' +
                 '<button type="button" class="vas-hvu-pager-btn vas-hvu-next">&rsaquo;</button>' +
                 '</div>' +
                 '</div>' +
@@ -538,9 +639,9 @@
             $monthSelect = $card.find('.vas-hvu-m-sel');
             $yearSelect = $card.find('.vas-hvu-y-sel');
 
-            var monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            var monthNames = label("VAS_184_Months", "Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec").split(',');
             for (var m = 1; m <= 12; m++) {
-                $monthSelect.append('<option value="' + m + '" ' + (m === selectedMonth ? 'selected' : '') + '>' + monthNames[m - 1] + '</option>');
+                $monthSelect.append('<option value="' + m + '" ' + (m === selectedMonth ? 'selected' : '') + '>' + escapeHtml(monthNames[m - 1]) + '</option>');
             }
 
             var currentYear = DateTimeNowYear();
@@ -590,7 +691,7 @@
         this.getRoot = function () { return $root; };
 
         this.disposeComponent = function () {
-            $(document).off("keydown.vas-hvu-modal"); if ($modal) { $modal.remove(); }
+            if ($modal) { $modal.remove(); }
             $root.remove();
         };
     };

@@ -43,14 +43,14 @@
  *  2 | By document base type                   | VAS_196_ByDocBaseType
  *  3 | Calendar                                | VAS_196_Calendar
  *  4 | Year                                    | VAS_196_Year
- *  5 | Period                                  | VAS_192_Period            (reuse)
- *  6 | Open                                    | VAS_192_Open              (reuse)
- *  7 | Closed                                  | VAS_192_Closed            (reuse)
- *  8 | Never Opened                            | VAS_192_NeverOpened       (reuse)
- *  9 | Permanently Closed                      | VAS_192_PermanentlyClosed (reuse)
- * 10 | Close                                   | VAS_018_Close             (reuse)
+ *  5 | Period                                  | VAS_196_Period            (reuse)
+ *  6 | Open                                    | VAS_196_Open              (reuse)
+ *  7 | Closed                                  | VAS_196_Closed            (reuse)
+ *  8 | Never Opened                            | VAS_196_NeverOpened       (reuse)
+ *  9 | Permanently Closed                      | VAS_196_PermanentlyClosed (reuse)
+ * 10 | Close                                   | VAS_196_Close             (reuse)
  * 11 | for                                     | VAS_196_For
- * 12 | Confirm                                 | VAS_062_Confirm           (reuse)
+ * 12 | Confirm                                 | VAS_196_Confirm           (reuse)
  * 13 | This period is permanently closed and cannot be reopened. | VAS_196_PermClosedHint
  * 14 | No period controls configured for this period.            | VAS_196_NoControls
  * 14a| Organization                            | VAS_196_Organization
@@ -58,7 +58,7 @@
  * 14c| No period controls match the filter.    | VAS_196_NoMatches
  * 14d| Clear                                   | VIS_Clear                 (reuse)
  * 14e| Apply                                   | VIS_Apply                 (reuse)
- * 14f| Filter                                  | VAS_034_Filter            (reuse)
+ * 14f| Filter                                  | VAS_196_Filter            (reuse)
  * 14g| Open / Close Period                     | VAS_196_OpenClosePeriod
  * 14h| Period Action                           | VAS_196_PeriodAction
  * 14i| Open Period                             | VAS_196_OpenPeriod
@@ -72,11 +72,11 @@
  * 15 | Could not change the period status.     | VAS_196_ChangeFailed
  * 16 | The open/close process is not configured. | VAS_196_NoProcess
  * 17 | The selected period is no longer available. | VAS_196_InvalidSelection
- * 18 | Couldn't load                           | VAS_192_CouldntLoad       (reuse)
- * 19 | Showing                                 | VAS_026_Showing           (reuse)
- * 20 | of                                      | VAS_026_Of                (reuse)
- * 21 | Previous                                | VAS_026_Prev              (reuse)
- * 22 | Next                                    | VAS_026_Next              (reuse)
+ * 18 | Couldn't load                           | VAS_196_CouldntLoad       (reuse)
+ * 19 | Showing                                 | VAS_196_Showing           (reuse)
+ * 20 | of                                      | VAS_196_Of                (reuse)
+ * 21 | Previous                                | VAS_196_Prev              (reuse)
+ * 22 | Next                                    | VAS_196_Next              (reuse)
  */
 ; VAS = window.VAS || {};
 
@@ -105,10 +105,10 @@
        badge tone and the action the row offers. Kept in lock-step with
        VASLogic.Models.VAS_196_PeriodControlMatrixModel. */
     var STATUS_MAP = {
-        'O': { key: 'VAS_192_Open', text: 'Open', tone: 'ok', actionKey: 'VAS_018_Close', actionText: 'Close', actionTone: 'close' },
-        'C': { key: 'VAS_192_Closed', text: 'Closed', tone: 'plain', actionKey: 'VAS_192_Open', actionText: 'Open', actionTone: 'open' },
-        'N': { key: 'VAS_192_NeverOpened', text: 'Never Opened', tone: 'fail', actionKey: 'VAS_192_Open', actionText: 'Open', actionTone: 'open' },
-        'P': { key: 'VAS_192_PermanentlyClosed', text: 'Permanently Closed', tone: 'dark', actionKey: '', actionText: '', actionTone: '' }
+        'O': { key: 'VAS_196_Open', text: 'Open', tone: 'ok', actionKey: 'VAS_196_Close', actionText: 'Close', actionTone: 'close' },
+        'C': { key: 'VAS_196_Closed', text: 'Closed', tone: 'plain', actionKey: 'VAS_196_Open', actionText: 'Open', actionTone: 'open' },
+        'N': { key: 'VAS_196_NeverOpened', text: 'Never Opened', tone: 'fail', actionKey: 'VAS_196_Open', actionText: 'Open', actionTone: 'open' },
+        'P': { key: 'VAS_196_PermanentlyClosed', text: 'Permanently Closed', tone: 'dark', actionKey: '', actionText: '', actionTone: '' }
     };
 
     /* The three actions VAdvantage.Process.PeriodStatus understands, in the order
@@ -223,8 +223,7 @@
         var _busyCount = 0;
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return (translated && translated.charAt(0) !== '[' && translated !== key) ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -269,7 +268,7 @@
         function createWidget() {
             var title = label('VAS_196_PeriodControlMatrix', 'Period Control Matrix');
             var subtitle = label('VAS_196_ByDocBaseType', 'By document base type');
-            var filterLabel = label('VAS_034_Filter', 'Filter');
+            var filterLabel = label('VAS_196_Filter', 'Filter');
             var processLabel = label('VAS_196_OpenClosePeriod', 'Open / Close Period');
 
             $card = $(
@@ -301,7 +300,7 @@
                             '<select class="vas-196-sel vas-196-sel-year" aria-label="' +
                                 escapeHtml(label('VAS_196_Year', 'Year')) + '"></select>' +
                             '<select class="vas-196-sel vas-196-sel-period" aria-label="' +
-                                escapeHtml(label('VAS_192_Period', 'Period')) + '"></select>' +
+                                escapeHtml(label('VAS_196_Period', 'Period')) + '"></select>' +
                             /* Funnel: opens the filter dialog. Keeping the lookups in a
                                dialog leaves the whole card height to the matrix. */
                             '<button type="button" class="vas-196-filter-btn" aria-haspopup="dialog"' +
@@ -404,7 +403,7 @@
                 success: function (res) {
                     var data = null;
                     try { data = parseResponse(res); } catch (e) { }
-                    if (!data || data.error) { renderState(label('VAS_192_CouldntLoad', "Couldn't load"), true); return; }
+                    if (!data || data.error) { renderState(label('VAS_196_CouldntLoad', "Couldn't load"), true); return; }
 
                     fillOptions($selCal, data.Calendars);
                     fillOptions($selYear, data.Years);
@@ -424,7 +423,7 @@
                         setRows([]);
                     }
                 },
-                error: function () { renderState(label('VAS_192_CouldntLoad', "Couldn't load"), true); },
+                error: function () { renderState(label('VAS_196_CouldntLoad', "Couldn't load"), true); },
                 complete: function () { showBusy(false); }
             });
         }
@@ -439,7 +438,7 @@
                 success: function (res) {
                     var data = null;
                     try { data = parseResponse(res); } catch (e) { }
-                    if (!data || data.error) { renderState(label('VAS_192_CouldntLoad', "Couldn't load"), true); return; }
+                    if (!data || data.error) { renderState(label('VAS_196_CouldntLoad', "Couldn't load"), true); return; }
 
                     fillOptions($selYear, data);
                     _yearId = preselectId > 0 ? preselectId : (data.length > 0 ? data[0].Id : 0);
@@ -448,7 +447,7 @@
                         loadPeriods(_yearId, 0);
                     }
                 },
-                error: function () { renderState(label('VAS_192_CouldntLoad', "Couldn't load"), true); },
+                error: function () { renderState(label('VAS_196_CouldntLoad', "Couldn't load"), true); },
                 complete: function () { showBusy(false); }
             });
         }
@@ -463,7 +462,7 @@
                 success: function (res) {
                     var data = null;
                     try { data = parseResponse(res); } catch (e) { }
-                    if (!data || data.error) { renderState(label('VAS_192_CouldntLoad', "Couldn't load"), true); return; }
+                    if (!data || data.error) { renderState(label('VAS_196_CouldntLoad', "Couldn't load"), true); return; }
 
                     fillOptions($selPeriod, data);
                     _periodId = preselectId > 0 ? preselectId : (data.length > 0 ? data[0].Id : 0);
@@ -475,7 +474,7 @@
                         setRows([]);
                     }
                 },
-                error: function () { renderState(label('VAS_192_CouldntLoad', "Couldn't load"), true); },
+                error: function () { renderState(label('VAS_196_CouldntLoad', "Couldn't load"), true); },
                 complete: function () { showBusy(false); }
             });
         }
@@ -490,13 +489,13 @@
                 success: function (res) {
                     var data = null;
                     try { data = parseResponse(res); } catch (e) { }
-                    if (!data || data.error) { renderState(label('VAS_192_CouldntLoad', "Couldn't load"), true); return; }
+                    if (!data || data.error) { renderState(label('VAS_196_CouldntLoad', "Couldn't load"), true); return; }
                     /* A late response for a period the user has already moved away
                        from must not overwrite the current matrix. */
                     if (periodId !== _periodId) { return; }
                     setRows(data);
                 },
-                error: function () { renderState(label('VAS_192_CouldntLoad', "Couldn't load"), true); },
+                error: function () { renderState(label('VAS_196_CouldntLoad', "Couldn't load"), true); },
                 complete: function () { showBusy(false); }
             });
         }
@@ -696,7 +695,7 @@
            every open, which is what makes it read as attached to the icon. */
         function buildFilterPopup() {
             $filterPopup = $('<div class="vas-196-fpop vas-196-hidden" role="dialog" aria-label="' +
-                escapeHtml(label('VAS_034_Filter', 'Filter')) + '">');
+                escapeHtml(label('VAS_196_Filter', 'Filter')) + '">');
             $filterPopup.append('<span class="vas-196-fpop-arrow"></span>');
 
             /* Organization - only offered when the period is controlled per org.
@@ -1198,7 +1197,7 @@
                 var hint = label('VAS_196_PermClosedHint', 'This period is permanently closed and cannot be reopened.');
                 action = '<button type="button" class="vas-196-btn vas-196-btn-disabled" disabled title="' +
                     escapeHtml(hint) + '">' +
-                    escapeHtml(label('VAS_192_Open', 'Open')) + '</button>';
+                    escapeHtml(label('VAS_196_Open', 'Open')) + '</button>';
             }
 
             return '<div class="vas-196-row" data-row-id="' + row.C_PeriodControl_ID +
@@ -1219,19 +1218,19 @@
             if (totalPages <= 1) { return ''; }
             var prevDis = pageNo <= 1 ? ' disabled' : '';
             var nextDis = pageNo >= totalPages ? ' disabled' : '';
-            var ofTxt = label('VAS_026_Of', 'of');
-            var showing = label('VAS_026_Showing', 'Showing') + ' ' + from + '–' + to + ' ' + ofTxt + ' ' + total;
+            var ofTxt = label('VAS_196_Of', 'of');
+            var showing = label('VAS_196_Showing', 'Showing') + ' ' + from + '–' + to + ' ' + ofTxt + ' ' + total;
 
             return '<div class="vas-196-pager-row">' +
                 '<span class="vas-196-pager-info" title="' + escapeHtml(showing) + '">' + escapeHtml(showing) + '</span>' +
                 '<div class="vas-196-pager-nav">' +
                     '<button type="button" class="vas-196-pgbtn vas-196-pg-prev" aria-label="' +
-                        escapeHtml(label('VAS_026_Prev', 'Previous')) + '"' + prevDis + '>' +
+                        escapeHtml(label('VAS_196_Prev', 'Previous')) + '"' + prevDis + '>' +
                         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>' +
                     '</button>' +
                     '<span class="vas-196-pager-label">' + pageNo + ' ' + escapeHtml(ofTxt) + ' ' + totalPages + '</span>' +
                     '<button type="button" class="vas-196-pgbtn vas-196-pg-next" aria-label="' +
-                        escapeHtml(label('VAS_026_Next', 'Next')) + '"' + nextDis + '>' +
+                        escapeHtml(label('VAS_196_Next', 'Next')) + '"' + nextDis + '>' +
                         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>' +
                     '</button>' +
                 '</div>' +
@@ -1308,7 +1307,7 @@
                 (_periodName ? ' ' + label('VAS_196_For', 'for') + ' ' + _periodName : '') + '?';
 
             if (VIS && VIS.ADialog && VIS.ADialog.confirm) {
-                VIS.ADialog.confirm("", false, question, label('VAS_062_Confirm', 'Confirm'), function (ok) {
+                VIS.ADialog.confirm("", false, question, label('VAS_196_Confirm', 'Confirm'), function (ok) {
                     if (ok) { changeStatus(row); }
                 });
             } else {

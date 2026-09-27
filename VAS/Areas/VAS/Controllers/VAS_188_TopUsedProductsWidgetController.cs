@@ -17,10 +17,49 @@ namespace VIS.Controllers
     /// Purpose     : Ranks top 10 products consumed by volume (quantity or value) with detail usage breakdown modal.
     /// Chronological development:
     ///   AI-Dev      2026-08-02 Created
+    ///   Claude      2026-09-18 Usage-breakdown modal Qty column now sources
+    ///                          M_InventoryLine.QtyEntered instead of QtyInternalUse.
+    ///   Claude      2026-09-18 GetProductUsageDetails now also returns each line's UOM
+    ///                          (C_UOM.Name) and its base-UOM quantity (QtyInternalUse, as
+    ///                          qtyBaseUom) alongside the selected-UOM QtyEntered, so the
+    ///                          modal can show both scales per line.
+    ///   Claude      2026-09-18 GetProductUsageDetails also returns the PRODUCT's base UOM
+    ///                          name (M_Product.C_UOM_ID, as baseUomName) - not a per-line
+    ///                          entered UOM, which can vary line to line - for the "Consumed
+    ///                          Qty (In Base UOM)" summary field to display alongside its number.
     /// </summary>
     public class VAS_188_TopUsedProductsWidgetController : Controller
     {
         private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_188_TopUsedProductsWidgetController).FullName);
+
+        /// <summary>
+        /// Factor that converts an issue-line quantity from the line's entered UOM to the
+        /// product's own (selected) UOM, so quantities and unit prices are reported in the UOM
+        /// the product is defined with - e.g. a line issued in Litres reads as millilitres when
+        /// the product's UOM is MILLILITRE.
+        ///
+        /// C_UOM_Conversion stores the product-specific rate with C_UOM_ID = product UOM and
+        /// C_UOM_To_ID = entered UOM; qty(product UOM) = qty(entered) * DivideRate (1 BOX = 126
+        /// Each is stored as DivideRate 126). Same UOM short-circuits to 1, and an issue line
+        /// with no conversion defined is left unchanged rather than dropped.
+        /// Client/org-specific rows win, matching MUOMConversion's lookup order.
+        /// Expects the line aliased as "line" and the product as "p".
+        /// </summary>
+        private const string UomToProductFactorSql = @"
+                      COALESCE(
+                        CASE WHEN COALESCE(line.C_UOM_ID, 0) = COALESCE(p.C_UOM_ID, 0) THEN 1 END,
+                        (SELECT conv.DivideRate
+                         FROM (SELECT conv0.DivideRate
+                               FROM C_UOM_Conversion conv0
+                               WHERE conv0.IsActive = 'Y'
+                                 AND conv0.M_Product_ID = p.M_Product_ID
+                                 AND conv0.C_UOM_ID = p.C_UOM_ID
+                                 AND conv0.C_UOM_To_ID = line.C_UOM_ID
+                                 AND COALESCE(conv0.DivideRate, 0) <> 0
+                               ORDER BY conv0.AD_Client_ID DESC, conv0.AD_Org_ID DESC
+                              ) conv
+                         WHERE ROWNUM = 1),
+                        1)";
 
         /// <summary>
         /// The product's CURRENT cost price, as a derived table (M_Product_ID, CurrentCostPrice).
@@ -72,12 +111,15 @@ namespace VIS.Controllers
                 // for why the NULLIF guards are required.
                 string orderBy = (measure == "val")
                     ? "SUM(line.QtyInternalUse * " + LineUnitCostSql + ") DESC"
-                    : "SUM(line.QtyInternalUse) DESC";
+                    : "SUM(line.QtyInternalUse * " + UomToProductFactorSql + ") DESC";
 
                 // Role access is applied to the inner header SELECT; applying it to this wrapped
                 // aggregate would append the predicate outside the subquery (ORA-00907).
                 string invAccessSql = BuildAccessibleInventorySql(ctx, msl, nmsl);
 
+                // Ranking measure is the product's CURRENT cost price, per spec §3/§8 - the
+                // quantity is converted to the product's selected UOM first so products whose
+                // issue lines were entered in a different UOM still rank on comparable volume.
                 string sql = @"
                     SELECT * FROM (
                       SELECT
@@ -85,19 +127,19 @@ namespace VIS.Controllers
                         p.Name AS ProductName,
                         asi.Description AS Attribute,
                         pcat.Name AS CategoryName,
-                        uom.Name AS UomName,
-                        SUM(line.QtyInternalUse) AS TotalQty,
+                        puom.Name AS UomName,
+                        SUM(line.QtyInternalUse * " + UomToProductFactorSql + @") AS TotalQty,
                         SUM(line.QtyInternalUse * " + LineUnitCostSql + @") AS TotalValue
                       FROM M_InventoryLine line
                       INNER JOIN (" + invAccessSql + @") ai ON ai.M_Inventory_ID = line.M_Inventory_ID
                       INNER JOIN M_Product p ON p.M_Product_ID = line.M_Product_ID
                       LEFT JOIN M_Product_Category pcat ON pcat.M_Product_Category_ID = p.M_Product_Category_ID
-                      LEFT JOIN C_UOM uom ON uom.C_UOM_ID = line.C_UOM_ID
+                      LEFT JOIN C_UOM puom ON puom.C_UOM_ID = p.C_UOM_ID
                       LEFT JOIN M_AttributeSetInstance asi ON asi.M_AttributeSetInstance_ID = line.M_AttributeSetInstance_ID
                       LEFT JOIN (" + ProductCurrentCostSql + @") pc ON pc.M_Product_ID = line.M_Product_ID
                       WHERE line.IsActive = 'Y'
                         AND COALESCE(line.QtyInternalUse, 0) > 0
-                      GROUP BY p.M_Product_ID, p.Name, asi.Description, pcat.Name, uom.Name
+                      GROUP BY p.M_Product_ID, p.Name, asi.Description, pcat.Name, puom.Name
                       ORDER BY " + orderBy + @"
                     ) WHERE ROWNUM <= 10";
 
@@ -151,48 +193,72 @@ namespace VIS.Controllers
 
                 string invAccessSql = BuildAccessibleInventorySql(ctx, msl, nmsl);
 
+                // LocatorCombination is the full "Warehouse.Aisle.Bin.Level"-style locator name;
+                // Value alone is often just an auto-generated numeric code (e.g. "1000004"), which
+                // read like a raw ID to the user. Not present on every database release, so check
+                // first and fall back to Value - same pattern as VAS_146/VAS_164/VAS_165/VAS_186.
+                string locatorSql = HasColumn("M_Locator", "LocatorCombination")
+                    ? "COALESCE(loc.LocatorCombination, loc.Value)"
+                    : "loc.Value";
+
                 string sql = @"
                     SELECT
+                      ai.M_Inventory_ID AS InventoryId,
                       ai.DocumentNo,
                       ai.MovementDate,
                       wh.Name AS WarehouseName,
-                      loc.Value AS LocatorCode,
-                      line.QtyInternalUse,
+                      " + locatorSql + @" AS LocatorCode,
+                      line.QtyEntered,
+                      uom.Name AS UomName,
+                      line.QtyInternalUse AS QtyBaseUOM,
+                      baseUom.Name AS BaseUomName,
                       (line.QtyInternalUse * " + LineUnitCostSql + @") AS LineValue
                     FROM M_InventoryLine line
                     INNER JOIN (" + invAccessSql + @") ai ON ai.M_Inventory_ID = line.M_Inventory_ID
+                    INNER JOIN M_Product prod ON prod.M_Product_ID = line.M_Product_ID
                     LEFT JOIN M_Locator loc ON loc.M_Locator_ID = line.M_Locator_ID
                     LEFT JOIN M_Warehouse wh ON wh.M_Warehouse_ID = loc.M_Warehouse_ID
+                    LEFT JOIN C_UOM uom ON uom.C_UOM_ID = line.C_UOM_ID
+                    LEFT JOIN C_UOM baseUom ON baseUom.C_UOM_ID = prod.C_UOM_ID
                     LEFT JOIN (" + ProductCurrentCostSql + @") pc ON pc.M_Product_ID = line.M_Product_ID
                     WHERE line.IsActive = 'Y'
                       AND COALESCE(line.QtyInternalUse, 0) > 0
                       AND line.M_Product_ID = " + productId + @"
                     ORDER BY ai.MovementDate DESC, ai.DocumentNo DESC";
 
+                string baseUomName = "";
+
                 using (IDataReader dr = DB.ExecuteReader(sql, null, null))
                 {
                     while (dr != null && dr.Read())
                     {
+                        if (string.IsNullOrEmpty(baseUomName))
+                        {
+                            baseUomName = Util.GetValueOfString(dr["BaseUomName"]);
+                        }
                         lines.Add(new
                         {
+                            inventoryId = Util.GetValueOfInt(dr["InventoryId"]),
                             documentNo = Util.GetValueOfString(dr["DocumentNo"]),
                             movementDate = Convert.ToDateTime(dr["MovementDate"]).ToString("dd MMM yyyy"),
                             whLoc = BuildWarehouseLocator(Util.GetValueOfString(dr["WarehouseName"]), Util.GetValueOfString(dr["LocatorCode"])),
-                            qty = Util.GetValueOfDecimal(dr["QtyInternalUse"]),
+                            qty = Util.GetValueOfDecimal(dr["QtyEntered"]),
+                            uomName = Util.GetValueOfString(dr["UomName"]),
+                            qtyBaseUom = Util.GetValueOfDecimal(dr["QtyBaseUOM"]),
                             value = Util.GetValueOfDecimal(dr["LineValue"])
                         });
                     }
                 }
 
+// ===== NEW CODE START — currency format (agent A10, 2026-08-19) =====
+                return Json(JsonConvert.SerializeObject(new { lines = lines, baseUomName = baseUomName, currency = GetCurrencyInfo(ctx), success = true }), JsonRequestBehavior.AllowGet);
+// ===== NEW CODE END — currency format =====
             }
             catch (Exception ex)
             {
                 Log.Log(Level.SEVERE, "VAS_188_TopUsedProductsWidget.GetProductUsageDetails", ex);
                 return Json(JsonConvert.SerializeObject(new { error = Msg.GetMsg(ctx, "Error") ?? "Error" }), JsonRequestBehavior.AllowGet);
             }
-// ===== NEW CODE START — currency format (agent A10, 2026-08-19) =====
-            return Json(JsonConvert.SerializeObject(new { lines = lines, currency = GetCurrencyInfo(ctx), success = true }), JsonRequestBehavior.AllowGet);
-// ===== NEW CODE END — currency format =====
 // ----- OLD CODE (kept for rollback, do not delete) -----
 //          return Json(JsonConvert.SerializeObject(new { lines = lines, success = true }), JsonRequestBehavior.AllowGet);
 // ----- END OLD CODE -----
@@ -265,6 +331,41 @@ namespace VIS.Controllers
                 return "TO_DATE('" + date.ToString("yyyy-MM-dd") + "', 'YYYY-MM-DD')";
             }
             return "CAST('" + date.ToString("yyyy-MM-dd") + "' AS DATE)";
+        }
+
+        /// <summary>Same dynamic column-existence check VAS_146/VAS_161-165/VAS_186 already use to guard LocatorCombination.</summary>
+        private bool HasColumn(string tableName, string columnName)
+        {
+            string sql;
+            if (DB.IsPostgreSQL())
+            {
+                sql = @"
+                    SELECT COUNT(1)
+                    FROM information_schema.columns
+                    WHERE UPPER(table_name)=UPPER(@TableName)
+                      AND UPPER(column_name)=UPPER(@ColumnName)";
+            }
+            else
+            {
+                sql = @"
+                    SELECT COUNT(1)
+                    FROM USER_TAB_COLUMNS
+                    WHERE TABLE_NAME=UPPER(@TableName)
+                      AND COLUMN_NAME=UPPER(@ColumnName)";
+            }
+
+            try
+            {
+                return Util.GetValueOfInt(DB.ExecuteScalar(sql, new SqlParameter[]
+                {
+                    new SqlParameter("@TableName", tableName),
+                    new SqlParameter("@ColumnName", columnName)
+                }, null)) > 0;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
 // ===== NEW CODE START — currency format (agent A10, 2026-08-19) =====

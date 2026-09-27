@@ -173,6 +173,7 @@
 }
 
 .vas140-col-val {
+    flex-shrink: 0;                             /* never let the column-flex squeeze this line to 0 height */
     font-size: 0.72em;
     color: #5F7283;
     white-space: nowrap;

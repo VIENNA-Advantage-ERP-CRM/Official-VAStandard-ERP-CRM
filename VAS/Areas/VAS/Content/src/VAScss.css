@@ -119,6 +119,15 @@
 @import "../VAS_139_HighValuePipelineWidget.css";
 @import "../VAS_140_ContractsExpiringWidget.css";
 @import "../VAS_141_CustomersBySegmentWidget.css";
+@import "../VAS_294_DelayedProjectsWidget.css";
+@import "../VAS_295_UnrespondedEmailsWidget.css";
+@import "../VAS_296_OpenProposalsWidget.css";
+@import "../VAS_297_RecentNewCustomersWidget.css";
+@import "../VAS_298_RecentUpdatesWidget.css";
+@import "../VAS_299_RevenueAtAGlanceWidget.css";
+@import "../VAS_300_BusinessBySourceWidget.css";
+@import "../VAS_301_SalesRepPortfolioWidget.css";
+@import "../VAS_302_NotSegmentedWidget.css";
 
 @import "../VAS_073_LowStockCountWidget.css";
 @import "../VAS_074_PendingGRNsWidget.css";
@@ -241,6 +250,9 @@
 @import "../VAS_106_OverviewSalesOrder.css";
 @import "../VAS_189_ARInvoiceDetailPanel.css";
 @import "../VAS_191_APPaymentDetailPanel.css";
+@import "../VAS_291_GLJournalRightPanel.css";
+@import "../VAS_292_BankingJournalRightPanel.css";
+@import "../VAS_293_BankAccountRightPanel.css";
 @import "../VAS_156_CountedMTDWidget.css";
 @import "../VAS_157_VarianceLinesWidget.css";
 @import "../VAS_158_OpenCountSheetsWidget.css";
@@ -296,6 +308,7 @@
 @import "../VAS_215_RepresentativeWisePOWidget.css";
 @import "../VAS_216_POQueueWidget.css";
 @import "../VAS_217_OpenRequisitionsWidget.css";
+@import "../VAS_290_ServiceContractRightPanel.css";
 @import "../VAS_219_ActiveSetupsWidget.css";
 @import "../VAS_220_SchedulesDueWidget.css";
 @import "../VAS_221_RecordGeneratedWidget.css";

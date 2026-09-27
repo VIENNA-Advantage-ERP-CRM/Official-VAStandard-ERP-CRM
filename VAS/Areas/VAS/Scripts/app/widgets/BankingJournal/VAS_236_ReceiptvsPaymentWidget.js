@@ -84,7 +84,7 @@
  *                  15 | Grain                         | VAS_236_Grain
  *                  16 | Range                         | VAS_236_Range
  *                  17 | No movement in this period    | VAS_236_NoMovement
- *                  18 | Couldn't load                 | VAS_192_CouldntLoad (reuse)
+ *                  18 | Couldn't load                 | VAS_236_CouldntLoad
  *
  * Chronological development:
  *   VAI154         Created  Date 2026-09-03
@@ -369,7 +369,7 @@
 
                     var data = parseResponse(raw);
                     if (!data || data.error || !data.Loaded) {
-                        renderState(label('VAS_192_CouldntLoad', "Couldn't load"));
+                        renderState(label('VAS_236_CouldntLoad', "Couldn't load"));
                         return;
                     }
 
@@ -393,7 +393,7 @@
                     /* The overlay comes down on failure too - a spinner left running over
                        an error the user cannot see is the worst of both. */
                     hideBusyIndicator();
-                    renderState(label('VAS_192_CouldntLoad', "Couldn't load"));
+                    renderState(label('VAS_236_CouldntLoad', "Couldn't load"));
                 }
             });
         }
@@ -902,14 +902,7 @@
         /* Every user-facing string goes through AD_Message; the fallback keeps the card
            readable when a key has not been seeded yet. */
         function label(key, fallback) {
-            try {
-                if (VIS.Msg && typeof VIS.Msg.getMsg === 'function') {
-                    var v = VIS.Msg.getMsg(key);
-                    if (v && v !== key && v.charAt(0) !== '[') { return v; }
-                }
-            }
-            catch (e) { /* ignore */ }
-            return fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         this.getRoot = function () { return $root; };

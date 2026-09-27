@@ -51,6 +51,9 @@
  * 36  | Locator                                       | VAS_148_DUF_Locator
  * 37  | Status                                        | VAS_148_DUF_Status
  * 38  | Data unavailable                             | VAS_148_DUF_DataUnavailable
+ * 39  | Include (prefix, product name appended)      | VAS_148_DUF_Include
+ * 40  | Locator for (prefix, product name appended)  | VAS_148_DUF_LocatorFor
+ * 41  | Quantity for (prefix, product name appended) | VAS_148_DUF_QuantityFor
  */
 ; VAS = window.VAS || {};
 
@@ -97,8 +100,7 @@
         var selectedWarehouseId = 0;
 
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            return (t && t.charAt(0) !== '[') ? t : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -293,10 +295,6 @@
                 '</div>'
             );
             $dialog.find('.vas-duf-mclose').on('click', closeDialog);
-            $dialog.find('.vas-duf-scrim').on('click', closeDialog);
-            $(document).on('keydown.vas-duf', function (e) {
-                if (e.key === 'Escape' && $dialog && !$dialog.hasClass('vas-duf-hidden')) { closeDialog(); }
-            });
 
             var $c = $dialog.find('.vas-duf-mcontent');
             $c.on('change', '.vas-duf-f-wh', onWarehouseChange);
@@ -410,11 +408,11 @@
             var rowCls = 'vas-duf-line' + (line.checked ? (Number(line.onHandQty) >= Number(line.qty) ? ' avail' : ' short') : ' off');
             var locOpts = optionList(modalData.locators, 'locatorId', 'locatorName', line.locatorId);
             return '<div class="' + rowCls + '" data-id="' + escapeHtml(line.orderLineId) + '">' +
-                '<button type="button" class="vas-duf-chk' + (line.checked ? ' on' : '') + '" data-id="' + escapeHtml(line.orderLineId) + '" aria-label="Include ' + escapeHtml(line.productName) + '">' + (line.checked ? checkIcon() : '') + '</button>' +
+                '<button type="button" class="vas-duf-chk' + (line.checked ? ' on' : '') + '" data-id="' + escapeHtml(line.orderLineId) + '" aria-label="' + escapeHtml(lbl('VAS_148_DUF_Include') + ' ' + line.productName) + '">' + (line.checked ? checkIcon() : '') + '</button>' +
                                 '<span class="vas-duf-lname" title="' + escapeHtml(line.productName) + '">' + escapeHtml(line.productName) + '</span>' +
                 badgeFor(line) +
-                '<select class="vas-duf-loc" data-id="' + escapeHtml(line.orderLineId) + '" aria-label="Locator for ' + escapeHtml(line.productName) + '"' + disabled + '>' + locOpts + '</select>' +
-                '<span class="vas-duf-qtywrap"><input type="number" min="1" class="vas-duf-qty" data-id="' + escapeHtml(line.orderLineId) + '" value="' + escapeHtml(line.qty) + '" aria-label="Quantity for ' + escapeHtml(line.productName) + '"' + disabled + ' />' +
+                '<select class="vas-duf-loc" data-id="' + escapeHtml(line.orderLineId) + '" aria-label="' + escapeHtml(lbl('VAS_148_DUF_LocatorFor') + ' ' + line.productName) + '"' + disabled + '>' + locOpts + '</select>' +
+                '<span class="vas-duf-qtywrap"><input type="number" min="1" class="vas-duf-qty" data-id="' + escapeHtml(line.orderLineId) + '" value="' + escapeHtml(line.qty) + '" aria-label="' + escapeHtml(lbl('VAS_148_DUF_QuantityFor') + ' ' + line.productName) + '"' + disabled + ' />' +
                 '<span class="vas-duf-uom">' + escapeHtml(line.uomName) + '</span></span>' +
                 '</div>';
         }
@@ -638,7 +636,6 @@
         this.refreshWidget = function () { loadFulfilments(1); };
         this.getRoot = function () { return $root; };
         this.disposeComponent = function () {
-            $(document).off('keydown.vas-duf');
             $('body').removeClass('vas-duf-body-lock');
             if ($dialog) { $dialog.remove(); $dialog = null; }
             $root.remove();

@@ -1,0 +1,452 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_301 Sales Rep Portfolio — 3x2 glass leaderboard (Customers dashboard) +
+ * rep drill-down list modal. Design: sales-rep-portfolio.html (attached) +
+ * Design Specs/dashboard-widgets.md. Glass surface, icon-well header,
+ * avatar + ARR-bar leaderboard rows (paged 7) with an at-risk/Healthy tag,
+ * circular pager; rep drill-down list (simple rows, zoom on click - no
+ * customer-detail modal, matching VAS_141/300). Row/bar/amt structure
+ * matches VAS_139's pipeline leaderboard. Widget scales in em against the
+ * widget root; modals are px overlays. MPC-prefixed.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas301-root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    color: #102C3F;
+    font-family: Roboto, sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 20px);
+}
+
+    .vas301-root,
+    .vas301-root * {
+        box-sizing: border-box;
+    }
+
+.vas301-card {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0.875em 1em 1.125em;
+    border: 2px solid #FFFFFF;                  /* px */
+    border-radius: 14px;                        /* px */
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.49));
+    backdrop-filter: blur(10px);
+}
+
+/* Header. */
+.vas301-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    margin-bottom: 0.625em;
+    flex-shrink: 0;
+}
+
+.vas301-head-l {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+}
+
+.vas301-iconwell {
+    width: 2em;
+    height: 2em;
+    flex-shrink: 0;
+    border-radius: 10px;                        /* px */
+    display: grid;
+    place-items: center;
+    background: linear-gradient(180deg, #FFFFFF, #F1F8FF);
+    border: 1px solid #BFE4FF;                  /* px */
+    color: #0083DA;
+}
+
+    .vas301-iconwell svg {
+        width: 1.05em;
+        height: 1.05em;
+    }
+
+.vas301-head-txt {
+    min-width: 0;
+}
+
+.vas301-title {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    font-weight: 500;
+    color: #000000;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas301-sub {
+    font-size: 0.7em;
+    color: #717182;
+    margin-top: 1px;                            /* px */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Body + rows. */
+.vas301-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.vas301-list {
+    flex: 1;
+    min-height: 0;
+}
+
+    /* Widget body: split the available height into `pageSize` equal rows so the
+     * records fill the card top-to-bottom (grid-template-rows set inline in JS).
+     * Partial pages leave empty tracks at the bottom rather than stretching.
+     * Matches VAS_135/138/139/294-300. */
+    .vas301-body > .vas301-list {
+        display: grid;
+        grid-auto-rows: minmax(0, 1fr);
+    }
+
+.vas301-row {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    width: 100%;
+    padding: 0.4em 0.25em;
+    border: none;
+    border-bottom: 1px solid #EDF2F6;           /* px */
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    min-height: 0;
+    overflow: hidden;
+}
+
+    .vas301-row:last-child {
+        border-bottom: none;
+    }
+
+    .vas301-row:hover {
+        background: rgba(31, 131, 255, 0.05);
+    }
+
+.vas301-avatar {
+    width: 2em;
+    height: 2em;
+    border-radius: 10px;                        /* px */
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    font-size: 0.72em;
+    font-weight: 700;
+    color: #FFFFFF;
+}
+
+.vas301-row-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25em;
+}
+
+.vas301-row-title {
+    font-size: 0.85em;
+    font-weight: 700;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas301-bar {
+    height: 0.3125em;
+    border-radius: 999px;
+    background: rgba(15, 61, 97, 0.07);
+    overflow: hidden;
+    display: block;
+}
+
+    .vas301-bar > div {
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #0083DA, #1F83FF);
+    }
+
+.vas301-row-amt {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    text-align: right;
+    min-width: 0;
+}
+
+.vas301-amt-val {
+    font-size: 0.82em;
+    font-weight: 700;
+    color: #102C3F;
+    white-space: nowrap;
+}
+
+.vas301-amt-lab {
+    font-size: 0.72em;
+    color: #748494;
+    white-space: nowrap;
+}
+
+/* Tags: at-risk / Healthy. */
+.vas301-tag {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.6875em;
+    font-weight: 600;
+    padding: 0.1875em 0.5em;
+    border-radius: 6px;                         /* px */
+    line-height: 1.2;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.vas301-tag-warn { background: #FCEBD3; color: #9A6500; }
+.vas301-tag-ontime { background: #E7F7EF; color: #0B6B45; }
+
+/* Footer pager (widget + modal) — dashboard-widgets.md §"Widget Footer Pager":
+   two zones, the result-range helper on the left and a compact
+   prev · "N of M" · next control on the right. */
+.vas301-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    padding-top: 0.5em;
+    margin-top: 0.25em;
+    flex-shrink: 0;
+}
+
+.vas301-pglabel {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.75em;
+    color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas301-pgctl {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-shrink: 0;
+}
+
+.vas301-pgtext {
+    min-width: 3em;
+    text-align: center;
+    font-size: 0.8125em;
+    font-weight: 500;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.vas301-pgbtn {
+    width: 1.5em;                               /* 24px */
+    height: 1.5em;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #E4EDF4;                  /* px */
+    border-radius: 6px;                         /* px */
+    background: #FBFDFF;
+    color: #0083DA;
+    cursor: pointer;
+}
+
+    .vas301-pgbtn:hover:not(:disabled) {
+        background: #EAF8FF;
+        border-color: #BFE4FF;
+    }
+
+    .vas301-pgbtn:disabled {
+        color: #B8C6D2;
+        cursor: default;
+    }
+
+    .vas301-pgbtn svg {
+        width: 0.875em;                         /* 14px */
+        height: 0.875em;
+        stroke: currentColor;
+    }
+
+.vas301-state {
+    padding: 0.9em 0.25em;
+    font-size: 0.82em;
+    color: #748494;
+}
+
+.vas301-retry {
+    margin-left: 6px;                           /* px */
+    border: 1px solid #BFE4FF;                  /* px */
+    background: #FFFFFF;
+    color: #0083DA;
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 0.9em;
+    padding: 2px 10px;                          /* px */
+    cursor: pointer;
+}
+
+/* ── Rep drill-down list modal ────────────────────────────────────────────── */
+
+.vas301-dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 5000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;                              /* px */
+    font-family: Roboto, sans-serif;
+    color: #102C3F;
+}
+
+    .vas301-dialog.is-open {
+        display: flex;
+    }
+
+    .vas301-dialog *,
+    .vas301-dialog {
+        box-sizing: border-box;
+    }
+
+.vas301-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(2, 20, 34, 0.42);
+    backdrop-filter: blur(2px);
+}
+
+.vas301-panel {
+    position: relative;
+    width: 100%;
+    max-width: 560px;                           /* px */
+    max-height: 84vh;
+    display: flex;
+    flex-direction: column;
+    background: #FFFFFF;
+    border-radius: 18px;                        /* px */
+    box-shadow: 0 30px 80px rgba(2, 20, 34, 0.35);
+    overflow: hidden;
+}
+
+.vas301-phead {
+    flex-shrink: 0;
+    height: 56px;                               /* px */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;                            /* px */
+    border-bottom: 1px solid #E4EDF4;           /* px */
+}
+
+.vas301-ptitle {
+    font-size: 16px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas301-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;                         /* px */
+    display: grid;
+    place-items: center;
+    background: transparent;
+    border: none;
+    color: #102C3F;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+    .vas301-close:hover {
+        background: #F1F4F8;
+    }
+
+    .vas301-close svg {
+        width: 20px;
+        height: 20px;
+    }
+
+.vas301-pbody {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 6px 14px 8px;                      /* px */
+}
+
+.vas301-list2 {
+    display: flex;
+    flex-direction: column;
+}
+
+.vas301-row2 {
+    display: flex;
+    align-items: center;
+    gap: 12px;                                  /* px */
+    width: 100%;
+    padding: 10px 8px;                          /* px */
+    border: none;
+    border-bottom: 1px solid #EDF2F6;           /* px */
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+}
+
+    .vas301-row2:last-child {
+        border-bottom: none;
+    }
+
+    .vas301-row2:hover {
+        background: rgba(31, 131, 255, 0.05);
+    }
+
+.vas301-row-val {
+    font-size: 13px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.vas301-pfoot {
+    flex-shrink: 0;
+    padding: 10px 20px 16px;                    /* px */
+    border-top: 1px solid #E4EDF4;              /* px */
+    background: #FBFDFF;
+}
+
+body.vas301-modal-open {
+    overflow: hidden;
+}

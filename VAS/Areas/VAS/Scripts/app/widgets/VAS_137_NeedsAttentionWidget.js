@@ -102,8 +102,7 @@
         var zoomWindowId = 0;
 
         function label(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            return t && t.charAt(0) !== '[' ? t : fallback;
+            return VIS.Msg.getMsg(key);
         }
         function escapeHtml(value) {
             if (value == null) { return ''; }
@@ -312,7 +311,7 @@
         function createListDialog() {
             $list = $(
                 '<div class="vas137-dialog" role="dialog" aria-modal="true" aria-hidden="true">' +
-                    '<div class="vas137-scrim" data-list-close></div>' +
+                    '<div class="vas137-scrim"></div>' +
                     '<section class="vas137-panel">' +
                         '<header class="vas137-phead"><h2 class="vas137-ptitle"></h2>' +
                             '<button type="button" class="vas137-close" data-list-close aria-label="' + escapeHtml(label('VAS_137_Close', 'Close')) + '">' + icon('close') + '</button></header>' +
@@ -464,7 +463,7 @@
         function createDetailDialog() {
             $detail = $(
                 '<div class="vas137-detail" role="dialog" aria-modal="true" aria-hidden="true" aria-label="' + escapeHtml(label('VAS_137_CustomerDetails', 'Customer details')) + '">' +
-                    '<div class="vas137-scrim" data-detail-close></div>' +
+                    '<div class="vas137-scrim"></div>' +
                     '<section class="vas137-dpanel">' +
                         '<header class="vas137-phead"><h2 class="vas137-ptitle">' + escapeHtml(label('VAS_137_CustomerDetails', 'Customer details')) + '</h2>' +
                             '<div class="vas137-phead-right"><span class="vas137-dsummary"></span>' +
@@ -513,18 +512,12 @@
             createWidget();
             createListDialog();
             createDetailDialog();
-            $(document).on('keydown.MPCvas137', function (event) {
-                if (event.key !== 'Escape') { return; }
-                else if ($detail && $detail.hasClass('is-open')) { closeDetail(); }
-                else if ($list && $list.hasClass('is-open')) { closeList(); }
-            });
             loadSummary();
         };
 
         this.refreshWidget = function () { loadSummary(); };
         this.getRoot = function () { return $root; };
         this.disposeComponent = function () {
-            $(document).off('keydown.MPCvas137');
             if ($list) { $list.remove(); $list = null; }
             if ($detail) { $detail.remove(); $detail = null; }
             $('body').removeClass('vas137-modal-open');

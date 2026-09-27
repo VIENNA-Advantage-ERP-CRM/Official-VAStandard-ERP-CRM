@@ -65,12 +65,18 @@
     var ZOOM_WINDOW_NAME_NEW = 'VAS_CustomerMaster';
     var ZOOM_WINDOW_NAME_OLD = CUSTOMER_WINDOW_NAME;
 
+    // Kept byte-identical to VAS_127_OpenTicketsListWidget's ensureDashInlineSizeVar
+    // (the widget this one sits beside on the Customer Master window dashboard) so
+    // the two compute --dash-inline-size the same way and render at matching sizes.
+    // Do not change this function without making the same change to VAS_127.
     function ensureDashInlineSizeVar($el) {
         if (window.__vasDashInlineSizeObserver) { return; }
         if (typeof ResizeObserver === 'undefined') { return; }
         var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
         if (!container) { return; }
-        var write = function () { document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px'); };
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
         window.__vasDashInlineSizeObserver = new ResizeObserver(write);
         window.__vasDashInlineSizeObserver.observe(container);
         write();
@@ -105,8 +111,7 @@
         var zoomWindowId = 0;
 
         function label(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            return t && t.charAt(0) !== '[' ? t : fallback;
+            return VIS.Msg.getMsg(key);
         }
         function escapeHtml(value) {
             if (value == null) { return ''; }

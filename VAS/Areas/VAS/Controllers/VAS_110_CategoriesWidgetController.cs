@@ -57,6 +57,10 @@ namespace VAS.Controllers
         /// distinct parent categories they roll up to ("product families").
         /// COUNT(DISTINCT parent) ignores the NULL parents automatically on both
         /// Oracle and PostgreSQL.
+        /// Scope: every organization the role has access to - the explicit
+        /// "logged-in org + star" predicate was removed because it hid categories
+        /// from the user's other accessible organizations; MRole.AddAccessSQL
+        /// already appends the client + AD_Role_OrgAccess org list.
         /// </summary>
         /// <param name="ctx">Current application context.</param>
         /// <returns>Category and family counts.</returns>
@@ -69,9 +73,7 @@ namespace VAS.Controllers
                 SELECT COUNT(DISTINCT Category.M_Product_Category_ID) AS Category_Count,
                        COUNT(DISTINCT Category.M_Product_Category_Parent_ID) AS Family_Count
                 FROM M_Product_Category Category
-                WHERE Category.IsActive=N'Y'
-                  AND Category.AD_Client_ID=@AD_Client_ID
-                  AND Category.AD_Org_ID IN (0,COALESCE(NULLIF(@AD_Org_ID,0),Category.AD_Org_ID))";
+                WHERE Category.IsActive=N'Y'";
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(
                 sql,
@@ -80,16 +82,10 @@ namespace VAS.Controllers
                 MRole.SQL_RO
             );
 
-            SqlParameter[] parameters = new SqlParameter[]
-            {
-                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
-                new SqlParameter("@AD_Org_ID", ctx.GetAD_Org_ID())
-            };
-
             IDataReader reader = null;
             try
             {
-                reader = DB.ExecuteReader(sql, parameters);
+                reader = DB.ExecuteReader(sql, null, null);
                 if (reader != null && reader.Read())
                 {
                     result.category_count = Util.GetValueOfInt(reader["Category_Count"]);

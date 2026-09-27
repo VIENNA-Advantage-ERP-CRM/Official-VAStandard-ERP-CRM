@@ -9,6 +9,19 @@
  *  1 | Production Issues               | VAS_181_ProductionIssues
  *  2 | Of issued value MTD             | VAS_181_OfIssuedValueMTD
  *  3 | Couldn't load                   | VAS_181_CouldntLoad
+ *
+ * NOTE (2026-09-18, Claude): setupResizeObserver()/--widget-inline-size removed from
+ * Initalize() to match VAS_180_IssuedMTDWidget's label/value/meta size. VAS_180 never
+ * scopes --widget-inline-size to its own card, so its font-size clamp() falls through
+ * to the dashboard-wide --dash-inline-size and lands near the clamp's midpoint
+ * (~18.4px); this widget's own --widget-inline-size was scoped to its ~300px card,
+ * which is small enough that the clamp always bottomed out at its 16px floor instead.
+ * Also found while here: the "OLD CODE (kept for rollback, do not delete)" Initalize
+ * block below this one is NOT actually commented out - it re-assigns this.Initalize
+ * and, being the later assignment, silently wins over the "NEW CODE" version above it
+ * (so loadCurrencyInfo() was never being called). Left as-is / out of scope for this
+ * change beyond removing setupResizeObserver() from both, since fixing it changes
+ * runtime behavior beyond what was asked here - flagged for a separate task.
  */
 ; VAS = window.VAS || {};
 
@@ -43,8 +56,7 @@
         var $busy;
 
         function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return (translated && translated.charAt(0) !== '[') ? translated : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function escapeHtml(value) {
@@ -70,6 +82,9 @@
 
 // ===== NEW CODE START — currency format (agent A03, 2026-08-19) =====
         var currencyInfo = { iso: '', symbol: '' };
+        // Work-order columns this installation actually has, reported by the KPI endpoint
+        // (they are manufacturing-module only and are absent on some databases).
+        var workOrderColumns = [];
 
         function loadCurrencyInfo() {
             $.ajax({
@@ -139,7 +154,6 @@
 
         this.Initalize = function () {
             createWidget();
-            setupResizeObserver();
             loadCurrencyInfo();
             loadKpi();
         };
@@ -147,7 +161,6 @@
 // ----- OLD CODE (kept for rollback, do not delete) -----
         this.Initalize = function () {
             createWidget();
-            setupResizeObserver();
             loadKpi();
         };
 // ----- END OLD CODE -----
@@ -177,6 +190,7 @@
                 success: function (res) {
                     var data = parseResponse(res);
                     if (data.error) { setError(); return; }
+                    if (data.workOrderColumns) { workOrderColumns = data.workOrderColumns; }
                     renderMetric(data);
                 },
                 error: function () { setError(); },
@@ -207,7 +221,7 @@
                 $valueEl.attr('title', pct + '%');
             }
             if ($metaEl) {
-                $metaEl.text(label("VAS_OfIssuedValueMTD", "Of issued value MTD"));
+                $metaEl.text(label("VAS_181_OfIssuedValueMTD", "Of issued value MTD"));
             }
             if ($card) { $card.prop('disabled', false); }
         }
@@ -222,22 +236,73 @@
             if ($card) { $card.prop('disabled', true); }
         }
 
+        // Home-page fallback for openProductionIssuesList(): there is no host window to relay
+        // a multi-record TabWhereClause to off-window, and VAS.ZoomUtil only supports zooming
+        // to a SINGLE record (see VAS_184/186/187's zoomToInventoryRecord). Landing on the
+        // newest matching document (ids[0], per GetProductionIssueIdsData's own ordering) is
+        // the closest available stand-in for "see the list" without inventing a new zoom
+        // capability. Resolves the Inventory Use window id once via VAS_178's existing
+        // GetMaterialIssueWindowId endpoint (shared with VAS_184/186/187/182), then caches it.
+        var inventoryUseWindowId = 0;
+
+        function zoomToFirstProductionIssue(ids) {
+            var firstId = Number((ids && ids[0]) || 0);
+            if (!firstId || !window.VAS || !VAS.ZoomUtil) { return; }
+
+            if (inventoryUseWindowId > 0) {
+                VAS.ZoomUtil.zoomToRecord('M_Inventory_ID', firstId, inventoryUseWindowId, null, null);
+                return;
+            }
+
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_178_NewMaterialIssueQuickAction/GetMaterialIssueWindowId',
+                type: 'GET',
+                dataType: 'json',
+                cache: false,
+                success: function (res) {
+                    var data = parseResponse(res);
+                    inventoryUseWindowId = Number((data && data.windowId) || 0);
+                    if (inventoryUseWindowId > 0) {
+                        VAS.ZoomUtil.zoomToRecord('M_Inventory_ID', firstId, inventoryUseWindowId, null, null);
+                    }
+                }
+            });
+        }
+
         function openProductionIssuesList() {
-            // Keep in lock-step with GetProductionIssuesPercentageData in the controller. The
-            // drill-through is DOCUMENT level, so the work-order classification (a line-level
-            // column) is expressed as an EXISTS over the production issue lines.
-            var where = "M_Inventory.IsActive = 'Y' AND M_Inventory.DocStatus IN ('CO', 'CL')"
-                + " AND COALESCE(M_Inventory.IsInternalUse, 'N') = 'Y'"
-                + " AND EXISTS (SELECT 1 FROM M_InventoryLine il WHERE il.M_Inventory_ID = M_Inventory.M_Inventory_ID"
-                + " AND il.IsActive = 'Y' AND COALESCE(il.QtyInternalUse, 0) > 0"
-                + " AND (COALESCE(il.VA075_WorkOrder_ID, 0) > 0 OR COALESCE(il.VAMFG_M_WorkOrder_ID, 0) > 0))"
-                + " AND M_Inventory.MovementDate >= TRUNC(SYSDATE, 'MM') AND M_Inventory.MovementDate < ADD_MONTHS(TRUNC(SYSDATE, 'MM'), 1)";
-            var windowParam = {
-                "TabWhereClause": where,
-                "TabLayout": "N",
-                "TabIndex": "0"
-            };
-            $self.widgetFirevalueChanged(windowParam);
+            // Keep in lock-step with GetProductionIssueIdsData in the controller. The
+            // TabWhereClause is a flat M_Inventory_ID IN (...) list, NOT a correlated
+            // EXISTS(SELECT 1 FROM M_InventoryLine ...) subquery - the host window's
+            // own "duplicate DocumentNo" grid diagnostic does naive, parenthesis-
+            // unaware text surgery on the TabWhereClause looking for a FROM to lift
+            // out, and it mishandled the nested EXISTS(...) (confirmed via the app
+            // log: it produced malformed SQL and Oracle rejected it with ORA-00933,
+            // which is what was actually hanging this drill-through). A flat ID list
+            // has no FROM/subquery in it at all, so there is nothing for that
+            // diagnostic query to mishandle.
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_181_ProductionIssuesWidget/GetProductionIssueIds',
+                type: 'GET',
+                cache: false,
+                success: function (res) {
+                    var data = parseResponse(res);
+                    if (data.error) { return; }
+                    var ids = data.ids || [];
+
+                    if ($self.windowNo >= 0) {
+                        var idList = ids.length ? ids.join(',') : '-1';
+                        var where = "M_Inventory.M_Inventory_ID IN (" + idList + ")";
+                        $self.widgetFirevalueChanged({
+                            "TabWhereClause": where,
+                            "TabLayout": "N",
+                            "TabIndex": "0"
+                        });
+                        return;
+                    }
+
+                    zoomToFirstProductionIssue(ids);
+                }
+            });
         }
 
         function createWidget() {

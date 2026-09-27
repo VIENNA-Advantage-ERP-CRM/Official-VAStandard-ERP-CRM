@@ -1,7 +1,7 @@
 /*
  * Stock Movement - Today message summary
  * VAS_096_StockMovementToday       Stock Movement - Today
- * Item                             Item
+ * VAS_096_Item                     Item
  * Type                             Type
  * Qty                              Qty
  * Location                         Location
@@ -21,15 +21,19 @@
  * VAS_PreviousPage                 Previous page
  * VAS_NextPage                     Next page
  * VAS_096_MovementDetail           Stock Movement Detail
- * MovementType                     Movement Type
- * Quantity                         Quantity
+ * VAS_096_MovementType             Movement Type
+ * VAS_096_Quantity                 Quantity
  * Warehouse                        Warehouse
  * Locator                          Locator
- * MovementDate                     Movement Date
+ * VAS_096_Date                     Movement Date
  * VAS_096_NoMovementsToday         No stock movements today.
  * Close                            Close
  * VAS_CouldntLoad                  Couldn't load
  * VAS_Attribute                    Attribute
+ * VAS_096_StockEffect              Stock Effect
+ * VAS_096_Before                   Before
+ * VAS_096_Change                   Change
+ * VAS_096_After                    After
  */
 
 ; (function (VAS, $) {
@@ -74,8 +78,7 @@
         var eventNamespace = '.MPCStockMovementToday';
 
         function label(key, fallback) {
-            var value = VIS.Msg.getMsg(key);
-            return value && value.charAt(0) !== '[' ? value : fallback;
+            return VIS.Msg.getMsg(key);
         }
 
         function getPrecision() {
@@ -164,14 +167,14 @@
                 .attr('class', 'MPC-smt-modal-badge MPC-smt-type MPC-smt-type-' + movementType.tone)
                 .text(movementType.text);
             var $details = $modal.find('.MPC-smt-modal-details').empty();
-            addDetail($details, label('Item', 'Item'), row.item_name, true);
+            addDetail($details, label('VAS_096_Item', 'Item'), row.item_name, true);
             if (row.attribute) {
                 addDetail($details, label('VAS_Attribute', 'Attribute'), row.attribute);
             }
-            addDetail($details, label('MovementType', 'Movement'), movementType.text);
-            addDetail($details, label('Quantity', 'Quantity'), formatQuantity(row.movement_qty));
+            addDetail($details, label('VAS_096_MovementType', 'Movement'), movementType.text);
+            addDetail($details, label('VAS_096_Quantity', 'Quantity'), formatQuantity(row.movement_qty));
             addDetail($details, label('Locator', 'Location'), row.locator_value || '');
-            addDetail($details, label('Date', 'Date'), formatDate(row.movement_date));
+            addDetail($details, label('VAS_096_Date', 'Date'), formatDate(row.movement_date));
             addDetail($details, label('Warehouse', 'Warehouse'), row.warehouse_name || '');
 
             var $effect = $modal.find('.MPC-smt-stock-effect').empty().addClass('MPC-smt-hidden');
@@ -186,13 +189,13 @@
                 var qtyAfter = Number(row.qty_on_hand || 0);
                 var qtyChange = Number(row.movement_qty || 0);
                 var qtyBefore = qtyAfter - qtyChange;
-                $effect.append($('<div class="MPC-smt-effect-head"></div>').text(label('VAS_StockEffect', 'Stock Effect')));
+                $effect.append($('<div class="MPC-smt-effect-head"></div>').text(label('VAS_096_StockEffect', 'Stock Effect')));
                 $effect.append(
                     '<table class="MPC-smt-effect-table">' +
                         '<thead><tr>' +
-                            '<th>' + label('VAS_Before', 'Before') + '</th>' +
-                            '<th class="is-center">' + label('VAS_Change', 'Change') + '</th>' +
-                            '<th class="is-right">' + label('VAS_After', 'After') + '</th>' +
+                            '<th>' + label('VAS_096_Before', 'Before') + '</th>' +
+                            '<th class="is-center">' + label('VAS_096_Change', 'Change') + '</th>' +
+                            '<th class="is-right">' + label('VAS_096_After', 'After') + '</th>' +
                         '</tr></thead>' +
                         '<tbody><tr>' +
                             '<td class="is-strong">' + fmtQ(qtyBefore) + '</td>' +
@@ -423,10 +426,7 @@
             $modal.find('.MPC-smt-modal-close').attr({ 'aria-label': closeText, title: closeText });
             $('body').append($modal);
 
-            $modal.on('click' + eventNamespace, '.MPC-smt-modal-close, .MPC-smt-modal-scrim', closeModal);
-            $(document).on('keydown' + eventNamespace, function (event) {
-                if (event.key === 'Escape') { closeModal(); }
-            });
+            $modal.on('click' + eventNamespace, '.MPC-smt-modal-close', closeModal);
         }
 
         this.Initalize = function () {
@@ -455,7 +455,7 @@
             );
 
             $card.find('.MPC-smt-title').text(label('VAS_096_StockMovementToday', 'Stock Movement - Today'));
-            $card.find('.MPC-smt-head-item').text(label('Item', 'Item'));
+            $card.find('.MPC-smt-head-item').text(label('VAS_096_Item', 'Item'));
             $card.find('.MPC-smt-head-type').text(label('Type', 'Type'));
             $card.find('.MPC-smt-head-quantity').text(label('Qty', 'Qty'));
             $card.find('.MPC-smt-head-location').text(label('VAS_096_Location', 'Location'));

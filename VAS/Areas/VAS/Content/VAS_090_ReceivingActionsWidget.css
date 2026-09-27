@@ -443,10 +443,11 @@
 
 .vas-ra-receive-row {
     display: grid;
-    /* Item | Attribute | PO Qty | Open Qty | Locator | Received. The
-       locator column flexes so the full locator text stays visible; qty
-       columns fit the value with its full unit name. */
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.45fr) 7em 7em minmax(8.5em, 1.15fr) 6.8em;
+    /* Item | Attribute | PO Qty | Open Qty | UOM | Locator | Received. The
+       locator column flexes so the full locator text stays visible. QA sheet
+       #76 (2026-09-15): quantities are plain numbers, the unit has its own
+       UOM column; #71: .vas-ra-noattr drops the Attribute column. */
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.45fr) 5.5em 5.5em 6em minmax(8.5em, 1.15fr) 6.8em;
     gap: 0.571em;
     align-items: center;
     min-height: 3em;
@@ -469,16 +470,23 @@
     }
 
     /* Numeric columns are right-aligned in the data rows - their headers
-       (PO Qty, Open Qty, Received) align the same way. */
-    .vas-ra-receive-row.head span:nth-child(3),
-    .vas-ra-receive-row.head span:nth-child(4),
-    .vas-ra-receive-row.head span:nth-child(6) {
-        text-align: right;
+       (PO Qty, Open Qty, Received) carry .num and align the same way.
+       Class-based, not nth-child: the Attribute column is optional. */
+    .vas-ra-receive-row.vas-ra-noattr {
+        grid-template-columns: minmax(0, 1.6fr) 5.5em 5.5em 6em minmax(8.5em, 1.15fr) 6.8em;
     }
 
-    /* Breathing room between the Open Qty and Locator columns. */
-    .vas-ra-receive-row > span:nth-child(5) {
+    /* Breathing room between the UOM and Locator columns. */
+    .vas-ra-receive-row > .vas-ra-line-loc {
         padding-inline-start: 0.9em;
+    }
+
+    .vas-ra-receive-row > .vas-ra-line-uom {
+        padding-inline-start: 0.6em;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .vas-ra-receive-row .num {
@@ -514,12 +522,66 @@
         border-color: #1F83FF;
     }
 
+    /* Above the open quantity or beyond the UOM precision (QA sheet #75). */
+    .vas-ra-rcv-input.vas-ra-rcv-invalid,
+    .vas-ra-rcv-input.vas-ra-rcv-invalid:focus {
+        border-color: #A33F3F;
+        background: #FCEFEF;
+    }
+
 .vas-ra-action-footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.75em;
     margin-top: 1.125em;
+}
+
+.vas-ra-gc-quality-list {
+    border-top: 1px solid #EDF2F6;
+}
+
+.vas-ra-gc-quality-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(9em, 1fr);
+    align-items: center;
+    gap: 0.75em;
+    padding: 0.75em 0;
+    border-bottom: 1px solid #EDF2F6;
+}
+
+.vas-ra-gc-quality-product,
+.vas-ra-gc-quality-parameter {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-ra-gc-quality-product {
+    color: #102C3F;
+    font-weight: 500;
+}
+
+.vas-ra-gc-quality-parameter {
+    color: #5F7283;
+}
+
+.vas-ra-gc-quality-actual {
+    width: 100%;
+    min-height: 2.286em;
+    border: 1px solid #D7D7D7;
+    border-radius: 4px;
+    background: #FFFFFF;
+    color: #102C3F;
+    padding: 0 0.5em;
+}
+
+@media (max-width: 42em) {
+    .vas-ra-gc-quality-row {
+        grid-template-columns: 1fr;
+        gap: 0.35em;
+    }
 }
 
     .vas-ra-action-footer.right {
@@ -1035,8 +1097,12 @@
     }
 
     .vas-ra-receive-row {
-        grid-template-columns: minmax(0, 1fr) 5.8em 6.4em 5.8em 5.8em;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 0.5fr) 4.2em 4.2em 4.5em 5.8em 5.2em;
         font-size: 0.75em;
+    }
+
+    .vas-ra-receive-row.vas-ra-noattr {
+        grid-template-columns: minmax(0, 1.3fr) 4.2em 4.2em 4.5em 5.8em 5.2em;
     }
 }
 
@@ -1208,6 +1274,14 @@
         outline: none;
         border-bottom-color: #1F83FF;
     }
+
+/* Editable Scrap Locator on the confirmation line (QA sheet #84). */
+.vas-ra-gc-inp.vas-ra-gc-scrap-loc {
+    text-align: left;
+    font-variant-numeric: normal;
+    font-family: inherit;
+    cursor: pointer;
+}
 
 .vas-ra-gc-done {
     margin: 0;
