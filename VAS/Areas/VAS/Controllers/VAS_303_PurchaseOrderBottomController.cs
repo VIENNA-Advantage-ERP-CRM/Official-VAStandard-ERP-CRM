@@ -1,26 +1,26 @@
 /******************************************************
- * Module Name    : CRM Extension VAS_107
- * Purpose        : Create Order Bottom Panel — controller
+ * Module Name    : CRM Extension VAS_303
+ * Purpose        : Purchase Order Bottom Panel — controller
  * Employee Code  : VAI154
- * Date           : 09-Jul-2026
+ * Date           : 09-Jul-2026 (split out of VAS_107 on 24-Sep-2026)
  ******************************************************/
 
 using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Web.Mvc;
 using VAdvantage.Utility;
-using VASLogic.Models;
+using VASLogic.Models.VAS_303;
 using VIS.Filters;
 
 namespace VAS.Controllers
 {
     /// <summary>
-    /// AJAX endpoints for the VAS_107_CreateOrderBottomPanel tab panel. Each
+    /// AJAX endpoints for the VAS_303_PurchaseOrderBottom tab panel. Each
     /// action reads the session Ctx, delegates to
-    /// <see cref="VAS_107_CreateOrderBottomPanelModel"/> and returns the
+    /// <see cref="VAS_303_PurchaseOrderBottomModel"/> and returns the
     /// serialized result. Reads use GET; write actions use HttpPost + payload.
     /// </summary>
-    public class VAS_107_CreateOrderBottomPanelController : Controller
+    public class VAS_303_PurchaseOrderBottomController : Controller
     {
         /// <summary>Returns the parent-order context and its saved lines.</summary>
         /// <param name="C_Order_ID">parent order</param>
@@ -33,7 +33,7 @@ namespace VAS.Controllers
             if (Session["ctx"] != null)
             {
                 Ctx ctx = Session["ctx"] as Ctx;
-                VAS_107_CreateOrderBottomPanelModel model = new VAS_107_CreateOrderBottomPanelModel();
+                VAS_303_PurchaseOrderBottomModel model = new VAS_303_PurchaseOrderBottomModel();
                 retJSON = JsonConvert.SerializeObject(model.GetPanelData(ctx, C_Order_ID, AD_Window_ID, page));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
@@ -61,7 +61,7 @@ namespace VAS.Controllers
                     try { rowValues = JsonConvert.DeserializeObject<Dictionary<string, object>>(rowContext); }
                     catch { rowValues = null; }
                 }
-                VAS_107_CreateOrderBottomPanelModel model = new VAS_107_CreateOrderBottomPanelModel();
+                VAS_303_PurchaseOrderBottomModel model = new VAS_303_PurchaseOrderBottomModel();
                 retJSON = JsonConvert.SerializeObject(
                     model.SearchProductsCharges(ctx, C_Order_ID, query, pageSize, offset, rowValues));
             }
@@ -85,7 +85,7 @@ namespace VAS.Controllers
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 OrderLookupRequest req = JsonConvert.DeserializeObject<OrderLookupRequest>(payload);
-                VAS_107_CreateOrderBottomPanelModel model = new VAS_107_CreateOrderBottomPanelModel();
+                VAS_303_PurchaseOrderBottomModel model = new VAS_303_PurchaseOrderBottomModel();
                 retJSON = JsonConvert.SerializeObject(model.GetLookupData(ctx, req));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
@@ -108,7 +108,7 @@ namespace VAS.Controllers
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 OrderRefLookupRequest req = JsonConvert.DeserializeObject<OrderRefLookupRequest>(payload);
-                VAS_107_CreateOrderBottomPanelModel model = new VAS_107_CreateOrderBottomPanelModel();
+                VAS_303_PurchaseOrderBottomModel model = new VAS_303_PurchaseOrderBottomModel();
                 retJSON = JsonConvert.SerializeObject(model.GetRefLookup(ctx, req));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
@@ -129,7 +129,7 @@ namespace VAS.Controllers
             if (Session["ctx"] != null)
             {
                 Ctx ctx = Session["ctx"] as Ctx;
-                VAS_107_CreateOrderBottomPanelModel model = new VAS_107_CreateOrderBottomPanelModel();
+                VAS_303_PurchaseOrderBottomModel model = new VAS_303_PurchaseOrderBottomModel();
                 retJSON = JsonConvert.SerializeObject(model.GetBlanketLine(ctx, C_OrderLine_ID));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
@@ -151,7 +151,7 @@ namespace VAS.Controllers
                 // Invariant parse: the client always sends "." as the decimal point.
                 decimal qty;
                 if (!decimal.TryParse(Qty, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out qty)) qty = 0;
-                VAS_107_CreateOrderBottomPanelModel model = new VAS_107_CreateOrderBottomPanelModel();
+                VAS_303_PurchaseOrderBottomModel model = new VAS_303_PurchaseOrderBottomModel();
                 retJSON = JsonConvert.SerializeObject(model.FindBlanketLine(ctx, C_Order_ID, M_Product_ID, C_Charge_ID, qty));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
@@ -186,7 +186,7 @@ namespace VAS.Controllers
                     C_Tax_ID = C_Tax_ID,
                     Discount = Discount
                 };
-                VAS_107_CreateOrderBottomPanelModel model = new VAS_107_CreateOrderBottomPanelModel();
+                VAS_303_PurchaseOrderBottomModel model = new VAS_303_PurchaseOrderBottomModel();
                 retJSON = JsonConvert.SerializeObject(model.CalcLine(ctx, req));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
@@ -222,7 +222,7 @@ namespace VAS.Controllers
                     C_Tax_ID = C_Tax_ID,
                     Discount = Discount
                 };
-                VAS_107_CreateOrderBottomPanelModel model = new VAS_107_CreateOrderBottomPanelModel();
+                VAS_303_PurchaseOrderBottomModel model = new VAS_303_PurchaseOrderBottomModel();
                 retJSON = JsonConvert.SerializeObject(model.RunColumnCallout(ctx, req));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
@@ -239,7 +239,7 @@ namespace VAS.Controllers
             if (Session["ctx"] != null)
             {
                 Ctx ctx = Session["ctx"] as Ctx;
-                VAS_107_CreateOrderBottomPanelModel model = new VAS_107_CreateOrderBottomPanelModel();
+                VAS_303_PurchaseOrderBottomModel model = new VAS_303_PurchaseOrderBottomModel();
                 retJSON = JsonConvert.SerializeObject(model.GetProductAttributes(ctx, M_Product_ID));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
@@ -256,7 +256,7 @@ namespace VAS.Controllers
             if (Session["ctx"] != null)
             {
                 Ctx ctx = Session["ctx"] as Ctx;
-                VAS_107_CreateOrderBottomPanelModel model = new VAS_107_CreateOrderBottomPanelModel();
+                VAS_303_PurchaseOrderBottomModel model = new VAS_303_PurchaseOrderBottomModel();
                 retJSON = JsonConvert.SerializeObject(model.GetInstanceValues(ctx, M_AttributeSetInstance_ID));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
@@ -274,7 +274,7 @@ namespace VAS.Controllers
             if (Session["ctx"] != null)
             {
                 Ctx ctx = Session["ctx"] as Ctx;
-                VAS_107_CreateOrderBottomPanelModel model = new VAS_107_CreateOrderBottomPanelModel();
+                VAS_303_PurchaseOrderBottomModel model = new VAS_303_PurchaseOrderBottomModel();
                 retJSON = JsonConvert.SerializeObject(model.ScanLookup(ctx, C_Order_ID, code));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
@@ -282,7 +282,7 @@ namespace VAS.Controllers
 
         /// <summary>
         /// Creates or updates an M_AttributeSetInstance from the picker selection.
-        /// Delegates entirely to <see cref="VAS_107_CreateOrderBottomPanelModel.SaveAttribute"/>
+        /// Delegates entirely to <see cref="VAS_303_PurchaseOrderBottomModel.SaveAttribute"/>
         /// so all framework dedup, mandatory-validation and AttrCode / UPC behaviour
         /// stays in the model layer.
         /// </summary>
@@ -298,7 +298,7 @@ namespace VAS.Controllers
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 OrderAttributeSaveRequest req = JsonConvert.DeserializeObject<OrderAttributeSaveRequest>(payload);
-                VAS_107_CreateOrderBottomPanelModel model = new VAS_107_CreateOrderBottomPanelModel();
+                VAS_303_PurchaseOrderBottomModel model = new VAS_303_PurchaseOrderBottomModel();
                 retJSON = JsonConvert.SerializeObject(model.SaveAttribute(ctx, req));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
@@ -317,7 +317,7 @@ namespace VAS.Controllers
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 OrderSaveLinesRequest req = JsonConvert.DeserializeObject<OrderSaveLinesRequest>(payload);
-                VAS_107_CreateOrderBottomPanelModel model = new VAS_107_CreateOrderBottomPanelModel();
+                VAS_303_PurchaseOrderBottomModel model = new VAS_303_PurchaseOrderBottomModel();
                 retJSON = JsonConvert.SerializeObject(model.SaveLines(ctx, req.C_Order_ID, req.AD_Window_ID, req.Lines, req.Page));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
@@ -340,7 +340,7 @@ namespace VAS.Controllers
             if (Session["ctx"] != null)
             {
                 Ctx ctx = (Ctx)Session["ctx"];
-                VAS_107_CreateOrderBottomPanelModel model = new VAS_107_CreateOrderBottomPanelModel();
+                VAS_303_PurchaseOrderBottomModel model = new VAS_303_PurchaseOrderBottomModel();
                 retJSON = JsonConvert.SerializeObject(model.LoadOrderTaxBreakdown(ctx, C_Order_ID));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
@@ -359,7 +359,7 @@ namespace VAS.Controllers
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 OrderDeleteLinesRequest req = JsonConvert.DeserializeObject<OrderDeleteLinesRequest>(payload);
-                VAS_107_CreateOrderBottomPanelModel model = new VAS_107_CreateOrderBottomPanelModel();
+                VAS_303_PurchaseOrderBottomModel model = new VAS_303_PurchaseOrderBottomModel();
                 retJSON = JsonConvert.SerializeObject(model.DeleteLines(ctx, req.C_Order_ID, req.AD_Window_ID, req.LineIds, req.Page));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);

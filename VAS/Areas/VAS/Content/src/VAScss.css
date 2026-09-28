@@ -243,6 +243,8 @@
 @import "../VAS_074_CreateInvoiceLinePanel.css";
 @import "../VAS_105_AccountRightPanel.css";
 @import "../VAS_107_CreateOrderBottomPanel.css";
+@import "../VAS_303_PurchaseOrderBottom.css";
+@import "../VAS_304_SalesOrderBottom.css";
 @import "../VAS_240_RequisitionBottomPanel.css";
 @import "../VAS_218_CreateOppLines.css";
 

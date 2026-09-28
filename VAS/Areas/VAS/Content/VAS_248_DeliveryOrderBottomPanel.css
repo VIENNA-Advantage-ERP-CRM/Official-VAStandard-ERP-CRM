@@ -33,10 +33,16 @@
  *                        the container queries tighten the tracks and gaps
  *                        instead, and cells clip their own overflow so head and
  *                        body rows stay in step.
+ *   VAI163   2026-09-25  Ported from VAS_249: the root carries its own white
+ *                        surface (a cleared panel never shows the host's blue);
+ *                        UOM / locator <select> side padding; the "..." is live on
+ *                        a locked delivery (the modal opens read-only); the product
+ *                        list is a fixed layer on <body>; no grey fields in the modal.
  * ============================================================ */
 
 .vas-dol-root,
 .vas-dol-dialog-backdrop,
+.vas-dol-catalog-popover--floating,
 .vas-dol-toast {
     --dol-action-blue: #0083da;
     --dol-action-blue-hover: #0069ae;
@@ -94,6 +100,9 @@
     overscroll-behavior: auto;
     font-family: var(--dol-font);
     color: var(--dol-text);
+    /* The panel's own surface. With no background of its own, a cleared panel (New
+       Record hides the grid) let the framework host's blue show through the root. */
+    background: var(--dol-surface);
     /* Query container for the responsive rules at the foot of this file, and for the
        fluid type anchor on .vas-dol-panel (cqw resolves against THIS box). */
     container-type: inline-size;
@@ -109,16 +118,23 @@
    Everything inside the panel is sized in em, so ONE font-size decides how big the whole
    panel is. It used to be a constant 16px: fine at 100%, but browser zoom shrinks the
    room the panel has (measured in CSS px) while the panel kept its 16px design size, so
-   at 125-175% the columns, the toolbar and the pager were being crushed into a box that
-   had lost a third of its width. Zooming OUT had the opposite look: a small panel lost
-   in a wide host.
+   at 125-175% the six columns, the toolbar and the pager were being crushed into a box
+   that had lost a third of its width - the cells wrapped, the buttons stacked, the
+   figures broke over two lines. Zooming OUT had the opposite look: a small panel lost in
+   a wide host.
 
    The anchor now follows the panel's own width (cqw = 1% of the root, the query
    container): 16px on a wide panel, easing down to a 12.5px floor as the panel narrows,
-   whether the narrowing comes from the splitter, the window or a zoom. The container
-   queries at the foot of this file then only have to trim gaps and minimums. Zooming in
-   still magnifies (the floor is in px), it just stops the panel outgrowing its box. */
-.vas-dol-panel,
+   whether the narrowing comes from the splitter, the window or a zoom. Between the two
+   clamps the scale is continuous, so there is no jump at a threshold. The container
+   queries at the foot of this file then only have to trim gaps and minimums - they no
+   longer carry the whole burden. Zooming in still magnifies (the floor is in px, so 12.5px
+   at 150% zoom is 18.75 device px), it just stops the panel outgrowing its box. */
+.vas-dol-panel {
+    font-size: clamp(12.5px, calc(9.5px + 0.65cqw), var(--panel-anchor));
+}
+/* The empty state and the pager sit beside .vas-dol-panel under the root, so they take
+   the same anchor. */
 .vas-dol-empty,
 .vas-dol-linepager {
     font-size: clamp(12.5px, calc(9.5px + 0.65cqw), var(--panel-anchor));
@@ -159,6 +175,17 @@
     min-width: 0;
 }
 
+/* New, unsaved header (27-Sep-2026): the grid and the message are both hidden, so the root
+   collapses and the framework host's blue surface around it was all that showed. The JS
+   sets .vas-dol-root--new only in that state, and the host chain is painted white until
+   the header has been saved - a loaded delivery keeps the host exactly as before. */
+.vis-ad-w-p-actionpanel-b:has(.vas-dol-root--new),
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-dol-root--new),
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-dol-root--new) > .vis-ad-w-p-ap-tp-o-body,
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-dol-root--new) .vis-ad-w-p-ap-tp-o-b-content {
+    background: #ffffff !important;
+}
+
 /* Hide the framework-rendered tab title bar and its coloured header. The framework places
    .vis-ad-w-p-ap-tp-body-head immediately before our root, so this adjacency :has()
    targets ONLY this panel's head — never a sibling panel's. It is redundant with the
@@ -174,9 +201,13 @@
 .vas-dol-empty {
     display: flex;
     height: 100%;
+    min-height: 4em;
     align-items: center;
     justify-content: center;
+    padding: 1em;
+    text-align: center;
     color: var(--dol-text-muted);
+    background: var(--dol-surface);
 }
 
 .vas-dol-icon {
@@ -586,10 +617,11 @@
    button are disabled -> not-allowed. A disabled control IGNORES its own `cursor` in
    Chromium, so put the cursor on the (enabled) parent cell and let the disabled control
    pass pointer events through to it. */
-.vas-dol-locked .vas-dol-cell--check,
-.vas-dol-locked .vas-dol-cell--more {
+.vas-dol-locked .vas-dol-cell--check {
     cursor: not-allowed;
 }
+/* The "..." cell is NOT in that set: on a locked delivery the button stays live and opens
+   the Additional Info modal for reading (17-Sep-2026). */
 
     .vas-dol-locked .vas-dol-cell--check input[type="checkbox"]:disabled,
     .vas-dol-locked .vas-dol-more-btn:disabled {
@@ -699,6 +731,11 @@
 
 .vas-dol-cell-edit select.vas-dol-cell-edit__select {
     color: var(--dol-text-secondary);
+    /* Room between the chosen option's text and the cell's edge on either side - with
+       appearance:none the browser draws no arrow, so a right-aligned UOM sat flush
+       against the border. */
+    padding-left: 0.5em;
+    padding-right: 0.5em;
 }
 
 .vas-dol-cell-edit input.vas-dol-cell-edit__input::placeholder {
@@ -754,6 +791,26 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* The resting UNIT under the quantity (25-Sep-2026, as VAS_249): text that WRAPS, not
+   a one-line input - an input clipped any unit longer than its box, so the full unit
+   was not visible on a new line. Same size / weight / colour / alignment as before. */
+.vas-dol-cell-edit .vas-dol-uomtext {
+    margin-top: 0.125em;
+    padding: 0.1em 0;
+    font-size: 0.85em;
+    font-weight: 500;
+    line-height: 1.3;
+    color: var(--dol-text-muted);
+    text-align: right;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    cursor: pointer;
+}
+.vas-dol-cell-edit .vas-dol-uomtext--empty { color: var(--dol-text-faint); }
+.vas-dol-cell-edit .vas-dol-uomtext--ro { cursor: not-allowed; }
+[dir="rtl"] .vas-dol-cell-edit .vas-dol-uomtext { text-align: left; }
+
 .vas-dol-cell-edit input.vas-dol-uomsub {
     text-align: right;
     margin-top: 0.125em;
@@ -796,6 +853,29 @@
     border-bottom: none;
     border-radius: var(--dol-r-md) var(--dol-r-md) 0 0;
 }
+
+/* The product list as a FIXED layer on <body> (25-Sep-2026). Inside the panel it was
+   clipped by the root's scroll box - a short bottom panel left it a sliver - and it was a
+   different size above the field than below. positionCatalog() sets left / width / top or
+   bottom / max-height (the same 16.25em either way) and the font size, so the list keeps
+   the panel's proportions; these rules only undo the in-cell anchoring above. */
+.vas-dol-catalog-popover--floating {
+    position: fixed;
+    top: auto;
+    right: auto;
+    bottom: auto;
+    min-width: 0;
+    max-width: none;
+    z-index: 1000;
+    font-family: var(--dol-font);
+    color: var(--dol-text);
+    text-align: left;
+}
+
+    .vas-dol-catalog-popover--floating,
+    .vas-dol-catalog-popover--floating * {
+        box-sizing: border-box;
+    }
 
 .vas-dol-catalog__hint {
     padding: 0.55em 0.75em;
@@ -1062,6 +1142,22 @@
 
     .vas-dol-dialog .vis-input-wrap:has(.vis-ev-col-readonly) {
         border-bottom: 1px solid #f3f3f3 !important;
+    }
+
+    /* No grey field fills in the modal (25-Sep-2026). The framework paints a read-only
+       control grey (.vis-ev-col-readonly { background: ... !important }) and the browser
+       greys a disabled one; its own edit view undoes that, the modal did not - so on a
+       locked delivery (or any read-only field) the whole form went grey. The read-only cue is
+       the muted text, the not-allowed cursor and the faint underline above. */
+    .vas-dol-dialog .vis-ev-col-readonly,
+    .vas-dol-dialog .vis-input-wrap,
+    .vas-dol-dialog .vis-control-wrap,
+    .vas-dol-dialog .vis-control-wrap input:disabled,
+    .vas-dol-dialog .vis-control-wrap input[readonly],
+    .vas-dol-dialog .vis-control-wrap select:disabled,
+    .vas-dol-dialog .vis-control-wrap textarea:disabled,
+    .vas-dol-dialog .vis-control-wrap textarea[readonly] {
+        background-color: transparent !important;
     }
 
     .vas-dol-dialog .vis-input-wrap:has(input:focus),
@@ -1437,6 +1533,28 @@
     justify-content: flex-end;
 }
 
+/* Additional Info opened past Drafted: "View only" note above the Done button. */
+.vas-dol-more-note {
+    margin: 0 1.25em;
+    padding: 0.5em 0.75em;
+    border-radius: var(--dol-r-sm);
+    background: #fdf3e2;
+    box-shadow: inset 0.1875em 0 0 var(--dol-warning);
+    color: #8a5a09;
+    font-size: 0.75em;
+}
+
+/* Refresh with unsaved changes: Save / Discard / Cancel. */
+.vas-dol-dialog--confirm {
+    max-width: 26em;
+}
+
+.vas-dol-confirm-text {
+    margin: 0;
+    color: var(--dol-text);
+    font-size: 0.875em;
+}
+
 .vas-dol-dialog__summary {
     margin: 0;
     font-size: 0.75em;
@@ -1768,15 +1886,15 @@
    of the work (the whole panel scales with its width); these steps only trim what
    scaling cannot: the gaps and the fixed minimums.
 
-   NO column is ever dropped (17-Sep-2026, ported from VAS_249). The earlier steps hid
-   Description below 56em and Locator below 40em, and with the host width the framework
-   leaves behind after a zoom (see "Full-width host" above) the first threshold was being
-   crossed at 100% on an ordinary screen - the user lost the Description column they
-   were about to fill in. Every column stays; what gives instead is the room between and
-   inside them: the gap shrinks, the fixed em minimum on the quantity column comes down
-   so all six tracks can share a narrow row, and the type steps down a little at the
-   narrowest widths. Text in a crushed cell truncates with an ellipsis (the cells carry
-   min-width:0 + overflow:hidden), which is recoverable - a hidden column is not. */
+   NO column is ever dropped (17-Sep-2026). The earlier steps hid Description below 56em
+   and Locator below 40em, and with the host width the framework leaves behind after a
+   zoom (see "Full-width host" above) the first threshold was being crossed at 100% on
+   an ordinary screen - the user lost the Description column they were about to fill in.
+   Every column stays; what gives instead is the room between and inside them: the gap
+   shrinks, the fixed em minimum on the quantity column comes down so all six tracks can
+   share a narrow row, and the type steps down a little at the narrowest widths. Text in
+   a crushed cell truncates with an ellipsis (the cells carry min-width:0 +
+   overflow:hidden), which is recoverable - a hidden column is not. */
 @container (max-width: 56em) {
     .vas-dol-row {
         grid-template-columns: 1.5em minmax(0, 1.8fr) minmax(0, 1.4fr) minmax(0, 1.1fr) minmax(5em, 0.8fr) 3.25em;
