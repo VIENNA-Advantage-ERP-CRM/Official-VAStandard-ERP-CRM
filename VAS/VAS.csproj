@@ -202,6 +202,8 @@
     <Compile Include="Areas\VAS\Controllers\VAS_188_TopUsedProductsWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_074_CreateInvoiceLinePanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_107_CreateOrderBottomPanelController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_303_PurchaseOrderBottomController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_304_SalesOrderBottomController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_247_MaterialTransferBottomPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_248_DeliveryOrderBottomPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_249_GRNBottomPanelController.cs" />
@@ -642,6 +644,8 @@
     <Content Include="Areas\VAS\Content\VAS_293_BankAccountRightPanel.css" />
     <Content Include="Areas\VAS\Content\VAS_074_CreateInvoiceLinePanel.css" />
     <Content Include="Areas\VAS\Content\VAS_107_CreateOrderBottomPanel.css" />
+    <Content Include="Areas\VAS\Content\VAS_303_PurchaseOrderBottom.css" />
+    <Content Include="Areas\VAS\Content\VAS_304_SalesOrderBottom.css" />
     <Content Include="Areas\VAS\Content\VAS_240_RequisitionBottomPanel.css" />
     <Content Include="Areas\VAS\Content\OutstandingSalesOrderWidget.css" />
     <Content Include="Areas\VAS\Content\OverdueWidget.css" />
@@ -814,6 +818,8 @@
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_293_BankAccountRightPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_074_CreateInvoiceLinePanel.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_107_CreateOrderBottomPanel.js" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_303_PurchaseOrderBottom.js" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_304_SalesOrderBottom.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_247_MaterialTransferBottomPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_248_DeliveryOrderBottomPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_249_GRNBottomPanel.js" />

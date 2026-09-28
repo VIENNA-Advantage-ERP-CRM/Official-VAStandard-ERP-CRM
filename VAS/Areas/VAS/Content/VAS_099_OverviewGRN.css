@@ -738,6 +738,15 @@
    children carry their own ellipsis, and the Received cell is a flex column —
    both are unharmed by the clip. */
 .vas_099-tRow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* The UOM is shown in FULL (25-Sep-2026): it wraps inside its track instead of
+   being ellipsised - a clipped unit ("Kilo…") changes what the quantity means. */
+.vas_099-tRow > span.vas_099-uom {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
 .vas_099-tHead > span,
 .vas_099-tRow > span.vas_099-ta-r,
 .vas_099-tRow > span.vas_099-ta-c { white-space: nowrap; }

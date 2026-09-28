@@ -36,6 +36,16 @@
  *                  - An attribute caption only for a REAL instance (> 0): the
  *                    instance-0 row some tenants carry (a dash) no longer shows
  *                    under a line raised from an order line.
+ *   VAI163         25-Sep-2026  GRN round of corrections:
+ *                  - One unit label everywhere (UomLabelExpr): the symbol, or the
+ *                    name when the symbol is missing OR BLANK. A saved line used to
+ *                    print the name while a new one printed the symbol, and a blank
+ *                    symbol (PostgreSQL keeps '') printed nothing at all.
+ *                  - Locators are named, not coded: LocatorCombination, then Bin,
+ *                    then Value - the rule the GRN overview panels already use.
+ *                  - The purchase order line (C_OrderLine_ID) is written even where
+ *                    the dictionary marks the column not updateable, but only when
+ *                    the user actually changed it in Additional Info.
  ******************************************************/
 
 using System;
@@ -539,7 +549,7 @@ namespace VASLogic.Models
         {
             List<ReceiptUomItem> list = new List<ReceiptUomItem>();
             string sql = @"SELECT u.C_UOM_ID, u.Name AS UOMName,
-                                  COALESCE(u.UOMSymbol, u.Name) AS UOMSymbol
+                                  " + UomLabelExpr("u") + @" AS UOMSymbol
                            FROM C_UOM u
                            WHERE u.IsActive = 'Y'
                              AND u.AD_Client_ID IN (0, " + ctx.GetAD_Client_ID() + ")";
@@ -561,8 +571,35 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Builds the locator dropdown list, labelled "WAREHOUSE - VALUE" and filtered by
-        /// the M_Locator_ID column's AD_Val_Rule where one is configured.
+        /// What a unit is called on screen: its full NAME, or its symbol when the name is
+        /// missing or blank (25-Sep-2026, second request of the day - the morning's
+        /// symbol-first rule is reversed; the panel now reads like VAS_248 / VAS_107).
+        /// It feeds every label the panel prints - the dropdown (ReceiptUomItem.Symbol),
+        /// the catalog row, the callout and the saved line - so a new line and a saved one
+        /// read the same. NULLIF(TRIM(..)) is the blank test because PostgreSQL keeps ''
+        /// as a value where Oracle stores NULL, so a bare COALESCE printed nothing.
+        /// </summary>
+        /// <param name="alias">C_UOM table alias</param>
+        /// <returns>SQL expression</returns>
+        private static string UomLabelExpr(string alias)
+        {
+            return "COALESCE(NULLIF(TRIM(" + alias + ".Name), N''), " + alias + ".UOMSymbol)";
+        }
+
+        /// <summary>
+        /// What a locator is called on screen: its combination, then its bin, then its
+        /// search key - the naming the GRN overview panels (VAS_099 / VAS_104) use.
+        /// </summary>
+        /// <param name="alias">M_Locator table alias</param>
+        /// <returns>SQL expression</returns>
+        private static string LocatorNameExpr(string alias)
+        {
+            return "COALESCE(" + alias + ".LocatorCombination, " + alias + ".Bin, " + alias + ".Value)";
+        }
+
+        /// <summary>
+        /// Builds the locator dropdown list, labelled with each locator's NAME and
+        /// filtered by the M_Locator_ID column's AD_Val_Rule where one is configured.
         /// </summary>
         /// <param name="ctx">session context</param>
         /// <param name="M_InOut_ID">parent receipt (val-rule context)</param>
@@ -574,7 +611,7 @@ namespace VASLogic.Models
         {
             List<ReceiptLocatorItem> list = new List<ReceiptLocatorItem>();
             string sql = @"SELECT l.M_Locator_ID, l.M_Warehouse_ID, l.Value,
-                                  COALESCE(w.Name, N'') AS WarehouseName
+                                  " + LocatorNameExpr("l") + @" AS LocatorName
                            FROM M_Locator l
                            INNER JOIN M_Warehouse w ON (w.M_Warehouse_ID = l.M_Warehouse_ID)
                            WHERE l.IsActive = 'Y'
@@ -593,14 +630,16 @@ namespace VASLogic.Models
             if (ds == null || ds.Tables.Count == 0) return list;
             foreach (DataRow r in ds.Tables[0].Rows)
             {
-                string wh = Util.GetValueOfString(r["WarehouseName"]);
                 string val = Util.GetValueOfString(r["Value"]);
+                string name = Util.GetValueOfString(r["LocatorName"]).Trim();
+                // The list is scoped to the header's one warehouse, so the warehouse no
+                // longer prefixes the label - the locator's own name is what is shown.
                 list.Add(new ReceiptLocatorItem
                 {
                     M_Locator_ID = Util.GetValueOfInt(r["M_Locator_ID"]),
                     M_Warehouse_ID = Util.GetValueOfInt(r["M_Warehouse_ID"]),
                     Value = val,
-                    Name = wh.Length > 0 ? wh + " - " + val : val
+                    Name = name.Length > 0 ? name : val
                 });
             }
             return list;
@@ -1086,8 +1125,8 @@ namespace VASLogic.Models
                 @"COALESCE(p.Value, N'') AS VASGRNDISP_ProductValue,
                   COALESCE(p.Name, N'') AS VASGRNDISP_ProductName,
                   COALESCE(ch.Name, N'') AS VASGRNDISP_ChargeName,
-                  COALESCE(uom.Name, N'') AS VASGRNDISP_UOMName,
-                  COALESCE(l.Value, N'') AS VASGRNDISP_LocatorName,
+                  COALESCE(" + UomLabelExpr("uom") + @", N'') AS VASGRNDISP_UOMName,
+                  COALESCE(" + LocatorNameExpr("l") + @", N'') AS VASGRNDISP_LocatorName,
                   COALESCE(asi.Description, N'') AS VASGRNDISP_AttrName,
                   COALESCE(p.M_AttributeSet_ID, 0) AS VASGRNDISP_HasAttrSet,
                   COALESCE(p.ProductType, '') AS VASGRNDISP_ProductType
@@ -1306,14 +1345,24 @@ namespace VASLogic.Models
             return items;
         }
 
-        /// <summary>C_UOM_ID -&gt; display symbol, so a catalog row can label its own unit.</summary>
+        /// <summary>
+        /// C_UOM_ID -&gt; display label, so a catalog row can label its own unit. Read
+        /// straight from C_UOM, NOT through the C_UOM_ID val rule: that rule is resolved
+        /// without a line (no product), so it could leave out the very unit the product
+        /// carries and the new line would show no unit until it was saved.
+        /// </summary>
         /// <param name="ctx">session context</param>
-        /// <param name="M_InOut_ID">parent receipt (val-rule context)</param>
-        /// <returns>unit id to symbol map</returns>
+        /// <param name="M_InOut_ID">parent receipt (unused; kept for the call sites)</param>
+        /// <returns>unit id to label map</returns>
         private Dictionary<int, string> LoadUomNames(Ctx ctx, int M_InOut_ID)
         {
             Dictionary<int, string> map = new Dictionary<int, string>();
-            foreach (ReceiptUomItem u in LoadUomList(ctx, M_InOut_ID, null)) map[u.C_UOM_ID] = u.Symbol;
+            DataSet ds = DB.ExecuteDataset(
+                "SELECT u.C_UOM_ID, " + UomLabelExpr("u") + " AS UOMLabel FROM C_UOM u"
+                + " WHERE u.AD_Client_ID IN (0, " + ctx.GetAD_Client_ID() + ")");
+            if (ds != null && ds.Tables.Count > 0)
+                foreach (DataRow r in ds.Tables[0].Rows)
+                    map[Util.GetValueOfInt(r["C_UOM_ID"])] = Util.GetValueOfString(r["UOMLabel"]);
             return map;
         }
 
@@ -1676,7 +1725,7 @@ namespace VASLogic.Models
         {
             if (C_UOM_ID <= 0) return "";
             object o = DB.ExecuteScalar(
-                "SELECT COALESCE(UOMSymbol, Name) FROM C_UOM WHERE C_UOM_ID = @id",
+                "SELECT " + UomLabelExpr("u") + " FROM C_UOM u WHERE u.C_UOM_ID = @id",
                 new SqlParameter[] { new SqlParameter("@id", C_UOM_ID) }, null);
             return Util.GetValueOfString(o);
         }
@@ -1974,6 +2023,17 @@ namespace VASLogic.Models
             "Line", "Description"
         };
 
+        /// <summary>
+        /// Additional Info columns the panel lets the user edit whatever the dictionary's
+        /// updateable flag says. The purchase ORDER LINE is keyed in by hand on a receipt
+        /// raised without Create From, so it must be settable here; it is written only
+        /// when the user actually changed it (TouchedCols), never from the untouched bag.
+        /// </summary>
+        private static readonly HashSet<string> ALWAYS_EDITABLE_COLUMNS = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "C_OrderLine_ID"
+        };
+
         private HashSet<string> _updateableColumns;
         private HashSet<string> _yesNoColumns;
         private HashSet<string> _referenceColumns;
@@ -1992,6 +2052,19 @@ namespace VASLogic.Models
                 bool isTouched = touched != null && touched.Contains(col);
                 if (kv.Value == null && !isTouched) continue;
                 if (CORE_OR_SYSTEM_COLUMNS.Contains(col)) continue;
+                // A column the panel always lets the user edit bypasses the updateable
+                // flag (Set_Value would refuse it on a saved line), but only when touched.
+                if (ALWAYS_EDITABLE_COLUMNS.Contains(col) && !updateable.Contains(col))
+                {
+                    if (!isTouched) continue;
+                    try
+                    {
+                        int id = Util.GetValueOfInt(CoerceJsonValue(kv.Value));
+                        line.Set_ValueNoCheck(col, id > 0 ? (object)id : null);
+                    }
+                    catch (Exception ex) { log.Warning("VAS_249 SaveLines: skip column " + col + " - " + ex.Message); }
+                    continue;
+                }
                 if (updateable.Count > 0 && !updateable.Contains(col)) continue;
                 try
                 {
@@ -2595,14 +2668,14 @@ namespace VASLogic.Models
         public ReceiptUomItem() { Name = ""; Symbol = ""; }
     }
 
-    /// <summary>A locator option, labelled with its warehouse.</summary>
+    /// <summary>A locator option.</summary>
     public class ReceiptLocatorItem
     {
         public int M_Locator_ID { get; set; }
         public int M_Warehouse_ID { get; set; }
         /// <summary>Locator value (the aisle/bin key).</summary>
         public string Value { get; set; }
-        /// <summary>"WAREHOUSE - VALUE", ready to render.</summary>
+        /// <summary>The locator's name (combination, bin, else value), ready to render.</summary>
         public string Name { get; set; }
         public ReceiptLocatorItem() { Value = ""; Name = ""; }
     }

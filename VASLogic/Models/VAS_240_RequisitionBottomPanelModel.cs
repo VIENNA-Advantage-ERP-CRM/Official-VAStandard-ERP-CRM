@@ -996,7 +996,11 @@ namespace VASLogic.Models
                 row.PriceActual = Util.GetValueOfDecimal(r["PriceActual"]);
                 row.LineNetAmt = Util.GetValueOfDecimal(r["LineNetAmt"]);
                 row.M_AttributeSetInstance_ID = Util.GetValueOfInt(r["M_AttributeSetInstance_ID"]);
-                row.AttrName = Util.GetValueOfString(r["VASOLDISP_AttrName"]);
+                // A caption belongs to a REAL instance only, and never a bare dash
+                // (25-Sep-2026): a line raised from a production / sales order holds
+                // instance 0, and the row 0 some tenants carry is described as "-".
+                string attr = Util.GetValueOfString(r["VASOLDISP_AttrName"]).Trim();
+                row.AttrName = (row.M_AttributeSetInstance_ID > 0 && attr.Trim('-', '_', ' ').Length > 0) ? attr : "";
                 int hasAttrSetRaw = Util.GetValueOfInt(r["VASOLDISP_HasAttrSet"]);
                 row.HasAttributeSet = hasAttrSetRaw > 0;
                 // Store under a canonical mixed-case key so the JS productHasAttributeSet()

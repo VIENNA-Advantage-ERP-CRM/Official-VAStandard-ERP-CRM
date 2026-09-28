@@ -338,6 +338,8 @@ import "../app/widgets/VAS_055_CashByCategoryCashJournalWidget.js";
 import "../app/tabpanel/VAS_065_APInvoicePanel.js";
 import "../app/tabpanel/VAS_074_CreateInvoiceLinePanel.js";
 import "../app/tabpanel/VAS_107_CreateOrderBottomPanel.js";
+import "../app/tabpanel/VAS_303_PurchaseOrderBottom.js";
+import "../app/tabpanel/VAS_304_SalesOrderBottom.js";
 import "../app/tabpanel/VAS_240_RequisitionBottomPanel.js";
 /* The three quantity-line panels are standalone classes, each modelled on
    VAS_240 - there is no shared engine to import first, and no ordering

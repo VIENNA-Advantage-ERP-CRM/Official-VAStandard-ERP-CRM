@@ -26,6 +26,28 @@
  * Chronological  : Development
  *   VAI154         Created  07-Sep-2026
  *   VAI154         Rebuilt on the VAS_240 pattern  09-Sep-2026
+ *   VAI163         25-Sep-2026  Delivery-order round of corrections. VAS_249's 17-Sep
+ *                  and 25-Sep rounds were replayed onto this model (three-way merge
+ *                  against the 9-Sep common copy; the direction and every other
+ *                  delivery-specific difference kept):
+ *                  - Lines page at 20, newest line first (Line DESC).
+ *                  - IsAllowNonItem (AD_Client) decides what the catalog offers:
+ *                    'N' = item products only, no charges; 'Y' = every product
+ *                    type plus charges. Carried to the panel as IsAllowNonItem.
+ *                  - IsDropShip carried on the header (LogicContext + flag) so the
+ *                    line's Drop Shipment box is offered only on a drop-ship delivery.
+ *                  - An attribute caption only for a REAL instance (> 0).
+ *                  - One unit label everywhere (UomLabelExpr): the unit's full NAME
+ *                    ("Each", not "Ea"), the symbol only where the name is blank.
+ *                  - Locators are named, not coded: LocatorCombination, then Bin,
+ *                    then Value.
+ *                  - Delivery raised against a sales order (M_InOut.C_Order_ID): the
+ *                    catalog offers only the products / charges on that order's lines;
+ *                    FindOrderLine matches a product + quantity to one of those lines;
+ *                    GetOrderLine reads one for the panel to fill a line from; the
+ *                    Order Line lookup lists that order's lines only. C_OrderLine_ID is
+ *                    written even where the dictionary marks it not updateable, but
+ *                    only when the user (or that match) actually set it.
  ******************************************************/
 
 using System;
@@ -62,8 +84,8 @@ namespace VASLogic.Models
         /// <summary>Page size for the Product / Charge catalog search.</summary>
         private const int CATALOG_PAGE_SIZE = 50;
 
-        /// <summary>Saved shipment lines loaded per page (server-side paging).</summary>
-        private const int LINE_PAGE_SIZE = 10;
+        /// <summary>Saved delivery lines loaded per page (server-side paging). 20 since 17-Sep-2026.</summary>
+        private const int LINE_PAGE_SIZE = 20;
 
         /// <summary>Physical line table this panel edits.</summary>
         private const string LINE_TABLE = "M_InOutLine";
@@ -483,10 +505,41 @@ namespace VASLogic.Models
         /// <param name="data">panel data to populate</param>
         private void LoadCatalogs(Ctx ctx, DeliveryPanelData data)
         {
+            data.IsAllowNonItem = AllowNonItem(ctx);
             data.UomList = LoadUomList(ctx, data.M_InOut_ID, null);
             // A shipment happens at ONE warehouse, so the locator list is scoped to the
             // header's — offering another warehouse's bins would only invite a save error.
             data.LocatorList = LoadLocatorList(ctx, data.M_InOut_ID, data.M_Warehouse_ID, null);
+        }
+
+        private bool? _allowNonItem;
+
+        /// <summary>
+        /// The tenant's "Allow Non Item" setting (AD_Client.IsAllowNonItem), which decides
+        /// what a delivery line may be raised for. 'N': item products only (ProductType =
+        /// 'I') and no charges. 'Y': every product type, and charges. The column is a
+        /// later addition to AD_Client, so a schema without it reads as 'N' — the stricter
+        /// answer, and the one every stock document assumes. Read once per request.
+        /// </summary>
+        /// <param name="ctx">session context</param>
+        /// <returns>true when non-item products and charges may be delivered</returns>
+        private bool AllowNonItem(Ctx ctx)
+        {
+            if (_allowNonItem.HasValue) return _allowNonItem.Value;
+            bool allow = false;
+            try
+            {
+                if (ColumnExists("AD_Client", "IsAllowNonItem"))
+                {
+                    object o = DB.ExecuteScalar(
+                        "SELECT IsAllowNonItem FROM AD_Client WHERE AD_Client_ID = @cid",
+                        new SqlParameter[] { new SqlParameter("@cid", ctx.GetAD_Client_ID()) }, null);
+                    allow = Util.GetValueOfString(o) == "Y";
+                }
+            }
+            catch (Exception ex) { log.Warning("VAS_248 AllowNonItem: " + ex.Message); }
+            _allowNonItem = allow;
+            return allow;
         }
 
         /// <summary>Builds the UOM dropdown list, enforcing the C_UOM_ID column's AD_Val_Rule.</summary>
@@ -498,7 +551,7 @@ namespace VASLogic.Models
         {
             List<DeliveryUomItem> list = new List<DeliveryUomItem>();
             string sql = @"SELECT u.C_UOM_ID, u.Name AS UOMName,
-                                  COALESCE(u.UOMSymbol, u.Name) AS UOMSymbol
+                                  " + UomLabelExpr("u") + @" AS UOMSymbol
                            FROM C_UOM u
                            WHERE u.IsActive = 'Y'
                              AND u.AD_Client_ID IN (0, " + ctx.GetAD_Client_ID() + ")";
@@ -520,8 +573,34 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Builds the locator dropdown list, labelled "WAREHOUSE - VALUE" and filtered by
-        /// the M_Locator_ID column's AD_Val_Rule where one is configured.
+        /// What a unit is called on screen: its full NAME ("Each", not "Ea" - asked for
+        /// on the delivery panel, 25-Sep-2026, where the GRN panel shows the symbol), or
+        /// its symbol when the name is blank. It feeds every label the panel prints - the
+        /// dropdown (DeliveryUomItem.Symbol), the catalog row and the saved line - so a new
+        /// line and a saved one read the same. NULLIF(TRIM(..)) is the blank test because
+        /// PostgreSQL keeps '' as a value where Oracle stores NULL.
+        /// </summary>
+        /// <param name="alias">C_UOM table alias</param>
+        /// <returns>SQL expression</returns>
+        private static string UomLabelExpr(string alias)
+        {
+            return "COALESCE(NULLIF(TRIM(" + alias + ".Name), N''), " + alias + ".UOMSymbol)";
+        }
+
+        /// <summary>
+        /// What a locator is called on screen: its combination, then its bin, then its
+        /// search key - the naming the GRN overview panels (VAS_099 / VAS_104) use.
+        /// </summary>
+        /// <param name="alias">M_Locator table alias</param>
+        /// <returns>SQL expression</returns>
+        private static string LocatorNameExpr(string alias)
+        {
+            return "COALESCE(" + alias + ".LocatorCombination, " + alias + ".Bin, " + alias + ".Value)";
+        }
+
+        /// <summary>
+        /// Builds the locator dropdown list, labelled with each locator's NAME and
+        /// filtered by the M_Locator_ID column's AD_Val_Rule where one is configured.
         /// </summary>
         /// <param name="ctx">session context</param>
         /// <param name="M_InOut_ID">parent shipment (val-rule context)</param>
@@ -533,7 +612,7 @@ namespace VASLogic.Models
         {
             List<DeliveryLocatorItem> list = new List<DeliveryLocatorItem>();
             string sql = @"SELECT l.M_Locator_ID, l.M_Warehouse_ID, l.Value,
-                                  COALESCE(w.Name, N'') AS WarehouseName
+                                  " + LocatorNameExpr("l") + @" AS LocatorName
                            FROM M_Locator l
                            INNER JOIN M_Warehouse w ON (w.M_Warehouse_ID = l.M_Warehouse_ID)
                            WHERE l.IsActive = 'Y'
@@ -552,14 +631,16 @@ namespace VASLogic.Models
             if (ds == null || ds.Tables.Count == 0) return list;
             foreach (DataRow r in ds.Tables[0].Rows)
             {
-                string wh = Util.GetValueOfString(r["WarehouseName"]);
                 string val = Util.GetValueOfString(r["Value"]);
+                string name = Util.GetValueOfString(r["LocatorName"]).Trim();
+                // The list is scoped to the header's one warehouse, so the warehouse no
+                // longer prefixes the label - the locator's own name is what is shown.
                 list.Add(new DeliveryLocatorItem
                 {
                     M_Locator_ID = Util.GetValueOfInt(r["M_Locator_ID"]),
                     M_Warehouse_ID = Util.GetValueOfInt(r["M_Warehouse_ID"]),
                     Value = val,
-                    Name = wh.Length > 0 ? wh + " - " + val : val
+                    Name = name.Length > 0 ? name : val
                 });
             }
             return list;
@@ -642,6 +723,10 @@ namespace VASLogic.Models
                 Dictionary<string, string> rowVars = BuildRowVars(req.RowValues);
                 string pred = GetValRulePredicate(ctx, req.ColumnName, def.TableName, alias, req.M_InOut_ID, rowVars);
                 if (pred.Length > 0) sql.Append(" AND (").Append(pred).Append(")");
+                // Order Line on a delivery raised against a sales order: that order's lines
+                // only (25-Sep-2026), whatever the dictionary's val rule says.
+                if (req.ColumnName.Equals("C_OrderLine_ID", StringComparison.OrdinalIgnoreCase) && parent.C_Order_ID > 0)
+                    sql.Append(" AND ").Append(alias).Append(".C_Order_ID = ").Append(parent.C_Order_ID);
             }
 
             string secured = MRole.GetDefault(ctx).AddAccessSQL(
@@ -882,6 +967,9 @@ namespace VASLogic.Models
             "DocumentNo", "MovementDate", "DateAcct", "M_Warehouse_ID", "C_DocType_ID",
             "C_BPartner_ID", "C_Order_ID", "AD_User_ID", "C_Project_ID", "C_Activity_ID",
             "C_Campaign_ID", "IsInDispute", "MovementType",
+            // The header's drop-shipment flag: the line's own Drop Shipment box is offered
+            // only on a delivery whose header carries it.
+            "IsDropShip",
             // The header's Date Required, under either name a schema may carry it: a new
             // line's own Date Required defaults from it.
             "DateRequired", "DTD001_DateRequired"
@@ -897,7 +985,7 @@ namespace VASLogic.Models
         /// non-updateable dictionary flag cannot swallow it. Same rule as VAS_240 / VAS_247.
         /// </summary>
         /// <param name="line">line being saved</param>
-        /// <param name="header">its shipment</param>
+        /// <param name="header">its delivery</param>
         private static void ApplyHeaderDateRequired(MInOutLine line, MInOut header)
         {
             if (header == null) return;
@@ -977,6 +1065,7 @@ namespace VASLogic.Models
             data.C_BPartner_ID = Util.GetValueOfInt(LogicValue(data, "C_BPartner_ID"));
             data.C_Order_ID = Util.GetValueOfInt(LogicValue(data, "C_Order_ID"));
             data.MovementDate = ParseDate(LogicValue(data, "MovementDate"));
+            data.IsDropShip = LogicValue(data, "IsDropShip") == "Y";
             // The header's Date Required as a real date (ISO on the wire), for the line
             // seed - the LogicContext copy is a culture-formatted string the panel cannot
             // parse reliably. Whichever column the schema carries; null where neither does.
@@ -1041,8 +1130,8 @@ namespace VASLogic.Models
                 @"COALESCE(p.Value, N'') AS VASDOLDISP_ProductValue,
                   COALESCE(p.Name, N'') AS VASDOLDISP_ProductName,
                   COALESCE(ch.Name, N'') AS VASDOLDISP_ChargeName,
-                  COALESCE(uom.Name, N'') AS VASDOLDISP_UOMName,
-                  COALESCE(l.Value, N'') AS VASDOLDISP_LocatorName,
+                  COALESCE(" + UomLabelExpr("uom") + @", N'') AS VASDOLDISP_UOMName,
+                  COALESCE(" + LocatorNameExpr("l") + @", N'') AS VASDOLDISP_LocatorName,
                   COALESCE(asi.Description, N'') AS VASDOLDISP_AttrName,
                   COALESCE(p.M_AttributeSet_ID, 0) AS VASDOLDISP_HasAttrSet,
                   COALESCE(p.ProductType, '') AS VASDOLDISP_ProductType
@@ -1057,7 +1146,10 @@ namespace VASLogic.Models
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "iol", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             if (page < 0) page = 0;
-            sql += " ORDER BY iol.Line, iol.M_InOutLine_ID" + PagingSuffix(LINE_PAGE_SIZE, page * LINE_PAGE_SIZE);
+            // Newest line first: the line just added is the one the user is working on,
+            // and it belongs at the top of the first page rather than at the foot of the
+            // last. The panel adds a new row at the top for the same reason.
+            sql += " ORDER BY iol.Line DESC, iol.M_InOutLine_ID DESC" + PagingSuffix(LINE_PAGE_SIZE, page * LINE_PAGE_SIZE);
 
             DataSet ds = DB.ExecuteDataset(sql,
                 new SqlParameter[] { new SqlParameter("@M_InOut_ID", M_InOut_ID) }, null);
@@ -1094,7 +1186,11 @@ namespace VASLogic.Models
                 row.M_Locator_ID = Util.GetValueOfInt(r["M_Locator_ID"]);
                 row.LocatorName = Util.GetValueOfString(r["VASDOLDISP_LocatorName"]);
                 row.M_AttributeSetInstance_ID = Util.GetValueOfInt(r["M_AttributeSetInstance_ID"]);
-                row.AttrName = Util.GetValueOfString(r["VASDOLDISP_AttrName"]);
+                // A caption belongs to a REAL instance only. A line raised from an order
+                // line holds instance 0 (not NULL), and some tenants carry a row 0 in
+                // M_AttributeSetInstance whose description is a dash — which the join then
+                // printed under the product as though it were an attribute of the line.
+                row.AttrName = row.M_AttributeSetInstance_ID > 0 ? Util.GetValueOfString(r["VASDOLDISP_AttrName"]) : "";
                 int hasAttrSetRaw = Util.GetValueOfInt(r["VASDOLDISP_HasAttrSet"]);
                 row.HasAttributeSet = hasAttrSetRaw > 0;
                 // Under a canonical mixed-case key so the client can read it case-insensitively
@@ -1172,6 +1268,10 @@ namespace VASLogic.Models
 
             Dictionary<string, string> rowVars = BuildRowVars(rowValues);
             string like = "%" + (query ?? "").Trim().ToLower() + "%";
+            // What the tenant lets a delivery line be raised for (AllowNonItem): with the
+            // flag off the list is item products alone — no service / expense products and
+            // no charges.
+            bool allowNonItem = AllowNonItem(ctx);
 
             // NOTE: every bind name occurs EXACTLY ONCE across the whole statement. Oracle
             // binds positionally, so a name reused in two places is bound twice and the
@@ -1189,6 +1289,15 @@ namespace VASLogic.Models
                                  AND (LOWER(p.Value) LIKE @kwPV
                                    OR LOWER(p.Name) LIKE @kwPN
                                    OR LOWER(COALESCE(p.UPC, N'')) LIKE @kwPU)";
+            if (!allowNonItem) prodSql += " AND p.ProductType = 'I'";
+            // A delivery raised against a SALES ORDER (M_InOut.C_Order_ID) offers only what
+            // that order carries (25-Sep-2026): the products - and, below, the charges - on
+            // its active lines. The id is an int read server-side, so it is inlined rather
+            // than bound (no extra bind name in the union).
+            int salesOrderId = HeaderOrderId(ctx, M_InOut_ID);
+            if (salesOrderId > 0)
+                prodSql += " AND p.M_Product_ID IN (SELECT ol.M_Product_ID FROM C_OrderLine ol"
+                    + " WHERE ol.C_Order_ID = " + salesOrderId + " AND ol.IsActive = 'Y' AND ol.M_Product_ID IS NOT NULL)";
             string prodPred = GetValRulePredicate(ctx, "M_Product_ID", "M_Product", "p", M_InOut_ID, rowVars);
             if (prodPred.Length > 0) prodSql += " AND (" + prodPred + ")";
             prodSql = MRole.GetDefault(ctx).AddAccessSQL(prodSql, "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
@@ -1204,22 +1313,30 @@ namespace VASLogic.Models
                                    AND ch.AD_Client_ID = " + ctx.GetAD_Client_ID() + @"
                                    AND (LOWER(ch.Name) LIKE @kwCN
                                      OR LOWER(COALESCE(ch.Description, N'')) LIKE @kwCD)";
+            if (salesOrderId > 0)
+                chargeSql += " AND ch.C_Charge_ID IN (SELECT ol.C_Charge_ID FROM C_OrderLine ol"
+                    + " WHERE ol.C_Order_ID = " + salesOrderId + " AND ol.IsActive = 'Y' AND ol.C_Charge_ID IS NOT NULL)";
             string chargePred = GetValRulePredicate(ctx, "C_Charge_ID", "C_Charge", "ch", M_InOut_ID, rowVars);
             if (chargePred.Length > 0) chargeSql += " AND (" + chargePred + ")";
             chargeSql = MRole.GetDefault(ctx).AddAccessSQL(chargeSql, "ch", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
+            // Charges only where the tenant allows non-item lines; otherwise the charge
+            // half of the union (and its two binds) is left out altogether.
             string combined = "SELECT x.RecordId, x.Kind, x.SearchKey, x.DisplayName, x.Description,"
                 + " x.AttributeSetId, x.ProductType, x.UomId"
-                + " FROM ((" + prodSql + ") UNION ALL (" + chargeSql + ")) x"
+                + " FROM (" + (allowNonItem ? "(" + prodSql + ") UNION ALL (" + chargeSql + ")" : prodSql) + ") x"
                 + " ORDER BY x.Kind, x.DisplayName" + PagingSuffix(pageSize, offset);
 
-            DataSet ds = DB.ExecuteDataset(combined, new SqlParameter[] {
-                new SqlParameter("@kwPV", like),
-                new SqlParameter("@kwPN", like),
-                new SqlParameter("@kwPU", like),
-                new SqlParameter("@kwCN", like),
-                new SqlParameter("@kwCD", like)
-            }, null);
+            List<SqlParameter> binds = new List<SqlParameter>();
+            binds.Add(new SqlParameter("@kwPV", like));
+            binds.Add(new SqlParameter("@kwPN", like));
+            binds.Add(new SqlParameter("@kwPU", like));
+            if (allowNonItem)
+            {
+                binds.Add(new SqlParameter("@kwCN", like));
+                binds.Add(new SqlParameter("@kwCD", like));
+            }
+            DataSet ds = DB.ExecuteDataset(combined, binds.ToArray(), null);
             if (ds == null || ds.Tables.Count == 0)
             {
                 log.Severe("VAS_248 SearchProductsCharges SQL failed. Term: " + like);
@@ -1244,16 +1361,177 @@ namespace VASLogic.Models
             return items;
         }
 
-        /// <summary>C_UOM_ID -&gt; display symbol, so a catalog row can label its own unit.</summary>
+        /// <summary>
+        /// C_UOM_ID -&gt; display label, so a catalog row can label its own unit. Read
+        /// straight from C_UOM, NOT through the C_UOM_ID val rule: that rule is resolved
+        /// without a line (no product), so it could leave out the very unit the product
+        /// carries and the new line would show no unit until it was saved.
+        /// </summary>
         /// <param name="ctx">session context</param>
-        /// <param name="M_InOut_ID">parent shipment (val-rule context)</param>
-        /// <returns>unit id to symbol map</returns>
+        /// <param name="M_InOut_ID">parent delivery (unused; kept for the call sites)</param>
+        /// <returns>unit id to label map</returns>
         private Dictionary<int, string> LoadUomNames(Ctx ctx, int M_InOut_ID)
         {
             Dictionary<int, string> map = new Dictionary<int, string>();
-            foreach (DeliveryUomItem u in LoadUomList(ctx, M_InOut_ID, null)) map[u.C_UOM_ID] = u.Symbol;
+            DataSet ds = DB.ExecuteDataset(
+                "SELECT u.C_UOM_ID, " + UomLabelExpr("u") + " AS UOMLabel FROM C_UOM u"
+                + " WHERE u.AD_Client_ID IN (0, " + ctx.GetAD_Client_ID() + ")");
+            if (ds != null && ds.Tables.Count > 0)
+                foreach (DataRow r in ds.Tables[0].Rows)
+                    map[Util.GetValueOfInt(r["C_UOM_ID"])] = Util.GetValueOfString(r["UOMLabel"]);
             return map;
         }
+
+        #region Sales-order lines a delivery ships (25-Sep-2026)
+
+        /// <summary>
+        /// The sales order the delivery is raised against (M_InOut.C_Order_ID), read
+        /// through LoadParentContext so the direction / access checks apply; 0 when the
+        /// delivery names no order.
+        /// </summary>
+        /// <param name="ctx">session context</param>
+        /// <param name="M_InOut_ID">delivery</param>
+        /// <returns>C_Order_ID, or 0</returns>
+        private int HeaderOrderId(Ctx ctx, int M_InOut_ID)
+        {
+            if (M_InOut_ID <= 0) return 0;
+            DeliveryPanelData hdr = new DeliveryPanelData();
+            LoadParentContext(ctx, M_InOut_ID, hdr);
+            return hdr.M_InOut_ID > 0 ? hdr.C_Order_ID : 0;
+        }
+
+        /// <summary>
+        /// Order lines of the delivery's sales order, in line order - one line when
+        /// C_OrderLine_ID &gt; 0, else those for the product / charge given. Each carries
+        /// what a delivery line is filled from, and its OPEN quantity in the order line's
+        /// own unit (ordered less delivered, restated from base to entered).
+        /// </summary>
+        /// <param name="ctx">session context</param>
+        /// <param name="C_Order_ID">the delivery's sales order</param>
+        /// <param name="C_OrderLine_ID">one line, or 0</param>
+        /// <param name="M_Product_ID">product to match, or 0</param>
+        /// <param name="C_Charge_ID">charge to match, or 0</param>
+        /// <returns>matching lines</returns>
+        private List<DeliveryOrderLineData> LoadOrderLines(Ctx ctx, int C_Order_ID, int C_OrderLine_ID,
+            int M_Product_ID, int C_Charge_ID)
+        {
+            List<DeliveryOrderLineData> list = new List<DeliveryOrderLineData>();
+            if (C_Order_ID <= 0) return list;
+            // Every bind name occurs exactly once (Oracle binds positionally).
+            string sql = @"SELECT ol.C_OrderLine_ID, ol.Line, o.DocumentNo,
+                                  COALESCE(ol.M_Product_ID, 0) AS M_Product_ID,
+                                  COALESCE(ol.C_Charge_ID, 0) AS C_Charge_ID,
+                                  COALESCE(p.Name, N'') AS ProductName,
+                                  COALESCE(p.Value, N'') AS ProductValue,
+                                  COALESCE(p.M_AttributeSet_ID, 0) AS AttributeSetId,
+                                  COALESCE(p.ProductType, '') AS ProductType,
+                                  COALESCE(ch.Name, N'') AS ChargeName,
+                                  COALESCE(ol.C_UOM_ID, 0) AS C_UOM_ID,
+                                  COALESCE(" + UomLabelExpr("u") + @", N'') AS UomName,
+                                  COALESCE(ol.QtyOrdered, 0) AS QtyOrdered,
+                                  COALESCE(ol.QtyDelivered, 0) AS QtyDelivered,
+                                  COALESCE(ol.QtyEntered, 0) AS QtyEntered,
+                                  COALESCE(ol.M_AttributeSetInstance_ID, 0) AS ASI,
+                                  COALESCE(asi.Description, N'') AS AttrName
+                           FROM C_OrderLine ol
+                           INNER JOIN C_Order o ON (o.C_Order_ID = ol.C_Order_ID)
+                           LEFT JOIN M_Product p ON (p.M_Product_ID = ol.M_Product_ID)
+                           LEFT JOIN C_Charge ch ON (ch.C_Charge_ID = ol.C_Charge_ID)
+                           LEFT JOIN C_UOM u ON (u.C_UOM_ID = ol.C_UOM_ID)
+                           LEFT JOIN M_AttributeSetInstance asi ON (asi.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID)
+                           WHERE ol.C_Order_ID = @oid
+                             AND ol.IsActive = 'Y'";
+            List<SqlParameter> ps = new List<SqlParameter>();
+            ps.Add(new SqlParameter("@oid", C_Order_ID));
+            if (C_OrderLine_ID > 0)
+            {
+                sql += " AND ol.C_OrderLine_ID = @lid";
+                ps.Add(new SqlParameter("@lid", C_OrderLine_ID));
+            }
+            else if (M_Product_ID > 0)
+            {
+                sql += " AND ol.M_Product_ID = @pid";
+                ps.Add(new SqlParameter("@pid", M_Product_ID));
+            }
+            else if (C_Charge_ID > 0)
+            {
+                sql += " AND ol.C_Charge_ID = @chid";
+                ps.Add(new SqlParameter("@chid", C_Charge_ID));
+            }
+            else return list;
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "ol", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            sql += " ORDER BY ol.Line, ol.C_OrderLine_ID";
+
+            DataSet ds = DB.ExecuteDataset(sql, ps.ToArray(), null);
+            if (ds == null || ds.Tables.Count == 0) return list;
+            foreach (DataRow r in ds.Tables[0].Rows)
+            {
+                DeliveryOrderLineData d = new DeliveryOrderLineData();
+                d.C_OrderLine_ID = Util.GetValueOfInt(r["C_OrderLine_ID"]);
+                d.Name = Util.GetValueOfString(r["DocumentNo"]) + " - " + Util.GetValueOfInt(r["Line"]);
+                d.M_Product_ID = Util.GetValueOfInt(r["M_Product_ID"]);
+                d.C_Charge_ID = Util.GetValueOfInt(r["C_Charge_ID"]);
+                d.ProductName = Util.GetValueOfString(r["ProductName"]);
+                d.ProductValue = Util.GetValueOfString(r["ProductValue"]);
+                d.HasAttributeSet = Util.GetValueOfInt(r["AttributeSetId"]) > 0;
+                d.ProductType = Util.GetValueOfString(r["ProductType"]);
+                d.ChargeName = Util.GetValueOfString(r["ChargeName"]);
+                d.C_UOM_ID = Util.GetValueOfInt(r["C_UOM_ID"]);
+                d.UomName = Util.GetValueOfString(r["UomName"]);
+                d.M_AttributeSetInstance_ID = Util.GetValueOfInt(r["ASI"]);
+                d.AttrName = d.M_AttributeSetInstance_ID > 0 ? Util.GetValueOfString(r["AttrName"]) : "";
+                decimal ordered = Util.GetValueOfDecimal(r["QtyOrdered"]);
+                decimal delivered = Util.GetValueOfDecimal(r["QtyDelivered"]);
+                decimal entered = Util.GetValueOfDecimal(r["QtyEntered"]);
+                decimal openBase = ordered - delivered;
+                if (openBase < 0) openBase = 0;
+                // QtyOrdered / QtyDelivered are base-unit; the line is re-entered in the
+                // order line's own unit, so restate by that line's entered/ordered ratio.
+                d.QtyOpen = (ordered != 0 && entered != 0) ? Math.Round(openBase * entered / ordered, 6) : openBase;
+                list.Add(d);
+            }
+            return list;
+        }
+
+        /// <summary>
+        /// One order line, for the panel to fill a delivery line from (the Order Line picked
+        /// in Additional Info). Refused (empty) when it is not a line of the delivery's own
+        /// sales order.
+        /// </summary>
+        /// <param name="ctx">session context</param>
+        /// <param name="M_InOut_ID">delivery</param>
+        /// <param name="C_OrderLine_ID">order line picked</param>
+        /// <returns>the line, or an empty item (C_OrderLine_ID = 0)</returns>
+        public DeliveryOrderLineData GetOrderLine(Ctx ctx, int M_InOut_ID, int C_OrderLine_ID)
+        {
+            if (C_OrderLine_ID <= 0) return new DeliveryOrderLineData();
+            List<DeliveryOrderLineData> l = LoadOrderLines(ctx, HeaderOrderId(ctx, M_InOut_ID), C_OrderLine_ID, 0, 0);
+            return l.Count > 0 ? l[0] : new DeliveryOrderLineData();
+        }
+
+        /// <summary>
+        /// The order line a product / charge and quantity are delivered against: the first
+        /// line (in line order) whose open quantity covers the quantity, else the first
+        /// with anything still open, else the first line for it at all. Empty when the
+        /// delivery names no sales order or the order has no line for it.
+        /// </summary>
+        /// <param name="ctx">session context</param>
+        /// <param name="M_InOut_ID">delivery</param>
+        /// <param name="M_Product_ID">product on the line, or 0</param>
+        /// <param name="C_Charge_ID">charge on the line, or 0</param>
+        /// <param name="qty">quantity entered on the line</param>
+        /// <returns>the matching line, or an empty item</returns>
+        public DeliveryOrderLineData FindOrderLine(Ctx ctx, int M_InOut_ID, int M_Product_ID, int C_Charge_ID, decimal qty)
+        {
+            if (M_Product_ID <= 0 && C_Charge_ID <= 0) return new DeliveryOrderLineData();
+            List<DeliveryOrderLineData> l = LoadOrderLines(ctx, HeaderOrderId(ctx, M_InOut_ID), 0, M_Product_ID, C_Charge_ID);
+            if (l.Count == 0) return new DeliveryOrderLineData();
+            foreach (DeliveryOrderLineData d in l) if (d.QtyOpen > 0 && d.QtyOpen >= qty) return d;
+            foreach (DeliveryOrderLineData d in l) if (d.QtyOpen > 0) return d;
+            return l[0];
+        }
+
+        #endregion
 
         /// <summary>Looks up a single product / charge by a scanned barcode.</summary>
         /// <param name="ctx">session context</param>
@@ -1265,6 +1543,8 @@ namespace VASLogic.Models
             DeliveryCatalogItem none = new DeliveryCatalogItem();
             if (M_InOut_ID <= 0 || string.IsNullOrEmpty(code)) return none;
             string key = code.Trim();
+            // The same tenant gate as the catalog search (AllowNonItem).
+            bool allowNonItem = AllowNonItem(ctx);
 
             string prodSql = @"SELECT p.M_Product_ID AS RecordId, 'P' AS Kind, p.Value AS SearchKey,
                                       p.Name AS DisplayName, COALESCE(p.Description, N'') AS Description,
@@ -1275,6 +1555,7 @@ namespace VASLogic.Models
                                WHERE p.IsActive = 'Y'
                                  AND p.AD_Client_ID = " + ctx.GetAD_Client_ID() + @"
                                  AND (UPPER(p.UPC) = UPPER(@code) OR UPPER(p.Value) = UPPER(@code))";
+            if (!allowNonItem) prodSql += " AND p.ProductType = 'I'";
             string scanProdPred = GetValRulePredicate(ctx, "M_Product_ID", "M_Product", "p", M_InOut_ID, null);
             if (scanProdPred.Length > 0) prodSql += " AND (" + scanProdPred + ")";
             prodSql = MRole.GetDefault(ctx).AddAccessSQL(prodSql, "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
@@ -1294,6 +1575,7 @@ namespace VASLogic.Models
                 it.C_UOM_ID = Util.GetValueOfInt(r["UomId"]);
                 return it;
             }
+            if (!allowNonItem) return none;   // no charge lines on this tenant
 
             string chargeSql = @"SELECT ch.C_Charge_ID AS RecordId, 'C' AS Kind, ch.Name AS SearchKey,
                                         ch.Name AS DisplayName, COALESCE(ch.Description, N'') AS Description
@@ -1610,7 +1892,7 @@ namespace VASLogic.Models
         {
             if (C_UOM_ID <= 0) return "";
             object o = DB.ExecuteScalar(
-                "SELECT COALESCE(UOMSymbol, Name) FROM C_UOM WHERE C_UOM_ID = @id",
+                "SELECT " + UomLabelExpr("u") + " FROM C_UOM u WHERE u.C_UOM_ID = @id",
                 new SqlParameter[] { new SqlParameter("@id", C_UOM_ID) }, null);
             return Util.GetValueOfString(o);
         }
@@ -1802,10 +2084,39 @@ namespace VASLogic.Models
                 }
                 else
                 {
-                    res.Error = fres.Error;
+                    res.Error = ReadableAttributeError(ctx, fres.Error);
                 }
             }
             return res;
+        }
+
+        /// <summary>
+        /// The framework reports a failed instance save as "Not Saved - &lt;table&gt;"
+        /// (the internal table name, e.g. M_ProductAttributes), which tells the user
+        /// nothing. The logged save error carries the actual reason, so that is what is
+        /// shown where there is one; otherwise a plain statement that the attribute could
+        /// not be saved. Any other framework message (a mandatory attribute, a duplicate
+        /// lot) is already readable and passes through as it is.
+        /// </summary>
+        /// <param name="ctx">session context (message lookup)</param>
+        /// <param name="raw">framework error text</param>
+        /// <returns>user-readable error</returns>
+        private static string ReadableAttributeError(Ctx ctx, string raw)
+        {
+            string s = (raw ?? "").Trim();
+            if (!s.StartsWith("Not Saved", StringComparison.OrdinalIgnoreCase)) return s;
+            string reason = "";
+            try
+            {
+                ValueNamePair pp = VLogger.RetrieveError();
+                if (pp != null) reason = (pp.GetName() ?? "").Trim();
+                // The logger's reason is sometimes the same table name wrapped again.
+                if (reason.StartsWith("Not Saved", StringComparison.OrdinalIgnoreCase)) reason = "";
+            }
+            catch (Exception) { reason = ""; }
+            string msg = Msg.GetMsg(ctx, MSG + "AttrNotSaved");
+            if (string.IsNullOrEmpty(msg) || msg.StartsWith("VAS_248_")) msg = "The attribute could not be saved. Check the values entered and try again.";
+            return reason.Length > 0 ? msg + " (" + reason + ")" : msg;
         }
 
         /// <summary>
@@ -1879,6 +2190,17 @@ namespace VASLogic.Models
             "Line", "Description"
         };
 
+        /// <summary>
+        /// Additional Info columns the panel lets the user edit whatever the dictionary's
+        /// updateable flag says. The sales ORDER LINE is picked by the user (restricted to the header's order) on a delivery
+        /// raised without Create From, so it must be settable here; it is written only
+        /// when the user actually changed it (TouchedCols), never from the untouched bag.
+        /// </summary>
+        private static readonly HashSet<string> ALWAYS_EDITABLE_COLUMNS = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "C_OrderLine_ID"
+        };
+
         private HashSet<string> _updateableColumns;
         private HashSet<string> _yesNoColumns;
         private HashSet<string> _referenceColumns;
@@ -1897,6 +2219,19 @@ namespace VASLogic.Models
                 bool isTouched = touched != null && touched.Contains(col);
                 if (kv.Value == null && !isTouched) continue;
                 if (CORE_OR_SYSTEM_COLUMNS.Contains(col)) continue;
+                // A column the panel always lets the user edit bypasses the updateable
+                // flag (Set_Value would refuse it on a saved line), but only when touched.
+                if (ALWAYS_EDITABLE_COLUMNS.Contains(col) && !updateable.Contains(col))
+                {
+                    if (!isTouched) continue;
+                    try
+                    {
+                        int id = Util.GetValueOfInt(CoerceJsonValue(kv.Value));
+                        line.Set_ValueNoCheck(col, id > 0 ? (object)id : null);
+                    }
+                    catch (Exception ex) { log.Warning("VAS_248 SaveLines: skip column " + col + " - " + ex.Message); }
+                    continue;
+                }
                 if (updateable.Count > 0 && !updateable.Contains(col)) continue;
                 try
                 {
@@ -2236,6 +2571,14 @@ namespace VASLogic.Models
         /// <summary>The header's Date Required (either column name), as a date; null where
         /// the schema has none. What a new line's own Date Required is seeded from.</summary>
         public DateTime? DateRequired { get; set; }
+        /// <summary>M_InOut.IsDropShip — the line's Drop Shipment box is offered only when set.</summary>
+        public bool IsDropShip { get; set; }
+        /// <summary>
+        /// AD_Client.IsAllowNonItem: whether a line may be raised for a non-item product or
+        /// a charge. Decides the catalog's contents (model side) and the column's caption
+        /// ("Product / Charge" vs "Product", panel side).
+        /// </summary>
+        public bool IsAllowNonItem { get; set; }
         /// <summary>
         /// Header values that M_InOutLine field DisplayLogic / ReadOnlyLogic name as tokens.
         /// A column that is NULL on the shipment is ABSENT from this bag, which the client
@@ -2492,16 +2835,42 @@ namespace VASLogic.Models
         public DeliveryUomItem() { Name = ""; Symbol = ""; }
     }
 
-    /// <summary>A locator option, labelled with its warehouse.</summary>
+    /// <summary>A locator option.</summary>
     public class DeliveryLocatorItem
     {
         public int M_Locator_ID { get; set; }
         public int M_Warehouse_ID { get; set; }
         /// <summary>Locator value (the aisle/bin key).</summary>
         public string Value { get; set; }
-        /// <summary>"WAREHOUSE - VALUE", ready to render.</summary>
+        /// <summary>The locator's name (combination, bin, else value), ready to render.</summary>
         public string Name { get; set; }
         public DeliveryLocatorItem() { Value = ""; Name = ""; }
+    }
+
+    /// <summary>A sales-order line a delivery line is filled from (GetOrderLine / FindOrderLine).</summary>
+    public class DeliveryOrderLineData
+    {
+        public int C_OrderLine_ID { get; set; }
+        /// <summary>"&lt;DocumentNo&gt; - &lt;line no&gt;", as the Order Line lookup names it.</summary>
+        public string Name { get; set; }
+        public int M_Product_ID { get; set; }
+        public int C_Charge_ID { get; set; }
+        public string ProductName { get; set; }
+        public string ProductValue { get; set; }
+        public bool HasAttributeSet { get; set; }
+        public string ProductType { get; set; }
+        public string ChargeName { get; set; }
+        public int C_UOM_ID { get; set; }
+        public string UomName { get; set; }
+        /// <summary>Ordered less delivered, in the order line's own unit.</summary>
+        public decimal QtyOpen { get; set; }
+        public int M_AttributeSetInstance_ID { get; set; }
+        public string AttrName { get; set; }
+        public DeliveryOrderLineData()
+        {
+            Name = ""; ProductName = ""; ProductValue = ""; ProductType = "";
+            ChargeName = ""; UomName = ""; AttrName = "";
+        }
     }
 
     /// <summary>One product / charge row in the catalog autocomplete.</summary>

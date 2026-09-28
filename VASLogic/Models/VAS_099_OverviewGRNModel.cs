@@ -1094,7 +1094,11 @@ namespace VASLogic.Models
                               p.Name            AS ProductName,
                               loc.Value         AS LocatorCode,
                               COALESCE(loc.LocatorCombination, loc.Bin, loc.Value) AS LocatorName,
-                              u.Name            AS UOMName,
+                              /* The unit as the lines name it (25-Sep-2026): its SYMBOL,
+                                 else its name where the symbol is missing or blank -
+                                 NULLIF(TRIM()) because PostgreSQL keeps '' as a value. */
+                              COALESCE(NULLIF(TRIM(u.UOMSymbol), N''), u.Name) AS UOMName,
+                              u.Name            AS UOMFullName,
                               COALESCE(u.StdPrecision, 0) AS UOMPrecision,
                               /* Ordered in the same (entered) scale as Received, so
                                  the two columns are comparable down the row. The
@@ -1159,6 +1163,7 @@ namespace VASLogic.Models
                 ln.LocatorCode        = Util.GetValueOfString(r["LocatorCode"]);
                 ln.LocatorName        = Util.GetValueOfString(r["LocatorName"]);
                 ln.UOMName            = Util.GetValueOfString(r["UOMName"]);
+                ln.UOMFullName        = Util.GetValueOfString(r["UOMFullName"]);
                 ln.UOMPrecision       = Util.GetValueOfInt(r["UOMPrecision"]);
                 ln.OrderedQty         = Util.GetValueOfDecimal(r["OrderedQty"]);
                 ln.AttributeSetInstance = Util.GetValueOfString(r["AttributeSetInstance"]);
@@ -3216,6 +3221,8 @@ namespace VASLogic.Models
             public string   LocatorCode      { get; set; }
             public string   LocatorName      { get; set; }
             public string   UOMName          { get; set; }
+            /// <summary>C_UOM.Name - the full name, for the UOM cell's tooltip (UOMName is symbol-first).</summary>
+            public string   UOMFullName      { get; set; }
             public int      UOMPrecision     { get; set; }
             public string   AttributeSetInstance { get; set; }   // M_AttributeSetInstance.Description (blank when none)
             /// <summary>Ordered quantity in the line's ENTERED uom (the one UOMName names).</summary>

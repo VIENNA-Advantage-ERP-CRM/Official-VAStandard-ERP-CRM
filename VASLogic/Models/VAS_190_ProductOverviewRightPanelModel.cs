@@ -461,6 +461,16 @@
 ///                        vectors before shipping. If a rendering complaint ever
 ///                        traces to a stripped element, widen KEEP_TAGS /
 ///                        KEEP_ATTRS — never the sanitiser's exits.
+///   VAI163   2026-09-25  - ACCOUNTING. On an installation that runs FRPT (the
+///                          switch MProduct.AfterSave uses: FRPT_Product_Category_Acct
+///                          exists) the classic M_Product_Acct is no longer read as a
+///                          fallback: its leftover rows reported accounts for a
+///                          product whose own Accounting tab is empty.
+///                        - TASKS. TaskStatus is completion in TENTHS, as the
+///                          framework's task views read it (10 x TaskStatus %), so
+///                          ParsePercent scales it - 100% had shown as 10%, 30% as 3%.
+///                          Each task/appointment carries its owner (OwnerUserId),
+///                          which the platform's task edit form is opened with.
 /// </summary>
 
 using System;
@@ -3751,7 +3761,15 @@ namespace VASLogic.Models
             }
 
             // ----- The classic twelve-column scheme -----
-            for (int i = 0; i < schemas.Count; i++)
+            // ONLY where the installation does not run FRPT (25-Sep-2026). On an
+            // FRPT tenant the product's Accounting tab is FRPT_Product_Acct, and
+            // M_Product_Acct can still hold rows written before the switch (or by
+            // the defaults generator) that the tab never shows - so a product
+            // whose tab is EMPTY was reported with a full set of accounts. The
+            // same switch MProduct.AfterSave uses decides it: FRPT_Product_Category_Acct
+            // existing means FRPT is live, and FRPT's silence is then the answer.
+            bool frptLive = TableExists("FRPT_Product_Category_Acct") && TableExists("FRPT_Product_Acct");
+            for (int i = 0; i < schemas.Count && !frptLive; i++)
             {
                 AcctSchemaInfo schema = schemas[i];
                 Dictionary<string, int> productAcct = LoadAcctRow(ctx, "M_Product_Acct",
@@ -5324,6 +5342,7 @@ namespace VASLogic.Models
                                   " + categoryExpr  + @" AS CategoryName,
                                   " + transcriptExpr + @" AS Transcript,
                                   u.Name AS AssigneeName,
+                                  COALESCE(ai.AD_User_ID, 0) AS OwnerUserId,
                                   cu.Name AS ActorName
                            FROM AppointmentsInfo ai
                            LEFT OUTER JOIN AD_User u ON (u.AD_User_ID=ai.AD_User_ID)
@@ -5421,10 +5440,14 @@ namespace VASLogic.Models
                     PriorityCode   = priorityCode,
                     PriorityName   = (priorityCode.Length > 0 && priorityLabels.ContainsKey(priorityCode))
                                         ? priorityLabels[priorityCode] : priorityCode,
-                    // TaskStatus holds the completion percentage. It is read as
-                    // text and parsed here, since revisions differ on whether the
-                    // column is numeric.
-                    PercentComplete = ParsePercent(Util.GetValueOfString(r["TaskStatus"]))
+                    // TaskStatus holds the completion in TENTHS (0-10), exactly as the
+                    // framework's task views read it (10 * TaskStatus + "%"). It is
+                    // read as text and parsed here, since revisions differ on
+                    // whether the column is numeric.
+                    PercentComplete = ParsePercent(Util.GetValueOfString(r["TaskStatus"])),
+                    // The row's owner, which the platform's task EDIT form is opened
+                    // with (WSP.WSP_AppointmentsForm, as the history panel does).
+                    OwnerUserId     = Util.GetValueOfInt(r["OwnerUserId"])
                 };
                 list.Add(a);
                 keptByMeeting[meetingKey] = a;
@@ -5458,6 +5481,12 @@ namespace VASLogic.Models
         /// A completion percentage from whatever TaskStatus holds. Null — not
         /// zero — when the column says nothing: "0% done" and "nobody has recorded
         /// progress" are different answers and the panel shows them differently.
+        ///
+        /// TaskStatus is stored in TENTHS (25-Sep-2026): the framework's task
+        /// views print 10 * TaskStatus + "%", so a task at 100% holds 10 and one at
+        /// 30% holds 3 - which this panel printed as "10%" / "3%". The value is
+        /// scaled by ten; a figure already above ten (a revision that stores the
+        /// percentage itself) is taken as it stands.
         /// </summary>
         private static int? ParsePercent(string value)
         {
@@ -5469,6 +5498,7 @@ namespace VASLogic.Models
                                   System.Globalization.CultureInfo.InvariantCulture, out parsed))
                 return null;
 
+            if (parsed <= 10) parsed = parsed * 10;
             int percent = (int)Math.Round(parsed);
             if (percent < 0) percent = 0;
             if (percent > 100) percent = 100;
@@ -6710,6 +6740,8 @@ namespace VASLogic.Models
             public string    TaskResult      { get; set; }
             /// <summary>Who the task is assigned to (AppointmentsInfo.AD_User_ID).</summary>
             public string    AssigneeName    { get; set; }
+        /// <summary>AppointmentsInfo.AD_User_ID - what the task edit form is opened with.</summary>
+        public int       OwnerUserId     { get; set; }
             /// <summary>Everyone on the engagement, comma-separated: the attendee
             /// rows the feed collapsed plus whatever AttendeeInfo names.</summary>
             public string    People          { get; set; }

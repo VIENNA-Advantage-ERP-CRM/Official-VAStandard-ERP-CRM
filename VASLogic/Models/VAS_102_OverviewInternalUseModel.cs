@@ -226,6 +226,12 @@
 ///                        value as already-zoned and skip its own conversion,
 ///                        printing the stored clock. Same JSON on either engine
 ///                        now. No-op on Oracle.
+///   VAI163   2026-09-25  The Value column is issued quantity x the line's own
+///                        M_InventoryLine.CurrentCostPrice (CostSource
+///                        "CURRENTCOST"); the M_CostDetail line / warehouse rates
+///                        and VA024_UnitPrice are now only the fallback for a line
+///                        whose CurrentCostPrice is NULL. The KPI card and footer
+///                        follow, being summed from the lines.
 /// </summary>
 
 using System;
@@ -734,9 +740,15 @@ namespace VASLogic.Models
                                AND l.M_AttributeSetInstance_ID > 0)"
                 : "";
 
+            // The line's own CurrentCostPrice, read raw (NULL when the column is not
+            // there or not set) - it is the rate the Value column states (25-Sep-2026).
+            string curCostExpr = ColumnExists("M_InventoryLine", "CurrentCostPrice")
+                ? "l.CurrentCostPrice" : "NULL";
+
             string sql = @"SELECT
                               l.M_InventoryLine_ID,
                               l.Line,
+                              " + curCostExpr + @" AS CurCostPrice,
                               l.Description     AS LineDescription,
                               l.M_Product_ID,
                               -- Quantities travel on two scales and are reconciled
@@ -876,7 +888,15 @@ namespace VASLogic.Models
                 ln.WorkOrderID        = Util.GetValueOfInt(r["WorkOrderID"]);
 
                 decimal costRate;
-                if (lineCosts.TryGetValue(ln.M_InventoryLine_ID, out costRate) && costRate != 0)
+                // The Value column is issued quantity x the line's CurrentCostPrice
+                // (25-Sep-2026) - the price the issue itself carries. The M_CostDetail
+                // rates below are only the fallback for a line that has none.
+                if (r["CurCostPrice"] != DBNull.Value)
+                {
+                    ln.UnitRate   = Util.GetValueOfDecimal(r["CurCostPrice"]);
+                    ln.CostSource = "CURRENTCOST";
+                }
+                else if (lineCosts.TryGetValue(ln.M_InventoryLine_ID, out costRate) && costRate != 0)
                 {
                     ln.UnitRate   = costRate;
                     ln.CostSource = "LINE";

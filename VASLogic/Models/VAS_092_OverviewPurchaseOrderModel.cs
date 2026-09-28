@@ -622,10 +622,29 @@ namespace VASLogic.Models
             //  the header then reads GrandTotal = gross + extracted tax (2,630.33
             //  on a 2,500.00 tax-inclusive line). Derived from the lines the way
             //  MOrderLine wrote them, Sub Total + Tax always states the amounts the
-            //  lines actually carry: tax-inclusive net = LineNetAmt - TaxAmt -
-            //  SurchargeAmt, tax-exclusive net = LineNetAmt.
-            result.SubTotal      = GetOrderTaxableBase(C_Order_ID, result.TotalLines);
-            result.GrandTotal    = result.SubTotal + result.TaxAmt;
+            //  lines actually carry.
+            //
+            //  25-Sep-2026: on a tax-INCLUSIVE price list the per-line
+            //  C_OrderLine.TaxAmt is no longer trusted - where it is 0 / not
+            //  maintained the old "LineNetAmt - TaxAmt" sum left the gross in the
+            //  Sub Total, and Grand Total (= Sub Total + Tax) then added the tax a
+            //  second time. The two figures now come from quantities that always
+            //  hold on such a list: the lines' SUM(LineNetAmt) IS the gross, i.e.
+            //  the Grand Total, and the Sub Total is that gross less the order's
+            //  extracted tax (SUM(C_OrderTax.TaxAmt)). Tax-exclusive is unchanged:
+            //  Sub Total = SUM(LineNetAmt), Grand Total = Sub Total + Tax.
+            bool plTaxIncluded;
+            decimal linesNet = GetOrderLinesNet(C_Order_ID, result.TotalLines, out plTaxIncluded);
+            if (plTaxIncluded)
+            {
+                result.GrandTotal = linesNet;
+                result.SubTotal   = linesNet - result.TaxAmt;
+            }
+            else
+            {
+                result.SubTotal   = linesNet;
+                result.GrandTotal = result.SubTotal + result.TaxAmt;
+            }
 
             // ----- Budget control (GL budget breach) -----
             //  The platform's budget check (ModelLibrary BudgetCheck) stamps the
@@ -842,38 +861,41 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// The order's taxable base = SUM over its lines of the net amount, judged
-        /// by the PRICE LIST's IsTaxIncluded (the flag MOrderLine and MOrderTax
-        /// wrote the line amounts under): tax-inclusive net = LineNetAmt - TaxAmt -
-        /// SurchargeAmt, tax-exclusive net = LineNetAmt. Falls back to
-        /// C_Order.TotalLines when the lines cannot be read. Standalone query,
-        /// child of an already authorized order, for the reason GetOrderTaxAmt
-        /// gives. Two bind names, each once, in order.
+        /// SUM(C_OrderLine.LineNetAmt) over the order's active lines, and whether the
+        /// order's PRICE LIST is tax-inclusive (the flag MOrderLine wrote LineNetAmt
+        /// under: gross on a tax-inclusive list, net otherwise). Falls back to
+        /// C_Order.TotalLines (and "not inclusive") when the lines cannot be read.
+        /// Standalone query, child of an already authorized order, for the reason
+        /// GetOrderTaxAmt gives. One bind name, once. (25-Sep-2026)
         /// </summary>
         /// <param name="C_Order_ID">Owning purchase order id.</param>
         /// <param name="totalLines">C_Order.TotalLines, the fallback.</param>
-        private decimal GetOrderTaxableBase(int C_Order_ID, decimal totalLines)
+        /// <param name="taxIncluded">M_PriceList.IsTaxIncluded of the order's list.</param>
+        private decimal GetOrderLinesNet(int C_Order_ID, decimal totalLines, out bool taxIncluded)
         {
+            taxIncluded = false;
             try
             {
-                string surchargeExpr = ColumnExists("C_OrderLine", "SurchargeAmt")
-                    ? "COALESCE(ol.SurchargeAmt, 0)" : "0";
-                string sql = @"SELECT COALESCE(SUM(CASE WHEN COALESCE(pl.IsTaxIncluded, 'N') = 'Y'
-                                                        THEN COALESCE(ol.LineNetAmt, 0) - COALESCE(ol.TaxAmt, 0) - " + surchargeExpr + @"
-                                                        ELSE COALESCE(ol.LineNetAmt, 0) END), 0) AS Net
-                                 FROM C_OrderLine ol
-                                INNER JOIN C_Order o ON (o.C_Order_ID = ol.C_Order_ID)
+                // One order row, no GROUP BY (a scalar sub-select beside a GROUP BY is
+                // an Oracle trap - ORA-22818).
+                string sql = @"SELECT COALESCE(pl.IsTaxIncluded, 'N') AS IsTaxIncluded,
+                                      (SELECT COALESCE(SUM(ol.LineNetAmt), 0)
+                                         FROM C_OrderLine ol
+                                        WHERE ol.C_Order_ID = o.C_Order_ID
+                                          AND ol.IsActive   = 'Y') AS LinesNet
+                                 FROM C_Order o
                                  LEFT OUTER JOIN M_PriceList pl ON (pl.M_PriceList_ID = o.M_PriceList_ID)
-                                WHERE ol.C_Order_ID = @C_Order_ID
-                                  AND ol.IsActive   = 'Y'";
+                                WHERE o.C_Order_ID = @C_Order_ID";
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
                 if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
                     return totalLines;
-                return Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["Net"]);
+                DataRow r = ds.Tables[0].Rows[0];
+                taxIncluded = Util.GetValueOfString(r["IsTaxIncluded"]) == "Y";
+                return Util.GetValueOfDecimal(r["LinesNet"]);
             }
             catch (Exception ex)
             {
-                _log.Severe("GetOrderTaxableBase (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+                _log.Severe("GetOrderLinesNet (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
                 return totalLines;
             }
         }

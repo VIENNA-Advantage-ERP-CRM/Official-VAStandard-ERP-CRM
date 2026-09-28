@@ -694,9 +694,19 @@
     color: var(--cil-text);
 }
 
+/* Shared dropdown style (Tax, UOM - every cell select), 23-Sep-2026: value text in the
+   panel's text colour, not grey (A3), and inner space between the option text and the
+   dropdown's edge (A9) - here once, never per field. */
 .vas-obl-cell-edit select.vas-obl-cell-edit__select {
-    color: var(--cil-text-secondary);
+    color: var(--cil-text);
+    padding-left: 0.5em;
+    padding-right: 0.5em;
 }
+
+    .vas-obl-cell-edit select.vas-obl-cell-edit__select option {
+        padding: 0.25em 0.5em;
+        color: var(--cil-text);
+    }
 
 /* The Tax dropdown sits in a right-aligned column, and a <select> inherits that
    alignment - so its list of names read ragged-right. A list of names is read from the
@@ -749,7 +759,7 @@
 .vas-obl-cell-edit input.vas-obl-cell-disp--sub {
     font-size: 0.85em;
     font-weight: 500;
-    color: var(--cil-text-muted);
+    color: var(--cil-text);   /* A3: value text, not grey */
 }
 
 .vas-obl-cell-edit input.vas-obl-qtyval {
@@ -757,6 +767,27 @@
     font-weight: 400;
     font-size: 1em;
 }
+
+/* The resting UNIT under the quantity (25-Sep-2026, as VAS_303 / 304 / 249 / 248 /
+   247 / 240): text that WRAPS, not a one-line input - an input clipped any unit longer
+   than its box, so the full unit was not visible on a new line. Same size / weight /
+   colour / alignment as before. */
+.vas-obl-cell-edit .vas-obl-uomtext {
+    margin-top: 0.125em;
+    padding: 0.1em 0;
+    font-size: 0.85em;
+    font-weight: 500;
+    line-height: 1.3;
+    color: var(--cil-text-muted);
+    text-align: right;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    cursor: pointer;
+}
+.vas-obl-cell-edit .vas-obl-uomtext--empty { color: var(--cil-text-faint); }
+.vas-obl-cell-edit .vas-obl-uomtext--ro { cursor: not-allowed; }
+[dir="rtl"] .vas-obl-cell-edit .vas-obl-uomtext { text-align: left; }
 
 .vas-obl-cell-edit input.vas-obl-uomsub {
     text-align: right;
@@ -766,7 +797,7 @@
 .vas-obl-cell-edit input.vas-obl-taxval {
     font-size: 0.975em;
     font-weight: 400;
-    color: var(--cil-text-secondary);
+    color: var(--cil-text);   /* A3: value text, not grey */
 }
 
 .vas-obl-amt {
@@ -902,45 +933,46 @@
 }
 
 /* ---------- more popover ---------- */
-/* The "..." (More) button reads its state by colour (17-Sep-2026): WHITE while the
-   line holds nothing in Additional Info, BLUE once it does (.has-values, re-evaluated
-   on every render). */
+/* The "..." (More) button - the invoice panel's (VAS_074) look, 23-Sep-2026: no border
+   or box around the dots, a plain transparent (white) button while the line holds
+   nothing in Additional Info, and the LIGHT blue fill with blue dots once it does
+   (.has-values, re-evaluated on every render - so it follows data added or cleared
+   without a reload). */
 .vas-obl-more-btn {
     width: 1.5em;
     height: 1.5em;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid var(--cil-border-default);
-    background: var(--cil-surface);
+    border: none;
+    outline: none;
+    box-shadow: none;
+    background: transparent;
     border-radius: var(--cil-r-sm);
     color: var(--cil-text-muted);
     cursor: pointer;
-    transition: background .12s, color .12s, border-color .12s;
+    transition: background .12s, color .12s;
 }
+
+    .vas-obl-more-btn:focus-visible {
+        box-shadow: 0 0 0 2px var(--cil-blue-soft);
+    }
 
     .vas-obl-more-btn:hover {
         background: #f1f8ff;
-        border-color: var(--cil-action-blue);
         color: var(--cil-action-blue);
     }
 
     .vas-obl-more-btn.is-open {
         background: var(--cil-blue-soft);
-        border-color: var(--cil-action-blue);
         color: var(--cil-action-blue);
     }
-    /* The line already holds Additional-Info values: blue, so the user can see there is
-       something inside without opening it. */
-    .vas-obl-more-btn.has-values {
-        background: var(--cil-action-blue);
-        border-color: var(--cil-action-blue);
-        color: #fff;
-    }
+    /* The line already holds Additional-Info values: light blue (#eaf8ff) with blue
+       dots, exactly as on the invoice panel. */
+    .vas-obl-more-btn.has-values,
     .vas-obl-more-btn.has-values:hover {
-        background: var(--cil-action-blue-hover);
-        border-color: var(--cil-action-blue-hover);
-        color: #fff;
+        background: var(--cil-blue-soft);
+        color: var(--cil-action-blue);
     }
     /* Read-only invoice: the "..." button is disabled -> not-allowed (no hover tint). */
     .vas-obl-more-btn:disabled {
@@ -1116,6 +1148,56 @@
     .vas-obl-dialog .vis-input-wrap:has(.vis-ev-col-readonly) {
         border-bottom: 1px solid #f3f3f3 !important;
     }
+
+    /* A2 / A3 (23-Sep-2026): a read-only field looks like a normal field - no grey
+       fill (the framework's .vis-ev-col-readonly background), and its value in the
+       normal text colour rather than the browser's disabled grey - it just cannot be
+       edited. Same as the invoice panel. */
+    .vas-obl-dialog .vis-ev-col-readonly,
+    .vas-obl-dialog .vis-input-wrap .vis-control-wrap input:disabled,
+    .vas-obl-dialog .vis-input-wrap .vis-control-wrap select:disabled,
+    .vas-obl-dialog .vis-input-wrap .vis-control-wrap textarea:disabled,
+    .vas-obl-dialog .vis-input-wrap .vis-control-wrap input[readonly],
+    .vas-obl-dialog .vis-input-wrap .vis-control-wrap textarea[readonly] {
+        background-color: transparent !important;
+        color: rgba(var(--v-c-on-common), 1) !important;
+        -webkit-text-fill-color: rgba(var(--v-c-on-common), 1);
+        opacity: 1;
+    }
+
+    .vas-obl-dialog .input-group-prepend .input-group-text,
+    .vas-obl-dialog .input-group-append {
+        background-color: transparent;
+    }
+
+/* Dropdown / input inner spacing inside the Additional Info modal (A9) - the invoice
+   panel's rule. */
+.vas-obl-more-body .vis-input-wrap .vis-control-wrap select {
+    padding-left: 10px !important;
+}
+
+/* "View only - this document is no longer editable." note above the Done button (A2),
+   as on the invoice panel. */
+.vas-obl-more-note {
+    margin: 0 1.25em;
+    padding: 0.5em 0.75em;
+    border-radius: var(--cil-r-sm);
+    background: #fdf3e2;
+    box-shadow: inset 0.1875em 0 0 var(--cil-warning);
+    color: #8a5a09;
+    font-size: 0.75em;
+}
+
+/* Refresh with unsaved changes: Save / Discard / Cancel (A7). */
+.vas-obl-dialog--confirm {
+    max-width: 26em;
+}
+
+.vas-obl-confirm-text {
+    margin: 0;
+    color: var(--cil-text);
+    font-size: 0.875em;
+}
 
     .vas-obl-dialog .vis-input-wrap:has(input:focus), .vas-obl-dialog .vis-input-wrap:has(select:focus), .vas-obl-dialog .vis-input-wrap:has(textarea:focus) {
         border-bottom: 1px solid rgba(var(--v-c-primary), 1);

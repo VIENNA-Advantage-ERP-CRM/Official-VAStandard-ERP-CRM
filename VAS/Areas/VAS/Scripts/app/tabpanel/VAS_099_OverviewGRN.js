@@ -362,6 +362,11 @@
  *                        Pending until a confirmation (M_InOutConfirm,
  *                        data.HasConfirmation) has actually been raised; it read
  *                        In Process from the start.
+ *   VAI163   2026-09-25  The PO number opened the AP Invoice screen: C_Order's
+ *                        purchase-side zoom target resolves there on this
+ *                        install. C_Order is now opened by window NAME -
+ *                        VAS_PurchaseOrder, or VAS_SalesOrder for the drop-ship
+ *                        Sales Order chip (WINDOW_NAME_BY_TABLE_SOTRX), as VAS_092.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -531,8 +536,22 @@
         //
         // Any further screen that needs naming belongs here; nothing else has to
         // change.
+        //
+        // C_Order (25-Sep-2026): the Purchase Order chip / document opened C_Order's
+        // purchase-side ZOOM target, which on this install resolves to the AP
+        // Invoice window - so "PO number" landed on AP Invoice. The purchase side is
+        // now named outright (VAS_PurchaseOrder), and the sales side - the drop-ship
+        // Sales Order chip - has its own name in WINDOW_NAME_BY_TABLE_SOTRX, exactly as
+        // the VAS_092 Purchase Order overview does.
         var WINDOW_NAME_BY_TABLE = {
-            "M_InOutConfirm": "VAS_ShipReceiptConfirm"
+            "M_InOutConfirm": "VAS_ShipReceiptConfirm",
+            "C_Order":        "VAS_PurchaseOrder"
+        };
+
+        // The same map for records opened as a SALES transaction; wins when the
+        // record is opened with IsSOTrx.
+        var WINDOW_NAME_BY_TABLE_SOTRX = {
+            "C_Order": "VAS_SalesOrder"
         };
 
         // Window name -> AD_Window_ID, resolved once per name and remembered for
@@ -578,7 +597,9 @@
         function openRecord(tableName, recordId, isSOTrx) {
             if (!tableName || !recordId || +recordId <= 0 || !window.VIS) return;
             try {
-                var windowId = resolveWindowIdByName(WINDOW_NAME_BY_TABLE[tableName]);
+                var windowName = (isSOTrx && WINDOW_NAME_BY_TABLE_SOTRX[tableName])
+                    || WINDOW_NAME_BY_TABLE[tableName];
+                var windowId = resolveWindowIdByName(windowName);
 
                 if (windowId <= 0 &&
                     VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === "function") {
@@ -1550,8 +1571,13 @@
 
             var prec = +ln.UOMPrecision || 0;
 
-            // UOM
-            $tr.append($('<span></span>').text(na(ln.UOMName)));
+            // UOM - symbol first, else the name (model side, 25-Sep-2026). Shown in
+            // FULL: the cell wraps rather than clipping (.vas_099-uom), and the unit's
+            // full name is on its tooltip.
+            var $uom = $('<span class="vas_099-uom"></span>').text(na(ln.UOMName));
+            var uomTip = ln.UOMFullName || ln.UOMName;
+            if (uomTip) $uom.attr("title", uomTip);
+            $tr.append($uom);
 
             // Ordered
             $tr.append($('<span class="vas_099-ta-r"></span>').text(formatNumber(+ln.OrderedQty || 0, prec)));

@@ -478,6 +478,32 @@
  *  seeded text as well, or the old abbreviations stay on screen.
  *  VAS_190_NotOnVendorTab and VAS_190_LetterSent / VAS_190_LetterReceived
  *  are no longer read.
+ *
+ * ── 2026-09-25 (VAI163) ─────────────────────────────────────────────────
+ *  - Limit / Standard price read OWN keys (VAS_190_LimitPriceLbl,
+ *    VAS_190_StandardPriceLbl): tenants had seeded the old keys as "Limit" /
+ *    "Std", which beat the fallback.
+ *  - Task Status %: TaskStatus is stored in tenths (model side, x10) - 100%
+ *    showed "10%", 30% "3%".
+ *  - Task priority chips in the TASK FORM's colours and mapping (1 Urgent,
+ *    3 High, 5 Medium, 7 Low, 9 Minor); the old map only knew "1".
+ *  - A task opens the platform task EDIT form on that task
+ *    (WSP.WSP_AppointmentsForm, as the history panel's edit button), falling
+ *    back to the create form where WSP does not expose it.
+ *  - Every meeting's detail view has a Transcript section; one not yet fetched
+ *    offers the history panel's Download transcript (GetSelectedAppointmentDetails
+ *    -> GetUserAccount / VA101 sign-in -> DownloadTranscript).
+ *  - Reply hands the composer a ";"-separated To list, and a wrapping line under
+ *    the composer's To / Cc / Bcc box lists every address.
+ *  - No-image placeholder by product type: Item box, Service wrench, Resource
+ *    person, Expense receipt.
+ *  - Tasks / letters appear at once: a page-wide XHR + fetch hook
+ *    ("vas190netdone") nudges the activity check for saves jQuery's
+ *    ajaxComplete never reports.
+ *  New keys: VAS_190_LimitPriceLbl, VAS_190_StandardPriceLbl,
+ *  VAS_190_TranscriptNotLoaded, VAS_190_NoTranscript,
+ *  VAS_190_TranscriptNeedsModule, VAS_190_TranscriptFailed,
+ *  VAS_190_TranscriptEmpty.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -1420,6 +1446,17 @@
             "E": { key: "VAS_190_TypeExpense",  text: "Expense" }
         };
 
+        // The no-image placeholder for a product type (M_Product.ProductType):
+        // I Item, S Service, R Resource, E Expense. Anything else is drawn as an item.
+        function placeholderIcon(code) {
+            switch (String(code || "").toUpperCase()) {
+                case "S": return "svcTool";
+                case "R": return "resource";
+                case "E": return "expense";
+                default:  return "box3d";
+            }
+        }
+
         function productTypeLabel(code) {
             var m = TYPE_META[code];
             return m ? msg(m.key, m.text) : (code || "");
@@ -1461,14 +1498,15 @@
                 // A file that has gone missing under the server's Images folder
                 // falls back to the placeholder rather than a broken-image glyph.
                 $tag.on("error", function () {
-                    $img.empty().addClass("vas_190-imgEmpty").append(svgIcon("box3d"));
+                    $img.empty().addClass("vas_190-imgEmpty").append(svgIcon(placeholderIcon(p.ProductType)));
                 });
                 $img.append($tag);
             } else {
-                // A product with no picture gets a 3-D box rather than a picture
-                // frame: the placeholder stands for the ITEM, which is what the
-                // reader is looking at, not for a missing photograph.
-                $img.addClass("vas_190-imgEmpty").append(svgIcon("box3d"));
+                // A product with no picture gets a placeholder that stands for WHAT
+                // IT IS, not for a missing photograph - by product type since
+                // 25-Sep-2026: Item a 3-D box, Service a wrench, Resource a person,
+                // Expense a receipt.
+                $img.addClass("vas_190-imgEmpty").append(svgIcon(placeholderIcon(p.ProductType)));
             }
             $top.append($img);
 
@@ -1885,7 +1923,9 @@
                 if (eff) priceBits.push(msg("VAS_190_Effective", "effective") + " " + eff);
                 priceBits.push(msg("VAS_190_ListPrice", "List Price") + " " +
                         formatAmount(p.PriceList, sym, p.CurPrecision));
-                priceBits.push(msg("VAS_190_LimitPrice", "Limit Price") + " " +
+                // Own key (25-Sep-2026): tenants seeded VAS_190_LimitPrice as "Limit",
+                // which beat the fallback - a new key cannot be caught by that row.
+                priceBits.push(msg("VAS_190_LimitPriceLbl", "Limit Price") + " " +
                         formatAmount(p.PriceLimit, sym, p.CurPrecision));
 
                 // Line 3 — what those figures are FOR. A price list holds one
@@ -1917,7 +1957,8 @@
                     // across rows. The other two stay on the meta line, where they
                     // read as the band this one sits in.
                     value: formatAmount(p.PriceStd, sym, p.CurPrecision),
-                    valueSub: msg("VAS_190_StdPrice", "Standard Price")
+                    // Own key, as Limit Price above (the seeded VAS_190_StdPrice says "Std").
+                    valueSub: msg("VAS_190_StandardPriceLbl", "Standard Price")
                 });
             }, $list);
         }
@@ -2783,19 +2824,29 @@
         // finished task in red kept it competing for attention with the ones
         // still to be done — the same rule, and the same four colours, as the
         // account panel's task list.
+        //
+        // 25-Sep-2026: the colours are now EXACTLY the task form's, and a closed
+        // task keeps its priority's colour as the task form does (the separate
+        // "resolved" colour is gone).
         function priorityChip(a) {
             return $('<span class="vas_190-prio"></span>')
-                .addClass("vas_190-prio-" + (a.IsClosed ? "resolved" : priorityTone(a.PriorityCode)))
+                .addClass("vas_190-prio-" + priorityTone(a.PriorityCode))
                 .text(a.PriorityName);
         }
 
-        // AppointmentsInfo.PriorityKey — '1' high, '2' medium, anything else low.
-        // The same three the account panel's task list paints.
+        // AppointmentsInfo.PriorityKey, mapped the way the platform's task views
+        // map it (VIS history panel: "1" Urgent #f60000, "3" High #fb9300,
+        // "5" Medium #6f04e8, "7" Low #03e5f3, "9" Minor #42d819). The old map
+        // ('1' high, '2' medium, anything else low) matched no code but "1", so
+        // High / Medium / Minor tasks all painted as Low.
         function priorityTone(code) {
-            var c = String(code === null || code === undefined ? "" : code).toLowerCase();
-            if (c === "1" || c === "high")   return "high";
-            if (c === "2" || c === "medium") return "medium";
-            return "low";
+            var c = String(code === null || code === undefined ? "" : code).trim().toLowerCase();
+            if (c === "1" || c === "urgent") return "urgent";
+            if (c === "3" || c === "high")   return "high";
+            if (c === "5" || c === "medium") return "medium";
+            if (c === "7" || c === "low")    return "low";
+            if (c === "9" || c === "minor")  return "minor";
+            return "none";
         }
 
         // ----------------------------------------------------------------- //
@@ -2902,6 +2953,30 @@
             try {
                 if (typeof window.$backBtn_ID === "undefined") window.$backBtn_ID = $();
             } catch (e3) { }
+
+            // THE CLICKED TASK, WITH ITS DETAILS (25-Sep-2026). Where the WSP module
+            // exposes its EDIT form, open that on this task - the call the
+            // framework's own history panel makes from its edit button:
+            //   WSP.WSP_AppointmentsForm.init(busy, AD_Table_ID, Record_ID,
+            //                                 AppointmentsInfo_ID, owner AD_User_ID, joinUrl)
+            // (history panel: `this.update = function (e) { v = e, m = this.table_ID }`,
+            // then init(n, m, v, rid, uid, joinurl)). The CREATE wrapper below stays
+            // as the fallback where that form is not loaded.
+            if (WSP.WSP_AppointmentsForm && typeof WSP.WSP_AppointmentsForm.init === "function") {
+                try {
+                    var $aptBusy = $("<div id='divAptBusy' class='wsp-busy-indicater'></div>");
+                    $("body").append($aptBusy);
+                    $aptBusy.show();
+                    WSP.WSP_AppointmentsForm.init($aptBusy, tableId, shownRecordId, taskId,
+                        +(a.OwnerUserId || 0) || userId, a.MeetingUrl || "");
+                    watchTaskFormClose();
+                    return true;
+                } catch (errEdit) {
+                    console.log("VAS_190: WSP.WSP_AppointmentsForm.init failed for task "
+                              + taskId + " — trying the task form instead.", errEdit);
+                    $("#divAptBusy").remove();
+                }
+            }
 
             try {
                 // Five arguments, exactly as VAS_105, VAS_123 and VAS_120 call it,
@@ -3074,7 +3149,9 @@
             // "Transcript" with the download beside the heading, the lines
             // underneath with the speaker picked out. It was a footer button
             // only, so the transcript could be saved but never read here.
-            if (a.Transcript && String(a.Transcript).trim()) {
+            // Every MEETING gets the section (25-Sep-2026), with the history
+            // panel's download button where the transcript has not been fetched.
+            if ((a.Transcript && String(a.Transcript).trim()) || a.Type === "appointment" || a.MeetingUrl) {
                 $sBody.append(buildTranscriptBlock(a));
             }
             $sheet.append($sBody);
@@ -3246,9 +3323,50 @@
 
         // The address a reply goes to: whoever sent an inbound mail, else whoever
         // the outbound one went to.
+        //
+        // 25-Sep-2026: a stored list may be separated by commas, semicolons or
+        // line breaks; the platform composer splits its To box on ";" ONLY, so the
+        // list is handed over "; "-separated - every address arrives as its own
+        // recipient rather than as one long invalid one.
         function replyAddress(a) {
             var addr = a.IsReceived ? a.MailFrom : a.MailTo;
-            return (addr === null || addr === undefined) ? "" : String(addr).trim();
+            if (addr === null || addr === undefined) return "";
+            var parts = String(addr).split(/[;,\r\n]+/), out = [];
+            for (var i = 0; i < parts.length; i++) {
+                var p = $.trim(parts[i]);
+                if (p) out.push(p);
+            }
+            return out.join("; ");
+        }
+
+        // The composer's To / Cc / Bcc boxes are single-line framework inputs, so a
+        // long recipient list ran off the end of the box and only its first
+        // addresses could be seen (25-Sep-2026). Under each box that holds more than
+        // one address, a wrapping line lists ALL of them, kept in step as the user
+        // edits the box. The input itself is left alone - the composer holds a
+        // direct reference to it.
+        function showFullRecipients(email) {
+            try {
+                var $root = email && typeof email.getRoot === "function" ? email.getRoot() : null;
+                if (!$root || !$root.length) return;
+                $root.find("input[id$='_emailTo'], input[id$='_emailToTop'], input[id$='_eamilCc'], "
+                         + "input[id$='_eamilCcTop'], input[id$='_emailBcc'], input[id$='_emailBccTop']")
+                    .each(function () {
+                        var $in = $(this);
+                        var $all = $('<div class="vas_190-mailAllRcpt"></div>');
+                        $in.after($all);
+                        var sync = function () {
+                            var v = $.trim($in.val() || "");
+                            $in.attr("title", v);
+                            // Only when there is more than one address - a single one
+                            // fits the box and the line would just repeat it.
+                            var many = v.split(/[;,]+/).filter(function (s) { return $.trim(s); }).length > 1;
+                            $all.text(many ? v : "").toggle(many);
+                        };
+                        $in.on("input.vas190 change.vas190 keyup.vas190", sync);
+                        sync();
+                    });
+            } catch (e) { console.log(e); }
         }
 
         // Opens the APPLICATION's mail composer on a reply — VIS.Email inside a
@@ -3298,6 +3416,7 @@
                     frame.setContent(email);
                     frame.show();
                     email.initializeComponent();
+                    showFullRecipients(email);
                     // email.js hard-codes "Contacts" in its header when it is opened
                     // outside a window frame. Named for the product instead, so the
                     // composer says what it is replying about. Cosmetic, and its own
@@ -3345,14 +3464,34 @@
         // (the shape the recorder writes) gets its speaker picked out, as the
         // history panel's transcript box does; any other line is printed as it
         // is. Text only - a transcript is never handed to the browser as markup.
+        //
+        // 25-Sep-2026: the section is there for EVERY meeting, as in the history
+        // panel. A meeting whose transcript has not been fetched yet (it has a
+        // meeting link but no stored text) offers the history panel's own
+        // "Download transcript" button, which LOADS it from the meeting service
+        // (loadTranscript) and then shows it here; once loaded, the button saves it
+        // as a text file, as before.
         function buildTranscriptBlock(a) {
             var $block = $('<div class="vas_190-sheetTranscript"></div>');
             var $head = $('<div class="vas_190-sheetTrHead"></div>');
             $head.append($('<div class="vas_190-sheetLabel"></div>')
                 .text(msg("VAS_190_Transcript", "Transcript")));
-            $head.append(sheetButton(msg("VAS_190_DownloadTranscript", "Download transcript"),
-                false, function () { downloadTranscript(a); }).addClass("vas_190-sheetBtn--sm"));
+            var hasText = !!(a.Transcript && String(a.Transcript).trim());
+            if (hasText) {
+                $head.append(sheetButton(msg("VAS_190_DownloadTranscript", "Download transcript"),
+                    false, function () { downloadTranscript(a); }).addClass("vas_190-sheetBtn--sm"));
+            } else if (a.MeetingUrl) {
+                $head.append(sheetButton(msg("VAS_190_DownloadTranscript", "Download transcript"),
+                    true, function () { loadTranscript(a, $block); }).addClass("vas_190-sheetBtn--sm"));
+            }
             $block.append($head);
+
+            if (!hasText) {
+                $block.append($('<div class="vas_190-sheetText vas_190-soft"></div>').text(a.MeetingUrl
+                    ? msg("VAS_190_TranscriptNotLoaded", "The transcript has not been downloaded yet.")
+                    : msg("VAS_190_NoTranscript", "No transcript for this meeting.")));
+                return $block;
+            }
 
             var $box = $('<div class="vas_190-sheetText vas_190-sheetTrBox"></div>');
             var lines = String(a.Transcript).replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
@@ -3372,6 +3511,76 @@
             }
             $block.append($box);
             return $block;
+        }
+
+        // Fetches a meeting's transcript from the meeting service, the way the
+        // framework's history panel does (25-Sep-2026) - the same three calls:
+        //   1. VIS/HistoryDetailsData/GetSelectedAppointmentDetails - the meeting's
+        //      auth provider (TokenRef_ID), mail configuration (MailConfig_ID) and
+        //      link, and the transcript itself where the platform already has it;
+        //   2. VIS/HistoryDetailsData/GetUserAccount - the signed-in account; when
+        //      it answers with an error the VA101 sign-in dialog is opened, and the
+        //      user clicks again once signed in;
+        //   3. VIS/HistoryDetailsData/DownloadTranscript - the transcript text.
+        // The meeting-recording module (VA101) is what does the fetching, so on an
+        // installation without it the user is told so instead.
+        function loadTranscript(a, $block) {
+            var ctxUrl = (window.VIS && VIS.Application && VIS.Application.contextUrl) || "";
+            var appointmentId = +(a && a.Id) || 0;
+            if (appointmentId <= 0 || !window.VIS || !VIS.dataContext) return;
+
+            function info(text) {
+                try { VIS.ADialog.info("", "", text); } catch (e) { console.log(text); }
+            }
+            function show(text) {
+                a.Transcript = text;
+                var $fresh = buildTranscriptBlock(a);
+                $block.replaceWith($fresh);
+            }
+
+            try {
+                var det = VIS.dataContext.getJSONData(ctxUrl + "VIS/HistoryDetailsData/GetSelectedAppointmentDetails",
+                    { record_ID: appointmentId }, null);
+                if (det && det.Transcript && String(det.Transcript).trim()) { show(String(det.Transcript)); return; }
+
+                if (!window.VA101) {
+                    info(msg("VAS_190_TranscriptNeedsModule",
+                             "Downloading a transcript needs the meeting-recording module (VA101)."));
+                    return;
+                }
+                var providerId = det ? (+det.TokenRef_ID || 0) : 0;
+                var mailConfigId = det ? (+det.MailConfig_ID || 0) : 0;
+                var meetingUrl = (det && det.MeetingUrl) || a.MeetingUrl || "";
+
+                var acct = VIS.dataContext.getJSONRecord("VIS/HistoryDetailsData/GetUserAccount",
+                    { AuthProviderID: providerId, MailConfigID: mailConfigId });
+                if (!acct) { info(msg("VAS_190_TranscriptFailed", "The transcript could not be downloaded.")); return; }
+                if (acct.ErrorMsg) {
+                    // Not signed in to the meeting service yet: the platform's own
+                    // sign-in dialog, then the user downloads again.
+                    try {
+                        var dlg = new VA101.VA101_GetAuthToken($self.windowNo || 0, {
+                            UserAccountID: acct.UserAccount_ID,
+                            AuthCredentialID: acct.AuthCredentialID,
+                            AuthProviderID: providerId
+                        });
+                        dlg.show();
+                    } catch (eAuth) { console.log(eAuth); info(String(acct.ErrorMsg)); }
+                    return;
+                }
+
+                VIS.dataContext.getJSONData(ctxUrl + "VIS/HistoryDetailsData/DownloadTranscript",
+                    { AppointmentID: appointmentId, UserAccountID: acct.UserAccount_ID, MeetingUrl: meetingUrl },
+                    function (res) {
+                        if (!res) { info(msg("VAS_190_TranscriptFailed", "The transcript could not be downloaded.")); return; }
+                        if (res.ErrorMsg) { info(String(res.ErrorMsg)); return; }
+                        if (res.transcript) show(String(res.transcript));
+                        else info(msg("VAS_190_TranscriptEmpty", "The meeting service returned no transcript."));
+                    });
+            } catch (e) {
+                console.log(e);
+                info(msg("VAS_190_TranscriptFailed", "The transcript could not be downloaded."));
+            }
         }
 
         // Whether the platform chat can be opened on this product from here.
@@ -3634,6 +3843,12 @@
             // as the three faces of one solid so it reads as the ITEM rather than
             // as a missing photograph.
             box3d:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.3 7 12 12 20.7 7"/><line x1="12" y1="22" x2="12" y2="12"/></svg>',
+            // The other product TYPES' placeholders (25-Sep-2026): a SERVICE is a
+            // wrench, a RESOURCE a person, an EXPENSE a receipt - an Item keeps the
+            // 3-D box above. Same stroke weight as the box so they read as one set.
+            svcTool:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
+            resource:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7.5" r="3.5"/><path d="M5 20.5c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="M16.5 3.5l1 1.5M19.5 7.5h-1.8"/></svg>',
+            expense:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14v18l-2.33-1.5L14.33 21 12 19.5 9.67 21l-2.34-1.5L5 21z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>',
             // The activity tags. Same set and same drawing as VAS_092's, so the
             // two panels' feeds read as one pattern.
             check:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
@@ -3778,7 +3993,66 @@
             self.nudgeActivityCheck();
         };
         try { $(document).on(this._ajaxNs, this._ajaxHandler); } catch (e) { }
+
+        // NOT EVERY SAVE IS A jQuery REQUEST (25-Sep-2026). `ajaxComplete` only
+        // fires for jQuery calls made with global events on; a dialog that saves
+        // through a raw XMLHttpRequest, fetch(), or $.ajax({ global: false }) went
+        // unheard, and a task or letter created that way sat off the feed until the
+        // twenty-second backstop. So the page's XHR / fetch traffic is heard at the
+        // source: one hook per page (installVas190NetHook) raises a document event
+        // when ANY request finishes, and every live panel nudges on it. As before,
+        // the nudge only asks the cheap signature question sooner.
+        installVas190NetHook();
+        this._netNs = "vas190netdone.vas190_" + seq;
+        this._netHandler = function (ev, url) {
+            if (String(url || "").indexOf("VAS_190_ProductOverviewRightPanel") >= 0) return;
+            self.nudgeActivityCheck();
+        };
+        try { $(document).on(this._netNs, this._netHandler); } catch (e) { }
     };
+
+    /* Page-wide network hook for VAS_190 (installed once per page): raises the
+       jQuery document event "vas190netdone" with the request URL whenever an
+       XMLHttpRequest or a fetch() finishes, so a panel hears saves that jQuery's
+       ajaxComplete never reports. It wraps, never replaces, the browser's own
+       behaviour - the original send / fetch runs untouched and the event is
+       raised from a listener, so a failure here can never break a request. */
+    function installVas190NetHook() {
+        if (VAS._vas190NetHooked) return;
+        VAS._vas190NetHooked = true;
+        function raise(url) {
+            try { $(document).trigger("vas190netdone", [String(url || "")]); } catch (e) { }
+        }
+        try {
+            var XHR = window.XMLHttpRequest;
+            if (XHR && XHR.prototype) {
+                var origOpen = XHR.prototype.open, origSend = XHR.prototype.send;
+                XHR.prototype.open = function (method, url) {
+                    try { this._vas190Url = url; } catch (e) { }
+                    return origOpen.apply(this, arguments);
+                };
+                XHR.prototype.send = function () {
+                    try {
+                        var xhr = this;
+                        xhr.addEventListener("loadend", function () { raise(xhr._vas190Url); });
+                    } catch (e) { }
+                    return origSend.apply(this, arguments);
+                };
+            }
+        } catch (e) { }
+        try {
+            if (typeof window.fetch === "function") {
+                var origFetch = window.fetch;
+                window.fetch = function (input) {
+                    var url = "";
+                    try { url = (typeof input === "string") ? input : (input && input.url) || ""; } catch (e) { }
+                    var p = origFetch.apply(this, arguments);
+                    try { p.then(function () { raise(url); }, function () { raise(url); }); } catch (e) { }
+                    return p;
+                };
+            }
+        } catch (e) { }
+    }
 
     /* Update tab panel based on selected record */
     VAS.VAS_190_ProductOverviewRightPanel.prototype.refreshPanelData = function (recordID, selectedRow) {
@@ -3832,6 +4106,13 @@
             try { $(document).off(this._ajaxNs); } catch (e) { }
             this._ajaxNs = null;
             this._ajaxHandler = null;
+        }
+        // Same for the page-wide XHR / fetch event (the hook itself stays on the
+        // page - it is shared, and with no listener it does nothing).
+        if (this._netNs) {
+            try { $(document).off(this._netNs); } catch (e) { }
+            this._netNs = null;
+            this._netHandler = null;
         }
         if (this.curTab && typeof this.curTab.removeDataStatusListener === "function") {
             try { this.curTab.removeDataStatusListener(this.tabDataListener); } catch (e) { }

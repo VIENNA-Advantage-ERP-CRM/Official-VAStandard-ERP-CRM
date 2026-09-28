@@ -320,22 +320,17 @@
     line-height: 1.5em;
     vertical-align: baseline;
 }
-/* The task colour scheme, taken from VAS_105 (.vas_105_acct-prio--*) rather
-   than mixed here. A reader moves between the two panels and a task that is
-   amber on one and orange on the other reads as two different states; these are
-   now the same four values in both places, so "the same priority" looks the
-   same wherever it is shown.
-
-   The medium and low entries used the panel's own generic warn / info tokens,
-   which is why they drifted — those tokens answer to this panel's palette, not
-   to what the task screens call a priority. */
-.vas_190-prio-high     { background: #FAD7D7; color: #8F2D2D; }
-.vas_190-prio-medium   { background: #FAEEDA; color: #9A6500; }
-.vas_190-prio-low      { background: #D9ECFF; color: #0E5DA8; }
-/* A CLOSED task, whatever it was raised at. Its priority has stopped being the
-   thing to act on, so it stops competing for attention with the open ones —
-   VAS_105's fourth priority colour, used for exactly this. */
-.vas_190-prio-resolved { background: #CCEFDD; color: #0C5D38; }
+/* The TASK FORM's own priority colours (25-Sep-2026) - the exact values the
+   platform's task views paint a PriorityKey in (VIS history panel): Urgent
+   #f60000, High #fb9300, Medium #6f04e8, Low #03e5f3, Minor #42d819. The word is
+   in that colour on a light wash of it, so the chip reads as the same priority
+   the task form shows. (The earlier VAS_105 set mapped only "1" correctly.) */
+.vas_190-prio-urgent { background: rgba(246, 0, 0, 0.12);    color: #f60000; }
+.vas_190-prio-high   { background: rgba(251, 147, 0, 0.14);  color: #fb9300; }
+.vas_190-prio-medium { background: rgba(111, 4, 232, 0.12);  color: #6f04e8; }
+.vas_190-prio-low    { background: rgba(3, 229, 243, 0.14);  color: #03e5f3; }
+.vas_190-prio-minor  { background: rgba(66, 216, 25, 0.14);  color: #42d819; }
+.vas_190-prio-none   { background: rgba(15, 23, 42, 0.06);   color: var(--p190-secondary, #475569); }
 
 /* ----------------------------------------------------------- */
 /*  Section header                                              */
@@ -976,6 +971,21 @@
 .vas_190-mailRow { display: flex; gap: 0.5em; font-size: 0.6875em; }
 .vas_190-mailK { flex-shrink: 0; width: 2.6em; font-weight: 500; color: var(--p190-muted); }
 .vas_190-mailV { font-weight: 400; color: var(--p190-secondary); word-break: break-word; min-width: 0; }
+
+/* Under the platform composer's To / Cc / Bcc box (25-Sep-2026): the whole list,
+   wrapping, so a recipient list longer than the single-line box is readable in
+   full. The composer mounts outside this panel's root, so no panel tokens. */
+.vas_190-mailAllRcpt {
+    flex-basis: 100%;
+    width: 100%;
+    margin: 0.25em 0 0.375em;
+    font-size: 12px;
+    line-height: 1.4;
+    color: #41576A;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
 
 /* The body keeps the line breaks the message was written with. */
 .vas_190-mailBody {
