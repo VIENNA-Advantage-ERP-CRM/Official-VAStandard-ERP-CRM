@@ -459,7 +459,7 @@ namespace VAdvantage.Model
                     role = new MRole(m_ctx, 0, m_trx);
                     role.SetAD_Client_ID(m_client.GetAD_Client_ID());
                     role.SetAD_Org_ID(0);
-                    role.SetName(ds.Tables[0].Rows[i]["Name"].ToString());
+                    role.SetName(ds.Tables[0].Rows[i]["Name"].ToString() + " (" + m_clientName + ")");
                     if (ds.Tables[0].Rows[i]["Description"] != null && ds.Tables[0].Rows[i]["Description"] != DBNull.Value)
                     {
                         role.SetDescription(ds.Tables[0].Rows[i]["Description"].ToString());
