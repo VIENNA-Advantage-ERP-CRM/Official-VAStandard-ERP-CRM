@@ -213,19 +213,19 @@ namespace VIS.Controllers
                + @" , l.PriceEntered"
                + " FROM C_OrderLine l"
                + " LEFT OUTER JOIN C_Order o ON (o.C_Order_ID = l.C_Order_ID)"
-               + " LEFT OUTER JOIN C_PaymentTerm t ON (t.C_PaymentTerm_ID = o.C_PaymentTerm_ID)"
-               + " LEFT OUTER JOIN M_MatchPO m ON (l.C_OrderLine_ID=m.C_OrderLine_ID AND ");
+               + " LEFT OUTER JOIN C_PaymentTerm t ON (t.C_PaymentTerm_ID = o.C_PaymentTerm_ID)");
+            //+ " LEFT OUTER JOIN M_MatchPO m ON (l.C_OrderLine_ID=m.C_OrderLine_ID AND ");
 
-            sql.Append((forInvoicees && !isProvisionalInvoice) ? "m.C_InvoiceLine_ID" : "m.M_InOutLine_ID");
+            //sql.Append((forInvoicees && !isProvisionalInvoice) ? "m.C_InvoiceLine_ID" : "m.M_InOutLine_ID");
 
             // Get lines from Order based on the setting taken on Tenant to allow non item Product
             if (!isAllownonItem)
             {
-                sql.Append(" IS NOT NULL) INNER JOIN M_Product p ON (l.M_Product_ID=p.M_Product_ID)");
+                sql.Append(" INNER JOIN M_Product p ON (l.M_Product_ID=p.M_Product_ID)");
             }
             else
             {
-                sql.Append(" IS NOT NULL) LEFT JOIN M_Product p ON (l.M_Product_ID=p.M_Product_ID)");
+                sql.Append(" LEFT JOIN M_Product p ON (l.M_Product_ID=p.M_Product_ID)");
             }
 
             if (isBaseLangess != "")
