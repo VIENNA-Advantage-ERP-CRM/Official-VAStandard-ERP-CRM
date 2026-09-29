@@ -161,11 +161,14 @@ namespace VIS.Controllers
                 precision = " uom.stdprecision ";
             }
 
+            // VAI147: "mi" is pre-aggregated to a single row per C_OrderLine_ID (see the LEFT JOIN below), so MAX() simply
+            // reads that value. Using SUM() here multiplied the created qty by the number of rows produced by other joins
+            // (e.g. multiple M_MatchPO records against the same order line) and returned a wrong remaining quantity.
             StringBuilder sql = new StringBuilder("SELECT "
-               + $@" ROUND((l.QtyOrdered - {(!isProvisionalInvoice ? " SUM(coalesce(mi.QtyCreated, 0))) "
+               + $@" ROUND((l.QtyOrdered - {(!isProvisionalInvoice ? " MAX(COALESCE(mi.QtyCreated, 0))) "
                : " CASE WHEN o.IsSoTrx = 'Y' THEN NVL(l.QtyDelivered, 0)  ELSE SUM(COALESCE(m.qty, 0))  END) ")} * "
                + " (CASE WHEN l.QtyOrdered=0 THEN 0 ELSE l.QtyEntered/l.QtyOrdered END ), " + precision + ") AS QUANTITY,"
-               + $@" ROUND((l.QtyOrdered - {(!isProvisionalInvoice ? " SUM(coalesce(mi.QtyCreated, 0))) "
+               + $@" ROUND((l.QtyOrdered - {(!isProvisionalInvoice ? " MAX(COALESCE(mi.QtyCreated, 0))) "
                : " CASE WHEN o.IsSoTrx = 'Y' THEN NVL(l.QtyDelivered, 0)  ELSE SUM(COALESCE(m.qty, 0))  END) ")} * "
                + " (CASE WHEN l.QtyOrdered=0 THEN 0 ELSE l.QtyEntered/l.QtyOrdered END ), " + precision + ") AS QTYENTER,"
                + " l.C_UOM_ID  as C_UOM_ID  ,COALESCE(uom.UOMSymbol,uom.Name) as UOM,"
@@ -181,19 +184,23 @@ namespace VIS.Controllers
                + @" , l.PriceEntered"
                + " FROM C_OrderLine l"
                + " LEFT OUTER JOIN C_Order o ON (o.C_Order_ID = l.C_Order_ID)"
-               + " LEFT OUTER JOIN C_PaymentTerm t ON (t.C_PaymentTerm_ID = o.C_PaymentTerm_ID)"
-               + " LEFT OUTER JOIN M_MatchPO m ON (l.C_OrderLine_ID=m.C_OrderLine_ID AND ");
+               + " LEFT OUTER JOIN C_PaymentTerm t ON (t.C_PaymentTerm_ID = o.C_PaymentTerm_ID)");
 
-            sql.Append((forInvoicees && !isProvisionalInvoice) ? "m.C_InvoiceLine_ID" : "m.M_InOutLine_ID");
+            // VAI147: M_MatchPO qty is only used for Provisional Invoice. For Invoice / Shipment the created qty comes from
+            // the "mi" sub-query, and joining M_MatchPO here only multiplied the rows (one per match record) per order line.
+            if (isProvisionalInvoice)
+            {
+                sql.Append(" LEFT OUTER JOIN M_MatchPO m ON (l.C_OrderLine_ID=m.C_OrderLine_ID AND m.M_InOutLine_ID IS NOT NULL)");
+            }
 
             // Get lines from Order based on the setting taken on Tenant to allow non item Product
             if (!isAllownonItem)
             {
-                sql.Append(" IS NOT NULL) INNER JOIN M_Product p ON (l.M_Product_ID=p.M_Product_ID)");
+                sql.Append(" INNER JOIN M_Product p ON (l.M_Product_ID=p.M_Product_ID)");
             }
             else
             {
-                sql.Append(" IS NOT NULL) LEFT JOIN M_Product p ON (l.M_Product_ID=p.M_Product_ID)");
+                sql.Append(" LEFT JOIN M_Product p ON (l.M_Product_ID=p.M_Product_ID)");
             }
 
             if (isBaseLangess != "")
@@ -201,21 +208,25 @@ namespace VIS.Controllers
                 sql.Append(isBaseLangess);
             }
 
+            // VAI147: aggregate inside the sub-query so "mi" returns exactly one row per order line; otherwise every
+            // invoice / shipment line multiplied the rows of the outer query.
             if (forInvoicees)
             {
                 /*VIS_045: 02-Feb-2026, this block is used to get the total QtyInvoiced against orderline */
-                sql.Append($@" LEFT JOIN (SELECT il.QtyInvoiced AS QtyCreated, il.C_OrderLine_ID, i.documentno
+                sql.Append($@" LEFT JOIN (SELECT SUM(il.QtyInvoiced) AS QtyCreated, il.C_OrderLine_ID
 		                                FROM C_InvoiceLine il
 		                                INNER JOIN C_Invoice I on (I.C_INVOICE_ID = il.C_INVOICE_ID)
-		                                WHERE i.DocStatus NOT IN ('VO', 'RE') AND I.C_Invoice_ID <> {recordID} ) mi on (l.C_OrderLine_ID = mi.C_OrderLine_ID)");
+		                                WHERE i.DocStatus NOT IN ('VO', 'RE') AND I.C_Invoice_ID <> {recordID}
+		                                GROUP BY il.C_OrderLine_ID) mi on (l.C_OrderLine_ID = mi.C_OrderLine_ID)");
             }
             else if (!forInvoicees && !isProvisionalInvoice)
             {
-                /*VIS_045: 02-Feb-2026, this block is used to get the total QtyInvoiced against orderline */
-                sql.Append($@" LEFT JOIN (SELECT il.MovementQty AS QtyCreated, il.C_OrderLine_ID, i.documentno
+                /*VIS_045: 02-Feb-2026, this block is used to get the total MovementQty against orderline */
+                sql.Append($@" LEFT JOIN (SELECT SUM(il.MovementQty) AS QtyCreated, il.C_OrderLine_ID
 		                                FROM M_InOutLine il
 		                                INNER JOIN M_InOut I on (I.M_InOut_ID = il.M_InOut_ID)
-		                                WHERE i.DocStatus NOT IN ('VO', 'RE') AND I.M_InOut_ID <> {recordID} ) mi on (l.C_OrderLine_ID = mi.C_OrderLine_ID)");
+		                                WHERE i.DocStatus NOT IN ('VO', 'RE') AND I.M_InOut_ID <> {recordID}
+		                                GROUP BY il.C_OrderLine_ID) mi on (l.C_OrderLine_ID = mi.C_OrderLine_ID)");
             }
 
             //Hanlded case: order not exist for the selected Business partner and on the change/selection of deliverydate excception's coming  missing expression
