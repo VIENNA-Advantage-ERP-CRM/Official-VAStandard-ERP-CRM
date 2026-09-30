@@ -386,64 +386,18 @@
                         frowPlain(msg('VAS_290_Validity'),     validityStr) +
                         frowPlain(msg('VAS_290_ContractType'), contractTypeTxt) +
                     '</div>' +
-                    '<div class="vas_290_sc-id-actions">' +
-                        '<button class="vas_290_sc-btn bs" id="vas_290_btn_gensched_' + widgetID + '"' +
-                                (isProcessed ? ' disabled aria-disabled="true"' : '') + '>' +
-                            svgIcon('refresh') + esc(msg('VAS_290_GenerateSchedule')) +
-                        '</button>' +
-                        '<button class="vas_290_sc-btn bs" id="vas_290_btn_renew_' + widgetID + '"' +
-                                (isProcessed ? ' disabled aria-disabled="true"' : '') + '>' +
-                            svgIcon('cal') + esc(msg('VAS_290_Renew')) +
-                        '</button>' +
-                        '<button class="vas_290_sc-btn bd" id="vas_290_btn_cancel_' + widgetID + '"' +
-                                (isProcessed ? ' disabled aria-disabled="true"' : '') + '>' +
-                            svgIcon('x') + esc(msg('VAS_290_CancelContract')) +
-                        '</button>' +
-                    '</div>' +
                 '</div>';
 
             setIdentityHtml(html);
             refreshHeroContractValue();
-
-            // Wire action buttons — guard with isProcessed check in handler so
-            // a manual DOM bypass cannot trigger actions on processed records
-            if (!isProcessed) {
-                var btnGen = document.getElementById('vas_290_btn_gensched_' + widgetID);
-                if (btnGen) {
-                    btnGen.addEventListener('click', function (e) {
-                        e.stopPropagation();
-                        if (sectionState.header.data && sectionState.header.data.processed !== true) {
-                            triggerAction('GenerateSchedule');
-                        }
-                    });
-                }
-                var btnRen = document.getElementById('vas_290_btn_renew_' + widgetID);
-                if (btnRen) {
-                    btnRen.addEventListener('click', function (e) {
-                        e.stopPropagation();
-                        if (sectionState.header.data && sectionState.header.data.processed !== true) {
-                            triggerAction('Renew');
-                        }
-                    });
-                }
-                var btnCan = document.getElementById('vas_290_btn_cancel_' + widgetID);
-                if (btnCan) {
-                    btnCan.addEventListener('click', function (e) {
-                        e.stopPropagation();
-                        if (sectionState.header.data && sectionState.header.data.processed !== true) {
-                            triggerAction('CancelContract');
-                        }
-                    });
-                }
-            }
         }
 
         // ── Refresh contract-value label and amount in the hero header ───────────
         // Called after header loads and again after schedules load.
         // Monthly billing: label = VAS_290_PerScheduleContractTotalValue,
-        //                  value = schedule count × lineNetAmt.
+        //                  value = sum of each schedule row's grandTotal.
         // All other frequencies: label = VAS_290_TotalContractValue,
-        //                        value = grandTotal.
+        //                        value = grandTotal from the contract header.
         // Null inputs are treated as 0 so the display never shows NaN or "—".
         function refreshHeroContractValue() {
             var d = sectionState.header.data;
@@ -453,35 +407,30 @@
             var lblEl = document.getElementById('vas_290_sc_hero_lbl_' + widgetID);
             if (!amtEl || !lblEl) return;
 
-            var ccy      = d.currencyIsoCode || '';
-            var prec     = (d.currencyPrecision != null) ? parseInt(d.currencyPrecision, 10) : 2;
+            var ccy       = d.currencyIsoCode || '';
+            var prec      = (d.currencyPrecision != null) ? parseInt(d.currencyPrecision, 10) : 2;
             var isMonthly = String(d.frequencyName || '').toLowerCase().indexOf('month') >= 0;
 
             var displayLabel, displayAmt;
 
             if (isMonthly) {
-                // Monthly: Number of Invoices (schedule count) × Line Amount
+                // Monthly: sum the net amount (excl. tax) of every schedule row loaded so far.
+                // Using per-row totalAmt (not lineNetAmt × count) because individual
+                // schedules can carry different amounts when discounts vary.
                 var schedItems = (sectionState.schedules.loaded && sectionState.schedules.data && sectionState.schedules.data.items)
                     ? sectionState.schedules.data.items : [];
-                displayLabel = msg('VAS_290_PerScheduleContractTotalValue');
-                displayAmt   = fmtMoney(schedItems.length * toNum(d.lineNetAmt), ccy, prec);
-            } else {
-                // Yearly and all other frequencies: Total Contract Value
+                var schedTotal = 0;
+                for (var i = 0; i < schedItems.length; i++) { schedTotal += toNum(schedItems[i].totalAmt); }
                 displayLabel = msg('VAS_290_TotalContractValue');
-                displayAmt   = fmtMoney(toNum(d.grandTotal), ccy, prec);
+                displayAmt   = fmtMoney(schedTotal, ccy, prec);
+            } else {
+                // Yearly and all other frequencies: Line Net Amount (excl. tax)
+                displayLabel = msg('VAS_290_TotalContractValue');
+                displayAmt   = fmtMoney(toNum(d.lineNetAmt), ccy, prec);
             }
 
             amtEl.textContent = displayAmt;
             lblEl.textContent = displayLabel;
-        }
-
-        // ── Trigger an existing Onfinity process action ────────────────────────
-        // TODO: Replace with actual Onfinity process invocation using the known
-        //       process IDs for Generate Schedule, Renew, and Cancel Contract.
-        function triggerAction(actionName) {
-            if (VIS && VIS.Msg && VIS.Msg.showMessage) {
-                VIS.Msg.showMessage(msg('VAS_290_ActionNotWired') || actionName);
-            }
         }
 
         // ── Zoom to Invoice window ────────────────────────────────────────────
@@ -575,6 +524,11 @@
         function renderProductPricingSection(data) {
             var ccy  = data.currencyIsoCode;
             var prec = (data.currencyPrecision != null) ? parseInt(data.currencyPrecision, 10) : 2;
+            var isMonthly = String(data.frequencyName || '').toLowerCase().indexOf('month') >= 0;
+
+            var contractValueLabel = isMonthly ? msg('VAS_290_PerSchedulePricingValue') :msg('VAS_290_TotalContractValue');
+
+            //var contractValueLabel = msg('VAS_290_ContractTotalValue');
 
             var body =
                 '<div class="vas_290_sc-frows">' +
@@ -587,7 +541,7 @@
                     frowPlain(msg('VAS_290_Discount'),       (data.discount != null ? toNum(data.discount).toFixed(2) + '%' : '—')) +
                     frowPlain(msg('VAS_290_TaxAmount'),      fmtMoney(data.taxAmt,         ccy, prec)) +
                     frowPlain(msg('VAS_290_LineNetAmount'),  fmtMoney(data.lineNetAmt,      ccy, prec)) +
-                    frowPlain(msg('VAS_290_TotalContractValue'), fmtMoney(data.grandTotal, ccy, prec), 'va', 'span-full') +
+                    frowPlain(contractValueLabel,            fmtMoney(data.lineNetAmt, ccy, prec), 'va', 'span-full') +
                 '</div>';
 
             setSecBodyHtml('productPricing', body);
@@ -644,6 +598,14 @@
 
         // ── Section 7: Contract Schedule ──────────────────────────────────────
         function renderScheduleSection(schedData) {
+            // Surface any server-side error (e.g. SQL exception) instead of showing empty state.
+            if (schedData && schedData.error) {
+                setSecBodyHtml('schedule', errorState(function () {
+                    fetchSection('schedules', 'GetContractSchedules', {}, null);
+                }));
+                updateSectionSum('schedule', '');
+                return;
+            }
             var items = (schedData && schedData.items) ? schedData.items : [];
             var d     = sectionState.header.data;
             var ccy   = d ? d.currencyIsoCode : '';

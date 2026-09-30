@@ -858,7 +858,9 @@
             $row.append('<div class="vas-ol-cell vas-ol-cell--right" role="columnheader">' + esc(lbl("VAS_218_PlannedQtyUOM", "Qty / UOM")) + '</div>');
             $row.append('<div class="vas-ol-cell vas-ol-cell--right" role="columnheader">' + esc(lbl("VAS_218_PlannedPrice", "Planned Price")) + '</div>');
             $row.append('<div class="vas-ol-cell vas-ol-cell--right" role="columnheader">' + esc(lbl("VAS_218_PlannedAmt", "Planned Amt")) + '</div>');
-            $row.append('<div class="vas-ol-cell vas-ol-cell--more" role="columnheader"></div>');
+            // No --more column header: opportunity lines have no Additional Info modal, so the
+            // action cell (Undo button) is absolutely positioned over the row instead of occupying
+            // a dedicated grid column.
             return $row;
         }
 
@@ -1115,6 +1117,30 @@
             $head.addClass("vas-ol-tab-hidden");
         }
 
+        // ── Host-width fix (mirrors VAS_074 pattern) ────────────────────────
+
+        /** Returns true when the browser supports the CSS :has() pseudo-class. */
+        function supportsHas() {
+            try { return CSS && CSS.supports("selector(:has(a))"); } catch (e) { return false; }
+        }
+
+        /**
+         * Overrides the framework's inline 250 px width on the outer panel host so the
+         * bottom-docked panel fills the full tab-content area.  The CSS rule in
+         * VAS_218_CreateOppLines.css handles this automatically where :has() is supported;
+         * this function is the fallback for older browsers (mirrors VAS_074.fitHostWidth).
+         */
+        function fitHostWidth() {
+            if (supportsHas()) return;
+            try {
+                if (!$self || !$self.length) return;
+                var host = $self.closest(".vis-ad-w-p-ap-tp-outerwrap");
+                if (!host.length) return;
+                host[0].style.width    = "auto";
+                host[0].style.maxWidth = "100%";
+            } catch (e) { if (window.console) console.log(e); }
+        }
+
         // ── Full render ──────────────────────────────────────────────────────
 
         /**
@@ -1248,10 +1274,33 @@
          * @param {string}  fromRole - TAB_ORDER role of the active cell.
          * @param {boolean} reverse  - true = Shift+Tab (move backwards).
          */
+        /**
+         * Traps focus inside the panel when Tab reaches the first/last boundary.
+         * Must be called BEFORE renderRow() so focus is moved while the active
+         * input still exists in the DOM — once renderRow() removes it the browser
+         * picks the next focusable element outside the panel on its own.
+         * Setting editing=null first makes every blur guard (if (!editing) return)
+         * exit early, so the blur event fired by .focus() does not re-render.
+         */
+        function trapFocusInPanel() {
+            editing = null;
+            // Move focus synchronously before the active input is destroyed.
+            if ($addBtn && $addBtn.length) {
+                $addBtn.focus();
+            } else if ($self && $self.length) {
+                if (!$self.attr("tabindex")) $self.attr("tabindex", "-1");
+                $self.focus();
+            }
+        }
+
         function moveFocus(line, fromRole, reverse) {
             var order   = TAB_ORDER.filter(function (r) { return r !== "more"; });
             var cur     = order.indexOf(fromRole);
-            if (cur < 0) { editing = null; renderRow(lines.indexOf(line)); return; }
+            if (cur < 0) {
+                trapFocusInPanel();
+                renderRow(lines.indexOf(line));
+                return;
+            }
             var lineIdx = lines.indexOf(line);
             var nextPos = reverse ? cur - 1 : cur + 1;
 
@@ -1282,7 +1331,11 @@
                     renderRow(lineIdx);
                     renderRow(targetIdx);
                 } else {
-                    editing = null;
+                    // Tab/Shift+Tab has gone past the last/first row — keep focus inside
+                    // the panel by moving it to $addBtn BEFORE renderRow() destroys the
+                    // active input.  (Moving focus after removal is too late — the browser
+                    // has already shifted focus outside the panel by then.)
+                    trapFocusInPanel();
                     renderRow(lineIdx);
                 }
             }
@@ -1897,12 +1950,14 @@
             $row.append(renderPriceCell(line, idx));
 
             // Col 6 – Planned Amount (read-only)
-            var $amtCell = $('<div class="vas-ol-cell vas-ol-cell--right" role="cell"></div>');
+            var $amtCell = $('<div class="vas-ol-cell vas-ol-cell--right vas-ol-cell--amt" role="cell"></div>');
             $amtCell.append('<span class="vas-ol-amt">' + esc(fmtMoney(v.PlannedAmt)) + '</span>');
             $row.append($amtCell);
 
-            // Col 7 – Undo + More actions
-            var $moreCell = $('<div class="vas-ol-cell vas-ol-cell--more" role="cell" style="position:relative"></div>');
+            // Undo action — absolutely positioned over the row's right edge so it does
+            // not occupy a grid track.  Do NOT add style="position:relative" here;
+            // the CSS class already sets position:absolute (inline overrides class).
+            var $moreCell = $('<div class="vas-ol-cell vas-ol-cell--more" role="cell"></div>');
 
             // Re-apply per-row spinner after a re-render so an in-flight save or callout
             // keeps its indicator even if renderRow() rebuilds the row DOM.
@@ -2662,6 +2717,18 @@
         // ── Save rows ────────────────────────────────────────────────────────
 
         /**
+         * Re-reads the parent opportunity header from the DB via the hosting GridTab so
+         * the VIS framework status bar (PlannedAmt and other header aggregates) reflects
+         * the values written by the line save.  Mirrors VAS_107's refreshHeaderRecord().
+         */
+        function refreshHeaderRecord() {
+            var tab = curTab || (self && self.curTab);
+            if (tab && typeof tab.dataRefresh === "function") {
+                tab.dataRefresh();
+            }
+        }
+
+        /**
          * Triggers blur on the currently focused cell editor (input/textarea/select) inside
          * the panel so its value is committed to line.values before the save runs.
          * Without this, e.preventDefault() on the Save mousedown keeps focus on the input
@@ -2748,6 +2815,9 @@
                             for (var i = 0; i < rows.length; i++) lines.push(fromServerRow(rows[i]));
                             renderAll();
                             showToast(msg("VAS_218_SaveSuccess"), false);
+                            // Refresh the parent opportunity header so aggregated fields
+                            // (PlannedAmt etc.) update in the status bar and right panel.
+                            refreshHeaderRecord();
                         } else {
                             renderAll();
                             showToast(msg("VAS_218_SaveError"), true);
@@ -3046,6 +3116,10 @@
                  */
                 onUndo: function () {
                     if (!parent || !parent.IsEditable) return;
+                    // Flush any in-progress text edit into line.values so _dirty is set
+                    // before we check it — without this, typing in a field and pressing
+                    // Ctrl+Alt+Z before clicking away reports "nothing to undo".
+                    commitActiveEditor();
                     // Priority 1: the row currently being edited
                     var target = (editing && lineById(editing.rowId)) || null;
                     if (target && !target._isNew && !target._dirty) target = null;
@@ -3069,7 +3143,12 @@
                 },
                 /** Alt+Ctrl+Q — refresh the current page (same as the Refresh button). */
                 onRefresh: function () {
-                    if (parent && parent.VAS_Opportunity_ID) fetchData(parent.VAS_Opportunity_ID, linePage);
+                    if (!parent || !parent.VAS_Opportunity_ID) return;
+                    if (hasDirtyLines()) {
+                        showToast(msg("VAS_218_RefreshWithUnsaved"), true);
+                        return;
+                    }
+                    fetchData(parent.VAS_Opportunity_ID, linePage);
                 }
             });
         }
@@ -3114,7 +3193,7 @@
             var $title   = $('<div><h2 class="vas-ol-panel__title">' + esc(lbl("VAS_218_OppLinesSummary", "Opportunity Lines")) + '</h2></div>');
             var $actions = $('<div class="vas-ol-panel__actions"></div>');
             $addBtn    = $('<button type="button" class="vas-ol-btn vas-ol-btn--outline" title="' + esc(lbl("VAS_218_Add", "Add line")) + ' (Ctrl+Alt+N)">' + icon("plus", "+") + '<span>' + esc(lbl("VAS_218_Add", "Add line")) + '</span></button>');
-            $saveBtn   = $('<button type="button" class="vas-ol-btn vas-ol-btn--primary vas-ol-is-disabled" data-action="save-rows" title="' + esc(lbl("VAS_218_Save", "Save row")) + ' (Ctrl+Alt+S)">' + icon("hard-drive", "💾") + '<span class="vas-ol-save-lbl"></span></button>');
+            $saveBtn   = $('<button type="button" class="vas-ol-btn vas-ol-btn--primary vas-ol-is-disabled" data-action="save-rows" title="' + esc(lbl("VAS_218_Save", "Save row")) + ' (Ctrl+Alt+S)"><i class="vis vis-save"></i><span class="vas-ol-save-lbl"></span></button>');
             $deleteBtn = $('<button type="button" class="vas-ol-btn vas-ol-btn--danger vas-ol-is-disabled" title="' + esc(lbl("VAS_218_Delete", "Delete record")) + ' (Ctrl+Alt+D)" disabled>' + icon("trash", "🗑") + '<span>' + esc(lbl("VAS_218_Delete", "Delete record")) + ' <span class="vas-ol-sel-count"></span></span></button>');
             $refreshBtn = $('<button type="button" class="vas-ol-btn vas-ol-btn--outline" title="' + esc(lbl("VAS_218_Refresh", "Refresh")) + ' (Ctrl+Alt+Q)">' + icon("refresh-cw", "↺") + '<span>' + esc(lbl("VAS_218_Refresh", "Refresh")) + '</span></button>');
             $actions.append($addBtn, $saveBtn, $deleteBtn, $refreshBtn);
@@ -3130,6 +3209,7 @@
             $panel.append($header, $table, $totalsRow, $pager);
             $container.empty().append($panel);
             createBusyIndicator();
+            fitHostWidth();   // override framework's 250 px outer-wrapper width (see CSS comment)
 
             // Toolbar events
             $addBtn.on("click", function () { addLine(); });
@@ -3158,7 +3238,12 @@
             });
 
             $refreshBtn.on("click", function () {
-                if (parent && parent.VAS_Opportunity_ID) fetchData(parent.VAS_Opportunity_ID, linePage);
+                if (!parent || !parent.VAS_Opportunity_ID) return;
+                if (hasDirtyLines()) {
+                    showToast(msg("VAS_218_RefreshWithUnsaved"), true);
+                    return;
+                }
+                fetchData(parent.VAS_Opportunity_ID, linePage);
             });
 
             // Keyboard and outside-click bindings
@@ -3281,6 +3366,12 @@
                 // Remove capture-phase shortcut listener registered during init
                 if (self._shortcuts) { self._shortcuts.dispose(); self._shortcuts = null; }
 
+                // Remove capture-phase Tab trap registered during init
+                if (self._tabTrap) {
+                    if ($self && $self[0]) { $self[0].removeEventListener('keydown', self._tabTrap, true); }
+                    self._tabTrap = null;
+                }
+
                 // Remove keyboard and outside-click handlers (including confirm dialog ESC binding)
                 $(document).off("mousedown.vasol").off("keydown.vasol").off("keydown.vasol-confirm");
 
@@ -3331,7 +3422,7 @@
                 var $title   = $('<div><h2 class="vas-ol-panel__title">' + esc(lbl("VAS_218_OppLinesSummary", "Opportunity Lines")) + '</h2></div>');
                 var $actions = $('<div class="vas-ol-panel__actions"></div>');
                 $addBtn    = $('<button type="button" class="vas-ol-btn vas-ol-btn--outline" title="' + esc(lbl("VAS_218_Add", "Add line")) + ' (Ctrl+Alt+N)">' + icon("plus", "+") + '<span>' + esc(lbl("VAS_218_Add", "Add line")) + '</span></button>');
-                $saveBtn   = $('<button type="button" class="vas-ol-btn vas-ol-btn--primary vas-ol-is-disabled" data-action="save-rows" title="' + esc(lbl("VAS_218_Save", "Save row")) + ' (Ctrl+Alt+S)">' + icon("hard-drive", "💾") + '<span class="vas-ol-save-lbl"></span></button>');
+                $saveBtn   = $('<button type="button" class="vas-ol-btn vas-ol-btn--primary vas-ol-is-disabled" data-action="save-rows" title="' + esc(lbl("VAS_218_Save", "Save row")) + ' (Ctrl+Alt+S)"><i class="vis vis-save"></i><span class="vas-ol-save-lbl"></span></button>');
                 $deleteBtn = $('<button type="button" class="vas-ol-btn vas-ol-btn--danger vas-ol-is-disabled" title="' + esc(lbl("VAS_218_Delete", "Delete record")) + ' (Ctrl+Alt+D)" disabled>' + icon("trash", "🗑") + '<span>' + esc(lbl("VAS_218_Delete", "Delete record")) + ' <span class="vas-ol-sel-count"></span></span></button>');
                 $refreshBtn = $('<button type="button" class="vas-ol-btn vas-ol-btn--outline" title="' + esc(lbl("VAS_218_Refresh", "Refresh")) + ' (Ctrl+Alt+Q)">' + icon("refresh-cw", "↺") + '<span>' + esc(lbl("VAS_218_Refresh", "Refresh")) + '</span></button>');
                 $actions.append($addBtn, $saveBtn, $deleteBtn, $refreshBtn);
@@ -3368,13 +3459,35 @@
                     showConfirmDialog(msg("VAS_218_ConfirmDelete"), deleteSelected, msg("VAS_218_Delete", "Delete"), true);
                 });
                 $refreshBtn.on("click", function () {
-                    if (parent && parent.VAS_Opportunity_ID) fetchData(parent.VAS_Opportunity_ID, linePage);
+                    if (!parent || !parent.VAS_Opportunity_ID) return;
+                    if (hasDirtyLines()) {
+                        showToast(msg("VAS_218_RefreshWithUnsaved"), true);
+                        return;
+                    }
+                    fetchData(parent.VAS_Opportunity_ID, linePage);
                 });
                 bindKeyboard();
                 bindOutsideClick();
                 // Start hidden: panel only appears once refreshPanelData loads a saved opportunity.
                 // A new/unsaved parent never flashes the empty grid.
                 applyTabVisibility(false);
+                // Override framework's 250 px outer-wrapper width so the bottom-docked
+                // panel fills the full tab-content area (fallback for browsers without :has()).
+                fitHostWidth();
+
+                // Capture-phase Tab trap: prevent Tab from ever escaping the panel.
+                // Fires BEFORE bubble-phase handlers and BEFORE any framework capture listener,
+                // so e.preventDefault() here guarantees the browser never moves focus via Tab
+                // while an element inside the panel is active.  Per-field keydown handlers in
+                // the bubble phase still run normally and drive moveFocus() for cell navigation.
+                self._tabTrap = function (e) {
+                    if (e.key !== 'Tab') return;
+                    var focused = document.activeElement;
+                    if (focused && $self && $self[0] && $.contains($self[0], focused)) {
+                        e.preventDefault();
+                    }
+                };
+                $self[0].addEventListener('keydown', self._tabTrap, true);
             },
 
             /** Returns the root jQuery element; the framework appends it to the tab container. */
@@ -3419,7 +3532,10 @@
             },
 
             /** Called by the framework when the panel container is resized. */
-            sizeChanged: function () { /* panel uses CSS fluid width */ },
+            sizeChanged: function () { fitHostWidth(); },
+
+            /** Public alias so the framework host can call fitHostWidth() directly. */
+            fitHostWidth: function () { fitHostWidth(); },
 
             /**
              * Clears all line state and hides the panel.  Mirrors VAS_074's clear() —

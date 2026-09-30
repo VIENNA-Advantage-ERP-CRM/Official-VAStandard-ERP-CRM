@@ -29,6 +29,32 @@
     display: none !important;
 }
 
+/* HOST-WIDTH FIX — mirrors VAS_074_CreateInvoiceLinePanel.css exactly.
+   The framework's own stylesheet sizes the tab-panel outer wrapper for RIGHT-docked
+   panels:  .vis-ad-w-p-ap-tp-outerwrap { width: 250px }
+   A BOTTOM-docked panel (like this one) is then stretched to its real pixel width by
+   framework JS, computed once at layout time.  Browser zoom changes the CSS viewport
+   but does NOT recompute that inline pixel width, so after a zoom the host stays at
+   its pre-zoom width and the panel renders short of the window's right edge — producing
+   the blank gap to the right of the "Total Amount" column.
+   An author !important declaration outranks an inline style, so these rules win even
+   when the framework re-asserts its width after a later re-layout.  Scoped with :has()
+   so right-docked panels elsewhere keep the 250 px the framework intends.
+   The JS fitHostWidth() (below) is the fallback for browsers without :has(). */
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-ol-root) {
+    width: auto !important;
+    max-width: 100% !important;
+}
+
+/* The host's inner wrappers may also carry computed widths; release them the same way
+   so the full width actually reaches the panel root. */
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-ol-root) > .vis-ad-w-p-ap-tp-o-body,
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-ol-root) .vis-ad-w-p-ap-tp-o-b-content {
+    width: auto !important;
+    max-width: 100% !important;
+    min-width: 0;
+}
+
 .vas-ol-root,
 .vas-ol-dialog-backdrop,
 .vas-ol-toast,
@@ -156,10 +182,11 @@
     padding: 0 16px;
     /*border-bottom: 1px solid #D9E2EB;*/
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     justify-content: space-between;
     gap: 0.75em;
+    overflow: hidden;
 }
 
 .vas-ol-panel__title {
@@ -168,6 +195,10 @@
     font-weight: 700;
     letter-spacing: -0.01em;
     color: var(--cil-text-strong);
+    min-width: 0;           /* allow title to shrink so buttons never wrap */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .vas-ol-panel__subtitle {
@@ -178,9 +209,10 @@
 
 .vas-ol-panel__actions {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     gap: 0.625em;
+    flex-shrink: 0;  /* actions block never shrinks — title yields first */
 }
 
 /* ---------- buttons ---------- */
@@ -269,15 +301,9 @@
     background: var(--cil-surface);
 }
 
-/* Faded blue for the primary (save) button when disabled — no dirty rows.
-   Uses CSS class so mousedown still fires before blur commits the active editor.
-   Mirrors VAS_074's pattern exactly. */
-.vas-ol-btn--primary.vas-ol-is-disabled {
-    background: #9fcdec;
-    border-color: #9fcdec;
-    color: #fff;
-    cursor: not-allowed;
-}
+/* When the primary (Save) button has no dirty rows, it falls through to the
+   general .vas-ol-btn.vas-ol-is-disabled rule (white bg, gray border, gray text).
+   No override needed here — the general rule already handles it. */
 
 /* selection count badge inside the Delete button */
 .vas-ol-sel-count {
@@ -313,7 +339,10 @@
 
 .vas-ol-row {
     display: grid;
-    grid-template-columns: 1.75em minmax(0, 1.9fr) minmax(0, 2fr) minmax(7em, 1fr) minmax(6em, 0.7fr) minmax(6.75em, 0.85fr) 3.5em;
+    /* 6 columns: checkbox | product | description | qty/uom | price | amount.
+       The undo-action cell is absolutely positioned over the row so it does not
+       consume a grid track — opportunity lines have no Additional Info modal. */
+    grid-template-columns: 1.75em minmax(0, 1.9fr) minmax(0, 1.4fr) minmax(7em, 1fr) minmax(6em, 0.7fr) minmax(6.75em, 0.85fr);
     gap: 0.75em;
     align-items: center;
     padding: 0.75em 0;
@@ -384,6 +413,12 @@
         background: var(--cil-blue-soft);
     }
 
+/* On dirty rows, push the amount text left by the undo-button width so the
+   absolutely-positioned undo button does not overlap the amount value. */
+.vas-ol-row--line.is-unsaved .vas-ol-cell--amt {
+    padding-right: 1.75em;
+}
+
 .vas-ol-row--line.is-invalid {
     background: var(--cil-danger-bg);
     box-shadow: inset 3px 0 0 var(--cil-danger);
@@ -413,7 +448,9 @@
     row-gap: 0.4em;
     align-items: baseline;
     justify-content: end;
-    padding: 0.75em 0 0.5em;
+    /* Match the table's horizontal padding so the value column aligns with
+       the Amount column in the grid rows above it. */
+    padding: 0.75em 1.25em 0.5em;
 }
 
 /* display:contents makes the row div transparent to grid layout;
@@ -480,10 +517,24 @@
 }
 
 .vas-ol-cell--more {
+    /* Absolutely positioned over the row's right edge so it does not occupy a
+       grid track — keeps the Amount column flush to the right like the totals row.
+       z-index: 2 ensures the undo button paints above all non-positioned grid items. */
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
     flex-direction: row;
     align-items: center;
     justify-content: center;
     gap: 0.25em;
+    pointer-events: none;
+    z-index: 2;
+}
+
+.vas-ol-cell--more > * {
+    pointer-events: auto;
 }
 
 .vas-ol-cell input[type="checkbox"] {
@@ -856,7 +907,8 @@
             color: var(--cil-text-disabled);
         }
 /* Row Undo: only shown on a saved row with unsaved edits; reverts to last snapshot.
-   Amber to read as "discard pending change" against the unsaved-row tint. */
+   White background + subtle shadow ensures visibility against any row background
+   (including the amber unsaved-row tint where transparent amber-on-amber is invisible). */
 .vas-ol-undo-btn {
     width: 1.5em;
     height: 1.5em;
@@ -864,10 +916,11 @@
     align-items: center;
     justify-content: center;
     border: none;
-    background: transparent;
+    background: var(--cil-surface, #ffffff);
     border-radius: var(--cil-r-sm);
     color: var(--cil-warning);
     cursor: pointer;
+    box-shadow: 0 0 0 1px rgba(0,0,0,.08), 0 1px 3px rgba(0,0,0,.08);
     transition: background .12s, color .12s;
 }
 
