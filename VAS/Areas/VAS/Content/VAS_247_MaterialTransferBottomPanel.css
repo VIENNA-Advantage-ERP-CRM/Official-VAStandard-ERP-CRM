@@ -167,6 +167,17 @@
     min-width: 0;
 }
 
+/* White host (30-Sep-2026, as VAS_249 / VAS_240): the framework host around the panel
+   carries its own blue surface, which showed wherever the root did not cover it - a New
+   Record (the grid is hidden and the root collapses) and the room left around / below a
+   short panel. The host chain is painted white whenever it holds THIS panel. */
+.vis-ad-w-p-actionpanel-b:has(.vas-mtl-root),
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-mtl-root),
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-mtl-root) > .vis-ad-w-p-ap-tp-o-body,
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-mtl-root) .vis-ad-w-p-ap-tp-o-b-content {
+    background: #ffffff !important;
+}
+
 /* Hide the framework-rendered tab title bar and its coloured header. The framework places
    .vis-ad-w-p-ap-tp-body-head immediately before our root, so this adjacency :has()
    targets ONLY this panel's head — never a sibling panel's. It is redundant with the

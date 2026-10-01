@@ -472,7 +472,11 @@
                     uomName: r.UOMName || "",
                     locatorName: r.LocatorName || "", locatorToName: r.LocatorToName || "",
                     attrName: r.AttrName || "",
-                    hasAttributeSet: r.M_Product_ID > 0 && (!!r.AttrName || !!r.HasAttributeSet)
+                    // As VAS_074 (30-Sep-2026): a SAVED line only shows the attribute sub-line
+                    // when it actually carries an instance. A line saved without one no
+                    // longer shows "Set attribute…" under the product - the picker still
+                    // opens itself when a product with an attribute set is picked on a new line.
+                    hasAttributeSet: r.M_Product_ID > 0 && !!r.AttrName && !!r.HasAttributeSet
                 }
             };
             // Pristine snapshot of the just-loaded/just-saved state, so the row Undo can
@@ -721,57 +725,15 @@
 
         /* Refresh button / Ctrl+Alt+Q: re-read the current page from the server. A reload
            throws away every line the user has not saved, so with unsaved work on the page
-           the user is asked Save / Discard / Cancel instead (27-Sep-2026, as VAS_107 A7).
+           (a picked product, an edited line) the refresh is BLOCKED with a message, the way
+           VAS_074 does it (30-Sep-2026): the user saves or discards first, then refreshes.
            A value typed into a cell that is still open counts too, so it is committed
-           before the check. */
+           before the check. The earlier Save / Discard / Cancel question is gone. */
         function refreshLines() {
             if (!parent || !parent.M_Movement_ID) return;
             flushActiveEdit();
-            if (!unsavedLines().length) { $self.fetchData(parent.M_Movement_ID, linePage); return; }
-            openRefreshConfirm();
-        }
-
-        function openRefreshConfirm() {
-            $("#vasMtlConfirm").remove();
-            var $bd = $('<div class="vas-mtl-dialog-backdrop" id="vasMtlConfirm"></div>');
-            var $dlg = $('<div class="vas-mtl-dialog vas-mtl-dialog--confirm" role="alertdialog" aria-modal="true"></div>');
-            $dlg.html(
-                '<header class="vas-mtl-dialog__header"><div class="vas-mtl-dialog__header-row">' +
-                '<h3 class="vas-mtl-dialog__title">' + esc(lbl("VAS_247_UnsavedTitle", "Unsaved changes")) + "</h3></div></header>" +
-                '<div class="vas-mtl-dialog__body"><p class="vas-mtl-confirm-text">' +
-                esc(lbl("VAS_247_UnsavedRefresh", "You have unsaved line changes. Save them before refreshing?")) + "</p></div>" +
-                '<footer class="vas-mtl-dialog__footer vas-mtl-dialog__footer--end">' +
-                '<button type="button" class="vas-mtl-btn vas-mtl-btn--ghost" data-act="cf-cancel">' + esc(lbl("VAS_247_Cancel", "Cancel")) + "</button>" +
-                '<button type="button" class="vas-mtl-btn vas-mtl-btn--outline" data-act="cf-discard">' + esc(lbl("VAS_247_Discard", "Discard")) + "</button>" +
-                '<button type="button" class="vas-mtl-btn vas-mtl-btn--primary" data-act="cf-save">' + esc(lbl("VAS_247_Save", "Save")) + "</button>" +
-                "</footer>");
-            $bd.append($dlg);
-            $("body").append($bd);
-            function close() { $("#vasMtlConfirm").remove(); }
-            $dlg.on("click", "[data-act=cf-cancel]", function () { close(); });
-            $dlg.on("click", "[data-act=cf-discard]", function () {
-                close();
-                editing = null;
-                if (parent && parent.M_Movement_ID) $self.fetchData(parent.M_Movement_ID, linePage);
-            });
-            $dlg.on("click", "[data-act=cf-save]", function () {
-                close();
-                afterCallouts(function () {
-                    if (!parent || !parent.M_Movement_ID) return;
-                    if (!unsavedLines().length) { $self.fetchData(parent.M_Movement_ID, linePage); return; }
-                    // Refresh only once the save went through; a failed save (a dirty header,
-                    // insufficient stock, ...) leaves the rows on screen with their errors,
-                    // exactly as the Save button does.
-                    saveRows(function (ok) { if (ok && parent) $self.fetchData(parent.M_Movement_ID, linePage); });
-                });
-            });
-            // Keep keys inside the dialog (the framework's own handlers would act on them);
-            // Escape = Cancel.
-            $bd.on("keydown", function (e) {
-                if (e.key === "Escape" || e.keyCode === 27) { e.preventDefault(); close(); }
-                e.stopPropagation();
-            });
-            setTimeout(function () { $dlg.find("[data-act=cf-save]").focus(); }, 0);
+            if (unsavedLines().length) { showToast(lbl("VAS_247_SaveBeforeRefresh", "Save or discard your changes before refreshing")); return; }
+            $self.fetchData(parent.M_Movement_ID, linePage);
         }
 
         /* Load another page of saved lines. Guards unsaved work so a page change never
@@ -865,15 +827,15 @@
             return String((parent && parent.DocStatus) || "").toUpperCase();
         }
 
-        /* Additional Info can be changed only while the movement is DRAFTED (25-Sep-2026).
-           In Progress, Completed, Closed, Voided, Reversed, Invalid, Approved - any other
-           status - the modal opens for reading: no field can be set, changed or cleared.
-           Stricter than panelEditable(), which still lets an In Progress movement take line
-           edits. A status nobody can state is not taken as a lock. */
+        /* Additional Info can be changed while the movement is DRAFTED or IN PROGRESS
+           (25-Sep-2026; In Progress added 30-Sep-2026). Completed, Closed, Voided,
+           Reversed, Invalid, Approved - any other status - the modal opens for reading: no
+           field can be set, changed or cleared. A status nobody can state is not taken as
+           a lock. */
         function additionalInfoEditable() {
             if (!panelEditable()) return false;
             var st = liveDocStatus();
-            return !st || st === "DR";
+            return !st || st === "DR" || st === "IP";
         }
 
         /* Lock state the panel was last PAINTED for (set by render). lastAddlLockState is
@@ -2299,8 +2261,11 @@
             // still new, and a ReadOnlyLogic that is true on such a line refused the click
             // in startEdit - the user could not pick a different product. The cell kept
             // looking clickable because the resting display does not ask this test.
+            // In Progress counts as well since 30-Sep-2026: the dictionary locked the
+            // product on an In Progress movement.
             if (col === "M_Product_ID"
-                && ((line && line.status === "new") || (panelEditable() && liveDocStatus() === "DR"))) return false;
+                && ((line && line.status === "new")
+                    || (panelEditable() && (liveDocStatus() === "DR" || liveDocStatus() === "IP")))) return false;
             // C_UOM_ID: editable until the line is saved, then locked. Changing the unit of
             // a stored movement line would restate a quantity the warehouse has already
             // acted on, so it is a delete-and-re-enter, not an edit.

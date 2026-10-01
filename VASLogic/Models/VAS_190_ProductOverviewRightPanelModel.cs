@@ -471,6 +471,13 @@
 ///                          ParsePercent scales it - 100% had shown as 10%, 30% as 3%.
 ///                          Each task/appointment carries its owner (OwnerUserId),
 ///                          which the platform's task edit form is opened with.
+///   VAI163   2026-10-01  - ACTIVITY. Mails RELATED to the product through
+///                          MailAttachmentRelatedTo are read too, as the history
+///                          panel reads them - a received reply filed that way never
+///                          reached the feed (and the change check did not see it).
+///                        - TRANSCRIPT. A meeting collapsed from several attendee rows
+///                          takes its link and transcript from whichever row has them
+///                          (TranscriptSourceId), so the Download button is offered.
 /// </summary>
 
 using System;
@@ -687,7 +694,8 @@ namespace VASLogic.Models
             if (TableExists("MailAttachment1"))
             {
                 parts.Add(@"SELECT COUNT(1) AS C, MAX(ma.Updated) AS U FROM MailAttachment1 ma
-                            WHERE ma.AD_Table_ID=" + tid + " AND ma.Record_ID=@pidMail");
+                            WHERE ((ma.AD_Table_ID=" + tid + " AND ma.Record_ID=@pidMail)"
+                            + RelatedMailClause(M_Product_ID) + ")");
                 ps.Add(new SqlParameter("@pidMail", M_Product_ID));
             }
             if (TableExists("AD_Note"))
@@ -5001,6 +5009,31 @@ namespace VASLogic.Models
             }
         }
 
+        /// <summary>
+        /// " OR EXISTS (...)" matching a mail filed against the product through
+        /// MailAttachmentRelatedTo (01-Oct-2026), or "" where that table is absent.
+        ///
+        /// A mail has its own AD_Table_ID / Record_ID, but the platform can also
+        /// RELATE it to further records, and a received reply to a product mail is
+        /// typically filed that way - under its own anchor, related to the product.
+        /// The framework's history panel reads both links (HistoryDetailsDataModel:
+        /// "(ma.AD_TABLE_ID=t AND ma.RECORD_ID=r) OR (mr.AD_TABLE_ID=t AND
+        /// mr.RECORD_ID=r)", mails only, letters by the direct link alone); this
+        /// panel read only the first, so the reply never reached the feed. EXISTS
+        /// rather than the history panel's LEFT JOIN, so a mail related twice is
+        /// still one row. The ids are inlined as integers, keeping the statement
+        /// at one bind name (positional binding).
+        /// </summary>
+        private string RelatedMailClause(int M_Product_ID)
+        {
+            if (_productTableId <= 0 || !TableExists("MailAttachmentRelatedTo")) return "";
+            return @" OR ((ma.AttachmentType IS NULL OR TRIM(ma.AttachmentType) <> 'L')
+                          AND EXISTS (SELECT 1 FROM MailAttachmentRelatedTo mr
+                                      WHERE mr.MailAttachment1_ID=ma.MailAttachment1_ID
+                                        AND mr.AD_Table_ID=" + _productTableId + @"
+                                        AND mr.Record_ID=" + M_Product_ID + "))";
+        }
+
         private void LoadMailActivity(Ctx ctx, int M_Product_ID, List<ActivityData> list)
         {
             if (!TableExists("MailAttachment1")) return;
@@ -5019,8 +5052,9 @@ namespace VASLogic.Models
                                   u.Name AS ActorName
                            FROM MailAttachment1 ma
                            LEFT OUTER JOIN AD_User u ON (u.AD_User_ID=ma.CreatedBy)
-                           WHERE ma.AD_Table_ID=" + _productTableId + @"
-                             AND ma.Record_ID=@M_Product_ID
+                           WHERE ((ma.AD_Table_ID=" + _productTableId + @"
+                                   AND ma.Record_ID=@M_Product_ID)"
+                                 + RelatedMailClause(M_Product_ID) + @")
                              AND COALESCE(ma.IsActive, 'Y')='Y'
                            ORDER BY COALESCE(ma.DateMailReceived, ma.Created) DESC,
                                     ma.MailAttachment1_ID DESC";
@@ -5402,6 +5436,27 @@ namespace VASLogic.Models
                     // reader sees, and its name is the only place that attendee
                     // appears.
                     AddPerson(peopleByEntry, kept, assignee);
+                    // The meeting link and the transcript can sit on ANY attendee
+                    // row (01-Oct-2026): the surviving row is just the first one
+                    // read, and where it lacked them the detail view had no
+                    // Download transcript button although the history panel,
+                    // opening the row that has them, showed one. Adopt them, and
+                    // the row id the transcript calls must be made with.
+                    string rowTranscript = PlainText(Util.GetValueOfString(r["Transcript"]));
+                    string rowMeetingUrl = Util.GetValueOfString(r["MeetingUrl"]);
+                    bool keptHasText = !string.IsNullOrEmpty(kept.Transcript) && kept.Transcript.Trim().Length > 0;
+                    if (!keptHasText && rowTranscript.Trim().Length > 0)
+                    {
+                        kept.Transcript = rowTranscript;
+                        kept.TranscriptSourceId = apptId;
+                        if (string.IsNullOrEmpty(kept.MeetingUrl)) kept.MeetingUrl = rowMeetingUrl;
+                    }
+                    else if (!keptHasText && string.IsNullOrEmpty(kept.MeetingUrl)
+                             && !string.IsNullOrEmpty(rowMeetingUrl))
+                    {
+                        kept.MeetingUrl = rowMeetingUrl;
+                        kept.TranscriptSourceId = apptId;
+                    }
                     continue;
                 }
 
@@ -6736,6 +6791,10 @@ namespace VASLogic.Models
             public string    Comments        { get; set; }
             /// <summary>AppointmentTranscript.Transcript, offered as a download.</summary>
             public string    Transcript      { get; set; }
+            /// <summary>The attendee row (AppointmentsInfo_ID) the transcript or the
+            /// meeting link was taken from when it is not <see cref="Id"/>; 0 otherwise.
+            /// The transcript download calls are made with this id.</summary>
+            public int       TranscriptSourceId { get; set; }
             /// <summary>AppointmentsInfo.Result — what a task concluded.</summary>
             public string    TaskResult      { get; set; }
             /// <summary>Who the task is assigned to (AppointmentsInfo.AD_User_ID).</summary>

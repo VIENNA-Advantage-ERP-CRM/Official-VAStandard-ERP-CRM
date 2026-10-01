@@ -319,27 +319,43 @@
                 var resolvedTopicId = topic.topicId || 0;
                 function doSend() {
                     var text = $.trim($root.find('#' + widgetID + '_wachatInput').val());
-                    if (!text) return;
+                    if (!text) { console.log('[VAS_105 WA] doSend: empty text, aborting'); return; }
                     var $btn = $root.find('#' + widgetID + '_wachatSend').prop('disabled', true);
                     var userId = (window.VIS && VIS.context && typeof VIS.context.getAD_User_ID === 'function')
                         ? VIS.context.getAD_User_ID() : 0;
+                    console.log('[VAS_105 WA] doSend: text="' + text + '", topicId=' + resolvedTopicId + ', userId=' + userId);
+
+                    // Step 1: get chatId + mobile for this topic
                     fetchModal('GetWhatsAppTopicMeta', { topicId: resolvedTopicId }, function (err1, meta) {
+                        if (err1) {
+                            console.error('[VAS_105 WA] GetWhatsAppTopicMeta error:', err1);
+                        } else {
+                            console.log('[VAS_105 WA] GetWhatsAppTopicMeta response:', JSON.stringify(meta));
+                        }
                         // chatId may be 0 when WSP_SMChat_ID is not set on the topic — still allow send
                         var chatId = (!err1 && meta) ? (meta.chatId || 0) : 0;
                         var mobile = (!err1 && meta) ? (meta.mobile || '') : '';
+                        console.log('[VAS_105 WA] chatId=' + chatId + ', mobile="' + mobile + '"');
+
+                        // Step 2: get the user's WhatsApp social account config
                         // WSP/Inbox endpoints require POST (matches VIS.dataContext.getJSONData behaviour)
+                        console.log('[VAS_105 WA] Calling GetUserSocialAcct: url=' + VIS.Application.contextUrl + 'WSP/Inbox/GetUserSocialAcct, User_ID=' + userId);
                         $.ajax({
                             url:      VIS.Application.contextUrl + 'WSP/Inbox/GetUserSocialAcct',
                             type:     'POST',
                             dataType: 'json',
                             data:     { User_ID: userId, Provider: 'WHATSAPP' },
                             success:  function (raw) {
+                                console.log('[VAS_105 WA] GetUserSocialAcct raw response:', raw);
                                 var accts = (typeof raw === 'string') ? JSON.parse(raw) : raw;
+                                console.log('[VAS_105 WA] GetUserSocialAcct parsed accounts:', JSON.stringify(accts));
                                 if (!accts || !accts.length) {
+                                    console.error('[VAS_105 WA] GetUserSocialAcct returned no accounts for userId=' + userId + ' Provider=WHATSAPP — cannot send');
                                     $btn.prop('disabled', false);
                                     return;
                                 }
                                 var cfg = accts[0];
+                                console.log('[VAS_105 WA] Using account config:', JSON.stringify(cfg));
                                 var chatDataObj = {
                                     smconfig_id:   cfg.SMConfigID   || 0,
                                     smpara_id:     cfg.SMParaID     || 0,
@@ -360,20 +376,29 @@
                                     msgdate:       new Date(),
                                     quote_id:      ''
                                 };
+                                // Step 3: send the message
+                                console.log('[VAS_105 WA] Calling CreateChat:', JSON.stringify(chatDataObj));
                                 $.ajax({
                                     url:      VIS.Application.contextUrl + 'WSP/Inbox/CreateChat',
                                     type:     'POST',
                                     dataType: 'json',
                                     data:     { ChatData: JSON.stringify(chatDataObj) },
-                                    success:  function () {
+                                    success:  function (res) {
+                                        console.log('[VAS_105 WA] CreateChat success:', res);
                                         $btn.prop('disabled', false);
                                         $root.find('#' + widgetID + '_wachatInput').val('');
                                         openWhatsAppModal(resolvedTopicId);
                                     },
-                                    error: function () { $btn.prop('disabled', false); }
+                                    error: function (xhr, status, err) {
+                                        console.error('[VAS_105 WA] CreateChat error:', status, err, xhr.responseText);
+                                        $btn.prop('disabled', false);
+                                    }
                                 });
                             },
-                            error: function () { $btn.prop('disabled', false); }
+                            error: function (xhr, status, err) {
+                                console.error('[VAS_105 WA] GetUserSocialAcct error:', status, err, xhr.responseText);
+                                $btn.prop('disabled', false);
+                            }
                         });
                     });
                 }

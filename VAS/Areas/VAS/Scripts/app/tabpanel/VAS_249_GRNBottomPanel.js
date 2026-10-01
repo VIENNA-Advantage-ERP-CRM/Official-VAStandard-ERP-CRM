@@ -68,7 +68,11 @@
  *                        - The unit reads the same before and after saving: symbol,
  *                          else name (model side, blank-safe).
  *                        - Order Line is editable in Additional Info whatever the
- *                          dictionary's read-only flag says (FORCED_EDITABLE_COLS).
+ *                          dictionary's read-only flag says - until the line is SAVED
+ *                          with one; then it is locked, as on the screen (orderLineLocked,
+ *                          30-Sep-2026). Picking one fills the line from that PO line -
+ *                          product / charge, unit, open quantity, attribute - never the
+ *                          locator (applyOrderLine, 30-Sep-2026).
  *                        - Product list: a fixed-size list on <body>, opening below the
  *                          field or, without room there, above it - same size either
  *                          way, and never squeezed to a sliver inside the short panel
@@ -105,12 +109,26 @@
        See startPanel / dispose. */
     var LIVE_BY_WINDOW = {};
 
-    /* When an undo last SUCCEEDED, per windowNo (Date.now()). A press that has already
-       been answered by a revert must not also be answered "Nothing to undo" - whoever
-       answers second (a twin instance, a repeat dispatch of the same key) reads this and
-       stays silent. Shared across instances on purpose. See onUndo. */
-    var LAST_UNDO_BY_WINDOW = {};
+    /* When an undo last SUCCEEDED (Date.now()) - across every instance of this panel AND,
+       through VAS.PanelShortcuts.lastUndoAt, every other panel on the page. A press that
+       has already been answered by a revert must not also be answered "Nothing to undo":
+       whoever answers second (a twin instance, another panel type on the same window, a
+       repeat dispatch of the same key) reads this and stays silent. Since 30-Sep-2026 the
+       verdict is also DEFERRED (UNDO_VERDICT_MS): a listener that runs BEFORE the one that
+       reverts would otherwise toast first, so "nothing" is only said once nobody has
+       reverted anything for that press. See onUndo. */
+    var LAST_UNDO_AT = 0;
     var UNDO_ECHO_MS = 500;
+    var UNDO_VERDICT_MS = 150;
+    function noteUndo() {
+        LAST_UNDO_AT = Date.now();
+        if (VAS.PanelShortcuts && typeof VAS.PanelShortcuts.markUndo === "function") VAS.PanelShortcuts.markUndo();
+    }
+    function lastUndoAt() {
+        var t = LAST_UNDO_AT;
+        if (VAS.PanelShortcuts && VAS.PanelShortcuts.lastUndoAt > t) t = VAS.PanelShortcuts.lastUndoAt;
+        return t;
+    }
 
     VAS.VAS_249_GRNBottomPanel = function () {
         this.record_ID = 0;
@@ -256,10 +274,38 @@
 
         /* ---------- short helpers ---------- */
 
-        /* Resolves an AD_Message, falling back to English. VIS.Msg.getMsg returns
-           "[key]" for a missing row, which must never reach the screen. */
+        /* Resolves an AD_Message, falling back to English (30-Sep-2026, as VAS_303). A
+           message the dictionary does not hold comes back from the framework either as
+           "[Key]" or as the bare key itself - both are a miss, and neither may reach the
+           screen: a save with no product picked, and the attribute picker (which borrows
+           this resolver), were showing bracketed keys. A miss tries the element
+           (AD_Element) translation of the same name, then the English fallback. */
+        function isMsgMiss(t, key) {
+            if (!t) return true;
+            t = String(t);
+            return t.charAt(0) === "[" || t === key;
+        }
+        /* Element captions resolved once per panel (the framework may go to the server
+           for one). Panel keys (VAS_249_* / VAS_074_*) are messages, never elements, so
+           only a dictionary name such as "GuaranteeDate" or "Lot" is ever looked up here. */
+        var elementCache = {};
+        function elementCaption(key) {
+            if (/^VAS_\d+_/.test(key)) return "";
+            if (elementCache.hasOwnProperty(key)) return elementCache[key];
+            var el = "";
+            try {
+                if (VIS.Msg && typeof VIS.Msg.getElement === "function")
+                    el = VIS.Msg.getElement(VIS.Env.getCtx(), key);
+            } catch (e) { el = ""; }
+            return (elementCache[key] = isMsgMiss(el, key) ? "" : String(el));
+        }
         function lbl(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            var t = "";
+            try { t = VIS.Msg.getMsg(key); } catch (e) { t = ""; }
+            if (!isMsgMiss(t, key)) return t;
+            var el = elementCaption(key);
+            if (el) return el;
+            return (fallback !== undefined) ? fallback : key;
         }
 
         /* Quantities are stated to two decimals, as the framework's own receipt grid
@@ -436,6 +482,7 @@
                 // since 25-Sep-2026 it says nothing at all: no highlighted hint.
                 if ($body) $body.hide();
                 if ($emptyState) $emptyState.hide();
+                markNewRecordHost();
             } else {
                 if ($emptyState) $emptyState.text(lbl("VAS_249_NoReceipt", "Select a record to add lines"));
                 // parent is already null here, so this reverts the heading to the neutral
@@ -444,6 +491,14 @@
                 render();
             }
         };
+
+        /* With a new, unsaved header the grid and the message are both hidden, so the root
+           collapses and the framework host's BLUE surface around it is all that shows
+           (30-Sep-2026, as VAS_248). This class lets the CSS paint that host white until the
+           header has been saved and real data renders; a loaded receipt keeps the host as is. */
+        function markNewRecordHost() {
+            if ($root) $root.toggleClass("vas-grn-root--new", !!newRecordMode && !(parent && parent.M_InOut_ID));
+        }
 
         /* The hosting tab reports "inserting" for a New Record the framework never tells a
            tab panel about (refreshPanelData is not called for it) - so the tab's own
@@ -491,7 +546,11 @@
                     uomName: r.UOMName || "",
                     locatorName: r.LocatorName || "",
                     attrName: attrName,
-                    hasAttributeSet: r.M_Product_ID > 0 && (!!attrName || !!r.HasAttributeSet)
+                    // As VAS_074 (30-Sep-2026): a SAVED line only shows the attribute sub-line
+                    // when it actually carries an instance. A line saved without one no
+                    // longer nags "Set attribute…" under the product - the picker still
+                    // opens itself when a product with an attribute set is picked on a new line.
+                    hasAttributeSet: r.M_Product_ID > 0 && !!attrName && !!r.HasAttributeSet
                 }
             };
             // Pristine snapshot of the just-loaded/just-saved state, so the row Undo can
@@ -688,6 +747,7 @@
         function render() {
             // The catalog dropdown must not outlive the primary cell that opened it.
             if (!(editing && (editing.field === "product" || editing.field === "charge"))) closeCatalog();
+            markNewRecordHost();
             if (!parent || !parent.M_InOut_ID) {
                 lastLockState = null; $body.hide();
                 // A new, unsaved header shows a plain white panel - no message (clear).
@@ -752,58 +812,13 @@
         /* Refresh button / Ctrl+Alt+Q: re-read the current page from the server. A reload
            throws away every line the user has not saved, so with unsaved work on the page -
            a picked product, an edited line, or a value still typed in the open cell - the
-           user is ASKED, VAS_107's way (25-Sep-2026): Save / Discard / Cancel. */
+           refresh is BLOCKED with a message, the way VAS_074 does it (30-Sep-2026): the
+           user saves or discards first, then refreshes. The earlier Save / Discard / Cancel
+           question is gone. */
         function refreshLines() {
             if (!parent || !parent.M_InOut_ID) return;
-            if (!unsavedLines().length && !activeEditorHasPendingText()) { $self.fetchData(parent.M_InOut_ID, linePage); return; }
-            openRefreshConfirm();
-        }
-
-        /* The unsaved-changes question in front of a refresh (as VAS_107's). Save saves
-           the lines and refreshes only once the save went through - a failed save leaves
-           the rows on screen with their errors, exactly as the Save button does; Discard
-           drops them and refreshes; Cancel leaves everything as it is. */
-        function openRefreshConfirm() {
-            $("#vasGrnConfirm").remove();
-            var $bd = $('<div class="vas-grn-dialog-backdrop" id="vasGrnConfirm"></div>');
-            var $dlg = $('<div class="vas-grn-dialog vas-grn-dialog--confirm" role="alertdialog" aria-modal="true"></div>');
-            $dlg.html(
-                '<header class="vas-grn-dialog__header"><div class="vas-grn-dialog__header-row">' +
-                '<h3 class="vas-grn-dialog__title">' + esc(lbl("VAS_249_UnsavedTitle", "Unsaved changes")) + "</h3></div></header>" +
-                '<div class="vas-grn-dialog__body"><p class="vas-grn-confirm-text">' +
-                esc(lbl("VAS_249_UnsavedRefresh", "You have unsaved line changes. Save them before refreshing?")) + "</p></div>" +
-                '<footer class="vas-grn-dialog__footer vas-grn-dialog__footer--end">' +
-                '<button type="button" class="vas-grn-btn vas-grn-btn--ghost" data-act="cf-cancel">' + esc(lbl("VAS_249_Cancel", "Cancel")) + "</button>" +
-                '<button type="button" class="vas-grn-btn vas-grn-btn--outline" data-act="cf-discard">' + esc(lbl("VAS_249_Discard", "Discard")) + "</button>" +
-                '<button type="button" class="vas-grn-btn vas-grn-btn--primary" data-act="cf-save">' + esc(lbl("VAS_249_Save", "Save")) + "</button>" +
-                "</footer>");
-            $bd.append($dlg);
-            $("body").append($bd);
-            function close() { $("#vasGrnConfirm").remove(); }
-            $dlg.on("click", "[data-act=cf-cancel]", function () { close(); });
-            $dlg.on("click", "[data-act=cf-discard]", function () {
-                close();
-                detachActiveEditor();
-                editing = null;
-                if (parent && parent.M_InOut_ID) $self.fetchData(parent.M_InOut_ID, linePage);
-            });
-            $dlg.on("click", "[data-act=cf-save]", function () {
-                close();
-                if (blockedByDirtyHeader()) return;
-                flushActiveEdit();
-                afterCallouts(function () {
-                    if (!parent || !parent.M_InOut_ID) return;
-                    if (!unsavedLines().length) { $self.fetchData(parent.M_InOut_ID, linePage); return; }
-                    saveRows(function (ok) { if (ok && parent) $self.fetchData(parent.M_InOut_ID, linePage); });
-                });
-            });
-            // Keys stay inside the dialog (the framework's own handlers would act on them);
-            // Escape = Cancel.
-            $bd.on("keydown", function (e) {
-                if (e.key === "Escape" || e.keyCode === 27) { e.preventDefault(); close(); }
-                e.stopPropagation();
-            });
-            setTimeout(function () { $dlg.find("[data-act=cf-save]").focus(); }, 0);
+            if (unsavedLines().length || activeEditorHasPendingText()) { showToast(lbl("VAS_249_SaveBeforeRefresh", "Save or discard your changes before refreshing")); return; }
+            $self.fetchData(parent.M_InOut_ID, linePage);
         }
 
         /* Load another page of saved lines. Guards unsaved work so a page change never
@@ -2349,15 +2364,24 @@
             ProcessedOn: 1, Processed: 1
         };
 
-        /* Columns the panel always lets the user edit, whatever AD_Field.IsReadOnly or the
-           ReadOnlyLogic say (25-Sep-2026): the purchase ORDER LINE is keyed in by hand on a
-           receipt raised without Create From. The document lock still applies - that is
-           buildDynField's additionalInfoEditable() test, not a column rule. The model
+        /* The purchase ORDER LINE follows the receipt window's own rule (30-Sep-2026): it
+           is keyed in by hand on a receipt raised without Create From, so it stays editable
+           whatever AD_Field.IsReadOnly or the ReadOnlyLogic say - until the line has been
+           SAVED with one. From then on it is locked, as the Order Line field on the screen
+           is: the receipt line now hangs off that order line (matching, invoicing), so the
+           link is not re-pointed by editing. The pristine snapshot (line._saved) says what
+           was saved; an unsaved edit of the field does not lock it. The document lock still
+           applies on top - that is buildDynField's additionalInfoEditable() test. The model
            writes it even where AD_Column is not updateable (ALWAYS_EDITABLE_COLUMNS). */
-        var FORCED_EDITABLE_COLS = { C_OrderLine_ID: 1 };
+        function orderLineLocked(line) {
+            if (!line || !line.values || !((line.values.M_InOutLine_ID || 0) > 0)) return false;
+            var saved = line._saved && line._saved.values;
+            if (!saved) return false;
+            return (parseInt(VAS.PanelUtil.lineVal(saved, "C_OrderLine_ID"), 10) || 0) > 0;
+        }
 
         function isColumnReadOnly(line, col) {
-            if (FORCED_EDITABLE_COLS[col]) return false;
+            if (col === "C_OrderLine_ID") return orderLineLocked(line);
             if (FORCED_READONLY_COLS[col]) return true;
             // Product / Charge stays SELECTABLE (25-Sep-2026, VAS_107's rule): on a
             // Drafted receipt, and on any line not saved yet, whatever the dictionary's
@@ -3073,6 +3097,70 @@
         }
         function setDynDisplay(line, col, name) { if (!line._dynDisp) line._dynDisp = {}; line._dynDisp[col] = name; }
 
+        /* ---------- purchase-order line picked in Additional Info (30-Sep-2026) ----------
+           The Order Line field fills the receipt line from that purchase-order line -
+           product / charge, unit, open quantity and attribute instance (GetOrderLine,
+           server-checked against the receipt's own order when it names one). NOT the
+           locator: the bin the goods land in is the receipt's own choice, so it is left
+           exactly as it was. Ported from VAS_248's applyOrderLine. */
+        function setOrderLineValue(line, id, name) {
+            setLineVal(line, "C_OrderLine_ID", id);
+            if (name) setDynDisplay(line, "C_OrderLine_ID", name);
+            if (!line._dynTouched) line._dynTouched = {};
+            line._dynTouched.C_OrderLine_ID = true;
+            line.dirty = true;
+        }
+
+        function applyOrderLine(line, id) {
+            if (!(id > 0) || !parent || !parent.M_InOut_ID) return;
+            var seq = line._olSeq = (line._olSeq || 0) + 1;
+            var before = snapshotDynValues(line);
+            setRowBusy(line, true);
+            $.ajax({
+                url: VIS.Application.contextUrl + "VAS_249_GRNBottomPanel/GetOrderLine",
+                type: "GET", dataType: "json",
+                data: { M_InOut_ID: parent.M_InOut_ID, C_OrderLine_ID: id },
+                success: function (raw) {
+                    line._busy = false;
+                    if (seq !== line._olSeq || lines.indexOf(line) < 0) { render(); return; }
+                    var b = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
+                    if (!b || !(+b.C_OrderLine_ID > 0)) {
+                        showToast(lbl("VAS_249_OrderLineNotFound", "The order line could not be read"));
+                        render(); return;
+                    }
+                    var v = line.values, d = line.display;
+                    if (+b.C_Charge_ID > 0) {
+                        v.C_Charge_ID = +b.C_Charge_ID; v.M_Product_ID = 0; v.M_AttributeSetInstance_ID = 0;
+                        d.chargeName = b.ChargeName || ""; d.productName = ""; d.productValue = "";
+                        d.hasAttributeSet = false; d.attrName = "";
+                        line._productType = "";
+                    } else {
+                        v.M_Product_ID = +b.M_Product_ID || 0; v.C_Charge_ID = 0;
+                        d.productName = b.ProductName || ""; d.productValue = b.ProductValue || ""; d.chargeName = "";
+                        d.hasAttributeSet = !!b.HasAttributeSet;
+                        v.M_AttributeSetInstance_ID = +b.M_AttributeSetInstance_ID || 0;
+                        d.attrName = b.AttrName || "";
+                        line._productType = b.ProductType || "";
+                    }
+                    if (+b.C_UOM_ID > 0) { v.C_UOM_ID = +b.C_UOM_ID; d.uomName = b.UomName || uomName(+b.C_UOM_ID) || d.uomName; }
+                    // What is still open on the order line; a fully received line keeps the
+                    // quantity already typed (or 1).
+                    if (+b.QtyOpen > 0) v.QtyEntered = +b.QtyOpen;
+                    else if (!(+v.QtyEntered > 0)) v.QtyEntered = 1;
+                    setOrderLineValue(line, +b.C_OrderLine_ID, b.Name);
+                    markDirty(line);
+                    // Restate the base-unit MovementQty for the new unit / quantity, then let
+                    // the row lookups (unit list, locator list) follow the new product and
+                    // repaint whichever modal fields the fill changed.
+                    runCallout(line, "QtyEntered", function () {
+                        ensureRowLookups(line);
+                        syncMoreDialogValues(line, before, "C_OrderLine_ID");
+                    });
+                },
+                error: function (err) { console.log(err); line._busy = false; render(); }
+            });
+        }
+
         /* Set a dynamic field value + mark dirty, then re-evaluate the modal (display
            logic / read-only / values refresh). When the column carries an
            AD_Column.Callout, hand off to runCallout - which executes the real CLIENT
@@ -3095,6 +3183,10 @@
                 // The locator is a grid / modal twin of a column the row also shows, so keep
                 // the row's display label in step with a modal edit.
                 if (col === "M_Locator_ID") line.display.locatorName = locatorName(+value) || line.display.locatorName;
+                // An Order Line picked here fills the line from it (product / charge, unit,
+                // open quantity, attribute - never the locator), 30-Sep-2026. The panel's
+                // own fill replaces the dictionary callout for this column.
+                if (col === "C_OrderLine_ID" && +value > 0) { applyOrderLine(line, +value); return; }
             }
             var m = columnMeta[col];
             if (m && m.Callout) {
@@ -3896,7 +3988,6 @@
              */
             onUndo: function () {
                 if (!panelEditable()) return;
-                var wKey = String($self.windowNo || 0);
                 var editLine = (editing && lineById(editing.rowId)) || null;
                 var target = editLine;
                 if (!target || !(target.status === "new" || target.dirty)) {
@@ -3913,17 +4004,23 @@
                     // count as nothing, because the line itself was still clean.
                     if (editLine && activeEditorHasPendingText()) {
                         editing = null; detachActiveEditor(); render();
-                        LAST_UNDO_BY_WINDOW[wKey] = Date.now();
+                        noteUndo();
                         return;
                     }
                     // Only a press nobody has answered is "nothing to undo". An echo of a
-                    // press that has just reverted something stays silent.
-                    if (Date.now() - (LAST_UNDO_BY_WINDOW[wKey] || 0) < UNDO_ECHO_MS) return;
-                    showToast(lbl("VAS_249_NothingToUndo", "Nothing to undo"));
+                    // press that has just reverted something stays silent - and the verdict
+                    // waits a moment, so a listener that reverts AFTER this one has run
+                    // (another instance, another panel) still keeps it silent.
+                    var pressAt = Date.now();
+                    if (pressAt - lastUndoAt() < UNDO_ECHO_MS) return;
+                    setTimeout(function () {
+                        if (lastUndoAt() >= pressAt) return;   // somebody reverted for this press
+                        showToast(lbl("VAS_249_NothingToUndo", "Nothing to undo"));
+                    }, UNDO_VERDICT_MS);
                     return;
                 }
                 if (target.status === "new") { discardNewLine(target); } else { undoLine(target); }
-                LAST_UNDO_BY_WINDOW[wKey] = Date.now();
+                noteUndo();
             },
             /**
              * Alt+Ctrl+Q — refresh the current page for the loaded receipt, same as the

@@ -575,6 +575,10 @@
             // attributes holds instance 0, and the description that row carries on some
             // tenants (a dash) is not an attribute of this line - it must read blank.
             // Every screen since 23-Sep-2026 (the quotation's "_" caption).
+            // hasAttributeSet follows VAS_074 (30-Sep-2026): a SAVED line only shows the
+            // attribute sub-line when it actually carries an instance. A line saved without
+            // one no longer nags "Set attribute…" under the product - the picker still
+            // opens itself when a product with an attribute set is picked on a new line.
             var attrName = !(vals.M_AttributeSetInstance_ID > 0) ? "" : (r.AttrName || "");
             var line = {
                 rowId: "r" + (++rowCounter), status: "saved", dirty: false, _priceOverride: false,
@@ -583,7 +587,7 @@
                 display: {
                     productName: r.ProductName || "", chargeName: r.ChargeName || "",
                     uomName: r.UOMName || "", taxName: r.TaxName || "",
-                    attrName: attrName, hasAttributeSet: r.M_Product_ID > 0 && (!!attrName || !!r.HasAttributeSet)
+                    attrName: attrName, hasAttributeSet: r.M_Product_ID > 0 && !!attrName && !!r.HasAttributeSet
                 }
             };
             // Pristine snapshot of the just-loaded/just-saved state, so the row Undo can
@@ -1038,8 +1042,9 @@
             return !!parent.IsEditable;
         }
 
-        /* Additional Info is view-only as soon as the order is anything but Drafted (A2,
-           23-Sep-2026) - In Progress, Completed, Closed, Voided, ... - on every screen.
+        /* Additional Info is view-only as soon as the order is anything but Drafted or
+           In Progress (A2, 23-Sep-2026; In Progress stays editable since 30-Sep-2026) -
+           Completed, Closed, Voided, Invalid, ... - on every screen.
            Deliberately stricter than panelEditable(): the LINES keep their own rule
            (locked on CO / CL / VO / RE), only the modal's add / update / delete stops.
            DocStatus is read live off the tab first (a doc action does not reload the
@@ -1047,7 +1052,14 @@
         function additionalInfoLocked() {
             if (!panelEditable()) return true;
             var st = docStatusNow();
-            return !!st && st !== "DR";
+            return !!st && st !== "DR" && st !== "IP";
+        }
+
+        /* The line's attribute set instance may not be changed on a RELEASE purchase order
+           (target document type IsReleaseDocument = 'Y', 30-Sep-2026): the attribute comes
+           with the blanket order line the release is raised against. */
+        function attributeLocked() {
+            return docIsReleasePO();
         }
 
         /* The order's DocStatus (upper-case, "" when unknown): live off the hosting tab
@@ -1065,9 +1077,14 @@
             return st.toUpperCase();
         }
 
-        /* Drafted - and ONLY Drafted (not Invalid / In Progress): the status in which the
-           line's Product / Charge may always be changed (see isColumnReadOnly). */
-        function docIsDrafted() { return panelEditable() && docStatusNow() === "DR"; }
+        /* Drafted or In Progress (30-Sep-2026; Drafted only before that): the statuses in
+           which the line's Product / Charge may always be changed (see isColumnReadOnly).
+           Invalid / Not Approved / ... keep the dictionary's rule. */
+        function docAllowsProductChange() {
+            if (!panelEditable()) return false;
+            var st = docStatusNow();
+            return st === "DR" || st === "IP";
+        }
 
         /* Lock state the panel was last PAINTED for (set by render), so a data-status
            event only repaints on a real transition. */
@@ -1291,9 +1308,15 @@
             } else {
                 var pv = primaryValue(line);
                 var primaryRO = fieldReadOnly(line, pField);   // dictionary ReadOnlyLogic only
+                // On a LOCKED order (completed / closed / voided) the dictionary's
+                // ReadOnlyLogic (@Processed@=Y) is true as well, which rendered the product
+                // DISABLED and greyed its name. The whole-order lock keeps the plain
+                // read-only look instead, so the product name stays in the normal text
+                // colour (30-Sep-2026); the --primary class also pins the colour in CSS.
                 var $pi = dispInput(line, pField, pv, {
                     placeholder: lbl("VAS_107_AddProductCharge", "Add product / charge…"),
-                    readOnly: primaryRO
+                    readOnly: editable && primaryRO,
+                    cls: "vas-po303-cell-disp--primary"
                 });
                 wrap.append($pi);
                 // For a product carrying (or able to carry) an attribute set, show the
@@ -1310,8 +1333,9 @@
                     // or on a saved line whose product has no attribute set defined (e.g. the
                     // set was removed after the line was created but the old ASI description
                     // still shows), the attribute is informational only - not a link (no click,
-                    // no pointer cursor / hover underline).
-                    if (editable && productHasAttributeSet(line)) $attr.on("click", function (e) { e.stopPropagation(); openAttrDialog(line); });
+                    // no pointer cursor / hover underline). The same on a release purchase
+                    // order, whose attribute is the blanket line's (see attributeLocked).
+                    if (editable && !attributeLocked() && productHasAttributeSet(line)) $attr.on("click", function (e) { e.stopPropagation(); openAttrDialog(line); });
                     else $attr.addClass("vas-po303-attr-link--disabled");
                     wrap.append($attr);
                 }
@@ -1518,7 +1542,7 @@
         function openMoreDialog(line) {
             closeDialogs();
             morePopoverFor = line.rowId;
-            // When the order is anything but Drafted the modal opens view-only: every
+            // When the order is anything but Drafted / In Progress the modal opens view-only: every
             // field is built non-editable (no add / update / delete), and the footer holds
             // the same single Done button with a "View only" note above it (as the
             // invoice panel does) - never a second Close next to the header ✕.
@@ -1905,6 +1929,12 @@
                 // the input when the panel scrolls or the window resizes / zooms.
                 if ($root && $root.length) $root.on("scroll.vaspo303cat", positionCatalog);
                 $(window).on("resize.vaspo303cat", positionCatalog);
+                // The panel's root is not the only scroll box above the input: the window
+                // form's own scroller (and any other ancestor) moves the cell too, and a
+                // scroll event does not bubble - so the list stayed put while the product
+                // column scrolled away from under it (30-Sep-2026). A capture-phase
+                // listener on the document sees EVERY element's scroll and re-anchors.
+                document.addEventListener("scroll", positionCatalog, true);
             } else {
                 inner.append(catalog.$pop);
             }
@@ -2001,6 +2031,7 @@
             if (catalog.$pop) { catalog.$pop.remove(); catalog.$pop = null; }
             if ($root && $root.length) $root.off("scroll.vaspo303cat");
             $(window).off("resize.vaspo303cat");
+            document.removeEventListener("scroll", positionCatalog, true);
             catalog.$inp = null;
             catalog.results = []; catalog.loading = false;
         }
@@ -2097,7 +2128,7 @@
                 matchBlanketLine(line, function (matched) {
                     var after = function () {
                         ensureRowLookups(line);
-                        if (d.hasAttributeSet && !(v.M_AttributeSetInstance_ID > 0)) openAttrDialog(line);
+                        if (d.hasAttributeSet && !(v.M_AttributeSetInstance_ID > 0) && !attributeLocked()) openAttrDialog(line);
                         else { editing = { rowId: line.rowId, field: "description" }; render(); }
                     };
                     if (matched) afterCallouts(after);
@@ -2501,10 +2532,12 @@
             if (FORCED_READONLY_COLS[col]) return true;
             // (Release orders no longer lock Product / Charge - since 23-Sep-2026 it is
             // picked in the cell from the blanket order's own products; see B1.)
-            // Drafted order: Product / Charge stays selectable on new AND saved lines, on
-            // every screen, whatever the dictionary's IsReadOnly / ReadOnlyLogic says
-            // (23-Sep-2026). Any other status keeps the dictionary's rule.
-            if ((col === "M_Product_ID" || col === "C_Charge_ID") && docIsDrafted()) return false;
+            // Drafted / In Progress order: Product / Charge stays selectable on new AND
+            // saved lines, on every screen, whatever the dictionary's IsReadOnly /
+            // ReadOnlyLogic says (23-Sep-2026; In Progress added 30-Sep-2026 - the
+            // dictionary locked the product on an In Progress PO). Any other status keeps
+            // the dictionary's rule.
+            if ((col === "M_Product_ID" || col === "C_Charge_ID") && docAllowsProductChange()) return false;
             // C_UOM_ID: always read-only for charge lines (default UOM is auto-assigned).
             // For product lines: editable until saved, then locked.
             if (col === "C_UOM_ID" && line && line.values) {
@@ -3875,6 +3908,7 @@
             // raw VASCILDISP_HasAttrSet flag off the line (case-insensitive), not the AttrName-
             // conflated display flag - see productHasAttributeSet.
             if (!productHasAttributeSet(line)) return;
+            if (attributeLocked()) return;            // release purchase order - blanket line's attribute
             closeDialogs();
             VIS.AttributeControl.open({
                 M_Product_ID: line.values.M_Product_ID,
@@ -4783,58 +4817,16 @@
             return f === "quantity" ? (+v.QtyEntered || 0) !== n : (+v.PriceEntered || 0) !== n;
         }
 
-        /* Refresh (button and Ctrl+Alt+Q). With unsaved line work on the page - including
-           a value still in the focused cell - ask Save / Discard / Cancel instead of
-           silently dropping it (A7). */
+        /* Refresh (button and Ctrl+Alt+Q). A reload throws away every line the user has not
+           saved, so with unsaved line work on the page - a picked product, an edited line,
+           or a value still in the focused cell - the refresh is BLOCKED with a message, the
+           way VAS_074 does it (30-Sep-2026): the user saves or discards first, then
+           refreshes. The earlier Save / Discard / Cancel question (A7) is gone. */
         function refreshPanel() {
             if (!parent || !parent.C_Order_ID) return;
             var cur = editing ? lineById(editing.rowId) : null;
-            if (!unsavedLines().length && !activeEditPending(cur)) { $self.fetchData(parent.C_Order_ID, linePage); return; }
-            openRefreshConfirm();
-        }
-
-        function openRefreshConfirm() {
-            $("#vasPo303Confirm").remove();
-            var $bd = $('<div class="vas-po303-dialog-backdrop" id="vasPo303Confirm"></div>');
-            var $dlg = $('<div class="vas-po303-dialog vas-po303-dialog--confirm" role="alertdialog" aria-modal="true"></div>');
-            $dlg.html(
-                '<header class="vas-po303-dialog__header"><div class="vas-po303-dialog__header-row">' +
-                '<h3 class="vas-po303-dialog__title">' + esc(lbl("VAS_107_UnsavedTitle", "Unsaved changes")) + "</h3></div></header>" +
-                '<div class="vas-po303-dialog__body"><p class="vas-po303-confirm-text">' +
-                esc(lbl("VAS_107_UnsavedRefresh", "You have unsaved line changes. Save them before refreshing?")) + "</p></div>" +
-                '<footer class="vas-po303-dialog__footer vas-po303-dialog__footer--end">' +
-                '<button type="button" class="vas-po303-btn vas-po303-btn--ghost" data-act="cf-cancel">' + esc(lbl("VAS_107_Cancel", "Cancel")) + "</button>" +
-                '<button type="button" class="vas-po303-btn vas-po303-btn--outline" data-act="cf-discard">' + esc(lbl("VAS_107_Discard", "Discard")) + "</button>" +
-                '<button type="button" class="vas-po303-btn vas-po303-btn--primary" data-act="cf-save">' + esc(lbl("VAS_107_Save", "Save")) + "</button>" +
-                "</footer>");
-            $bd.append($dlg);
-            $("body").append($bd);
-            function close() { $("#vasPo303Confirm").remove(); }
-            $dlg.on("click", "[data-act=cf-cancel]", function () { close(); });
-            $dlg.on("click", "[data-act=cf-discard]", function () {
-                close();
-                editing = null;
-                if (parent && parent.C_Order_ID) $self.fetchData(parent.C_Order_ID, linePage);
-            });
-            $dlg.on("click", "[data-act=cf-save]", function () {
-                close();
-                if (blockedByDirtyHeader()) return;
-                flushActiveEdit();
-                afterCallouts(function () {
-                    if (!parent || !parent.C_Order_ID) return;
-                    if (!unsavedLines().length) { $self.fetchData(parent.C_Order_ID, linePage); return; }
-                    // Refresh only once the save went through; a failed save leaves the
-                    // rows on screen with their errors, exactly as the Save button does.
-                    saveRows(function (ok) { if (ok && parent) $self.fetchData(parent.C_Order_ID, linePage); });
-                });
-            });
-            // Keep keys inside the dialog (the framework's own handlers would act on them);
-            // Escape = Cancel.
-            $bd.on("keydown", function (e) {
-                if (e.key === "Escape" || e.keyCode === 27) { e.preventDefault(); close(); }
-                e.stopPropagation();
-            });
-            setTimeout(function () { $dlg.find("[data-act=cf-save]").focus(); }, 0);
+            if (unsavedLines().length || activeEditPending(cur)) { showToast(lbl("VAS_107_SaveBeforeRefresh", "Save or discard your changes before refreshing")); return; }
+            $self.fetchData(parent.C_Order_ID, linePage);
         }
 
         // Alt+Ctrl+N/S/D/Z/Q keyboard shortcuts via the shared utility (VAI154 12-Aug-2026).

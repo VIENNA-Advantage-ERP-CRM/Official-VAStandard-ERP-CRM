@@ -1160,6 +1160,7 @@ namespace VASLogic.Models
         /// Reads the changed column's AD_Column.Callout and returns the default UOM,
         /// display name, PlannedPrice (from price list or charge), and PlannedAmt
         /// for the selected product or charge.
+        /// Also returns PriceList, PriceLimit, and MarginPrice from M_ProductPrice.
         /// PlannedPrice is skipped when req.PriceOverride is true (user manually entered it).
         /// </summary>
         public OppCalloutResult RunColumnCallout(Ctx ctx, OppLineCalcRequest req)
@@ -1194,13 +1195,23 @@ namespace VASLogic.Models
                 res.Values["M_Product_ID"] = req.M_Product_ID;
                 res.Values["C_Charge_ID"] = 0;
 
-                // Look up PriceStd from the opportunity's price list version unless the user
-                // has already manually overridden the price on this line.
-                if (!req.PriceOverride && M_PriceList_Version_ID > 0)
+                // Look up all three prices (List, Std, Limit) from the opportunity's price list
+                // version unless the user has manually overridden the price on this line.
+                if (M_PriceList_Version_ID > 0)
                 {
-                    decimal listPrice = GetProductPriceFromList(ctx, req.M_Product_ID, M_PriceList_Version_ID);
-                    if (listPrice > 0)
-                        plannedPrice = listPrice;
+                    OppProductPrices prices = GetProductPricesFromList(ctx, req.M_Product_ID, M_PriceList_Version_ID);
+                    if (!req.PriceOverride && prices.PriceStd > 0)
+                        plannedPrice = prices.PriceStd;
+
+                    // Always populate price reference fields regardless of PriceOverride so the
+                    // line record always carries current catalogue prices from the price list.
+                    if (prices.PriceList > 0)
+                        res.Values["PriceList"] = prices.PriceList;
+                    if (prices.PriceLimit > 0)
+                        res.Values["PriceLimit"] = prices.PriceLimit;
+                    // MarginPrice = PriceList - PriceLimit (gross margin above the floor price).
+                    if (prices.PriceList > 0 && prices.PriceLimit >= 0)
+                        res.Values["MarginPrice"] = prices.PriceList - prices.PriceLimit;
                 }
             }
             else if (req.C_Charge_ID > 0)
@@ -1288,29 +1299,38 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Returns the standard price (PriceStd) from M_ProductPrice for the given product
-        /// and price list version. Returns 0 when no price entry exists.
+        /// Returns all three price fields (PriceList, PriceStd, PriceLimit) from M_ProductPrice
+        /// for the given product and price list version.
+        /// Returns an empty struct (all zeros) when no price entry exists.
         /// </summary>
         /// <param name="ctx">session context</param>
         /// <param name="M_Product_ID">product to price</param>
         /// <param name="M_PriceList_Version_ID">price list version from the parent opportunity</param>
-        /// <returns>PriceStd, or 0 if not found</returns>
-        private decimal GetProductPriceFromList(Ctx ctx, int M_Product_ID, int M_PriceList_Version_ID)
+        /// <returns>OppProductPrices with PriceList, PriceStd, PriceLimit; zeros if not found</returns>
+        private OppProductPrices GetProductPricesFromList(Ctx ctx, int M_Product_ID, int M_PriceList_Version_ID)
         {
-            if (M_Product_ID <= 0 || M_PriceList_Version_ID <= 0) return 0;
-            string sql = @"SELECT pp.PriceStd
+            OppProductPrices result = new OppProductPrices();
+            if (M_Product_ID <= 0 || M_PriceList_Version_ID <= 0) return result;
+            string sql = @"SELECT pp.PriceList, pp.PriceStd, pp.PriceLimit
                            FROM M_ProductPrice pp
                            WHERE pp.M_Product_ID = @M_Product_ID
                              AND pp.M_PriceList_Version_ID = @M_PriceList_Version_ID
                              AND pp.IsActive = 'Y'";
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "pp", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-            object val = DB.ExecuteScalar(sql,
+            DataSet ds = DB.ExecuteDataset(sql,
                 new SqlParameter[]
                 {
                     new SqlParameter("@M_Product_ID", M_Product_ID),
                     new SqlParameter("@M_PriceList_Version_ID", M_PriceList_Version_ID)
                 }, null);
-            return Util.GetValueOfDecimal(val);
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                DataRow r = ds.Tables[0].Rows[0];
+                result.PriceList  = Util.GetValueOfDecimal(r["PriceList"]);
+                result.PriceStd   = Util.GetValueOfDecimal(r["PriceStd"]);
+                result.PriceLimit = Util.GetValueOfDecimal(r["PriceLimit"]);
+            }
+            return result;
         }
 
         /// <summary>
@@ -1992,6 +2012,14 @@ namespace VASLogic.Models
         public int C_UOM_ID { get; set; }
         public decimal PlannedPrice { get; set; }
         public bool PriceOverride { get; set; }
+    }
+
+    /// <summary>Three catalogue prices for a product from M_ProductPrice.</summary>
+    public class OppProductPrices
+    {
+        public decimal PriceList  { get; set; }
+        public decimal PriceStd   { get; set; }
+        public decimal PriceLimit { get; set; }
     }
 
     /// <summary>A saved opportunity line shown in the panel grid.</summary>

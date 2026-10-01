@@ -49,6 +49,11 @@ namespace VAS.Models
             dynamic response = new ExpandoObject();
             response.error = null;
 
+            // The right panel may be invoked from the C_ContractSchedule child tab, which
+            // passes C_ContractSchedule_ID as recordID instead of the parent C_Contract_ID.
+            // Resolve it here so both header and schedule queries use the correct parent ID.
+            contractId = ResolveToContractId(contractId);
+
             int adClientId = ctx.GetAD_Client_ID();
             string language = ctx.GetAD_Language();
 
@@ -80,7 +85,7 @@ namespace VAS.Models
                 sb.Append("       c.C_Order_ID,");
                 sb.Append("       COALESCE(o.DocumentNo, N'') AS OrderDocumentNo,");
                 sb.Append("       c.C_OrderLine_ID,");
-                sb.Append("       COALESCE(CAST(ol.Line AS VARCHAR(20)), N'') AS OrderLineNo,");
+                sb.Append("       ol.Line AS OrderLineNo,");
                 sb.Append("       COALESCE(ol.Description, N'') AS OrderDescription,");
                 sb.Append("       c.PriceEntered,");
                 sb.Append("       c.PriceActual,");
@@ -122,6 +127,8 @@ namespace VAS.Models
                 string baseSql = sb.ToString();
                 string accessSql = MRole.GetDefault(ctx).AddAccessSQL(
                     baseSql, "c", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                if (DB.IsOracle())
+                    accessSql = RemovePrivateAccessClauses(accessSql);
 
                 var sqlParams = new SqlParameter[]
                 {
@@ -138,43 +145,43 @@ namespace VAS.Models
 
                 DataRow row = ds.Tables[0].Rows[0];
 
-                response.id                    = Util.GetValueOfInt(row["C_Contract_ID"]);
-                response.documentNo            = Util.GetValueOfString(row["DocumentNo"]);
-                response.docStatus             = Util.GetValueOfString(row["DocStatus"]);
-                response.processed             = Util.GetValueOfString(row["Processed"]) == "Y";
-                response.contractType          = Util.GetValueOfString(row["ContractType"]);
-                response.startDate             = row["StartDate"] != DBNull.Value ? Convert.ToDateTime(row["StartDate"]).ToString("yyyy-MM-dd") : null;
-                response.endDate               = row["EndDate"]   != DBNull.Value ? Convert.ToDateTime(row["EndDate"]).ToString("yyyy-MM-dd")   : null;
-                response.bPartnerId            = Util.GetValueOfInt(row["C_BPartner_ID"]);
-                response.bPartnerName          = Util.GetValueOfString(row["BPartnerName"]);
-                response.billingLocationName   = Util.GetValueOfString(row["BillingLocationName"]);
+                response.id = Util.GetValueOfInt(row["C_Contract_ID"]);
+                response.documentNo = Util.GetValueOfString(row["DocumentNo"]);
+                response.docStatus = Util.GetValueOfString(row["DocStatus"]);
+                response.processed = Util.GetValueOfString(row["Processed"]) == "Y";
+                response.contractType = Util.GetValueOfString(row["ContractType"]);
+                response.startDate = row["StartDate"] != DBNull.Value ? Convert.ToDateTime(row["StartDate"]).ToString("yyyy-MM-dd") : null;
+                response.endDate = row["EndDate"] != DBNull.Value ? Convert.ToDateTime(row["EndDate"]).ToString("yyyy-MM-dd") : null;
+                response.bPartnerId = Util.GetValueOfInt(row["C_BPartner_ID"]);
+                response.bPartnerName = Util.GetValueOfString(row["BPartnerName"]);
+                response.billingLocationName = Util.GetValueOfString(row["BillingLocationName"]);
                 response.billingLocationAddress = Util.GetValueOfString(row["BillingLocationAddress"]);
-                response.productId             = Util.GetValueOfInt(row["M_Product_ID"]);
-                response.productName           = Util.GetValueOfString(row["ProductName"]);
-                response.attributeDisplay      = Util.GetValueOfString(row["AttributeDisplay"]);
-                response.uomName               = Util.GetValueOfString(row["UOMName"]);
-                response.frequencyName         = Util.GetValueOfString(row["FrequencyName"]);
-                response.refContract           = Util.GetValueOfString(row["RefContract"]);
+                response.productId = Util.GetValueOfInt(row["M_Product_ID"]);
+                response.productName = Util.GetValueOfString(row["ProductName"]);
+                response.attributeDisplay = Util.GetValueOfString(row["AttributeDisplay"]);
+                response.uomName = Util.GetValueOfString(row["UOMName"]);
+                response.frequencyName = Util.GetValueOfString(row["FrequencyName"]);
+                response.refContract = Util.GetValueOfString(row["RefContract"]);
                 response.refContractDocumentNo = Util.GetValueOfString(row["RefContractDocumentNo"]);
-                response.orderDocumentNo       = Util.GetValueOfString(row["OrderDocumentNo"]);
-                response.orderLineNo           = Util.GetValueOfString(row["OrderLineNo"]);
-                response.orderDescription      = Util.GetValueOfString(row["OrderDescription"]);
-                response.priceEntered          = row["PriceEntered"]   != DBNull.Value ? Convert.ToDecimal(row["PriceEntered"])   : (decimal?)null;
-                response.priceActual           = row["PriceActual"]    != DBNull.Value ? Convert.ToDecimal(row["PriceActual"])    : (decimal?)null;
-                response.priceListAmount       = row["PriceListAmount"] != DBNull.Value ? Convert.ToDecimal(row["PriceListAmount"]) : (decimal?)null;
-                response.discount              = row["Discount"]       != DBNull.Value ? Convert.ToDecimal(row["Discount"])       : (decimal?)null;
-                response.taxAmt                = row["TaxAmt"]         != DBNull.Value ? Convert.ToDecimal(row["TaxAmt"])         : (decimal?)null;
-                response.lineNetAmt            = row["LineNetAmt"]     != DBNull.Value ? Convert.ToDecimal(row["LineNetAmt"])     : (decimal?)null;
-                response.grandTotal            = row["GrandTotal"]     != DBNull.Value ? Convert.ToDecimal(row["GrandTotal"])     : (decimal?)null;
-                response.priceListName         = Util.GetValueOfString(row["PriceListName"]);
-                response.paymentTermName       = Util.GetValueOfString(row["PaymentTermName"]);
-                response.currencyIsoCode       = Util.GetValueOfString(row["CurrencyISOCode"]);
-                response.currencySymbol        = Util.GetValueOfString(row["CurrencySymbol"]);
-                response.currencyPrecision     = row["CurrencyPrecision"] != DBNull.Value ? Util.GetValueOfInt(row["CurrencyPrecision"]) : 2;
-                response.description           = Util.GetValueOfString(row["Description"]);
-                response.renewalType           = Util.GetValueOfString(row["RenewalType"]);
-                response.cancelBeforeDays      = row["CancelBeforeDays"] != DBNull.Value ? Util.GetValueOfInt(row["CancelBeforeDays"]) : (int?)null;
-                response.cancellationDate      = row["CancellationDate"] != DBNull.Value ? Convert.ToDateTime(row["CancellationDate"]).ToString("yyyy-MM-dd") : null;
+                response.orderDocumentNo = Util.GetValueOfString(row["OrderDocumentNo"]);
+                response.orderLineNo = Util.GetValueOfString(row["OrderLineNo"]);
+                response.orderDescription = Util.GetValueOfString(row["OrderDescription"]);
+                response.priceEntered = row["PriceEntered"] != DBNull.Value ? Convert.ToDecimal(row["PriceEntered"]) : (decimal?)null;
+                response.priceActual = row["PriceActual"] != DBNull.Value ? Convert.ToDecimal(row["PriceActual"]) : (decimal?)null;
+                response.priceListAmount = row["PriceListAmount"] != DBNull.Value ? Convert.ToDecimal(row["PriceListAmount"]) : (decimal?)null;
+                response.discount = row["Discount"] != DBNull.Value ? Convert.ToDecimal(row["Discount"]) : (decimal?)null;
+                response.taxAmt = row["TaxAmt"] != DBNull.Value ? Convert.ToDecimal(row["TaxAmt"]) : (decimal?)null;
+                response.lineNetAmt = row["LineNetAmt"] != DBNull.Value ? Convert.ToDecimal(row["LineNetAmt"]) : (decimal?)null;
+                response.grandTotal = row["GrandTotal"] != DBNull.Value ? Convert.ToDecimal(row["GrandTotal"]) : (decimal?)null;
+                response.priceListName = Util.GetValueOfString(row["PriceListName"]);
+                response.paymentTermName = Util.GetValueOfString(row["PaymentTermName"]);
+                response.currencyIsoCode = Util.GetValueOfString(row["CurrencyISOCode"]);
+                response.currencySymbol = Util.GetValueOfString(row["CurrencySymbol"]);
+                response.currencyPrecision = row["CurrencyPrecision"] != DBNull.Value ? Util.GetValueOfInt(row["CurrencyPrecision"]) : 2;
+                response.description = Util.GetValueOfString(row["Description"]);
+                response.renewalType = Util.GetValueOfString(row["RenewalType"]);
+                response.cancelBeforeDays = row["CancelBeforeDays"] != DBNull.Value ? Util.GetValueOfInt(row["CancelBeforeDays"]) : (int?)null;
+                response.cancellationDate = row["CancellationDate"] != DBNull.Value ? Convert.ToDateTime(row["CancellationDate"]).ToString("yyyy-MM-dd") : null;
             }
             catch (Exception ex)
             {
@@ -240,12 +247,19 @@ namespace VAS.Models
             dynamic response = new ExpandoObject();
             response.items = new List<dynamic>();
 
+            // Same parent-ID resolution as GetContractOverview.
+            contractId = ResolveToContractId(contractId);
+
             int adClientId = ctx.GetAD_Client_ID();
 
             // Use application date (ctx date) as the as-of date; never use SYSDATE/NOW
             // inside SQL so the same date governs all schedule-status decisions.
             DateTime? _ctxDate = CommonFunctions.CovertMilliToDate(ctx.GetContextAsTime("#Date"));
             DateTime asOfDate = _ctxDate.HasValue ? _ctxDate.Value.Date : DateTime.Now.Date;
+            _log.Info("VAS_290 GetContractSchedules: _ctxDate=" + (_ctxDate.HasValue ? _ctxDate.Value.ToString("yyyy-MM-dd HH:mm:ss") : "null")
+                    + " | asOfDate=" + asOfDate.ToString("yyyy-MM-dd")
+                    + " | asOfDate_formatted=" + asOfDate.ToString("yyyy-MM-dd")
+                    + " | contractId=" + contractId);
 
             try
             {
@@ -258,28 +272,43 @@ namespace VAS.Models
                 sb.Append("       s.TaxAmt,");
                 sb.Append("       s.GrandTotal,");
                 sb.Append("       s.C_Invoice_ID,");
-                sb.Append("       COALESCE(i.DocumentNo, N'') AS InvoiceDocumentNo,");
+                // Correlated subquery instead of LEFT JOIN so AddAccessSQL does not inject
+                // "i.C_Invoice_ID NOT IN (SELECT Record_ID ...)" which causes ORA-01722 on Oracle
+                // when C_Invoice_ID is NULL (LEFT JOIN miss) or when Record_ID type-mismatches NUMBER.
+                sb.Append("       (SELECT inv.DocumentNo FROM C_Invoice inv WHERE inv.C_Invoice_ID = s.C_Invoice_ID AND inv.IsActive = 'Y') AS InvoiceDocumentNo, ");
                 sb.Append("       CASE");
                 sb.Append("           WHEN s.C_Invoice_ID IS NOT NULL THEN 'Invoiced'");
-                sb.Append("           WHEN s.FROMDATE <= @asOfDate THEN 'Due'");
+                // Date literal is inlined for both dialects so no bind parameter is needed.
+                // Oracle: TO_DATE(literal) avoids ODP.NET mapping DateTime params to NUMBER (ORA-00932).
+                // PostgreSQL: ISO date string 'YYYY-MM-DD' is accepted natively; CONVERT is SQL Server only.
+                sb.Append("           WHEN s.FROMDATE <= " + GlobalVariable.TO_DATE(asOfDate, true) + " THEN 'Due'");
                 sb.Append("           ELSE 'Scheduled'");
                 sb.Append("       END AS BillingStatus");
                 sb.Append("  FROM C_ContractSchedule s");
-                sb.Append("  LEFT OUTER JOIN C_Invoice i ON (i.C_Invoice_ID = s.C_Invoice_ID AND i.IsActive = 'Y')");
                 sb.Append(" WHERE s.C_Contract_ID = @contractId");
                 sb.Append("   AND s.AD_Client_ID = @adClientId");
                 sb.Append("   AND s.IsActive = 'Y'");
-                sb.Append(" ORDER BY s.FROMDATE, s.C_ContractSchedule_ID");
 
                 string baseSql = sb.ToString();
                 string accessSql = MRole.GetDefault(ctx).AddAccessSQL(
                     baseSql, "s", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                // RULE 5: ORDER BY must be appended after AddAccessSQL, not inside baseSql.
+                // AddAccessSQL injects WHERE predicates at the end of the SQL string; if ORDER BY
+                // is already present those predicates land after it, producing invalid SQL that
+                // causes DB.ExecuteDataset to return null.
+                accessSql += " ORDER BY s.FROMDATE, s.C_ContractSchedule_ID";
+                // Remove the NOT IN (SELECT Record_ID FROM AD_Private_Access ...) clause on all databases:
+                // • Oracle: Record_ID is VARCHAR2 but PK is NUMBER → ORA-01722 on implicit conversion.
+                // • SQL Server: if AD_Private_Access has NULL Record_ID values the NOT IN evaluates
+                //   to NULL for every row, silently returning 0 rows.
+                // C_ContractSchedule rows are already scoped to a secured parent contract, so the
+                // private-access predicate is redundant and safe to omit.
+                accessSql = RemovePrivateAccessClauses(accessSql);
 
                 var sqlParams = new SqlParameter[]
                 {
                     new SqlParameter("@contractId", contractId),
-                    new SqlParameter("@adClientId", adClientId),
-                    new SqlParameter("@asOfDate",   asOfDate.Date)
+                    new SqlParameter("@adClientId", adClientId)
                 };
 
                 DataSet ds = DB.ExecuteDataset(accessSql, sqlParams, null);
@@ -290,16 +319,16 @@ namespace VAS.Models
                 foreach (DataRow row in ds.Tables[0].Rows)
                 {
                     dynamic item = new ExpandoObject();
-                    item.id                  = Util.GetValueOfInt(row["C_ContractSchedule_ID"]);
-                    item.contractId          = Util.GetValueOfInt(row["C_Contract_ID"]);
-                    item.fromDate            = row["FROMDATE"] != DBNull.Value ? Convert.ToDateTime(row["FROMDATE"]).ToString("yyyy-MM-dd") : null;
-                    item.endDate             = row["EndDate"]  != DBNull.Value ? Convert.ToDateTime(row["EndDate"]).ToString("yyyy-MM-dd")  : null;
-                    item.totalAmt            = row["TotalAmt"]    != DBNull.Value ? Convert.ToDecimal(row["TotalAmt"])    : (decimal?)null;
-                    item.taxAmt              = row["TaxAmt"]      != DBNull.Value ? Convert.ToDecimal(row["TaxAmt"])      : (decimal?)null;
-                    item.grandTotal          = row["GrandTotal"]  != DBNull.Value ? Convert.ToDecimal(row["GrandTotal"])  : (decimal?)null;
-                    item.cInvoiceId          = row["C_Invoice_ID"] != DBNull.Value ? Util.GetValueOfInt(row["C_Invoice_ID"]) : (int?)null;
-                    item.invoiceDocumentNo   = Util.GetValueOfString(row["InvoiceDocumentNo"]);
-                    item.billingStatus       = Util.GetValueOfString(row["BillingStatus"]);
+                    item.id = Util.GetValueOfInt(row["C_ContractSchedule_ID"]);
+                    item.contractId = Util.GetValueOfInt(row["C_Contract_ID"]);
+                    item.fromDate = row["FROMDATE"] != DBNull.Value ? Convert.ToDateTime(row["FROMDATE"]).ToString("yyyy-MM-dd") : null;
+                    item.endDate = row["EndDate"] != DBNull.Value ? Convert.ToDateTime(row["EndDate"]).ToString("yyyy-MM-dd") : null;
+                    item.totalAmt = row["TotalAmt"] != DBNull.Value ? Convert.ToDecimal(row["TotalAmt"]) : (decimal?)null;
+                    item.taxAmt = row["TaxAmt"] != DBNull.Value ? Convert.ToDecimal(row["TaxAmt"]) : (decimal?)null;
+                    item.grandTotal = row["GrandTotal"] != DBNull.Value ? Convert.ToDecimal(row["GrandTotal"]) : (decimal?)null;
+                    item.cInvoiceId = row["C_Invoice_ID"] != DBNull.Value ? Util.GetValueOfInt(row["C_Invoice_ID"]) : (int?)null;
+                    item.invoiceDocumentNo = Util.GetValueOfString(row["InvoiceDocumentNo"]);
+                    item.billingStatus = Util.GetValueOfString(row["BillingStatus"]);
                     items.Add(item);
                 }
 
@@ -317,6 +346,106 @@ namespace VAS.Models
         // ─────────────────────────────────────────────────────────
         // Private helpers
         // ─────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Resolves a possible C_ContractSchedule_ID to its parent C_Contract_ID.
+        /// The right panel may be invoked from the C_ContractSchedule child tab, in which
+        /// case the framework passes the selected schedule row's PK (C_ContractSchedule_ID)
+        /// rather than the parent C_Contract_ID. If possibleId is found in C_ContractSchedule
+        /// the method returns that row's C_Contract_ID; otherwise possibleId is returned
+        /// unchanged (it is already a C_Contract_ID).
+        /// No MRole security is applied here — the caller's main queries apply it on the
+        /// resolved ID, so security is not bypassed.
+        /// </summary>
+        /// <param name="possibleId">ID received by the controller — may be either a C_Contract_ID
+        /// or a C_ContractSchedule_ID depending on which tab triggered the panel.</param>
+        /// <returns>Resolved C_Contract_ID, or possibleId when no resolution was needed.</returns>
+        private int ResolveToContractId(int possibleId)
+        {
+            if (possibleId <= 0) return possibleId;
+            try
+            {
+                object result = DB.ExecuteScalar(
+                    "SELECT C_Contract_ID FROM C_ContractSchedule WHERE C_ContractSchedule_ID = @id AND IsActive = 'Y'",
+                    new SqlParameter[] { new SqlParameter("@id", possibleId) },
+                    null);
+                if (result != null && result != DBNull.Value)
+                {
+                    int parentId = Util.GetValueOfInt(result);
+                    if (parentId > 0 && parentId != possibleId)
+                    {
+                        _log.Info("VAS_290 ResolveToContractId: C_ContractSchedule_ID=" + possibleId
+                                + " resolved to C_Contract_ID=" + parentId);
+                        return parentId;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.SaveError("VAS_290_ServiceContractRightPanelModel.ResolveToContractId", ex.Message);
+            }
+            return possibleId;
+        }
+
+        /// <summary>
+        /// Removes all "AND alias.PK NOT IN (SELECT Record_ID FROM AD_Private_Access ...)"
+        /// clauses that AddAccessSQL injects into a SQL string on Oracle.
+        /// The Record_ID column in AD_Private_Access is VARCHAR2, but primary-key columns
+        /// are NUMBER; the implicit type conversion causes ORA-01722 on any query that
+        /// touches AD_Private_Access rows whose Record_ID values are not numeric strings.
+        /// This helper locates every occurrence of the AD_Private_Access table name in
+        /// the SQL, walks back to the enclosing NOT IN subquery, then removes the whole
+        /// "AND ... NOT IN (...)" clause using balanced-paren tracking.
+        /// </summary>
+        /// <param name="sql">SQL string returned by AddAccessSQL.</param>
+        /// <returns>SQL string with all AD_Private_Access NOT IN clauses removed.</returns>
+        private static string RemovePrivateAccessClauses(string sql)
+        {
+            const string PA_TABLE = "AD_Private_Access";
+            const string NOT_IN_P = "NOT IN (";
+
+            int searchPos = 0;
+            while (true)
+            {
+                // Locate the next occurrence of the private-access table name.
+                int paIdx = sql.IndexOf(PA_TABLE, searchPos, StringComparison.OrdinalIgnoreCase);
+                if (paIdx < 0) break;
+
+                // Walk backward from the table-name position to find "NOT IN (" that encloses it.
+                int notInIdx = sql.LastIndexOf(NOT_IN_P, paIdx, StringComparison.OrdinalIgnoreCase);
+                if (notInIdx < 0) { searchPos = paIdx + PA_TABLE.Length; continue; }
+
+                // Walk backward from "NOT IN (" to find the "AND " that starts the clause.
+                int andIdx = sql.LastIndexOf("AND ", notInIdx, StringComparison.OrdinalIgnoreCase);
+                if (andIdx < 0) { searchPos = paIdx + PA_TABLE.Length; continue; }
+
+                // The opening paren of the NOT IN subquery sits right after "NOT IN ".
+                int openParen = notInIdx + NOT_IN_P.Length - 1; // index of '('
+                if (openParen >= sql.Length || sql[openParen] != '(')
+                {
+                    searchPos = paIdx + PA_TABLE.Length;
+                    continue;
+                }
+
+                // Track paren depth to find the matching closing paren.
+                int depth = 0, closeParen = -1;
+                for (int ci = openParen; ci < sql.Length; ci++)
+                {
+                    if (sql[ci] == '(') depth++;
+                    else if (sql[ci] == ')') { if (--depth == 0) { closeParen = ci; break; } }
+                }
+
+                if (closeParen < 0) { searchPos = paIdx + PA_TABLE.Length; continue; }
+
+                // Remove from "AND " through the closing paren (inclusive).
+                sql = sql.Remove(andIdx, closeParen + 1 - andIdx);
+
+                // Don't advance searchPos — the string shrank; the next iteration
+                // starts from the same position and will catch any further clauses.
+            }
+
+            return sql;
+        }
 
         /// <summary>
         /// Resolves the translated display name for a reference-list value on a

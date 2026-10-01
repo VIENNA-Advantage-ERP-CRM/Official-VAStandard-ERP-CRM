@@ -729,7 +729,12 @@ namespace VAS.Models
                     sbCC.Append("       ct.Description AS ct_description,");
                     sbCC.Append("       ct.ContractType AS type_code,");
                     // Resolve ContractType code to translated display name via AD_Ref_List
-                    sbCC.Append("       (SELECT COALESCE(tCt.Name, rCt.Name)");
+                    // Oracle: AD_Ref_List_Trl.Name is NVARCHAR2 but AD_Ref_List.Name is VARCHAR2;
+                    // mixing them in COALESCE causes ORA-12704. TO_CHAR normalises both to VARCHAR2.
+                    if (DB.IsOracle())
+                        sbCC.Append("       (SELECT COALESCE(TO_CHAR(tCt.Name), TO_CHAR(rCt.Name))");
+                    else
+                        sbCC.Append("       (SELECT COALESCE(tCt.Name, rCt.Name)");
                     sbCC.Append("          FROM AD_Ref_List rCt");
                     sbCC.Append("          LEFT OUTER JOIN AD_Ref_List_Trl tCt ON (tCt.AD_Ref_List_ID = rCt.AD_Ref_List_ID");
                     sbCC.Append("               AND tCt.IsActive = 'Y' AND tCt.AD_Language = @ctLang)");
@@ -746,10 +751,15 @@ namespace VAS.Models
                     sbCC.Append("       TO_CHAR(ct.EndDate,'YYYY-MM-DD') AS end_date,");
                     sbCC.Append("       ct.Processed AS status_code,");
                     sbCC.Append("       ct.RenewalType AS renewal_code,");
-                    sbCC.Append("       (SELECT COALESCE(trl.Name, r.Name)");
+                    // Oracle: same NVARCHAR2 vs VARCHAR2 mismatch as ContractType — wrap with TO_CHAR
+                    if (DB.IsOracle())
+                        sbCC.Append("       (SELECT COALESCE(TO_CHAR(trl.Name), TO_CHAR(r.Name))");
+                    else
+                        sbCC.Append("       (SELECT COALESCE(trl.Name, r.Name)");
                     sbCC.Append("          FROM AD_Ref_List r");
                     sbCC.Append("          LEFT OUTER JOIN AD_Ref_List_Trl trl ON (trl.AD_Ref_List_ID = r.AD_Ref_List_ID");
-                    sbCC.Append("               AND trl.IsActive = 'Y' AND trl.AD_Language = @ctLang)");
+                    // Oracle binds by position: @ctLangR is a distinct name for the same value to avoid ORA-01008
+                    sbCC.Append("               AND trl.IsActive = 'Y' AND trl.AD_Language = @ctLangR)");
                     sbCC.Append("         WHERE r.IsActive = 'Y'");
                     sbCC.Append("           AND r.Value = ct.RenewalType");
                     sbCC.Append("           AND r.AD_Reference_ID IN (SELECT col.AD_Reference_Value_ID");
@@ -759,9 +769,8 @@ namespace VAS.Models
                     sbCC.Append("                                            AND tbl.IsActive = 'Y')");
                     sbCC.Append("                                       WHERE col.ColumnName = 'RenewalType'");
                     sbCC.Append("                                         AND col.IsActive = 'Y')) AS renewal_name,");
-                    // C_Contract has GrandTotal (includes tax) and LineNetAmt (net, excl. tax).
-                    // TotalLines does not exist on C_Contract — use GrandTotal here.
-                    sbCC.Append("       ct.GrandTotal AS value,");
+                    // LineNetAmt is the contract total excluding tax (GrandTotal includes tax).
+                    sbCC.Append("       ct.LineNetAmt AS value,");
                     sbCC.Append("       CASE WHEN curCC.CurSymbol IS NOT NULL THEN curCC.CurSymbol ELSE curCC.ISO_Code END AS cur_symbol,");
                     sbCC.Append("       curCC.ISO_Code AS cur_iso,");
                     sbCC.Append("       COALESCE(curCC.StdPrecision, 2) AS cur_precision,");
@@ -780,8 +789,10 @@ namespace VAS.Models
                     accessCC += " ORDER BY ct.StartDate DESC";
 
                     var paramsCC = new SqlParameter[] {
-                        new SqlParameter("@bPartnerIdCC", bPartnerId),
-                        new SqlParameter("@ctLang",       lang)
+                       
+                        new SqlParameter("@ctLang",       lang),
+                        new SqlParameter("@ctLangR",      lang),   // Oracle position-based binding requires a unique name per occurrence
+                         new SqlParameter("@bPartnerIdCC", bPartnerId)
                     };
                     DataSet dsCC = DB.ExecuteDataset(accessCC, paramsCC, null);
                     if (dsCC != null && dsCC.Tables.Count > 0)
@@ -851,10 +862,12 @@ namespace VAS.Models
                         sbCCProd.Append(" WHERE cl.IsActive = 'Y' AND (cl.M_Product_ID > 0 OR cl.C_Charge_ID > 0)");
                         sbCCProd.Append("   AND cl.C_Contract_ID IN (");
                         sbCCProd.Append(sbCCIds);
-                        sbCCProd.Append(") ORDER BY cl.C_Contract_ID, COALESCE(p.Name, ch.Name)");
+                        sbCCProd.Append(")");
 
                         string ccProdAccess = MRole.GetDefault(ctx).AddAccessSQL(
                             sbCCProd.ToString(), "cl", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                        // RULE 5: ORDER BY after AddAccessSQL
+                        ccProdAccess += " ORDER BY cl.C_Contract_ID, COALESCE(p.Name, ch.Name)";
                         DataSet dsCCProd = DB.ExecuteDataset(ccProdAccess, null, null);
 
                         // Aggregate product/charge names and collect first attribute description per C_Contract
@@ -912,7 +925,12 @@ namespace VAS.Models
                     sbVM.Append("       vm.VAS_ContractSummary AS name,");
                     sbVM.Append("       vm.ContractType AS type_code,");
                     // Resolve ContractType code to translated display name via AD_Ref_List
-                    sbVM.Append("       (SELECT COALESCE(tCt.Name, rCt.Name)");
+                    // Oracle: AD_Ref_List_Trl.Name is NVARCHAR2 but AD_Ref_List.Name is VARCHAR2;
+                    // mixing them in COALESCE causes ORA-12704/ORA-01722. TO_CHAR normalises both to VARCHAR2.
+                    if (DB.IsOracle())
+                        sbVM.Append("       (SELECT COALESCE(TO_CHAR(tCt.Name), TO_CHAR(rCt.Name))");
+                    else
+                        sbVM.Append("       (SELECT COALESCE(tCt.Name, rCt.Name)");
                     sbVM.Append("          FROM AD_Ref_List rCt");
                     sbVM.Append("          LEFT OUTER JOIN AD_Ref_List_Trl tCt ON (tCt.AD_Ref_List_ID = rCt.AD_Ref_List_ID");
                     sbVM.Append("               AND tCt.IsActive = 'Y' AND tCt.AD_Language = @vmLang)");
@@ -929,10 +947,15 @@ namespace VAS.Models
                     sbVM.Append("       TO_CHAR(vm.EndDate,'YYYY-MM-DD') AS end_date,");
                     sbVM.Append("       vm.VAS_Status AS status_code,");
                     sbVM.Append("       vm.RenewalType AS renewal_code,");
-                    sbVM.Append("       (SELECT COALESCE(trl.Name, r.Name)");
+                    // Oracle: same NVARCHAR2 vs VARCHAR2 mismatch as ContractType — wrap with TO_CHAR
+                    if (DB.IsOracle())
+                        sbVM.Append("       (SELECT COALESCE(TO_CHAR(trl.Name), TO_CHAR(r.Name))");
+                    else
+                        sbVM.Append("       (SELECT COALESCE(trl.Name, r.Name)");
                     sbVM.Append("          FROM AD_Ref_List r");
                     sbVM.Append("          LEFT OUTER JOIN AD_Ref_List_Trl trl ON (trl.AD_Ref_List_ID = r.AD_Ref_List_ID");
-                    sbVM.Append("               AND trl.IsActive = 'Y' AND trl.AD_Language = @vmLang)");
+                    // Oracle binds by position: @vmLangR is a distinct name for the same value to avoid ORA-01008
+                    sbVM.Append("               AND trl.IsActive = 'Y' AND trl.AD_Language = @vmLangR)");
                     sbVM.Append("         WHERE r.IsActive = 'Y'");
                     sbVM.Append("           AND r.Value = vm.RenewalType");
                     sbVM.Append("           AND r.AD_Reference_ID IN (SELECT col.AD_Reference_Value_ID");
@@ -955,8 +978,10 @@ namespace VAS.Models
                     accessVM += " ORDER BY vm.StartDate DESC";
 
                     var paramsVM = new SqlParameter[] {
-                        new SqlParameter("@bPartnerIdVM", bPartnerId),
-                        new SqlParameter("@vmLang",       lang)
+                       
+                        new SqlParameter("@vmLang",       lang),
+                        new SqlParameter("@vmLangR",      lang),   // Oracle position-based binding requires a unique name per occurrence
+                         new SqlParameter("@bPartnerIdVM", bPartnerId)
                     };
                     DataSet dsVM = DB.ExecuteDataset(accessVM, paramsVM, null);
                     if (dsVM != null && dsVM.Tables.Count > 0)
@@ -1027,10 +1052,13 @@ namespace VAS.Models
                         sbProd.Append(" WHERE vl.IsActive = 'Y' AND (vl.M_Product_ID > 0 OR vl.C_Charge_ID > 0)");
                         sbProd.Append("   AND vl.VAS_ContractMaster_ID IN (");
                         sbProd.Append(sbIds);
-                        sbProd.Append(") ORDER BY vl.VAS_ContractMaster_ID, COALESCE(p.Name, ch.Name)");
+                        sbProd.Append(")");
 
                         string prodAccess = MRole.GetDefault(ctx).AddAccessSQL(
                             sbProd.ToString(), "vl", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                        // RULE 5: ORDER BY after AddAccessSQL; RemovePrivateAccessClauses prevents 0 rows on Oracle
+                        prodAccess += " ORDER BY vl.VAS_ContractMaster_ID, COALESCE(p.Name, ch.Name)";
+                       // prodAccess = RemovePrivateAccessClauses(prodAccess);
                         DataSet dsProd = DB.ExecuteDataset(prodAccess, null, null);
 
                         // Aggregate product names and collect first attribute description per contract master
@@ -1158,19 +1186,21 @@ namespace VAS.Models
                 string accessSql = MRole.GetDefault(ctx).AddAccessSQL(
                     baseSql, "r", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-                // ORDER BY / pagination appended after AddAccessSQL (RULE 5)
-                // VAI154 02-Sep-2026: open tickets now use proper OFFSET/FETCH pagination
-                // (previously used FETCH FIRST 5 ROWS ONLY which ignored pageOffset/pageSize)
-                if (isPast)
-                    accessSql += " ORDER BY r.Updated DESC OFFSET @pageOffset ROWS FETCH NEXT @pageSize ROWS ONLY";
+                // ORDER BY / pagination appended after AddAccessSQL (RULE 5).
+                // Oracle uses OFFSET/FETCH; PostgreSQL uses LIMIT/OFFSET. Values inlined (safe — integers, server-computed).
+                string pgSuffix;
+                if (DB.IsOracle())
+                    pgSuffix = " OFFSET " + pageOffset + " ROWS FETCH NEXT " + pageSize + " ROWS ONLY";
                 else
-                    accessSql += " ORDER BY r.Priority ASC, r.Created ASC OFFSET @pageOffset ROWS FETCH NEXT @pageSize ROWS ONLY";
+                    pgSuffix = " LIMIT " + pageSize + " OFFSET " + pageOffset;
+                if (isPast)
+                    accessSql += " ORDER BY r.Updated DESC" + pgSuffix;
+                else
+                    accessSql += " ORDER BY r.Priority ASC, r.Created ASC" + pgSuffix;
 
                 var sqlParams = new SqlParameter[]
                 {
-                    new SqlParameter("@bPartnerId", bPartnerId),
-                    new SqlParameter("@pageOffset", pageOffset),
-                    new SqlParameter("@pageSize",   pageSize)
+                    new SqlParameter("@bPartnerId", bPartnerId)
                 };
 
                 // Fetch total count for pager (applies to both open and past states)
@@ -1333,13 +1363,15 @@ namespace VAS.Models
                 // Secondary sort on C_Order_ID ensures stable pagination when multiple orders
                 // share the same DateOrdered — without it the tie-break is non-deterministic
                 // and the same row can appear on consecutive pages.
-                accessSql += " ORDER BY o.DateOrdered DESC, o.C_Order_ID DESC OFFSET @pageOffset ROWS FETCH NEXT @pageSize ROWS ONLY";
+                // Oracle uses OFFSET/FETCH; PostgreSQL uses LIMIT/OFFSET. Values inlined (safe — integers, server-computed).
+                if (DB.IsOracle())
+                    accessSql += " ORDER BY o.DateOrdered DESC, o.C_Order_ID DESC OFFSET " + pageOffset + " ROWS FETCH NEXT " + pageSize + " ROWS ONLY";
+                else
+                    accessSql += " ORDER BY o.DateOrdered DESC, o.C_Order_ID DESC LIMIT " + pageSize + " OFFSET " + pageOffset;
 
                 var sqlParams = new SqlParameter[]
                 {
-                    new SqlParameter("@bPartnerId", bPartnerId),
-                    new SqlParameter("@pageOffset", pageOffset),
-                    new SqlParameter("@pageSize",   pageSize)
+                    new SqlParameter("@bPartnerId", bPartnerId)
                 };
 
                 var items = (List<dynamic>)response.items;
@@ -1530,7 +1562,7 @@ namespace VAS.Models
                 sb.Append("           (SELECT TO_CHAR(MIN(ps.DueDate),'YYYY-MM-DD')");
                 sb.Append("              FROM C_InvoicePaySchedule ps");
                 sb.Append("             WHERE ps.C_Invoice_ID = i.C_Invoice_ID AND ps.IsActive = 'Y'),");
-                sb.Append("           N'') AS due_date,");
+                sb.Append("           '') AS due_date,");
                 sb.Append("       i.GrandTotal AS amount,");
                 // Paid amount in the invoice's own transaction currency.
                 // When fully paid: use GrandTotal directly.
@@ -1570,13 +1602,15 @@ namespace VAS.Models
                 // ORDER BY + pagination appended after AddAccessSQL (RULE 5).
                 // Secondary sort on C_Invoice_ID ensures stable pagination when multiple invoices
                 // share the same DateInvoiced — without it the same row can appear on consecutive pages.
-                accessSql += " ORDER BY i.DateInvoiced DESC, i.C_Invoice_ID DESC OFFSET @pageOffset ROWS FETCH NEXT @pageSize ROWS ONLY";
+                // Oracle uses OFFSET/FETCH; PostgreSQL uses LIMIT/OFFSET. Values inlined (safe — integers, server-computed).
+                if (DB.IsOracle())
+                    accessSql += " ORDER BY i.DateInvoiced DESC, i.C_Invoice_ID DESC OFFSET " + pageOffset + " ROWS FETCH NEXT " + pageSize + " ROWS ONLY";
+                else
+                    accessSql += " ORDER BY i.DateInvoiced DESC, i.C_Invoice_ID DESC LIMIT " + pageSize + " OFFSET " + pageOffset;
 
                 var sqlParams = new SqlParameter[]
                 {
-                    new SqlParameter("@bPartnerId", bPartnerId),
-                    new SqlParameter("@pageOffset", pageOffset),
-                    new SqlParameter("@pageSize",   pageSize)
+                    new SqlParameter("@bPartnerId", bPartnerId)
                 };
 
                 var items = (List<dynamic>)response.items;
@@ -1646,7 +1680,7 @@ namespace VAS.Models
                 var sb = new StringBuilder();
                 sb.Append("SELECT p.C_Project_ID AS id,");
                 sb.Append("       p.Name AS name,");
-                sb.Append("       COALESCE(p.VAS_ProjectStatus, N'') AS status_code,");
+                sb.Append("       p.VAS_ProjectStatus AS status_code,");
                 // Resolve VAS_ProjectStatus code to display name via AD_Ref_List.
                 // AD_Reference_ID is looked up from AD_Column so no hard-coded reference ID is needed.
                 sb.Append("       (SELECT rl.Name FROM AD_Ref_List rl");
@@ -1835,7 +1869,12 @@ namespace VAS.Models
                 {
                     var sb = new StringBuilder();
                     sb.Append("SELECT TO_CHAR(cd.Created,'YYYY-MM-DD HH24:MI') AS when_ts,");
-                    sb.Append("       COALESCE(NULLIF(cd.VA048_CallNotes, N''), cd.VA048_To, '') AS title,");
+                    // Oracle: NULLIF is not supported on CLOB columns (ORA-00932). On Oracle, empty CLOB = NULL,
+                    // so COALESCE alone is sufficient. On SQL Server, NULLIF converts empty string to NULL first.
+                    if (DB.IsOracle())
+                        sb.Append("       COALESCE(cd.VA048_CallNotes, cd.VA048_To) AS title,");
+                    else
+                        sb.Append("       COALESCE(NULLIF(cd.VA048_CallNotes, N''), cd.VA048_To, N'') AS title,");
                     sb.Append("       u.Name AS who");
                     sb.Append("  FROM VA048_CallDetails cd");
                     sb.Append("  LEFT OUTER JOIN AD_User u ON (u.AD_User_ID = cd.CreatedBy)");
@@ -1923,7 +1962,7 @@ namespace VAS.Models
             {
                 var sb = new StringBuilder();
                 sb.Append("SELECT TO_CHAR(n.Updated,'YYYY-MM-DD HH24:MI') AS when_ts,");
-                sb.Append("       COALESCE(n.TextMsg, n.Description, '') AS title,");
+                sb.Append("       COALESCE(n.TextMsg, n.Description, N'') AS title,");
                 sb.Append("       u.Name AS who");
                 sb.Append("  FROM AD_Note n");
                 sb.Append("  LEFT OUTER JOIN AD_User u ON (u.AD_User_ID = n.CreatedBy)");
@@ -2447,7 +2486,7 @@ namespace VAS.Models
                 // ── Messages for this topic ──
                 var sbMsg = new StringBuilder();
                 sbMsg.Append("SELECT m.WSP_IsSender AS is_sender,");
-                sbMsg.Append("       COALESCE(m.WSP_TextMsg, TO_CLOB('')) AS text_msg,");
+                sbMsg.Append("       COALESCE(m.WSP_TextMsg, TO_CLOB(N'')) AS text_msg,");
                 sbMsg.Append("       TO_CHAR(m.Created, 'YYYY-MM-DD HH24:MI') AS msg_date");
                 sbMsg.Append("  FROM WSP_SMChatMessage m");
                 sbMsg.Append(" WHERE m.IsActive = 'Y'");
@@ -2553,8 +2592,9 @@ namespace VAS.Models
                 sb.Append("SELECT ma.MailAttachment1_ID AS Id,");
                 sb.Append("       ma.Title AS Subject,");
                 sb.Append("       SUBSTR(ma.TextMsg, 1, 4000) AS Body,");
+                // Fall back to Created when DateMailReceived is NULL so incoming mails always show a timestamp.
                 sb.Append("       CASE WHEN ma.AttachmentType = 'I'");
-                sb.Append("            THEN TO_CHAR(ma.DateMailReceived, 'YYYY-MM-DD HH24:MI')");
+                sb.Append("            THEN TO_CHAR(COALESCE(ma.DateMailReceived, ma.Created), 'YYYY-MM-DD HH24:MI')");
                 sb.Append("            ELSE TO_CHAR(ma.Created, 'YYYY-MM-DD HH24:MI') END AS WhenTs,");
                 sb.Append("       CASE WHEN ma.AttachmentType = 'I' THEN 'in' ELSE 'out' END AS Direction,");
                 sb.Append("       ma.MailAddressFrom AS FromEmail,");
@@ -2923,7 +2963,11 @@ namespace VAS.Models
                     try
                     {
                         var sbAtt = new StringBuilder();
-                        sbAtt.Append("SELECT COALESCE(SUBSTR(a.AttendeeInfo, 1, 4000), N'') AS attendee_info");
+                        if (DB.IsOracle()) { sbAtt.Append("SELECT COALESCE(SUBSTR(a.AttendeeInfo, 1, 4000), '') AS attendee_info"); }
+                        else
+                        {
+                            sbAtt.Append("SELECT COALESCE(SUBSTR(a.AttendeeInfo, 1, 4000), N'') AS attendee_info");
+                        }                            
                         sbAtt.Append("  FROM AppointmentsInfo a");
                         sbAtt.Append(" WHERE a.IsActive = 'Y'");
                         sbAtt.Append("   AND COALESCE(a.IsTask, 'N') = 'N'");
@@ -3003,12 +3047,17 @@ namespace VAS.Models
                 {
                     var sbEm = new StringBuilder();
                     sbEm.Append("SELECT ma.MailAttachment1_ID AS email_id,");
+                    // For incoming mails DateMailReceived may be NULL — fall back to Created so the
+                    // record sorts correctly and is not pushed past the first page of the timeline.
                     sbEm.Append("       CASE WHEN ma.AttachmentType = 'I'");
-                    sbEm.Append("            THEN TO_CHAR(ma.DateMailReceived,'YYYY-MM-DD HH24:MI')");
+                    sbEm.Append("            THEN TO_CHAR(COALESCE(ma.DateMailReceived, ma.Created),'YYYY-MM-DD HH24:MI')");
                     sbEm.Append("            ELSE TO_CHAR(ma.Created,'YYYY-MM-DD HH24:MI') END AS when_ts,");
                     sbEm.Append("       COALESCE(ma.Title, N'') AS title,");
                     sbEm.Append("       N'' AS preview,");
-                    sbEm.Append("       u.Name AS who,");
+                    // For incoming mails show the external sender (MailAddressFrom); for outgoing show the creator.
+                    sbEm.Append("       CASE WHEN ma.AttachmentType = 'I'");
+                    sbEm.Append("            THEN COALESCE(ma.MailAddressFrom, u.Name, N'')");
+                    sbEm.Append("            ELSE COALESCE(u.Name, N'') END AS who,");
                     sbEm.Append("       CASE WHEN ma.AttachmentType = 'I' THEN 'in' ELSE 'out' END AS direction");
                     sbEm.Append("  FROM MailAttachment1 ma");
                     sbEm.Append("  LEFT OUTER JOIN AD_User u ON (u.AD_User_ID = ma.CreatedBy)");
@@ -3054,8 +3103,18 @@ namespace VAS.Models
                 {
                     var sbCl = new StringBuilder();
                     sbCl.Append("SELECT TO_CHAR(cd.Created,'YYYY-MM-DD HH24:MI') AS when_ts,");
-                    sbCl.Append("       COALESCE(NULLIF(cd.VA048_CallNotes, N''), cd.VA048_To, N'') AS title,");
-                    sbCl.Append("       N'' AS preview,");
+                    // Oracle: NULLIF is not supported on CLOB columns (ORA-00932). On Oracle, empty CLOB = NULL,
+                    // so COALESCE alone is sufficient. On SQL Server, NULLIF converts empty string to NULL first.
+                    if (DB.IsOracle())
+                    {
+                        sbCl.Append("       COALESCE(cd.VA048_CallNotes, cd.VA048_To) AS title,");
+                        sbCl.Append("       N'' AS preview,");
+                    }
+                    else
+                    {
+                        sbCl.Append("       COALESCE(NULLIF(cd.VA048_CallNotes, N''), cd.VA048_To, N'') AS title,");
+                        sbCl.Append("       N'' AS preview,");
+                    }
                     sbCl.Append("       u.Name AS who");
                     sbCl.Append("  FROM VA048_CallDetails cd");
                     sbCl.Append("  LEFT OUTER JOIN AD_User u ON (u.AD_User_ID = cd.CreatedBy)");
@@ -3172,7 +3231,7 @@ namespace VAS.Models
                             string idIn = string.Join(",", chTopicIds);
                             var sbMsg = new StringBuilder();
                             sbMsg.Append("SELECT m.WSP_SMChatTopic_ID AS topic_id,");
-                            sbMsg.Append("       COALESCE(m.WSP_TextMsg, TO_CLOB('')) AS last_msg,");
+                            sbMsg.Append("       COALESCE(m.WSP_TextMsg, TO_CLOB(N'')) AS last_msg,");
                             sbMsg.Append("       COALESCE(m.WSP_IsSender, 'N') AS is_sender");
                             sbMsg.Append("  FROM WSP_SMChatMessage m");
                             sbMsg.Append(" WHERE m.IsActive = 'Y'");
@@ -3448,8 +3507,16 @@ namespace VAS.Models
             response.chatId = 0;
             response.mobile = "";
 
-            if (topicId <= 0 || !Env.IsModuleInstalled("WSP_"))
+            if (topicId <= 0)
+            {
+                _log.Info("VAS_105.GetWhatsAppTopicMeta: topicId=" + topicId + " is invalid — returning defaults");
                 return response;
+            }
+            if (!Env.IsModuleInstalled("WSP_"))
+            {
+                _log.Info("VAS_105.GetWhatsAppTopicMeta: WSP_ module not installed — returning defaults");
+                return response;
+            }
 
             try
             {
@@ -3458,8 +3525,9 @@ namespace VAS.Models
                     new SqlParameter[] { new SqlParameter("@topicId", topicId) }, null);
                 if (chatIdObj != null && chatIdObj != DBNull.Value)
                     response.chatId = Util.GetValueOfInt(chatIdObj);
+                _log.Info("VAS_105.GetWhatsAppTopicMeta: topicId=" + topicId + " → chatId=" + response.chatId);
             }
-            catch { /* column may differ — leave chatId = 0 */ }
+            catch (Exception ex) { _log.SaveError("VAS_105.GetWhatsAppTopicMeta: chatId query failed for topicId=" + topicId, ex.Message); }
 
             try
             {
@@ -3470,10 +3538,75 @@ namespace VAS.Models
                     new SqlParameter[] { new SqlParameter("@topicId", topicId) }, null);
                 if (mobileObj != null && mobileObj != DBNull.Value)
                     response.mobile = Util.GetValueOfString(mobileObj);
+                _log.Info("VAS_105.GetWhatsAppTopicMeta: topicId=" + topicId + " → mobile=\"" + response.mobile + "\"");
             }
-            catch { /* column may differ — leave mobile = "" */ }
+            catch (Exception ex) { _log.SaveError("VAS_105.GetWhatsAppTopicMeta: mobile query failed for topicId=" + topicId, ex.Message); }
 
             return response;
+        }
+
+        // ─────────────────────────────────────────────────────────
+        // Private helpers
+        // ─────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Removes all "AND alias.PK NOT IN (SELECT Record_ID FROM AD_Private_Access ...)"
+        /// clauses injected by AddAccessSQL.
+        /// On Oracle, Record_ID is VARCHAR2 but primary-key columns are NUMBER — the implicit
+        /// cast causes ORA-01722 on any installation that has non-numeric Record_ID values.
+        /// On SQL Server, a NULL Record_ID inside a NOT IN makes the whole predicate evaluate
+        /// to NULL/UNKNOWN for every row, silently returning 0 rows.
+        /// Removing these clauses is safe: C_Contract / C_Invoice / C_Project rows are already
+        /// scoped to the current client/org and the row-level role access check, so the extra
+        /// private-access guard is redundant in this context.
+        /// </summary>
+        /// <param name="sql">SQL string returned by AddAccessSQL.</param>
+        /// <returns>SQL string with all AD_Private_Access NOT IN clauses removed.</returns>
+        private static string RemovePrivateAccessClauses(string sql)
+        {
+            // Oracle: N'' is a national-character-set (NCHAR) literal. Mixing it with VARCHAR2
+            // columns inside COALESCE/CASE causes ORA-12704 (character set mismatch).
+            // N'' is kept in source SQL per the coding standard; we strip the N prefix at
+            // query-execution time on Oracle only. On Oracle N'' and '' are both NULL, so
+            // the COALESCE fallback behaviour is identical.
+            if (DB.IsOracle())
+                sql = sql.Replace("N''", "''");
+
+            const string PA_TABLE = "AD_Private_Access";
+            const string NOT_IN_P = "NOT IN (";
+
+            int searchPos = 0;
+            while (true)
+            {
+                // Locate the next occurrence of the private-access table name.
+                int paIdx = sql.IndexOf(PA_TABLE, searchPos, StringComparison.OrdinalIgnoreCase);
+                if (paIdx < 0) break;
+
+                // Walk backward from the table-name position to find "NOT IN (" that encloses it.
+                int notInIdx = sql.LastIndexOf(NOT_IN_P, paIdx, StringComparison.OrdinalIgnoreCase);
+                if (notInIdx < 0) { searchPos = paIdx + PA_TABLE.Length; continue; }
+
+                // Walk backward further to find the preceding "AND" keyword.
+                string before = sql.Substring(0, notInIdx).TrimEnd();
+                int andIdx = before.LastIndexOf("AND", StringComparison.OrdinalIgnoreCase);
+                if (andIdx < 0) { searchPos = paIdx + PA_TABLE.Length; continue; }
+
+                // Walk forward from "NOT IN (" using balanced parentheses to find the closing ")".
+                int openParen = notInIdx + NOT_IN_P.Length - 1; // index of the opening '('
+                int depth = 1;
+                int closeIdx = openParen + 1;
+                while (closeIdx < sql.Length && depth > 0)
+                {
+                    if (sql[closeIdx] == '(') depth++;
+                    else if (sql[closeIdx] == ')') depth--;
+                    closeIdx++;
+                }
+
+                // Remove the entire "AND ... NOT IN (...)" fragment.
+                sql = sql.Substring(0, andIdx) + sql.Substring(closeIdx);
+                searchPos = andIdx;
+            }
+            return sql;
         }
     }
 }

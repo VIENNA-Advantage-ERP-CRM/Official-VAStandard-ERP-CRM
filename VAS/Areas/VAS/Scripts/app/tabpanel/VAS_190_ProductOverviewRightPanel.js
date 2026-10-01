@@ -504,6 +504,17 @@
  *  VAS_190_TranscriptNotLoaded, VAS_190_NoTranscript,
  *  VAS_190_TranscriptNeedsModule, VAS_190_TranscriptFailed,
  *  VAS_190_TranscriptEmpty.
+ *
+ * ── 2026-10-01 (VAI163) ─────────────────────────────────────────────────
+ *  - A task opens the INTERNAL TASK form on that task (WSP.EditTaskForm, as
+ *    VAS_105 / VAS_123), no longer WSP.WSP_AppointmentsForm - that is the
+ *    appointment editor, so a task click opened the appointment form. Where
+ *    EditTaskForm is not loaded the task opens in the read-only sheet.
+ *  - Transcript download is made with the attendee row that carries the
+ *    meeting link (TranscriptSourceId), not only the row the feed kept.
+ *  - The composer's full-recipients line sits under the field ROW, outside the
+ *    floating-label wrapper that clipped it.
+ *  No new message keys.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -2892,43 +2903,21 @@
             var taskId = +(a && a.Id) || 0;
             if (taskId <= 0) return false;
 
-            // VIS.AppointmentsForm is the entry point this application actually
-            // has. WSP.EditTaskForm — the name VAS_105 and VAS_123 call on their
-            // task rows — is in none of the framework bundles, so that call has
-            // always resolved to undefined and their task clicks do nothing here.
-            //
-            // The trade this makes is worth stating: VIS.AppointmentsForm is the
-            // CREATE entry point. Its sixth argument is a boolean (the VIS
-            // toolbar's own cmd_appointment passes `true` there), not a record
-            // id, so it opens the task form ON THIS PRODUCT rather than loaded
-            // with the task that was clicked. Targeting the clicked task needs
-            // WSP.WSP_AppointmentsForm, which this installation does not expose.
-            if (!window.VIS || !VIS.AppointmentsForm
-                || typeof VIS.AppointmentsForm.init !== "function") {
-                console.log("VAS_190: VIS.AppointmentsForm is not available on this "
-                          + "window; task " + taskId + " opens the read-only detail.");
-                return false;
-            }
-
-            // WSP IS CHECKED HERE, BEFORE THE CALL, and this is not belt-and-braces.
-            //
-            // VIS.AppointmentsForm.init is a thin wrapper whose entire body is
-            // `if (window.WSP) { …open the form… } else alert("please download
-            // WSP !!!")`. It RETURNS NORMALLY in the second case — nothing
-            // throws — so calling it on an installation without WSP would put a
-            // browser alert in front of the reader, and the catch below would
-            // never run, so the panel would report success and show nothing.
-            // The reader would have clicked a task and been handed an alert
-            // about a module they cannot install.
-            //
-            // Answering the question ourselves keeps that alert off the screen
-            // and returns false, which is what puts the read-only detail sheet
-            // back — the behaviour the panel had before it ever tried to open a
-            // form, and the right answer where no form exists to open.
-            if (!window.WSP) {
-                console.log("VAS_190: the WSP module is not installed, so there is "
-                          + "no task form to open. Task " + taskId + " falls back "
-                          + "to the read-only detail.");
+            // THE INTERNAL TASK FORM, LOADED WITH THE CLICKED TASK (01-Oct-2026):
+            // WSP.EditTaskForm.init(AppointmentsInfo_ID, AD_Table_ID, Record_ID,
+            // AD_User_ID, userName, $busy) - the call VAS_105 and VAS_123 make from
+            // their task rows. It lives in the WSP module's own bundle, which is
+            // why grepping the VIS bundles never found it (the 08-Sep report saw it
+            // run and fail on window.$backBtn_ID, defined below).
+            // WSP.WSP_AppointmentsForm is NOT used for tasks any more: it is the
+            // APPOINTMENT editor, so a task click opened the appointment form.
+            // Nor is the VIS.AppointmentsForm create wrapper: it opens an EMPTY
+            // task form. Where EditTaskForm is not loaded, the task opens in the
+            // read-only sheet, which carries the task's details.
+            if (!window.WSP || !WSP.EditTaskForm
+                || typeof WSP.EditTaskForm.init !== "function") {
+                console.log("VAS_190: WSP.EditTaskForm is not loaded on this page; "
+                          + "task " + taskId + " opens the read-only detail.");
                 return false;
             }
 
@@ -2954,40 +2943,15 @@
                 if (typeof window.$backBtn_ID === "undefined") window.$backBtn_ID = $();
             } catch (e3) { }
 
-            // THE CLICKED TASK, WITH ITS DETAILS (25-Sep-2026). Where the WSP module
-            // exposes its EDIT form, open that on this task - the call the
-            // framework's own history panel makes from its edit button:
-            //   WSP.WSP_AppointmentsForm.init(busy, AD_Table_ID, Record_ID,
-            //                                 AppointmentsInfo_ID, owner AD_User_ID, joinUrl)
-            // (history panel: `this.update = function (e) { v = e, m = this.table_ID }`,
-            // then init(n, m, v, rid, uid, joinurl)). The CREATE wrapper below stays
-            // as the fallback where that form is not loaded.
-            if (WSP.WSP_AppointmentsForm && typeof WSP.WSP_AppointmentsForm.init === "function") {
-                try {
-                    var $aptBusy = $("<div id='divAptBusy' class='wsp-busy-indicater'></div>");
-                    $("body").append($aptBusy);
-                    $aptBusy.show();
-                    WSP.WSP_AppointmentsForm.init($aptBusy, tableId, shownRecordId, taskId,
-                        +(a.OwnerUserId || 0) || userId, a.MeetingUrl || "");
-                    watchTaskFormClose();
-                    return true;
-                } catch (errEdit) {
-                    console.log("VAS_190: WSP.WSP_AppointmentsForm.init failed for task "
-                              + taskId + " — trying the task form instead.", errEdit);
-                    $("#divAptBusy").remove();
-                }
-            }
-
+            var $busy = $("<div id='divAptBusy' class='wsp-busy-indicater'></div>");
             try {
-                // Five arguments, exactly as VAS_105, VAS_123 and VAS_120 call it,
-                // with isTask = true so the wrapper routes to the TASK form rather
-                // than the appointment one. No busy overlay is built here —
-                // VIS.AppointmentsForm creates #divAptBusy itself and hands it to
-                // the form, and a second one would sit on the page for ever.
-                VIS.AppointmentsForm.init(tableId, shownRecordId, userId, userName, true);
+                $("body").append($busy);
+                $busy.show();
+                WSP.EditTaskForm.init(taskId, tableId, shownRecordId, userId, userName, $busy);
             } catch (err) {
-                console.log("VAS_190: VIS.AppointmentsForm.init failed for task "
+                console.log("VAS_190: WSP.EditTaskForm.init failed for task "
                           + taskId + " — falling back to the detail sheet.", err);
+                $busy.remove();
                 return false;
             }
             // Whatever the reader changes in there is an activity change. The
@@ -3354,7 +3318,18 @@
                     .each(function () {
                         var $in = $(this);
                         var $all = $('<div class="vas_190-mailAllRcpt"></div>');
-                        $in.after($all);
+                        // OUTSIDE the field's own wrapper (01-Oct-2026). The reply
+                        // composer's To box is a floating-label control
+                        // (.vis-input-wrap > .vis-control-wrap > input + label):
+                        // placed straight after the input, the line sat inside a
+                        // fixed-height wrapper, where it was clipped, and between
+                        // the input and its label, which broke the label's
+                        // `input ~ label` styling. Under the whole field ROW instead
+                        // (.vis-form-rytData is a flex row, so inside it the line
+                        // would sit beside the box rather than under it).
+                        var $field = $in.closest(".vis-form-rytData, .vis-form-data, .vis-input-wrap");
+                        if ($field.length) $field.after($all);
+                        else $in.after($all);
                         var sync = function () {
                             var v = $.trim($in.val() || "");
                             $in.attr("title", v);
@@ -3526,7 +3501,9 @@
         // installation without it the user is told so instead.
         function loadTranscript(a, $block) {
             var ctxUrl = (window.VIS && VIS.Application && VIS.Application.contextUrl) || "";
-            var appointmentId = +(a && a.Id) || 0;
+            // The attendee row that carries the meeting link, where the collapsed
+            // entry took it from another row (01-Oct-2026).
+            var appointmentId = +(a && (a.TranscriptSourceId || a.Id)) || 0;
             if (appointmentId <= 0 || !window.VIS || !VIS.dataContext) return;
 
             function info(text) {

@@ -976,6 +976,12 @@
    wrapping, so a recipient list longer than the single-line box is readable in
    full. The composer mounts outside this panel's root, so no panel tokens. */
 .vas_190-mailAllRcpt {
+    /* A sibling of the composer's field rows, which are 100%-wide floats
+       (01-Oct-2026): floated and cleared the same way, so it stacks under its
+       row instead of sliding up behind it. */
+    float: left;
+    clear: both;
+    box-sizing: border-box;
     flex-basis: 100%;
     width: 100%;
     margin: 0.25em 0 0.375em;
