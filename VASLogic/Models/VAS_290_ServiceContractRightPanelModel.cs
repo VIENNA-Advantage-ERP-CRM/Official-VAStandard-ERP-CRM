@@ -278,13 +278,10 @@ namespace VAS.Models
                 sb.Append("       (SELECT inv.DocumentNo FROM C_Invoice inv WHERE inv.C_Invoice_ID = s.C_Invoice_ID AND inv.IsActive = 'Y') AS InvoiceDocumentNo, ");
                 sb.Append("       CASE");
                 sb.Append("           WHEN s.C_Invoice_ID IS NOT NULL THEN 'Invoiced'");
-                // TO_DATE() is required on Oracle: ODP.NET maps DateTime params to NUMBER (ORA-00932).
-                // SQL Server accepts the ISO string via CONVERT with style 120 (yyyy-MM-dd).
-                if (DB.IsOracle())
-                    //sb.Append("           WHEN s.FROMDATE <= @asOfDate THEN 'Due'");
-                    sb.Append("           WHEN s.FROMDATE <= " + GlobalVariable.TO_DATE(asOfDate, true) + " THEN 'Due'");
-                else
-                    sb.Append("           WHEN s.FROMDATE <= CONVERT(DATE, @asOfDate, 120) THEN 'Due'");
+                // Date literal is inlined for both dialects so no bind parameter is needed.
+                // Oracle: TO_DATE(literal) avoids ODP.NET mapping DateTime params to NUMBER (ORA-00932).
+                // PostgreSQL: ISO date string 'YYYY-MM-DD' is accepted natively; CONVERT is SQL Server only.
+                sb.Append("           WHEN s.FROMDATE <= " + GlobalVariable.TO_DATE(asOfDate, true) + " THEN 'Due'");
                 sb.Append("           ELSE 'Scheduled'");
                 sb.Append("       END AS BillingStatus");
                 sb.Append("  FROM C_ContractSchedule s");
@@ -311,9 +308,7 @@ namespace VAS.Models
                 var sqlParams = new SqlParameter[]
                 {
                     new SqlParameter("@contractId", contractId),
-                    new SqlParameter("@adClientId", adClientId),
-                    // Pass as 'YYYY-MM-DD' string so TO_DATE() in SQL resolves it correctly on Oracle.
-                    //new SqlParameter("@asOfDate",  GlobalVariable.TO_DATE(asOfDate,true))
+                    new SqlParameter("@adClientId", adClientId)
                 };
 
                 DataSet ds = DB.ExecuteDataset(accessSql, sqlParams, null);

@@ -256,8 +256,8 @@ namespace VAS.Models
                     // instead of a hard-coded or missing AD_Message key.
                     string adLang = ctx.GetAD_Language();
                     string creditBaseSql = @"SELECT CASE WHEN (bp.CreditStatusSettingOn = 'CH')
-                                                         THEN COALESCE(bp.SOCreditStatus, N'')
-                                                         ELSE COALESCE(cl.SOCreditStatus, N'')
+                                                         THEN bp.SOCreditStatus
+                                                         ELSE cl.SOCreditStatus
                                                     END AS CreditStatus,
                                              COALESCE(rlt.Name, rl.Name, N'') AS CreditStatusName
                         FROM C_Order o
@@ -821,7 +821,13 @@ namespace VAS.Models
             sb.Append("       op.Name AS OpportunityName,");
             sb.Append("       op.VAS_OppStage AS Stage,");
             sb.Append("       TO_CHAR(op.VAS_DecisionDate, 'YYYY-MM-DD') AS ExpectedCloseDate,");
-            sb.Append("       TRIM(COALESCE(rep.Name, N'') || ' ' || COALESCE(rep.LastName, N'')) AS SalesRepName,");
+            // Oracle: COALESCE(VARCHAR2_col, N'') raises ORA-12704 due to character-set mismatch.
+            // Oracle || treats NULL as empty string, so COALESCE is not needed there.
+            // PostgreSQL requires COALESCE to avoid NULL propagating through ||.
+            string salesRepExpr = DB.IsOracle()
+                ? "TRIM(rep.Name || ' ' || rep.LastName)"
+                : "TRIM(COALESCE(rep.Name, N'') || ' ' || COALESCE(rep.LastName, N''))";
+            sb.Append("       " + salesRepExpr + " AS SalesRepName,");
             sb.Append("       op.PlannedAmt AS Amount");
             sb.Append("  FROM C_Order o");
             sb.Append("  LEFT OUTER JOIN VAS_Opportunity op ON (op.VAS_Opportunity_ID = o.VAS_Opportunity_ID AND op.IsActive = 'Y')");
@@ -907,10 +913,16 @@ namespace VAS.Models
                 COALESCE(p.Value, N'') AS ProductValue,
                 COALESCE(p.Name, ch.Name, N'') AS ProductName,
                 p.ProductType AS ProductType,
-                (SELECT arl.Name FROM AD_Ref_List arl WHERE arl.Value = p.ProductType AND arl.AD_Reference_ID = (SELECT c.AD_Reference_Value_ID FROM AD_Column c INNER JOIN AD_Table t ON (t.AD_Table_ID = c.AD_Table_ID) WHERE UPPER(t.TableName) = 'M_PRODUCT' AND UPPER(c.ColumnName) = 'PRODUCTTYPE')) AS ProductTypeName,
-                COALESCE(u.Name, N'') AS UOMName,
-                COALESCE(NULLIF(NULLIF(TRIM(asi.Description), '---'), '--'), N'') AS AttributeDesc
-                FROM C_OrderLine ol
+                (SELECT arl.Name FROM AD_Ref_List arl WHERE arl.Value = p.ProductType AND arl.AD_Reference_ID =
+                (SELECT c.AD_Reference_Value_ID FROM AD_Column c INNER JOIN AD_Table t ON (t.AD_Table_ID = c.AD_Table_ID) 
+                WHERE UPPER(t.TableName) = 'M_PRODUCT' AND UPPER(c.ColumnName) = 'PRODUCTTYPE')) AS ProductTypeName,
+                COALESCE(u.Name, N'') AS UOMName," +
+                // Oracle: COALESCE(VARCHAR2_result, N'') raises ORA-12704 due to character-set mismatch.
+                // On Oracle, use '' (VARCHAR2 literal); on PostgreSQL keep N'' (CLAUDE.md rule).
+                (DB.IsOracle()
+                    ? " COALESCE(NULLIF(NULLIF(TRIM(CAST(asi.Description AS VARCHAR(4000))), '---'), '--'), '') AS AttributeDesc"
+                    : " COALESCE(NULLIF(NULLIF(TRIM(asi.Description), '---'), '--'), N'') AS AttributeDesc") +
+                @" FROM C_OrderLine ol
                 LEFT OUTER JOIN M_Product p ON (p.M_Product_ID = ol.M_Product_ID AND p.IsActive = 'Y')
                 LEFT OUTER JOIN C_Charge ch ON (ch.C_Charge_ID = ol.C_Charge_ID AND ch.IsActive = 'Y')
                 LEFT OUTER JOIN C_UOM u ON (u.C_UOM_ID = ol.C_UOM_ID AND u.IsActive = 'Y')
@@ -919,6 +931,8 @@ namespace VAS.Models
                 AND ol.IsActive = 'Y'
                 ORDER BY ol.Line";
 
+            // Oracle: COALESCE(VARCHAR2_col, N'') raises ORA-12704; strip N prefix for Oracle.
+            //if (DB.IsOracle()) baseSql = baseSql.Replace("N''", "''");
             string accessSql = MRole.GetDefault(ctx).AddAccessSQL(
                 baseSql, "ol", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
@@ -1802,8 +1816,10 @@ namespace VAS.Models
                     sbMt.Append("   AND a.AD_Table_ID = " + tableId);
                     sbMt.Append("   AND a.Record_ID = @orderId");
 
+                    // Oracle: COALESCE(VARCHAR2_col, N'') raises ORA-12704; strip N prefix for Oracle.
+                    string mtSql = DB.IsOracle() ? sbMt.ToString().Replace("N''", "''") : sbMt.ToString();
                     string mtAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
-                        sbMt.ToString(), "a", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                        mtSql, "a", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
                     mtAccessSql += " GROUP BY a.StartDate, a.Subject";
                     mtAccessSql += " ORDER BY MIN(a.StartDate) DESC";
 
@@ -1988,7 +2004,9 @@ namespace VAS.Models
                     var sbEm = new StringBuilder();
                     sbEm.Append("SELECT ma.MailAttachment1_ID AS email_id,");
                     sbEm.Append("       CASE WHEN ma.AttachmentType = 'I'");
-                    sbEm.Append("            THEN TO_CHAR(ma.DateMailReceived,'YYYY-MM-DD HH24:MI')");
+                    // Fall back to Created when DateMailReceived is NULL so incoming mails
+                    // sort to the correct timeline position instead of drifting to the last page.
+                    sbEm.Append("            THEN TO_CHAR(COALESCE(ma.DateMailReceived, ma.Created),'YYYY-MM-DD HH24:MI')");
                     sbEm.Append("            ELSE TO_CHAR(ma.Created,'YYYY-MM-DD HH24:MI') END AS when_ts,");
                     sbEm.Append("       COALESCE(ma.Title, N'') AS title,");
                     sbEm.Append("       N'' AS preview,");
@@ -1998,17 +2016,21 @@ namespace VAS.Models
                     sbEm.Append("            ELSE COALESCE(ma.MailAddress, N'') END AS who,");
                     sbEm.Append("       CASE WHEN ma.AttachmentType = 'I' THEN 'in' ELSE 'out' END AS direction");
                     sbEm.Append("  FROM MailAttachment1 ma");
-                    sbEm.Append(" WHERE ma.IsActive = 'Y'");
-                    sbEm.Append("   AND ma.AD_Table_ID = " + tableId);
+                    // No IsActive filter: the platform history panel (AttachmentHistoryModel) does not
+                    // apply one either. Inbox-synced incoming mails can arrive with IsActive = 'N'
+                    // before the sync engine "processes" them — filtering by IsActive would hide them.
+                    // AttachmentType uses plain = comparisons (not COALESCE/TRIM) to avoid ORA-12704
+                    // on installations where AttachmentType is an NVARCHAR2 column.
+                    sbEm.Append(" WHERE ma.AD_Table_ID = " + tableId);
                     sbEm.Append("   AND ma.Record_ID = @orderId");
-                    // Use COALESCE so rows where AttachmentType IS NULL (valid mail rows in some
-                    // installations) are not silently excluded — same convention as VAS_ActivitySourcesModel.
-                    sbEm.Append("   AND COALESCE(ma.AttachmentType, 'M') IN ('M', 'I')");
+                    sbEm.Append("   AND (ma.AttachmentType IN ('M','I') OR ma.AttachmentType IS NULL)");
 
-                    string emAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
-                        sbEm.ToString(), "ma", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-
-                    DataSet emDs = DB.ExecuteDataset(emAccessSql,
+                    // MailAttachment1 is intentionally NOT passed through AddAccessSQL.
+                    // Incoming mails synced by the inbox engine are stored under a different
+                    // AD_Org_ID than the current session, so AddAccessSQL would silently
+                    // filter them out. The platform history panel (AttachmentHistoryModel)
+                    // follows the same convention — no role predicate on MailAttachment1.
+                    DataSet emDs = DB.ExecuteDataset(sbEm.ToString(),
                         new SqlParameter[] { new SqlParameter("@orderId", orderId) }, null);
                     if (emDs != null && emDs.Tables.Count > 0)
                     {
@@ -2048,7 +2070,9 @@ namespace VAS.Models
                         var sbAppt = new StringBuilder();
                         sbAppt.Append("SELECT ma.MailAttachment1_ID AS email_id,");
                         sbAppt.Append("       CASE WHEN ma.AttachmentType = 'I'");
-                        sbAppt.Append("            THEN TO_CHAR(ma.DateMailReceived,'YYYY-MM-DD HH24:MI')");
+                        // Same COALESCE as Step 3 — prevents NULL DateMailReceived pushing
+                        // appointment-linked incoming mails to the last timeline page.
+                        sbAppt.Append("            THEN TO_CHAR(COALESCE(ma.DateMailReceived, ma.Created),'YYYY-MM-DD HH24:MI')");
                         sbAppt.Append("            ELSE TO_CHAR(ma.Created,'YYYY-MM-DD HH24:MI') END AS when_ts,");
                         sbAppt.Append("       COALESCE(ma.Title, N'') AS title,");
                         sbAppt.Append("       N'' AS preview,");
@@ -2061,16 +2085,16 @@ namespace VAS.Models
                         sbAppt.Append("       AND ai.Record_ID = @orderId");
                         sbAppt.Append("       AND COALESCE(ai.IsActive,'Y') = 'Y'");
                         sbAppt.Append("       AND COALESCE(ai.IsDeleted,'N') = 'N')");
-                        sbAppt.Append(" WHERE ma.IsActive = 'Y'");
-                        sbAppt.Append("   AND ma.AD_Table_ID = " + apptTableId);
-                        // Exclude image attachments; NULL AttachmentType = standard mail (same
-                        // convention as Step 3 above and VAS_ActivitySourcesModel).
-                        sbAppt.Append("   AND COALESCE(ma.AttachmentType, 'M') IN ('M', 'I')");
+                        // No IsActive filter: inbox-synced incoming mails can arrive with IsActive = 'N'
+                        // before the sync engine processes them — filtering by IsActive would hide them.
+                        // The platform history panel (AttachmentHistoryModel) applies no IsActive check either.
+                        // AttachmentType uses plain = comparisons (not COALESCE/TRIM) to avoid ORA-12704
+                        // on installations where AttachmentType is an NVARCHAR2 column.
+                        sbAppt.Append(" WHERE ma.AD_Table_ID = " + apptTableId);
+                        sbAppt.Append("   AND (ma.AttachmentType IN ('M','I') OR ma.AttachmentType IS NULL)");
 
-                        string apptAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
-                            sbAppt.ToString(), "ma", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-
-                        DataSet apptDs = DB.ExecuteDataset(apptAccessSql,
+                        // Same convention as Step 3: no AddAccessSQL on MailAttachment1.
+                        DataSet apptDs = DB.ExecuteDataset(sbAppt.ToString(),
                             new SqlParameter[] { new SqlParameter("@orderId", orderId) }, null);
                         if (apptDs != null && apptDs.Tables.Count > 0)
                         {
@@ -2112,8 +2136,11 @@ namespace VAS.Models
                     sbCl.Append("   AND cd.Record_ID = @orderId");
                     sbCl.Append("   AND cd.AD_Table_ID = " + tableId);
 
+                    // Oracle: COALESCE(CLOB/VARCHAR2, N'') raises ORA-00932 (CLOB vs NCHAR).
+                    // Strip N prefix so the empty fallback is VARCHAR2, compatible with both CLOB and VARCHAR2 args.
+                    string clSql = DB.IsOracle() ? sbCl.ToString().Replace("N''", "''") : sbCl.ToString();
                     string clAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
-                        sbCl.ToString(), "cd", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                        clSql, "cd", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
                     DataSet clDs = DB.ExecuteDataset(clAccessSql,
                         new SqlParameter[] { new SqlParameter("@orderId", orderId) }, null);
@@ -2570,7 +2597,9 @@ namespace VAS.Models
                 sb.Append("       ma.Title AS Subject,");
                 sb.Append("       SUBSTR(ma.TextMsg, 1, 4000) AS Body,");
                 sb.Append("       CASE WHEN ma.AttachmentType = 'I'");
-                sb.Append("            THEN TO_CHAR(ma.DateMailReceived, 'YYYY-MM-DD HH24:MI')");
+                // Fall back to Created when DateMailReceived is NULL so the detail modal
+                // always shows a timestamp for incoming mails.
+                sb.Append("            THEN TO_CHAR(COALESCE(ma.DateMailReceived, ma.Created), 'YYYY-MM-DD HH24:MI')");
                 sb.Append("            ELSE TO_CHAR(ma.Created, 'YYYY-MM-DD HH24:MI') END AS WhenTs,");
                 sb.Append("       CASE WHEN ma.AttachmentType = 'I' THEN 'in' ELSE 'out' END AS Direction,");
                 sb.Append("       ma.MailAddressFrom AS FromEmail,");
@@ -3047,7 +3076,7 @@ namespace VAS.Models
             try
             {
                 object chatIdObj = DB.ExecuteScalar(
-                    "SELECT WSP_SMChat_ID FROM WSP_SMChatTopic WHERE IsActive = 'Y' AND WSP_SMChatTopic_ID = @topicId",
+                    "SELECT WSP_SMChatIdentifier_ID FROM WSP_SMChatTopic WHERE IsActive = 'Y' AND WSP_SMChatTopic_ID = @topicId",
                     new SqlParameter[] { new SqlParameter("@topicId", topicId) }, null);
                 if (chatIdObj != null && chatIdObj != DBNull.Value)
                     response.chatId = Util.GetValueOfInt(chatIdObj);
@@ -3057,7 +3086,7 @@ namespace VAS.Models
             try
             {
                 object mobileObj = DB.ExecuteScalar(
-                    "SELECT ci.Identifier FROM WSP_SMChatIdentifier ci" +
+                    "SELECT ci.WSP_ChatID FROM WSP_SMChatIdentifier ci" +
                     " INNER JOIN WSP_SMChatTopic ct ON (ct.WSP_SMChatIdentifier_ID = ci.WSP_SMChatIdentifier_ID AND ct.IsActive = 'Y')" +
                     " WHERE ci.IsActive = 'Y' AND ct.WSP_SMChatTopic_ID = @topicId",
                     new SqlParameter[] { new SqlParameter("@topicId", topicId) }, null);

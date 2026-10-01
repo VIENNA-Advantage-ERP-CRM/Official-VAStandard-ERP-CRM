@@ -1048,6 +1048,8 @@ html[dir="rtl"] .vas_105_acct-tip[data-tip]:hover::after {
 }
 
 .vas_105_acct-modal__body {
+    flex: 1;
+    min-height: 0;
     padding: 1.5em;
     overflow-y: auto;
 }
@@ -2059,8 +2061,6 @@ html[dir="rtl"] .vas_105_acct-tip[data-tip]:hover::after {
     border-radius: 0.5em;
     border:        0.0625em solid var(--acct-border);
     margin-bottom: 0.75em;
-    max-height:    18em;
-    overflow-y:    auto;
 }
 
 /* ===== Tasks section ===== */
