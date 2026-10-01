@@ -18,6 +18,14 @@
 
     var PS = VAS.PanelShortcuts = VAS.PanelShortcuts || {};
 
+    /* When an undo last SUCCEEDED anywhere on the page (Date.now()), shared by every
+       panel (30-Sep-2026). Two panels can hear the same Ctrl+Alt+Z - a twin instance the
+       host started, or two panel types on one window - and the one with nothing to revert
+       used to answer "Nothing to undo" although the other had just reverted the change.
+       A panel calls markUndo() after a revert and checks lastUndoAt before it toasts. */
+    PS.lastUndoAt = 0;
+    PS.markUndo = function () { PS.lastUndoAt = Date.now(); };
+
     /**
      * Registers Alt+Ctrl+N/S/D/Z/Q keyboard shortcuts for a panel and returns
      * a disposer that removes them.

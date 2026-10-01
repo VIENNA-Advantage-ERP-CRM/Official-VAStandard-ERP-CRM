@@ -756,6 +756,13 @@
 .vas-po303-cell-edit:has(input.vas-po303-cell-disp:disabled) {
     cursor: not-allowed;
 }
+/* The PRODUCT / CHARGE name is never greyed (30-Sep-2026): even when the column is
+   rendered disabled (dictionary ReadOnlyLogic on a status that still allows edits) the
+   name stays in the normal text colour - only the cursor says it is locked. */
+.vas-po303-cell-edit input.vas-po303-cell-disp--primary:disabled {
+    color: var(--cil-text);
+    -webkit-text-fill-color: var(--cil-text);
+}
 .vas-po303-cell-edit input.vas-po303-cell-disp--sub {
     font-size: 0.85em;
     font-weight: 500;
@@ -1185,7 +1192,9 @@
     background: #fdf3e2;
     box-shadow: inset 0.1875em 0 0 var(--cil-warning);
     color: #8a5a09;
-    font-size: 0.75em;
+    font-size: 1.5em;   /* was 0.75em, then 0.9375em - matches the field captions (30-Sep-2026) */
+    line-height: 1.4;
+    font-weight: 500;
 }
 
 /* Refresh with unsaved changes: Save / Discard / Cancel (A7). */

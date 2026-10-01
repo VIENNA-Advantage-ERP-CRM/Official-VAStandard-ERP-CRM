@@ -219,13 +219,17 @@
     /* The instance list's first column. Default: the lot, else the serial number (never
        the internal id). codeByControl (opt-in): what the product's attribute set controls
        - Lot No for a lot-controlled set, Serial No for a serial-controlled one, and the
-       instance id for any other attribute set. */
+       instance id for any other attribute set. The cell is never left BLANK (30-Sep-2026):
+       an instance of a lot-controlled product that was created without a lot (only an
+       attribute value) used to show an empty Code, so after the control's own value the
+       column falls through lot -> serial -> instance id. */
     function instanceCode(r) {
         if (!cfg.codeByControl) return r.Lot || r.SerNo || "";
         var info = st.info || {};
-        if (info.IsLot) return r.Lot || "";
-        if (info.IsSerNo) return r.SerNo || "";
-        return r.M_AttributeSetInstance_ID ? String(r.M_AttributeSetInstance_ID) : "";
+        var id = r.M_AttributeSetInstance_ID ? String(r.M_AttributeSetInstance_ID) : "";
+        if (info.IsLot && r.Lot) return r.Lot;
+        if (info.IsSerNo && r.SerNo) return r.SerNo;
+        return r.Lot || r.SerNo || id;
     }
 
     /* Reload the existing-instance list after the "Show All" toggle changes. getJSONData is

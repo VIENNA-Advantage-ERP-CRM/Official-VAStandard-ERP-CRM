@@ -175,6 +175,18 @@
     min-width: 0;
 }
 
+/* New, unsaved header (30-Sep-2026, as VAS_248): the grid and the message are both hidden,
+   so the root collapses and the framework host's blue surface around it was all that
+   showed. The host chain is painted white in EVERY state (second pass, 30-Sep-2026): a
+   loaded receipt whose panel is shorter than its host showed the same blue below and
+   around the panel, so the rule no longer waits for .vas-grn-root--new. */
+.vis-ad-w-p-actionpanel-b:has(.vas-grn-root),
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-grn-root),
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-grn-root) > .vis-ad-w-p-ap-tp-o-body,
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-grn-root) .vis-ad-w-p-ap-tp-o-b-content {
+    background: #ffffff !important;
+}
+
 /* Hide the framework-rendered tab title bar and its coloured header. The framework places
    .vis-ad-w-p-ap-tp-body-head immediately before our root, so this adjacency :has()
    targets ONLY this panel's head — never a sibling panel's. It is redundant with the

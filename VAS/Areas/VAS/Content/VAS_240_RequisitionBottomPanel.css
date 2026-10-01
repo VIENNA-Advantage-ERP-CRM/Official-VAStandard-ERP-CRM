@@ -162,6 +162,17 @@
     max-width: 100% !important;
     min-width: 0;
 }
+/* White host (30-Sep-2026, as VAS_249): the framework host around the panel carries its
+   own blue surface, which showed wherever the root did not cover it - a New Record (the
+   grid is hidden and the root collapses) and the room left around / below a short panel.
+   The host chain is painted white whenever it holds THIS panel. */
+.vis-ad-w-p-actionpanel-b:has(.vas-rbl-root),
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-rbl-root),
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-rbl-root) > .vis-ad-w-p-ap-tp-o-body,
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-rbl-root) .vis-ad-w-p-ap-tp-o-b-content {
+    background: #ffffff !important;
+}
+
 /* Same guard down the wrapper chain in case the host stretches an inner block as the
    flex item rather than the root itself. */
 .vas-rbl-body, .vas-rbl-panel, .vas-rbl-table, .vas-rbl-tbody {
@@ -738,7 +749,16 @@
 
 .vas-rbl-cell-edit select.vas-rbl-cell-edit__select {
     color: var(--cil-text-secondary);
+    /* Room between the option text and the cell's edge on either side (30-Sep-2026, as
+       VAS_249) - with appearance:none the browser draws no arrow, so the UOM sat flush
+       against the border, in the box and in its dropdown list alike. */
+    padding-left: 0.5em;
+    padding-right: 0.5em;
 }
+
+    .vas-rbl-cell-edit select.vas-rbl-cell-edit__select option {
+        padding: 0.25em 0.5em;
+    }
 
 .vas-rbl-cell-edit input.vas-rbl-cell-edit__input::placeholder {
     color: var(--cil-text-disabled);
@@ -874,8 +894,10 @@
    it and it keeps its full size whether it opens below or above the input - which is
    what stopped its first row being cut off (17-Sep-2026). Outside the root it must carry
    its own font anchor and design tokens and sit above the framework chrome; the FK
-   popover inside the Additional Info modal keeps the in-flow rule above. Its width is
-   the input's (inline), so the in-flow min / max widths (cqw) do not apply. */
+   popover inside the Additional Info modal keeps the in-flow rule above. Its width,
+   height and font size are set inline by positionCatalog (VAS_249's rule since
+   30-Sep-2026: the field's width, never under 22.5em), so the in-flow min / max widths
+   (cqw) do not apply and the font-size below is only the fallback. */
 .vas-rbl-catalog-popover--fixed {
     position: fixed;
     right: auto;
@@ -885,6 +907,7 @@
     font-family: var(--cil-font);
     font-size: clamp(12.5px, calc(9.5px + 0.5vw), 16px);
     color: var(--cil-text);
+    text-align: left;
     border-top: 1px solid var(--cil-divider-strong);
 }
 
