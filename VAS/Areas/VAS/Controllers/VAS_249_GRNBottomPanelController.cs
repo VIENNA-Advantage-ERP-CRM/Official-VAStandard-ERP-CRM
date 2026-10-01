@@ -163,6 +163,28 @@ namespace VAS.Controllers
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
 
+        /// <summary>
+        /// One purchase-order line, for the panel to fill a receipt line from once it is
+        /// picked as the Order Line in Additional Info (30-Sep-2026). Empty when the line is
+        /// not a purchase-order line the receipt may take.
+        /// </summary>
+        /// <param name="M_InOut_ID">receipt</param>
+        /// <param name="C_OrderLine_ID">order line picked</param>
+        /// <returns>serialized ReceiptOrderLineData</returns>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetOrderLine(int M_InOut_ID, int C_OrderLine_ID)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                VAS_249_GRNBottomPanelModel model = new VAS_249_GRNBottomPanelModel();
+                retJSON = JsonConvert.SerializeObject(model.GetOrderLine(ctx, M_InOut_ID, C_OrderLine_ID));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
         /// <summary>Returns the product's attribute-set definition for the attribute picker.</summary>
         /// <param name="M_Product_ID">product whose attribute set is read</param>
         /// <returns>serialized attribute-set definition</returns>

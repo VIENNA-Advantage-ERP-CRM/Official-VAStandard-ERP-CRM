@@ -2470,6 +2470,23 @@ namespace VASLogic.Models.VAS_304
                     // ride along onto the new one.
                     bool productSwapped = input.C_OrderLine_ID > 0
                         && (line.GetM_Product_ID() != input.M_Product_ID || line.GetC_Charge_ID() != input.C_Charge_ID);
+
+                    // A saved RELEASE line (raised against a blanket order line) whose price
+                    // the user did not touch (30-Sep-2026). MOrderLine.BeforeSave refuses an
+                    // update with "PriceCantChange" as soon as PriceEntered, PriceActual or
+                    // PriceList reads as changed on a price-controlled blanket order - and
+                    // the setters below restated all three on every save (PriceActual from
+                    // PriceEntered, PriceList from the client's column bag), so editing the
+                    // Description alone was refused. The stored prices are put back after
+                    // the setters, which leaves the three columns unchanged; a price the
+                    // user really changed still goes through and is refused by the framework.
+                    bool keepReleasePrices = input.C_OrderLine_ID > 0 && !productSwapped
+                        && line.GetC_OrderLine_Blanket_ID() > 0
+                        && decimal.Compare(input.PriceEntered, line.GetPriceEntered()) == 0;
+                    decimal keptEntered = line.GetPriceEntered();
+                    decimal keptActual = line.GetPriceActual();
+                    decimal keptList = line.GetPriceList();
+
                     if (input.M_Product_ID > 0)
                     {
                         line.SetM_Product_ID(input.M_Product_ID, true);
@@ -2517,6 +2534,13 @@ namespace VASLogic.Models.VAS_304
                         ? new HashSet<string>(input.TouchedCols, StringComparer.OrdinalIgnoreCase)
                         : null;
                     ApplyExtraColumns(line, input.Values, touchedCols);
+
+                    if (keepReleasePrices)
+                    {
+                        line.SetPriceEntered(keptEntered);
+                        line.SetPriceActual(keptActual);
+                        line.SetPriceList(keptList);
+                    }
 
                     if (!line.Save())
                     {

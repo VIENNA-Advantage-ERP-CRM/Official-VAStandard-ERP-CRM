@@ -4796,58 +4796,16 @@
             return f === "quantity" ? (+v.QtyEntered || 0) !== n : (+v.PriceEntered || 0) !== n;
         }
 
-        /* Refresh (button and Ctrl+Alt+Q). With unsaved line work on the page - including
-           a value still in the focused cell - ask Save / Discard / Cancel instead of
-           silently dropping it (A7). */
+        /* Refresh (button and Ctrl+Alt+Q). A reload throws away every line the user has not
+           saved, so with unsaved line work on the page - a picked product, an edited line,
+           or a value still in the focused cell - the refresh is BLOCKED with a message, the
+           way VAS_074 does it (30-Sep-2026): the user saves or discards first, then
+           refreshes. The earlier Save / Discard / Cancel question (A7) is gone. */
         function refreshPanel() {
             if (!parent || !parent.C_Order_ID) return;
             var cur = editing ? lineById(editing.rowId) : null;
-            if (!unsavedLines().length && !activeEditPending(cur)) { $self.fetchData(parent.C_Order_ID, linePage); return; }
-            openRefreshConfirm();
-        }
-
-        function openRefreshConfirm() {
-            $("#vasOblConfirm").remove();
-            var $bd = $('<div class="vas-obl-dialog-backdrop" id="vasOblConfirm"></div>');
-            var $dlg = $('<div class="vas-obl-dialog vas-obl-dialog--confirm" role="alertdialog" aria-modal="true"></div>');
-            $dlg.html(
-                '<header class="vas-obl-dialog__header"><div class="vas-obl-dialog__header-row">' +
-                '<h3 class="vas-obl-dialog__title">' + esc(lbl("VAS_107_UnsavedTitle", "Unsaved changes")) + "</h3></div></header>" +
-                '<div class="vas-obl-dialog__body"><p class="vas-obl-confirm-text">' +
-                esc(lbl("VAS_107_UnsavedRefresh", "You have unsaved line changes. Save them before refreshing?")) + "</p></div>" +
-                '<footer class="vas-obl-dialog__footer vas-obl-dialog__footer--end">' +
-                '<button type="button" class="vas-obl-btn vas-obl-btn--ghost" data-act="cf-cancel">' + esc(lbl("VAS_107_Cancel", "Cancel")) + "</button>" +
-                '<button type="button" class="vas-obl-btn vas-obl-btn--outline" data-act="cf-discard">' + esc(lbl("VAS_107_Discard", "Discard")) + "</button>" +
-                '<button type="button" class="vas-obl-btn vas-obl-btn--primary" data-act="cf-save">' + esc(lbl("VAS_107_Save", "Save")) + "</button>" +
-                "</footer>");
-            $bd.append($dlg);
-            $("body").append($bd);
-            function close() { $("#vasOblConfirm").remove(); }
-            $dlg.on("click", "[data-act=cf-cancel]", function () { close(); });
-            $dlg.on("click", "[data-act=cf-discard]", function () {
-                close();
-                editing = null;
-                if (parent && parent.C_Order_ID) $self.fetchData(parent.C_Order_ID, linePage);
-            });
-            $dlg.on("click", "[data-act=cf-save]", function () {
-                close();
-                if (blockedByDirtyHeader()) return;
-                flushActiveEdit();
-                afterCallouts(function () {
-                    if (!parent || !parent.C_Order_ID) return;
-                    if (!unsavedLines().length) { $self.fetchData(parent.C_Order_ID, linePage); return; }
-                    // Refresh only once the save went through; a failed save leaves the
-                    // rows on screen with their errors, exactly as the Save button does.
-                    saveRows(function (ok) { if (ok && parent) $self.fetchData(parent.C_Order_ID, linePage); });
-                });
-            });
-            // Keep keys inside the dialog (the framework's own handlers would act on them);
-            // Escape = Cancel.
-            $bd.on("keydown", function (e) {
-                if (e.key === "Escape" || e.keyCode === 27) { e.preventDefault(); close(); }
-                e.stopPropagation();
-            });
-            setTimeout(function () { $dlg.find("[data-act=cf-save]").focus(); }, 0);
+            if (unsavedLines().length || activeEditPending(cur)) { showToast(lbl("VAS_107_SaveBeforeRefresh", "Save or discard your changes before refreshing")); return; }
+            $self.fetchData(parent.C_Order_ID, linePage);
         }
 
         // Alt+Ctrl+N/S/D/Z/Q keyboard shortcuts via the shared utility (VAI154 12-Aug-2026).

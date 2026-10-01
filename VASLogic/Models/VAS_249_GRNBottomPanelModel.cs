@@ -1755,6 +1755,87 @@ namespace VASLogic.Models
 
         #endregion
 
+        #region Purchase-order line a receipt line is filled from (30-Sep-2026)
+
+        /// <summary>
+        /// One purchase-order line, for the panel to fill a receipt line from once it is
+        /// picked as the Order Line in Additional Info: product / charge, unit, the OPEN
+        /// quantity (ordered less received, in the order line's own unit) and the attribute
+        /// instance. NOT the locator - the bin the goods land in stays the receipt's own
+        /// choice, so the panel leaves it as it was. When the receipt names a purchase order
+        /// the line must belong to it; a receipt raised without one (no Create From) takes
+        /// any purchase-order line the role can read. Empty (C_OrderLine_ID = 0) otherwise.
+        /// </summary>
+        /// <param name="ctx">session context</param>
+        /// <param name="M_InOut_ID">receipt</param>
+        /// <param name="C_OrderLine_ID">order line picked</param>
+        /// <returns>the line, or an empty item</returns>
+        public ReceiptOrderLineData GetOrderLine(Ctx ctx, int M_InOut_ID, int C_OrderLine_ID)
+        {
+            ReceiptOrderLineData none = new ReceiptOrderLineData();
+            if (M_InOut_ID <= 0 || C_OrderLine_ID <= 0) return none;
+            Dictionary<string, string> io = GetInOutVars(ctx, M_InOut_ID);
+            int headerOrder = 0;
+            if (io.ContainsKey("C_Order_ID")) int.TryParse(io["C_Order_ID"], out headerOrder);
+
+            // Every bind name occurs exactly once (Oracle binds positionally).
+            string sql = @"SELECT ol.C_OrderLine_ID, ol.Line, o.DocumentNo,
+                                  COALESCE(ol.M_Product_ID, 0) AS M_Product_ID,
+                                  COALESCE(ol.C_Charge_ID, 0) AS C_Charge_ID,
+                                  COALESCE(p.Name, N'') AS ProductName,
+                                  COALESCE(p.Value, N'') AS ProductValue,
+                                  COALESCE(p.M_AttributeSet_ID, 0) AS AttributeSetId,
+                                  COALESCE(p.ProductType, '') AS ProductType,
+                                  COALESCE(ch.Name, N'') AS ChargeName,
+                                  COALESCE(ol.C_UOM_ID, 0) AS C_UOM_ID,
+                                  COALESCE(" + UomLabelExpr("u") + @", N'') AS UomName,
+                                  COALESCE(ol.QtyOrdered, 0) AS QtyOrdered,
+                                  COALESCE(ol.QtyDelivered, 0) AS QtyDelivered,
+                                  COALESCE(ol.QtyEntered, 0) AS QtyEntered,
+                                  COALESCE(ol.M_AttributeSetInstance_ID, 0) AS ASI,
+                                  COALESCE(asi.Description, N'') AS AttrName
+                           FROM C_OrderLine ol
+                           INNER JOIN C_Order o ON (o.C_Order_ID = ol.C_Order_ID)
+                           LEFT JOIN M_Product p ON (p.M_Product_ID = ol.M_Product_ID)
+                           LEFT JOIN C_Charge ch ON (ch.C_Charge_ID = ol.C_Charge_ID)
+                           LEFT JOIN C_UOM u ON (u.C_UOM_ID = ol.C_UOM_ID)
+                           LEFT JOIN M_AttributeSetInstance asi ON (asi.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID)
+                           WHERE ol.C_OrderLine_ID = @lid
+                             AND ol.IsActive = 'Y'
+                             AND o.IsSOTrx = 'N'";
+            if (headerOrder > 0) sql += " AND o.C_Order_ID = " + headerOrder;
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "ol", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+            DataSet ds = DB.ExecuteDataset(sql, new SqlParameter[] { new SqlParameter("@lid", C_OrderLine_ID) }, null);
+            if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return none;
+            DataRow r = ds.Tables[0].Rows[0];
+            ReceiptOrderLineData d = new ReceiptOrderLineData();
+            d.C_OrderLine_ID = Util.GetValueOfInt(r["C_OrderLine_ID"]);
+            d.Name = Util.GetValueOfString(r["DocumentNo"]) + " - " + Util.GetValueOfInt(r["Line"]);
+            d.M_Product_ID = Util.GetValueOfInt(r["M_Product_ID"]);
+            d.C_Charge_ID = Util.GetValueOfInt(r["C_Charge_ID"]);
+            d.ProductName = Util.GetValueOfString(r["ProductName"]);
+            d.ProductValue = Util.GetValueOfString(r["ProductValue"]);
+            d.HasAttributeSet = Util.GetValueOfInt(r["AttributeSetId"]) > 0;
+            d.ProductType = Util.GetValueOfString(r["ProductType"]);
+            d.ChargeName = Util.GetValueOfString(r["ChargeName"]);
+            d.C_UOM_ID = Util.GetValueOfInt(r["C_UOM_ID"]);
+            d.UomName = Util.GetValueOfString(r["UomName"]);
+            d.M_AttributeSetInstance_ID = Util.GetValueOfInt(r["ASI"]);
+            d.AttrName = d.M_AttributeSetInstance_ID > 0 ? Util.GetValueOfString(r["AttrName"]) : "";
+            decimal ordered = Util.GetValueOfDecimal(r["QtyOrdered"]);
+            decimal received = Util.GetValueOfDecimal(r["QtyDelivered"]);
+            decimal entered = Util.GetValueOfDecimal(r["QtyEntered"]);
+            decimal openBase = ordered - received;
+            if (openBase < 0) openBase = 0;
+            // QtyOrdered / QtyDelivered are base-unit; the receipt line is entered in the
+            // order line's own unit, so restate by that line's entered / ordered ratio.
+            d.QtyOpen = (ordered != 0 && entered != 0) ? Math.Round(openBase * entered / ordered, 6) : openBase;
+            return d;
+        }
+
+        #endregion
+
         #region Product attributes (M_AttributeSetInstance)
 
         /// <summary>
@@ -2852,6 +2933,32 @@ namespace VASLogic.Models
         public string Description { get; set; }
         public string Error { get; set; }
         public ReceiptAttributeSaveResult() { Description = ""; Error = ""; }
+    }
+
+    /// <summary>A purchase-order line a receipt line is filled from (GetOrderLine, 30-Sep-2026).</summary>
+    public class ReceiptOrderLineData
+    {
+        public int C_OrderLine_ID { get; set; }
+        /// <summary>"&lt;DocumentNo&gt; - &lt;line no&gt;", as the Order Line lookup names it.</summary>
+        public string Name { get; set; }
+        public int M_Product_ID { get; set; }
+        public int C_Charge_ID { get; set; }
+        public string ProductName { get; set; }
+        public string ProductValue { get; set; }
+        public bool HasAttributeSet { get; set; }
+        public string ProductType { get; set; }
+        public string ChargeName { get; set; }
+        public int C_UOM_ID { get; set; }
+        public string UomName { get; set; }
+        /// <summary>Ordered less received, in the order line's own unit.</summary>
+        public decimal QtyOpen { get; set; }
+        public int M_AttributeSetInstance_ID { get; set; }
+        public string AttrName { get; set; }
+        public ReceiptOrderLineData()
+        {
+            Name = ""; ProductName = ""; ProductValue = ""; ProductType = "";
+            ChargeName = ""; UomName = ""; AttrName = "";
+        }
     }
 
     #endregion

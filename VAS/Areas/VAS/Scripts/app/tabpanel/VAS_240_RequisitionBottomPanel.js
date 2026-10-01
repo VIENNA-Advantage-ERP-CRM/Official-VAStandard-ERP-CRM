@@ -471,7 +471,11 @@
                     // description that row carries on some tenants is a dash - which printed
                     // under the product as though it were the line's attribute.
                     attrName: realAttrCaption(r),
-                    hasAttributeSet: r.M_Product_ID > 0 && (!!realAttrCaption(r) || !!r.HasAttributeSet)
+                    // As VAS_074 (30-Sep-2026): a SAVED line only shows the attribute sub-line
+                    // when it actually carries an instance. A line saved without one no
+                    // longer shows "Set attribute…" under the product - the picker still
+                    // opens itself when a product with an attribute set is picked on a new line.
+                    hasAttributeSet: r.M_Product_ID > 0 && !!realAttrCaption(r) && !!r.HasAttributeSet
                 }
             };
             // Pristine snapshot of the just-loaded/just-saved state, so the row Undo can
@@ -729,63 +733,21 @@
             if (typeof res.OtherPagesSubtotal === "number") otherSub = res.OtherPagesSubtotal;
         }
 
-        /* Load another page of saved lines. Guards unsaved work so a page change never
-           silently discards a new/edited row. */
         /* Refresh button / Ctrl+Alt+Q: re-read the current page from the server. A reload
            throws away every line the user has not saved, so with unsaved work on the page
-           the user is asked Save / Discard / Cancel instead (27-Sep-2026, as VAS_107 A7).
+           (a picked product, an edited line) the refresh is BLOCKED with a message, the way
+           VAS_074 does it (30-Sep-2026): the user saves or discards first, then refreshes.
            A value typed into a cell that is still open counts too, so it is committed
-           before the check. */
+           before the check. The earlier Save / Discard / Cancel question is gone. */
         function refreshLines() {
             if (!parent || !parent.M_Requisition_ID) return;
             flushActiveEdit();
-            if (!unsavedLines().length) { $self.fetchData(parent.M_Requisition_ID, linePage); return; }
-            openRefreshConfirm();
+            if (unsavedLines().length) { showToast(lbl("VAS_240_SaveBeforeRefresh", "Save or discard your changes before refreshing")); return; }
+            $self.fetchData(parent.M_Requisition_ID, linePage);
         }
 
-        function openRefreshConfirm() {
-            $("#vasRblConfirm").remove();
-            var $bd = $('<div class="vas-rbl-dialog-backdrop" id="vasRblConfirm"></div>');
-            var $dlg = $('<div class="vas-rbl-dialog vas-rbl-dialog--confirm" role="alertdialog" aria-modal="true"></div>');
-            $dlg.html(
-                '<header class="vas-rbl-dialog__header"><div class="vas-rbl-dialog__header-row">' +
-                '<h3 class="vas-rbl-dialog__title">' + esc(lbl("VAS_240_UnsavedTitle", "Unsaved changes")) + "</h3></div></header>" +
-                '<div class="vas-rbl-dialog__body"><p class="vas-rbl-confirm-text">' +
-                esc(lbl("VAS_240_UnsavedRefresh", "You have unsaved line changes. Save them before refreshing?")) + "</p></div>" +
-                '<footer class="vas-rbl-dialog__footer vas-rbl-dialog__footer--end">' +
-                '<button type="button" class="vas-rbl-btn vas-rbl-btn--ghost" data-act="cf-cancel">' + esc(lbl("VAS_240_Cancel", "Cancel")) + "</button>" +
-                '<button type="button" class="vas-rbl-btn vas-rbl-btn--outline" data-act="cf-discard">' + esc(lbl("VAS_240_Discard", "Discard")) + "</button>" +
-                '<button type="button" class="vas-rbl-btn vas-rbl-btn--primary" data-act="cf-save">' + esc(lbl("VAS_240_Save", "Save")) + "</button>" +
-                "</footer>");
-            $bd.append($dlg);
-            $("body").append($bd);
-            function close() { $("#vasRblConfirm").remove(); }
-            $dlg.on("click", "[data-act=cf-cancel]", function () { close(); });
-            $dlg.on("click", "[data-act=cf-discard]", function () {
-                close();
-                editing = null;
-                if (parent && parent.M_Requisition_ID) $self.fetchData(parent.M_Requisition_ID, linePage);
-            });
-            $dlg.on("click", "[data-act=cf-save]", function () {
-                close();
-                afterCallouts(function () {
-                    if (!parent || !parent.M_Requisition_ID) return;
-                    if (!unsavedLines().length) { $self.fetchData(parent.M_Requisition_ID, linePage); return; }
-                    // Refresh only once the save went through; a failed save (including a
-                    // dirty header, which saveRows refuses) leaves the rows on screen with
-                    // their errors, exactly as the Save button does.
-                    saveRows(function (ok) { if (ok && parent) $self.fetchData(parent.M_Requisition_ID, linePage); });
-                });
-            });
-            // Keep keys inside the dialog (the framework's own handlers would act on them);
-            // Escape = Cancel.
-            $bd.on("keydown", function (e) {
-                if (e.key === "Escape" || e.keyCode === 27) { e.preventDefault(); close(); }
-                e.stopPropagation();
-            });
-            setTimeout(function () { $dlg.find("[data-act=cf-save]").focus(); }, 0);
-        }
-
+        /* Load another page of saved lines. Guards unsaved work so a page change never
+           silently discards a new/edited row. */
         function gotoLinePage(p) {
             if (!parent || !parent.M_Requisition_ID) return;
             var pageCount = Math.max(1, Math.ceil((linesTotal || 0) / (linePageSize || 10)));
@@ -888,15 +850,16 @@
             return String((parent && parent.DocStatus) || "").toUpperCase();
         }
 
-        /* Additional Info can be changed only while the requisition is DRAFTED
-           (25-Sep-2026). In Progress, Completed, Closed, Voided, Reversed, Invalid,
-           Approved - any other status - the modal opens for reading: no field can be set,
-           changed or cleared. Stricter than panelEditable(), which still lets an In Progress
-           requisition take line edits. A status nobody can state is not taken as a lock. */
+        /* Additional Info can be changed while the requisition is DRAFTED or IN PROGRESS
+           (25-Sep-2026; In Progress added 30-Sep-2026 - the requisition line is editable
+           on the screen in that status, so the modal is too). Completed, Closed, Voided,
+           Reversed, Invalid, Approved - any other status - the modal opens for reading: no
+           field can be set, changed or cleared. A status nobody can state is not taken as
+           a lock. */
         function additionalInfoEditable() {
             if (!panelEditable()) return false;
             var st = liveDocStatus();
-            return !st || st === "DR";
+            return !st || st === "DR" || st === "IP";
         }
 
         /* Lock state the panel was last PAINTED for (set by render), so a data-status
@@ -1672,6 +1635,10 @@
             // panel the list flipped above and its first rows were cut off, so the top
             // product could not be read or picked (17-Sep-2026).
             catalog.$pop = $('<div class="vas-rbl-catalog-popover vas-rbl-catalog-popover--fixed"></div>');
+            catalog.side = null;   // below / above - chosen once per list, see positionCatalog
+            // Keep focus in the search box on ANY press inside the list (a scrollbar drag
+            // included), so the box's blur never tears the list down mid-gesture.
+            catalog.$pop.on("mousedown", function (e) { e.preventDefault(); });
             catalog.$pop.on("scroll", function () {
                 var el = this;
                 if (catalog.hasMore && !catalog.loading && el.scrollTop + el.clientHeight >= el.scrollHeight - 40) loadCatalogPage(inner, line, $inp, false);
@@ -1687,9 +1654,11 @@
             catalog.$pop.css({ position: "fixed", top: "-9999px", left: "-9999px" });
             $("body").append(catalog.$pop);
             // Fixed positioning is relative to the viewport, so the list must follow the
-            // input when the panel scrolls or the window resizes / zooms.
-            if ($root && $root.length) $root.on("scroll.vasrblcat", positionCatalog);
+            // input while ANYTHING scrolls - the panel, the window, a framework pane - or
+            // the window resizes / zooms. Listening on the root alone (until 30-Sep-2026)
+            // left the list where it was while the page scrolled the product column away.
             $(window).on("resize.vasrblcat", positionCatalog);
+            document.addEventListener("scroll", onCatalogScroll, true);
             positionCatalog();
             setTimeout(positionCatalog, 0);   // once the row is in the grid
             // Fire the server search immediately, even for an empty term: the server uses
@@ -1708,39 +1677,71 @@
            the earlier fix for that clamped the list's height to the room inside the root -
            which is how the first row of the list ended up cut off when the input sat near
            the top of the panel. Fixed to the viewport, the only limit is the window itself.
-           Width follows the input (with the CSS min-width behind it), so it lines up with
-           the cell it drops from. Re-run as rows load (the first page changes the height
-           from the Loading hint to the list) and on scroll / resize. Mirrors VAS_107. */
-        var CATALOG_MAX_PX = 260;   // keep in sync with .vas-rbl-catalog-popover max-height (16.25em)
+           Re-run as rows load and on scroll / resize.
+
+           Since 30-Sep-2026 it is VAS_249's rule exactly, so the list is the same size on
+           every bottom panel: the product field's width, but never narrower than 22.5em
+           at the panel's own font size, and 16.25em tall on either side. The side is
+           chosen once per list, so rows arriving (or a scroll) never flip it mid-use. */
+        var CATALOG_MAX_EM = 16.25;   // keep in sync with .vas-rbl-catalog-popover max-height
+        var CATALOG_MIN_W_EM = 22.5;  // readable width when the product column is narrow
         function positionCatalog() {
             if (!catalog.$pop || !catalog.$pop.length) return;
             var $inp = catalog.$inp;
             if (!$inp || !$inp.length || !$inp[0].getBoundingClientRect) return;
-            // The row is built BEFORE it is appended to the grid (renderRow returns it),
-            // so on the first call the input is not in the document yet and cannot be
-            // measured. Leave the list parked - it is measured again a tick later
-            // (resetCatalog) and when the first page of rows lands (appendCatalogRows).
-            if (!$inp.closest("body").length) return;
+            // Not in the page: either still being built (render appends the row after the
+            // cell - resetCatalog re-measures on the next tick) or already replaced (the
+            // re-render that replaced it closes or rebuilds the list). Just stay unseen.
+            if (!$inp.closest("body").length) { catalog.$pop.css("visibility", "hidden"); return; }
             var r = $inp[0].getBoundingClientRect();
+            // Size in the PANEL's font (the grid is em-sized off a width-driven anchor),
+            // so the list reads the same size as the row it drops from.
+            var fs = 13;
+            try {
+                var anchor = ($root && $root.find(".vas-rbl-panel")[0]) || ($root && $root[0]);
+                if (anchor) fs = parseFloat(window.getComputedStyle(anchor).fontSize) || fs;
+            } catch (e) { }
+            var vw = window.innerWidth || document.documentElement.clientWidth;
             var vh = window.innerHeight || document.documentElement.clientHeight;
-            var GAP = 4;   // small breathing gap from the viewport edge
+            var GAP = 4, EDGE = 8;
+            var fullH = Math.round(CATALOG_MAX_EM * fs);
+            var width = Math.min(Math.max(r.width, Math.round(CATALOG_MIN_W_EM * fs)), vw - 2 * EDGE);
+            var left = Math.min(Math.max(EDGE, r.left), vw - width - EDGE);
             var spaceBelow = vh - r.bottom - GAP;
             var spaceAbove = r.top - GAP;
-            // What the list wants to be: its content, capped at the fixed maximum.
-            var natural = Math.min((catalog.$pop[0].scrollHeight || CATALOG_MAX_PX) + 2, CATALOG_MAX_PX + 2);
-            var above;
-            if (natural <= spaceBelow) above = false;
-            else if (natural <= spaceAbove) above = true;
-            else above = spaceAbove > spaceBelow;
+            if (!catalog.side) {
+                if (spaceBelow >= fullH) catalog.side = "below";
+                else if (spaceAbove >= fullH) catalog.side = "above";
+                else catalog.side = spaceAbove > spaceBelow ? "above" : "below";
+            }
+            var above = catalog.side === "above";
+            var maxH = Math.max(0, Math.min(fullH, above ? spaceAbove : spaceBelow));
+            // Scrolled out of the panel's visible area: hide rather than float over the
+            // header or the form above.
+            var visible = true;
+            if ($root && $root.length && $root[0].getBoundingClientRect) {
+                var rr = $root[0].getBoundingClientRect();
+                visible = r.bottom > rr.top && r.top < rr.bottom;
+            }
             catalog.$pop.css({
                 position: "fixed",
-                left: Math.round(r.left) + "px",
-                width: Math.round(r.width) + "px",
-                maxHeight: CATALOG_MAX_PX + "px",
-                top: above ? "auto" : (Math.round(r.bottom) + "px"),
-                bottom: above ? (Math.round(vh - r.top) + "px") : "auto"
+                "font-size": fs + "px",
+                left: left + "px",
+                width: width + "px",
+                top: above ? "auto" : (r.bottom + "px"),
+                bottom: above ? ((vh - r.top) + "px") : "auto",
+                "max-height": maxH + "px",
+                visibility: visible ? "" : "hidden"
             });
             catalog.$pop.toggleClass("vas-rbl-catalog-popover--above", above);
+        }
+
+        /* Capture-phase scroll listener (any scroller: the panel root, the window, a
+           framework pane) - keeps the fixed list on its field. The list's own scroll is
+           its paging, not a move. */
+        function onCatalogScroll(e) {
+            if (catalog.$pop && e && e.target === catalog.$pop[0]) return;
+            positionCatalog();
         }
 
         /* Remove the catalog dropdown immediately (used on commit, before the row's busy
@@ -1748,9 +1749,9 @@
         function closeCatalog() {
             if (catalog.debounce) { clearTimeout(catalog.debounce); catalog.debounce = null; }
             if (catalog.$pop) { catalog.$pop.remove(); catalog.$pop = null; }
-            if ($root && $root.length) $root.off("scroll.vasrblcat");
             $(window).off("resize.vasrblcat");
-            catalog.$inp = null;
+            document.removeEventListener("scroll", onCatalogScroll, true);
+            catalog.$inp = null; catalog.side = null;
             catalog.results = []; catalog.loading = false;
         }
 

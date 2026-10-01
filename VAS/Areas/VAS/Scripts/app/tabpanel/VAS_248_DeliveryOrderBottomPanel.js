@@ -430,7 +430,10 @@
            (27-Sep-2026). This class lets the CSS paint that host white until the header
            has been saved and real data renders; a loaded delivery keeps the host as is. */
         function markNewRecordHost() {
-            if ($root) $root.toggleClass("vas-dol-root--new", !!newRecordMode && !(parent && parent.M_InOut_ID));
+            // White by DEFAULT (30-Sep-2026): whenever no saved header is loaded - a New
+            // Record, or no record yet - not only while newRecordMode is flagged (a panel
+            // that had not been told about the New Record still showed the blue host).
+            if ($root) $root.toggleClass("vas-dol-root--new", !(parent && parent.M_InOut_ID));
         }
 
         function isTabInserting() {
@@ -476,7 +479,11 @@
                     uomName: r.UOMName || "",
                     locatorName: r.LocatorName || "",
                     attrName: attrName,
-                    hasAttributeSet: r.M_Product_ID > 0 && (!!attrName || !!r.HasAttributeSet)
+                    // As VAS_074 (30-Sep-2026): a SAVED line only shows the attribute sub-line
+                    // when it actually carries an instance. A line saved without one no
+                    // longer shows "Set attribute…" under the product - the picker still
+                    // opens itself when a product with an attribute set is picked on a new line.
+                    hasAttributeSet: r.M_Product_ID > 0 && !!attrName && !!r.HasAttributeSet
                 }
             };
             // Pristine snapshot of the just-loaded/just-saved state, so the row Undo can
@@ -737,57 +744,15 @@
 
         /* Refresh button / Ctrl+Alt+Q: re-read the current page from the server. A reload
            throws away every line the user has not saved, so with unsaved work on the page
-           the user is asked Save / Discard / Cancel instead (27-Sep-2026, as VAS_107 A7).
+           (a picked product, an edited line) the refresh is BLOCKED with a message, the way
+           VAS_074 does it (30-Sep-2026): the user saves or discards first, then refreshes.
            A value typed into a cell that is still open counts too, so it is committed
-           before the check. */
+           before the check. The earlier Save / Discard / Cancel question is gone. */
         function refreshLines() {
             if (!parent || !parent.M_InOut_ID) return;
             flushActiveEdit();
-            if (!unsavedLines().length) { $self.fetchData(parent.M_InOut_ID, linePage); return; }
-            openRefreshConfirm();
-        }
-
-        function openRefreshConfirm() {
-            $("#vasDolConfirm").remove();
-            var $bd = $('<div class="vas-dol-dialog-backdrop" id="vasDolConfirm"></div>');
-            var $dlg = $('<div class="vas-dol-dialog vas-dol-dialog--confirm" role="alertdialog" aria-modal="true"></div>');
-            $dlg.html(
-                '<header class="vas-dol-dialog__header"><div class="vas-dol-dialog__header-row">' +
-                '<h3 class="vas-dol-dialog__title">' + esc(lbl("VAS_248_UnsavedTitle", "Unsaved changes")) + "</h3></div></header>" +
-                '<div class="vas-dol-dialog__body"><p class="vas-dol-confirm-text">' +
-                esc(lbl("VAS_248_UnsavedRefresh", "You have unsaved line changes. Save them before refreshing?")) + "</p></div>" +
-                '<footer class="vas-dol-dialog__footer vas-dol-dialog__footer--end">' +
-                '<button type="button" class="vas-dol-btn vas-dol-btn--ghost" data-act="cf-cancel">' + esc(lbl("VAS_248_Cancel", "Cancel")) + "</button>" +
-                '<button type="button" class="vas-dol-btn vas-dol-btn--outline" data-act="cf-discard">' + esc(lbl("VAS_248_Discard", "Discard")) + "</button>" +
-                '<button type="button" class="vas-dol-btn vas-dol-btn--primary" data-act="cf-save">' + esc(lbl("VAS_248_Save", "Save")) + "</button>" +
-                "</footer>");
-            $bd.append($dlg);
-            $("body").append($bd);
-            function close() { $("#vasDolConfirm").remove(); }
-            $dlg.on("click", "[data-act=cf-cancel]", function () { close(); });
-            $dlg.on("click", "[data-act=cf-discard]", function () {
-                close();
-                editing = null;
-                if (parent && parent.M_InOut_ID) $self.fetchData(parent.M_InOut_ID, linePage);
-            });
-            $dlg.on("click", "[data-act=cf-save]", function () {
-                close();
-                afterCallouts(function () {
-                    if (!parent || !parent.M_InOut_ID) return;
-                    if (!unsavedLines().length) { $self.fetchData(parent.M_InOut_ID, linePage); return; }
-                    // Refresh only once the save went through; a failed save (a dirty header,
-                    // insufficient stock, ...) leaves the rows on screen with their errors,
-                    // exactly as the Save button does.
-                    saveRows(function (ok) { if (ok && parent) $self.fetchData(parent.M_InOut_ID, linePage); });
-                });
-            });
-            // Keep keys inside the dialog (the framework's own handlers would act on them);
-            // Escape = Cancel.
-            $bd.on("keydown", function (e) {
-                if (e.key === "Escape" || e.keyCode === 27) { e.preventDefault(); close(); }
-                e.stopPropagation();
-            });
-            setTimeout(function () { $dlg.find("[data-act=cf-save]").focus(); }, 0);
+            if (unsavedLines().length) { showToast(lbl("VAS_248_SaveBeforeRefresh", "Save or discard your changes before refreshing")); return; }
+            $self.fetchData(parent.M_InOut_ID, linePage);
         }
 
         /* Load another page of saved lines. Guards unsaved work so a page change never
@@ -879,15 +844,15 @@
             return String((parent && parent.DocStatus) || "").toUpperCase();
         }
 
-        /* Additional Info can be changed only while the delivery is DRAFTED (25-Sep-2026).
-           In Progress, Completed, Closed, Voided, Reversed, Invalid, Approved - any other
-           status - the modal opens for reading: no field can be set, changed or cleared.
-           Stricter than panelEditable(), which still lets an In Progress delivery take line
-           edits. A status nobody can state is not taken as a lock. */
+        /* Additional Info can be changed while the delivery is DRAFTED or IN PROGRESS
+           (25-Sep-2026; In Progress added 30-Sep-2026). Completed, Closed, Voided,
+           Reversed, Invalid, Approved - any other status - the modal opens for reading: no
+           field can be set, changed or cleared. A status nobody can state is not taken as
+           a lock. */
         function additionalInfoEditable() {
             if (!panelEditable()) return false;
             var st = liveDocStatus();
-            return !st || st === "DR";
+            return !st || st === "DR" || st === "IP";
         }
 
 
@@ -1941,10 +1906,13 @@
                 // Warm the per-row UOM / locator lists for the new product context.
                 ensureRowLookups(line);
                 // A delivery against a sales order: the order line this product ships
-                // against goes on the line at once (Additional Info > Order Line).
-                matchOrderLine(line);
-                if (d.hasAttributeSet) openAttrDialog(line);
-                else { editing = { rowId: line.rowId, field: "description" }; render(); }
+                // against goes on the line at once (Additional Info > Order Line) - and
+                // with it the ORDERED quantity still open on that line, as the default
+                // (30-Sep-2026). The user can change it afterwards like any quantity.
+                matchOrderLine(line, true, function () {
+                    if (d.hasAttributeSet) openAttrDialog(line);
+                    else { editing = { rowId: line.rowId, field: "description" }; render(); }
+                });
             });
         }
 
@@ -1959,28 +1927,46 @@
            The catalog itself only offers what the order carries (model side). */
         function deliveryOrderId() { return +(parent && parent.C_Order_ID) || 0; }
 
-        function matchOrderLine(line) {
-            if (!(deliveryOrderId() > 0) || !parent || !parent.M_InOut_ID) return;
+        /* fillQty (the product was JUST picked): the line also takes the order line's
+           unit and the quantity still open on it, and `done` runs once that has settled -
+           so the caller moves on (attribute picker / description) with the quantity
+           already in place. Without fillQty nothing but the link is written and nothing
+           is re-rendered (the user may be typing in another cell). `done` always runs. */
+        function matchOrderLine(line, fillQty, done) {
+            var finish = function () { if (done) done(); };
+            if (!(deliveryOrderId() > 0) || !parent || !parent.M_InOut_ID) { finish(); return; }
             var v = line.values;
-            if (!(v.M_Product_ID > 0 || v.C_Charge_ID > 0)) return;
+            if (!(v.M_Product_ID > 0 || v.C_Charge_ID > 0)) { finish(); return; }
             var seq = line._olSeq = (line._olSeq || 0) + 1;
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_248_DeliveryOrderBottomPanel/FindOrderLine",
                 type: "GET", dataType: "json",
                 data: { M_InOut_ID: parent.M_InOut_ID, M_Product_ID: v.M_Product_ID || 0, C_Charge_ID: v.C_Charge_ID || 0, QtyEntered: +v.QtyEntered || 0 },
                 success: function (raw) {
-                    if (seq !== line._olSeq || lines.indexOf(line) < 0) return;   // superseded / gone
+                    if (seq !== line._olSeq || lines.indexOf(line) < 0) { finish(); return; }   // superseded / gone
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     var id = +(res && res.C_OrderLine_ID) || 0;
-                    if (!(id > 0) || sameVal(lineVal(line, "C_OrderLine_ID"), id)) return;
-                    setOrderLineValue(line, id, res.Name);
+                    if (!(id > 0)) { finish(); return; }
+                    if (!sameVal(lineVal(line, "C_OrderLine_ID"), id)) setOrderLineValue(line, id, res.Name);
+                    if (fillQty && +res.QtyOpen > 0) {
+                        if (+res.C_UOM_ID > 0) {
+                            v.C_UOM_ID = +res.C_UOM_ID;
+                            line.display.uomName = res.UomName || uomName(+res.C_UOM_ID) || line.display.uomName;
+                        }
+                        v.QtyEntered = +res.QtyOpen;
+                        markDirty(line);
+                        // Restate the base-unit MovementQty for the defaulted quantity.
+                        runCallout(line, "QtyEntered", function () { ensureRowLookups(line); finish(); });
+                        return;
+                    }
                     // No full render: the user may be typing in another cell. The only thing
                     // on the grid this changes is the "..." highlight.
                     var cols = additionalInfoColumns(line);
                     $linesBody.find('[data-rowid="' + line.rowId + '"] .vas-dol-more-btn')
                         .toggleClass("has-values", hasAdditionalValues(line, cols));
+                    finish();
                 },
-                error: function (err) { console.log(err); }
+                error: function (err) { console.log(err); finish(); }
             });
         }
 
@@ -3009,10 +2995,13 @@
         function tryViennaControl(line, m, kind, ro, caption) {
             if (!viennaAvailable() || kind === "ro") return null;
             var col = m.ColumnName, dt = m.AD_Reference_ID, ctrl;
-            // Order Line uses the panel's own searchable lookup (GetRefLookup), not the
-            // framework control: the server restricts it to the delivery's sales order,
-            // which the framework lookup would only do if the dictionary's val rule said so.
-            if (col === "C_OrderLine_ID") return null;
+            // Order Line is the FRAMEWORK control like every other field (30-Sep-2026, as
+            // VAS_249): it lists exactly the options the Order Line field on the screen
+            // lists, under the dictionary's own names and validation, and its caption
+            // floats like the rest (the panel's own lookup named the lines
+            // "<DocumentNo> - <line>" and its caption only showed on hover). A line that
+            // is not on the delivery's sales order is still refused server-side
+            // (GetOrderLine). The panel lookup stays as the fallback below.
             try {
                 ctrl = makeViennaCtrl(dt, col, m.Name || col, m.AD_Reference_Value_ID, dynMandatory(line, m), ro, m.AD_Column_ID);
                 ctrl.getControl().css("width", "100%");
