@@ -183,6 +183,7 @@ namespace VAdvantage.Model
              *  - Admin
              *  - User
              */
+            log.SaveError("TS", "Step 1");
             name = m_clientName + " Admin";
             MRole admin = new MRole(m_ctx, 0, m_trx);
             admin.SetClientOrg(m_client);
@@ -192,6 +193,7 @@ namespace VAdvantage.Model
             admin.SetIsShowAcct(true);
             admin.SetIsAdministrator(true);
             admin.SetIsManual(false);
+            log.SaveError("TS", "Step 1 User Level : " + MRole.USERLEVEL_ClientPlusOrganization + ", Role : " + name);
             if (!admin.Save())
             {
                 String err = "Admin Role A NOT inserted";
@@ -469,6 +471,7 @@ namespace VAdvantage.Model
                     {
                         role.SetIsAdministrator(ds.Tables[0].Rows[i]["IsAdministrator"].ToString().Equals('Y') ? true : false);
                     }
+                    log.SaveError("TS", "Step 1 " + i + " User Level : " + MRole.USERLEVEL_ClientPlusOrganization + ", Role : " + ds.Tables[0].Rows[i]["Name"].ToString() + " (" + m_clientName + ")");
                     if (ds.Tables[0].Rows[i]["UserLevel"] != null && ds.Tables[0].Rows[i]["UserLevel"] != DBNull.Value)
                     {
                         // change done to handle the user level
@@ -476,10 +479,14 @@ namespace VAdvantage.Model
                         // the role doesn't have any relevance if the UserLevel is set to System
                         if (ds.Tables[0].Rows[i]["UserLevel"].ToString().Trim().Equals("S"))
                         {
+                            log.SaveError("TS", "Step 1 " + i + " User Level : " + MRole.USERLEVEL_ClientPlusOrganization + ", Role : " + ds.Tables[0].Rows[i]["Name"].ToString() + " (" + m_clientName + ")");
                             role.SetUserLevel(MRole.USERLEVEL_ClientPlusOrganization);
                         }
                         else
+                        {
+                            log.SaveError("TS", "Step 1 " + i + " User Level : " + ds.Tables[0].Rows[i]["UserLevel"].ToString() + ", Role : " + ds.Tables[0].Rows[i]["Name"].ToString() + " (" + m_clientName + ")");
                             role.SetUserLevel(ds.Tables[0].Rows[i]["UserLevel"].ToString());
+                        }
                     }
                     if (ds.Tables[0].Rows[i]["IsManual"] != null && ds.Tables[0].Rows[i]["IsManual"] != DBNull.Value)
                     {
@@ -788,6 +795,63 @@ namespace VAdvantage.Model
                                 if (!widgetAcess.Save(m_trx))
                                 {
                                     log.Info(" WidgetAcessNotSaved");
+                                }
+                            }
+                        }
+
+                        ///////// Create Dashboard and Save Dashboard Access
+                        dsComm = DB.ExecuteDataset(@"SELECT d.AD_Dashboard_ID, d.Name, d.Description, da.AD_Role_ID, da.IsDefault, da.IsReadWrite, da.SeqNo FROM AD_Dashboard_Access da 
+                        INNER JOIN AD_Dashboard d ON (da.AD_Dashboard_ID = d.AD_Dashboard_ID) WHERE d.IsActive = 'Y' AND da.IsActive = 'Y' AND da.AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
+                        if (dsComm != null && dsComm.Tables.Count > 0)
+                        {
+                            StringBuilder sbSql = new StringBuilder("");
+                            PO _dashboard = null;
+                            PO _dashboardAccess = null;
+                            for (int j = 0; j < dsComm.Tables[0].Rows.Count; j++)
+                            {
+                                _dashboard = MTable.GetPO(m_ctx, "AD_Dashboard", 0, m_trx);
+                                _dashboard.SetAD_Client_ID(m_client.GetAD_Client_ID());
+                                _dashboard.SetAD_Org_ID(0);
+                                _dashboard.Set_Value("Name", Util.GetValueOfString(dsComm.Tables[0].Rows[j]["Name"]));
+                                _dashboard.Set_Value("Description", Util.GetValueOfString(dsComm.Tables[0].Rows[j]["Description"]));
+                                if (!_dashboard.Save())
+                                {
+                                    log.Info(" DashboardNotSaved");
+                                }
+                                else
+                                {
+                                    _dashboardAccess = MTable.GetPO(m_ctx, "AD_Dashboard_Access", 0, m_trx);
+                                    _dashboardAccess.SetAD_Client_ID(m_client.GetAD_Client_ID());
+                                    _dashboardAccess.SetAD_Org_ID(0);
+                                    _dashboardAccess.Set_ValueNoCheck("AD_Role_ID", role.GetAD_Role_ID());
+                                    _dashboardAccess.Set_ValueNoCheck("AD_Dashboard_ID", _dashboard.Get_ID());
+                                    _dashboardAccess.Set_Value("IsReadWrite", Util.GetValueOfString(dsComm.Tables[0].Rows[j]["IsReadWrite"]) == "Y");
+                                    _dashboardAccess.Set_Value("IsDefault", Util.GetValueOfString(dsComm.Tables[0].Rows[j]["IsDefault"]) == "Y");
+                                    _dashboardAccess.Set_Value("SeqNo", Util.GetValueOfInt(dsComm.Tables[0].Rows[j]["SeqNo"]));
+                                    if (!_dashboardAccess.Save())
+                                    {
+                                        log.Info(" DashboardAcessNotSaved");
+                                    }
+
+                                    sbSql.Clear().Append("SELECT * FROM AD_UserHomeWidget WHERE AD_Dashboard_ID = " + Util.GetValueOfInt(dsComm.Tables[0].Rows[j]["AD_Dashboard_ID"]));
+                                    DataSet dsDashboardComps = DB.ExecuteDataset(sbSql.ToString());
+                                    if (dsDashboardComps != null && dsDashboardComps.Tables != null && dsDashboardComps.Tables[0].Rows.Count > 0)
+                                    {
+                                        for (int d = 0; d < dsDashboardComps.Tables[0].Rows.Count; d++)
+                                        {
+                                            PO oldDBComp = MTable.GetPO(m_ctx, "AD_UserHomeWidget", Util.GetValueOfInt(dsDashboardComps.Tables[0].Rows[d]["AD_UserHomeWidget_ID"]), m_trx);
+                                            PO newDBComp = MTable.GetPO(m_ctx, "AD_UserHomeWidget", 0, m_trx);
+                                            oldDBComp.CopyTo(newDBComp);
+                                            newDBComp.SetAD_Client_ID(m_client.GetAD_Client_ID());
+                                            newDBComp.SetAD_Org_ID(0);
+                                            newDBComp.Set_ValueNoCheck("AD_Dashboard_ID", _dashboard.Get_ID());
+                                            newDBComp.Set_ValueNoCheck("AD_Role_ID", role.GetAD_Role_ID());
+                                            if (!newDBComp.Save())
+                                            {
+                                                log.Info(" DashboardComponentNotSaved");
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
