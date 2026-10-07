@@ -20,13 +20,13 @@ window.VAS = window.VAS || {};
         let self = this;
        
         // Lazy load the component based on componentName
-        const MyComponent = React.lazy(() => import(`./pages/${componentName}`));
+        //const MyComponent = React.lazy(() => import(`./pages/${componentName}`));
 
         // Render the component with Suspense for fallback
         ReactDOM.createRoot(frame.getContentGrid()[0]).render(
-            <React.Suspense fallback={<div>Loading...</div>}>
-                <MyComponent self={self} />
-            </React.Suspense>
+            //<React.Suspense fallback={<div>Loading...</div>}>
+            //    <MyComponent self={self} />
+            //</React.Suspense>
         );
     };
 
