@@ -1017,21 +1017,20 @@
                 + " WHERE  PI.IsActive = 'Y' AND pi.DocStatus  NOT IN('VO', 'RE'))";
         }
 
-        sql += " AND C_Order.IsReturnTrx='" + (isReturnTrx ? "Y" : "N") + "' AND C_Order.IsDropShip='" + (_isdrop ? "Y" : "N") + "'  AND C_Order.C_Order_ID IN "
-            + "(SELECT C_Order_ID FROM (SELECT ol.C_Order_ID,ol.C_OrderLine_ID,ol.QtyOrdered,"
-            + " (SELECT SUM(m.qty) FROM m_matchPO m WHERE ol.C_OrderLine_ID = m.C_OrderLine_ID AND NVL(" + column + ", 0) != 0 AND m.ISACTIVE = 'Y') AS Qty,"
-            + " (SELECT SUM(IL.QtyInvoiced)  FROM C_INVOICELINE IL INNER JOIN C_Invoice I ON I.C_INVOICE_ID = IL.C_INVOICE_ID"
-            + " WHERE il.ISACTIVE = 'Y' AND I.DOCSTATUS NOT IN('VO', 'RE') AND OL.C_ORDERLINE_ID = IL.C_ORDERLINE_ID) AS QtyInvoiced,"
-            + " (SELECT SUM(IL.QtyInvoiced)  FROM C_ProvisionalInvoiceLine IL INNER JOIN C_ProvisionalInvoice I ON I.C_ProvisionalInvoice_ID = IL.C_ProvisionalInvoice_ID"
-            + " WHERE il.ISACTIVE = 'Y' AND I.DOCSTATUS NOT IN('VO', 'RE') AND OL.C_ORDERLINE_ID = IL.C_ORDERLINE_ID) AS QtyProvisional FROM C_OrderLine ol ";
+        // Correlate order lines to the outer C_Order so only lines of the filtered orders are evaluated,
+        // instead of a full scan of C_OrderLine with the sub-selects run for every line in the system
+        sql += " AND C_Order.IsReturnTrx='" + (isReturnTrx ? "Y" : "N") + "' AND C_Order.IsDropShip='" + (_isdrop ? "Y" : "N") + "'  AND EXISTS "
+            + "(SELECT 1 FROM C_OrderLine ol ";
 
         // Get Orders based on the setting taken on Tenant to allow non item Product
         if (!forInvoice && VIS.Utility.Util.getValueOfString(VIS.Env.getCtx().getContext("$AllowNonItem")) == "N") {
             sql += " INNER JOIN M_Product p ON ol.M_Product_ID = p.M_Product_ID AND p.ProductType = 'I'";
         }
 
-        sql += ") t GROUP BY C_Order_ID,C_OrderLine_ID,QtyOrdered "
-            + " HAVING QtyOrdered > SUM(nvl(Qty,0)) AND QtyOrdered > SUM(NVL(QtyInvoiced,0)))";
+        sql += " WHERE ol.C_Order_ID = C_Order.C_Order_ID"
+            + " AND ol.QtyOrdered > NVL((SELECT SUM(m.qty) FROM m_matchPO m WHERE ol.C_OrderLine_ID = m.C_OrderLine_ID AND NVL(" + column + ", 0) != 0 AND m.ISACTIVE = 'Y'), 0)"
+            + " AND ol.QtyOrdered > NVL((SELECT SUM(IL.QtyInvoiced)  FROM C_INVOICELINE IL INNER JOIN C_Invoice I ON I.C_INVOICE_ID = IL.C_INVOICE_ID"
+            + " WHERE il.ISACTIVE = 'Y' AND I.DOCSTATUS NOT IN('VO', 'RE') AND OL.C_ORDERLINE_ID = IL.C_ORDERLINE_ID), 0))";
 
         var lookupOrder = VIS.MLookupFactory.get(VIS.Env.getCtx(), VIS.Env.getWindowNo(), 0, VIS.DisplayType.Search, "C_Order_ID", 0, false, sql);
         this.cmbOrder = new VIS.Controls.VTextBoxButton("C_Order_ID", true, false, true, VIS.DisplayType.Search, lookupOrder);
@@ -1191,21 +1190,22 @@
             sql += whereCondition;
         }
 
-        sql += " AND C_Order.IsReturnTrx='" + (isReturnTrx ? "Y" : "N") + "' AND C_Order.IsDropShip='" + (_isdrop ? "Y" : "N") + "'  AND C_Order.C_Order_ID IN "
-            + "(SELECT C_Order_ID FROM (SELECT ol.C_Order_ID,ol.C_OrderLine_ID,ol.QtyOrdered,"
-            + " (SELECT SUM(m.qty) FROM m_matchPO m WHERE ol.C_OrderLine_ID = m.C_OrderLine_ID AND NVL(" + column + ", 0) != 0 AND m.ISACTIVE = 'Y') AS Qty,"
-            + " (SELECT SUM(IL.QtyInvoiced)  FROM C_INVOICELINE IL INNER JOIN C_Invoice I ON I.C_INVOICE_ID = IL.C_INVOICE_ID"
-            + " WHERE il.ISACTIVE = 'Y' AND I.DOCSTATUS NOT IN('VO', 'RE') AND OL.C_ORDERLINE_ID = IL.C_ORDERLINE_ID) AS QtyInvoiced,"
-            + " (SELECT SUM(IL.QtyInvoiced)  FROM C_ProvisionalInvoiceLine IL INNER JOIN C_ProvisionalInvoice I ON I.C_ProvisionalInvoice_ID = IL.C_ProvisionalInvoice_ID"
-            + " WHERE il.ISACTIVE = 'Y' AND I.DOCSTATUS NOT IN('VO', 'RE') AND OL.C_ORDERLINE_ID = IL.C_ORDERLINE_ID) AS QtyProvisional FROM C_OrderLine ol ";
+        // Correlate order lines to the outer C_Order so only lines of the filtered orders are evaluated,
+        // instead of a full scan of C_OrderLine with the sub-selects run for every line in the system
+        sql += " AND C_Order.IsReturnTrx='" + (isReturnTrx ? "Y" : "N") + "' AND C_Order.IsDropShip='" + (_isdrop ? "Y" : "N") + "'  AND EXISTS "
+            + "(SELECT 1 FROM C_OrderLine ol ";
 
         // Get Orders based on the setting taken on Tenant to allow non item Product
         if (VIS.Utility.Util.getValueOfString(VIS.Env.getCtx().getContext("$AllowNonItem")) == "N") {
             sql += " INNER JOIN M_Product p ON ol.M_Product_ID = p.M_Product_ID AND p.ProductType = 'I'";
         }
 
-        sql += ") t GROUP BY C_Order_ID,C_OrderLine_ID,QtyOrdered "
-            + " HAVING QtyOrdered > SUM(nvl(Qty,0)) AND QtyOrdered > SUM(NVL(QtyInvoiced,0)) AND QtyOrdered > SUM(NVL(QtyProvisional, 0)))";
+        sql += " WHERE ol.C_Order_ID = C_Order.C_Order_ID"
+            + " AND ol.QtyOrdered > NVL((SELECT SUM(m.qty) FROM m_matchPO m WHERE ol.C_OrderLine_ID = m.C_OrderLine_ID AND NVL(" + column + ", 0) != 0 AND m.ISACTIVE = 'Y'), 0)"
+            + " AND ol.QtyOrdered > NVL((SELECT SUM(IL.QtyInvoiced)  FROM C_INVOICELINE IL INNER JOIN C_Invoice I ON I.C_INVOICE_ID = IL.C_INVOICE_ID"
+            + " WHERE il.ISACTIVE = 'Y' AND I.DOCSTATUS NOT IN('VO', 'RE') AND OL.C_ORDERLINE_ID = IL.C_ORDERLINE_ID), 0)"
+            + " AND ol.QtyOrdered > NVL((SELECT SUM(IL.QtyInvoiced)  FROM C_ProvisionalInvoiceLine IL INNER JOIN C_ProvisionalInvoice I ON I.C_ProvisionalInvoice_ID = IL.C_ProvisionalInvoice_ID"
+            + " WHERE il.ISACTIVE = 'Y' AND I.DOCSTATUS NOT IN('VO', 'RE') AND OL.C_ORDERLINE_ID = IL.C_ORDERLINE_ID), 0))";
 
         var lookupOrder = VIS.MLookupFactory.get(VIS.Env.getCtx(), this.windowNo, 0, VIS.DisplayType.Search, "C_Order_ID", 0, false, sql);
         this.cmbOrder = new VIS.Controls.VTextBoxButton("C_Order_ID", true, false, true, VIS.DisplayType.Search, lookupOrder);
