@@ -2676,8 +2676,14 @@
                 // of a similar name apart. The combination's DESCRIPTION is no
                 // longer printed as a third line: it repeated the combination the
                 // row already states on the right.
+                // The account's name follows its code, "-" separated (07-Oct-2026):
+                // "51100 - Cost of Goods Sold". Left off when it would only repeat
+                // the label.
+                var primary = role ? msg(role.key, role.text) : a.AccountRole;
+                if (a.AccountName && a.AccountName !== primary)
+                    primary = (primary ? primary + " - " : "") + a.AccountName;
                 return listRow({
-                    primary: role ? msg(role.key, role.text) : a.AccountRole,
+                    primary: primary,
                     primarySoft: a.AccountKey || "",
                     meta: accountDetailText(a),
                     value: a.Combination || "—"
@@ -3452,17 +3458,23 @@
             $head.append($('<div class="vas_190-sheetLabel"></div>')
                 .text(msg("VAS_190_Transcript", "Transcript")));
             var hasText = !!(a.Transcript && String(a.Transcript).trim());
+            // Every MEETING offers the download (06-Oct-2026), as the history panel does:
+            // loadTranscript asks the platform for the meeting's link itself
+            // (GetSelectedAppointmentDetails), so the button no longer waits for the
+            // feed's own row to carry one - the row often had none, and the section then
+            // offered nothing to press.
+            var canLoad = a.Type === "appointment" || !!a.MeetingUrl;
             if (hasText) {
                 $head.append(sheetButton(msg("VAS_190_DownloadTranscript", "Download transcript"),
                     false, function () { downloadTranscript(a); }).addClass("vas_190-sheetBtn--sm"));
-            } else if (a.MeetingUrl) {
+            } else if (canLoad) {
                 $head.append(sheetButton(msg("VAS_190_DownloadTranscript", "Download transcript"),
                     true, function () { loadTranscript(a, $block); }).addClass("vas_190-sheetBtn--sm"));
             }
             $block.append($head);
 
             if (!hasText) {
-                $block.append($('<div class="vas_190-sheetText vas_190-soft"></div>').text(a.MeetingUrl
+                $block.append($('<div class="vas_190-sheetText vas_190-soft"></div>').text(canLoad
                     ? msg("VAS_190_TranscriptNotLoaded", "The transcript has not been downloaded yet.")
                     : msg("VAS_190_NoTranscript", "No transcript for this meeting.")));
                 return $block;

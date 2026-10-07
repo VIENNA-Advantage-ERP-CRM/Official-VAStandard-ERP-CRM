@@ -153,6 +153,9 @@
         var CALLOUT_WAIT_MS = 8000;
         /* client-side line rows + reactive UI state */
         var lines = [];
+        // Messages of new lines the user undid (06-Oct-2026): Undo removes such a line, and
+        // its message stays on the panel until the next reload (Refresh) - see discardNewLine.
+        var undoneMsgs = [];
         var rowCounter = 0;
         var editing = null;            // { rowId, field }
         var morePopoverFor = null;     // rowId
@@ -510,7 +513,7 @@
                     // new order so its val rule re-resolves against the new header context
                     // (e.g. a different C_BPartner_ID) instead of serving the prior order's list.
                     _mlookupCache = {};
-                    lines = [];
+                    lines = []; undoneMsgs = [];
                     if (parent && parent.Lines) for (var j = 0; j < parent.Lines.length; j++) lines.push(fromServerRow(parent.Lines[j]));
                     editing = null; morePopoverFor = null;
                     render();
@@ -532,7 +535,7 @@
             // Also tear down any open dialog so a fixed backdrop isn't orphaned over the page.
             closeDialogs();
             try { if (window.VIS && VIS.AttributeControl && VIS.AttributeControl.close) VIS.AttributeControl.close(); } catch (e) { }
-            parent = null; lines = [];
+            parent = null; lines = []; undoneMsgs = [];
             if (isNewRecord) {
                 // New unsaved record — show a blank panel (no message).
                 if ($body)       $body.hide();
@@ -575,19 +578,23 @@
             // attributes holds instance 0, and the description that row carries on some
             // tenants (a dash) is not an attribute of this line - it must read blank.
             // Every screen since 23-Sep-2026 (the quotation's "_" caption).
-            // hasAttributeSet follows VAS_074 (30-Sep-2026): a SAVED line only shows the
-            // attribute sub-line when it actually carries an instance. A line saved without
-            // one no longer nags "Set attribute…" under the product - the picker still
-            // opens itself when a product with an attribute set is picked on a new line.
+            // hasAttributeSet is the PRODUCT's own flag (06-Oct-2026): a line saved without
+            // an instance for a product that has an attribute set shows a plain "---" under
+            // the product (as VAS_074 does), and clicking it opens the attribute picker.
             var attrName = !(vals.M_AttributeSetInstance_ID > 0) ? "" : (r.AttrName || "");
+            // A saved RELEASE line keeps the blanket line's price (06-Oct-2026, as VAS_304):
+            // held as a price override, so a later quantity / description edit never
+            // re-prices it from the price list - the framework refuses any price change on
+            // a release ("Price Can't Change"), and the user had not changed one.
+            var heldPrice = !!(parent && parent.IsReleaseDoc) && (+VAS.PanelUtil.lineVal(vals, BLANKET_LINE_COL) > 0);
             var line = {
-                rowId: "r" + (++rowCounter), status: "saved", dirty: false, _priceOverride: false,
+                rowId: "r" + (++rowCounter), status: "saved", dirty: false, _priceOverride: heldPrice,
                 _productType: r.ProductType || "",
                 values: vals,
                 display: {
                     productName: r.ProductName || "", chargeName: r.ChargeName || "",
                     uomName: r.UOMName || "", taxName: r.TaxName || "",
-                    attrName: attrName, hasAttributeSet: r.M_Product_ID > 0 && !!attrName && !!r.HasAttributeSet
+                    attrName: attrName, hasAttributeSet: r.M_Product_ID > 0 && !!r.HasAttributeSet
                 }
             };
             // Pristine snapshot of the just-loaded/just-saved state, so the row Undo can
@@ -608,7 +615,9 @@
         }
 
         /* Revert a dirty saved row to its last pristine (loaded/saved) snapshot. New
-           (never-saved) rows have no snapshot - they are removed via Delete instead. */
+           (never-saved) rows have no snapshot - they are removed via Delete instead.
+           The row's message (line._error) is deliberately left in place: it stays until
+           Refresh reloads the line, which shows it gone once the change is undone. */
         function undoLine(line) {
             if (!line || !line._saved) return;
             if (editing && editing.rowId === line.rowId) editing = null;
@@ -628,6 +637,9 @@
             if (!line) return;
             if (editing && editing.rowId === line.rowId) editing = null;
             if (morePopoverFor === line.rowId) { morePopoverFor = null; closeDialogs(); }
+            // The line goes, its message does not (06-Oct-2026): it stays on the panel
+            // until Refresh, like the message of an undone saved row.
+            if (line._error && undoneMsgs.indexOf(line._error) < 0) undoneMsgs.push(line._error);
             var i = lines.indexOf(line);
             if (i >= 0) lines.splice(i, 1);
             render();
@@ -829,6 +841,8 @@
             updateDocTypeLabels();
 
             $linesBody.empty();
+            for (var u = 0; u < undoneMsgs.length; u++)
+                $linesBody.append('<div class="vas-po303-undone-msg" role="alert">' + esc(undoneMsgs[u]) + "</div>");
             if (!lines.length) {
                 $linesBody.append('<div class="vas-po303-emptyrow">' + esc(lbl("VAS_107_NoLines", "No lines yet - use Add line")) + "</div>");
             } else {
@@ -1324,9 +1338,14 @@
                 // product. Clicking it opens the attribute control instead of editing
                 // the product name (so the click must not bubble to the cell handler).
                 if (line.values.M_Product_ID > 0 && (line.display.attrName || line.display.hasAttributeSet)) {
+                    // No instance yet: "Set Attribute" while the line is unsaved (new or
+                    // edited), a plain "---" once it is saved (07-Oct-2026); clicking either
+                    // still opens the picker.
                     var hasAttr = !!line.display.attrName;
-                    var attrTxt = hasAttr ? line.display.attrName : lbl("VAS_107_SetAttribute", "Set attribute…");
-                    var $attr = $('<span class="vas-po303-attr-link"></span>').text(attrTxt).attr("title", attrTxt);
+                    var attrTxt = hasAttr ? line.display.attrName
+                        : ((line.status === "new" || line.dirty) ? lbl("VAS_107_SetAttributeLabel", "Set Attribute") : "---");
+                    var $attr = $('<span class="vas-po303-attr-link"></span>').text(attrTxt)
+                        .attr("title", hasAttr ? attrTxt : lbl("VAS_107_SetAttribute", "Set attribute…"));
                     if (!hasAttr) $attr.addClass("vas-po303-attr-link--empty");
                     // Clickable only when the order is editable AND the product actually
                     // carries an attribute set (M_AttributeSet_ID > 0). On a read-only order,
@@ -1335,7 +1354,12 @@
                     // still shows), the attribute is informational only - not a link (no click,
                     // no pointer cursor / hover underline). The same on a release purchase
                     // order, whose attribute is the blanket line's (see attributeLocked).
-                    if (editable && !attributeLocked() && productHasAttributeSet(line)) $attr.on("click", function (e) { e.stopPropagation(); openAttrDialog(line); });
+                    if (editable && !attributeLocked() && productHasAttributeSet(line)) {
+                        // mousedown + preventDefault (as VAS_074): a plain click while a cell
+                        // editor is focused blurs -> re-renders the row and eats the click.
+                        $attr.on("mousedown", function (e) { e.preventDefault(); e.stopPropagation(); openAttrDialog(line); });
+                        $attr.on("click", function (e) { e.stopPropagation(); if (e.detail === 0) openAttrDialog(line); });
+                    }
                     else $attr.addClass("vas-po303-attr-link--disabled");
                     wrap.append($attr);
                 }
@@ -2455,6 +2479,10 @@
            the framework callout isn't loaded on the page. */
         function runCalloutServer(line, trigger, done) {
             var v = line.values;
+            // A new product / charge takes its OWN tax (06-Oct-2026): BuildCalcLine keeps any
+            // C_Tax_ID it is sent, so changing the product of a saved line used to re-price
+            // it but leave the previous product's tax. Send none so the server re-determines it.
+            var newItem = trigger === "M_Product_ID" || trigger === "C_Charge_ID";
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_303_PurchaseOrderBottom/RunCallout",
                 type: "GET", dataType: "json",
@@ -2464,7 +2492,7 @@
                     M_AttributeSetInstance_ID: v.M_AttributeSetInstance_ID || 0,
                     QtyEntered: v.QtyEntered || 0, QtyOrdered: v.QtyOrdered || 0, C_UOM_ID: v.C_UOM_ID || 0,
                     PriceEntered: v.PriceEntered || 0, PriceOverride: !!line._priceOverride,
-                    C_Tax_ID: v.C_Tax_ID || 0, Discount: v.Discount || 0
+                    C_Tax_ID: newItem ? 0 : (v.C_Tax_ID || 0), Discount: v.Discount || 0
                 },
                 success: function (raw) {
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
@@ -4634,6 +4662,9 @@
             }
             saveInFlight = true;
             var rows = batch.map(buildRowPayload);
+            // A save stays on the page it was made from: the server numbers new lines above
+            // every existing one, so from a later page they move to the FIRST page and leave
+            // this one (07-Oct-2026).
             // Lock + show a per-row spinner on each saving row.
             batch.forEach(function (l) { l._saving = true; setRowBusy(l, true, lbl("VAS_107_Saving", "Saving…")); });
             renderHeaderButtons();   // the batch no longer counts as "unsaved" -> Save mutes
@@ -4708,9 +4739,14 @@
             // Brand-new client lines not part of this batch (added during the save).
             var newKeep = lines.filter(function (l) { return (l.values.C_OrderLine_ID || 0) <= 0 && !inBatch(l); });
             var merged = (serverRows || []).map(function (r) {
-                return dirtyById[r.C_OrderLine_ID] || fromServerRow(r);
+                var kept = dirtyById[r.C_OrderLine_ID];
+                if (kept) delete dirtyById[r.C_OrderLine_ID];
+                return kept || fromServerRow(r);
             });
-            lines = newKeep.concat(merged);
+            // An edited line the returned page does not carry (it moved off the page while the
+            // save was in flight) is kept rather than dropped with its edit.
+            var strayDirty = Object.keys(dirtyById).map(function (k) { return dirtyById[k]; });
+            lines = newKeep.concat(merged, strayDirty);
             if (editing && !lineById(editing.rowId)) editing = null;
             render();
         }

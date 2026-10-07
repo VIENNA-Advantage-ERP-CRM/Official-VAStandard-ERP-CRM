@@ -1936,13 +1936,46 @@ namespace VASLogic.Models
             if (req.C_Tax_ID > 0)
                 line.SetC_Tax_ID(req.C_Tax_ID);
             else
-                line.SetTax();
+                TrySetTax(line);
 
             line.SetLineNetAmt();
             if (line.GetC_Tax_ID() > 0)
                 line.SetTaxAmt();
 
             return line;
+        }
+
+        /// <summary>
+        /// MOrderLine.SetTax() without the crash: when no VATAX rule matches it falls back to
+        /// the tax category's default C_Tax_ID and, if the category has none, calls
+        /// SetC_Tax_ID(0), which throws "C_Tax_ID is mandatory." (07-Oct-2026). The line is
+        /// then left without a tax so the user picks one in the panel.
+        /// </summary>
+        /// <returns>true when a tax was set on the line</returns>
+        private static bool TrySetTax(MOrderLine line)
+        {
+            try
+            {
+                line.SetTax();
+            }
+            catch (ArgumentException ex)
+            {
+                log.Fine("VAS_107 SetTax: no tax resolved for product " + line.GetM_Product_ID()
+                    + " / charge " + line.GetC_Charge_ID() + " - " + ex.Message);
+            }
+            return line.GetC_Tax_ID() > 0;
+        }
+
+        /// <summary>"Required: Tax" - the panel's own wording for a missing mandatory field.</summary>
+        private static string TaxRequiredMessage(Ctx ctx)
+        {
+            string req = Msg.GetMsg(ctx, "VAS_107_FieldRequired");
+            if (string.IsNullOrEmpty(req) || req.StartsWith("[") || req == "VAS_107_FieldRequired")
+                req = "Required";
+            string tax = Msg.GetElement(ctx, "C_Tax_ID");
+            if (string.IsNullOrEmpty(tax) || tax.StartsWith("[") || tax == "C_Tax_ID")
+                tax = "Tax";
+            return req + ": " + tax;
         }
 
         /// <summary>
@@ -2445,6 +2478,7 @@ namespace VASLogic.Models
             try
             {
                 MOrder order = new MOrder(ctx, C_Order_ID, trx);
+                ShiftNewLinesToTop(C_Order_ID, rows, trx);
                 foreach (OrderLineInput input in rows)
                 {
                     if (input.M_Product_ID <= 0 && input.C_Charge_ID <= 0)
@@ -2497,8 +2531,19 @@ namespace VASLogic.Models
 
                     if (input.C_Tax_ID > 0)
                         line.SetC_Tax_ID(input.C_Tax_ID);
-                    else
-                        line.SetTax();
+                    else if (!TrySetTax(line))
+                    {
+                        // No tax resolvable for the product / charge: report it on the row
+                        // (MOrderLine.BeforeSave would otherwise re-run SetTax and throw).
+                        res.LineErrors.Add(new OrderLineSaveError
+                        {
+                            RowKey = input.RowKey,
+                            C_OrderLine_ID = input.C_OrderLine_ID,
+                            Line = input.Line,
+                            Message = TaxRequiredMessage(ctx)
+                        });
+                        continue;
+                    }
 
                     if (input.Line > 0)
                         line.SetLine(input.Line);
@@ -2510,7 +2555,8 @@ namespace VASLogic.Models
                         : null;
                     ApplyExtraColumns(line, input.Values, touchedCols);
 
-                    if (!line.Save())
+                    bool lineSaved = line.Save();
+                    if (!lineSaved)
                     {
                         string err = string.Empty;
                         ValueNamePair pp = VLogger.RetrieveError();
@@ -2560,6 +2606,9 @@ namespace VASLogic.Models
             if (page < 0) page = 0;
             int total;
             res.Lines = LoadLines(ctx, C_Order_ID, ResolveOrderLineTabs(AD_Window_ID), page, IsRealOrder(ctxData), out total);
+            // The lines this save created are numbered above every other line (ShiftNewLinesToTop),
+            // so they sit on the FIRST page only. Saved from a later page they leave the page the
+            // user is on - the page itself is kept (07-Oct-2026).
             res.LinesTotal = total;
             res.LinePage = page;
             res.LinePageSize = LINE_PAGE_SIZE;
@@ -2567,6 +2616,39 @@ namespace VASLogic.Models
             ComputeOtherPageTotals(ctx, C_Order_ID, res.Lines, ctxData.IsTaxIncluded, out soNet, out soTax, out soTcs);
             res.OtherPagesSubtotal = soNet; res.OtherPagesTax = soTax; res.OtherPagesTcs = soTcs;
             return res;
+        }
+
+        /// <summary>
+        /// Numbers the batch's NEW lines above every line the order already has
+        /// (06-Oct-2026, as VAS_303). Lines are listed newest first (LoadLines: Line DESC), but
+        /// the panel numbers a new line from the page it is on - on page 2 that is below page
+        /// 1's lines, so the saved line landed mid-document instead of at the top of the first
+        /// page. The new lines keep their order among themselves; only the offset moves.
+        /// </summary>
+        /// <param name="C_Order_ID">order</param>
+        /// <param name="rows">lines being saved; Line of the new ones is rewritten</param>
+        /// <param name="trx">save transaction</param>
+        private void ShiftNewLinesToTop(int C_Order_ID, List<OrderLineInput> rows, Trx trx)
+        {
+            int minNew = int.MaxValue;
+            foreach (OrderLineInput input in rows)
+            {
+                if (input.C_OrderLine_ID > 0 || (input.M_Product_ID <= 0 && input.C_Charge_ID <= 0)) continue;
+                minNew = Math.Min(minNew, Math.Max(input.Line, 0));
+            }
+            if (minNew == int.MaxValue) return;
+
+            int maxLine = Util.GetValueOfInt(DB.ExecuteScalar(
+                "SELECT COALESCE(MAX(Line), 0) FROM C_OrderLine WHERE C_Order_ID = @C_Order_ID",
+                new SqlParameter[] { new SqlParameter("@C_Order_ID", C_Order_ID) }, trx));
+            if (minNew > maxLine) return;
+
+            int shift = maxLine + 10 - minNew;
+            foreach (OrderLineInput input in rows)
+            {
+                if (input.C_OrderLine_ID > 0 || (input.M_Product_ID <= 0 && input.C_Charge_ID <= 0)) continue;
+                input.Line = Math.Max(input.Line, 0) + shift;
+            }
         }
 
         /// <summary>Soft-deletes the supplied saved order lines through MOrderLine.</summary>

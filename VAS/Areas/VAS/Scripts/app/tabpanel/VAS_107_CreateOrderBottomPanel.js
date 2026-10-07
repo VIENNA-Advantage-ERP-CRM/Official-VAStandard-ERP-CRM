@@ -1065,6 +1065,14 @@
            line's Product / Charge may always be changed (see isColumnReadOnly). */
         function docIsDrafted() { return panelEditable() && docStatusNow() === "DR"; }
 
+        /* Drafted OR In Progress (06-Oct-2026, as VAS_303): the statuses in which the line's
+           Product / Charge may always be changed (see isColumnReadOnly). */
+        function docAllowsProductChange() {
+            if (!panelEditable()) return false;
+            var st = docStatusNow();
+            return st === "DR" || st === "IP";
+        }
+
         /* Lock state the panel was last PAINTED for (set by render), so a data-status
            event only repaints on a real transition. */
         var lastLockState = null;
@@ -1287,9 +1295,15 @@
             } else {
                 var pv = primaryValue(line);
                 var primaryRO = fieldReadOnly(line, pField);   // dictionary ReadOnlyLogic only
+                // On a LOCKED document (completed / closed / voided) the dictionary's
+                // ReadOnlyLogic is true as well, which rendered the product DISABLED and
+                // greyed its name. The whole-document lock keeps the plain read-only look,
+                // and the --primary class pins the name to the normal text colour in CSS
+                // (06-Oct-2026, as VAS_303).
                 var $pi = dispInput(line, pField, pv, {
                     placeholder: lbl("VAS_107_AddProductCharge", "Add product / charge…"),
-                    readOnly: primaryRO
+                    readOnly: panelEditable() && primaryRO,
+                    cls: "vas-obl-cell-disp--primary"
                 });
                 wrap.append($pi);
                 // For a product carrying (or able to carry) an attribute set, show the
@@ -1297,9 +1311,14 @@
                 // product. Clicking it opens the attribute control instead of editing
                 // the product name (so the click must not bubble to the cell handler).
                 if (line.values.M_Product_ID > 0 && (line.display.attrName || line.display.hasAttributeSet)) {
+                    // No instance yet: "Set Attribute" while the line is unsaved (new or
+                    // edited), a plain "---" once it is saved (07-Oct-2026); clicking either
+                    // still opens the picker.
                     var hasAttr = !!line.display.attrName;
-                    var attrTxt = hasAttr ? line.display.attrName : lbl("VAS_107_SetAttribute", "Set attribute…");
-                    var $attr = $('<span class="vas-obl-attr-link"></span>').text(attrTxt).attr("title", attrTxt);
+                    var attrTxt = hasAttr ? line.display.attrName
+                        : ((line.status === "new" || line.dirty) ? lbl("VAS_107_SetAttributeLabel", "Set Attribute") : "---");
+                    var $attr = $('<span class="vas-obl-attr-link"></span>').text(attrTxt)
+                        .attr("title", hasAttr ? attrTxt : lbl("VAS_107_SetAttribute", "Set attribute…"));
                     if (!hasAttr) $attr.addClass("vas-obl-attr-link--empty");
                     // Clickable only when the order is editable AND the product actually
                     // carries an attribute set (M_AttributeSet_ID > 0). On a read-only order,
@@ -1307,7 +1326,12 @@
                     // set was removed after the line was created but the old ASI description
                     // still shows), the attribute is informational only - not a link (no click,
                     // no pointer cursor / hover underline).
-                    if (editable && productHasAttributeSet(line)) $attr.on("click", function (e) { e.stopPropagation(); openAttrDialog(line); });
+                    if (editable && productHasAttributeSet(line)) {
+                        // mousedown + preventDefault (as VAS_074): a plain click while a cell
+                        // editor is focused blurs -> re-renders the row and eats the click.
+                        $attr.on("mousedown", function (e) { e.preventDefault(); e.stopPropagation(); openAttrDialog(line); });
+                        $attr.on("click", function (e) { e.stopPropagation(); if (e.detail === 0) openAttrDialog(line); });
+                    }
                     else $attr.addClass("vas-obl-attr-link--disabled");
                     wrap.append($attr);
                 }
@@ -1901,6 +1925,12 @@
                 // the input when the panel scrolls or the window resizes / zooms.
                 if ($root && $root.length) $root.on("scroll.vasoblcat", positionCatalog);
                 $(window).on("resize.vasoblcat", positionCatalog);
+                // The panel's root is not the only scroll box above the input: the window
+                // form's own scroller (and any other ancestor) moves the cell too, and a
+                // scroll event does not bubble - so the list stayed put while the product
+                // column scrolled away from under it (06-Oct-2026, as VAS_303). A
+                // capture-phase listener on the document sees EVERY element's scroll.
+                document.addEventListener("scroll", positionCatalog, true);
             } else {
                 inner.append(catalog.$pop);
             }
@@ -1997,6 +2027,7 @@
             if (catalog.$pop) { catalog.$pop.remove(); catalog.$pop = null; }
             if ($root && $root.length) $root.off("scroll.vasoblcat");
             $(window).off("resize.vasoblcat");
+            document.removeEventListener("scroll", positionCatalog, true);
             catalog.$inp = null;
             catalog.results = []; catalog.loading = false;
         }
@@ -2497,10 +2528,12 @@
             if (FORCED_READONLY_COLS[col]) return true;
             // (Release orders no longer lock Product / Charge - since 23-Sep-2026 it is
             // picked in the cell from the blanket order's own products; see B1.)
-            // Drafted order: Product / Charge stays selectable on new AND saved lines, on
-            // every screen, whatever the dictionary's IsReadOnly / ReadOnlyLogic says
-            // (23-Sep-2026). Any other status keeps the dictionary's rule.
-            if ((col === "M_Product_ID" || col === "C_Charge_ID") && docIsDrafted()) return false;
+            // Drafted / In Progress document: Product / Charge stays selectable on new AND
+            // saved lines, whatever the dictionary's IsReadOnly / ReadOnlyLogic says
+            // (23-Sep-2026; In Progress added 06-Oct-2026, as VAS_303 - the dictionary
+            // locked the product on an In Progress quotation). Any other status keeps the
+            // dictionary's rule.
+            if ((col === "M_Product_ID" || col === "C_Charge_ID") && docAllowsProductChange()) return false;
             // C_UOM_ID: always read-only for charge lines (default UOM is auto-assigned).
             // For product lines: editable until saved, then locked.
             if (col === "C_UOM_ID" && line && line.values) {
@@ -2632,14 +2665,14 @@
         var ADDITIONAL_INFO_FIELDS = [
             // --- Dimensions ---
             // One order on EVERY screen (23-Sep-2026): Organization Unit, Campaign,
-            // Project, Project Phase, Billing Code - and only here, never under References
-            // (the 18-Sep sales-order placement under References is withdrawn). Each still
-            // follows its own dictionary DisplayLogic (Billing Code = Activity, typically
-            // gated on the accounting schema's Activity element).
+            // Project, Billing Code - and only here, never under References (the 18-Sep
+            // sales-order placement under References is withdrawn). Each still follows its
+            // own dictionary DisplayLogic (Billing Code = Activity, typically gated on the
+            // accounting schema's Activity element). Project Phase is not offered on the
+            // quotation (06-Oct-2026).
             { col: "AD_OrgTrx_ID",      grp: "dim" },
             { col: "C_Campaign_ID",     grp: "dim" },
             { col: "C_Project_ID",      grp: "dim" },
-            { col: "C_ProjectPhase_ID", grp: "dim" },
             { col: "C_Activity_ID",     grp: "dim" },
             { col: "VAS_Opportunity_ID", grp: "dim" },
             // --- Contract (SALES ORDERS only: IsSOTrx = 'Y' and not a quotation).

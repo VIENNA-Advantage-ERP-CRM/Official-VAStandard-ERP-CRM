@@ -2035,6 +2035,7 @@ namespace VASLogic.Models
             try
             {
                 MMovement movement = new MMovement(ctx, M_Movement_ID, trx);
+                ShiftNewLinesToTop(M_Movement_ID, rows, trx);
                 foreach (MovementLineInput input in rows)
                 {
                     // A movement line without a product is meaningless — there is no charge
@@ -2107,7 +2108,8 @@ namespace VASLogic.Models
                         continue;
                     }
 
-                    if (!line.Save())
+                    bool lineSaved = line.Save();
+                    if (!lineSaved)
                     {
                         string err = FrameworkError(ctx);
                         log.Warning("VAS_247 SaveLines: line save failed (Line " + input.Line + ") - " + err);
@@ -2148,10 +2150,46 @@ namespace VASLogic.Models
             if (page < 0) page = 0;
             int total;
             res.Lines = LoadLines(ctx, M_Movement_ID, page, out total);
+            // The lines this save created are numbered above every other line (ShiftNewLinesToTop),
+            // so they sit on the FIRST page only. Saved from a later page they leave the page the
+            // user is on - the page itself is kept (07-Oct-2026).
             res.LinesTotal = total;
             res.LinePage = page;
             res.TotalQty = SumQty(ctx, M_Movement_ID);
             return res;
+        }
+
+        /// <summary>
+        /// Numbers the batch's NEW lines above every line the movement already has
+        /// (06-Oct-2026, as VAS_303). Lines are listed newest first (LoadLines: Line DESC), but
+        /// the panel numbers a new line from the page it is on - on page 2 that is below page
+        /// 1's lines, so the saved line landed mid-document instead of at the top of the first
+        /// page. The new lines keep their order among themselves; only the offset moves.
+        /// </summary>
+        /// <param name="M_Movement_ID">movement</param>
+        /// <param name="rows">lines being saved; Line of the new ones is rewritten</param>
+        /// <param name="trx">save transaction</param>
+        private void ShiftNewLinesToTop(int M_Movement_ID, List<MovementLineInput> rows, Trx trx)
+        {
+            int minNew = int.MaxValue;
+            foreach (MovementLineInput input in rows)
+            {
+                if (input.M_MovementLine_ID > 0 || input.M_Product_ID <= 0) continue;
+                minNew = Math.Min(minNew, Math.Max(input.Line, 0));
+            }
+            if (minNew == int.MaxValue) return;
+
+            int maxLine = Util.GetValueOfInt(DB.ExecuteScalar(
+                "SELECT COALESCE(MAX(Line), 0) FROM M_MovementLine WHERE M_Movement_ID = @M_Movement_ID",
+                new SqlParameter[] { new SqlParameter("@M_Movement_ID", M_Movement_ID) }, trx));
+            if (minNew > maxLine) return;
+
+            int shift = maxLine + 10 - minNew;
+            foreach (MovementLineInput input in rows)
+            {
+                if (input.M_MovementLine_ID > 0 || input.M_Product_ID <= 0) continue;
+                input.Line = Math.Max(input.Line, 0) + shift;
+            }
         }
 
         /// <summary>Deletes the supplied saved movement lines through MMovementLine.</summary>

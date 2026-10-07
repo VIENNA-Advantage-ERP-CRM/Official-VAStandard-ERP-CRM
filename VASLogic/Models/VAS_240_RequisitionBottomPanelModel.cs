@@ -2076,6 +2076,7 @@ namespace VASLogic.Models
             try
             {
                 MRequisition parent = new MRequisition(ctx, M_Requisition_ID, trx);
+                ShiftNewLinesToTop(M_Requisition_ID, rows, trx);
                 foreach (RequisitionLineInput input in rows)
                 {
                     if (input.M_Product_ID <= 0 && input.C_Charge_ID <= 0)
@@ -2144,7 +2145,8 @@ namespace VASLogic.Models
                     // so a non-updateable dictionary flag cannot swallow it.
                     ApplyHeaderDateRequired(line, parent);
 
-                    if (!line.Save())
+                    bool lineSaved = line.Save();
+                    if (!lineSaved)
                     {
                         string err = string.Empty;
                         ValueNamePair pp = VLogger.RetrieveError();
@@ -2194,11 +2196,47 @@ namespace VASLogic.Models
             if (page < 0) page = 0;
             int total;
             res.Lines = LoadLines(ctx, M_Requisition_ID, ResolveRequisitionLineTabs(AD_Window_ID), page, out total);
+            // The lines this save created are numbered above every other line (ShiftNewLinesToTop),
+            // so they sit on the FIRST page only. Saved from a later page they leave the page the
+            // user is on - the page itself is kept (07-Oct-2026).
             res.LinesTotal = total;
             res.LinePage = page;
             res.LinePageSize = LINE_PAGE_SIZE;
             res.OtherPagesSubtotal = ComputeOtherPageTotal(ctx, M_Requisition_ID, res.Lines);
             return res;
+        }
+
+        /// <summary>
+        /// Numbers the batch's NEW lines above every line the requisition already has
+        /// (06-Oct-2026, as VAS_303). Lines are listed newest first (LoadLines: Line DESC), but
+        /// the panel numbers a new line from the page it is on - on page 2 that is below page
+        /// 1's lines, so the saved line landed mid-document instead of at the top of the first
+        /// page. The new lines keep their order among themselves; only the offset moves.
+        /// </summary>
+        /// <param name="M_Requisition_ID">requisition</param>
+        /// <param name="rows">lines being saved; Line of the new ones is rewritten</param>
+        /// <param name="trx">save transaction</param>
+        private void ShiftNewLinesToTop(int M_Requisition_ID, List<RequisitionLineInput> rows, Trx trx)
+        {
+            int minNew = int.MaxValue;
+            foreach (RequisitionLineInput input in rows)
+            {
+                if (input.M_RequisitionLine_ID > 0 || (input.M_Product_ID <= 0 && input.C_Charge_ID <= 0)) continue;
+                minNew = Math.Min(minNew, Math.Max(input.Line, 0));
+            }
+            if (minNew == int.MaxValue) return;
+
+            int maxLine = Util.GetValueOfInt(DB.ExecuteScalar(
+                "SELECT COALESCE(MAX(Line), 0) FROM M_RequisitionLine WHERE M_Requisition_ID = @M_Requisition_ID",
+                new SqlParameter[] { new SqlParameter("@M_Requisition_ID", M_Requisition_ID) }, trx));
+            if (minNew > maxLine) return;
+
+            int shift = maxLine + 10 - minNew;
+            foreach (RequisitionLineInput input in rows)
+            {
+                if (input.M_RequisitionLine_ID > 0 || (input.M_Product_ID <= 0 && input.C_Charge_ID <= 0)) continue;
+                input.Line = Math.Max(input.Line, 0) + shift;
+            }
         }
 
         /// <summary>Soft-deletes the supplied saved requisition lines through MRequisitionLine.</summary>

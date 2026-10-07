@@ -325,8 +325,13 @@
            is the GROSS (price already contains tax); otherwise it is the net. */
         function lineGross(line) {
             var v = line.values;
-            var disc = (+v.Discount || 0) / 100;
-            return (+v.QtyEntered || 0) * (+v.PriceEntered || 0) * (1 - disc);
+            // No Discount factor (06-Oct-2026): C_OrderLine.Discount is the percentage the
+            // price sits BELOW the list price - PriceEntered already carries it, and the
+            // framework's LineNetAmt is plain qty x price. A sales order line holds a real
+            // Discount (the purchase order's is normally 0, which is why VAS_303 read
+            // right), so an edited line's Taxable Amount came out discounted twice until
+            // it was saved and the stored amount took over.
+            return (+v.QtyEntered || 0) * (+v.PriceEntered || 0);
         }
         /* Line tax. Tax-inclusive: EXTRACT it from the gross (gross*r/(100+r)) - mirrors
            the framework MTax.CalculateTax(amount, taxIncluded=true). Tax-exclusive: add
@@ -600,10 +605,9 @@
             // attributes holds instance 0, and the description that row carries on some
             // tenants (a dash) is not an attribute of this line - it must read blank.
             // Every screen since 23-Sep-2026 (the quotation's "_" caption).
-            // hasAttributeSet follows VAS_074 (30-Sep-2026): a SAVED line only shows the
-            // attribute sub-line when it actually carries an instance. A line saved without
-            // one no longer nags "Set attribute…" under the product - the picker still
-            // opens itself when a product with an attribute set is picked on a new line.
+            // hasAttributeSet is the PRODUCT's own flag (06-Oct-2026): a line saved without
+            // an instance for a product that has an attribute set shows a plain "---" under
+            // the product (as VAS_074 does), and clicking it opens the attribute picker.
             var attrName = !(vals.M_AttributeSetInstance_ID > 0) ? "" : (r.AttrName || "");
             // A saved RELEASE line keeps the blanket line's price (30-Sep-2026): held as a
             // price override, so a later quantity / description edit never re-prices it
@@ -617,7 +621,7 @@
                 display: {
                     productName: r.ProductName || "", chargeName: r.ChargeName || "",
                     uomName: r.UOMName || "", taxName: r.TaxName || "",
-                    attrName: attrName, hasAttributeSet: r.M_Product_ID > 0 && !!attrName && !!r.HasAttributeSet
+                    attrName: attrName, hasAttributeSet: r.M_Product_ID > 0 && !!r.HasAttributeSet
                 }
             };
             // Pristine snapshot of the just-loaded/just-saved state, so the row Undo can
@@ -1422,9 +1426,14 @@
                 // product. Clicking it opens the attribute control instead of editing
                 // the product name (so the click must not bubble to the cell handler).
                 if (line.values.M_Product_ID > 0 && (line.display.attrName || line.display.hasAttributeSet)) {
+                    // No instance yet: "Set Attribute" while the line is unsaved (new or
+                    // edited), a plain "---" once it is saved (07-Oct-2026); clicking either
+                    // still opens the picker.
                     var hasAttr = !!line.display.attrName;
-                    var attrTxt = hasAttr ? line.display.attrName : lbl("VAS_107_SetAttribute", "Set attribute…");
-                    var $attr = $('<span class="vas-so304-attr-link"></span>').text(attrTxt).attr("title", attrTxt);
+                    var attrTxt = hasAttr ? line.display.attrName
+                        : ((line.status === "new" || line.dirty) ? lbl("VAS_107_SetAttributeLabel", "Set Attribute") : "---");
+                    var $attr = $('<span class="vas-so304-attr-link"></span>').text(attrTxt)
+                        .attr("title", hasAttr ? attrTxt : lbl("VAS_107_SetAttribute", "Set attribute…"));
                     if (!hasAttr) $attr.addClass("vas-so304-attr-link--empty");
                     // Clickable only when the order is editable AND the product actually
                     // carries an attribute set (M_AttributeSet_ID > 0). On a read-only order,
@@ -1434,12 +1443,25 @@
                     // no pointer cursor / hover underline).
                     // Nor on a release order, whose attribute is the blanket line's
                     // (see attributeLocked).
-                    if (editable && !attributeLocked() && productHasAttributeSet(line)) $attr.on("click", function (e) { e.stopPropagation(); openAttrDialog(line); });
+                    if (editable && !attributeLocked() && productHasAttributeSet(line)) {
+                        // mousedown + preventDefault (as VAS_074): a plain click while a cell
+                        // editor is focused blurs -> re-renders the row and eats the click.
+                        $attr.on("mousedown", function (e) { e.preventDefault(); e.stopPropagation(); openAttrDialog(line); });
+                        $attr.on("click", function (e) { e.stopPropagation(); if (e.detail === 0) openAttrDialog(line); });
+                    }
                     else $attr.addClass("vas-so304-attr-link--disabled");
                     wrap.append($attr);
                 }
             }
             return cell;
+        }
+
+        /* Repaint ONE row's Taxable Amount from a value still being typed: the line is
+           copied with the pending values over its own and priced as an edited line. */
+        function previewLineAmount(line, pending) {
+            var probe = { status: line.status, dirty: true, values: $.extend({}, line.values, pending) };
+            var amt = lineAmount(probe);
+            $linesBody.find('[data-rowid="' + line.rowId + '"] .vas-so304-amt').text(amt ? fmtMoney(amt) : "");
         }
 
         function renderEditableCell(line, field, value, placeholder, opts) {
@@ -1458,6 +1480,10 @@
                 if (opts.maxLength > 0) $inp.attr("maxlength", opts.maxLength);   // AD_Column.FieldLength cap
                 if (opts.align === "right") $inp.css("text-align", "right");
                 if (opts.amount) bindAmountInput($inp);
+                // Taxable Amount follows the PRICE as it is typed (06-Oct-2026): it used to
+                // change only once the cell was left, so a typed price showed beside the old
+                // amount. The line itself is not touched until the commit on blur.
+                if (field === "price") $inp.on("input", function () { previewLineAmount(line, { PriceEntered: parseNum($inp.val()) }); });
                 $inp.on("blur", function () { commitField(line, field, opts.amount ? parseNum($inp.val()) : $inp.val()); editing = null; render(); });
                 $inp.on("keydown", function (e) {
                     e.stopPropagation();
@@ -1647,14 +1673,9 @@
             // invoice panel does) - never a second Close next to the header ✕.
             var isRO = additionalInfoLocked();
             moreOpenEditable = !isRO;   // see onTabDataStatus
-            // ...and the user is told so the moment they click (25-Sep-2026, as the GRN /
-            // Material Transfer panels): e.g. "This Order is Completed - Additional Info
-            // can be viewed but not changed".
-            if (isRO) {
-                var st = docStatusNow();
-                showToast(docMsg("VAS_107_AddlInfoReadOnly", "This {0} is {1} - Additional Info can be viewed but not changed")
-                    .replace(/\{1\}/g, st ? docStatusName(st) : lbl("VAS_107_NotEditableStatus", "not editable")));
-            }
+            // No "Additional Info can be viewed but not changed" toast on opening any more
+            // (06-Oct-2026): the modal's own "View only" note already says so, and the toast
+            // repeated it every time the pop-up was opened.
             // Snapshot the line's editable state BEFORE any field is touched. Dynamic
             // fields commit live to line.values/display on change, so closing via the
             // cross (Cancel) must restore this snapshot to leave the record unchanged.
@@ -2563,6 +2584,10 @@
            the framework callout isn't loaded on the page. */
         function runCalloutServer(line, trigger, done) {
             var v = line.values;
+            // A new product / charge takes its OWN tax (06-Oct-2026): BuildCalcLine keeps any
+            // C_Tax_ID it is sent, so changing the product of a saved line used to re-price
+            // it but leave the previous product's tax. Send none so the server re-determines it.
+            var newItem = trigger === "M_Product_ID" || trigger === "C_Charge_ID";
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_304_SalesOrderBottom/RunCallout",
                 type: "GET", dataType: "json",
@@ -2572,7 +2597,10 @@
                     M_AttributeSetInstance_ID: v.M_AttributeSetInstance_ID || 0,
                     QtyEntered: v.QtyEntered || 0, QtyOrdered: v.QtyOrdered || 0, C_UOM_ID: v.C_UOM_ID || 0,
                     PriceEntered: v.PriceEntered || 0, PriceOverride: !!line._priceOverride,
-                    C_Tax_ID: v.C_Tax_ID || 0, Discount: v.Discount || 0
+                    // Discount 0 (06-Oct-2026): the line's Discount is the list-price
+                    // discount already inside the price (see lineGross); sending it made
+                    // the server's ApplyDiscount take it off PriceActual a second time.
+                    C_Tax_ID: newItem ? 0 : (v.C_Tax_ID || 0), Discount: 0
                 },
                 success: function (raw) {
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
@@ -2633,8 +2661,9 @@
         /* Columns the panel always shows read-only, whatever the dictionary says: they are
            stamped by the process that produced the line (drop-shipment flag set by
            OrderPOCreate, MRP plan run stamped by the planning run), so editing them here
-           would break the link back to the document that created the line. */
-        var FORCED_READONLY_COLS = { IsDropShip: 1, VAMRP_PlanRun_ID: 1 };
+           would break the link back to the document that created the line. Project Phase
+           (06-Oct-2026) is read-only as on the order's Lines tab. */
+        var FORCED_READONLY_COLS = { IsDropShip: 1, VAMRP_PlanRun_ID: 1, C_ProjectPhase_ID: 1 };
 
         function isColumnReadOnly(line, col) {
             if (FORCED_READONLY_COLS[col]) return true;
@@ -2659,6 +2688,10 @@
             var m = columnMeta[col];
             if (!m) return false;
             if (m.IsReadOnly) return true;
+            // A NON-UPDATEABLE column (AD_Column.IsUpdateable = 'N') is filled on a new line
+            // and locked once the line is saved - the framework's own rule on the Lines tab
+            // (06-Oct-2026: the Order Line reference stayed editable here after save).
+            if (m.IsUpdateable === false && line && line.values && (+line.values.C_OrderLine_ID || 0) > 0) return true;
             return !!(m.ReadOnlyLogic && evalLogic(line, m.ReadOnlyLogic));
         }
         var FIELD_COL = { product: "M_Product_ID", charge: "C_Charge_ID", uom: "C_UOM_ID", tax: "C_Tax_ID", quantity: "QtyEntered", price: "PriceEntered", description: "Description" };
@@ -2811,9 +2844,9 @@
             { col: "VA106_TCSAmount",               grp: "ref", when: "va106_" },
             // Drop Shipment, read-only: stamped by the process that raised the line, never
             // entered by hand (see FORCED_READONLY_COLS). SALES ORDER only (23-Sep-2026 -
-            // no longer on a purchase order or a quotation), and only when the order's
-            // HEADER is flagged C_Order.IsDropShip = 'Y'; otherwise it is not offered.
-            { col: "IsDropShip",       grp: "ref", when: "salesOrderDropShip" }
+            // no longer on a purchase order or a quotation), and only when the LINE's own
+            // Drop Shipment box is ticked (06-Oct-2026; it used to follow the header flag).
+            { col: "IsDropShip",       grp: "ref", when: "salesOrderDropShipLine" }
             // Plan Run (VAMRP_PlanRun_ID) and Original PO Line (Ref_C_Orderline_ID) were
             // dropped from References on 16-Sep-2026, and Quotation Line
             // (C_Quotation_Line_ID) on 17-Sep-2026: each is stamped by the process that
@@ -2867,6 +2900,15 @@
             if (when === "orderDropShip") return docIsRealOrder() && docIsDropShip();
             // Sales order whose header carries the drop-shipment flag (D1).
             if (when === "salesOrderDropShip") return docIsSalesOrder() && docIsDropShip();
+            // Sales order line whose own Drop Shipment box is ticked (06-Oct-2026). With no
+            // line in hand (groupCols) the answer is "may apply"; the per-line pass in
+            // additionalInfoColumns settles it.
+            if (when === "salesOrderDropShipLine") {
+                if (!docIsSalesOrder()) return false;
+                if (!line || !line.values) return true;
+                var ds = String(lineVal(line, "IsDropShip") == null ? "" : lineVal(line, "IsDropShip"));
+                return ds === "Y" || ds === "true" || ds === "1";
+            }
             // Release order of either side.
             if (when === "releaseOrder") return docIsReleaseOrder();
             // Sales order that is not a quotation (IsSOTrx = 'Y' AND IsSalesQuotation = 'N').
@@ -3114,11 +3156,11 @@
             // "Blanket Order Line" on a release order of either side: that is where the
             // product comes from, so it is offered whatever the dictionary says.
             { col: "C_OrderLine_Blanket_ID", when: "releaseOrder" },
-            // Drop Shipment (30-Sep-2026): under References whenever the sales order's
-            // HEADER is flagged IsDropShip = 'Y' - the dictionary's own DisplayLogic must
-            // not hide it then. With the header flag off the field is not in the list at
-            // all (ADDITIONAL_INFO_FIELDS, "salesOrderDropShip").
-            { col: "IsDropShip", when: "salesOrderDropShip" }
+            // Drop Shipment: under References whenever the LINE's own box is ticked
+            // (06-Oct-2026) - the dictionary's own DisplayLogic must not hide it then. An
+            // unticked line never builds the field (ADDITIONAL_INFO_FIELDS,
+            // "salesOrderDropShipLine").
+            { col: "IsDropShip", when: "salesOrderDropShipLine" }
         ];
         /* Fields whose DisplayLogic is REPLACED by a panel-side rule for the given
            document, evaluated with the same evaluator and header tokens as a dictionary
@@ -4773,6 +4815,9 @@
             }
             saveInFlight = true;
             var rows = batch.map(buildRowPayload);
+            // A save stays on the page it was made from: the server numbers new lines above
+            // every existing one, so from a later page they move to the FIRST page and leave
+            // this one (07-Oct-2026).
             // Lock + show a per-row spinner on each saving row.
             batch.forEach(function (l) { l._saving = true; setRowBusy(l, true, lbl("VAS_107_Saving", "Saving…")); });
             renderHeaderButtons();   // the batch no longer counts as "unsaved" -> Save mutes
@@ -4847,9 +4892,14 @@
             // Brand-new client lines not part of this batch (added during the save).
             var newKeep = lines.filter(function (l) { return (l.values.C_OrderLine_ID || 0) <= 0 && !inBatch(l); });
             var merged = (serverRows || []).map(function (r) {
-                return dirtyById[r.C_OrderLine_ID] || fromServerRow(r);
+                var kept = dirtyById[r.C_OrderLine_ID];
+                if (kept) delete dirtyById[r.C_OrderLine_ID];
+                return kept || fromServerRow(r);
             });
-            lines = newKeep.concat(merged);
+            // An edited line the returned page does not carry (it moved off the page while the
+            // save was in flight) is kept rather than dropped with its edit.
+            var strayDirty = Object.keys(dirtyById).map(function (k) { return dirtyById[k]; });
+            lines = newKeep.concat(merged, strayDirty);
             if (editing && !lineById(editing.rowId)) editing = null;
             render();
         }
