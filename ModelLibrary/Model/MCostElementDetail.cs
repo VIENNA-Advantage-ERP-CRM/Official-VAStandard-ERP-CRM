@@ -73,78 +73,74 @@ namespace VAdvantage.Model
         {
             try
             {
-                MCostElementDetail ced = new MCostElementDetail(ctx, 0, cd.Get_Trx());
-                ced.SetAD_Client_ID(AD_Client_ID);
+                // Org / Warehouse
+                int orgID = costingCheck != null ? costingCheck.AD_Org_ID : AD_Org_ID;
+                int warehouseID = costingCheck != null ? costingCheck.M_Warehouse_ID : cd.GetM_Warehouse_ID();
                 if (windowName.Equals("Inventory Move"))
                 {
+                    orgID = AD_Org_ID;
+                    warehouseID = 0;
                     if ((!(bool)costingCheck.isReversal && qty > 0) || (bool)costingCheck.isReversal && qty < 0)
                     {
-                        // when not reversed record and inc qty OR when reversed record and dec qty 
-                        ced.SetAD_Org_ID(costingCheck.AD_OrgTo_ID);
-                        ced.SetM_Warehouse_ID(costingCheck.M_WarehouseTo_ID);
+                        // when not reversed record and inc qty OR when reversed record and dec qty
+                        orgID = costingCheck.AD_OrgTo_ID;
+                        warehouseID = costingCheck.M_WarehouseTo_ID;
                     }
                     else if ((!(bool)costingCheck.isReversal && qty < 0) || (bool)costingCheck.isReversal && qty > 0)
                     {
-                        // when not reversed record and dec qty OR when reversed record and inc qty 
-                        ced.SetAD_Org_ID(costingCheck.AD_Org_ID);
-                        ced.SetM_Warehouse_ID(costingCheck.M_Warehouse_ID);
+                        // when not reversed record and dec qty OR when reversed record and inc qty
+                        orgID = costingCheck.AD_Org_ID;
+                        warehouseID = costingCheck.M_Warehouse_ID;
                     }
                 }
-                else
+
+                // Direct insert instead of MCostElementDetail.Save() - performance
+                CostingInsertBuilder ced = new CostingInsertBuilder(ctx, Table_Name, AD_Client_ID, orgID, cd.Get_Trx());
+                ced.AddID("M_Warehouse_ID", warehouseID);
+                ced.AddInt("C_AcctSchema_ID", mas.GetC_AcctSchema_ID());
+                ced.AddInt("M_CostElement_ID", M_costElement_ID);
+                ced.AddInt("M_Product_ID", Product.GetM_Product_ID());
+                ced.AddID("M_AttributeSetInstance_ID", costingCheck != null ? costingCheck.M_ASI_ID : M_ASI_ID);
+                ced.AddDecimal("Qty", qty);
+                ced.AddDecimal("Amt", amt);
+                if (costingCheck != null && ced.HasColumn("MovementDate"))
                 {
-                    ced.SetAD_Org_ID(costingCheck != null ? costingCheck.AD_Org_ID : AD_Org_ID);
-                    ced.SetM_Warehouse_ID(costingCheck != null ? costingCheck.M_Warehouse_ID : cd.GetM_Warehouse_ID());
+                    ced.AddDate("MovementDate", costingCheck.movementDate);
                 }
-                ced.SetC_AcctSchema_ID(mas.GetC_AcctSchema_ID());
-                ced.SetM_CostElement_ID(M_costElement_ID);
-                ced.SetM_Product_ID(Product.GetM_Product_ID());
-                ced.SetM_AttributeSetInstance_ID(costingCheck != null ? costingCheck.M_ASI_ID : M_ASI_ID);
-                ced.SetQty(qty);
-                ced.SetAmt(amt);
-                ced.Set_Value("MovementDate", costingCheck != null ? costingCheck.movementDate : null);
                 //Refrences
-                ced.SetC_OrderLine_ID(cd.GetC_OrderLine_ID());
-                ced.SetM_InOutLine_ID(cd.GetM_InOutLine_ID());
+                ced.AddID("C_OrderLine_ID", cd.GetC_OrderLine_ID());
+                ced.AddID("M_InOutLine_ID", cd.GetM_InOutLine_ID());
                 if (windowName == "Material Receipt" || windowName == "Customer Return" || windowName == "Shipment" || windowName == "Return To Vendor")
                 {
                     // not to bind Invoiceline refernece on cost element detail
                 }
                 else
                 {
-                    ced.SetC_InvoiceLine_ID(cd.GetC_InvoiceLine_ID());
+                    ced.AddID("C_InvoiceLine_ID", cd.GetC_InvoiceLine_ID());
                 }
-                ced.Set_Value("VAFAM_AssetDisposal_ID", cd.Get_Value("VAFAM_AssetDisposal_ID"));
-                ced.SetM_InventoryLine_ID(cd.GetM_InventoryLine_ID());
-                ced.SetM_MovementLine_ID(cd.GetM_MovementLine_ID());
-                ced.SetC_ProjectIssue_ID(cd.GetC_ProjectIssue_ID());
-                ced.SetIsSOTrx(cd.IsSOTrx());
-                ced.SetA_Asset_ID(cd.GetA_Asset_ID());
-                ced.SetM_ProductionLine_ID(cd.GetM_ProductionLine_ID());
-                ced.SetM_WorkOrderResourceTxnLine_ID(cd.GetM_WorkOrderResourceTxnLine_ID());
-                ced.SetM_WorkOrderTransactionLine_ID(cd.GetM_WorkOrderTransactionLine_ID());
+                ced.AddValueIfExists("VAFAM_AssetDisposal_ID", cd.Get_Value("VAFAM_AssetDisposal_ID"));
+                ced.AddID("M_InventoryLine_ID", cd.GetM_InventoryLine_ID());
+                ced.AddID("M_MovementLine_ID", cd.GetM_MovementLine_ID());
+                ced.AddID("C_ProjectIssue_ID", cd.GetC_ProjectIssue_ID());
+                ced.AddBool("IsSOTrx", cd.IsSOTrx());
+                ced.AddID("A_Asset_ID", cd.GetA_Asset_ID());
+                ced.AddID("M_ProductionLine_ID", cd.GetM_ProductionLine_ID());
+                ced.AddID("M_WorkOrderResourceTxnLine_ID", cd.GetM_WorkOrderResourceTxnLine_ID());
+                ced.AddID("M_WorkOrderTransactionLine_ID", cd.GetM_WorkOrderTransactionLine_ID());
                 if (windowName.Equals("In") || windowName.Equals("Out"))
                 {
-                    ced.Set_Value(costingCheck.po.GetTableName() + "_ID", costingCheck.po.Get_ID());
+                    ced.AddValueIfExists(costingCheck.po.GetTableName() + "_ID", costingCheck.po.Get_ID());
                 }
                 if (Env.IsModuleInstalled("VAMFG_"))
                 {
-                    if (ced.Get_ColumnIndex("VAMFG_M_WrkOdrRscTxnLine_ID") > -1)
-                    {
-                        ced.Set_Value("VAMFG_M_WrkOdrRscTxnLine_ID", cd.GetVAMFG_M_WrkOdrRscTxnLine_ID());
-                    }
-                    if (ced.Get_ColumnIndex("VAMFG_M_WrkOdrTrnsctionLine_ID") > -1)
-                    {
-                        ced.Set_Value("VAMFG_M_WrkOdrTrnsctionLine_ID", cd.GetVAMFG_M_WrkOdrTrnsctionLine_ID());
-                    }
+                    ced.AddValueIfExists("VAMFG_M_WrkOdrRscTxnLine_ID", cd.GetVAMFG_M_WrkOdrRscTxnLine_ID());
+                    ced.AddValueIfExists("VAMFG_M_WrkOdrTrnsctionLine_ID", cd.GetVAMFG_M_WrkOdrTrnsctionLine_ID());
                 }
-                if (ced.Get_ColumnIndex("C_ProvisionalInvoiceLine_ID") > -1)
+                ced.AddValueIfExists("C_ProvisionalInvoiceLine_ID", cd.Get_Value("C_ProvisionalInvoiceLine_ID"));
+                string error;
+                if (!ced.Execute(cd.Get_Trx(), out error))
                 {
-                    ced.Set_Value("C_ProvisionalInvoiceLine_ID", cd.Get_Value("C_ProvisionalInvoiceLine_ID"));
-                }
-                if (!ced.Save())
-                {
-                    ValueNamePair pp = VLogger.RetrieveError();
-                    _log.Info("Error Occured during costing " + pp.ToString());
+                    _log.Info("Error Occured during costing " + error);
                     return false;
                 }
             }

@@ -167,6 +167,7 @@
     <Compile Include="Classes\AdvanceDocumentType.cs" />
     <Compile Include="Classes\BudgetCheck.cs" />
     <Compile Include="Classes\CostingCheck.cs" />
+    <Compile Include="Classes\CostingInsertBuilder.cs" />
     <Compile Include="Classes\MyModelValidator.cs" />
     <Compile Include="Classes\VAS_CommonMethod.cs" />
     <Compile Include="CM\CacheClearAll.cs" />

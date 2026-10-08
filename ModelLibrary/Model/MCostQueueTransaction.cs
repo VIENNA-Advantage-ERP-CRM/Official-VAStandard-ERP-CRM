@@ -59,100 +59,78 @@ namespace VAdvantage.Model
         {
             try
             {
-                MCostQueueTransaction ced = new MCostQueueTransaction(ctx, 0, cd.Get_Trx());
-                ced.SetAD_Client_ID(AD_Client_ID);
-                ced.SetAD_Org_ID(AD_Org_ID);
-                ced.SetM_CostQueue_ID(M_CostQueue_ID);
-                ced.SetM_Product_ID(cd.GetM_Product_ID());
-                ced.SetM_AttributeSetInstance_ID(cd.GetM_AttributeSetInstance_ID());
-                ced.SetM_Warehouse_ID(cd.GetM_Warehouse_ID());
+                // Direct insert instead of MCostQueueTransaction.Save() - performance
+                CostingInsertBuilder ced = new CostingInsertBuilder(ctx, Table_Name, AD_Client_ID, AD_Org_ID, cd.Get_Trx());
+                ced.AddInt("M_CostQueue_ID", M_CostQueue_ID);
+                ced.AddID("M_Product_ID", cd.GetM_Product_ID());
+                ced.AddID("M_AttributeSetInstance_ID", cd.GetM_AttributeSetInstance_ID());
+                ced.AddID("M_Warehouse_ID", cd.GetM_Warehouse_ID());
 
-                // date and qty 
-                ced.SetMovementQty(qty);
-                if (costingCheck != null && costingCheck.movementDate != null)
-                {
-                    ced.SetMovementDate(costingCheck.movementDate);
-                }
-                else
-                {
-                    ced.SetMovementDate(DateTime.Now);
-                }
+                // date and qty
+                ced.AddDecimal("MovementQty", qty);
+                ced.AddDate("MovementDate", (costingCheck != null && costingCheck.movementDate != null) ? costingCheck.movementDate : DateTime.Now);
 
                 //Refrences
-                ced.SetM_InOutLine_ID(cd.GetM_InOutLine_ID());
-                if (ced.GetM_InOutLine_ID() > 0)
+                int M_InOutLine_ID = cd.GetM_InOutLine_ID();
+                ced.AddID("M_InOutLine_ID", M_InOutLine_ID);
+                if (M_InOutLine_ID > 0)
                 {
-                    if (costingCheck.inout != null)
+                    if (costingCheck != null && costingCheck.inout != null)
                     {
-                        ced.SetIsSOTrx(costingCheck.inout.IsSOTrx());
-                        ced.SetIsReturnTrx(costingCheck.inout.IsReturnTrx());
+                        ced.AddBool("IsSOTrx", costingCheck.inout.IsSOTrx());
+                        ced.AddBool("IsReturnTrx", costingCheck.inout.IsReturnTrx());
                     }
                     else
                     {
                         DataSet ds = DB.ExecuteDataset(@"SELECT M_InOut.IsSOTrx, M_InOut.IsReturnTrx FROM M_InOutLine
-                                    INNER JOIN M_InOut ON M_InOutLine.M_InOut_ID = M_InOut.M_InOut_ID 
-                                    WHERE M_InOutLine.M_InOutLine_ID = " + ced.GetM_InOutLine_ID(), null, cd.Get_Trx());
+                                    INNER JOIN M_InOut ON M_InOutLine.M_InOut_ID = M_InOut.M_InOut_ID
+                                    WHERE M_InOutLine.M_InOutLine_ID = " + M_InOutLine_ID, null, cd.Get_Trx());
                         if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                         {
-                            ced.SetIsSOTrx(Util.GetValueOfString(ds.Tables[0].Rows[0]["IsSOTrx"]).Equals("N") ? false : true);
-                            ced.SetIsReturnTrx(Util.GetValueOfString(ds.Tables[0].Rows[0]["IsReturnTrx"]).Equals("N") ? false : true);
+                            ced.AddBool("IsSOTrx", Util.GetValueOfString(ds.Tables[0].Rows[0]["IsSOTrx"]).Equals("N") ? false : true);
+                            ced.AddBool("IsReturnTrx", Util.GetValueOfString(ds.Tables[0].Rows[0]["IsReturnTrx"]).Equals("N") ? false : true);
                         }
                     }
                 }
-                if (cd.GetC_InvoiceLine_ID() > 0 && ced.Get_ColumnIndex("C_InvoiceLine_ID") >= 0)
+                if (cd.GetC_InvoiceLine_ID() > 0)
                 {
-                    ced.Set_Value("C_InvoiceLine_ID", cd.GetC_InvoiceLine_ID());
+                    ced.AddValueIfExists("C_InvoiceLine_ID", cd.GetC_InvoiceLine_ID());
                 }
-                ced.SetM_InventoryLine_ID(cd.GetM_InventoryLine_ID());
-                if (ced.GetM_InventoryLine_ID() > 0)
+                int M_InventoryLine_ID = cd.GetM_InventoryLine_ID();
+                ced.AddID("M_InventoryLine_ID", M_InventoryLine_ID);
+                if (M_InventoryLine_ID > 0)
                 {
-                    if (costingCheck.inventory != null)
+                    if (costingCheck != null && costingCheck.inventory != null)
                     {
-                        ced.SetIsInternalUse(costingCheck.inventory.IsInternalUse());
+                        ced.AddBool("IsInternalUse", costingCheck.inventory.IsInternalUse());
                     }
                     else
                     {
                         bool isInternalUse = Util.GetValueOfString(DB.ExecuteScalar(@"SELECT M_Inventory.IsInternalUse  FROM M_InventoryLine
-                                    INNER JOIN M_Inventory ON M_InventoryLine.M_Inventory_ID = M_Inventory.M_Inventory_ID 
-                                    WHERE M_InventoryLine.M_InventoryLine_ID = " + ced.GetM_InventoryLine_ID(), null, cd.Get_Trx())).Equals("N") ? false : true;
-                        ced.SetIsInternalUse(isInternalUse);
+                                    INNER JOIN M_Inventory ON M_InventoryLine.M_Inventory_ID = M_Inventory.M_Inventory_ID
+                                    WHERE M_InventoryLine.M_InventoryLine_ID = " + M_InventoryLine_ID, null, cd.Get_Trx())).Equals("N") ? false : true;
+                        ced.AddBool("IsInternalUse", isInternalUse);
                     }
                 }
-                ced.SetM_MovementLine_ID(cd.GetM_MovementLine_ID());
-                ced.SetC_ProjectIssue_ID(cd.GetC_ProjectIssue_ID());
-                //ced.SetA_Asset_ID(cd.GetA_Asset_ID());
-                ced.SetM_ProductionLine_ID(cd.GetM_ProductionLine_ID());
-                if (Env.IsModuleInstalled("VAFAM_") && ced.Get_ColumnIndex("VAFAM_AssetDisposal_ID") > -1)
+                ced.AddID("M_MovementLine_ID", cd.GetM_MovementLine_ID());
+                ced.AddID("C_ProjectIssue_ID", cd.GetC_ProjectIssue_ID());
+                ced.AddID("M_ProductionLine_ID", cd.GetM_ProductionLine_ID());
+                if (Env.IsModuleInstalled("VAFAM_"))
                 {
-                    ced.Set_Value("VAFAM_AssetDisposal_ID", cd.Get_Value("VAFAM_AssetDisposal_ID"));
+                    ced.AddValueIfExists("VAFAM_AssetDisposal_ID", cd.Get_Value("VAFAM_AssetDisposal_ID"));
                 }
                 if (Env.IsModuleInstalled("VAMFG_"))
                 {
-                    if (ced.Get_ColumnIndex("VAMFG_M_WrkOdrRscTxnLine_ID") > -1)
-                    {
-                        ced.Set_Value("VAMFG_M_WrkOdrRscTxnLine_ID", cd.GetVAMFG_M_WrkOdrRscTxnLine_ID());
-                    }
-                    if (ced.Get_ColumnIndex("VAMFG_M_WrkOdrTrnsctionLine_ID") > -1)
-                    {
-                        ced.Set_Value("VAMFG_M_WrkOdrTrnsctionLine_ID", cd.GetVAMFG_M_WrkOdrTrnsctionLine_ID());
-                    }
+                    ced.AddValueIfExists("VAMFG_M_WrkOdrRscTxnLine_ID", cd.GetVAMFG_M_WrkOdrRscTxnLine_ID());
+                    ced.AddValueIfExists("VAMFG_M_WrkOdrTrnsctionLine_ID", cd.GetVAMFG_M_WrkOdrTrnsctionLine_ID());
                 }
-                if (Env.IsModuleInstalled("VA143_") && costingCheck.TableName.Equals("VA143_JobWorkInOutLine"))
+                if (Env.IsModuleInstalled("VA143_") && costingCheck != null && "VA143_JobWorkInOutLine".Equals(costingCheck.TableName))
                 {
-                    ced.Set_Value(costingCheck.po.GetTableName() + "_ID", costingCheck.po.Get_ID());
+                    ced.AddValueIfExists(costingCheck.po.GetTableName() + "_ID", costingCheck.po.Get_ID());
                 }
-                if (!ced.Save())
+                string error;
+                if (!ced.Execute(cd.Get_Trx(), out error))
                 {
-                    ValueNamePair pp = VLogger.RetrieveError();
-                    string error = "";
-                    if (pp != null)
-                    {
-                        error = pp.GetValue();
-                        if (String.IsNullOrEmpty(error))
-                        {
-                            error = pp.GetValue();
-                        }
-                    }
                     _log.Info("Costing Engine : Error Occured during saving a record on Cost Queue Transaction -> " + error);
                     costingCheck.errorMessage += "Cost Queue Transaction not created, " + error;
                     return false;

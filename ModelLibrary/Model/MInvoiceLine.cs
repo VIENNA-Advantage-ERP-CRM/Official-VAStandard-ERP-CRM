@@ -340,7 +340,6 @@ namespace VAdvantage.Model
                 if (C_OrderLine_ID != 0)
                 {
                     MOrderLine oLine = new MOrderLine(GetCtx(), C_OrderLine_ID, Get_TrxName());
-                    MOrder ord = new MOrder(GetCtx(), oLine.GetC_Order_ID(), Get_TrxName());          //Added By Bharat
                                                                                                       //VAI082 12/22/2023  DevOps Task ID:-3579,Set "ContractLine_ID" When user create the invoice with the reference of shipment.
                     if (oLine.Get_ValueAsInt("VAS_ContractLine_ID") > 0)
                     {
@@ -353,7 +352,10 @@ namespace VAdvantage.Model
                     }
                     M_AttributeSetInstance_ID = sLine.GetM_AttributeSetInstance_ID();               //Added By Bharat
                     C_UOM_ID = oLine.GetC_UOM_ID();
-                    string docsubTypeSO = Util.GetValueOfString(DB.ExecuteScalar("SELECT DocSubTypeSO FROM C_Doctype WHERE C_DocType_ID = " + ord.GetC_DocTypeTarget_ID()));
+                    // Only the order's target doc sub type is needed - read it directly instead of loading the full order per line
+                    string docsubTypeSO = Util.GetValueOfString(DB.ExecuteScalar(@"SELECT dt.DocSubTypeSO FROM C_Order o
+                                INNER JOIN C_DocType dt ON (dt.C_DocType_ID = o.C_DocTypeTarget_ID)
+                                WHERE o.C_Order_ID = " + oLine.GetC_Order_ID(), null, Get_Trx()));
                     if (docsubTypeSO == "WR")
                     {
                         SetPriceEntered(oLine.GetPriceEntered());

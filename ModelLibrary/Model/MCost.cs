@@ -291,8 +291,19 @@ namespace VAdvantage.Model
                             INNER JOIN M_CostElement ON M_CostQueue.M_CostElement_ID = M_CostElement.M_CostElement_ID
                             INNER JOIN C_AcctSchema asch ON (asch.C_AcctSchema_ID = M_CostQueue.C_AcctSchema_ID) 
                             INNER JOIN C_Currency c ON (c.C_Currency_ID = asch.C_Currency_ID)
-                            WHERE M_CostElement.costingMethod = '" + costingMethod + @"' AND M_CostQueueTransaction.MovementQty <> 0 
+                            WHERE M_CostElement.costingMethod = '" + costingMethod + @"' AND M_CostQueueTransaction.MovementQty <> 0
                             AND M_CostQueue.C_ACCTSCHEMA_ID = (SELECT c_acctschema1_id FROM AD_ClientInfo WHERE AD_Client_ID =M_CostQueue.AD_Client_ID)";
+                // the transaction rows of a document line always belong to its product - without these filters
+                // the line reference alone made the DB scan the whole M_CostQueueTransaction table on every call
+                if (AD_Client_ID > 0)
+                {
+                    sql += " AND M_CostQueue.AD_Client_ID = " + AD_Client_ID;
+                }
+                if (M_Product_ID > 0)
+                {
+                    sql += " AND M_CostQueue.M_Product_ID = " + M_Product_ID + 
+                           " AND M_CostQueueTransaction.M_Product_ID = " + M_Product_ID;
+                }
                 if (WindowName == (int)windowName.M_InventoryLine_ID)
                 {
                     sql += " AND M_InventoryLine_ID = " + RecordLine_ID;
