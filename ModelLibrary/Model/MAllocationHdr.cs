@@ -438,10 +438,21 @@ namespace VAdvantage.Model
             //	Link
             GetLines(false);
             HashSet<int> bps = new HashSet<int>();
+            // one payment / cash line is often shared by many lines (one receipt against N invoices):
+            // test & save it once, and load it once for the read-only use below
+            HashSet<int> testedPayments = new HashSet<int>();
+            Dictionary<int, MPayment> paymentCache = new Dictionary<int, MPayment>();
+            Dictionary<int, MCashLine> cashLineCache = new Dictionary<int, MCashLine>();
+            System.Diagnostics.Stopwatch swComplete = System.Diagnostics.Stopwatch.StartNew();
+            System.Diagnostics.Stopwatch swStep = new System.Diagnostics.Stopwatch();
+            long processItMs = 0, scheduleMs = 0;
             for (int i = 0; i < _lines.Length; i++)
             {
                 MAllocationLine line = _lines[i];
-                bps.Add(line.ProcessIt(false));	//	not reverse
+                swStep.Restart();
+                bps.Add(line.ProcessIt(false, testedPayments));	//	not reverse
+                processItMs += swStep.ElapsedMilliseconds;
+                swStep.Restart();
 
                 // change by Amit for Payment Management 5-11-2015
                 //if (Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(AD_MODULEINFO_ID) FROM AD_MODULEINFO WHERE PREFIX='VA009_'  AND IsActive = 'Y'")) > 0)
@@ -461,14 +472,21 @@ namespace VAdvantage.Model
 
                         MInvoicePaySchedule paySch = new MInvoicePaySchedule(GetCtx(), line.GetC_InvoicePaySchedule_ID(), Get_Trx());
                         if (paySch.IsVA009_IsPaid())
+                        {
+                            scheduleMs += swStep.ElapsedMilliseconds;
                             continue;
+                        }
                         //// Added by Bharat on 27 June 2017 to restrict multiple payment against same Invoice Pay Schedule.
                         //if (paySch.IsVA009_IsPaid())
                         //{
                         //    _processMsg = "Payment is already done for selected invoice Schedule";
                         //    return DocActionVariables.STATUS_INVALID;
                         //}
-                        MInvoice invoice = new MInvoice(GetCtx(), line.GetC_Invoice_ID(), Get_Trx());
+                        // line.ProcessIt above already loaded this invoice (and saved it if its paid flag changed) - reuse it
+                        // instead of loading the whole invoice a second time, unless it still carries unsaved changes
+                        MInvoice invoice = line.GetInvoice();
+                        if (invoice == null || invoice.Is_Changed() || invoice.GetC_Invoice_ID() != line.GetC_Invoice_ID())
+                            invoice = new MInvoice(GetCtx(), line.GetC_Invoice_ID(), Get_Trx());
                         MCurrency currency = MCurrency.Get(GetCtx(), invoice.GetC_Currency_ID());
                         MDocType doctype = MDocType.Get(GetCtx(), invoice.GetC_DocType_ID());
                         //VIS_427 created object of payment term and schedule to get discount percentage
@@ -498,12 +516,18 @@ namespace VAdvantage.Model
                         #region set Invoice Paid Amount
                         //added check for payment and cash if cash/payment exist than create object otherwise that will be null
                         MPayment payment = null;
-                        if (line.GetC_Payment_ID() > 0)
+                        if (line.GetC_Payment_ID() > 0 && !paymentCache.TryGetValue(line.GetC_Payment_ID(), out payment))
+                        {
                             payment = new MPayment(GetCtx(), line.GetC_Payment_ID(), Get_Trx());
+                            paymentCache[line.GetC_Payment_ID()] = payment;
+                        }
 
                         MCashLine cashline = null;
-                        if (line.GetC_CashLine_ID() > 0)
+                        if (line.GetC_CashLine_ID() > 0 && !cashLineCache.TryGetValue(line.GetC_CashLine_ID(), out cashline))
+                        {
                             cashline = new MCashLine(GetCtx(), line.GetC_CashLine_ID(), Get_Trx());
+                            cashLineCache[line.GetC_CashLine_ID()] = cashline;
+                        }
 
                         // in case of GL Allocation if GL_JournalLine_ID is available on Allocation Line
                         MJournalLine journalline = null;
@@ -785,9 +809,12 @@ namespace VAdvantage.Model
                         }
                     }
                 }
+                scheduleMs += swStep.ElapsedMilliseconds;
 
                 //End
             }
+            log.Info("CompleteIt: " + _lines.Length + " lines in " + swComplete.ElapsedMilliseconds + " ms (line ProcessIt=" + processItMs
+                + " ms, invoice schedule update=" + scheduleMs + " ms)");
             //VA228:update amount paid on invoice,get total of paid schedule invoice amount from C_InvoicePaySchedule and update on invoice header
             if (invoiceIds.Count > 0)
             {
