@@ -253,7 +253,7 @@ namespace VAdvantage.Model
             if (name == null || name.Length == 0)
                 name = m_clientName + "Client";
             AD_User_ID = GetNextID(AD_Client_ID, "AD_User");
-            ///////////
+            //////////////
             m_ctx.SetContext("#AD_User_A_ID", AD_User_ID);
             //////////////
             AD_User_Name = name;
@@ -587,6 +587,25 @@ namespace VAdvantage.Model
                     }
                     else
                     {
+                        if (role.IsUseUserOrgAccess())
+                        {
+                            PO _userOrgAccess = MTable.GetPO(m_ctx, "AD_User_OrgAccess", 0, m_trx);
+                            _userOrgAccess.Set_ValueNoCheck("AD_Org_ID", m_org.GetAD_Org_ID());
+                            _userOrgAccess.Set_ValueNoCheck("AD_User_ID", adminUserID);
+                            if (!_userOrgAccess.Save())
+                            {
+                                log.Info(role.GetName() + " UserOrgAccessNotSaved");
+                            }
+
+                            _userOrgAccess = MTable.GetPO(m_ctx, "AD_User_OrgAccess", 0, m_trx);
+                            _userOrgAccess.Set_ValueNoCheck("AD_Org_ID", 0);
+                            _userOrgAccess.Set_ValueNoCheck("AD_User_ID", adminUserID);
+                            if (!_userOrgAccess.Save())
+                            {
+                                log.Info(role.GetName() + " UserOrgAccessNotSaved");
+                            }
+                        }
+
                         /////////Save OrgAccess
                         dsComm = DB.ExecuteDataset("SELECT * FROM AD_Role_OrgAccess WHERE IsActive = 'Y' AND AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
                         if (dsComm != null)
