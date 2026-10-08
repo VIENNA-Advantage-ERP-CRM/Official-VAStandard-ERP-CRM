@@ -990,6 +990,10 @@
 }
 
 /* ---------- more popover ---------- */
+/* The "..." (More) button as on the Purchase Order panel (VAS_303), 06-Oct-2026: no
+   border, box or fill around the dots while the line holds nothing in Additional Info -
+   the row's own tint shows through (the earlier explicit white fill read as a white box
+   on an unsaved / selected row); .has-values below turns it light blue. */
 .vas-rbl-more-btn {
     width: 1.5em;
     height: 1.5em;
@@ -997,15 +1001,18 @@
     align-items: center;
     justify-content: center;
     border: none;
-    /* WHITE while the line has no Additional Info (25-Sep-2026) - an explicit fill, not
-       transparent, so it stays white on an unsaved (amber) or selected (blue) row too;
-       .has-values below turns it light blue. */
-    background: var(--cil-surface);
+    outline: none;
+    box-shadow: none;
+    background: transparent;
     border-radius: var(--cil-r-sm);
     color: var(--cil-text-muted);
     cursor: pointer;
     transition: background .12s, color .12s;
 }
+
+    .vas-rbl-more-btn:focus-visible {
+        box-shadow: 0 0 0 2px var(--cil-blue-soft);
+    }
 
     .vas-rbl-more-btn:hover {
         background: #f1f8ff;
@@ -1016,12 +1023,10 @@
         background: var(--cil-blue-soft);
         color: var(--cil-action-blue);
     }
-    .vas-rbl-more-btn.has-values {
+    .vas-rbl-more-btn.has-values,
+    .vas-rbl-more-btn.has-values:hover {
         background: var(--cil-blue-soft);
         color: var(--cil-action-blue);
-    }
-    .vas-rbl-more-btn.has-values:hover {
-        background: #d9eeff;
     }
     /* Read-only invoice: the "..." button is disabled -> not-allowed (no hover tint). */
     .vas-rbl-more-btn:disabled {

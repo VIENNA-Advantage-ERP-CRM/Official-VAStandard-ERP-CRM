@@ -2351,6 +2351,7 @@ namespace VASLogic.Models
             try
             {
                 MInOut inout = new MInOut(ctx, M_InOut_ID, trx);
+                ShiftNewLinesToTop(M_InOut_ID, rows, trx);
                 foreach (DeliveryLineInput input in rows)
                 {
                     if (input.M_Product_ID <= 0 && input.C_Charge_ID <= 0) continue;
@@ -2405,7 +2406,8 @@ namespace VASLogic.Models
                     // carries (DTD001_DateRequired first), where nothing has set it.
                     ApplyHeaderDateRequired(line, inout);
 
-                    if (!line.Save())
+                    bool lineSaved = line.Save();
+                    if (!lineSaved)
                     {
                         string err = FrameworkError(ctx);
                         log.Warning("VAS_248 SaveLines: line save failed (Line " + input.Line + ") - " + err);
@@ -2446,10 +2448,46 @@ namespace VASLogic.Models
             if (page < 0) page = 0;
             int total;
             res.Lines = LoadLines(ctx, M_InOut_ID, page, out total);
+            // The lines this save created are numbered above every other line (ShiftNewLinesToTop),
+            // so they sit on the FIRST page only. Saved from a later page they leave the page the
+            // user is on - the page itself is kept (07-Oct-2026).
             res.LinesTotal = total;
             res.LinePage = page;
             res.TotalQty = SumQty(ctx, M_InOut_ID);
             return res;
+        }
+
+        /// <summary>
+        /// Numbers the batch's NEW lines above every line the shipment already has
+        /// (06-Oct-2026, as VAS_303). Lines are listed newest first (LoadLines: Line DESC), but
+        /// the panel numbers a new line from the page it is on - on page 2 that is below page
+        /// 1's lines, so the saved line landed mid-document instead of at the top of the first
+        /// page. The new lines keep their order among themselves; only the offset moves.
+        /// </summary>
+        /// <param name="M_InOut_ID">shipment</param>
+        /// <param name="rows">lines being saved; Line of the new ones is rewritten</param>
+        /// <param name="trx">save transaction</param>
+        private void ShiftNewLinesToTop(int M_InOut_ID, List<DeliveryLineInput> rows, Trx trx)
+        {
+            int minNew = int.MaxValue;
+            foreach (DeliveryLineInput input in rows)
+            {
+                if (input.M_InOutLine_ID > 0 || (input.M_Product_ID <= 0 && input.C_Charge_ID <= 0)) continue;
+                minNew = Math.Min(minNew, Math.Max(input.Line, 0));
+            }
+            if (minNew == int.MaxValue) return;
+
+            int maxLine = Util.GetValueOfInt(DB.ExecuteScalar(
+                "SELECT COALESCE(MAX(Line), 0) FROM M_InOutLine WHERE M_InOut_ID = @M_InOut_ID",
+                new SqlParameter[] { new SqlParameter("@M_InOut_ID", M_InOut_ID) }, trx));
+            if (minNew > maxLine) return;
+
+            int shift = maxLine + 10 - minNew;
+            foreach (DeliveryLineInput input in rows)
+            {
+                if (input.M_InOutLine_ID > 0 || (input.M_Product_ID <= 0 && input.C_Charge_ID <= 0)) continue;
+                input.Line = Math.Max(input.Line, 0) + shift;
+            }
         }
 
         /// <summary>Deletes the supplied saved shipment lines through MInOutLine.</summary>

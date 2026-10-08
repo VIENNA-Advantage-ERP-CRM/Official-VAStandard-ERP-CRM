@@ -224,7 +224,7 @@
        attribute value) used to show an empty Code, so after the control's own value the
        column falls through lot -> serial -> instance id. */
     function instanceCode(r) {
-        if (!cfg.codeByControl) return r.Lot || r.SerNo || "";
+        if (!cfg.codeByControl) return r.Lot || r.SerNo || ("#" + r.M_AttributeSetInstance_ID);
         var info = st.info || {};
         var id = r.M_AttributeSetInstance_ID ? String(r.M_AttributeSetInstance_ID) : "";
         if (info.IsLot && r.Lot) return r.Lot;

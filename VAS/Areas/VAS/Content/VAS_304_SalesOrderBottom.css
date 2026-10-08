@@ -146,6 +146,19 @@
     min-width: 0;
 }
 
+/* White host (06-Oct-2026, as VAS_249 / 248 / 247 / 240): the framework host around the
+   panel carries its own blue surface, which showed wherever the root did not cover it - a
+   New Record (the grid is hidden and the root collapses) and the room left around / below
+   a short panel. The host chain is painted white whenever it holds THIS panel, and the
+   root itself is white too. */
+.vis-ad-w-p-actionpanel-b:has(.vas-so304-root),
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-so304-root),
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-so304-root) > .vis-ad-w-p-ap-tp-o-body,
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-so304-root) .vis-ad-w-p-ap-tp-o-b-content,
+.vas-so304-root {
+    background: #ffffff !important;
+}
+
 .vas-so304-root * {
     box-sizing: border-box;
 }
@@ -759,9 +772,17 @@
 /* The PRODUCT / CHARGE name is never greyed (30-Sep-2026): even when the column is
    rendered disabled (dictionary ReadOnlyLogic on a status that still allows edits) the
    name stays in the normal text colour - only the cursor says it is locked. */
+/* ...and in EVERY state (06-Oct-2026): on a completed / closed order the name still came
+   out grey - the resting cell is a read-only input there, and the framework's read-only
+   input styling outranked the plain colour rule. Pinned with !important on the read-only
+   and disabled states alike. */
+.vas-so304-cell-edit input.vas-so304-cell-disp--primary,
+.vas-so304-cell-edit input.vas-so304-cell-disp--primary[readonly],
+.vas-so304-cell-edit input.vas-so304-cell-disp--primary.vas-so304-cell-disp--ro,
 .vas-so304-cell-edit input.vas-so304-cell-disp--primary:disabled {
-    color: var(--cil-text);
-    -webkit-text-fill-color: var(--cil-text);
+    color: var(--cil-text) !important;
+    -webkit-text-fill-color: var(--cil-text) !important;
+    opacity: 1 !important;
 }
 .vas-so304-cell-edit input.vas-so304-cell-disp--sub {
     font-size: 0.85em;
@@ -1213,6 +1234,24 @@
    The native checkbox must not show beside the slider (30-Sep-2026): it stays in the
    label - so a click on the switch or its caption still toggles it and :checked still
    drives the slider - but takes no room and is not painted. */
+/* The framework shifts the slider 15px LEFT (left: -15px) to sit over the space its
+   checkbox takes; with that checkbox collapsed here the slider stuck out past the field's
+   left edge, beyond the icons of the fields above (06-Oct-2026). Put it back on the edge. */
+.vas-so304-dialog .vis-ec-col-lblchkbox .vis-ctrl-switchSlider {
+    left: 0 !important;
+    /* Space between the switch and its caption (06-Oct-2026): the -15px used to eat into
+       the label's side, so with the slider back on the edge the caption touched it. */
+    margin-right: 0.75em;
+    flex: none;
+}
+
+html[dir="rtl"] .vas-so304-dialog .vis-ec-col-lblchkbox .vis-ctrl-switchSlider {
+    left: unset !important;
+    right: 0 !important;
+    margin-right: 0;
+    margin-left: 0.75em;
+}
+
 .vas-so304-dialog .vis-ec-col-lblchkbox input.vis-ctrl-switch {
     position: absolute !important;
     width: 0 !important;

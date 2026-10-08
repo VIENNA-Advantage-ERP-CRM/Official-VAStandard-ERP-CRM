@@ -546,11 +546,10 @@
                     uomName: r.UOMName || "",
                     locatorName: r.LocatorName || "",
                     attrName: attrName,
-                    // As VAS_074 (30-Sep-2026): a SAVED line only shows the attribute sub-line
-                    // when it actually carries an instance. A line saved without one no
-                    // longer nags "Set attribute…" under the product - the picker still
-                    // opens itself when a product with an attribute set is picked on a new line.
-                    hasAttributeSet: r.M_Product_ID > 0 && !!attrName && !!r.HasAttributeSet
+                    // The PRODUCT's own flag (06-Oct-2026): a line saved without an instance
+                    // for a product that has an attribute set shows a plain "---" under the
+                    // product (as VAS_074 does), and clicking it opens the attribute picker.
+                    hasAttributeSet: r.M_Product_ID > 0 && !!r.HasAttributeSet
                 }
             };
             // Pristine snapshot of the just-loaded/just-saved state, so the row Undo can
@@ -1139,15 +1138,25 @@
                 // opens the attribute control instead of editing the product name, so the
                 // click must not bubble to the cell handler.
                 if (line.values.M_Product_ID > 0 && (line.display.attrName || line.display.hasAttributeSet)) {
+                    // No instance yet: "Set Attribute" while the line is unsaved (new or
+                    // edited), a plain "---" once it is saved (07-Oct-2026); clicking either
+                    // still opens the picker.
                     var hasAttr = !!line.display.attrName;
-                    var attrTxt = hasAttr ? line.display.attrName : lbl("VAS_249_SetAttribute", "Set attribute…");
-                    var $attr = $('<span class="vas-grn-attr-link"></span>').text(attrTxt).attr("title", attrTxt);
+                    var attrTxt = hasAttr ? line.display.attrName
+                        : ((line.status === "new" || line.dirty) ? lbl("VAS_249_SetAttributeLabel", "Set Attribute") : "---");
+                    var $attr = $('<span class="vas-grn-attr-link"></span>').text(attrTxt)
+                        .attr("title", hasAttr ? attrTxt : lbl("VAS_249_SetAttribute", "Set attribute…"));
                     if (!hasAttr) $attr.addClass("vas-grn-attr-link--empty");
                     // Clickable only when the receipt is editable AND the product actually
                     // carries an attribute set. On a read-only receipt, or on a saved line
                     // whose product no longer has a set defined (but still carries an old
                     // instance, so AttrName is set), the attribute is informational only.
-                    if (editable && productHasAttributeSet(line)) $attr.on("click", function (e) { e.stopPropagation(); openAttrDialog(line); });
+                    if (editable && productHasAttributeSet(line)) {
+                        // mousedown + preventDefault (as VAS_074): a plain click while a cell
+                        // editor is focused blurs -> re-renders the row and eats the click.
+                        $attr.on("mousedown", function (e) { e.preventDefault(); e.stopPropagation(); openAttrDialog(line); });
+                        $attr.on("click", function (e) { e.stopPropagation(); if (e.detail === 0) openAttrDialog(line); });
+                    }
                     else $attr.addClass("vas-grn-attr-link--disabled");
                     wrap.append($attr);
                 }

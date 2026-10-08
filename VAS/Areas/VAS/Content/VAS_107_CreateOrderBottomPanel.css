@@ -756,6 +756,17 @@
 .vas-obl-cell-edit:has(input.vas-obl-cell-disp:disabled) {
     cursor: not-allowed;
 }
+/* The PRODUCT / CHARGE name is never greyed (06-Oct-2026, as VAS_303 / 304): read-only,
+   locked or disabled, it stays in the normal text colour - only the cursor says it is
+   locked. !important beats the framework's read-only input styling. */
+.vas-obl-cell-edit input.vas-obl-cell-disp--primary,
+.vas-obl-cell-edit input.vas-obl-cell-disp--primary[readonly],
+.vas-obl-cell-edit input.vas-obl-cell-disp--primary.vas-obl-cell-disp--ro,
+.vas-obl-cell-edit input.vas-obl-cell-disp--primary:disabled {
+    color: var(--cil-text) !important;
+    -webkit-text-fill-color: var(--cil-text) !important;
+    opacity: 1 !important;
+}
 .vas-obl-cell-edit input.vas-obl-cell-disp--sub {
     font-size: 0.85em;
     font-weight: 500;
