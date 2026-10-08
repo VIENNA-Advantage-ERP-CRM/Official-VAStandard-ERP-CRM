@@ -3260,9 +3260,22 @@ namespace VAdvantage.Model
                 DataSet dsOriginalInvoiceLines = null;
                 if (IsReversal())
                 {
-                    dsOriginalInvoiceLines = DB.ExecuteDataset($@"SELECT * FROM C_InvoiceLine 
+                    dsOriginalInvoiceLines = DB.ExecuteDataset($@"SELECT * FROM C_InvoiceLine
                                     WHERE C_Invoice_ID= {GetReversalDoc_ID()}", null, Get_Trx());
                 }
+
+                // Set Transaction ID on Invoice Lines - once for the document instead of once per line
+                // (nothing in the line loop inserts M_Transaction rows, so the result is the same)
+                DB.ExecuteQuery($@"UPDATE C_InvoiceLine SET M_Transaction_ID =
+                                        (SELECT MAX(M_Transaction_ID) FROM M_Transaction WHERE M_Product_ID = C_InvoiceLine.M_Product_ID)
+                                       WHERE C_Invoice_ID = {GetC_Invoice_ID()} ", null, Get_Trx());
+
+                // Per-document caches for the line loop: accounting schema / cost elements are client level,
+                // product is not modified inside this transaction
+                DataSet dsCostingAcctSchema = null;
+                DataSet dsCostingCostElement = null;
+                ModelLibrary.Classes.CostingCheck previousCostingCheck = null;
+                Dictionary<int, MProduct> productCache = new Dictionary<int, MProduct>();
 
                 for (int i = 0; i < lines.Length; i++)
                 {
@@ -3290,6 +3303,15 @@ namespace VAdvantage.Model
                             }
 
                             ol.SetQtyInvoiced(Decimal.Add(ol.GetQtyInvoiced(), line.GetQtyInvoiced()));
+
+                            // Hand the order header to the line so MOrderLine.BeforeSave does not reload C_Order for every line
+                            MOrder olOrder = orderDetails.Find(x => x.C_Order_ID == ol.GetC_Order_ID())?.Order;
+                            if (olOrder == null || olOrder.GetC_Order_ID() == 0)
+                            {
+                                olOrder = new MOrder(GetCtx(), ol.GetC_Order_ID(), Get_Trx());
+                                orderDetails.Add(new OrderDetails { C_Order_ID = olOrder.GetC_Order_ID(), Order = olOrder });
+                            }
+                            ol.SetHeaderInfo(olOrder);
 
                             if (!ol.Save(Get_TrxName()))
                             {
@@ -3754,11 +3776,6 @@ namespace VAdvantage.Model
                         }
                     }
 
-                    // Set Transaction ID on Invoice Line 
-                    DB.ExecuteQuery($@"UPDATE C_InvoiceLine SET M_Transaction_ID = 
-                                        (SELECT MAX(M_Transaction_ID) FROM M_Transaction WHERE M_Product_ID = C_InvoiceLine.M_Product_ID)
-                                       WHERE C_Invoiceline_ID = {line.GetC_InvoiceLine_ID()} ", null, Get_Trx());
-
                     //VIS_0045: 13-Mar-2025, check Original Invoice Cost is calculated or not, if not calculated then not to calculate cost for reversal document as well
                     bool IsCostCalcualtionRequired = true;
                     if (IsReversal() && dsOriginalInvoiceLines != null && dsOriginalInvoiceLines.Tables.Count > 0 && dsOriginalInvoiceLines.Tables[0].Rows.Count > 0)
@@ -3774,7 +3791,15 @@ namespace VAdvantage.Model
                     if (client.IsCostImmediate() && IsCostCalcualtionRequired)
                     {
                         ModelLibrary.Classes.CostingCheck costingCheck = new ModelLibrary.Classes.CostingCheck(GetCtx());
-                        costingCheck.dsAccountingSchema = costingCheck.GetAccountingSchema(GetAD_Client_ID());
+                        if (dsCostingAcctSchema == null)
+                        {
+                            dsCostingAcctSchema = costingCheck.GetAccountingSchema(GetAD_Client_ID());
+                            dsCostingCostElement = costingCheck.dsCostElement;
+                        }
+                        costingCheck.dsAccountingSchema = dsCostingAcctSchema;
+                        costingCheck.dsCostElement = dsCostingCostElement;
+                        costingCheck.ShareLookupCache(previousCostingCheck);
+                        previousCostingCheck = costingCheck;
                         costingCheck.invoiceline = line;
                         costingCheck.invoice = this;
                         costingCheck.AD_Org_ID = GetAD_Org_ID();
@@ -3842,7 +3867,12 @@ namespace VAdvantage.Model
                             }
                             else
                             {
-                                MProduct product1 = new MProduct(GetCtx(), line.GetM_Product_ID(), Get_Trx());
+                                MProduct product1 = null;
+                                if (!productCache.TryGetValue(line.GetM_Product_ID(), out product1))
+                                {
+                                    product1 = new MProduct(GetCtx(), line.GetM_Product_ID(), Get_Trx());
+                                    productCache[line.GetM_Product_ID()] = product1;
+                                }
                                 costingCheck.product = product1;
                                 count = product1.Get_ColumnIndex("IsCostAdjustmentOnLost") >= 0 ? 1 : 0;
 
@@ -4592,7 +4622,12 @@ namespace VAdvantage.Model
                                     #endregion
                                 }
                             }
-                            MProduct product1 = new MProduct(GetCtx(), line.GetM_Product_ID(), Get_Trx());
+                            MProduct product1 = null;
+                            if (!productCache.TryGetValue(line.GetM_Product_ID(), out product1))
+                            {
+                                product1 = new MProduct(GetCtx(), line.GetM_Product_ID(), Get_Trx());
+                                productCache[line.GetM_Product_ID()] = product1;
+                            }
                             costingCheck.product = product1;
                             count = product1.Get_ColumnIndex("IsCostAdjustmentOnLost") >= 0 ? 1 : 0;
 

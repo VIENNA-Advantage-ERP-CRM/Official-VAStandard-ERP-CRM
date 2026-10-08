@@ -74,6 +74,60 @@ namespace VAdvantage.Model
         /**is container applicable */
         private bool isContainrApplicable = false;
 
+        /* Per-completion caches - product / order header / costing method do not change inside the completion transaction,
+           but were reloaded for every line (and every material allocation row) */
+        private Dictionary<int, MProduct> _productCache = new Dictionary<int, MProduct>();
+        private Dictionary<int, MOrder> _orderCache = new Dictionary<int, MOrder>();
+        private Dictionary<int, string> _costingMethodCache = new Dictionary<int, string>();
+
+        /// <summary>
+        /// Get Product loaded in this document's transaction, once per product
+        /// </summary>
+        /// <param name="M_Product_ID">Product ID</param>
+        /// <returns>Product</returns>
+        private MProduct GetCachedProduct(int M_Product_ID)
+        {
+            MProduct product = null;
+            if (!_productCache.TryGetValue(M_Product_ID, out product))
+            {
+                product = new MProduct(GetCtx(), M_Product_ID, Get_Trx());
+                _productCache[M_Product_ID] = product;
+            }
+            return product;
+        }
+
+        /// <summary>
+        /// Get Order header loaded in this document's transaction, once per order
+        /// </summary>
+        /// <param name="C_Order_ID">Order ID</param>
+        /// <returns>Order</returns>
+        private MOrder GetCachedOrder(int C_Order_ID)
+        {
+            MOrder order = null;
+            if (!_orderCache.TryGetValue(C_Order_ID, out order))
+            {
+                order = new MOrder(GetCtx(), C_Order_ID, Get_Trx());
+                _orderCache[C_Order_ID] = order;
+            }
+            return order;
+        }
+
+        /// <summary>
+        /// Get LIFO / FIFO costing method of a product, once per product
+        /// </summary>
+        /// <param name="M_Product_ID">Product ID</param>
+        /// <returns>Costing Method</returns>
+        private string GetCachedCostingMethod(int M_Product_ID)
+        {
+            string costingMethod = null;
+            if (!_costingMethodCache.TryGetValue(M_Product_ID, out costingMethod))
+            {
+                costingMethod = MCostElement.CheckLifoOrFifoMethod(GetCtx(), GetAD_Client_ID(), M_Product_ID, Get_Trx());
+                _costingMethodCache[M_Product_ID] = costingMethod;
+            }
+            return costingMethod;
+        }
+
 
         #endregion
 
@@ -2081,8 +2135,15 @@ namespace VAdvantage.Model
         /// <returns>new status (Complete, In Progress, Invalid, Waiting ..)</returns>
         public virtual String CompleteIt()
         {
+            string timeEstimation = " Inout Completion start at  " + DateTime.Now.ToUniversalTime() + " - ";
+
             // chck pallet Functionality applicable or not
             isContainrApplicable = MTransaction.ProductContainerApplicable(GetCtx());
+
+            // start every completion with fresh caches
+            _productCache.Clear();
+            _orderCache.Clear();
+            _costingMethodCache.Clear();
 
             //************* Change By Lokesh Chauhan ***************
             // If qty on locator is insufficient then return
@@ -2377,10 +2438,14 @@ namespace VAdvantage.Model
             }
 
             // get Warehouse Stock availablity, PO price in base currency
-            DataSet dsAvailableStock = DB.ExecuteDataset(@"SELECT M_InOutLine.M_InOutLine_ID , M_Storage.QtyOnHand, 
+            // only consumed by PO matching (Material Receipt / Vendor return, not reversal) - skip it for Shipments
+            DataSet dsAvailableStock = null;
+            if (!IsSOTrx() && !IsReversal())
+            {
+                dsAvailableStock = DB.ExecuteDataset(@"SELECT M_InOutLine.M_InOutLine_ID , M_Storage.QtyOnHand,
                                         NVL(CurrencyConvert(C_OrderLine.PriceEntered , C_Order.C_Currency_ID , " + GetCtx().GetContextAsInt("$C_Currency_ID") +
-                                        @", M_InOut.DateAcct, C_Order.C_ConversionType_ID, M_InOut.AD_Client_ID, M_InOut.AD_Org_ID) , 0) as PriceEntered
-                                        FROM M_InOutLine 
+                                            @", M_InOut.DateAcct, C_Order.C_ConversionType_ID, M_InOut.AD_Client_ID, M_InOut.AD_Org_ID) , 0) as PriceEntered
+                                        FROM M_InOutLine
                                         INNER JOIN M_InOut ON M_InOut.M_InOut_ID = M_InOutLine.M_InOut_ID
                                         LEFT JOIN M_Storage ON(M_InOutLine.M_Locator_ID = M_Storage.M_Locator_ID
                                         AND M_InOutLine.M_Product_ID = M_Storage.M_Product_ID
@@ -2388,6 +2453,7 @@ namespace VAdvantage.Model
                                         LEFT JOIN C_OrderLine ON M_InOutLine.C_OrderLine_ID = C_OrderLine.C_OrderLine_ID
                                         LEFT JOIN C_Order ON C_Order.C_Order_ID = C_OrderLine.C_Order_ID
                                         WHERE M_InOut.M_InOut_ID = " + GetM_InOut_ID(), null, Get_Trx());
+            }
 
             //VIS_045: 04/Oct/2023, DevOps Task ID:2495 --> Get Cost Detail from the Original Document of Ship/Receipt
             if (IsSOTrx() && IsReturnTrx())
@@ -2585,6 +2651,8 @@ namespace VAdvantage.Model
                 if (sLine.GetC_OrderLine_ID() != 0)
                 {
                     oLine = new MOrderLine(GetCtx(), sLine.GetC_OrderLine_ID(), Get_TrxName());
+                    // Hand the order header to the line so MOrderLine.BeforeSave does not reload C_Order for every line
+                    oLine.SetHeaderInfo(GetCachedOrder(oLine.GetC_Order_ID()));
                     log.Fine("OrderLine - Reserved=" + oLine.GetQtyReserved()
                     + ", Delivered=" + oLine.GetQtyDelivered());
                     // nnayak - Qty reserved and Qty updated not affected by returns
@@ -2659,8 +2727,7 @@ namespace VAdvantage.Model
                                 MOrderLine ordLine = oLine != null && oLine.GetC_OrderLine_ID() == sLine.GetC_OrderLine_ID() ? oLine
                                                     : new MOrderLine(GetCtx(), sLine.GetC_OrderLine_ID(), Get_TrxName());
 
-                                int OrdWh_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT M_Warehouse_ID FROM C_Order WHERE C_Order_ID ="
-                                    + ordLine.GetC_Order_ID(), null, Get_Trx()));
+                                int OrdWh_ID = GetCachedOrder(ordLine.GetC_Order_ID()).GetM_Warehouse_ID();
 
                                 if (!IsReversal())
                                 {
@@ -2880,8 +2947,7 @@ namespace VAdvantage.Model
                         {
                             MOrderLine ordLine = new MOrderLine(GetCtx(), sLine.GetC_OrderLine_ID(), Get_TrxName());
                             //MOrder ord = new MOrder(GetCtx(), ordLine.GetC_Order_ID(), Get_TrxName());
-                            int OrdWh_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT M_Warehouse_ID FROM C_Order WHERE C_Order_ID ="
-                                   + ordLine.GetC_Order_ID(), null, Get_Trx()));
+                            int OrdWh_ID = GetCachedOrder(ordLine.GetC_Order_ID()).GetM_Warehouse_ID();
 
                             if (!IsReversal())
                             {
@@ -3378,7 +3444,7 @@ namespace VAdvantage.Model
                     query.Clear();
                     query.Append("Update M_Transaction SET ");
 
-                    productCQ = new MProduct(GetCtx(), sLine.GetM_Product_ID(), Get_Trx());
+                    productCQ = GetCachedProduct(sLine.GetM_Product_ID());
                     costingCheck.product = productCQ;
 
                     if (sLine.GetM_Product_ID() > 0 && productCQ.GetProductType() == "I") // for Item Type product
@@ -4266,6 +4332,9 @@ namespace VAdvantage.Model
                 }
             }
 
+            timeEstimation += " End at " + DateTime.Now.ToUniversalTime();
+            log.Info(timeEstimation + " - " + GetDocumentNo());
+
             SetProcessed(true);
             SetDocAction(DOCACTION_Close);
             return DocActionVariables.STATUS_COMPLETED;
@@ -4342,9 +4411,9 @@ namespace VAdvantage.Model
             query.Append("Update M_Transaction SET ");
 
             // check Costing Methid is LIFO or FIFO
-            String costingMethod = MCostElement.CheckLifoOrFifoMethod(GetCtx(), GetAD_Client_ID(), sLine.GetM_Product_ID(), Get_Trx());
+            String costingMethod = GetCachedCostingMethod(sLine.GetM_Product_ID());
 
-            productCQ = new MProduct(GetCtx(), sLine.GetM_Product_ID(), Get_Trx());
+            productCQ = GetCachedProduct(sLine.GetM_Product_ID());
             costingCheck.product = productCQ;
 
             if (sLine.GetM_Product_ID() > 0 && productCQ.GetProductType() == "I") // for Item Type product
@@ -4958,7 +5027,7 @@ namespace VAdvantage.Model
         private String UpdateTransactionContainer(MInOutLine sLine, MTransaction mtrx, decimal Qty)
         {
             string errorMessage = null;
-            MProduct pro = new MProduct(Env.GetCtx(), sLine.GetM_Product_ID(), Get_TrxName());
+            MProduct pro = GetCachedProduct(sLine.GetM_Product_ID());
             MTransaction trx = null;
             MInventoryLine inventoryLine = null;
             MInventory inventory = null;
@@ -5175,7 +5244,7 @@ namespace VAdvantage.Model
         /// <param name="Qty"></param>
         private void UpdateTransaction(MInOutLine sLine, MTransaction mtrx, decimal Qty)
         {
-            MProduct pro = new MProduct(Env.GetCtx(), sLine.GetM_Product_ID(), Get_TrxName());
+            MProduct pro = GetCachedProduct(sLine.GetM_Product_ID());
             MTransaction trx = null;
             MInventoryLine inventoryLine = null;
             MInventory inventory = null;

@@ -400,7 +400,8 @@ namespace VAdvantage.Model
             // when calculate cost from process, then no need to calculate cost for define costing method either on product category or on Accounting Schema
             if (GetM_CostElement_ID() == 0 && optionalStrCd == "process")
             {
-                MCostElement[] ces = MCostElement.GetCostingMethods(this);
+                // cached per run on CostingCheck - same list for every line of the client
+                MCostElement[] ces = costingCheck != null ? costingCheck.GetMaterialCostElements(this) : MCostElement.GetCostingMethods(this);
                 try
                 {
                     for (int i = 0; i < ces.Length; i++)
@@ -945,7 +946,7 @@ namespace VAdvantage.Model
                         {
                             cost.SetCumulatedAmt(Decimal.Add(cost.GetCumulatedAmt(), adjustedAmt));
                             MCostQueue[] cQueue = MCostQueue.GetQueueForCostUpdate(product, cd.GetM_AttributeSetInstance_ID(),
-                                                 mas, QueueOrganizationID, ce, Get_TrxName(), cd.GetM_Warehouse_ID(), costingCheck);
+                                                 mas, QueueOrganizationID, ce, Get_TrxName(), cd.GetM_Warehouse_ID(), costingCheck, true);
                             if (cQueue != null && cQueue.Length > 0)
                             {
                                 cost.SetCurrentCostPrice(Decimal.Round(cQueue[0].GetCurrentCostPrice(), precision, MidpointRounding.AwayFromZero));
@@ -1104,7 +1105,7 @@ namespace VAdvantage.Model
                 #region Lifo / Fifo
                 //	Get Costs - costing level Org/ASI
                 MCostQueue[] cQueue = MCostQueue.GetQueueForCostUpdate(product, cd.GetM_AttributeSetInstance_ID(),
-                    mas, QueueOrganizationID, ce, Get_TrxName(), cd.GetM_Warehouse_ID(), costingCheck);
+                    mas, QueueOrganizationID, ce, Get_TrxName(), cd.GetM_Warehouse_ID(), costingCheck, true);
                 if (cQueue != null && cQueue.Length > 0)
                 {
                     cost.SetCurrentCostPrice(Decimal.Round(cQueue[0].GetCurrentCostPrice(), precision, MidpointRounding.AwayFromZero));
@@ -3000,13 +3001,13 @@ namespace VAdvantage.Model
                 if (windowName == "Inventory Move")
                 {
                     cQueue = MCostQueue.GetQueueForCostUpdate(product, cd.GetM_AttributeSetInstance_ID(),
-                    mas, QueueOrganizationID, ce, Get_TrxName(), cd.GetM_Warehouse_ID(), costingCheck);
+                    mas, QueueOrganizationID, ce, Get_TrxName(), cd.GetM_Warehouse_ID(), costingCheck, true);
                     //M_ASI_ID,  mas, cq_AD_Org_ID, ce, Get_TrxName(), cost.GetM_Warehouse_ID());
                 }
                 else
                 {
                     cQueue = MCostQueue.GetQueueForCostUpdate(product, cd.GetM_AttributeSetInstance_ID(),
-                    mas, QueueOrganizationID, ce, Get_TrxName(), cd.GetM_Warehouse_ID(), costingCheck);
+                    mas, QueueOrganizationID, ce, Get_TrxName(), cd.GetM_Warehouse_ID(), costingCheck, true);
                     // M_ASI_ID,  mas, Org_ID, ce, Get_TrxName(), cost.GetM_Warehouse_ID());
                 }
                 if (cQueue != null && cQueue.Length > 0)
@@ -4093,7 +4094,7 @@ namespace VAdvantage.Model
             else if (ce.IsLifo() || ce.IsFifo())
             {
                 MCostQueue[] cQueue = MCostQueue.GetQueueForCostUpdate(product, cd.GetM_AttributeSetInstance_ID(),
-                    mas, QueueOrganizationID, ce, Get_TrxName(), cd.GetM_Warehouse_ID(), costingCheck);
+                    mas, QueueOrganizationID, ce, Get_TrxName(), cd.GetM_Warehouse_ID(), costingCheck, true);
                 if (cQueue != null && cQueue.Length > 0)
                 {
                     cost.SetCurrentCostPrice(Decimal.Round(cQueue[0].GetCurrentCostPrice(), precision, MidpointRounding.AwayFromZero));
@@ -4201,7 +4202,7 @@ namespace VAdvantage.Model
             else if (ce.IsLifo() || ce.IsFifo())
             {
                 MCostQueue[] cQueue = MCostQueue.GetQueueForCostUpdate(product, cd.GetM_AttributeSetInstance_ID(),
-                    mas, QueueOrganizationID, ce, Get_TrxName(), cd.GetM_Warehouse_ID(), costingCheck);
+                    mas, QueueOrganizationID, ce, Get_TrxName(), cd.GetM_Warehouse_ID(), costingCheck, true);
                 if (cQueue != null && cQueue.Length > 0)
                 {
                     cost.SetCurrentCostPrice(Decimal.Round(cQueue[0].GetCurrentCostPrice(), precision, MidpointRounding.AwayFromZero));
@@ -4352,7 +4353,7 @@ namespace VAdvantage.Model
             {
                 #region Lifo / Fifo
                 MCostQueue[] cQueue = MCostQueue.GetQueueForCostUpdate(product, cd.GetM_AttributeSetInstance_ID(),
-                mas, QueueOrganizationID, ce, Get_TrxName(), cd.GetM_Warehouse_ID(), costingCheck);
+                mas, QueueOrganizationID, ce, Get_TrxName(), cd.GetM_Warehouse_ID(), costingCheck, true);
                 if (cQueue != null && cQueue.Length > 0)
                 {
                     cost.SetCurrentCostPrice(Decimal.Round(cQueue[0].GetCurrentCostPrice(), precision, MidpointRounding.AwayFromZero));
@@ -4792,6 +4793,17 @@ namespace VAdvantage.Model
         /// <returns>true when success</returns>
         public bool FreightDistribution(String windowName, MCostDetail cd, MAcctSchema acctSchema, int AD_Org_ID, MProduct product, int M_ASI_ID, int M_Warehouse_ID)
         {
+            // Get Element which belongs to Landed Cost
+            // (read first: when the client has no landed cost element there is nothing to distribute and every path below returns true,
+            //  so the expensive current qty lookup is skipped)
+            String sql = "SELECT M_CostElement_ID , Name FROM M_CostElement WHERE CostElementType = '" + MCostElement.COSTELEMENTTYPE_Material +
+                        @"' AND CostingMethod IS NULL AND IsActive = 'Y' AND AD_Client_ID = " + cd.GetAD_Client_ID();
+            DataSet ds = DB.ExecuteDataset(sql, null, cd.Get_Trx());
+            if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+            {
+                return true;
+            }
+
             // is used to get current qty of defined costing method on Product category or Accounting schema
             Decimal Qty = MCost.GetproductCostAndQtyMaterialonAcctSchema(cd.GetAD_Client_ID(), AD_Org_ID, acctSchema.GetC_AcctSchema_ID(), product.GetM_Product_ID(), M_ASI_ID, cd.Get_Trx(), M_Warehouse_ID, true);
             if (Qty == 0 && cd.GetM_CostElement_ID() > 0)
@@ -4818,10 +4830,6 @@ namespace VAdvantage.Model
                 VAS_IsAdjustLandedCostOnPhyInv = Util.GetValueOfBool(MClient.Get(cd.GetCtx(), cd.GetAD_Client_ID()).Get_Value("VAS_AdjustLandedCostOnPhyInv"));
             }
 
-            // Get Element which belongs to Landed Cost
-            String sql = "SELECT M_CostElement_ID , Name FROM M_CostElement WHERE CostElementType = '" + MCostElement.COSTELEMENTTYPE_Material +
-                        @"' AND CostingMethod IS NULL AND IsActive = 'Y' AND AD_Client_ID = " + cd.GetAD_Client_ID();
-            DataSet ds = DB.ExecuteDataset(sql, null, cd.Get_Trx());
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
                 MCost cost = null;
