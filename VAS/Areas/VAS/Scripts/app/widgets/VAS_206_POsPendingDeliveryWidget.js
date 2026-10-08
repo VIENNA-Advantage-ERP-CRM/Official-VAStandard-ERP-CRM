@@ -314,47 +314,36 @@
         /* ============================================================
            RECORD NAVIGATION TO PURCHASE ORDER WINDOW
            ============================================================ */
+        // Canonical Home/Landing-page zoom handling (2026-09-30, per user-supplied reference
+        // pattern): $self.windowNo >= 0 means this widget is hosted inside an actual window tab,
+        // so the host's own tab-panel router relays the value change; otherwise (Home dashboard
+        // placement, windowNo < 0) VAS.ZoomUtil.zoomToRecord resolves and opens the window
+        // directly, caching the resolved window id so repeat clicks skip re-resolving it by name.
+        // Was: an always-truthy "if ($self.widgetFirevalueChanged)" check (a prototype method
+        // reference, never falsy) fired the tab-relay branch even with no listener attached,
+        // and a hardcoded AD_Table_ID passed to VIS.ZoomManager.zoom/startWindow(0, action)
+        // could resolve to the wrong window.
+        var poZoomWindowId = 0;
+
         function openPurchaseOrderRecord(orderId) {
             if (!orderId) { return; }
             // Navigating away must dismiss the popup: the record opens behind it
             // otherwise, leaving the dialog stranded over the window it just opened.
             closeModal();
 
-            // 1. Fire value changed if tab panel / dashboard router is listening
-            try {
-                if ($self.widgetFirevalueChanged) {
-                    var windowParam = {
-                        "Record_ID": orderId,
-                        "C_Order_ID": orderId,
-                        "AD_Table_ID": 259,
-                        "WindowName": "VAS_PurchaseOrder",
-                        "AD_Tab_ID": 1002398,
-                        "TabWhereClause": "C_Order.C_Order_ID = " + orderId,
-                        "TabLayout": "N",
-                        "TabIndex": "0"
-                    };
-                    $self.widgetFirevalueChanged(windowParam);
-                }
-            } catch (e) { }
-
-            // 2. Standard VIS Zoom / Window Open
-            try {
-                if (VIS && VIS.ZoomManager && VIS.ZoomManager.zoom) {
-                    VIS.ZoomManager.zoom(259, orderId);
-                    return;
-                }
-            } catch (e) { }
-
-            try {
-                if (VIS && VIS.viewManager && VIS.viewManager.startWindow) {
-                    var action = new VIS.AActionItem();
-                    action.setAD_Table_ID(259);
-                    action.setRecord_ID(orderId);
-                    action.setWindowName("VAS_PurchaseOrder");
-                    action.setAD_Tab_ID(1002398);
-                    VIS.viewManager.startWindow(0, action);
-                }
-            } catch (e) { }
+            if ($self.windowNo >= 0) {
+                var windowParam = {
+                    "TabWhereClause": "C_Order.C_Order_ID=" + orderId,
+                    "TabLayout": "Y",
+                    "TabIndex": "0"
+                };
+                $self.widgetFirevalueChanged(windowParam);
+            } else {
+                VAS.ZoomUtil.zoomToRecord("C_Order_ID", orderId, poZoomWindowId, "VAS_PurchaseOrder", "")
+                    .done(function (id) {
+                        if (id > 0) { poZoomWindowId = id; }
+                    });
+            }
         }
 
         /* ============================================================
@@ -420,9 +409,9 @@
 
                 var $lk = $(e.target).closest('.vas-206-lnk');
                 if ($lk.length) {
+                    // A PO number opens that record on the Purchase Order screen (window tab or Home page).
                     var poId = parseInt($lk.attr('data-po-id'), 10);
-                    var poNo = $lk.attr('data-po-no');
-                    openRecordModal(poId, poNo);
+                    openPurchaseOrderRecord(poId);
                     return;
                 }
 

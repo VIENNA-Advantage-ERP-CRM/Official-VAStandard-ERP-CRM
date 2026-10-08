@@ -25,7 +25,13 @@
 
 /* ---------- GLASS WIDGET CARD ---------- */
 .vas-mpt-card {
-    font-size: clamp(14px, 1.2cqi, 20px);
+    /* Floor raised 14px -> 16px (user request) to match every other widget in the
+       Purchase Order dashboard family (VAS_209/211/212/213/215/216, all floored at
+       16px) - the .vas-mpt-sel filter control below is explicitly documented as
+       "shared... across every PO widget" and uses the exact same em rule as
+       VAS_209_Top10VendorsWidget's .vas-t10v-sel, so the mismatched floor was the
+       only reason the two selects rendered at different sizes despite identical CSS. */
+    font-size: clamp(16px, 1.2cqi, 20px);
     background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
     border: 2px solid #FFFFFF;
     border-radius: 14px;

@@ -81,7 +81,7 @@
 
         var selectedStatus = "ALL";
         var pageNo = 1;
-        var pageSize = 4;
+        var pageSize = 3;
         var totalRecords = 0;
         var totalPages = 1;
         var recordsData = [];
@@ -495,6 +495,7 @@
                 '<div class="vas-riu-filter-menu vas-riu-hidden">' +
                 '<button type="button" class="vas-riu-filter-opt active" data-status="ALL">' + escapeHtml(label("VAS_187_AllStatuses", "All Statuses")) + '</button>' +
                 '<button type="button" class="vas-riu-filter-opt" data-status="CO">' + escapeHtml(label("VAS_187_Completed", "Completed")) + '</button>' +
+                '<button type="button" class="vas-riu-filter-opt" data-status="CL">' + escapeHtml(label("VAS_187_Closed", "Closed")) + '</button>' +
                 '<button type="button" class="vas-riu-filter-opt" data-status="DR">' + escapeHtml(label("VAS_187_Drafted", "Drafted")) + '</button>' +
                 '<button type="button" class="vas-riu-filter-opt" data-status="IP">' + escapeHtml(label("VAS_187_InProcess", "In Process")) + '</button>' +
                 '<button type="button" class="vas-riu-filter-opt" data-status="RE">' + escapeHtml(label("VAS_187_Reversed", "Reversed")) + '</button>' +

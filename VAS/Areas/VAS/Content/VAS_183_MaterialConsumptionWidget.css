@@ -122,6 +122,12 @@
     gap: .3em;
     white-space: nowrap;
     outline: none;
+    /* Fixed max-width, not "grow to fit the selected label" - a long warehouse/locator
+       name (e.g. "Tata Motors Mohali Warehouse") used to widen this pill past 200px,
+       squeezing .vas-mcw-head-left/.vas-mcw-title down until the widget's own heading
+       cropped to "Con...". The label itself truncates with ellipsis instead (see
+       .vas-mcw-wh-lbl); the full name is still available as the label's own tooltip. */
+    max-width: 9em;
 }
 
     .vas-mcw-pill-btn:hover {
@@ -134,6 +140,15 @@
         height: 1em;
         flex: 0 0 auto;
     }
+
+/* Truncates within the pill's own max-width (see .vas-mcw-pill-btn) instead of forcing the
+   button to grow to fit a long warehouse/locator name. */
+.vas-mcw-wh-lbl {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
 
 /* Dropdown menu. Appended to <body> and positioned with position:fixed from JS, because
    .vas-mcw-card is overflow:hidden and would clip a menu rendered inside the card. Menus are the

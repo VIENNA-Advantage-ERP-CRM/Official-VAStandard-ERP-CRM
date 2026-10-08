@@ -19,11 +19,12 @@
     overflow: hidden;
     position: relative;
     box-sizing: border-box;
-    /* Widget-level container query scaling using 4.5cqi / --widget-inline-size */
-    font-size: clamp(14px, 4.5cqi, 36px);
-    font-size: clamp(14px, calc(var(--widget-inline-size, 320px) * 0.045), 36px);
 }
 
+/* Chrome matched to VAS_159/VAS_160 (Positive/Negative Variance Qty), which in turn match
+   VAS_132_OutOfStockWidget / VAS_133_UpdatedThisMonthWidget: single font-size anchor on the card
+   itself against --dash-inline-size (dashboard width, not this widget's own box), label pinned to
+   the top, value+meta wrapped in a "body" pinned to the bottom via margin-top:auto. */
 .vas-variance-lines-card {
     display: flex;
     flex-direction: column;
@@ -32,19 +33,19 @@
     height: 100%;
     min-width: 0;
     overflow: hidden;
-    padding: 0.85em;
-    gap: 0.25em;
+    padding: 0.875em;
     box-sizing: border-box;
     background: linear-gradient(180deg, rgba(255,255,255,1), rgba(255,255,255,0.6));
     border: 2px solid #FFFFFF;
     border-radius: 14px;
     box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    font-family: 'Roboto', sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.014), 24px);
 }
 
 .vas-variance-lines-label {
-    font-family: 'Roboto', sans-serif;
-    font-weight: 400;
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    font-weight: 500;
+    font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * 0.011375), 16px);
     line-height: 1.3;
     color: #102C3F;
     white-space: nowrap;
@@ -52,11 +53,14 @@
     text-overflow: ellipsis;
 }
 
+.vas-variance-lines-body {
+    margin-top: auto;
+}
+
 .vas-variance-lines-value {
-    font-family: 'Roboto', sans-serif;
-    font-weight: 600;
+    font-weight: 500;
     font-size: 1.75em;
-    line-height: 1.05;
+    line-height: 1.1;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -65,11 +69,11 @@
 }
 
 .vas-variance-lines-meta {
-    font-family: 'Roboto', sans-serif;
     font-weight: 400;
     font-size: 0.6875em;
     line-height: 1.3;
     color: #5F7283;
+    margin-top: 0.25em;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

@@ -235,6 +235,17 @@
     white-space: nowrap;
 }
 
+/* Lines view only (see renderLinesContent) - the title doubles as the "open record" link that
+   used to be a separate, redundant "Purchase order 800080 · date · status" row underneath it. */
+.vas-207-mtitle-link {
+    cursor: pointer;
+    color: #0083DA;
+}
+
+    .vas-207-mtitle-link:hover {
+        text-decoration: underline;
+    }
+
 .vas-207-msub {
     font-size: 0.8125em;
     color: #717182;

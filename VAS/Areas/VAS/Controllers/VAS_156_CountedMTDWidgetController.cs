@@ -17,7 +17,13 @@ namespace VIS.Controllers
     ///               (M_Inventory, M_InventoryLine) and distinct products counted.
     /// Prefix      : VAS_000_
     ///
-    /// The HEADLINE REMAINS A COUNT OF LINES, not of documents. A count-sheet screen listing
+    /// 2026-10-08: the headline is now a count of DOCUMENTS (distinct M_Inventory_ID), so it equals the
+    /// number of rows the drill-down popup lists ("1-3 of 3"). It used to count lines: 3 documents
+    /// carrying 4 lines read "4" on the card against 3 rows in the popup. The JSON field keeps its old
+    /// name, countedLines, so the widget script needs no change. The text below describes the earlier
+    /// lines-based reading and is kept for the history of why the figures once looked different.
+    ///
+    /// (Earlier note) The headline REMAINED A COUNT OF LINES, not of documents. A count-sheet screen listing
     /// 46 documents and this card reading 53 is therefore not automatically a contradiction - 46
     /// documents can carry 53 lines between them. But the card should never read FEWER lines than
     /// the window has documents when each document typically carries only 1-2 lines, which is
@@ -63,7 +69,7 @@ namespace VIS.Controllers
 
             string sql = @"
                 SELECT
-                    COUNT(*) AS counted_lines,
+                    COUNT(DISTINCT i.M_Inventory_ID) AS counted_lines,
                     COUNT(DISTINCT il.M_Product_ID) AS products_counted
                 FROM M_Inventory i
                 JOIN M_InventoryLine il

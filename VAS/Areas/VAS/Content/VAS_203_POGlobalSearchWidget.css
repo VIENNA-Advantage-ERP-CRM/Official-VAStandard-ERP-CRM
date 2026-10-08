@@ -168,16 +168,21 @@
     justify-content: flex-end;
     padding-top: .4em;
 }
+/* Pill-shaped, blue-outline buttons matching every other Purchase Order window widget's modal
+   footer (VAS_205/206/207/... .vas-w205-btn / .vas-207-btn / etc.) - 2026-09-30, user request:
+   "follow the same pattern of buttons like back and close on line details pop up on all
+   Purchase Order window widgets". Was a small rounded-rectangle with a gray (#D9E2EB) border and
+   a much smaller font-size (.64em vs the standard .8125em), the one outlier in this set. */
 .vas-203-dtl-openbtn, .vas-203-dtl-closebtn {
     background: #fff;
-    border: 1px solid #D9E2EB;
-    border-radius: .4em;
+    border: 1px solid #0083DA;
+    border-radius: 999px;
     color: #0083DA;
     cursor: pointer;
     font-family: inherit;
-    font-size: .64em;
+    font-size: .8125em;
     font-weight: 500;
-    padding: .4em .9em;
+    padding: .5em .875em;
 }
 .vas-203-dtl-openbtn { background: #0083DA; border-color: #0083DA; color: #fff; }
 .vas-203-dtl-openbtn:hover { background: #0069AE; }

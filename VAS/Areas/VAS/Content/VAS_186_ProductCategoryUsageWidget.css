@@ -125,8 +125,9 @@
     -webkit-appearance: none !important;
     -moz-appearance: none !important;
     background-image: none !important;
-    text-align: center;
-    text-align-last: center;
+    /* Left-aligned (2026-09-29, user request: "text should be left align"). Was centred. */
+    text-align: left;
+    text-align-last: left;
     padding: 0.3em 0.45em;
     outline: none;
     cursor: pointer;
@@ -141,15 +142,15 @@
         min-width: 4.2em;
     }
 
-    /* Centre each option row too, so the open list matches the closed control.
-       text-align on <option> only works in Firefox - Chrome/Edge on Windows render the open
-       popup with their own menu-list-item box and ignore text-align there entirely (a long-
-       standing Chromium limitation), even though they do honour a plain padding on the same
-       element. Every option here is a fixed-width value (3-letter month / 4-digit year), so a
-       flat padding-left visually centres them for that browser too. */
+    /* Left-align each option row too, so the open list matches the closed control (2026-09-29,
+       user request: "text should be left align" - was centred, see the removed padding-left:1em
+       centring hack below). text-align on <option> only works in Firefox - Chrome/Edge on
+       Windows render the open popup with their own menu-list-item box and ignore text-align
+       there entirely (a long-standing Chromium limitation), but a small left padding reads
+       correctly left-aligned in both regardless. */
     .vas-pcu-select option {
-        text-align: center;
-        padding-left: 1em;
+        text-align: left;
+        padding-left: .5em;
     }
 
     /* Standard select hover tint (was missing on this widget). */

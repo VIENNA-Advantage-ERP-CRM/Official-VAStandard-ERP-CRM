@@ -66,7 +66,9 @@ namespace VIS.Controllers
                         rep.Name AS representative_name,
                         o.DateOrdered,
                         o.DatePromised,
-                        o.OrderCompletionDatetime,
+                        -- OrderCompletionDatetime is a POS-shift field, NULL for ordinary vendor POs, so the
+                        -- cycle end falls back to the last update of a Completed/Closed order.
+                        CASE WHEN o.DocStatus IN ('CO', 'CL') THEN COALESCE(o.OrderCompletionDatetime, o.Updated) END AS OrderCompletionDatetime,
                         o.DocStatus,
                         o.C_Currency_ID,
                         o.C_ConversionType_ID,
@@ -80,6 +82,7 @@ namespace VIS.Controllers
                       AND o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
+                      AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
                       AND o.SalesRep_ID IS NOT NULL
                       AND o.DocStatus NOT IN ('VO', 'RE')
                       AND o.DateOrdered >= @MonthStart
@@ -247,7 +250,9 @@ namespace VIS.Controllers
                         o.DocumentNo,
                         o.DateOrdered,
                         o.DatePromised,
-                        o.OrderCompletionDatetime,
+                        -- OrderCompletionDatetime is a POS-shift field, NULL for ordinary vendor POs, so the
+                        -- cycle end falls back to the last update of a Completed/Closed order.
+                        CASE WHEN o.DocStatus IN ('CO', 'CL') THEN COALESCE(o.OrderCompletionDatetime, o.Updated) END AS OrderCompletionDatetime,
                         o.DocStatus,
                         o.C_Currency_ID,
                         o.C_ConversionType_ID,
@@ -267,6 +272,7 @@ namespace VIS.Controllers
                       AND o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
+                      AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
                       AND o.DocStatus NOT IN ('VO', 'RE')
                       AND o.SalesRep_ID = @SalesRepID
                       AND o.DateOrdered >= @MonthStart
@@ -415,15 +421,15 @@ namespace VIS.Controllers
                     // to the trailing 12 months so the card keeps reporting a meaningful average.
                     DateTime wideStart = monthStart.AddMonths(-12);
                     string cycleSql = @"
-                        SELECT o.DateOrdered, o.OrderCompletionDatetime
+                        SELECT o.DateOrdered, COALESCE(o.OrderCompletionDatetime, o.Updated) AS OrderCompletionDatetime
                         FROM C_Order o
                         WHERE o.AD_Client_ID = @ClientID
                           AND o.IsActive = 'Y'
                           AND o.IsSOTrx = 'N'
                           AND COALESCE(o.IsReturnTrx, 'N') = 'N'
+                          AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
                           AND o.DocStatus IN ('CO', 'CL')
                           AND o.SalesRep_ID = @SalesRepID
-                          AND o.OrderCompletionDatetime IS NOT NULL
                           AND o.DateOrdered >= @WideStart
                           AND o.DateOrdered < @MonthEnd";
                     cycleSql = MRole.GetDefault(ctx).AddAccessSQL(cycleSql, "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
@@ -553,24 +559,30 @@ namespace VIS.Controllers
                     }
                 }
 
-                // Fetch Order Lines
+                // p.Value / ch.Name / p.Name / asi.Description are NVARCHAR2 columns. COALESCE'ing
+                // any of them against a string literal raises ORA-12704 (character set mismatch) on
+                // Oracle - the statement throws, the catch block below swallows it, and the endpoint
+                // returns an empty response, which the modal renders as "No lines found" with every
+                // stat at zero. Same bug fixed the same way in VAS_161 / VAS_163 / VAS_165 / VAS_164:
+                // select these columns raw (no COALESCE against a literal) and leave them blank in
+                // C# (Util.GetValueOfString already returns "" for DBNull) when there is no value.
                 string linesSql = @"
                     SELECT
                         ol.C_OrderLine_ID,
                         ol.Line,
-                        COALESCE(p.Value, N'') AS ProductCode,
+                        p.Value AS ProductCode,
                         -- A charge line, or a product that is not of Item type, carries no
                         -- stock movement: the widget shows its name, UOM, ordered, rate and
                         -- amount, and dashes for received / pending / line status.
                         CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0
-                             THEN COALESCE(ch.Name, N'')
-                             ELSE COALESCE(p.Name, N'') END AS ProductName,
+                             THEN ch.Name
+                             ELSE p.Name END AS ProductName,
                         CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0 THEN 'Y'
                              WHEN ol.M_Product_ID IS NOT NULL AND COALESCE(p.ProductType, 'I') <> 'I' THEN 'Y'
                              ELSE 'N' END AS IsNonStock,
                         CASE WHEN COALESCE(ol.M_AttributeSetInstance_ID, 0) > 0
-                             THEN COALESCE(asi.Description, N'')
-                             ELSE N'' END AS AttributeDesc,
+                             THEN asi.Description
+                             ELSE NULL END AS AttributeDesc,
                         COALESCE(uom.UOMSymbol, uom.Name) AS UomName,
                         COALESCE(ol.QtyOrdered, 0) AS QtyOrdered,
                         -- QtyEntered is expressed in the line's own C_UOM_ID (the UOM the buyer
@@ -592,7 +604,16 @@ namespace VIS.Controllers
 
                 List<object> linesList = new List<object>();
 
-                using (IDataReader dr = DB.ExecuteReader(linesSql, orderParams, null))
+                // linesSql only references @OrderID (no @ClientID predicate) - reusing orderParams
+                // here passed a @ClientID bind value with no matching placeholder in the SQL text,
+                // which Oracle rejects with ORA-01006 "bind variable does not exist". A dedicated,
+                // single-parameter array keeps the bound parameters in step with the SQL text.
+                SqlParameter[] lineParams = new SqlParameter[]
+                {
+                    new SqlParameter("@OrderID", orderId)
+                };
+
+                using (IDataReader dr = DB.ExecuteReader(linesSql, lineParams, null))
                 {
                     while (dr != null && dr.Read())
                     {

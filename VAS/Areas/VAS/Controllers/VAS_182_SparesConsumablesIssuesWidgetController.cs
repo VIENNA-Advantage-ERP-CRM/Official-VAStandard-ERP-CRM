@@ -32,6 +32,20 @@ namespace VIS.Controllers
     ///                          VAMFG_M_WorkOrder_ID) GetSparesConsumablesIdsData already
     ///                          used - the two endpoints previously disagreed on what
     ///                          counted as a work-order line.
+    ///   Claude      2026-09-29 Reclassified again per user-supplied, verified-correct
+    ///                          query: DTD001_IsConsumable lives on M_Product, not
+    ///                          M_Product_Category, so the M_Product_Category join is
+    ///                          gone from both GetSparesConsumablesPercentageData and
+    ///                          GetSparesConsumablesIdsData. The denominator is now
+    ///                          TOTAL internal-use issue value (every product), not just
+    ///                          the consumable category's own total - the previous
+    ///                          version measured "consumable share of consumable spend"
+    ///                          instead of "consumable share of total spend", and its
+    ///                          SparesValue CASE still tested the old work-order columns
+    ///                          rather than the category flag the WHERE clause had
+    ///                          already switched to. Cost fallback simplified to plain
+    ///                          CurrentCostPrice (no PriceCost/VA024_CostPrice chain),
+    ///                          per the same supplied query.
     /// </summary>
     public class VAS_182_SparesConsumablesIssuesWidgetController : Controller
     {
@@ -192,25 +206,23 @@ namespace VIS.Controllers
             string msl = ToSqlDate(monthStart);
             string nmsl = ToSqlDate(nextMonthStart);
 
-            // Same population as GetSparesConsumablesPercentageData's SparesValue
-            // branch (Product Category DTD001_IsConsumable = 'Y' + line-level
-            // NOT-work-order classification), just DISTINCT header ids instead of a SUM.
+            // Same population as GetSparesConsumablesPercentageData's SparesValue branch
+            // (M_Product.DTD001_IsConsumable = 'Y', no category join, no work-order
+            // exclusion - see that method's comment for why), just DISTINCT header ids
+            // instead of a SUM. Must stay in lockstep with that predicate or the KPI %
+            // and its click-through drill-down would disagree on what counts as "spares".
             string sql = @"
                 SELECT DISTINCT inv.M_Inventory_ID
                   FROM M_Inventory inv
                   INNER JOIN M_InventoryLine line ON ( line.M_Inventory_ID = inv.M_Inventory_ID )
                   INNER JOIN M_Product mp ON ( mp.M_Product_ID = line.M_Product_ID )
-                  INNER JOIN M_Product_Category mpc ON ( mpc.M_Product_Category_ID = mp.M_Product_Category_ID )
                  WHERE inv.IsActive = 'Y'
-                   AND mpc.DTD001_IsConsumable = 'Y'
+                   AND mp.DTD001_IsConsumable = 'Y'
                    AND line.IsActive = 'Y'
                    AND mp.IsActive = 'Y'
-                   AND mpc.IsActive = 'Y'
                    AND COALESCE(inv.IsInternalUse, 'N') = 'Y'
                    AND inv.DocStatus IN ('CO', 'CL')
                    AND COALESCE(line.QtyInternalUse, 0) > 0
-                   AND COALESCE(line.VA075_WorkOrder_ID, 0) = 0
-                   AND COALESCE(line.VAMFG_M_WorkOrder_ID, 0) = 0
                    AND inv.MovementDate >= " + msl + @"
                    AND inv.MovementDate < " + nmsl;
 
@@ -235,39 +247,40 @@ namespace VIS.Controllers
             string msl = ToSqlDate(monthStart);
             string nmsl = ToSqlDate(nextMonthStart);
 
-            // Spares / consumables share = value of issue lines for products whose Product
-            // Category is flagged Consumable (M_Product_Category.DTD001_IsConsumable = 'Y'),
-            // as a share of the SAME category's total issued value for the period.
+            // Spares / consumables share = value of issue lines whose PRODUCT is flagged
+            // Consumable (M_Product.DTD001_IsConsumable = 'Y'), as a share of TOTAL
+            // internal-use issue value for the period (every product, not just
+            // consumable-flagged ones) - user-supplied, verified-correct query
+            // (2026-09-29).
             //
             // Earlier versions classified "spares" as "any line NOT raised against a work
             // order" (an exact complement of VAS_181_ProductionIssuesWidget with no actual
             // product classification behind it, ~99-100% on installs where few internal-use
-            // lines carry a work order link), then as ProductGroup = 'C'. Confirmed against a
-            // known-good query that the real predicate is DTD001_IsConsumable = 'Y', and that
-            // the work-order-line test itself is just the two explicit line columns
-            // (VA075_WorkOrder_ID, VAMFG_M_WorkOrder_ID) - matching what
-            // GetSparesConsumablesIdsData already used, rather than a dynamically-resolved
-            // list of every "*WORKORDER*"-named column on M_InventoryLine.
+            // lines carry a work order link), then as ProductGroup = 'C', then as
+            // M_Product_Category.DTD001_IsConsumable = 'Y' with the denominator ALSO
+            // restricted to that category (so it measured "consumable share of consumable
+            // spend", not "consumable share of total spend") while the numerator's CASE
+            // still checked the unrelated work-order columns instead of the category flag -
+            // an inconsistency between the WHERE filter and the CASE that never actually got
+            // fixed when the predicate was changed. The flag lives on M_Product itself, not
+            // the category, and no work-order exclusion or category join belongs here at all.
             //
-            // Cost fallback must end in 0: NVL(CurrentCostPrice, PriceCost) yields NULL when both
-            // are null, and SUM() silently drops those lines from the total.
+            // Cost fallback must end in 0: SUM() silently drops a line whose only cost source
+            // is null.
             string sql = @"
                 SELECT
-                  COALESCE(SUM(CASE WHEN COALESCE(line.VA075_WorkOrder_ID, 0) = 0 AND COALESCE(line.VAMFG_M_WorkOrder_ID, 0) = 0
-                                    THEN (line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0))
+                  COALESCE(SUM(CASE WHEN mp.DTD001_IsConsumable = 'Y'
+                                    THEN (line.QtyInternalUse * COALESCE(line.CurrentCostPrice, 0))
                                     ELSE 0 END), 0) AS SparesValue,
-                  COALESCE(SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0)), 0) AS TotalValue
+                  COALESCE(SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, 0)), 0) AS TotalValue
                 FROM M_Inventory inv
                 INNER JOIN M_InventoryLine line ON ( line.M_Inventory_ID = inv.M_Inventory_ID )
                 INNER JOIN M_Product mp ON ( mp.M_Product_ID = line.M_Product_ID )
-                INNER JOIN M_Product_Category mpc ON ( mpc.M_Product_Category_ID = mp.M_Product_Category_ID )
                 WHERE inv.IsActive = 'Y'
-                  AND mpc.DTD001_IsConsumable = 'Y'
                   AND inv.DocStatus IN ('CO', 'CL')
                   AND COALESCE(inv.IsInternalUse, 'N') = 'Y'
                   AND line.IsActive = 'Y'
                   AND mp.IsActive = 'Y'
-                  AND mpc.IsActive = 'Y'
                   AND COALESCE(line.QtyInternalUse, 0) > 0
                   AND inv.MovementDate >= " + msl + @"
                   AND inv.MovementDate < " + nmsl;
@@ -290,8 +303,7 @@ namespace VIS.Controllers
             decimal pct = (sparesVal / totalVal) * 100m;
             return Convert.ToInt32(Math.Round(pct));
         }
-// ----- END OLD CODE -----
-    
+
         /// <summary>Date literal for the target DB. Merged in from upstream/beta, which
         /// introduced the msl/nmsl date-literal style this controller now uses.</summary>
         private static string ToSqlDate(DateTime date)

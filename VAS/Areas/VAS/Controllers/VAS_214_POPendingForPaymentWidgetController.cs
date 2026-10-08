@@ -230,6 +230,7 @@ namespace VIS.Controllers
                       AND o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
+                      AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
                       AND " + eligibilityWhere + @"
                       AND o.C_Order_ID IN (@P_ORDER_ACCESS@)
                       AND (
@@ -443,11 +444,6 @@ namespace VIS.Controllers
                         COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) AS QtyEntered,
                         COALESCE(ol.QtyDelivered, 0) AS delivered_qty,
                         p.ProductType AS product_type,
-                        CASE
-                            WHEN COALESCE(ol.QtyOrdered, 0) <> 0
-                            THEN COALESCE(ol.QtyDelivered, 0) * COALESCE(ol.QtyEntered, ol.QtyOrdered) / ol.QtyOrdered
-                            ELSE COALESCE(ol.QtyDelivered, 0)
-                        END AS delivered_qty,
                         COALESCE(ol.PriceEntered, ol.PriceActual, 0) AS price_actual,
                         COALESCE(ol.LineNetAmt, COALESCE(ol.QtyEntered, 0) * COALESCE(ol.PriceEntered, 0)) AS line_net_amt,
                         c.CurSymbol AS cur_symbol,
@@ -484,9 +480,8 @@ namespace VIS.Controllers
                         decimal uomRatio = (orderedQty != 0) ? (enteredQtyUom / orderedQty) : 1m;
                         orderedQty = enteredQtyUom;
                         deliveredQty = deliveredQty * uomRatio;
-                        decimal pendingQty = Util.GetValueOfDecimal(dr["pending_qty"]);
                         // Pending follows the converted figures, not the base-UOM value.
-                        pendingQty = Math.Max(0m, orderedQty - deliveredQty);
+                        decimal pendingQty = Math.Max(0m, orderedQty - deliveredQty);
                         decimal priceActual = Util.GetValueOfDecimal(dr["price_actual"]);
                         decimal lineNetAmt = Util.GetValueOfDecimal(dr["line_net_amt"]);
 

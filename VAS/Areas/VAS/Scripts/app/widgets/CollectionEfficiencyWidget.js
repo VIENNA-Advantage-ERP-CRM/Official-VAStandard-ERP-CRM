@@ -320,12 +320,12 @@
 
                 '<div class="vas-ce-custom-row">' +
                 '<label>' + lbl("VIS_FromDate", "From Date") + '</label>' +
-                '<input type="date" class="vas-ce-from-date" />' +
+                '<input type="date" max="9999-12-31" class="vas-ce-from-date" />' +
                 '</div>' +
 
                 '<div class="vas-ce-custom-row">' +
                 '<label>' + lbl("VIS_ToDate", "To Date") + '</label>' +
-                '<input type="date" class="vas-ce-to-date" />' +
+                '<input type="date" max="9999-12-31" class="vas-ce-to-date" />' +
                 '</div>' +
 
                 '<div class="vas-ce-custom-actions">' +

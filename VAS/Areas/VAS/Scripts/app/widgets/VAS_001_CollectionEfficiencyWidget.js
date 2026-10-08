@@ -600,7 +600,6 @@
                 '<div class="vas-ce-overdue">0 ' + escapeHtml(lbl("VAS_001_OverdueDot", "overdue ·")) + ' 0 ' + escapeHtml(lbl("VAS_001_Invoices", "invoices")) + '</div>' +
                 '</div>' +
                 '</div>' +
-
                 '</div>'
             );
 

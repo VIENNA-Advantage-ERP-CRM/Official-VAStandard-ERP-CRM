@@ -569,7 +569,7 @@
                     '<div class="vas-211-mtbl">' +
                         '<div class="vas-211-mrow vas-211-mhead vas-211-orders-grid">' +
                             '<span class="vas-211-cell"></span>' +
-                            '<span class="vas-211-cell vas-211-c-link" title="' + escapeHtml(lbl('VAS_211_PONo', 'PO No')) + '">' + escapeHtml(lbl('VAS_211_PONo', 'PO No')) + '</span>' +
+                            '<span class="vas-211-cell vas-211-c-dark" title="' + escapeHtml(lbl('VAS_211_PONo', 'PO No')) + '">' + escapeHtml(lbl('VAS_211_PONo', 'PO No')) + '</span>' +
                             '<span class="vas-211-cell" title="' + escapeHtml(lbl('VAS_211_PODate', 'PO date')) + '">' + escapeHtml(lbl('VAS_211_PODate', 'PO date')) + '</span>' +
                             '<span class="vas-211-cell" title="' + escapeHtml(lbl('VAS_211_Vendor', 'Vendor')) + '">' + escapeHtml(lbl('VAS_211_Vendor', 'Vendor')) + '</span>' +
                             '<span class="vas-211-cell" title="' + escapeHtml(lbl('VAS_211_Warehouse', 'Warehouse')) + '">' + escapeHtml(lbl('VAS_211_Warehouse', 'Warehouse')) + '</span>' +
@@ -763,7 +763,7 @@
                             '<span class="vas-211-cell" title="' + escapeHtml(lbl('VAS_211_UoM', 'UoM')) + '">' + escapeHtml(lbl('VAS_211_UoM', 'UoM')) + '</span>' +
                             '<span class="vas-211-cell vas-211-right" title="' + escapeHtml(lbl('VAS_211_Ordered', 'Ordered')) + '">' + escapeHtml(lbl('VAS_211_Ordered', 'Ordered')) + '</span>' +
                             '<span class="vas-211-cell vas-211-right" title="' + escapeHtml(lbl('VAS_211_Received', 'Received')) + '">' + escapeHtml(lbl('VAS_211_Received', 'Received')) + '</span>' +
-                            '<span class="vas-211-cell vas-211-right vas-211-c-prim" title="' + escapeHtml(lbl('VAS_211_Pending', 'Pending')) + '">' + escapeHtml(lbl('VAS_211_Pending', 'Pending')) + '</span>' +
+                            '<span class="vas-211-cell vas-211-right" title="' + escapeHtml(lbl('VAS_211_Pending', 'Pending')) + '">' + escapeHtml(lbl('VAS_211_Pending', 'Pending')) + '</span>' +
                             '<span class="vas-211-cell vas-211-right" title="' + escapeHtml(lbl('VAS_211_Rate', 'Rate')) + '">' + escapeHtml(lbl('VAS_211_Rate', 'Rate')) + '</span>' +
                             '<span class="vas-211-cell vas-211-right vas-211-c-emph" title="' + escapeHtml(lbl('VAS_211_Amount', 'Amount')) + '">' + escapeHtml(lbl('VAS_211_Amount', 'Amount')) + '</span>' +
                             '<span class="vas-211-cell" title="' + escapeHtml(lbl('VAS_211_LineStatus', 'Line status')) + '">' + escapeHtml(lbl('VAS_211_LineStatus', 'Line status')) + '</span>' +
@@ -891,7 +891,7 @@
                         '<span class="vas-211-cell" title="' + escapeHtml(l.uomName) + '">' + escapeHtml(l.uomName) + '</span>' +
                         '<span class="vas-211-cell vas-211-right" title="' + formatNumber(l.qtyOrdered) + '">' + formatNumber(l.qtyOrdered) + '</span>' +
                         '<span class="vas-211-cell vas-211-right" title="' + receivedDisp + '">' + receivedDisp + '</span>' +
-                        '<span class="vas-211-cell vas-211-right vas-211-c-prim" title="' + pendingDisp + '">' + pendingDisp + '</span>' +
+                        '<span class="vas-211-cell vas-211-right" title="' + pendingDisp + '">' + pendingDisp + '</span>' +
                         '<span class="vas-211-cell vas-211-right" title="' + formatAmount(l.priceActual, curSymbol) + '">' + formatAmount(l.priceActual, curSymbol) + '</span>' +
                         '<span class="vas-211-cell vas-211-right vas-211-c-emph" title="' + formatAmount(l.lineNetAmt, curSymbol) + '">' + formatAmount(l.lineNetAmt, curSymbol) + '</span>' +
                         statusCell +
@@ -927,20 +927,30 @@
             }
         }
 
-        // Direct record navigation to VAS_PurchaseOrder screen
+        // Canonical Home/Landing-page zoom handling (2026-09-30, per user-supplied reference
+        // pattern): $self.windowNo >= 0 means this widget is hosted inside an actual window tab,
+        // so the host's own tab-panel router relays the value change; otherwise (Home dashboard
+        // placement, windowNo < 0) VAS.ZoomUtil.zoomToRecord resolves and opens the window
+        // directly, caching the resolved window id so repeat clicks skip re-resolving it by name.
+        // Was: an unconditional widgetFirevalueChanged call with no fallback at all - on Home page
+        // placement (no listener attached) this silently no-op'd and the click did nothing.
+        var poZoomWindowId = 0;
+
         function zoomToPurchaseOrder(orderId) {
             if (!orderId) { return; }
             closeModal();
-            try {
-                $self.widgetFirevalueChanged({
+            if ($self.windowNo >= 0) {
+                var windowParam = {
                     "TabWhereClause": "C_Order.C_Order_ID=" + orderId,
                     "TabLayout": "Y",
-                    "TabIndex": "0",
-                    "ActionName": "VAS_PurchaseOrder",
-                    "ActionType": "W"
-                });
-            } catch (e) {
-                /* zoom is best-effort */
+                    "TabIndex": "0"
+                };
+                $self.widgetFirevalueChanged(windowParam);
+            } else {
+                VAS.ZoomUtil.zoomToRecord("C_Order_ID", orderId, poZoomWindowId, "VAS_PurchaseOrder", "")
+                    .done(function (id) {
+                        if (id > 0) { poZoomWindowId = id; }
+                    });
             }
         }
 

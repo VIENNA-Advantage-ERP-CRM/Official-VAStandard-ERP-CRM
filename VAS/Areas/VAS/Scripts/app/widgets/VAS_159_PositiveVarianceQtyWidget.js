@@ -70,7 +70,6 @@
         var $valueEl;
         var $metaEl;
         var $busy;
-        var widgetObserver = null;
 
         // Modal elements
         var $modalOverlay = null;
@@ -110,19 +109,6 @@
                 .replace(/>/g, "&gt;")
                 .replace(/"/g, "&quot;")
                 .replace(/'/g, "&#039;");
-        }
-
-        function setupWidgetSizeObserver() {
-            if (typeof ResizeObserver === 'undefined') { return; }
-            widgetObserver = new ResizeObserver(function (entries) {
-                for (var i = 0; i < entries.length; i++) {
-                    var width = entries[i].contentRect.width;
-                    if (width > 0) {
-                        $root[0].style.setProperty('--widget-inline-size', width + 'px');
-                    }
-                }
-            });
-            widgetObserver.observe($wrapper[0]);
         }
 
         this.Initalize = function () {
@@ -178,11 +164,17 @@
         }
 
         function createWidget() {
+            /* Card structure matches VAS_132_OutOfStockWidget / VAS_133_UpdatedThisMonthWidget:
+               label at the top, value+meta wrapped in a "body" pinned to the bottom via
+               margin-top:auto, single font-size anchor on the card itself against
+               --dash-inline-size (dashboard width, not this widget's own box). */
             var $card = $(
                 '<div class="vas-pos-var-card">' +
                 '<div class="vas-pos-var-label">' + escapeHtml(lbl("VAS_159_PositiveVarianceQty", "Positive Variance Qty")) + '</div>' +
+                '<div class="vas-pos-var-body">' +
                 '<div class="vas-pos-var-value">—</div>' +
                 '<div class="vas-pos-var-meta"></div>' +
+                '</div>' +
                 '</div>'
             );
 
@@ -195,7 +187,6 @@
             $root.append($busy);
 
             $wrapper.append($root);
-            setupWidgetSizeObserver();
             bindWidgetEvents();
         }
 
@@ -512,10 +503,6 @@
         this.getRoot = function () { return $wrapper; };
 
         this.disposeComponent = function () {
-            if (widgetObserver) {
-                widgetObserver.disconnect();
-                widgetObserver = null;
-            }
             if ($modalOverlay) {
                 $(window).off('.vasPosVarModal');
                 $modalOverlay.remove();

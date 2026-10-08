@@ -774,7 +774,7 @@
                 '<div class="vas120-frow">' +
                     '<div class="vas120-field">' +
                         '<label class="vas120-flabel" for="' + dateId + '">' + escapeHtml(label('VAS_120_Date', 'Date')) + '</label>' +
-                        '<input type="date" class="vas120-finput" id="' + dateId + '" data-field="date">' +
+                        '<input type="date" max="9999-12-31" class="vas120-finput" id="' + dateId + '" data-field="date">' +
                     '</div>' +
                     '<div class="vas120-field">' +
                         '<label class="vas120-flabel" for="' + timeId + '">' + escapeHtml(label('VAS_120_Time', 'Time')) + '</label>' +

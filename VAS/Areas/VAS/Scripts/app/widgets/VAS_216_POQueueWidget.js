@@ -233,7 +233,7 @@
         var $busy = null;
 
         var currentPage = 1;
-        var pageSize = 7;
+        var pageSize = 5;
         var totalRecords = 0;
         var totalPages = 1;
         var currentMonth = new Date().getMonth() + 1;
@@ -401,11 +401,10 @@
                 { label: lbl('VAS_PODate', 'PO date'), align: 'left' },
                 { label: lbl('VAS_Vendor', 'Vendor'), align: 'left' },
                 { label: lbl('VAS_Warehouse', 'Warehouse'), align: 'left' },
-                { label: lbl('VAS_216_Requisition', 'Requisition'), align: 'left' },
                 { label: lbl('VAS_Representative', 'Representative'), align: 'left' },
                 { label: lbl('VAS_216_Expected', 'Expected'), align: 'left' },
                 { label: lbl('VAS_Value', 'Value'), align: 'right' },
-                { label: lbl('VAS_Status', 'Status'), align: 'left' }
+                { label: lbl('VAS_Status', 'Status').replace(/\s*:\s*$/, ''), align: 'left' }
             ];
 
             var hHtml = '';
@@ -481,8 +480,6 @@
                 var vendor = r.VendorName || '—';
                 var warehouse = r.WarehouseName || '—';
                 var rep = r.RepresentativeName || '—';
-                var firstReq = r.FirstRequisition || '—';
-                var allReqs = r.AllRequisitions || firstReq;
 
                 var curSym = r.CurrencySymbol || baseCurrency.CurSymbol;
                 var curIso = r.CurrencyISO || baseCurrency.ISO_Code;
@@ -497,7 +494,6 @@
                         '<span class="vas-216-cell vas-216-c-std" title="' + esc(poDateFull) + '">' + esc(poDateShort) + '</span>' +
                         '<span class="vas-216-cell vas-216-c-std" title="' + esc(vendor) + '">' + esc(vendor) + '</span>' +
                         '<span class="vas-216-cell vas-216-c-dark" title="' + esc(warehouse) + '">' + esc(warehouse) + '</span>' +
-                        '<span class="vas-216-cell vas-216-c-std" title="' + esc(allReqs) + '">' + esc(firstReq) + '</span>' +
                         '<span class="vas-216-cell vas-216-c-dark" title="' + esc(rep) + '">' + esc(rep) + '</span>' +
                         '<span class="vas-216-cell vas-216-c-std" title="' + esc(expDateFull) + '">' + esc(expDateShort) + '</span>' +
                         '<span class="vas-216-cell vas-216-right vas-216-c-emph" title="' + esc(formattedVal) + '">' + esc(formattedVal) + '</span>' +
@@ -541,47 +537,34 @@
         /* ============================================================
            RECORD NAVIGATION TO PURCHASE ORDER WINDOW
            ============================================================ */
+        // Canonical Home/Landing-page zoom handling (2026-09-30, per user-supplied reference
+        // pattern): $self.windowNo >= 0 means this widget is hosted inside an actual window tab,
+        // so the host's own tab-panel router relays the value change; otherwise (Home dashboard
+        // placement, windowNo < 0) VAS.ZoomUtil.zoomToRecord resolves and opens the window
+        // directly, caching the resolved window id so repeat clicks skip re-resolving it by name.
+        // Was: an always-truthy "if ($self.widgetFirevalueChanged)" check (a prototype method
+        // reference, never falsy) fired the tab-relay branch even with no listener attached.
+        var poZoomWindowId = 0;
+
         function openPurchaseOrderRecord(orderId) {
             if (!orderId) { return; }
             // Navigating away must dismiss the popup: the record opens behind it
             // otherwise, leaving the dialog stranded over the window it just opened.
             closeModal();
 
-            // 1. Fire value changed if tab panel / dashboard router is listening
-            try {
-                if ($self.widgetFirevalueChanged) {
-                    var windowParam = {
-                        "Record_ID": orderId,
-                        "C_Order_ID": orderId,
-                        "AD_Table_ID": 259,
-                        "WindowName": "VAS_PurchaseOrder",
-                        "AD_Tab_ID": 1002398,
-                        "TabWhereClause": "C_Order.C_Order_ID = " + orderId,
-                        "TabLayout": "N",
-                        "TabIndex": "0"
-                    };
-                    $self.widgetFirevalueChanged(windowParam);
-                }
-            } catch (e) { }
-
-            // 2. Standard VIS Zoom / Window Open
-            try {
-                if (VIS && VIS.ZoomManager && VIS.ZoomManager.zoom) {
-                    VIS.ZoomManager.zoom(259, orderId);
-                    return;
-                }
-            } catch (e) { }
-
-            try {
-                if (VIS && VIS.viewManager && VIS.viewManager.startWindow) {
-                    var action = new VIS.AActionItem();
-                    action.setAD_Table_ID(259);
-                    action.setRecord_ID(orderId);
-                    action.setWindowName("VAS_PurchaseOrder");
-                    action.setAD_Tab_ID(1002398);
-                    VIS.viewManager.startWindow(0, action);
-                }
-            } catch (e) { }
+            if ($self.windowNo >= 0) {
+                var windowParam = {
+                    "TabWhereClause": "C_Order.C_Order_ID=" + orderId,
+                    "TabLayout": "Y",
+                    "TabIndex": "0"
+                };
+                $self.widgetFirevalueChanged(windowParam);
+            } else {
+                VAS.ZoomUtil.zoomToRecord("C_Order_ID", orderId, poZoomWindowId, "VAS_PurchaseOrder", "")
+                    .done(function (id) {
+                        if (id > 0) { poZoomWindowId = id; }
+                    });
+            }
         }
 
         /* ============================================================
@@ -917,6 +900,17 @@
                                     nonStock ? NS : { chip: lStInfo.chip, text: lStInfo.text }
                                 ];
                             });
+
+                            /* Attribute column: shown only when at least one line of this PO has an
+                               attribute set instance description; otherwise it is dropped from
+                               the header and every row (index 2 in both). */
+                            var hasAttribute = lines.some(function (l) {
+                                return !!(l.AttributeDescription && String(l.AttributeDescription).trim());
+                            });
+                            if (!hasAttribute) {
+                                lineCols.splice(2, 1);
+                                lineRows.forEach(function (row) { row.splice(2, 1); });
+                            }
 
                             var bodyHtml =
                                 headerStats +

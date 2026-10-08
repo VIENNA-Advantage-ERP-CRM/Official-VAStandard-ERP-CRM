@@ -327,10 +327,18 @@
             );
 
             var $body = $('<div class="vas-207-modal-body"></div>');
+            // Back button shown here too, alongside the header's back arrow icon - matches the
+            // Back+Close footer pattern every other Purchase Order window widget's modal already
+            // uses (2026-09-30, user request: "not showing back button Drafted / In-Process POs
+            // widget"). Hidden by default; toggled in sync with .vas-207-mback in
+            // renderMainTableView (hide) / openLinesDrilldown (show).
             var $foot = $(
                 '<div class="vas-207-modal-foot">' +
                     '<span class="vas-207-foot-note"></span>' +
-                    '<button type="button" class="vas-207-btn vas-207-close-btn">' + esc(lbl("VAS_Close", "Close")) + '</button>' +
+                    '<span>' +
+                        '<button type="button" class="vas-207-btn vas-207-back-btn" style="display:none;">' + esc(lbl("VAS_Back", "Back")) + '</button> ' +
+                        '<button type="button" class="vas-207-btn vas-207-close-btn">' + esc(lbl("VAS_Close", "Close")) + '</button>' +
+                    '</span>' +
                 '</div>'
             );
 
@@ -350,14 +358,16 @@
             $header.find('.vas-207-mclose').on('click', closeModal);
             $foot.find('.vas-207-close-btn').on('click', closeModal);
 
-            $header.find('.vas-207-mback').on('click', function () {
+            var goBack = function () {
                 if (modalStack.length > 0) {
                     var prevView = modalStack.pop();
                     if (prevView && prevView.render) {
                         prevView.render();
                     }
                 }
-            });
+            };
+            $header.find('.vas-207-mback').on('click', goBack);
+            $foot.find('.vas-207-back-btn').on('click', goBack);
 
             renderMainTableView($dialog, $header, $body, $foot);
 
@@ -372,13 +382,20 @@
 
         function renderMainTableView($dialog, $header, $body, $foot) {
             $header.find('.vas-207-mback').hide();
+            $foot.find('.vas-207-back-btn').hide();
             $dialog.removeClass('vas-207-modal-md');
 
             var sym = cachedData.currencySymbol || '₹';
             var iso = cachedData.currencyIso || 'INR';
             var formattedTotal = formatCurrency(cachedData.totalValue, sym, iso);
 
-            $header.find('.vas-207-mtitle').text(lbl("VAS_207_DraftedInProcessPOs", "Drafted / In-Process POs"));
+            // Undo the clickable "open record" state the Lines view puts on the title
+            // (see renderLinesContent) - the main KPI view's title is never clickable.
+            $header.find('.vas-207-mtitle')
+                .removeClass('vas-207-mtitle-link')
+                .removeAttr('title')
+                .off('click')
+                .text(lbl("VAS_207_DraftedInProcessPOs", "Drafted / In-Process POs"));
             $header.find('.vas-207-msub').text(formattedTotal);
 
             $body.empty();
@@ -458,7 +475,9 @@
 
             for (var i = 0; i < pageRows.length; i++) {
                 var r = pageRows[i];
-                var stageChipClass = r.DocStatus === 'DR' ? 'vas-207-chip-neutral' : 'vas-207-chip-prop';
+                // Drafted shown in orange (2026-09-30, user request: "Drafted badge should be
+                // visible in orange color") - was the neutral gray chip.
+                var stageChipClass = r.DocStatus === 'DR' ? 'vas-207-chip-warn' : 'vas-207-chip-prop';
                 var stageText = r.DocStatus === 'DR' ? lbl("VAS_Drafted", "Drafted") : lbl("VAS_207_InProgress", "In Progress");
                 var formattedVal = formatCurrency(r.ConvertedValue, sym, iso);
 
@@ -555,6 +574,7 @@
             });
 
             $header.find('.vas-207-mback').show();
+            $foot.find('.vas-207-back-btn').show();
             $dialog.addClass('vas-207-modal-md');
 
             var sym = cachedData.currencySymbol || '₹';
@@ -611,21 +631,16 @@
             var iso = cachedData.currencyIso || 'INR';
             var formattedVal = formatCurrency(poRec.ConvertedValue, sym, iso);
 
-            // Top Link Row
-            var $poLinkRow = $(
-                '<div class="vas-207-polink">' +
-                    '<span>' + esc(lbl("VAS_PurchaseOrder", "Purchase order")) + ' </span>' +
-                    '<button type="button" class="vas-207-lnk vas-207-pono-btn" title="' + esc(lbl("VAS_OpenRecord", "Open record")) + '">' +
-                        esc(poRec.PurchaseOrderNumber) +
-                    '</button>' +
-                    '<span> · ' + esc(poRec.OrderDateFormatted) + ' · ' + esc(poRec.DocStatusName) + '</span>' +
-                '</div>'
-            );
-
-            $poLinkRow.find('.vas-207-pono-btn').on('click', function () {
-                openPurchaseOrderRecord(poRec.PurchaseOrderId);
-            });
-            $body.append($poLinkRow);
+            // The "Purchase order 800080 · date · status" link row that used to sit here
+            // (2026-09-30 removed, user request: "Remove the highlighted details from the
+            // pop-up, as they are already displayed at the top of the pop-up") duplicated the
+            // header's own title ("Lines · 800080") and subtitle ("Vendor · date · status")
+            // verbatim. Its "open record" click-through now lives on the header title itself.
+            $header.find('.vas-207-mtitle')
+                .addClass('vas-207-mtitle-link')
+                .attr('title', lbl("VAS_OpenRecord", "Open record"))
+                .off('click')
+                .on('click', function () { openPurchaseOrderRecord(poRec.PurchaseOrderId); });
 
             // Stat Strip
             var $statStrip = $(
@@ -776,6 +791,17 @@
            RECORD NAVIGATION (C_Order_ID -> VAS_PurchaseOrder)
            ============================================================ */
 
+        // Canonical Home/Landing-page zoom handling (2026-09-30, per user-supplied reference
+        // pattern): $self.windowNo >= 0 means this widget is hosted inside an actual window tab,
+        // so the host's own tab-panel router relays the value change; otherwise (Home dashboard
+        // placement, windowNo < 0) VAS.ZoomUtil.zoomToRecord resolves and opens the window
+        // directly, caching the resolved window id so repeat clicks skip re-resolving it by name.
+        // Was: a hardcoded numeric AD_Window_ID fallback (181), which can resolve to the wrong
+        // window on a real install and reads as a role/access error ("With your current role and
+        // settings, you cannot view this information") even though the role has no actual access
+        // problem.
+        var poZoomWindowId = 0;
+
         function openPurchaseOrderRecord(orderId) {
             if (!orderId) { return; }
 
@@ -788,26 +814,18 @@
                 modalStack = [];
             }
 
-            try {
-                // Table 259 is C_Order
-                var query = new VIS.Query();
-                query.addRestriction("C_Order_ID", VIS.Query.prototype.EQUAL, orderId);
-
-                // Check window resolution from context or default Purchase Order window
-                var windowId = 0;
-                if (VIS.context && VIS.context.getWindowId) {
-                    windowId = VIS.context.getWindowId("VAS_PurchaseOrder") || VIS.context.getWindowId("C_Order") || 181;
-                } else {
-                    windowId = 181;
-                }
-
-                if (VIS.viewManager) {
-                    VIS.viewManager.startWindow(windowId, query);
-                } else if (AEnv && AEnv.zoom) {
-                    AEnv.zoom(259, orderId);
-                }
-            } catch (ex) {
-                console.error("VAS_207: Error navigating to Purchase Order record:", ex);
+            if ($self.windowNo >= 0) {
+                var windowParam = {
+                    "TabWhereClause": "C_Order.C_Order_ID=" + orderId,
+                    "TabLayout": "Y",
+                    "TabIndex": "0"
+                };
+                $self.widgetFirevalueChanged(windowParam);
+            } else {
+                VAS.ZoomUtil.zoomToRecord("C_Order_ID", orderId, poZoomWindowId, "VAS_PurchaseOrder", "")
+                    .done(function (id) {
+                        if (id > 0) { poZoomWindowId = id; }
+                    });
             }
         }
 
@@ -873,6 +891,14 @@
             }
             $wrapper.remove();
         };
+    };
+
+    VAS.VAS_207_DraftedInProcessPOsWidget.prototype.widgetFirevalueChanged = function (value) {
+        if (this.listener) { this.listener.widgetFirevalueChanged(value); }
+    };
+
+    VAS.VAS_207_DraftedInProcessPOsWidget.prototype.addChangeListener = function (listener) {
+        this.listener = listener;
     };
 
     VAS.VAS_207_DraftedInProcessPOsWidget.prototype.init = function (windowNo, frame) {

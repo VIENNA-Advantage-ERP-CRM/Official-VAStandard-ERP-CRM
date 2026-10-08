@@ -116,6 +116,7 @@
         var ZOOM_WINDOW_NAME = 'VAS_PurchaseOrder';
         var ZOOM_WINDOW_FALLBACK = 'Purchase Order';
         var ZOOM_TABLE = 'C_Order';
+        var poZoomWindowId = 0;
 
         function lbl(key, fallback) {
             return VIS.Msg.getMsg(key);
@@ -306,34 +307,26 @@
            MODAL ENGINE & DRILL-DOWNS
            ========================================================================= */
 
+        // Canonical Home/Landing-page zoom handling (2026-09-30, per user-supplied reference
+        // pattern): $self.windowNo >= 0 means this widget is hosted inside an actual window tab,
+        // so the host's own tab-panel router relays the value change; otherwise (Home dashboard
+        // placement, windowNo < 0) VAS.ZoomUtil.zoomToRecord resolves and opens the window
+        // directly, caching the resolved window id so repeat clicks skip re-resolving it by name.
         function zoomToPurchaseOrder(cOrderId) {
             if (!cOrderId) { return; }
             closeModal();
-            var navigated = false;
-            try {
-                if ($self.listener && typeof $self.widgetFirevalueChanged === 'function') {
-                    $self.widgetFirevalueChanged({
-                        "TabWhereClause": ZOOM_TABLE + "." + ZOOM_TABLE + "_ID=" + cOrderId,
-                        "TabLayout": "Y",
-                        "TabIndex": "0",
-                        "AD_Tab_ID": 1002398,
-                        "ActionName": ZOOM_WINDOW_NAME,
-                        "ActionType": "W"
+            if ($self.windowNo >= 0) {
+                var windowParam = {
+                    "TabWhereClause": ZOOM_TABLE + "." + ZOOM_TABLE + "_ID=" + cOrderId,
+                    "TabLayout": "Y",
+                    "TabIndex": "0"
+                };
+                $self.widgetFirevalueChanged(windowParam);
+            } else {
+                VAS.ZoomUtil.zoomToRecord(ZOOM_TABLE + "_ID", cOrderId, poZoomWindowId, ZOOM_WINDOW_NAME, "")
+                    .done(function (id) {
+                        if (id > 0) { poZoomWindowId = id; }
                     });
-                    navigated = true;
-                }
-            } catch (e) { }
-
-            if (!navigated) {
-                try {
-                    if (window.VAS && VAS.ZoomUtil && typeof VAS.ZoomUtil.zoomToRecord === 'function') {
-                        VAS.ZoomUtil.zoomToRecord(ZOOM_TABLE + "_ID", cOrderId, 0, ZOOM_WINDOW_NAME, ZOOM_WINDOW_FALLBACK);
-                    } else if (window.VIS && VIS.AEnv && typeof VIS.AEnv.zoom === 'function') {
-                        VIS.AEnv.zoom(259, cOrderId);
-                    } else if (window.VIS && VIS.viewManager && typeof VIS.viewManager.startWindow === 'function') {
-                        VIS.viewManager.startWindow(143, cOrderId);
-                    }
-                } catch (e2) { }
             }
         }
 

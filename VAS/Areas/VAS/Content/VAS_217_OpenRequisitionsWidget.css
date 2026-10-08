@@ -174,15 +174,17 @@
 
 .vas-217-orw-tbody .vas-217-orw-trow {
     font-size: 0.75em;
-    padding-top: 0.62em;
-    padding-bottom: 0.62em;
+    padding-top: 0.2em;
+    padding-bottom: 0.2em;
     border-bottom: 1px solid #E2EAF1;
     transition: background 0.15s ease, box-shadow 0.15s ease;
-    /* Rows keep their NATURAL height and never stretch or squash. rowsThatFit() in the JS
-       divides the body's clientHeight by a rendered row's height, so a row whose height
-       depended on how many rows there are would make that calculation feed back on itself
-       and the page count would never settle. Same rule as VAS_161 / VAS_165. */
-    flex: 0 0 auto;
+    /* The page is a fixed four rows, so each row is exactly a quarter of the table body: four
+       rows always fit, with tight spacing. A short last page keeps the same row height and
+       stacks from the top, leaving the blank space below instead of stretching its rows. */
+    flex: 0 0 25%;
+    min-height: 0;
+    box-sizing: border-box;
+    overflow: hidden;
 }
 
 .vas-217-orw-tbody .vas-217-orw-trow:last-child {
@@ -493,6 +495,17 @@
     overflow-y: auto;
 }
 
+/* Details / Lines pages: when the content (table + totals + the opened "Line text" panel)
+   is taller than the dialog, scroll the body instead of cropping it under the footer.
+   Children keep their natural height so they scroll rather than get squashed. */
+.vas-217-orw-modal-body.compact {
+    overflow-y: auto;
+}
+
+.vas-217-orw-modal-body.compact > * {
+    flex-shrink: 0;
+}
+
 .vas-217-orw-modal-body button,
 .vas-217-orw-modal-body input,
 .vas-217-orw-modal-body select,
@@ -514,6 +527,21 @@
     justify-content: space-between;
     gap: 0.6em;
     background: #FBFDFF;
+}
+
+/* Footer actions on one line: the PO stage dropdown sits beside the buttons at its own
+   width instead of stretching full width and pushing them onto a second row. */
+.vas-217-orw-modal-foot > span:last-child {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    flex: none;
+}
+
+.vas-217-orw-modal-foot .vas-217-orw-stagesel {
+    width: auto;
+    min-width: 9em;
+    flex: none;
 }
 
 .vas-217-orw-foot-note {
@@ -582,7 +610,6 @@
 }
 
 .vas-217-orw-posum .l {
-    font-size: 0.6875em;
     color: #5F7283;
     line-height: 1.2;
 }
@@ -629,6 +656,14 @@
     }
 }
 
+/* Delivery and pricing row: Currency is read-only and short, Incoterm names are long, so the
+   Incoterm column gets the extra room (wide layout only; the 2-column layout above stays). */
+@container (min-width: 801px) {
+    .vas-217-orw-form-grid.vas-217-orw-grid-pricing {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 0.7fr) minmax(0, 0.95fr) minmax(0, 1.6fr);
+    }
+}
+
 .vas-217-orw-field {
     display: flex;
     flex-direction: column;
@@ -645,7 +680,6 @@
 }
 
 .vas-217-orw-field label {
-    font-size: 0.6875em;
     color: #5F7283;
     line-height: 1.2;
     display: flex;
@@ -922,6 +956,34 @@ select.vas-217-orw-fctl {
     font-size: 0.6875em;
     color: #5F7283;
     margin-bottom: 0.35em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+}
+
+.vas-217-orw-ldclose {
+    flex: none;
+    width: 1.8em;
+    height: 1.8em;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #5F7283;
+    cursor: pointer;
+}
+
+.vas-217-orw-ldclose:hover {
+    background: #EEF3F8;
+    color: #102C3F;
+}
+
+.vas-217-orw-ldclose svg {
+    width: 1.1em;
+    height: 1.1em;
 }
 
 .vas-217-orw-linedesc .ldhead b {

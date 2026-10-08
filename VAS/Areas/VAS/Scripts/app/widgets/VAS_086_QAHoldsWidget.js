@@ -425,7 +425,7 @@
                 '<div class="vas-qah-qc-ico">' + icon("calendar") + '</div>' +
                 '<div class="vas-qah-qc-main">' +
                 '<div class="vas-qah-qc-label">' + escapeHtml(lbl("VAS_086_QAQCDate", "QA/QC Date")) + '</div>' +
-                '<input class="vas-qah-date" type="date" value="' + escapeHtml(qaDate) + '"/>' +
+                '<input class="vas-qah-date" type="date" max="9999-12-31" value="' + escapeHtml(qaDate) + '"/>' +
                 '</div>' +
                 '</div>' +
                 '<div class="vas-qah-qc-field active note">' +
