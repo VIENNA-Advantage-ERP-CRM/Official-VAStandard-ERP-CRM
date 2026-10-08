@@ -440,6 +440,16 @@
     color: var(--cil-danger);
 }
 
+/* Message of a new line the user undid - kept above the lines until Refresh. */
+.vas-po303-undone-msg {
+    padding: 0.375em 0.75em 0.375em 2.5em;
+    font-size: 0.75em;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--cil-danger);
+    border-bottom: 1px solid var(--cil-border, transparent);
+}
+
 /* ---------- totals block (vertical per-tax summary) ---------- */
 /* CSS Grid with two shared columns (label | value). Every row uses
    display:contents so its label and value become direct grid items —
@@ -1192,7 +1202,7 @@
     background: #fdf3e2;
     box-shadow: inset 0.1875em 0 0 var(--cil-warning);
     color: #8a5a09;
-    font-size: 1.5em;   /* was 0.75em, then 0.9375em - matches the field captions (30-Sep-2026) */
+    font-size: .9375em; /* was 0.75em, then 0.9375em - matches the field captions (30-Sep-2026) */
     line-height: 1.4;
     font-weight: 500;
 }

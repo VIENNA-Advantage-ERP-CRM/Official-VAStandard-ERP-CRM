@@ -176,13 +176,14 @@
 }
 
 /* New, unsaved header (27-Sep-2026): the grid and the message are both hidden, so the root
-   collapses and the framework host's blue surface around it was all that showed. The JS
-   sets .vas-dol-root--new only in that state, and the host chain is painted white until
-   the header has been saved - a loaded delivery keeps the host exactly as before. */
-.vis-ad-w-p-actionpanel-b:has(.vas-dol-root--new),
-.vis-ad-w-p-ap-tp-outerwrap:has(.vas-dol-root--new),
-.vis-ad-w-p-ap-tp-outerwrap:has(.vas-dol-root--new) > .vis-ad-w-p-ap-tp-o-body,
-.vis-ad-w-p-ap-tp-outerwrap:has(.vas-dol-root--new) .vis-ad-w-p-ap-tp-o-b-content {
+   collapses and the framework host's blue surface around it was all that showed. The host
+   chain is painted white in EVERY state (06-Oct-2026, as VAS_249 since 30-Sep): a loaded
+   delivery whose panel is shorter than its host showed the same blue below and around the
+   panel, so the rule no longer waits for .vas-dol-root--new. */
+.vis-ad-w-p-actionpanel-b:has(.vas-dol-root),
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-dol-root),
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-dol-root) > .vis-ad-w-p-ap-tp-o-body,
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-dol-root) .vis-ad-w-p-ap-tp-o-b-content {
     background: #ffffff !important;
 }
 

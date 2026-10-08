@@ -2191,25 +2191,26 @@
             if (VIS && VIS.AttributeControl && typeof VIS.AttributeControl.open === "function") {
                 // Full VAS_107-style control (preferred when available)
                 VIS.AttributeControl.open({
-                    M_Product_ID:              prodId,
+                    M_Product_ID: prodId,
                     M_AttributeSetInstance_ID: v.M_AttributeSetInstance_ID || 0,
-                    productName:               d.productName || "",
-                    // Opportunities are always sales-side: open the existing-instance list
-                    // first (matching the mockup) so users select from stock.
-                    // newAttribute: false hides the "jump straight to new form" behaviour.
-                    IsSOTrx:                   true,
-                    newAttribute:              false,
-                    showAll:                   false,
-                    lbl: function (key, def) {
-                        return VIS.Msg.getMsg(key);
+                    productName: d.productName || "",
+                    // Opportunities are always sales-side -> show the existing instance
+                    // list first so the picker can select from stock, with the
+                    // "Show All (include zero and (-ve) qty)" box unticked.
+                    IsSOTrx: true,
+                    newAttribute: false,
+                    showAll: false,
+                    // "Code" column: Lot No for a lot-controlled set, Serial No for a
+                    // serial-controlled one, else the instance id - and translated captions.
+                    codeByControl: true,
+                    gridLabels: {
+                        code: lbl("VAS_218_Code", "Code"),
+                        guaranteeDate: lbl("VAS_218_GuaranteeDate", "Guarantee Date"),
+                        qtyOnHand: lbl("VAS_218_QtyOnHand", "On Hand")
                     },
-                    esc:       esc,
-                    icon:      icon,
-                    showBusy:  showBusy,
-                    showToast: showToast,
-                    dateStr:   dateStr,
-                    fmtMoney:  fmtMoney,
-                    parseNum:  parseNum,
+                    lbl: lbl, esc: esc, icon: icon,
+                    showBusy: showBusy, showToast: showToast,
+                    dateStr: dateStr, fmtMoney: fmtMoney, parseNum: parseNum,
                     onApply: function (res) {
                         var asi = (res && res.M_AttributeSetInstance_ID) || 0;
                         fieldSet(line, "M_AttributeSetInstance_ID", asi);

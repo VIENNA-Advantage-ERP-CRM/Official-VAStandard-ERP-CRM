@@ -471,12 +471,13 @@
                     productValue: r.ProductValue || "", productName: r.ProductName || "",
                     uomName: r.UOMName || "",
                     locatorName: r.LocatorName || "", locatorToName: r.LocatorToName || "",
-                    attrName: r.AttrName || "",
-                    // As VAS_074 (30-Sep-2026): a SAVED line only shows the attribute sub-line
-                    // when it actually carries an instance. A line saved without one no
-                    // longer shows "Set attribute…" under the product - the picker still
-                    // opens itself when a product with an attribute set is picked on a new line.
-                    hasAttributeSet: r.M_Product_ID > 0 && !!r.AttrName && !!r.HasAttributeSet
+                    // A caption belongs to a REAL instance only: instance 0's description (a
+                    // dash on some tenants) is not an attribute of this line.
+                    attrName: (vals.M_AttributeSetInstance_ID > 0) ? (r.AttrName || "") : "",
+                    // The PRODUCT's own flag (06-Oct-2026): a line saved without an instance
+                    // for a product that has an attribute set shows a plain "---" under the
+                    // product (as VAS_074 does), and clicking it opens the attribute picker.
+                    hasAttributeSet: r.M_Product_ID > 0 && !!r.HasAttributeSet
                 }
             };
             // Pristine snapshot of the just-loaded/just-saved state, so the row Undo can
@@ -1039,15 +1040,25 @@
                 // opens the attribute control instead of editing the product name, so the
                 // click must not bubble to the cell handler.
                 if (line.values.M_Product_ID > 0 && (line.display.attrName || line.display.hasAttributeSet)) {
+                    // No instance yet: "Set Attribute" while the line is unsaved (new or
+                    // edited), a plain "---" once it is saved (07-Oct-2026); clicking either
+                    // still opens the picker.
                     var hasAttr = !!line.display.attrName;
-                    var attrTxt = hasAttr ? line.display.attrName : lbl("VAS_247_SetAttribute", "Set attribute…");
-                    var $attr = $('<span class="vas-mtl-attr-link"></span>').text(attrTxt).attr("title", attrTxt);
+                    var attrTxt = hasAttr ? line.display.attrName
+                        : ((line.status === "new" || line.dirty) ? lbl("VAS_247_SetAttributeLabel", "Set Attribute") : "---");
+                    var $attr = $('<span class="vas-mtl-attr-link"></span>').text(attrTxt)
+                        .attr("title", hasAttr ? attrTxt : lbl("VAS_247_SetAttribute", "Set attribute…"));
                     if (!hasAttr) $attr.addClass("vas-mtl-attr-link--empty");
                     // Clickable only when the movement is editable AND the product actually
                     // carries an attribute set. On a read-only movement, or on a saved line
                     // whose product no longer has a set defined (but still carries an old
                     // instance, so AttrName is set), the attribute is informational only.
-                    if (editable && productHasAttributeSet(line)) $attr.on("click", function (e) { e.stopPropagation(); openAttrDialog(line); });
+                    if (editable && productHasAttributeSet(line)) {
+                        // mousedown + preventDefault (as VAS_074): a plain click while a cell
+                        // editor is focused blurs -> re-renders the row and eats the click.
+                        $attr.on("mousedown", function (e) { e.preventDefault(); e.stopPropagation(); openAttrDialog(line); });
+                        $attr.on("click", function (e) { e.stopPropagation(); if (e.detail === 0) openAttrDialog(line); });
+                    }
                     else $attr.addClass("vas-mtl-attr-link--disabled");
                     wrap.append($attr);
                 }
@@ -3549,6 +3560,9 @@
             }
             saveInFlight = true;
             var rows = batch.map(buildRowPayload);
+            // A save stays on the page it was made from: the server numbers new lines above
+            // every existing one, so from a later page they move to the FIRST page and leave
+            // this one (07-Oct-2026).
             // Lock + show a per-row spinner on each saving row.
             batch.forEach(function (l) { l._saving = true; setRowBusy(l, true, lbl("VAS_247_Saving", "Saving…")); });
             renderHeaderButtons();   // the batch no longer counts as "unsaved" -> Save mutes
@@ -3629,9 +3643,14 @@
             // Brand-new client lines not part of this batch (added during the save).
             var newKeep = lines.filter(function (l) { return (l.values.M_MovementLine_ID || 0) <= 0 && !inBatch(l); });
             var merged = (serverRows || []).map(function (r) {
-                return dirtyById[r.M_MovementLine_ID] || fromServerRow(r);
+                var kept = dirtyById[r.M_MovementLine_ID];
+                if (kept) delete dirtyById[r.M_MovementLine_ID];
+                return kept || fromServerRow(r);
             });
-            lines = newKeep.concat(merged);
+            // An edited line the returned page does not carry (it moved off the page while the
+            // save was in flight) is kept rather than dropped with its edit.
+            var strayDirty = Object.keys(dirtyById).map(function (k) { return dirtyById[k]; });
+            lines = newKeep.concat(merged, strayDirty);
             if (editing && !lineById(editing.rowId)) editing = null;
             render();
         }

@@ -3591,6 +3591,12 @@
                 // Default state of the instance list's "Show All (include zero and (-ve) qty)"
                 // checkbox for THIS screen. true -> show all; false -> only QtyOnHand > 0.
                 showAll: !(parent && parent.IsSOTrx),
+                codeByControl: true,
+                gridLabels: {
+                    code: lbl("VAS_074_Code", "Code"),
+                    guaranteeDate: lbl("VAS_074_GuaranteeDate", "Guarantee Date"),
+                    qtyOnHand: lbl("VAS_074_QtyOnHand", "On Hand")
+                },
                 lbl: lbl, esc: esc, icon: icon,
                 showBusy: showBusy, showToast: showToast,
                 dateStr: dateStr, fmtMoney: fmtMoney, parseNum: parseNum,

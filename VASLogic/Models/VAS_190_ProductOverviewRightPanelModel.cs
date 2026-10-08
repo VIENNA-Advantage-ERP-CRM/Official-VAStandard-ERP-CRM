@@ -3750,8 +3750,19 @@ namespace VASLogic.Models
             // the primary one reported that product as having none.
             List<AcctSchemaInfo> schemas = LoadAcctSchemas(ctx);
 
+            // Which table the product window's own Accounting tab shows (06-Oct-2026).
+            // The section must state what that TAB states: FRPT was read first on
+            // every installation, so where FRPT_Product_Acct still held rows while
+            // the tab shows M_Product_Acct (or the reverse), a product whose
+            // Accounting tab is EMPTY was reported here with a full set of accounts.
+            // Empty when the dictionary cannot say - the earlier switch then decides.
+            HashSet<string> tabTables = AccountingTabTables();
+            bool frptLive = TableExists("FRPT_Product_Category_Acct") && TableExists("FRPT_Product_Acct");
+            bool readFrpt = tabTables.Count == 0 || tabTables.Contains("FRPT_PRODUCT_ACCT");
+            bool readClassic = tabTables.Count == 0 ? !frptLive : tabTables.Contains("M_PRODUCT_ACCT");
+
             // ----- The FRPT scheme, where the installation runs it -----
-            for (int i = 0; i < schemas.Count; i++)
+            for (int i = 0; i < schemas.Count && readFrpt; i++)
             {
                 List<AccountRowData> frptRows =
                     LoadFrptAccounts(ctx, M_Product_ID, schemas[i].C_AcctSchema_ID);
@@ -3776,8 +3787,8 @@ namespace VASLogic.Models
             // whose tab is EMPTY was reported with a full set of accounts. The
             // same switch MProduct.AfterSave uses decides it: FRPT_Product_Category_Acct
             // existing means FRPT is live, and FRPT's silence is then the answer.
-            bool frptLive = TableExists("FRPT_Product_Category_Acct") && TableExists("FRPT_Product_Acct");
-            for (int i = 0; i < schemas.Count && !frptLive; i++)
+            // Since 06-Oct-2026 the Accounting tab's own table decides first (above).
+            for (int i = 0; i < schemas.Count && readClassic; i++)
             {
                 AcctSchemaInfo schema = schemas[i];
                 Dictionary<string, int> productAcct = LoadAcctRow(ctx, "M_Product_Acct",
@@ -3820,6 +3831,7 @@ namespace VASLogic.Models
                     {
                         row.Combination = combos[id].Combination;
                         row.Description = combos[id].Description;
+                        row.AccountName = combos[id].AccountName;
                     }
                     acct.Rows.Add(row);
                 }
@@ -3843,6 +3855,37 @@ namespace VASLogic.Models
                 return empty;
             }
             return null;   // the client has no accounting schema at all
+        }
+
+        /// <summary>
+        /// The accounting tables - FRPT_Product_Acct and / or M_Product_Acct, upper-cased -
+        /// that an ACTIVE tab of an active product window shows (06-Oct-2026). That tab is
+        /// what the user compares this section with, so its table is the one read. Empty
+        /// when the dictionary cannot answer; the caller then keeps the earlier switch.
+        /// No MRole: dictionary metadata, not tenant data.
+        /// </summary>
+        private HashSet<string> AccountingTabTables()
+        {
+            HashSet<string> tables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (_productTableId <= 0) return tables;
+            string sql = @"SELECT DISTINCT UPPER(t.TableName) AS TableName
+                           FROM AD_Tab tab
+                           INNER JOIN AD_Table t ON (t.AD_Table_ID=tab.AD_Table_ID)
+                           INNER JOIN AD_Window w ON (w.AD_Window_ID=tab.AD_Window_ID AND w.IsActive='Y')
+                           WHERE tab.IsActive='Y'
+                             AND UPPER(t.TableName) IN ('FRPT_PRODUCT_ACCT', 'M_PRODUCT_ACCT')
+                             AND tab.AD_Window_ID IN (SELECT pt.AD_Window_ID FROM AD_Tab pt
+                                                      WHERE pt.AD_Table_ID=" + _productTableId + @"
+                                                        AND pt.IsActive='Y'
+                                                        AND pt.TabLevel=0)";
+            DataSet ds = Query(sql, null, "AccountingTabTables");
+            if (ds == null || ds.Tables.Count == 0) return tables;
+            foreach (DataRow r in ds.Tables[0].Rows)
+            {
+                string name = Util.GetValueOfString(r["TableName"]).Trim();
+                if (name.Length > 0) tables.Add(name.ToUpperInvariant());
+            }
+            return tables;
         }
 
         /// <summary>
@@ -4056,16 +4099,21 @@ namespace VASLogic.Models
             // MRole: this row is a dependent of a product already read under the
             // access filter, and FRPT_Product_Acct's key is the triple, not a
             // FRPT_Product_Acct_ID the rewriter could reach for — see LoadAcctRow.
+            // The combination's natural account (C_ElementValue) gives the account
+            // NAME printed after the code (07-Oct-2026).
             string sql = @"SELECT ad." + labelColumn + @" AS AccountRole,
                                   " + keyExpr + @" AS AccountKey,
                                   vc.Combination,
-                                  vc.Description"
+                                  vc.Description,
+                                  ev.Name AS AccountName"
                                   + detailSelect + @"
                            FROM FRPT_Product_Acct pa
                            INNER JOIN FRPT_AcctDefault ad
                                    ON (ad.FRPT_AcctDefault_ID=pa.FRPT_AcctDefault_ID)
                            LEFT OUTER JOIN C_ValidCombination vc
                                    ON (vc.C_ValidCombination_ID=pa.C_ValidCombination_ID)
+                           LEFT OUTER JOIN C_ElementValue ev
+                                   ON (ev.C_ElementValue_ID=vc.Account_ID)
                            WHERE pa.M_Product_ID=@M_Product_ID
                              AND pa.C_AcctSchema_ID=" + C_AcctSchema_ID + @"
                              AND pa.AD_Client_ID=" + ctx.GetAD_Client_ID() + @"
@@ -4084,6 +4132,7 @@ namespace VASLogic.Models
                     AccountKey  = Util.GetValueOfString(r["AccountKey"]),
                     Combination = Util.GetValueOfString(r["Combination"]),
                     Description = Util.GetValueOfString(r["Description"]),
+                    AccountName = Util.GetValueOfString(r["AccountName"]),
                     Details     = ReadAcctDefaultDetails(ctx, r, detailFields)
                 });
             }
@@ -4338,8 +4387,11 @@ namespace VASLogic.Models
             // reads exactly like the product having no accounting details.
             string sql = @"SELECT vc.C_ValidCombination_ID,
                                   vc.Combination,
-                                  vc.Description
+                                  vc.Description,
+                                  ev.Name AS AccountName
                            FROM C_ValidCombination vc
+                           LEFT OUTER JOIN C_ElementValue ev
+                                   ON (ev.C_ElementValue_ID=vc.Account_ID)
                            WHERE vc.C_ValidCombination_ID IN (" + JoinIds(ids) + @")
                              AND vc.AD_Client_ID=" + ctx.GetAD_Client_ID() + @"
                              AND vc.IsActive='Y'";
@@ -4352,7 +4404,8 @@ namespace VASLogic.Models
                 map[Util.GetValueOfInt(r["C_ValidCombination_ID"])] = new ValidCombinationInfo
                 {
                     Combination = Util.GetValueOfString(r["Combination"]),
-                    Description = Util.GetValueOfString(r["Description"])
+                    Description = Util.GetValueOfString(r["Description"]),
+                    AccountName = Util.GetValueOfString(r["AccountName"])
                 };
             }
             return map;
@@ -6320,6 +6373,8 @@ namespace VASLogic.Models
         {
             public string Combination { get; set; }
             public string Description { get; set; }
+            /// <summary>C_ElementValue.Name of the combination's account.</summary>
+            public string AccountName { get; set; }
         }
 
         public class ProductSummaryData
@@ -6696,6 +6751,9 @@ namespace VASLogic.Models
             public string AccountKey     { get; set; }
             public string Combination    { get; set; }
             public string Description    { get; set; }
+            /// <summary>Name of the combination's natural account (C_ElementValue.Name),
+            /// printed after the code as "51100 - Name"; empty when unresolved.</summary>
+            public string AccountName    { get; set; }
             /// <summary>The accounting-default fields behind this account — Related
             /// To, Variance Type, Recognize Type, Foreign Currency Revaluation.
             /// Never null; empty on the classic scheme, whose account is a COLUMN
