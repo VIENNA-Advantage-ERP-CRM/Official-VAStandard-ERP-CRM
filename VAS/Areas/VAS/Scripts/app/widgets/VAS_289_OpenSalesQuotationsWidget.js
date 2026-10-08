@@ -993,8 +993,8 @@
                 '<div class="vas289-form-grid">' +
                     fieldBlock(label('VAS_289_FieldDocType', 'Target Document Type'), selectHtml('', 'docTypeId', o.DocTypes, 'Id', 'Name', h.docTypeId), true) +
                     fieldBlock(label('VAS_289_FieldPOReference', 'Order Reference'), '<input type="text" class="vas289-fctl" data-field="poReference" value="' + escapeHtml(h.poReference) + '">') +
-                    fieldBlock(label('VAS_289_FieldDateOrdered', 'SO Date'), '<input type="date" class="vas289-fctl" data-field="dateOrdered" value="' + escapeHtml(h.dateOrdered) + '">', true) +
-                    fieldBlock(label('VAS_289_FieldDatePromised', 'Date Promised'), '<input type="date" class="vas289-fctl" data-field="datePromised" value="' + escapeHtml(h.datePromised) + '">', true) +
+                    fieldBlock(label('VAS_289_FieldDateOrdered', 'SO Date'), '<input type="date" max="9999-12-31" class="vas289-fctl" data-field="dateOrdered" value="' + escapeHtml(h.dateOrdered) + '">', true) +
+                    fieldBlock(label('VAS_289_FieldDatePromised', 'Date Promised'), '<input type="date" max="9999-12-31" class="vas289-fctl" data-field="datePromised" value="' + escapeHtml(h.datePromised) + '">', true) +
                     fieldBlock(label('VAS_289_FieldPriority', 'Priority'), selectHtml('', 'priorityRule', o.PriorityRules, 'Code', 'Name', h.priorityRule)) +
                 '</div>' +
                 '<div class="vas289-formsec">' + escapeHtml(label('VAS_289_GroupBPartner', 'Customer And Payment')) + '</div>' +
@@ -1134,7 +1134,7 @@
                     cellHtml(formatNumDisplay(line.qtyToOrder), 'vas289-c-dark', 'right') +
                     cellHtml(formatINR(line.rate), 'vas289-c-std', 'right') +
                     '<span class="vas289-cell"><select class="vas289-fctl vas289-line-tax" data-line-idx="' + idx + '">' + taxOptions + '</select></span>' +
-                    '<span class="vas289-cell"><input type="date" class="vas289-fctl vas289-line-promised" data-line-idx="' + idx + '" value="' + escapeHtml(line.datePromised || wizard.header.datePromised) + '"></span>' +
+                    '<span class="vas289-cell"><input type="date" max="9999-12-31" class="vas289-fctl vas289-line-promised" data-line-idx="' + idx + '" value="' + escapeHtml(line.datePromised || wizard.header.datePromised) + '"></span>' +
                     stockCell +
                     '<span class="vas289-cell center"><button type="button" class="vas289-iconbtn vas289-line-desc-toggle" data-line-idx="' + idx + '" title="' + escapeHtml(label('VAS_289_FieldDescription', 'Description')) + '">' + icon('desc') + '</button></span>' +
                 '</div>' + descRow;

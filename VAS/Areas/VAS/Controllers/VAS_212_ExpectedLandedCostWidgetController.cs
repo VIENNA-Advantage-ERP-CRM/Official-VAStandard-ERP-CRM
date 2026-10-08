@@ -111,6 +111,7 @@ namespace VIS.Controllers
                           AND o.IsActive = 'Y'
                           AND o.IsSOTrx = 'N'
                           AND COALESCE(o.IsReturnTrx, 'N') = 'N'
+                          AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
                           AND o.DateOrdered >= @MonthStart
                           AND o.DateOrdered < @MonthEndExclusive
                           AND o.DocStatus IN ('DR', 'IP', 'CO')
@@ -308,6 +309,7 @@ namespace VIS.Controllers
                           AND o.IsActive = 'Y'
                           AND o.IsSOTrx = 'N'
                           AND COALESCE(o.IsReturnTrx, 'N') = 'N'
+                          AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
                           AND o.DateOrdered >= @MonthStart
                           AND o.DateOrdered < @MonthEndExclusive
                           AND o.DocStatus IN ('DR', 'IP', 'CO')
@@ -397,8 +399,9 @@ namespace VIS.Controllers
                         {
                             purchaseOrderId = orderId,
                             purchaseOrderNo = Util.GetValueOfString(row["purchase_order_number"]),
+                            // Standard widget date format (dd MMM yyyy, e.g. 21 Aug 2026), as the other PO widgets show it
                             orderDate = orderDateN.HasValue
-                                ? orderDateN.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
+                                ? orderDateN.Value.ToString("dd MMM yyyy", CultureInfo.InvariantCulture) : "",
                             docStatus = Util.GetValueOfString(row["document_status"]),
                             vendorName = Util.GetValueOfString(row["vendor_name"]),
                             warehouseName = Util.GetValueOfString(row["warehouse_name"]),

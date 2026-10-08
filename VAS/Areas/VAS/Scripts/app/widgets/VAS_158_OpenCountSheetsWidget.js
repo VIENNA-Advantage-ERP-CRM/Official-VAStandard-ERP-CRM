@@ -83,7 +83,6 @@
        VAS_158_OpenCountSheetsWidget.css, which sizes the dialog to exactly this many rows. */
         var pageSize = 7;
         var $modalOverlay = null;
-        var widgetObserver = null;
 
         this.Initalize = function () {
             createWidget();
@@ -91,25 +90,17 @@
         };
 
         function createWidget() {
+            /* Card structure matches VAS_159/VAS_160: label at the top, value wrapped in a "body"
+               pinned to the bottom via margin-top:auto. No meta subline - the card used to carry
+               "Tap to view drafted counts" under the value; removed on request. The card stays
+               clickable - the affordance is the cursor/hover state on .vas-opencountsheets-root,
+               not a caption. */
             var $label = $('<div class="vas-opencountsheets-label">' + lbl("VAS_158_OpenCountSheets") + '</div>');
             $valEl = $('<div class="vas-opencountsheets-value">--</div>');
-            /* No meta subline. The card used to carry "Tap to view drafted counts" under the
-               value; removed on request. The card stays clickable - the affordance is the
-               cursor/hover state on .vas-opencountsheets-root, not a caption. */
-            $root.append($label).append($valEl);
+            var $body = $('<div class="vas-opencountsheets-body">');
+            $body.append($valEl);
+            $root.append($label).append($body);
             $wrapper.append($root);
-
-            if (window.ResizeObserver && $wrapper[0]) {
-                widgetObserver = new ResizeObserver(function (entries) {
-                    for (var i = 0; i < entries.length; i++) {
-                        var width = entries[i].contentRect.width;
-                        if (width > 0 && $root[0]) {
-                            $root[0].style.setProperty('--widget-inline-size', width + 'px');
-                        }
-                    }
-                });
-                widgetObserver.observe($wrapper[0]);
-            }
 
             $root.on('click', function () {
                 openModal();
@@ -417,10 +408,6 @@
         };
 
         this.disposeComponent = function () {
-            if (widgetObserver) {
-                widgetObserver.disconnect();
-                widgetObserver = null;
-            }
             if ($modalOverlay) {
                 $modalOverlay.remove();
                 $modalOverlay = null;

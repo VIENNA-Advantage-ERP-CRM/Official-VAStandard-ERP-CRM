@@ -208,7 +208,7 @@
                 '<section class="vas-cpow-card vas-widget-bg">' +
                 '  <div class="vas-cpow-head">' +
                 '    <div class="vas-cpow-head-txt">' +
-                '      <p class="vas-cpow-title">' + escapeHtml(title) + '</p>' +
+                '      <p class="vas-cpow-title" title="' + escapeHtml(title) + '">' + escapeHtml(title) + '</p>' +
                 '    </div>' +
                 '    <div class="vas-cpow-mfilter">' +
                 '      <select class="vas-cpow-msel vas-cpow-m-sel" aria-label="' + escapeHtml(lbl("VAS_210_Month")) + '"></select>' +
@@ -424,16 +424,33 @@
             else { openModalShell(prev, true); }
         }
 
+        // Canonical Home/Landing-page zoom handling (2026-09-30, per user-supplied reference
+        // pattern): $self.windowNo >= 0 means this widget is hosted inside an actual window tab,
+        // so the host's own tab-panel router relays the value change; otherwise (Home dashboard
+        // placement, windowNo < 0) VAS.ZoomUtil.zoomToRecord resolves and opens the window
+        // directly, caching the resolved window id so repeat clicks skip re-resolving it by name.
+        // Was: an unconditional widgetFirevalueChanged call with no TabWhereClause/ActionName and
+        // no Home-page fallback at all - on Home page placement the click did nothing.
+        var poZoomWindowId = 0;
+
         function openRecord(orderId) {
             if (!orderId) { return; }
             // Navigating away must dismiss the popup: the record opens behind it
             // otherwise, leaving the dialog stranded over the window it just opened.
             closeModal();
-            var param = {
-                "Record_ID": orderId,
-                "TabIndex": "0"
-            };
-            $self.widgetFirevalueChanged(param);
+            if ($self.windowNo >= 0) {
+                var windowParam = {
+                    "TabWhereClause": "C_Order.C_Order_ID=" + orderId,
+                    "TabLayout": "Y",
+                    "TabIndex": "0"
+                };
+                $self.widgetFirevalueChanged(windowParam);
+            } else {
+                VAS.ZoomUtil.zoomToRecord("C_Order_ID", orderId, poZoomWindowId, "VAS_PurchaseOrder", "")
+                    .done(function (id) {
+                        if (id > 0) { poZoomWindowId = id; }
+                    });
+            }
         }
 
         /* ---------- CATEGORY PO DRILL-DOWN MODAL ---------- */

@@ -107,6 +107,9 @@
         var totalMonthValue = 0;
         var totalMonthPOs = 0;
         var curSymbol = "₹";
+        // Currency of the PO whose lines popup is open (its own price-list currency); empty = accounting currency.
+        var lineCurSymbol = '';
+        var lineCurIso = '';
         var curIso = "INR";
         var stdPrecision = 2;
 
@@ -114,6 +117,10 @@
         // Rows per page in the modal table. The stylesheet sizes the table body to
         // exactly this many rows (--vas-t10v-rows), so the two must stay in step.
         var pageSize = 6;
+    // Rows per page in the popup tables (vendor POs and PO lines). The stylesheet sizes the table body to
+    // exactly --vas-t10v-rows rows (6), so a page must hold the same number or the rest are cut off while
+    // the footer still counts them (it used to read 'Showing 1-10 of 15' with 6 rows visible).
+    var MODAL_PAGE_ROWS = 6;
         var totalPages = 1;
 
         // Modal Stack State
@@ -134,10 +141,13 @@
                 .replace(/'/g, '&#39;');
         }
 
-        function fmtMoney(v) {
+        // symOverride / isoOverride: format in another currency (a PO's own, price-list currency,
+        // e.g. dollars) instead of the widget's accounting currency.
+        function fmtMoney(v, symOverride, isoOverride) {
             var val = Number(v || 0);
-            var sym = curSymbol || '₹';
-            if (curIso === 'INR' || sym === '₹') {
+            var sym = symOverride || curSymbol || '₹';
+            var iso = symOverride ? (isoOverride || '') : curIso;
+            if (iso === 'INR' || sym === '₹') {
                 if (Math.abs(val) >= 1e7) {
                     return sym + ' ' + (val / 1e7).toFixed(2) + ' Cr';
                 }
@@ -591,10 +601,24 @@
                 cache: false,
                 success: function (res) {
                     var data = parseResponse(res);
+
+                    // Server returns {error, message} on a caught exception - previously this was
+                    // never checked, so a genuine server-side failure silently rendered as "No
+                    // purchase orders found", identical to the legitimate empty state. The stat
+                    // strip above the table is populated from the cached vendor-list row, not from
+                    // this response, so it kept showing real numbers while the table beneath it
+                    // silently failed. Surface the real error instead.
+                    if (data && data.error) {
+                        console.error('VAS_209_Top10VendorsWidget: GetVendorPurchaseOrders failed', data);
+                        $container.html('<div class="vas-t10v-empty-box"><p class="vas-t10v-empty-msg">' + esc(data.message || data.error) + '</p></div>');
+                        return;
+                    }
+
                     var orders = data.orders || [];
                     renderPagedPOTable($container, orders, vendorName);
                 },
-                error: function () {
+                error: function (xhr) {
+                    console.error('VAS_209_Top10VendorsWidget: GetVendorPurchaseOrders request failed', xhr);
                     $container.html('<div class="vas-t10v-empty-box"><p class="vas-t10v-empty-msg">' + esc(lbl('VAS_209_FailedToLoadVendorData', 'Failed to load vendor data')) + '</p></div>');
                 }
             });
@@ -603,7 +627,7 @@
         function renderPagedPOTable($container, orders, vendorName) {
             $container.empty();
             var mPage = 0;
-            var mPageSize = 10;
+            var mPageSize = MODAL_PAGE_ROWS;
             var mTotalPages = Math.max(1, Math.ceil(orders.length / mPageSize));
 
             var $tableWrap = $('<div class="vas-t10v-paged-table-wrap"></div>');
@@ -616,7 +640,7 @@
                 '<span class="vas-t10v-cell" title="' + esc(lbl('VAS_Representative', 'Representative')) + '">' + esc(lbl('VAS_Representative', 'Representative')) + '</span>' +
                 '<span class="vas-t10v-cell vas-t10v-right" title="' + esc(lbl('VAS_Value', 'Value')) + '">' + esc(lbl('VAS_Value', 'Value')) + '</span>' +
                 '<span class="vas-t10v-cell" title="' + esc(lbl('VAS_Delivery', 'Delivery')) + '">' + esc(lbl('VAS_Delivery', 'Delivery')) + '</span>' +
-                '<span class="vas-t10v-cell" title="' + esc(lbl('VAS_Status', 'Status')) + '">' + esc(lbl('VAS_Status', 'Status')) + '</span>' +
+                '<span class="vas-t10v-cell" title="' + esc(lbl('VAS_Status', 'Status').replace(/\s*:\s*$/, '')) + '">' + esc(lbl('VAS_Status', 'Status').replace(/\s*:\s*$/, '')) + '</span>' +
                 '</div>');
 
             var $tableBody = $('<div class="vas-t10v-mbody"></div>');
@@ -645,7 +669,9 @@
 
                 for (var i = 0; i < slice.length; i++) {
                     var p = slice[i];
-                    var formattedVal = fmtMoney(p.valueNum);
+                    // Value is shown in the PO's own currency (its price list), e.g. dollars; the
+                    // accounting-currency figure is the fallback when the order has no currency.
+                    var formattedVal = p.docCurSymbol ? fmtMoney(p.docValue, p.docCurSymbol, p.docCurIso) : fmtMoney(p.valueNum);
 
                     var $row = $('<div class="vas-t10v-mrow" style="grid-template-columns: minmax(0, 0.35fr) minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.6fr) minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1.1fr);">' +
                         '<span class="vas-t10v-cell vas-t10v-center"><button type="button" class="vas-t10v-iconbtn" data-order-id="' + p.orderId + '" title="' + esc(lbl('VAS_LinesOf', 'Lines of') + ' ' + p.po) + '">' + iconLinesSvg + '</button></span>' +
@@ -717,8 +743,39 @@
                 cache: false,
                 success: function (res) {
                     var data = parseResponse(res);
+
+                    // Server returns {error, message} on a caught exception - previously this was
+                    // never checked, so a genuine server-side failure silently rendered as "No
+                    // lines found" with every stat at zero, identical to the legitimate empty
+                    // state. Surface it so a real bug is visible instead of indistinguishable from
+                    // "this PO really has no lines".
+                    if (data && data.error) {
+                        console.error('VAS_209_Top10VendorsWidget: GetPurchaseOrderLines failed', data);
+                        openModal({
+                            isChild: true,
+                            size: 'md',
+                            title: lbl('VAS_Lines', 'Lines') + ' · PO #' + orderId,
+                            subtitle: '',
+                            body: '<div class="vas-t10v-empty-box"><p class="vas-t10v-empty-msg">' +
+                                esc(data.message || data.error) + '</p></div>',
+                            foot: function ($foot) {
+                                $foot.html('<span class="vas-t10v-foot-note"></span>' +
+                                    '<span>' +
+                                    '<button type="button" class="vas-t10v-btn vas-t10v-back-btn">' + esc(lbl('VAS_Back', 'Back')) + '</button> ' +
+                                    '<button type="button" class="vas-t10v-btn vas-t10v-close-btn">' + esc(lbl('VAS_Close', 'Close')) + '</button>' +
+                                    '</span>');
+                                $foot.find('.vas-t10v-back-btn').on('click', popModal);
+                                $foot.find('.vas-t10v-close-btn').on('click', closeModal);
+                            }
+                        });
+                        return;
+                    }
+
                     var header = data.header || {};
                     var lines = data.lines || [];
+                    // Line amounts are in the PO's own currency; format them that way.
+                    lineCurSymbol = data.docCurSymbol || '';
+                    lineCurIso = data.docCurIso || '';
 
                     var poNo = header.po || ('PO #' + orderId);
                     var poVendor = header.vendor || '—';
@@ -728,8 +785,12 @@
                     var totalPending = 0;
                     var totalLinesAmt = 0;
                     for (var k = 0; k < lines.length; k++) {
-                        totalOrdered += (lines[k].qty || 0);
-                        totalPending += (lines[k].pend || 0);
+                        // Qty ordered / Qty pending count Item-type products only: charge lines and other non-Item
+                        // products are never received, so they must not add to either figure.
+                        if (!(lines[k].isNonStock || lines[k].IsNonStock)) {
+                            totalOrdered += (lines[k].qty || 0);
+                            totalPending += (lines[k].pend || 0);
+                        }
                         totalLinesAmt += (lines[k].amount || 0);
                     }
 
@@ -740,7 +801,7 @@
                         '</div>' +
                         '<div class="vas-t10v-mstats">' +
                         '  <div class="vas-t10v-mstat"><div class="l">' + esc(lbl('VAS_Lines', 'Lines')) + '</div><div class="v">' + lines.length + '</div></div>' +
-                        '  <div class="vas-t10v-mstat"><div class="l">' + esc(lbl('VAS_POValue', 'PO value')) + '</div><div class="v" title="' + esc(fmtMoney(totalLinesAmt)) + '">' + esc(fmtMoney(totalLinesAmt)) + '</div></div>' +
+                        '  <div class="vas-t10v-mstat"><div class="l">' + esc(lbl('VAS_POValue', 'PO value')) + '</div><div class="v" title="' + esc(fmtMoney(totalLinesAmt, lineCurSymbol, lineCurIso)) + '">' + esc(fmtMoney(totalLinesAmt, lineCurSymbol, lineCurIso)) + '</div></div>' +
                         '  <div class="vas-t10v-mstat"><div class="l">' + esc(lbl('VAS_QtyOrdered', 'Qty ordered')) + '</div><div class="v">' + num(totalOrdered) + '</div></div>' +
                         '  <div class="vas-t10v-mstat"><div class="l">' + esc(lbl('VAS_QtyPending', 'Qty pending')) + '</div><div class="v">' + num(totalPending) + '</div></div>' +
                         '</div>' +
@@ -769,6 +830,22 @@
                             renderPagedLinesTable($host.find('#vas_t10v_lines_table_wrap'), lines, poNo);
                         }
                     });
+                },
+                error: function (xhr) {
+                    console.error('VAS_209_Top10VendorsWidget: GetPurchaseOrderLines request failed', xhr);
+                    openModal({
+                        isChild: true,
+                        size: 'md',
+                        title: lbl('VAS_Lines', 'Lines') + ' · PO #' + orderId,
+                        subtitle: '',
+                        body: '<div class="vas-t10v-empty-box"><p class="vas-t10v-empty-msg">' +
+                            esc(lbl('VAS_209_FailedToLoadVendorData', 'Failed to load vendor data')) + '</p></div>',
+                        foot: function ($foot) {
+                            $foot.html('<span class="vas-t10v-foot-note"></span>' +
+                                '<button type="button" class="vas-t10v-btn vas-t10v-close-btn">' + esc(lbl('VAS_Close', 'Close')) + '</button>');
+                            $foot.find('.vas-t10v-close-btn').on('click', closeModal);
+                        }
+                    });
                 }
             });
         }
@@ -776,7 +853,7 @@
         function renderPagedLinesTable($container, lines, poNo) {
             $container.empty();
             var lPage = 0;
-            var lPageSize = 10;
+            var lPageSize = MODAL_PAGE_ROWS;
             var lTotalPages = Math.max(1, Math.ceil(lines.length / lPageSize));
 
             var $tableWrap = $('<div class="vas-t10v-paged-table-wrap"></div>');
@@ -817,8 +894,8 @@
 
                 for (var i = 0; i < slice.length; i++) {
                     var l = slice[i];
-                    var rateFormatted = fmtMoney(l.rate);
-                    var amtFormatted = fmtMoney(l.amount);
+                    var rateFormatted = fmtMoney(l.rate, lineCurSymbol, lineCurIso);
+                    var amtFormatted = fmtMoney(l.amount, lineCurSymbol, lineCurIso);
 
                     var $row = $('<div class="vas-t10v-mrow" style="grid-template-columns: minmax(0, 0.4fr) minmax(0, 1.6fr) minmax(0, 1.2fr) minmax(0, 0.6fr) minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1.1fr);">' +
                         '<span class="vas-t10v-cell vas-t10v-right vas-t10v-c-std">' + (sIdx + i + 1) + '</span>' +
@@ -864,44 +941,29 @@
             drawLinesPage();
         }
 
+        // Canonical Home/Landing-page zoom handling (2026-09-30, per user-supplied reference
+        // pattern): $self.windowNo >= 0 means this widget is hosted inside an actual window tab,
+        // so the host's own tab-panel router relays the value change; otherwise (Home dashboard
+        // placement, windowNo < 0) VAS.ZoomUtil.zoomToRecord resolves and opens the window
+        // directly, caching the resolved window id so repeat clicks skip re-resolving it by name.
+        var poZoomWindowId = 0;
+
         function openPurchaseOrderRecord(orderId) {
             if (!orderId) return;
             closeModal();
 
-            var ZOOM_WINDOW_NAME = 'VAS_PurchaseOrder';
-            var ZOOM_WINDOW_FALLBACK = 'Purchase Order';
-            var ZOOM_TABLE = 'C_Order';
-
-            var navigated = false;
-            try {
-                if ($self.listener && typeof $self.widgetFirevalueChanged === 'function') {
-                    $self.widgetFirevalueChanged({
-                        "TabWhereClause": ZOOM_TABLE + "." + ZOOM_TABLE + "_ID=" + orderId,
-                        "TabLayout": "Y",
-                        "TabIndex": "0",
-                        "AD_Tab_ID": 1002398,
-                        "ActionName": ZOOM_WINDOW_NAME,
-                        "ActionType": "W"
+            if ($self.windowNo >= 0) {
+                var windowParam = {
+                    "TabWhereClause": "C_Order.C_Order_ID=" + orderId,
+                    "TabLayout": "Y",
+                    "TabIndex": "0"
+                };
+                $self.widgetFirevalueChanged(windowParam);
+            } else {
+                VAS.ZoomUtil.zoomToRecord("C_Order_ID", orderId, poZoomWindowId, "VAS_PurchaseOrder", "")
+                    .done(function (id) {
+                        if (id > 0) { poZoomWindowId = id; }
                     });
-                    navigated = true;
-                }
-            } catch (e) { }
-
-            if (!navigated) {
-                try {
-                    if (window.VAS && VAS.ZoomUtil && typeof VAS.ZoomUtil.zoomToRecord === 'function') {
-                        VAS.ZoomUtil.zoomToRecord(ZOOM_TABLE + "_ID", orderId, 0, ZOOM_WINDOW_NAME, ZOOM_WINDOW_FALLBACK);
-                    } else if (window.VIS && VIS.AEnv && typeof VIS.AEnv.zoom === 'function') {
-                        VIS.AEnv.zoom(259, orderId);
-                    } else if (window.VIS && VIS.viewManager && typeof VIS.viewManager.startWindow === 'function') {
-                        var windowId = (VIS.context && VIS.context.getWindowId)
-                            ? (VIS.context.getWindowId(ZOOM_WINDOW_NAME) || VIS.context.getWindowId(ZOOM_TABLE) || 181)
-                            : 181;
-                        var query = new VIS.Query();
-                        query.addRestriction("C_Order_ID", VIS.Query.prototype.EQUAL, orderId);
-                        VIS.viewManager.startWindow(windowId, query);
-                    }
-                } catch (e2) { }
             }
         }
 

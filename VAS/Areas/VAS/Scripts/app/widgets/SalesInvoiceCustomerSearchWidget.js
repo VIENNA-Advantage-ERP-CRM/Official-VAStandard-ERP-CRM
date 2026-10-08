@@ -316,7 +316,7 @@
         /* ── Filter popover ──
            Two date ranges (Invoice Date -> C_Invoice.DateInvoiced, Due Date ->
            C_InvoicePaySchedule.DueDate), a grand-total amount band, and a currency restriction.
-           Every bound is optional and open-endable. Dates are native <input type="date"> so they are
+           Every bound is optional and open-endable. Dates are native <input type="date" max="9999-12-31"> so they are
            always ISO yyyy-MM-dd on the wire; the amounts and the currency use the framework's own
            controls (VAmountTextBox / VTextBoxButton) so the decimal separator and the C_Currency_ID
            lookup behave exactly as they do in a standard window. */
@@ -353,9 +353,9 @@
                 '<div class="vas-sics-flabel">' + escapeHtml(title) + '</div>' +
                 '<div class="vas-sics-fpair">' +
                 '<label><span>' + escapeHtml(lbl('VAS_063_From', 'From')) + '</span>' +
-                '<input type="date" id="' + fromId + '"></label>' +
+                '<input type="date" max="9999-12-31" id="' + fromId + '"></label>' +
                 '<label><span>' + escapeHtml(lbl('VAS_063_To', 'To')) + '</span>' +
-                '<input type="date" id="' + toId + '"></label>' +
+                '<input type="date" max="9999-12-31" id="' + toId + '"></label>' +
                 '</div></div>';
         }
 

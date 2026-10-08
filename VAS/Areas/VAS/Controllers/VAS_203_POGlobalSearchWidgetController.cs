@@ -105,7 +105,7 @@ namespace VAS.Controllers
                         o.DateOrdered AS order_date,
                         o.DocStatus AS document_status,
                         bp.Name AS vendor_name,
-                        o.GrandTotal AS total_amount,
+                        COALESCE(o.TotalLines, 0) AS total_amount, -- Sub total (excl. taxes)
                         curr.ISO_Code AS currency_code,
                         curr.CurSymbol AS currency_symbol,
                         curr.StdPrecision AS currency_precision
@@ -116,6 +116,7 @@ namespace VAS.Controllers
                       AND o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
+                      AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
                     ORDER BY o.DateOrdered DESC, o.DocumentNo DESC";
 
                 sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
@@ -216,7 +217,7 @@ namespace VAS.Controllers
                         p.Value AS product_code,
                         p.SKU AS product_sku,
                         r.DocumentNo AS requisition_number,
-                        o.GrandTotal AS total_amount,
+                        COALESCE(o.TotalLines, 0) AS total_amount, -- Sub total (excl. taxes)
                         curr.ISO_Code AS currency_code,
                         curr.CurSymbol AS currency_symbol,
                         curr.StdPrecision AS currency_precision
@@ -234,6 +235,7 @@ namespace VAS.Controllers
                       AND o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
+                      AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
                       AND (
                            LOWER(o.DocumentNo) LIKE @SearchLike
                            OR LOWER(COALESCE(bp.Name, N'')) LIKE @SearchLike
@@ -473,6 +475,7 @@ namespace VAS.Controllers
                             Group = Msg.GetMsg(ctx, "VAS_203_Description") ?? "Description",
                             GroupKey = "Description",
                             Title = descTitle,
+                            FullTitle = description,
                             Subtitle = subtitle,
                             Value = formattedValue,
                             Amount = totalAmount,
@@ -526,6 +529,7 @@ namespace VAS.Controllers
                     group = c.Group,
                     groupKey = c.GroupKey,
                     title = c.Title,
+                    fullTitle = c.FullTitle ?? c.Title,
                     subtitle = c.Subtitle,
                     value = c.Value,
                     amount = c.Amount,
@@ -650,14 +654,20 @@ namespace VAS.Controllers
                     return Fail(Msg.GetMsg(ctx, "RecordNotFound") ?? "Record not found");
                 }
 
+                // p.Name / p.Value / asi.Description / uom.UOMSymbol / uom.Name / ol.Description are
+                // NVARCHAR2 columns. COALESCE'ing any of them against a string literal (''/'Standard
+                // Product') raises ORA-12704 (character set mismatch) on Oracle - selected raw here
+                // (or COALESCE'd only against another column, never a literal) and defaulted in C#
+                // instead. Same bug fixed the same way in VAS_161/163/165/164/215/209.
                 string linesSql = @"
                     SELECT
                         ol.C_OrderLine_ID,
                         ol.Line,
-                        COALESCE(p.Name, ol.Description, 'Standard Product') AS ProductName,
-                        COALESCE(p.Value, '') AS ProductCode,
-                        COALESCE(asi.Description, '') AS AttributeDesc,
-                        COALESCE(uom.UOMSymbol, uom.Name, '') AS UomName,
+                        p.Name AS ProductNameRaw,
+                        ol.Description AS OrderLineDescRaw,
+                        p.Value AS ProductCode,
+                        asi.Description AS AttributeDesc,
+                        COALESCE(uom.UOMSymbol, uom.Name) AS UomName,
                         COALESCE(ol.QtyOrdered, 0) AS QtyOrdered,
                         COALESCE(ol.QtyDelivered, 0) AS QtyDelivered,
                         COALESCE(ol.PriceActual, 0) AS PriceActual,
@@ -670,20 +680,32 @@ namespace VAS.Controllers
                       AND ol.IsActive = 'Y'
                     ORDER BY ol.Line ASC, ol.C_OrderLine_ID ASC";
 
+                // linesSql only references @OrderID (no @ClientID predicate) - reusing headParams
+                // here passed a @ClientID bind value with no matching placeholder in the SQL text,
+                // which Oracle rejects with ORA-01006 "bind variable does not exist". A dedicated,
+                // single-parameter array keeps the bound parameters in step with the SQL text.
+                SqlParameter[] lineParams = new SqlParameter[]
+                {
+                    new SqlParameter("@OrderID", orderId)
+                };
+
                 var lines = new List<object>();
                 dr = null;
                 try
                 {
-                    dr = DB.ExecuteReader(linesSql, headParams, null);
+                    dr = DB.ExecuteReader(linesSql, lineParams, null);
                     while (dr != null && dr.Read())
                     {
                         decimal qtyOrdered = Util.GetValueOfDecimal(dr["QtyOrdered"]);
                         decimal qtyDelivered = Util.GetValueOfDecimal(dr["QtyDelivered"]);
+                        string productName = Util.GetValueOfString(dr["ProductNameRaw"]);
+                        if (string.IsNullOrEmpty(productName)) { productName = Util.GetValueOfString(dr["OrderLineDescRaw"]); }
+                        if (string.IsNullOrEmpty(productName)) { productName = "Standard Product"; }
                         lines.Add(new
                         {
                             lineId = Util.GetValueOfInt(dr["C_OrderLine_ID"]),
                             lineNo = Util.GetValueOfInt(dr["Line"]),
-                            productName = Util.GetValueOfString(dr["ProductName"]),
+                            productName = productName,
                             productCode = Util.GetValueOfString(dr["ProductCode"]),
                             attribute = Util.GetValueOfString(dr["AttributeDesc"]),
                             uom = Util.GetValueOfString(dr["UomName"]),
@@ -777,6 +799,9 @@ namespace VAS.Controllers
             public string Group { get; set; }
             public string GroupKey { get; set; }
             public string Title { get; set; }
+            // Untruncated text of the title (the Description group shortens Title to 60 characters);
+            // the widget shows it as a tooltip. Null means Title is already complete.
+            public string FullTitle { get; set; }
             public string Subtitle { get; set; }
             public string Value { get; set; }
             public decimal Amount { get; set; }

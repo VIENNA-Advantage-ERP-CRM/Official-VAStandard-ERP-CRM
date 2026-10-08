@@ -86,6 +86,7 @@ namespace VAS.Areas.VAS.Controllers
                       AND o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
+                      AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
                       AND o.DocStatus <> 'VO'
                       AND o.DateOrdered >= " + ToSqlDate(monthStart) + @"
                       AND o.DateOrdered < " + ToSqlDate(monthEndExclusive) + @"
@@ -315,15 +316,7 @@ namespace VAS.Areas.VAS.Controllers
                         o.C_Order_ID,
                         o.DocumentNo,
                         o.DateOrdered,
-                        b                        -- A charge line, or a product that is not of Item type, carries no
-                        -- stock movement: the widget shows its name, UOM, ordered, rate and
-                        -- amount, and dashes for received / pending / line status.
-CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0
-     THEN COALESCE(ch.Name, N'')
-     ELSE p.Name END AS VendorName,
-CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0 THEN 'Y'
-     WHEN ol.M_Product_ID IS NOT NULL AND COALESCE(p.ProductType, 'I') <> 'I' THEN 'Y'
-     ELSE 'N' END AS IsNonStock,
+                        bp.Name AS VendorName,
                         wh.Name AS WarehouseName,
                         sr.Name AS RepName,
                         o.DocStatus,
@@ -333,15 +326,10 @@ CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0 THEN 'Y'
                         o.AD_Org_ID,
                         SUM(COALESCE(ol.LineNetAmt, 0)) AS CategoryLineNetAmt,
                         SUM(COALESCE(ol.QtyOrdered, 0)) AS TotalQtyOrdered,
-                        -- QtyEntered is expressed in the line's own C_UOM_ID (the UOM the buyer
-                        -- picked); QtyOrdered / QtyDelivered are in the product's base UOM. The
-                        -- widget shows the selected UOM, so quantities are scaled to it.
-COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) AS QtyEntered,
                         SUM(COALESCE(ol.QtyDelivered, 0)) AS TotalQtyDelivered
                     FROM C_Order o
                     INNER JOIN C_OrderLine ol ON (ol.C_Order_ID = o.C_Order_ID AND ol.IsActive = 'Y')
                     LEFT JOIN M_Product p ON (p.M_Product_ID = ol.M_Product_ID)
-                    LEFT JOIN C_Charge ch ON (ch.C_Charge_ID = ol.C_Charge_ID)
                     LEFT JOIN M_Product_Category pc ON (pc.M_Product_Category_ID = p.M_Product_Category_ID)
                     LEFT JOIN C_BPartner bp ON (bp.C_BPartner_ID = o.C_BPartner_ID)
                     LEFT JOIN M_Warehouse wh ON (wh.M_Warehouse_ID = o.M_Warehouse_ID)
@@ -350,6 +338,7 @@ COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) AS QtyEntered,
                       AND o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
+                      AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
                       AND o.DocStatus <> 'VO'
                       AND o.DateOrdered >= " + ToSqlDate(monthStart) + @"
                       AND o.DateOrdered < " + ToSqlDate(monthEndExclusive) + @"
@@ -603,7 +592,12 @@ COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) AS QtyEntered,
                     SELECT
                         ol.C_OrderLine_ID,
                         ol.Line,
-                        p.Name AS ProductName,
+                        CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0
+                             THEN COALESCE(ch.Name, N'')
+                             ELSE p.Name END AS ProductName,
+                        CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0 THEN 'Y'
+                             WHEN ol.M_Product_ID IS NOT NULL AND COALESCE(p.ProductType, 'I') <> 'I' THEN 'Y'
+                             ELSE 'N' END AS IsNonStock,
                         CASE WHEN COALESCE(ol.M_AttributeSetInstance_ID, 0) > 0
                              THEN COALESCE(asi.Description, N'')
                              ELSE N'' END AS Attribute,
@@ -616,6 +610,7 @@ COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) AS QtyEntered,
                     FROM C_OrderLine ol
                     INNER JOIN C_Order o ON (o.C_Order_ID = ol.C_Order_ID)
                     LEFT JOIN M_Product p ON (p.M_Product_ID = ol.M_Product_ID)
+                    LEFT JOIN C_Charge ch ON (ch.C_Charge_ID = ol.C_Charge_ID)
                     LEFT JOIN M_AttributeSetInstance asi ON (asi.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID)
                     LEFT JOIN C_UOM uom ON (uom.C_UOM_ID = ol.C_UOM_ID)
                     WHERE ol.C_Order_ID = " + orderId + @"

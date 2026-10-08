@@ -6,6 +6,15 @@
  * Chronological  : Development
  * Created Date   : 17 August 2026
  * Widget ID      : VAS_207_DraftedInProcessPOsWidget
+ * Claude 2026-09-30: GetDraftedInProcessPOsData's line_count/po_value aggregates counted every
+ *                    order line, including charge lines and non-Item products. Added a JOIN to
+ *                    M_Product and "AND prod.ProductType = 'I'" so only Item-type product lines
+ *                    are counted/summed, matching VAS_206_POsPendingDeliveryWidget's same fix.
+ * Claude 2026-09-30: GetOrderLines showed "Couldn't load" for every PO - it called
+ *                    MRole.AddAccessSQL directly on a 6-JOIN + ORDER BY statement, which
+ *                    AccessSqlParser cannot reliably parse (same documented issue as
+ *                    VAS_216_POQueueWidget / this file's own GetDraftedInProcessPOsData). Switched
+ *                    to the same safe sub-query access pattern used elsewhere in this file.
  ***********************************************************/
 
 using Newtonsoft.Json;
@@ -83,6 +92,8 @@ namespace VIS.Controllers
                     LEFT JOIN C_OrderLine ol
                         ON ol.C_Order_ID = o.C_Order_ID
                        AND ol.IsActive = 'Y'
+                    LEFT JOIN M_Product prod
+                        ON prod.M_Product_ID = ol.M_Product_ID
                     INNER JOIN C_BPartner bp
                         ON bp.C_BPartner_ID = o.C_BPartner_ID
                     LEFT JOIN AD_User rep
@@ -91,6 +102,7 @@ namespace VIS.Controllers
                       AND o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
+                      AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
                       AND o.DocStatus IN ('DR', 'IP')
                       -- Per specification this widget covers the Purchase Order screen only;
                       -- Blanket Purchase Order documents are excluded (C_DocType.IsBlanketTrx).
@@ -99,6 +111,7 @@ namespace VIS.Controllers
                           WHERE dt.C_DocType_ID = o.C_DocTypeTarget_ID
                             AND COALESCE(dt.IsBlanketTrx, 'N') = 'Y')
                       AND o.C_Order_ID IN (@P_ORDER_ACCESS@)
+                      AND prod.ProductType = 'I'
                     GROUP BY
                         o.C_Order_ID,
                         o.DocumentNo,
@@ -250,6 +263,10 @@ namespace VIS.Controllers
 
             try
             {
+                // Raw string columns selected without COALESCE-against-a-literal: mixing an
+                // NVARCHAR2 literal (N'') with a VARCHAR2 column (p.Value, u.UOMSymbol, p.ProductType
+                // are all VARCHAR2/CHAR, not NVARCHAR2) raises ORA-12704 character-set mismatch -
+                // same established pattern as VAS_161/163/164/165. Null/default handling moved to C#.
                 string sql = @"
                     SELECT
                         ol.C_OrderLine_ID             AS line_id,
@@ -257,18 +274,17 @@ namespace VIS.Controllers
                         -- A charge line, or a product that is not of Item type, carries no
                         -- stock movement: the widget shows its name, UOM, ordered, rate and
                         -- amount, and dashes for received / pending / line status.
-                        CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0
-                             THEN COALESCE(ch.Name, N'')
-                             ELSE COALESCE(p.Name, ol.Description, N'—') END AS product_name,
+                        CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0 THEN ch.Name ELSE p.Name END AS product_name_raw,
+                        ol.Description AS line_description_raw,
                         CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0 THEN 'Y'
                              WHEN ol.M_Product_ID IS NOT NULL AND COALESCE(p.ProductType, 'I') <> 'I' THEN 'Y'
                              ELSE 'N' END AS IsNonStock,
-                        COALESCE(p.Value, N'')         AS product_code,
+                        p.Value                        AS product_code_raw,
                         CASE WHEN COALESCE(ol.M_AttributeSetInstance_ID, 0) > 0
-                             THEN COALESCE(asi.Description, N'')
-                             ELSE N'' END AS attribute_desc,
-                        COALESCE(u.UOMSymbol, u.Name, N'') AS uom_symbol,
-                        COALESCE(p.ProductType, N'')   AS product_type,
+                             THEN asi.Description ELSE NULL END AS attribute_desc_raw,
+                        u.UOMSymbol                    AS uom_symbol_raw,
+                        u.Name                         AS uom_name_raw,
+                        p.ProductType                  AS product_type_raw,
                         COALESCE(ol.QtyOrdered, 0)    AS qty_ordered,
                         -- QtyEntered is expressed in the line's own C_UOM_ID (the UOM the buyer
                         -- picked); QtyOrdered / QtyDelivered are in the product's base UOM. The
@@ -292,9 +308,19 @@ namespace VIS.Controllers
                     LEFT JOIN C_Currency cur ON cur.C_Currency_ID = o.C_Currency_ID
                     WHERE ol.C_Order_ID = " + C_Order_ID + @"
                       AND ol.IsActive = 'Y'
+                      AND ol.C_Order_ID IN (@P_ORDER_ACCESS@)
                     ORDER BY ol.Line ASC, ol.C_OrderLine_ID ASC";
 
-                sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "ol", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                // MRole.AddAccessSQL cannot reliably parse a multi-JOIN + ORDER BY statement like
+                // this one - AccessSqlParser mis-locates the insertion point (same documented
+                // problem as VAS_216_POQueueWidget and this controller's own
+                // GetDraftedInProcessPOsData), which either throws or silently produces a query
+                // that matches nothing, surfacing here as "Couldn't load". Applying role access via
+                // a small, easily-parsed sub-query on C_Order instead.
+                string orderAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                    "SELECT accessOrd.C_Order_ID FROM C_Order accessOrd WHERE accessOrd.AD_Client_ID = " + ctx.GetAD_Client_ID(),
+                    "accessOrd", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                sql = sql.Replace("@P_ORDER_ACCESS@", orderAccessSql);
 
                 List<object> lines = new List<object>();
                 IDataReader dr = null;
@@ -334,15 +360,31 @@ namespace VIS.Controllers
                             lineStatus = "Partial received";
                         }
 
+                        string productName = Util.GetValueOfString(dr["product_name_raw"]);
+                        if (string.IsNullOrEmpty(productName))
+                        {
+                            productName = Util.GetValueOfString(dr["line_description_raw"]);
+                        }
+                        if (string.IsNullOrEmpty(productName))
+                        {
+                            productName = "—";
+                        }
+
+                        string uom = Util.GetValueOfString(dr["uom_symbol_raw"]);
+                        if (string.IsNullOrEmpty(uom))
+                        {
+                            uom = Util.GetValueOfString(dr["uom_name_raw"]);
+                        }
+
                         lines.Add(new
                         {
                             LineId = Util.GetValueOfInt(dr["line_id"]),
                             LineNo = Util.GetValueOfInt(dr["line_no"]),
-                            ProductName = Util.GetValueOfString(dr["product_name"]),
-                            ProductCode = Util.GetValueOfString(dr["product_code"]),
-                            AttributeDesc = Util.GetValueOfString(dr["attribute_desc"]),
-                            UOM = Util.GetValueOfString(dr["uom_symbol"]),
-                            ProductType = Util.GetValueOfString(dr["product_type"]),
+                            ProductName = productName,
+                            ProductCode = Util.GetValueOfString(dr["product_code_raw"]),
+                            AttributeDesc = Util.GetValueOfString(dr["attribute_desc_raw"]),
+                            UOM = uom,
+                            ProductType = Util.GetValueOfString(dr["product_type_raw"]),
                             QtyOrdered = qtyOrdered,
                             QtyDelivered = qtyDelivered,
                             QtyPending = qtyPending,

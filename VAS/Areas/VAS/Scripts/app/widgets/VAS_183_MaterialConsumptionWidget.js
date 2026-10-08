@@ -364,9 +364,12 @@
             // VAS_186. Name (fullName) is the real, human-readable warehouse name and must win;
             // Value is only a fallback for the rare warehouse with no name at all.
             if ($whLbl) {
-                $whLbl.text(selectedWarehouse
+                // The pill has a fixed max-width and ellipsis-truncates a long name (see
+                // .vas-mcw-pill-btn / .vas-mcw-wh-lbl) - title exposes the full value on hover.
+                var whLblText = selectedWarehouse
                     ? (selectedWarehouse.fullName || selectedWarehouse.shortName || '')
-                    : label("VAS_183_NoWarehouse", "No warehouse"));
+                    : label("VAS_183_NoWarehouse", "No warehouse");
+                $whLbl.text(whLblText).attr('title', whLblText);
             }
             if (!$whMenu) { return; }
 

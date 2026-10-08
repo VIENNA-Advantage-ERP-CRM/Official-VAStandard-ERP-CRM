@@ -363,15 +363,12 @@
 /* The document number opens the Inventory Count record - give it a visible link affordance. */
 .vas-adjwisecount-doclink {
     cursor: pointer;
-    text-decoration: underline;
-    text-underline-offset: 0.15em;
-    text-decoration-color: rgba(31, 131, 255, 0.45);
+    text-decoration: none;
 }
 
 .vas-adjwisecount-doclink:hover,
 .vas-adjwisecount-doclink:focus-visible {
     color: #1F83FF;
-    text-decoration-color: #1F83FF;
     outline: none;
 }
 

@@ -61,7 +61,8 @@ namespace VAS.Controllers
                     FROM C_Order o 
                     WHERE o.IsActive = 'Y' 
                       AND o.IsSOTrx = 'N' 
-                      AND COALESCE(o.IsReturnTrx, 'N') = 'N' 
+                      AND COALESCE(o.IsReturnTrx, 'N') = 'N'
+                      AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
                       AND o.DocStatus IN ('DR', 'IP', 'CO', 'CL') 
                       AND o.DateOrdered IS NOT NULL
                       AND o.C_Order_ID IN (@P_ORDER_ACCESS@)";
@@ -146,6 +147,7 @@ namespace VAS.Controllers
                     WHERE o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
+                      AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
                       AND o.DocStatus IN ('DR', 'IP', 'CO', 'CL')
                       AND o.DateOrdered >= " + DB.TO_DATE(startDate, true) + @"
                       AND o.DateOrdered < " + DB.TO_DATE(endDateExclusive, true);
@@ -291,6 +293,7 @@ namespace VAS.Controllers
                     WHERE o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
+                      AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
                       AND o.DocStatus IN ('DR', 'IP', 'CO', 'CL')
                       AND o.M_Warehouse_ID = " + warehouseId + @"
                       AND o.DateOrdered >= " + DB.TO_DATE(startDate, true) + @"
@@ -426,6 +429,11 @@ namespace VAS.Controllers
             string parentDocStatus = "DR";
             decimal totalQtyOrdered = 0;
             decimal totalQtyDelivered = 0;
+            // Ordered / Pending summary cards: the sum of the per-line figures in each line's SELECTED
+            // UOM (what the table shows), Item-type lines only. totalQtyOrdered / totalQtyDelivered above
+            // stay in the product base UOM and only drive the delivery status.
+            decimal totalOrderedInUom = 0;
+            decimal totalPendingInUom = 0;
             IDataReader dr = null;
 
             try
@@ -517,7 +525,7 @@ namespace VAS.Controllers
                         CASE WHEN COALESCE(ol.M_AttributeSetInstance_ID, 0) > 0
                              THEN COALESCE(asi.Description, N'')
                              ELSE N'' END                      AS AttributeDesc,
-                        COALESCE(uom.UOMSymbol, uom.Name, N'') AS UomName,
+                        COALESCE(uom.Name, uom.UOMSymbol, N'') AS UomName,
                         COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) AS QtyEntered,
                         COALESCE(ol.QtyOrdered, 0)   AS QtyOrdered,
                         COALESCE(ol.QtyDelivered, 0) AS QtyDelivered,
@@ -559,6 +567,11 @@ namespace VAS.Controllers
                     decimal orderedInUom = entered;
                     decimal deliveredInUom = del * uomRatio;
                     decimal pendingInUom = Math.Max(0, orderedInUom - deliveredInUom);
+                    if (!isNonStock)
+                    {
+                        totalOrderedInUom += orderedInUom;
+                        totalPendingInUom += pendingInUom;
+                    }
 
                     string lineStatus = "Pending";
                     string lineChip   = "chip-neutral";
@@ -641,9 +654,9 @@ namespace VAS.Controllers
                 header            = orderHeader,
                 lines             = lines,
                 totalLines        = lines.Count,
-                totalQtyOrdered   = totalQtyOrdered,
+                totalQtyOrdered   = totalOrderedInUom,
                 totalQtyDelivered = totalQtyDelivered,
-                totalQtyPending   = Math.Max(0, totalQtyOrdered - totalQtyDelivered),
+                totalQtyPending   = totalPendingInUom,
                 deliveryStatus    = delStatus,
                 deliveryChip      = delChip
             }, JsonRequestBehavior.AllowGet);

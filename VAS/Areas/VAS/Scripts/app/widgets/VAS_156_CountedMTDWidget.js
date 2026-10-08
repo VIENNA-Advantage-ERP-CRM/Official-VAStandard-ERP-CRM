@@ -38,7 +38,6 @@
         var $valueEl;
         var $metaEl;
         var $busy;
-        var widgetObserver = null;
         var $modal = null;
         var detailRows = [];
         var modalPageNo = 1;
@@ -64,19 +63,6 @@
                 .replace(/>/g, "&gt;")
                 .replace(/"/g, "&quot;")
                 .replace(/'/g, "&#039;");
-        }
-
-        function setupWidgetSizeObserver() {
-            if (typeof ResizeObserver === 'undefined') { return; }
-            widgetObserver = new ResizeObserver(function (entries) {
-                for (var i = 0; i < entries.length; i++) {
-                    var width = entries[i].contentRect.width;
-                    if (width > 0) {
-                        $root[0].style.setProperty('--widget-inline-size', width + 'px');
-                    }
-                }
-            });
-            widgetObserver.observe($wrapper[0]);
         }
 
         this.Initalize = function () {
@@ -336,11 +322,15 @@
         }
 
         function createWidget() {
+            /* Card structure matches VAS_159/VAS_160: label at the top, value+meta wrapped in a
+               "body" pinned to the bottom via margin-top:auto. */
             var $card = $(
                 '<div class="vas-counted-mtd-card vas-counted-mtd-clickable" role="button" tabindex="0">' +
                 '<div class="vas-counted-mtd-label">' + escapeHtml(lbl("VAS_156_CountedMTD", "Counted MTD")) + '</div>' +
+                '<div class="vas-counted-mtd-body">' +
                 '<div class="vas-counted-mtd-value">—</div>' +
                 '<div class="vas-counted-mtd-meta"></div>' +
+                '</div>' +
                 '</div>'
             );
 
@@ -361,7 +351,6 @@
             $root.append($busy);
 
             $wrapper.append($root);
-            setupWidgetSizeObserver();
         }
 
         this.refreshWidget = function () {
@@ -371,10 +360,6 @@
         this.getRoot = function () { return $wrapper; };
 
         this.disposeComponent = function () {
-            if (widgetObserver) {
-                widgetObserver.disconnect();
-                widgetObserver = null;
-            }
             // The modal lives on <body>, so detaching $wrapper alone would leak it.
             if ($modal) { $modal.remove(); $modal = null; }
             $wrapper.remove();

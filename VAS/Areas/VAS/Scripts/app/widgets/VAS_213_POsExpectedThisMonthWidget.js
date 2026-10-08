@@ -389,51 +389,31 @@
         /* ============================================================
            RECORD NAVIGATION TO PURCHASE ORDER WINDOW
            ============================================================ */
+        // Canonical Home/Landing-page zoom handling (2026-09-30, per user-supplied reference
+        // pattern): $self.windowNo >= 0 means this widget is hosted inside an actual window tab,
+        // so the host's own tab-panel router relays the value change; otherwise (Home dashboard
+        // placement, windowNo < 0) VAS.ZoomUtil.zoomToRecord resolves and opens the window
+        // directly, caching the resolved window id so repeat clicks skip re-resolving it by name.
+        var poZoomWindowId = 0;
+
         function openPurchaseOrderRecord(orderId) {
             if (!orderId) { return; }
             // Navigating away must dismiss the popup: the record opens behind it
             // otherwise, leaving the dialog stranded over the window it just opened.
             closeModal();
 
-            var ZOOM_TABLE = "C_Order";
-            var ZOOM_WINDOW_NAME = "VAS_PurchaseOrder";
-            var ZOOM_WINDOW_FALLBACK = "Purchase Order";
-
-            var navigated = false;
-
-            try {
-                if ($self.listener && typeof $self.listener.widgetFirevalueChanged === 'function') {
-                    $self.listener.widgetFirevalueChanged({
-                        "Record_ID": orderId,
-                        "C_Order_ID": orderId,
-                        "AD_Table_ID": 259,
-                        "WindowName": ZOOM_WINDOW_NAME,
-                        "AD_Tab_ID": 1002398,
-                        "TabWhereClause": "C_Order.C_Order_ID = " + orderId,
-                        "TabLayout": "N",
-                        "TabIndex": "0"
+            if ($self.windowNo >= 0) {
+                var windowParam = {
+                    "TabWhereClause": "C_Order.C_Order_ID=" + orderId,
+                    "TabLayout": "Y",
+                    "TabIndex": "0"
+                };
+                $self.widgetFirevalueChanged(windowParam);
+            } else {
+                VAS.ZoomUtil.zoomToRecord("C_Order_ID", orderId, poZoomWindowId, "VAS_PurchaseOrder", "")
+                    .done(function (id) {
+                        if (id > 0) { poZoomWindowId = id; }
                     });
-                    navigated = true;
-                }
-            } catch (e) { }
-
-            if (!navigated) {
-                try {
-                    if (window.VAS && VAS.ZoomUtil && typeof VAS.ZoomUtil.zoomToRecord === 'function') {
-                        VAS.ZoomUtil.zoomToRecord(ZOOM_TABLE + "_ID", orderId, 0, ZOOM_WINDOW_NAME, ZOOM_WINDOW_FALLBACK);
-                    } else if (window.VIS && VIS.ZoomManager && typeof VIS.ZoomManager.zoom === 'function') {
-                        VIS.ZoomManager.zoom(259, orderId);
-                    } else if (window.VIS && VIS.AEnv && typeof VIS.AEnv.zoom === 'function') {
-                        VIS.AEnv.zoom(259, orderId);
-                    } else if (window.VIS && VIS.viewManager && typeof VIS.viewManager.startWindow === 'function') {
-                        var action = new VIS.AActionItem();
-                        action.setAD_Table_ID(259);
-                        action.setRecord_ID(orderId);
-                        action.setWindowName(ZOOM_WINDOW_NAME);
-                        action.setAD_Tab_ID(1002398);
-                        VIS.viewManager.startWindow(0, action);
-                    }
-                } catch (e2) { }
             }
         }
 
@@ -732,7 +712,7 @@
                 { label: lbl('VAS_Representative', 'Representative'), w: 1.2 },
                 { label: lbl('VAS_Value', 'Value'), w: 0.9, align: 'right', cls: 'vas-213-c-emph' },
                 { label: lbl('VAS_Delivery', 'Delivery'), w: 1.05 },
-                { label: lbl('VAS_Status', 'Status'), w: 1.1 }
+                { label: lbl('VAS_Status', 'Status').replace(/\s*:\s*$/, ''), w: 1.1 }
             ];
 
             var rows = all.map(function (p) {

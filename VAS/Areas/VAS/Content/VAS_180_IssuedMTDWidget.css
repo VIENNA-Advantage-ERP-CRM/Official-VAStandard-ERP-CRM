@@ -20,7 +20,9 @@
     flex-direction: column;
     justify-content: flex-start;
     text-align: left;
-    padding: .85em;
+    /* Matches the Inventory Use window's shared card padding (VAS_188/VAS_183/VAS_186/
+       VAS_178 all use .875em) - was .85em here, a slight but real mismatch. */
+    padding: .875em;
     border: 2px solid #FFFFFF;
     border-radius: 14px;
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));

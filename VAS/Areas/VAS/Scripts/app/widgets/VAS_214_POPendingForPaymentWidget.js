@@ -102,11 +102,15 @@
 
     // Totals are Item-type lines only. A completed PO with nothing received is Pending (it used to read
     // "Fully delivered"), which matters now that completed advance-payment POs are listed before receipt.
-    function getDeliveryStatusDisplay(status, totalOrdered, totalDelivered) {
+    // allItemLinesReceived (optional): true when every Item line is received in full. Lines may be in
+    // different UOMs (litre / millilitre), so comparing summed quantities is unreliable - when it is
+    // given it decides "Fully delivered" instead of the totals.
+    function getDeliveryStatusDisplay(status, totalOrdered, totalDelivered, allItemLinesReceived) {
         if (status === 'CL' || status === 'Closed' || status === 'VO' || status === 'Voided' || !(totalOrdered > 0)) {
             return lbl('VAS_NotApplicable', 'Not applicable');
         }
-        if (totalDelivered >= totalOrdered) {
+        var fullyReceived = (allItemLinesReceived === undefined) ? (totalDelivered >= totalOrdered) : allItemLinesReceived;
+        if (fullyReceived) {
             return lbl('VAS_FullyDelivered', 'Fully delivered');
         }
         if (totalDelivered > 0) {
@@ -322,6 +326,12 @@
             $card.append($foot);
             $root.append($card);
 
+            // Sortable column headings (PO date, Received on, Payment due)
+            $payHead.on('click', '.vas-214-sortbtn', function (e) {
+                e.stopPropagation();
+                onSortHeaderClick($(this).attr('data-sort'));
+            });
+
             // Delegate row & link click events
             $payBody.on('click', '.vas-214-trow', function (e) {
                 var poId = parseInt($(this).attr('data-po-id'), 10);
@@ -339,14 +349,20 @@
             $root.append($busy);
         }
 
+        // Column sorting (client side: every record is already loaded). sortKey is the record
+        // field to order by - PO date, Received on and Payment due are the sortable columns.
+        // Until a header is clicked the server order (oldest payment due first) is kept.
+        var sortKey = '';
+        var sortDir = 'asc';
+
         function renderTableHeaders() {
             var colHeaders = [
                 { label: lbl('VAS_214_PONumber', 'PO No'), align: 'left' },
-                { label: lbl('VAS_PODate', 'PO date'), align: 'left' },
+                { label: lbl('VAS_PODate', 'PO date'), align: 'left', sort: 'OrderDate' },
                 { label: lbl('VAS_Vendor', 'Vendor'), align: 'left' },
                 { label: lbl('VAS_Warehouse', 'Warehouse'), align: 'left' },
-                { label: lbl('VAS_214_ReceivedOn', 'Received on'), align: 'left' },
-                { label: lbl('VAS_214_PaymentDue', 'Payment due'), align: 'left' },
+                { label: lbl('VAS_214_ReceivedOn', 'Received on'), align: 'left', sort: 'ReceivedOn' },
+                { label: lbl('VAS_214_PaymentDue', 'Payment due'), align: 'left', sort: 'PaymentDue' },
                 { label: lbl('VAS_214_Balance', 'Balance'), align: 'right' }
             ];
 
@@ -354,9 +370,50 @@
             for (var i = 0; i < colHeaders.length; i++) {
                 var col = colHeaders[i];
                 var rightClass = col.align === 'right' ? ' vas-214-right' : '';
-                h += '<span class="vas-214-cell' + rightClass + '" title="' + esc(col.label) + '">' + esc(col.label) + '</span>';
+                if (col.sort) {
+                    var active = (sortKey === col.sort);
+                    var ariaSort = active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none';
+                    h += '<span class="vas-214-cell' + rightClass + '" title="' + esc(col.label) + '" aria-sort="' + ariaSort + '">' +
+                        '<button type="button" class="vas-214-sortbtn' + (active ? ' vas-214-sorted vas-214-' + sortDir : '') + '" data-sort="' + col.sort + '">' +
+                        '<span class="vas-214-sortlbl">' + esc(col.label) + '</span><span class="vas-214-sort" aria-hidden="true"></span>' +
+                        '</button></span>';
+                } else {
+                    h += '<span class="vas-214-cell' + rightClass + '" title="' + esc(col.label) + '">' + esc(col.label) + '</span>';
+                }
             }
             $payHead.html(h);
+        }
+
+        // Records in display order. Rows with no value for the sorted field always go last, and
+        // ties keep their server order, so the result is stable in both directions.
+        function getSortedRecords() {
+            var records = (queueData.records || []).slice();
+            if (!sortKey) { return records; }
+            var dir = sortDir === 'desc' ? -1 : 1;
+            var indexed = records.map(function (r, i) { return { r: r, i: i }; });
+            indexed.sort(function (a, b) {
+                var av = a.r[sortKey] || '';
+                var bv = b.r[sortKey] || '';
+                if (!av && !bv) { return a.i - b.i; }
+                if (!av) { return 1; }
+                if (!bv) { return -1; }
+                if (av < bv) { return -1 * dir; }
+                if (av > bv) { return 1 * dir; }
+                return a.i - b.i;
+            });
+            return indexed.map(function (x) { return x.r; });
+        }
+
+        function onSortHeaderClick(key) {
+            if (sortKey === key) {
+                sortDir = (sortDir === 'asc') ? 'desc' : 'asc';
+            } else {
+                sortKey = key;
+                sortDir = 'asc';
+            }
+            currentPage = 0;
+            renderTableHeaders();
+            renderWidgetPage();
         }
 
         function loadQueueData() {
@@ -393,7 +450,7 @@
         }
 
         function renderWidgetPage() {
-            var records = queueData.records || [];
+            var records = getSortedRecords();
             var total = records.length;
             totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -462,7 +519,7 @@
 
             var showingFrom = startIdx + 1;
             var showingTo = endIdx;
-            var helperString = lbl('VAS_Showing', 'Showing') + ' ' + showingFrom + '–' + showingTo + ' ' + lbl('VAS_Of', 'of') + ' ' + total + ' · ' + lbl('VAS_214_OldestDueFirst', 'oldest due first') + ' · ' + lbl('VAS_SelectPOToOpen', 'select a PO number to open the record');
+            var helperString = lbl('VAS_Showing', 'Showing') + ' ' + showingFrom + '–' + showingTo + ' ' + lbl('VAS_Of', 'of') + ' ' + total + (sortKey ? '' : ' · ' + lbl('VAS_214_OldestDueFirst', 'oldest due first'));
             $payHelper.text(helperString);
 
             $payPage.text((currentPage + 1) + ' ' + lbl('VAS_Of', 'of') + ' ' + totalPages);
@@ -485,47 +542,34 @@
         /* ============================================================
            PO RECORD NAVIGATION (ZOOM / WINDOW LAUNCH)
            ============================================================ */
+        // Canonical Home/Landing-page zoom handling (2026-09-30, per user-supplied reference
+        // pattern): $self.windowNo >= 0 means this widget is hosted inside an actual window tab,
+        // so the host's own tab-panel router relays the value change; otherwise (Home dashboard
+        // placement, windowNo < 0) VAS.ZoomUtil.zoomToRecord resolves and opens the window
+        // directly, caching the resolved window id so repeat clicks skip re-resolving it by name.
+        // Was: a hardcoded AD_Window_ID ("181"), which can resolve to the wrong window on a real
+        // install and reads as a role/access error even though the role has no actual problem.
+        var poZoomWindowId = 0;
+
         function openPurchaseOrderRecord(orderId) {
             if (!orderId) { return; }
             // Navigating away must dismiss the popup: the record opens behind it
             // otherwise, leaving the dialog stranded over the window it just opened.
             closeModal();
 
-            // 1. Tab Panel / Widget Event firing
-            try {
-                if ($self.listener) {
-                    var windowParam = {
-                        "action": "openRecord",
-                        "AD_Table_ID": "259",
-                        "Record_ID": String(orderId),
-                        "WindowName": "VAS_PurchaseOrder",
-                        "AD_Window_ID": "181",
-                        "AD_Tab_ID": "1002398",
-                        "TabIndex": "0"
-                    };
-                    $self.widgetFirevalueChanged(windowParam);
-                }
-            } catch (e) { }
-
-            // 2. Standard VIS Zoom Manager
-            try {
-                if (window.VIS && VIS.ZoomManager && VIS.ZoomManager.zoom) {
-                    VIS.ZoomManager.zoom(259, orderId);
-                    return;
-                }
-            } catch (e) { }
-
-            // 3. Fallback View Manager
-            try {
-                if (window.VIS && VIS.viewManager && VIS.viewManager.startWindow) {
-                    var action = new VIS.AActionItem();
-                    action.setAD_Table_ID(259);
-                    action.setRecord_ID(orderId);
-                    action.setWindowName("VAS_PurchaseOrder");
-                    action.setAD_Tab_ID(1002398);
-                    VIS.viewManager.startWindow(0, action);
-                }
-            } catch (e) { }
+            if ($self.windowNo >= 0) {
+                var windowParam = {
+                    "TabWhereClause": "C_Order.C_Order_ID=" + orderId,
+                    "TabLayout": "Y",
+                    "TabIndex": "0"
+                };
+                $self.widgetFirevalueChanged(windowParam);
+            } else {
+                VAS.ZoomUtil.zoomToRecord("C_Order_ID", orderId, poZoomWindowId, "VAS_PurchaseOrder", "")
+                    .done(function (id) {
+                        if (id > 0) { poZoomWindowId = id; }
+                    });
+            }
         }
 
         /* ============================================================
@@ -816,25 +860,29 @@
                             var totalOrderedQty = 0;
                             var totalDeliveredQty = 0;
                             var totalPendingQty = 0;
+                            var allItemLinesReceived = true;
                             lines.forEach(function (l) {
-                                // Delivery status counts Item-type products only; charges and other product types are excluded
-                                if (l.ProductType !== 'I') { return; }
+                                // Delivery status counts Item-type products only; charges (no product) and every other
+                                // product type (service, expense, resource...) are excluded
+                                if (l.ProductType !== 'I' || l.isNonStock) { return; }
                                 totalOrderedQty += Number(l.OrderedQty || 0);
                                 totalDeliveredQty += Number(l.DeliveredQty || 0);
                                 totalPendingQty += Number(l.PendingQty || 0);
+                                // Judged line by line: each line's quantities are in its own UOM
+                                if (!(Number(l.OrderedQty || 0) > 0) || Number(l.DeliveredQty || 0) < Number(l.OrderedQty || 0)) {
+                                    allItemLinesReceived = false;
+                                }
                             });
 
                             var rawDocStatus = hdr.DocStatus || (po ? po.DocStatus : 'CO');
                             var docStatusTxt = getDocStatusDisplay(rawDocStatus);
-                            var delivStatusTxt = getDeliveryStatusDisplay(rawDocStatus, totalOrderedQty, totalDeliveredQty);
+                            var delivStatusTxt = getDeliveryStatusDisplay(rawDocStatus, totalOrderedQty, totalDeliveredQty, allItemLinesReceived);
 
                             var headerStatsHtml = mstatsHtml([
                                 { l: lbl('VAS_214_TotalPayable', 'Total payable'), v: totalPayableFmt },
                                 { l: lbl('VAS_214_Paid', 'Paid'), v: paidFmt },
                                 { l: lbl('VAS_214_Balance', 'Balance'), v: balFmt },
                                 { l: lbl('VAS_214_PaymentDue', 'Payment due'), v: dueDisplay },
-                                { l: lbl('VAS_Vendor', 'Vendor'), v: vendor },
-                                { l: lbl('VAS_PODate', 'PO date'), v: dateDisplay },
                                 { l: lbl('VAS_Warehouse', 'Warehouse'), v: whName },
                                 { l: lbl('VAS_CreatedBy', 'Created by'), v: createdBy || '—' },
                                 { l: lbl('VAS_DocumentStatus', 'Document status'), v: docStatusTxt },

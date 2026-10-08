@@ -69,7 +69,8 @@ namespace VIS.Controllers
                             o.C_ConversionType_ID,
                             o.AD_Client_ID,
                             o.AD_Org_ID,
-                            SUM(" + NetOfTaxLineAmount() + @") AS po_value_document_currency,
+                            -- PO value is the order Sub total (excl. taxes), the Sub total field on the PO screen
+                            MAX(COALESCE(o.TotalLines, 0)) AS po_value_document_currency,
                             SUM(COALESCE(ol.QtyOrdered, 0)) AS ordered_qty,
                             SUM(COALESCE(ol.QtyDelivered, 0)) AS delivered_qty
                         FROM C_Order o
@@ -80,6 +81,7 @@ namespace VIS.Controllers
                           AND o.IsActive = 'Y'
                           AND o.IsSOTrx = 'N'
                           AND COALESCE(o.IsReturnTrx, 'N') = 'N'
+                          AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
                           AND o.DocStatus <> 'VO'
                           AND o.DateOrdered >= @MonthStart
                           AND o.DateOrdered < @MonthEnd
@@ -296,7 +298,10 @@ namespace VIS.Controllers
                         bp.Name AS VendorName,
                         wh.Name AS WarehouseName,
                         usr.Name AS SalesRepName,
-                        SUM(" + NetOfTaxLineAmount() + @") AS PoValueDoc,
+                        c.CurSymbol AS DocCurSymbol,
+                        c.ISO_Code AS DocCurIso,
+                        -- Order Sub total (excl. taxes), matching the summary card
+                        MAX(COALESCE(o.TotalLines, 0)) AS PoValueDoc,
                         SUM(COALESCE(ol.QtyOrdered, 0)) AS OrderedQty,
                         SUM(COALESCE(ol.QtyDelivered, 0)) AS DeliveredQty,
                         COUNT(ol.C_OrderLine_ID) AS LineCount,
@@ -313,10 +318,12 @@ namespace VIS.Controllers
                     INNER JOIN C_BPartner bp ON bp.C_BPartner_ID = o.C_BPartner_ID
                     LEFT JOIN M_Warehouse wh ON wh.M_Warehouse_ID = o.M_Warehouse_ID
                     LEFT JOIN AD_User usr ON usr.AD_User_ID = o.SalesRep_ID
+                    LEFT JOIN C_Currency c ON c.C_Currency_ID = o.C_Currency_ID
                     LEFT JOIN C_OrderLine ol ON ol.C_Order_ID = o.C_Order_ID AND ol.IsActive = 'Y'                    WHERE o.AD_Client_ID = @ClientID
                       AND o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
+                      AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
                       AND o.DocStatus <> 'VO'
                       AND o.C_BPartner_ID = @VendorID
                       AND o.DateOrdered >= @MonthStart
@@ -332,7 +339,9 @@ namespace VIS.Controllers
                         o.AD_Org_ID,
                         bp.Name,
                         wh.Name,
-                        usr.Name
+                        usr.Name,
+                        c.CurSymbol,
+                        c.ISO_Code
                     ORDER BY o.DateOrdered DESC, o.DocumentNo DESC";
 
                 SqlParameter[] parameters = new SqlParameter[]
@@ -360,6 +369,8 @@ namespace VIS.Controllers
                         string vendorName = Util.GetValueOfString(dr["VendorName"]);
                         string whName = Util.GetValueOfString(dr["WarehouseName"]);
                         string repName = Util.GetValueOfString(dr["SalesRepName"]);
+                        string docCurSymbol = Util.GetValueOfString(dr["DocCurSymbol"]);
+                        string docCurIso = Util.GetValueOfString(dr["DocCurIso"]);
                         decimal docValue = Util.GetValueOfDecimal(dr["PoValueDoc"]);
                         decimal orderedQty = Util.GetValueOfDecimal(dr["OrderedQty"]);
                         decimal deliveredQty = Util.GetValueOfDecimal(dr["DeliveredQty"]);
@@ -434,6 +445,11 @@ namespace VIS.Controllers
                             wh = string.IsNullOrEmpty(whName) ? "—" : whName,
                             rep = string.IsNullOrEmpty(repName) ? "—" : repName,
                             valueNum = convertedValue,
+                            // The PO value in the PO's own (price list) currency, e.g. dollars - what the Value
+                            // column shows. valueNum above stays in the accounting currency.
+                            docValue = docValue,
+                            docCurSymbol = docCurSymbol,
+                            docCurIso = docCurIso,
                             qtyOrdered = orderedQty,
                             qtyDelivered = deliveredQty,
                             qtyPending = Math.Max(0, orderedQty - deliveredQty),
@@ -497,11 +513,14 @@ namespace VIS.Controllers
                         bp.Name AS VendorName,
                         wh.Name AS WarehouseName,
                         usr.Name AS CreatedByName,
-                        o.Created AS CreatedOn
+                        o.Created AS CreatedOn,
+                        cur.CurSymbol AS DocCurSymbol,
+                        cur.ISO_Code AS DocCurIso
                     FROM C_Order o
                     INNER JOIN C_BPartner bp ON bp.C_BPartner_ID = o.C_BPartner_ID
                     LEFT JOIN M_Warehouse wh ON wh.M_Warehouse_ID = o.M_Warehouse_ID
                     LEFT JOIN AD_User usr ON usr.AD_User_ID = o.CreatedBy
+                    LEFT JOIN C_Currency cur ON cur.C_Currency_ID = o.C_Currency_ID
                     WHERE o.C_Order_ID = @OrderID
                       AND o.AD_Client_ID = @ClientID";
 
@@ -512,6 +531,8 @@ namespace VIS.Controllers
                 };
 
                 object orderHeader = null;
+                string docCurSymbolHdr = "";
+                string docCurIsoHdr = "";
                 string parentDocStatus = "DR";
 
                 using (IDataReader dr = DB.ExecuteReader(orderSql, orderParams, null))
@@ -519,6 +540,8 @@ namespace VIS.Controllers
                     if (dr != null && dr.Read())
                     {
                         parentDocStatus = Util.GetValueOfString(dr["DocStatus"]);
+                        docCurSymbolHdr = Util.GetValueOfString(dr["DocCurSymbol"]);
+                        docCurIsoHdr = Util.GetValueOfString(dr["DocCurIso"]);
                         DateTime? dtOrd = Util.GetValueOfDateTime(dr["DateOrdered"]);
                         DateTime? dtProm = Util.GetValueOfDateTime(dr["DatePromised"]);
                         DateTime? dtCreated = Util.GetValueOfDateTime(dr["CreatedOn"]);
@@ -537,24 +560,32 @@ namespace VIS.Controllers
                     }
                 }
 
+                // p.Value / ch.Name / p.Name / asi.Description are NVARCHAR2 columns. COALESCE'ing
+                // any of them against a string literal raises ORA-12704 (character set mismatch) on
+                // Oracle - the statement throws, the catch block below swallows it, and the endpoint
+                // returns an empty response, which the modal renders as "No lines found" with every
+                // stat at zero. Same bug fixed the same way in VAS_161 / VAS_163 / VAS_165 / VAS_164
+                // / VAS_215: select these columns raw (no COALESCE against a literal) and leave them
+                // blank in C# (Util.GetValueOfString already returns "" for DBNull) when there is no
+                // value.
                 // Fetch Order Lines
                 string linesSql = @"
                     SELECT
                         ol.C_OrderLine_ID,
                         ol.Line,
-                        COALESCE(p.Value, N'') AS ProductCode,
+                        p.Value AS ProductCode,
                         -- A charge line, or a product that is not of Item type, carries no
                         -- stock movement: the widget shows its name, UOM, ordered, rate and
                         -- amount, and dashes for received / pending / line status.
                         CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0
-                             THEN COALESCE(ch.Name, N'')
-                             ELSE COALESCE(p.Name, N'') END AS ProductName,
+                             THEN ch.Name
+                             ELSE p.Name END AS ProductName,
                         CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0 THEN 'Y'
                              WHEN ol.M_Product_ID IS NOT NULL AND COALESCE(p.ProductType, 'I') <> 'I' THEN 'Y'
                              ELSE 'N' END AS IsNonStock,
                         CASE WHEN COALESCE(ol.M_AttributeSetInstance_ID, 0) > 0
-                             THEN COALESCE(asi.Description, N'')
-                             ELSE N'' END AS AttributeDesc,
+                             THEN asi.Description
+                             ELSE NULL END AS AttributeDesc,
                         COALESCE(uom.UOMSymbol, uom.Name) AS UomName,
                         COALESCE(ol.QtyOrdered, 0) AS QtyOrdered,
                         -- QtyEntered is expressed in the line's own C_UOM_ID (the UOM the buyer
@@ -577,7 +608,16 @@ namespace VIS.Controllers
 
                 List<object> linesList = new List<object>();
 
-                using (IDataReader dr = DB.ExecuteReader(linesSql, orderParams, null))
+                // linesSql only references @OrderID (no @ClientID predicate) - reusing orderParams
+                // here passed a @ClientID bind value with no matching placeholder in the SQL text,
+                // which Oracle rejects with ORA-01006 "bind variable does not exist". A dedicated,
+                // single-parameter array keeps the bound parameters in step with the SQL text.
+                SqlParameter[] lineParams = new SqlParameter[]
+                {
+                    new SqlParameter("@OrderID", orderId)
+                };
+
+                using (IDataReader dr = DB.ExecuteReader(linesSql, lineParams, null))
                 {
                     while (dr != null && dr.Read())
                     {
@@ -652,6 +692,8 @@ namespace VIS.Controllers
                     success = true,
                     header = orderHeader,
                     lines = linesList,
+                    docCurSymbol = docCurSymbolHdr,
+                    docCurIso = docCurIsoHdr,
                     curSymbol = curInfo.CurSymbol,
                     curIso = curInfo.CurIso,
                     stdPrecision = curInfo.StdPrecision

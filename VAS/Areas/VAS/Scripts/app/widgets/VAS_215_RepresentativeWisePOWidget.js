@@ -673,10 +673,32 @@
             });
         }
 
+        // Sizes a popup table body to the rows that really fit the dialog at the current
+        // screen size, and returns that count. The dialog is capped at min(880px, 90dvh), so
+        // the room for rows is that cap less everything around the table (header, stats,
+        // column head, footer), measured from the live layout rather than guessed. The same
+        // count is the page size, so "Showing 1-N of M" always equals the rows on screen.
+        function fitModalRows($body) {
+            var fallback = parseInt(window.getComputedStyle($body[0]).getPropertyValue('--vas-rwpo-rows'), 10) || 6;
+            var $modal = $body.closest('.vas-rwpo-modal');
+            var bodyH = $body.outerHeight();
+            if (!$modal.length || !bodyH) { return fallback; }
+
+            var rowH = bodyH / fallback;
+            var maxH = Math.min(880, window.innerHeight * 0.9);
+            var overhead = $modal.outerHeight() - bodyH;
+            // The helper/pager footer is still empty on first measure; reserve room for it.
+            if (!$body.next().outerHeight()) { overhead += rowH * 1.6; }
+            var rows = Math.floor((maxH - overhead) / rowH);
+            rows = Math.max(4, Math.min(10, rows));
+            $body[0].style.setProperty('--vas-rwpo-rows', rows);
+            return rows;
+        }
+
         function renderPagedPOTable($container, orders, repName) {
             $container.empty();
             var mPage = 0;
-            var mPageSize = 10;
+            var mPageSize = 6;
             var mTotalPages = Math.max(1, Math.ceil(orders.length / mPageSize));
 
             var $tableWrap = $('<div class="vas-rwpo-paged-table-wrap"></div>');
@@ -689,7 +711,7 @@
                 '<span class="vas-rwpo-cell" title="' + esc(lbl('VAS_Representative', 'Representative')) + '">' + esc(lbl('VAS_Representative', 'Representative')) + '</span>' +
                 '<span class="vas-rwpo-cell vas-rwpo-right" title="' + esc(lbl('VAS_Value', 'Value')) + '">' + esc(lbl('VAS_Value', 'Value')) + '</span>' +
                 '<span class="vas-rwpo-cell" title="' + esc(lbl('VAS_Delivery', 'Delivery')) + '">' + esc(lbl('VAS_Delivery', 'Delivery')) + '</span>' +
-                '<span class="vas-rwpo-cell" title="' + esc(lbl('VAS_Status', 'Status')) + '">' + esc(lbl('VAS_Status', 'Status')) + '</span>' +
+                '<span class="vas-rwpo-cell" title="' + esc(lbl('VAS_Status', 'Status').replace(/\s*:\s*$/, '')) + '">' + esc(lbl('VAS_Status', 'Status').replace(/\s*:\s*$/, '')) + '</span>' +
                 '</div>');
 
             var $tableBody = $('<div class="vas-rwpo-mbody"></div>');
@@ -697,6 +719,7 @@
 
             $tableWrap.append($tableHead).append($tableBody).append($tableFoot);
             $container.append($tableWrap);
+            mPageSize = fitModalRows($tableBody);
 
             function drawPage() {
                 $tableBody.empty();
@@ -792,6 +815,34 @@
                 cache: false,
                 success: function (res) {
                     var data = parseResponse(res);
+
+                    // Server returns {error, message} on a caught exception - previously this was
+                    // never checked, so a genuine server-side failure silently rendered as "No
+                    // lines found" with every stat at zero, identical to the legitimate empty
+                    // state. Surface it so a real bug is visible instead of indistinguishable from
+                    // "this PO really has no lines".
+                    if (data && data.error) {
+                        console.error('VAS_215_RepresentativeWisePOWidget: GetPurchaseOrderLines failed', data);
+                        openModal({
+                            isChild: true,
+                            size: 'md',
+                            title: lbl('VAS_Lines', 'Lines') + ' · ' + lbl('VAS_PONo', 'PO No') + ' #' + orderId,
+                            subtitle: '',
+                            body: '<div class="vas-rwpo-empty-box"><p class="vas-rwpo-empty-msg">' +
+                                esc(data.message || data.error) + '</p></div>',
+                            foot: function ($foot) {
+                                $foot.html('<span class="vas-rwpo-foot-note"></span>' +
+                                    '<span>' +
+                                    '<button type="button" class="vas-rwpo-btn vas-rwpo-back-btn">' + esc(lbl('VAS_Back', 'Back')) + '</button> ' +
+                                    '<button type="button" class="vas-rwpo-btn vas-rwpo-close-btn">' + esc(lbl('VAS_Close', 'Close')) + '</button>' +
+                                    '</span>');
+                                $foot.find('.vas-rwpo-back-btn').on('click', popModal);
+                                $foot.find('.vas-rwpo-close-btn').on('click', closeModal);
+                            }
+                        });
+                        return;
+                    }
+
                     var header = data.header || {};
                     var lines = data.lines || [];
 
@@ -803,8 +854,12 @@
                     var totalPending = 0;
                     var totalLinesAmt = 0;
                     for (var k = 0; k < lines.length; k++) {
-                        totalOrdered += (lines[k].qty || 0);
-                        totalPending += (lines[k].pend || 0);
+                        // Qty ordered / Qty pending count Item-type products only: charge lines and other non-Item
+                        // products are never received, so they must not add to either figure.
+                        if (!(lines[k].isNonStock || lines[k].IsNonStock)) {
+                            totalOrdered += (lines[k].qty || 0);
+                            totalPending += (lines[k].pend || 0);
+                        }
                         totalLinesAmt += (lines[k].amount || 0);
                     }
 
@@ -844,6 +899,22 @@
                             renderPagedLinesTable($host.find('#vas_rwpo_lines_table_wrap'), lines, poNo);
                         }
                     });
+                },
+                error: function (xhr) {
+                    console.error('VAS_215_RepresentativeWisePOWidget: GetPurchaseOrderLines request failed', xhr);
+                    openModal({
+                        isChild: true,
+                        size: 'md',
+                        title: lbl('VAS_Lines', 'Lines') + ' · ' + lbl('VAS_PONo', 'PO No') + ' #' + orderId,
+                        subtitle: '',
+                        body: '<div class="vas-rwpo-empty-box"><p class="vas-rwpo-empty-msg">' +
+                            esc(lbl('VAS_215_FailedToLoadRepresentativeData', 'Failed to load representative data')) + '</p></div>',
+                        foot: function ($foot) {
+                            $foot.html('<span class="vas-rwpo-foot-note"></span>' +
+                                '<button type="button" class="vas-rwpo-btn vas-rwpo-close-btn">' + esc(lbl('VAS_Close', 'Close')) + '</button>');
+                            $foot.find('.vas-rwpo-close-btn').on('click', closeModal);
+                        }
+                    });
                 }
             });
         }
@@ -851,7 +922,7 @@
         function renderPagedLinesTable($container, lines, poNo) {
             $container.empty();
             var lPage = 0;
-            var lPageSize = 10;
+            var lPageSize = 6;
             var lTotalPages = Math.max(1, Math.ceil(lines.length / lPageSize));
 
             var $tableWrap = $('<div class="vas-rwpo-paged-table-wrap"></div>');
@@ -873,6 +944,7 @@
 
             $tableWrap.append($tableHead).append($tableBody).append($tableFoot);
             $container.append($tableWrap);
+            lPageSize = fitModalRows($tableBody);
 
             function drawLinesPage() {
                 $tableBody.empty();
@@ -940,44 +1012,29 @@
             drawLinesPage();
         }
 
+        // Canonical Home/Landing-page zoom handling (2026-09-30, per user-supplied reference
+        // pattern): $self.windowNo >= 0 means this widget is hosted inside an actual window tab,
+        // so the host's own tab-panel router relays the value change; otherwise (Home dashboard
+        // placement, windowNo < 0) VAS.ZoomUtil.zoomToRecord resolves and opens the window
+        // directly, caching the resolved window id so repeat clicks skip re-resolving it by name.
+        var poZoomWindowId = 0;
+
         function openPurchaseOrderRecord(orderId) {
             if (!orderId) return;
             closeModal();
 
-            var ZOOM_WINDOW_NAME = 'VAS_PurchaseOrder';
-            var ZOOM_WINDOW_FALLBACK = 'Purchase Order';
-            var ZOOM_TABLE = 'C_Order';
-
-            var navigated = false;
-            try {
-                if ($self.listener && typeof $self.widgetFirevalueChanged === 'function') {
-                    $self.widgetFirevalueChanged({
-                        "TabWhereClause": ZOOM_TABLE + "." + ZOOM_TABLE + "_ID=" + orderId,
-                        "TabLayout": "Y",
-                        "TabIndex": "0",
-                        "AD_Tab_ID": 1002398,
-                        "ActionName": ZOOM_WINDOW_NAME,
-                        "ActionType": "W"
+            if ($self.windowNo >= 0) {
+                var windowParam = {
+                    "TabWhereClause": "C_Order.C_Order_ID=" + orderId,
+                    "TabLayout": "Y",
+                    "TabIndex": "0"
+                };
+                $self.widgetFirevalueChanged(windowParam);
+            } else {
+                VAS.ZoomUtil.zoomToRecord("C_Order_ID", orderId, poZoomWindowId, "VAS_PurchaseOrder", "")
+                    .done(function (id) {
+                        if (id > 0) { poZoomWindowId = id; }
                     });
-                    navigated = true;
-                }
-            } catch (e) { }
-
-            if (!navigated) {
-                try {
-                    if (window.VAS && VAS.ZoomUtil && typeof VAS.ZoomUtil.zoomToRecord === 'function') {
-                        VAS.ZoomUtil.zoomToRecord(ZOOM_TABLE + "_ID", orderId, 0, ZOOM_WINDOW_NAME, ZOOM_WINDOW_FALLBACK);
-                    } else if (window.VIS && VIS.AEnv && typeof VIS.AEnv.zoom === 'function') {
-                        VIS.AEnv.zoom(259, orderId);
-                    } else if (window.VIS && VIS.viewManager && typeof VIS.viewManager.startWindow === 'function') {
-                        var windowId = (VIS.context && VIS.context.getWindowId)
-                            ? (VIS.context.getWindowId(ZOOM_WINDOW_NAME) || VIS.context.getWindowId(ZOOM_TABLE) || 181)
-                            : 181;
-                        var query = new VIS.Query();
-                        query.addRestriction("C_Order_ID", VIS.Query.prototype.EQUAL, orderId);
-                        VIS.viewManager.startWindow(windowId, query);
-                    }
-                } catch (e2) { }
             }
         }
 

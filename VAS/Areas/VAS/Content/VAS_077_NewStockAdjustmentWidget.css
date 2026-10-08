@@ -55,24 +55,27 @@
     outline-offset: 2px;
 }
 
+/* Icon well tokens matched to the established "New X" quick-action tile family
+   (VAS_166_NewCycleCountWidget.css, "matched 100% to VAS_108_NewItemWidget.css"):
+   1.75em well, solid #1F83FF, radius fixed at 10px (border radii don't scale with em -
+   dashboard-widgets.md "Not Scaled With Em"). */
 .MPC-stock-adjustment-icon {
-    width: 2.25em;
-    height: 2.25em;
+    width: 1.75em;
+    height: 1.75em;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     align-self: flex-end;
     flex: 0 0 auto;
-    padding: 0.5em;
     color: #fff;
-    background: #0083da;
-    border-radius: 0.625em;
-    box-shadow: 0 5px 12px rgba(0, 131, 218, 0.22);
+    background: #1F83FF;
+    border-radius: 10px;
+    box-shadow: 0 10px 24px rgba(31, 131, 255, 0.22);
 }
 
 .MPC-stock-adjustment-icon svg {
-    width: 100%;
-    height: 100%;
+    width: 1em;
+    height: 1em;
 }
 
 .MPC-stock-adjustment-copy {
@@ -89,16 +92,22 @@
 }
 
 .MPC-stock-adjustment-title {
-    font-size: 0.875em;
+    font-size: 0.75em;
     font-weight: 500;
-    line-height: 1.15;
+    line-height: 1.2;
 }
 
 .MPC-stock-adjustment-subtitle {
-    color: #667985;
-    font-size: 0.6875em;
+    /* Muted token per foundations.md (#5F7283) - was #667985, an off-palette one-off. */
+    color: #5F7283;
+    font-size: 0.625em;
     font-weight: 400;
-    line-height: 1.2;
+    line-height: 1.25;
+    margin-top: 0.25em;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 @media (prefers-reduced-motion: reduce) {

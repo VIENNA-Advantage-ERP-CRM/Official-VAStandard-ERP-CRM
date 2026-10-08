@@ -206,7 +206,7 @@
 
         /* ================= Filter popover =================
            Two date ranges, an amount band and a currency restriction; every bound optional and
-           open-endable. Dates are native <input type="date"> (always ISO on the wire); the amounts
+           open-endable. Dates are native <input type="date" max="9999-12-31"> (always ISO on the wire); the amounts
            and the currency use the framework's own controls so the decimal separator and the
            C_Currency_ID lookup behave exactly as in a standard window. */
         function hasFilters() {
@@ -240,8 +240,8 @@
         function dateRangeHtml(title, fromId, toId) {
             return '<div class="vas-dssrch-frow"><div class="vas-dssrch-flabel">' + dsEsc(title) + '</div>' +
                 '<div class="vas-dssrch-fpair">' +
-                '<label><span>' + dsEsc(msg('VAS_067_From', 'From')) + '</span><input type="date" id="' + fromId + '"></label>' +
-                '<label><span>' + dsEsc(msg('VAS_067_To', 'To')) + '</span><input type="date" id="' + toId + '"></label>' +
+                '<label><span>' + dsEsc(msg('VAS_067_From', 'From')) + '</span><input type="date" max="9999-12-31" id="' + fromId + '"></label>' +
+                '<label><span>' + dsEsc(msg('VAS_067_To', 'To')) + '</span><input type="date" max="9999-12-31" id="' + toId + '"></label>' +
                 '</div></div>';
         }
 

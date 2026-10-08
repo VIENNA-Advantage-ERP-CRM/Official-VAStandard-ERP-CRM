@@ -18,6 +18,24 @@
  *  9 | Previous                                         | VAS_Previous
  * 10 | Next                                             | VAS_Next
  * 11 | of                                               | VAS_Of
+ * 12 | Close                                            | VAS_Close
+ * 13 | Loading...                                       | VAS_Loading
+ * 14 | Landed cost                                      | VAS_212_LandedCost
+ * 15 | Expected landed cost                             | VAS_212_ExpectedLandedCost
+ * 16 | Failed to load data                              | VAS_212_FailedToLoad
+ * 17 | No purchase orders found                         | VAS_NoPOsFound
+ * 18 | Purchase order                                   | VAS_PurchaseOrder
+ * 19 | Vendor                                           | VAS_Vendor
+ * 20 | Warehouse                                        | VAS_Warehouse
+ * 21 | PO date                                          | VAS_PODate
+ * 22 | Status                                           | VAS_Status
+ * 23 | Amount                                           | VAS_Amount
+ * 24 | Showing                                          | VAS_Showing
+ * 25 | purchase orders                                  | VAS_PurchaseOrders
+ * 26 | Drafted                                          | VAS_Drafted
+ * 27 | In process                                       | VAS_InProcess
+ * 28 | Completed                                        | VAS_Completed
+ * 29 | Closed                                           | VAS_Closed
  */
 ; VAS = window.VAS || {};
 
@@ -424,6 +442,33 @@
 
             $('body').append($elcMask);
             $elcMask.find('.vas-elc-mclose, .vas-elc-mbtn').on('click', closeCostModal);
+            $elcMask.on('click', '.vas-elc-lnk', function () {
+                openPurchaseOrder(Number($(this).data('orderid')));
+            });
+        }
+
+        // Home/Landing-page zoom handling: windowNo >= 0 means the widget is hosted inside a
+        // window tab, so the host's tab-panel router relays the value change; otherwise
+        // (Home dashboard, windowNo < 0) VAS.ZoomUtil.zoomToRecord resolves and opens the
+        // window directly, caching the resolved window id so repeat clicks skip the lookup.
+        var poZoomWindowId = 0;
+
+        function openPurchaseOrder(orderId) {
+            if (!orderId) { return; }
+            // The record opens behind the popup otherwise, stranding the dialog over it.
+            closeCostModal();
+            if ($self.windowNo >= 0) {
+                $self.widgetFirevalueChanged({
+                    "TabWhereClause": "C_Order.C_Order_ID=" + orderId,
+                    "TabLayout": "Y",
+                    "TabIndex": "0"
+                });
+            } else {
+                VAS.ZoomUtil.zoomToRecord("C_Order_ID", orderId, poZoomWindowId, "VAS_PurchaseOrder", "")
+                    .done(function (id) {
+                        if (id > 0) { poZoomWindowId = id; }
+                    });
+            }
         }
 
         function closeCostModal() {
@@ -483,7 +528,7 @@
                     '<span class="vas-elc-mcell">' + escapeHtml(label('VAS_Vendor', 'Vendor')) + '</span>' +
                     '<span class="vas-elc-mcell">' + escapeHtml(label('VAS_Warehouse', 'Warehouse')) + '</span>' +
                     '<span class="vas-elc-mcell">' + escapeHtml(label('VAS_PODate', 'PO date')) + '</span>' +
-                    '<span class="vas-elc-mcell">' + escapeHtml(label('VAS_Status', 'Status')) + '</span>' +
+                    '<span class="vas-elc-mcell">' + escapeHtml(label('VAS_Status', 'Status').replace(/\s*:\s*$/, '')) + '</span>' +
                     '<span class="vas-elc-mcell vas-elc-mright">' + escapeHtml(label('VAS_Amount', 'Amount')) + '</span>' +
                 '</div>';
 
@@ -493,7 +538,9 @@
                 var amt = formatCurrency(r.amount, sym, prec);
                 body +=
                     '<div class="vas-elc-mrow">' +
-                        '<span class="vas-elc-mcell" title="' + escapeHtml(r.purchaseOrderNo) + '">' + escapeHtml(r.purchaseOrderNo) + '</span>' +
+                        '<span class="vas-elc-mcell" title="' + escapeHtml(r.purchaseOrderNo) + '">' +
+                            '<button type="button" class="vas-elc-lnk" data-orderid="' + Number(r.purchaseOrderId || 0) + '">' + escapeHtml(r.purchaseOrderNo) + '</button>' +
+                        '</span>' +
                         '<span class="vas-elc-mcell" title="' + escapeHtml(r.vendorName) + '">' + escapeHtml(r.vendorName) + '</span>' +
                         '<span class="vas-elc-mcell" title="' + escapeHtml(r.warehouseName) + '">' + escapeHtml(r.warehouseName) + '</span>' +
                         '<span class="vas-elc-mcell">' + escapeHtml(r.orderDate) + '</span>' +

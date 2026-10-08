@@ -125,6 +125,7 @@ namespace VIS.Controllers
                       AND o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
+                      AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
                       AND o.DocStatus IN ('DR', 'IP', 'CO', 'CL') -- queue includes Completed and Closed per specification; only Voided/Reversed stay out
                       AND o.DatePromised >= @MonthStart
                       AND o.DatePromised < @MonthEndExclusive";
@@ -148,7 +149,7 @@ namespace VIS.Controllers
                         o.DateOrdered AS order_date,
                         o.DatePromised AS promised_date,
                         o.DocStatus AS document_status,
-                        COALESCE(o.GrandTotal, 0) AS po_value,
+                        COALESCE(o.TotalLines, 0) AS po_value, -- Sub total (excl. taxes), matches the PO value card
                         o.C_Currency_ID AS currency_id,
                         c.CurSymbol AS doc_cur_symbol,
                         c.ISO_Code AS doc_cur_iso,
@@ -195,6 +196,7 @@ namespace VIS.Controllers
                       AND o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
+                      AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
                       AND o.DocStatus IN ('DR', 'IP', 'CO', 'CL') -- queue includes Completed and Closed per specification; only Voided/Reversed stay out
                       AND o.C_Order_ID IN (@P_ORDER_ACCESS@)
                       AND o.DatePromised >= @MonthStart
@@ -426,9 +428,17 @@ namespace VIS.Controllers
                         ON rq.C_Order_ID = o.C_Order_ID
                     WHERE o.C_Order_ID = @C_Order_ID
                       AND o.IsActive = 'Y'
-                      AND o.AD_Client_ID = " + ctx.GetAD_Client_ID();
+                      AND o.AD_Client_ID = " + ctx.GetAD_Client_ID() + @"
+                      AND o.C_Order_ID IN (@P_ORDER_ACCESS@)";
 
-                sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                // MRole.AddAccessSQL cannot parse a statement with a derived table (the requisition
+                // join): it inserts the access predicates at the wrong place, the query fails and
+                // the popup header comes back empty. Apply the same role access through a simple,
+                // parseable sub-query on C_Order instead, as GetPOQueueData does.
+                string orderAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                    "SELECT accessOrd.C_Order_ID FROM C_Order accessOrd WHERE accessOrd.AD_Client_ID = " + ctx.GetAD_Client_ID(),
+                    "accessOrd", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                sql = sql.Replace("@P_ORDER_ACCESS@", orderAccessSql);
 
                 SqlParameter[] sqlParams = { new SqlParameter("@C_Order_ID", C_Order_ID) };
 

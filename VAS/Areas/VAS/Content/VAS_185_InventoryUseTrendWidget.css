@@ -14,16 +14,17 @@
 
 .vas-iut-card {
     font-family: Roboto, Arial, sans-serif;
-    /* Design Specs (dashboard-widgets.md > "Widget Root Anchor"): every widget root
-       must use clamp(16px, 1.2cqi, 20px) - was clamp(15px, 4cqi, 24px) here, well
-       past even the PRE-calibration clamp(16px, 1.4cqi, 24px) the spec's own "2K
-       Calibration" section documents replacing (24px read oversized on 2K
-       dashboards; this widget's 4cqi rate is ~3x steeper still). Container-query
-       scaling first (cqi resolves against the root, which sets container-type:
-       inline-size), with the JS-driven --widget-inline-size as the fallback for
-       engines without container queries. Same rate in both: 1.2cqi == 0.012. */
-    font-size: clamp(16px, 1.2cqi, 20px);
-    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 480px)) * 0.012), 20px);
+    /* Reverted to clamp(15px, 4cqi, 24px) (2026-09-28, user request): a prior pass had
+       shrunk this to the compact-tile canonical clamp(16px, 1.2cqi, 20px) per
+       dashboard-widgets.md's generic "Widget Root Anchor" formula, but that formula is
+       sized for small KPI/quick-action tiles, not this 4x2 chart widget. That made this
+       widget read noticeably smaller than its siblings in the same Inventory Use window
+       (e.g. VAS_188_TopUsedProductsWidget, also 4x2, still correctly at 4cqi/15-24px).
+       Container-query scaling first (cqi resolves against the root, which sets
+       container-type: inline-size), with the JS-driven --widget-inline-size as the
+       fallback for engines without container queries. Same rate in both: 4cqi == 0.04. */
+    font-size: clamp(15px, 4cqi, 24px);
+    font-size: clamp(15px, calc(var(--widget-inline-size, var(--dash-inline-size, 480px)) * 0.04), 24px);
     width: 100%;
     height: 100%;
     display: flex;
@@ -35,7 +36,9 @@
     box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
     background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
     backdrop-filter: blur(10px);
-    padding: .85em;
+    /* Matches the Inventory Use window's shared card padding (VAS_188/VAS_183/VAS_186/
+       VAS_178 all use .875em) - was .85em here, a slight but real mismatch. */
+    padding: .875em;
     overflow: hidden;
 }
 

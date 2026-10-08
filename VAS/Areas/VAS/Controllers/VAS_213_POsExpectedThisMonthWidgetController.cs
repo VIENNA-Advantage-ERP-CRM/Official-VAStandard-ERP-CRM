@@ -148,7 +148,8 @@ namespace VIS.Controllers
                       AND o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
-                      AND o.DocStatus NOT IN ('CO', 'CL', 'VO', 'RE')
+                      AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
+                      AND o.DocStatus NOT IN ('DR', 'IP', 'VO', 'RE')
                       AND o.DatePromised >= @P_MONTH_START
                       AND o.DatePromised < @P_MONTH_END_EXCLUSIVE
                       AND q.ordered_qty > q.delivered_qty
@@ -305,6 +306,7 @@ namespace VIS.Controllers
                       AND o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
+                      AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
                       AND o.DocStatus NOT IN ('CL', 'VO', 'RE')
                       AND q.ordered_qty > q.delivered_qty
                       AND o.C_Order_ID IN (@P_ORDER_ACCESS@)";

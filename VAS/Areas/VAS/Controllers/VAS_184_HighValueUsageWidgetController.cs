@@ -31,6 +31,29 @@ namespace VIS.Controllers
     ///                          M_InventoryLine.CurrentCostPrice (COALESCE(...,0), no NULLIF
     ///                          chain, no product-cost lookup). ProductCurrentCostSql and its
     ///                          join are removed as now-unused.
+    ///   Claude      2026-09-29 GetHighValueProducts: (1) now selects UomId alongside UomName
+    ///                          so the client can round-trip it back to GetProductIssueHistory;
+    ///                          (2) added HAVING to drop product/UOM groups whose total value
+    ///                          is 0 from the top-10 listing, per "dont include records with 0
+    ///                          amount in listing". GetProductIssueHistory now takes uomId and
+    ///                          filters the issue-history table to that exact UOM - previously
+    ///                          it returned every line for the product regardless of which
+    ///                          UOM's row (e.g. "Filter Oil (Litre)" grouped separately as
+    ///                          Liter vs MILLILITRE) the user opened the modal from, so both
+    ///                          modals showed the same unfiltered record set.
+    ///   Claude      2026-09-29 TotalIssuedQty was summing QtyInternalUse, which - unlike
+    ///                          QtyEntered - is carried in the product's stocking/base UOM
+    ///                          regardless of which UOM the line was entered in. Grouping by
+    ///                          the entered UOM (uom.Name/C_UOM_ID) but summing a stocking-UOM
+    ///                          quantity produced a caption in the wrong unit: a MILLILITRE
+    ///                          group showed "4 MILLILITRE" when the two matching lines'
+    ///                          QtyEntered actually totalled 4000 (their QtyInternalUse was
+    ///                          ~4, i.e. the Liter-equivalent). Switched to SUM(QtyEntered),
+    ///                          which is already in the group's own entered UOM and matches
+    ///                          the modal table's per-line Qty column (also QtyEntered). Value
+    ///                          (issuedValue) is left on QtyInternalUse * CurrentCostPrice -
+    ///                          CurrentCostPrice is per stocking-UOM unit, so that math was
+    ///                          already dimensionally correct and unaffected by this bug.
     /// </summary>
     public class VAS_184_HighValueUsageWidgetController : Controller
     {
@@ -114,9 +137,10 @@ namespace VIS.Controllers
                         p.M_Product_ID,
                         p.Name AS ProductName,
                         asi.Description AS Attribute,
+                        uom.C_UOM_ID AS UomId,
                         uom.Name AS UomName,
                         MAX(COALESCE(line.CurrentCostPrice, 0)) AS CostPrice,
-                        SUM(line.QtyInternalUse) AS TotalIssuedQty,
+                        SUM(line.QtyEntered) AS TotalIssuedQty,
                         SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, 0)) AS TotalIssuedValue
                       FROM M_InventoryLine line
                       INNER JOIN (" + invAccessSql + @") ai ON ai.M_Inventory_ID = line.M_Inventory_ID
@@ -125,7 +149,8 @@ namespace VIS.Controllers
                       LEFT JOIN M_AttributeSetInstance asi ON asi.M_AttributeSetInstance_ID = line.M_AttributeSetInstance_ID
                       WHERE line.IsActive = 'Y'
                         AND COALESCE(line.QtyInternalUse, 0) > 0
-                      GROUP BY p.M_Product_ID, p.Name, asi.Description, uom.Name
+                      GROUP BY p.M_Product_ID, p.Name, asi.Description, uom.C_UOM_ID, uom.Name
+                      HAVING SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, 0)) > 0
                       ORDER BY MAX(COALESCE(line.CurrentCostPrice, 0)) DESC,
                                SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, 0)) DESC
                     ) WHERE ROWNUM <= 10";
@@ -139,6 +164,7 @@ namespace VIS.Controllers
                             productId = Util.GetValueOfInt(dr["M_Product_ID"]),
                             productName = Util.GetValueOfString(dr["ProductName"]),
                             attribute = NormalizeAttributes(Util.GetValueOfString(dr["Attribute"])),
+                            uomId = Util.GetValueOfInt(dr["UomId"]),
                             uomName = Util.GetValueOfString(dr["UomName"]),
                             costPrice = Util.GetValueOfDecimal(dr["CostPrice"]),
                             issuedQty = Util.GetValueOfDecimal(dr["TotalIssuedQty"]),
@@ -164,7 +190,7 @@ namespace VIS.Controllers
         /// <summary>Endpoint B: Individual issue entries for a specific product in selected period.</summary>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetProductIssueHistory(int productId, int month, int year)
+        public JsonResult GetProductIssueHistory(int productId, int month, int year, int uomId = 0)
         {
             Ctx ctx = Session["ctx"] as Ctx;
             if (ctx == null) { return Json("", JsonRequestBehavior.AllowGet); }
@@ -182,6 +208,9 @@ namespace VIS.Controllers
 
                 // Same cost rule and same zero exclusion as GetHighValueProducts - if the two drifted,
                 // the modal's line values would no longer add up to the total shown on the row.
+                // Filtered to the exact UOM the row was grouped/opened by, since GetHighValueProducts
+                // now returns one row per product+UOM (e.g. "Filter Oil (Litre)" as Liter and again as
+                // MILLILITRE) - without this, both modals showed the same unfiltered set of lines.
                 // LocatorCombination is the full "Warehouse.Aisle.Bin.Level"-style locator name;
                 // Value alone is often just an auto-generated numeric code, which read like a raw
                 // ID to the user. Not present on every database release, so check first and fall
@@ -206,6 +235,7 @@ namespace VIS.Controllers
                     WHERE line.IsActive = 'Y'
                       AND COALESCE(line.QtyInternalUse, 0) > 0
                       AND line.M_Product_ID = " + productId + @"
+                      AND COALESCE(line.C_UOM_ID, 0) = " + uomId + @"
                     ORDER BY ai.MovementDate DESC, ai.DocumentNo DESC";
 
                 using (IDataReader dr = DB.ExecuteReader(sql, null, null))

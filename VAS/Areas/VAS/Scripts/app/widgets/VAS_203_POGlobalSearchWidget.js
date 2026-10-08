@@ -293,9 +293,9 @@
                     '<span class="vas-dssrch-chip vas-dssrch-chip-' + dsEsc(cfg.chip) + '">' + dsEsc(label) + '</span>' +
                     '<div class="vas-dssrch-main">' +
                         '<div class="vas-dssrch-docline">' +
-                            '<span class="vas-dssrch-docno">' + dsEsc(item.title || '') + '</span>' +
+                            '<span class="vas-dssrch-docno" title="' + dsEsc(item.fullTitle || item.title || '') + '">' + dsEsc(item.title || '') + '</span>' +
                         '</div>' +
-                        '<div class="vas-dssrch-title">' + dsEsc(item.subtitle || '') + '</div>' +
+                        '<div class="vas-dssrch-title" title="' + dsEsc(item.subtitle || '') + '">' + dsEsc(item.subtitle || '') + '</div>' +
                     '</div>' +
                     '<div class="vas-dssrch-meta">' +
                         '<div class="vas-dssrch-amount">' + dsEsc(item.value || '') + '</div>' +
@@ -343,33 +343,27 @@
         }
 
 
+        // Canonical Home/Landing-page zoom handling (2026-09-30, per user-supplied reference
+        // pattern): $self.windowNo >= 0 means this widget is hosted inside an actual window tab,
+        // so the host's own tab-panel router relays the value change; otherwise (Home dashboard
+        // placement, windowNo < 0) VAS.ZoomUtil.zoomToRecord resolves and opens the window
+        // directly, caching the resolved window id so repeat clicks skip re-resolving it by name.
+        var poZoomWindowId = 0;
+
         /* Opens the Purchase Order window for a record - used by the detail modal's "Open record". */
         function openRecordInWindow(orderId) {
-            var navigated = false;
-            try {
-                if ($self.listener && typeof $self.widgetFirevalueChanged === 'function') {
-                    $self.widgetFirevalueChanged({
-                        "TabWhereClause": TABLE_NAME + "." + TABLE_NAME + "_ID=" + orderId,
-                        "TabLayout": "Y",
-                        "TabIndex": "0",
-                        "AD_Tab_ID": TAB_ID,
-                        "ActionName": WINDOW_NAME,
-                        "ActionType": "W"
+            if ($self.windowNo >= 0) {
+                var windowParam = {
+                    "TabWhereClause": TABLE_NAME + "." + TABLE_NAME + "_ID=" + orderId,
+                    "TabLayout": "Y",
+                    "TabIndex": "0"
+                };
+                $self.widgetFirevalueChanged(windowParam);
+            } else {
+                VAS.ZoomUtil.zoomToRecord(TABLE_NAME + "_ID", orderId, poZoomWindowId, WINDOW_NAME, "")
+                    .done(function (id) {
+                        if (id > 0) { poZoomWindowId = id; }
                     });
-                    navigated = true;
-                }
-            } catch (ex) {
-                console.warn("VAS_203_POGlobalSearchWidget: widgetFirevalueChanged failed", ex);
-            }
-
-            if (!navigated) {
-                try {
-                    if (VIS && VIS.AEnv && typeof VIS.AEnv.zoom === 'function') {
-                        VIS.AEnv.zoom(ZOOM_TABLE_ID, orderId);
-                    }
-                } catch (ex2) {
-                    console.warn("VAS_203_POGlobalSearchWidget: VIS.AEnv.zoom fallback failed", ex2);
-                }
             }
         }
 

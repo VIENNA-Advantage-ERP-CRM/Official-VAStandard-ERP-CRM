@@ -184,16 +184,23 @@
         }
 
         // "Nice" rounded axis max + step for tickCount intervals (standard chart-axis
-        // algorithm: 1/2/5/10 x a power of ten), so gridlines land on round numbers
-        // (0/500/1,000/... or 0/10K/20K/...) instead of the raw data max.
+        // algorithm: 1/2/2.5/5/7.5/10 x a power of ten), so gridlines land on round
+        // numbers (0/500/1,000/... or 0/10K/20K/...) instead of the raw data max.
+        // The 2.5/7.5 candidates (user request: "highest slab according to max data")
+        // fill the two widest gaps in the plain 1/2/5/10 set - without them a residual
+        // just over 5 (e.g. 5.22) rounded all the way up to 10, which could put the top
+        // gridline at nearly double the actual data max; 7.5 catches that case with far
+        // less overshoot while still being a clean, round step value.
         function niceTicks(maxValue, tickCount) {
             var safeMax = Math.max(Number(maxValue) || 0, 1);
             var rawStep = safeMax / tickCount;
             var magnitude = Math.pow(10, Math.floor(Math.log(rawStep) / Math.LN10));
             var residual = rawStep / magnitude;
             var niceResidual;
-            if (residual > 5) { niceResidual = 10; }
-            else if (residual > 2) { niceResidual = 5; }
+            if (residual > 7.5) { niceResidual = 10; }
+            else if (residual > 5) { niceResidual = 7.5; }
+            else if (residual > 2.5) { niceResidual = 5; }
+            else if (residual > 2) { niceResidual = 2.5; }
             else if (residual > 1) { niceResidual = 2; }
             else { niceResidual = 1; }
             var step = niceResidual * magnitude;
@@ -208,7 +215,7 @@
             t.setAttribute('x', x);
             t.setAttribute('y', y);
             t.setAttribute('text-anchor', o.anchor || 'middle');
-            t.setAttribute('font-size', o.size || '9');
+            t.setAttribute('font-size', o.size || '15');
             t.setAttribute('font-weight', o.weight || '400');
             t.setAttribute('fill', o.fill || '#5F7283');
             if (o.transform) { t.setAttribute('transform', o.transform); }
@@ -309,6 +316,8 @@
                 if (seriesData[i].qty > maxQtyRaw) { maxQtyRaw = seriesData[i].qty; }
                 if (seriesData[i].val > maxValRaw) { maxValRaw = seriesData[i].val; }
             }
+            // TICK_COUNT back to 5 (user request: "show 6 slabs" - 0..5 steps = 6
+            // gridlines/labels).
             var TICK_COUNT = 5;
             var qtyTicks = niceTicks(maxQtyRaw, TICK_COUNT);
             var valTicks = niceTicks(maxValRaw, TICK_COUNT);
@@ -316,14 +325,17 @@
             var maxVal = valTicks.max;
 
             // Layout: [rotated title][tick labels] chart area [tick labels][rotated title]
-            var leftAxisTitleW = 11;
-            var leftTickLabelW = 32;
-            var rightTickLabelW = 30;
-            var rightAxisTitleW = 11;
+            // Sized for the 15px chart text (user request). These exist purely to give
+            // the tick/axis-title text room to render without clipping/overlap against
+            // the now 6-line gridline set, not an independent size change.
+            var leftAxisTitleW = 17;
+            var leftTickLabelW = 50;
+            var rightTickLabelW = 47;
+            var rightAxisTitleW = 17;
             var padLeft = leftAxisTitleW + leftTickLabelW + 4;
             var padRight = rightAxisTitleW + rightTickLabelW + 4;
-            var padTop = 22;
-            var padBottom = 18;
+            var padTop = 35;
+            var padBottom = 28;
             var chartW = width - padLeft - padRight;
             var chartH = height - padTop - padBottom;
             if (chartW <= 0 || chartH <= 0) { return; }
@@ -342,11 +354,11 @@
                 gridLine.setAttribute('stroke-width', '1');
                 $svg.append(gridLine);
 
-                $svg.append(svgText(padLeft - 4, gy + 3, formatAxisQty(qtyTicks.step * g), {
-                    anchor: 'end', size: '9', fill: '#5F7283'
+                $svg.append(svgText(padLeft - 4, gy + 5, formatAxisQty(qtyTicks.step * g), {
+                    anchor: 'end', size: '15', fill: '#5F7283'
                 }));
-                $svg.append(svgText(width - padRight + 4, gy + 3, formatAxisValue(valTicks.step * g), {
-                    anchor: 'start', size: '9', fill: '#5F7283'
+                $svg.append(svgText(width - padRight + 4, gy + 5, formatAxisValue(valTicks.step * g), {
+                    anchor: 'start', size: '15', fill: '#5F7283'
                 }));
             }
 
@@ -354,12 +366,12 @@
             var leftTitleX = leftAxisTitleW - 2;
             var midY = padTop + chartH / 2;
             $svg.append(svgText(leftTitleX, midY, label("VAS_185_Quantity", "Quantity"), {
-                anchor: 'middle', size: '9', weight: '600', fill: '#41576A',
+                anchor: 'middle', size: '15', weight: '600', fill: '#41576A',
                 transform: 'rotate(-90 ' + leftTitleX + ' ' + midY + ')'
             }));
             var rightTitleX = width - (rightAxisTitleW - 2);
             $svg.append(svgText(rightTitleX, midY, label("VAS_185_Value", "Value"), {
-                anchor: 'middle', size: '9', weight: '600', fill: '#41576A',
+                anchor: 'middle', size: '15', weight: '600', fill: '#41576A',
                 transform: 'rotate(90 ' + rightTitleX + ' ' + midY + ')'
             }));
 
@@ -410,7 +422,7 @@
 
                 // Qty inline label candidate on 3M/6M (only when there is a bar to label)
                 if (selectedMonthsWindow <= 6 && hasQty) {
-                    qtyLabelCandidates[j] = { x: centerX, y: Math.max(padTop - 4, barY - 4), text: formatQty(item.qty) };
+                    qtyLabelCandidates[j] = { x: centerX, y: Math.max(padTop - 6, barY - 6), text: formatQty(item.qty) };
                 }
 
                 // Calculate Value Line coordinates
@@ -419,7 +431,7 @@
                 points.push({ x: centerX, y: valY, item: item, idx: j });
 
                 // Bottom Month Label
-                $svg.append(svgText(centerX, height - 2, item.label, { anchor: 'middle', size: '10', fill: '#5F7283' }));
+                $svg.append(svgText(centerX, height - 3, item.label, { anchor: 'middle', size: '15', fill: '#5F7283' }));
             }
 
             // Draw Value Polyline
@@ -464,7 +476,7 @@
                 // format. Collected as a candidate, not appended yet - see the collision
                 // pass below, which resolves overlaps against this same month's qty label.
                 if (selectedMonthsWindow <= 6) {
-                    var textY = (pt.y - 8 < padTop) ? pt.y + 14 : pt.y - 6;
+                    var textY = (pt.y - 13 < padTop) ? pt.y + 22 : pt.y - 10;
                     valLabelCandidates[pt.idx] = { x: pt.x, y: textY, text: formatFullCurrency(pt.item.val) };
                 }
 // ===== NEW CODE END — currency format =====
@@ -483,7 +495,7 @@
             // least MIN_LABEL_GAP of vertical separation by pushing whichever of the two is
             // already higher (smaller y) further up, leaving the lower one at its natural,
             // correctly-anchored position.
-            var MIN_LABEL_GAP = 12;
+            var MIN_LABEL_GAP = 20;
             for (var m = 0; m < numSlots; m++) {
                 var qtyC = qtyLabelCandidates[m];
                 var valC = valLabelCandidates[m];
@@ -498,11 +510,11 @@
             for (var n = 0; n < numSlots; n++) {
                 if (qtyLabelCandidates[n]) {
                     var qc = qtyLabelCandidates[n];
-                    $svg.append(svgText(qc.x, qc.y, qc.text, { anchor: 'middle', size: '9', weight: '700', fill: '#0F69AC' }));
+                    $svg.append(svgText(qc.x, qc.y, qc.text, { anchor: 'middle', size: '15', weight: '700', fill: '#0F69AC' }));
                 }
                 if (valLabelCandidates[n]) {
                     var vc = valLabelCandidates[n];
-                    $svg.append(svgText(vc.x, vc.y, vc.text, { anchor: 'middle', size: '9', weight: '700', fill: '#9A6500' }));
+                    $svg.append(svgText(vc.x, vc.y, vc.text, { anchor: 'middle', size: '15', weight: '700', fill: '#9A6500' }));
                 }
             }
         }

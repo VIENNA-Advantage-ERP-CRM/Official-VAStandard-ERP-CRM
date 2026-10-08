@@ -6,6 +6,14 @@
  *                  (Completed / Closed) in the current MTD window.
  * Author         : Builder Agent 3
  * Date           : 17 August 2026
+ * Claude 2026-09-29: GetPOCompletedMTDData always returned 0. Two compounding bugs:
+ *   (1) MTD window was filtered on OrderCompletionDatetime, a POS-shift field that is
+ *       NULL for ordinary vendor Purchase Orders - now COALESCE(OrderCompletionDatetime,
+ *       Updated).
+ *   (2) MRole.AddAccessSQL was called directly on the full GROUP BY/ORDER BY/multi-JOIN
+ *       query, which VAS_216_POQueueWidget's own code already documents as unreliable
+ *       (AccessSqlParser mis-locates the insertion point) - switched to that same widget's
+ *       fix: access filtered via a small sub-query (o.C_Order_ID IN (...)) instead.
  ***********************************************************/
 
 using Newtonsoft.Json;
@@ -96,13 +104,25 @@ namespace VIS.Controllers
                 DateTime mtdEndExclusive = mtdStart.AddMonths(1);
 
                 // 3. Query MTD Completed/Closed Purchase Orders
+                // OrderCompletionDatetime is a POS-shift field (see MOrder.GetOrderCompletionDatetime()/
+                // MInvoice's VAPOS_ShiftDetails_ID usage) - it is only ever populated for
+                // point-of-sale orders, so on ordinary vendor Purchase Orders (IsSOTrx='N') it is
+                // NULL on essentially every row. Filtering the MTD window on that column alone
+                // therefore matched zero rows regardless of how many POs were actually completed/
+                // closed this month, which is why the KPI always read 0. Falls back to the
+                // standard, always-populated Updated audit column (last save - for a CO/CL
+                // document, effectively the completion timestamp) whenever the POS field is null.
+                // Same root cause VAS_215_RepresentativeWisePOWidget already worked around (its own
+                // comment: "the selected month may hold no COMPLETED order... left the card
+                // permanently empty"), though that fix widened the date window instead since it was
+                // only feeding an average, not this widget's core MTD count.
                 string sql = @"
                     SELECT
                         o.C_Order_ID AS purchase_order_id,
                         o.DocumentNo AS purchase_order_number,
                         o.DateOrdered AS order_date,
                         o.DatePromised AS promised_date,
-                        o.OrderCompletionDatetime AS completion_datetime,
+                        COALESCE(o.OrderCompletionDatetime, o.Updated) AS completion_datetime,
                         o.DocStatus AS document_status,
                         o.C_Currency_ID AS currency_id,
                         o.C_ConversionType_ID AS conversion_type_id,
@@ -127,15 +147,18 @@ namespace VIS.Controllers
                       AND o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
+                      AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
                       AND o.DocStatus IN ('CO', 'CL')
-                      AND o.OrderCompletionDatetime >= @P_MTD_START
-                      AND o.OrderCompletionDatetime < @P_MTD_END_EXCLUSIVE
+                      AND COALESCE(o.OrderCompletionDatetime, o.Updated) >= @P_MTD_START
+                      AND COALESCE(o.OrderCompletionDatetime, o.Updated) < @P_MTD_END_EXCLUSIVE
+                      AND o.C_Order_ID IN (@P_ORDER_ACCESS@)
                     GROUP BY
                         o.C_Order_ID,
                         o.DocumentNo,
                         o.DateOrdered,
                         o.DatePromised,
                         o.OrderCompletionDatetime,
+                        o.Updated,
                         o.DocStatus,
                         o.C_Currency_ID,
                         o.C_ConversionType_ID,
@@ -143,9 +166,18 @@ namespace VIS.Controllers
                         bp.Name,
                         w.Name,
                         rep.Name
-                    ORDER BY o.OrderCompletionDatetime DESC, o.DocumentNo DESC";
+                    ORDER BY MAX(COALESCE(o.OrderCompletionDatetime, o.Updated)) DESC, o.DocumentNo DESC";
 
-                sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                // MRole.AddAccessSQL cannot reliably parse a GROUP BY / multi-JOIN statement like this
+                // one - AccessSqlParser mis-locates the insertion point and appends the access
+                // predicate after GROUP BY / ORDER BY, which either throws (ORA-00933/00979/00904) or
+                // (as it did here) inserts a predicate that silently zeroed out every row. Same fix
+                // VAS_216_POQueueWidget already uses for the identical problem: apply role access
+                // through a small, easily-parsed sub-query on C_Order instead of the full aggregate.
+                string orderAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                    "SELECT accessOrd.C_Order_ID FROM C_Order accessOrd WHERE accessOrd.AD_Client_ID = " + clientId,
+                    "accessOrd", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                sql = sql.Replace("@P_ORDER_ACCESS@", orderAccessSql);
 
                 SqlParameter[] sqlParams =
                 {

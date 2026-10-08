@@ -4,6 +4,13 @@
  * Visualizes up to 12 months of Purchase Order value by DateOrdered with month bars
  * opening the matching PO drill-down list and lines.
  *
+ * 2026-09-30: Close/Back/Showing/of used to be looked up with bare, unprefixed keys
+ * ("Close"/"Back"/"Showing"/"of" - no "VAS_" prefix, unlike every other row in this table).
+ * That collided with an unrelated, already-registered core AD_Message also named "Close",
+ * which carried the text "Close Window" - so the footer button showed "Close Window" instead
+ * of "Close". Prefixed to match every other shared label in this file (VAS_Close/VAS_Back/
+ * VAS_Showing/VAS_Of).
+ *
  * Summary Message Table
  *  #  | Current Text                           | Message Key
  * ----+----------------------------------------+-----------------------------------
@@ -35,10 +42,10 @@
  *  26 | Rate                                   | VAS_Rate
  *  27 | Amount                                 | VAS_Amount
  *  28 | Line status                            | VAS_LineStatus
- *  29 | Close                                  | Close
- *  30 | Back                                   | Back
- *  31 | Showing                                | Showing
- *  32 | of                                     | Of
+ *  29 | Close                                  | VAS_Close
+ *  30 | Back                                   | VAS_Back
+ *  31 | Showing                                | VAS_Showing
+ *  32 | of                                     | VAS_Of
  *  33 | No purchase orders found for this month| VAS_208_NoPOsFoundForMonth
  *  34 | Purchase order lines                   | VAS_PurchaseOrderLines
  *  35 | From month                             | VAS_208_FromMonth
@@ -443,7 +450,7 @@
                     '<div class="vas-mpt-modal">' +
                         '<div class="vas-mpt-modal-head">' +
                             '<div class="vas-mpt-modal-head-left">' +
-                                '<button type="button" class="vas-mpt-xbtn vas-mpt-back-btn" aria-label="' + escapeHtml(lbl("Back", "Back")) + '" style="display:none;">' +
+                                '<button type="button" class="vas-mpt-xbtn vas-mpt-back-btn" aria-label="' + escapeHtml(lbl("VAS_Back", "Back")) + '" style="display:none;">' +
                                     '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>' +
                                 '</button>' +
                                 '<div class="vas-mpt-modal-htxt">' +
@@ -452,7 +459,7 @@
                                 '</div>' +
                             '</div>' +
                             '<div class="vas-mpt-modal-hact">' +
-                                '<button type="button" class="vas-mpt-xbtn vas-mpt-close-btn" aria-label="' + escapeHtml(lbl("Close", "Close")) + '">' +
+                                '<button type="button" class="vas-mpt-xbtn vas-mpt-close-btn" aria-label="' + escapeHtml(lbl("VAS_Close", "Close")) + '">' +
                                     '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>' +
                                 '</button>' +
                             '</div>' +
@@ -490,7 +497,7 @@
             $modal.find('.vas-mpt-modal-title').text(cfg.title || '');
             $modal.find('.vas-mpt-modal-msub').text(cfg.subtitle || '');
             $modal.find('.vas-mpt-modal-body').html(cfg.body || '');
-            $modal.find('.vas-mpt-modal-foot').html(cfg.foot || '<span class="vas-mpt-foot-note"></span><button type="button" class="vas-mpt-btn vas-mpt-close-action">' + escapeHtml(lbl("Close", "Close")) + '</button>');
+            $modal.find('.vas-mpt-modal-foot').html(cfg.foot || '<span class="vas-mpt-foot-note"></span><button type="button" class="vas-mpt-btn vas-mpt-close-action">' + escapeHtml(lbl("VAS_Close", "Close")) + '</button>');
 
             $modal.find('.vas-mpt-close-action').on('click', closeModal);
 
@@ -519,24 +526,33 @@
             currentModalCfg = null;
         }
 
+        // Canonical Home/Landing-page zoom handling (2026-09-30, per user-supplied reference
+        // pattern): $self.windowNo >= 0 means this widget is hosted inside an actual window tab,
+        // so the host's own tab-panel router relays the value change; otherwise (Home dashboard
+        // placement, windowNo < 0) VAS.ZoomUtil.zoomToRecord resolves and opens the window
+        // directly, caching the resolved window id so repeat clicks skip re-resolving it by name.
+        // Was: an unconditional widgetFirevalueChanged call with no windowNo check - on Home page
+        // placement (no listener attached) this silently no-ops instead of throwing, so the
+        // try/catch fallback below it never ran and the click did nothing at all.
+        var poZoomWindowId = 0;
+
         function zoomToPurchaseOrder(orderId) {
             if (!orderId) { return; }
             // Navigating away must dismiss the popup: the record opens behind it
             // otherwise, leaving the dialog stranded over the window it just opened.
             closeModal();
-            try {
-                $self.widgetFirevalueChanged({
+            if ($self.windowNo >= 0) {
+                var windowParam = {
                     "TabWhereClause": "C_Order.C_Order_ID=" + orderId,
                     "TabLayout": "Y",
-                    "TabIndex": "0",
-                    "AD_Tab_ID": 1002398,
-                    "ActionName": "VAS_PurchaseOrder",
-                    "ActionType": "W"
-                });
-            } catch (e) {
-                if (VIS && VIS.viewManager && VIS.viewManager.startWindow) {
-                    VIS.viewManager.startWindow("VAS_PurchaseOrder", "C_Order.C_Order_ID=" + orderId);
-                }
+                    "TabIndex": "0"
+                };
+                $self.widgetFirevalueChanged(windowParam);
+            } else {
+                VAS.ZoomUtil.zoomToRecord("C_Order_ID", orderId, poZoomWindowId, "VAS_PurchaseOrder", "")
+                    .done(function (id) {
+                        if (id > 0) { poZoomWindowId = id; }
+                    });
             }
         }
 
@@ -606,7 +622,7 @@
                                 '<span class="vas-mpt-cell" title="' + escapeHtml(lbl("VAS_Representative", "Representative")) + '">' + escapeHtml(lbl("VAS_Representative", "Representative")) + '</span>' +
                                 '<span class="vas-mpt-cell right" title="' + escapeHtml(lbl("VAS_Value", "Value")) + '">' + escapeHtml(lbl("VAS_Value", "Value")) + '</span>' +
                                 '<span class="vas-mpt-cell" title="' + escapeHtml(lbl("VAS_Delivery", "Delivery")) + '">' + escapeHtml(lbl("VAS_Delivery", "Delivery")) + '</span>' +
-                                '<span class="vas-mpt-cell" title="' + escapeHtml(lbl("VAS_Status", "Status")) + '">' + escapeHtml(lbl("VAS_Status", "Status")) + '</span>' +
+                                '<span class="vas-mpt-cell" title="' + escapeHtml(lbl("VAS_Status", "Status").replace(/\s*:\s*$/, '')) + '">' + escapeHtml(lbl("VAS_Status", "Status").replace(/\s*:\s*$/, '')) + '</span>' +
                             '</div>' +
                             '<div class="vas-mpt-mbody" id="vas-mpt-rows-container"></div>' +
                         '</div>' +
@@ -644,14 +660,14 @@
                 $modalRoot.find('#vas-mpt-rows-container').html(rowsHtml);
 
                 var showingTxt = records.length === 0 ? '' :
-                    lbl("Showing", "Showing") + ' ' + (start + 1) + '–' + (start + slice.length) + ' ' + lbl("of", "of") + ' ' + records.length;
+                    lbl("VAS_Showing", "Showing") + ' ' + (start + 1) + '–' + (start + slice.length) + ' ' + lbl("VAS_Of", "of") + ' ' + records.length;
 
                 var footHtml =
                     '<span class="helper">' + escapeHtml(showingTxt) + '</span>' +
                     (totalPages > 1 ?
                         '<span class="vas-mpt-pager">' +
                             '<button type="button" class="vas-mpt-pbtn vas-mpt-prev-btn"' + (curPage === 0 ? ' disabled' : '') + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button>' +
-                            '<span class="vas-mpt-ptxt">' + (curPage + 1) + ' ' + lbl("of", "of") + ' ' + totalPages + '</span>' +
+                            '<span class="vas-mpt-ptxt">' + (curPage + 1) + ' ' + lbl("VAS_Of", "of") + ' ' + totalPages + '</span>' +
                             '<button type="button" class="vas-mpt-pbtn vas-mpt-next-btn"' + (curPage >= totalPages - 1 ? ' disabled' : '') + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg></button>' +
                         '</span>' : '<span></span>');
 
@@ -690,7 +706,7 @@
                 title: title,
                 subtitle: subtitle,
                 body: buildBodyHtml(),
-                foot: '<span class="vas-mpt-foot-note">' + records.length + ' ' + lbl("VAS_PurchaseOrders", "purchase orders") + '</span><button type="button" class="vas-mpt-btn vas-mpt-close-action">' + escapeHtml(lbl("Close", "Close")) + '</button>',
+                foot: '<span class="vas-mpt-foot-note">' + records.length + ' ' + lbl("VAS_PurchaseOrders", "purchase orders") + '</span><button type="button" class="vas-mpt-btn vas-mpt-close-action">' + escapeHtml(lbl("VAS_Close", "Close")) + '</button>',
                 onRender: function ($m) {
                     renderRows($m);
                 }
@@ -735,8 +751,13 @@
             var totalPending = 0;
             var totalAmt = 0;
             for (var k = 0; k < lines.length; k++) {
-                totalOrdered += (lines[k].qtyOrdered || 0);
-                totalPending += (lines[k].qtyPending || 0);
+                // Qty ordered / Qty pending summary cards count Item-type products only (2026-09-30,
+                // user request; ordered brought in line with pending 2026-10-08) - a charge/non-Item
+                // line is never delivered, so it has no meaningful ordered or pending quantity.
+                if (!lines[k].isNonStock) {
+                    totalOrdered += (lines[k].qtyOrdered || 0);
+                    totalPending += (lines[k].qtyPending || 0);
+                }
                 totalAmt += (lines[k].amount || 0);
             }
 
@@ -797,14 +818,14 @@
                 $mRoot.find('#vas-mpt-line-rows-container').html(html);
 
                 var showingTxt = lines.length === 0 ? '' :
-                    lbl("Showing", "Showing") + ' ' + (start + 1) + '–' + (start + slice.length) + ' ' + lbl("of", "of") + ' ' + lines.length;
+                    lbl("VAS_Showing", "Showing") + ' ' + (start + 1) + '–' + (start + slice.length) + ' ' + lbl("VAS_Of", "of") + ' ' + lines.length;
 
                 var footHtml =
                     '<span class="helper">' + escapeHtml(showingTxt) + '</span>' +
                     (totalPages > 1 ?
                         '<span class="vas-mpt-pager">' +
                             '<button type="button" class="vas-mpt-pbtn vas-mpt-l-prev"' + (curPage === 0 ? ' disabled' : '') + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button>' +
-                            '<span class="vas-mpt-ptxt">' + (curPage + 1) + ' ' + lbl("of", "of") + ' ' + totalPages + '</span>' +
+                            '<span class="vas-mpt-ptxt">' + (curPage + 1) + ' ' + lbl("VAS_Of", "of") + ' ' + totalPages + '</span>' +
                             '<button type="button" class="vas-mpt-pbtn vas-mpt-l-next"' + (curPage >= totalPages - 1 ? ' disabled' : '') + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg></button>' +
                         '</span>' : '<span></span>');
 
@@ -831,7 +852,7 @@
                 title: title,
                 subtitle: sub,
                 body: buildLinesBodyHtml(),
-                foot: '<span class="vas-mpt-foot-note">' + poNo + '</span><span><button type="button" class="vas-mpt-btn vas-mpt-back-action" style="margin-right:8px;">' + escapeHtml(lbl("Back", "Back")) + '</button><button type="button" class="vas-mpt-btn vas-mpt-close-action">' + escapeHtml(lbl("Close", "Close")) + '</button></span>',
+                foot: '<span class="vas-mpt-foot-note">' + poNo + '</span><span><button type="button" class="vas-mpt-btn vas-mpt-back-action" style="margin-right:8px;">' + escapeHtml(lbl("VAS_Back", "Back")) + '</button><button type="button" class="vas-mpt-btn vas-mpt-close-action">' + escapeHtml(lbl("VAS_Close", "Close")) + '</button></span>',
                 onRender: function ($m) {
                     $m.find('.vas-mpt-back-action').on('click', backModal);
                     renderLineRows($m);

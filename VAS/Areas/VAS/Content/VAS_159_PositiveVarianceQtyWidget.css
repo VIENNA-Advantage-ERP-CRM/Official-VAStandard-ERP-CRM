@@ -19,9 +19,6 @@
     overflow: hidden;
     position: relative;
     box-sizing: border-box;
-    /* Widget-level container query scaling using 4.5cqi / --widget-inline-size */
-    font-size: clamp(14px, 4.5cqi, 36px);
-    font-size: clamp(14px, calc(var(--widget-inline-size, 320px) * 0.045), 36px);
 }
 
 .vas-pos-var-clickable {
@@ -42,6 +39,11 @@
     outline-offset: 2px;
 }
 
+/* Chrome matched to VAS_132_OutOfStockWidget / VAS_133_UpdatedThisMonthWidget: single font-size
+   anchor on the card against --dash-inline-size (dashboard width - not this widget's own box),
+   label pinned to the top, value+meta wrapped in a "body" pinned to the bottom via
+   margin-top:auto. Border tint (#CBEEDD) is the same success-green border used by
+   VAS_205_POCompletedMTDWidget / VAS_270_SalesOrdersCompletedMTDWidget for a positive KPI. */
 .vas-pos-var-card {
     display: flex;
     flex-direction: column;
@@ -50,19 +52,19 @@
     height: 100%;
     min-width: 0;
     overflow: hidden;
-    padding: 0.85em;
-    gap: 0.25em;
+    padding: 0.875em;
     box-sizing: border-box;
     background: linear-gradient(180deg, rgba(255,255,255,1), rgba(255,255,255,0.6));
-    border: 2px solid #FFFFFF;
+    border: 2px solid #CBEEDD;
     border-radius: 14px;
     box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    font-family: 'Roboto', sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.014), 24px);
 }
 
 .vas-pos-var-label {
-    font-family: 'Roboto', sans-serif;
-    font-weight: 400;
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    font-weight: 500;
+    font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * 0.011375), 16px);
     line-height: 1.3;
     color: #102C3F;
     white-space: nowrap;
@@ -70,11 +72,14 @@
     text-overflow: ellipsis;
 }
 
+.vas-pos-var-body {
+    margin-top: auto;
+}
+
 .vas-pos-var-value {
-    font-family: 'Roboto', sans-serif;
-    font-weight: 600;
+    font-weight: 500;
     font-size: 1.75em;
-    line-height: 1.05;
+    line-height: 1.1;
     color: #0B6B45; /* Success Green for positive variance */
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -83,11 +88,11 @@
 }
 
 .vas-pos-var-meta {
-    font-family: 'Roboto', sans-serif;
     font-weight: 400;
     font-size: 0.6875em;
     line-height: 1.3;
     color: #5F7283;
+    margin-top: 0.25em;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -257,15 +262,12 @@
 /* The document number opens the Inventory Count record - give it a visible link affordance. */
 .vas-pos-var-doclink {
     cursor: pointer;
-    text-decoration: underline;
-    text-underline-offset: 0.15em;
-    text-decoration-color: rgba(31, 131, 255, 0.45);
+    text-decoration: none;
 }
 
 .vas-pos-var-doclink:hover,
 .vas-pos-var-doclink:focus-visible {
     color: #1F83FF;
-    text-decoration-color: #1F83FF;
     outline: none;
 }
 
