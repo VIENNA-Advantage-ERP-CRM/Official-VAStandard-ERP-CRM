@@ -20,6 +20,7 @@ using System.Runtime.CompilerServices;
 using ModelLibrary.Classes;
 using System.Threading;
 using System.Linq;
+using System.Collections.Concurrent;
 
 namespace VAdvantage.Model
 {
@@ -27,6 +28,110 @@ namespace VAdvantage.Model
     {
         /**	Logger	*/
         private static VLogger _log = VLogger.GetVLogger(typeof(MCostQueue).FullName);
+
+        /// <summary>
+        /// Concurrency control for cost calculation (replaces [MethodImpl(Synchronized)], which serialised costing of ALL products).
+        /// - Same product      : calls run one after another (sequential) - cost queue / M_Cost of a product is never calculated in parallel.
+        /// - Different products: calls run in parallel.
+        /// - No product (e.g. landed cost / charge lines, which can touch the cost of several products):
+        ///                       runs exclusively - waits for running product calls and blocks new ones, same as the old global lock.
+        /// - A nested call on the same thread runs under the lock already held by the outer call (re-entrant, like the old lock).
+        /// </summary>
+        /// <summary>
+        /// Product whose costing lock a CreateProductCostsDetails call needs.
+        /// Returns 0 (= exclusive lock) when the call can change the cost of OTHER products, i.e. Landed Cost Allocation:
+        /// no product (charge line), Expense type product on Invoice(Vendor), or window "LandedCost".
+        /// </summary>
+        /// <param name="windowName">window name passed to costing</param>
+        /// <param name="product">product passed to costing</param>
+        /// <returns>M_Product_ID, or 0 for exclusive</returns>
+        private static int GetCostingLockProductID(string windowName, MProduct product)
+        {
+            if (product == null || product.GetM_Product_ID() <= 0)
+            {
+                return 0;
+            }
+            if (windowName == "LandedCost" || (windowName == "Invoice(Vendor)" && product.GetProductType() == "E"))
+            {
+                return 0;
+            }
+            return product.GetM_Product_ID();
+        }
+
+        private sealed class CostingLockScope : IDisposable
+        {
+            /* readers = product level calls, writer = calls without product */
+            private static readonly ReaderWriterLockSlim _allProductsLock = new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion);
+            private static readonly ConcurrentDictionary<int, object> _productLocks = new ConcurrentDictionary<int, object>();
+
+            /* lock nesting on the current thread */
+            [ThreadStatic]
+            private static int _depth;
+
+            private readonly object _productLock;
+            private readonly bool _isExclusive;
+            private readonly bool _isOwner;
+
+            /// <summary>
+            /// Acquire the costing lock for a product (M_Product_ID &lt;= 0 = exclusive)
+            /// </summary>
+            /// <param name="M_Product_ID">Product ID</param>
+            public CostingLockScope(int M_Product_ID)
+            {
+                if (_depth > 0)
+                {
+                    // nested call - outer call already holds the lock for this thread
+                    _depth++;
+                    _isOwner = false;
+                    return;
+                }
+
+                if (M_Product_ID > 0)
+                {
+                    _allProductsLock.EnterReadLock();
+                    try
+                    {
+                        _productLock = _productLocks.GetOrAdd(M_Product_ID, id => new object());
+                        Monitor.Enter(_productLock);
+                    }
+                    catch
+                    {
+                        _allProductsLock.ExitReadLock();
+                        throw;
+                    }
+                }
+                else
+                {
+                    _allProductsLock.EnterWriteLock();
+                    _isExclusive = true;
+                }
+                _isOwner = true;
+                _depth = 1;
+            }
+
+            /// <summary>
+            /// Release the costing lock
+            /// </summary>
+            public void Dispose()
+            {
+                if (!_isOwner)
+                {
+                    _depth--;
+                    return;
+                }
+
+                _depth = 0;
+                if (_isExclusive)
+                {
+                    _allProductsLock.ExitWriteLock();
+                }
+                else
+                {
+                    Monitor.Exit(_productLock);
+                    _allProductsLock.ExitReadLock();
+                }
+            }
+        }
 
         /// <summary>
         /// Standard Constructor
@@ -377,8 +482,9 @@ namespace VAdvantage.Model
         /// <param name="ce">Cost Element</param>
         /// <param name="trxName">transaction</param>
         /// <returns>cost queue or null</returns>
+        /// <param name="firstRowOnly">true - return only the first queue record (callers that just need the current cost price of FIFO / LIFO)</param>
         public static MCostQueue[] GetQueueForCostUpdate(MProduct product, int M_ASI_ID, MAcctSchema mas,
-            int Org_ID, MCostElement ce, Trx trxName, int M_Warehouse_ID, CostingCheck costingCheck)
+            int Org_ID, MCostElement ce, Trx trxName, int M_Warehouse_ID, CostingCheck costingCheck, bool firstRowOnly = false)
         {
             string costingLevel = costingCheck.costinglevel;
             if (string.IsNullOrEmpty(costingLevel))
@@ -424,6 +530,11 @@ namespace VAdvantage.Model
             sql += " , M_AttributeSetInstance_ID ";
             if (!ce.IsFifo())
                 sql += "DESC";
+            if (firstRowOnly)
+            {
+                // do not fetch / build the whole open queue when only its first record is used
+                sql = DB.IsPostgreSQL() ? sql + " LIMIT 1" : "SELECT * FROM (" + sql + ") WHERE ROWNUM = 1";
+            }
             try
             {
                 DataSet ds = DataBase.DB.ExecuteDataset(sql, null, trxName);
@@ -609,7 +720,7 @@ namespace VAdvantage.Model
         }
 
         //Created by amit
-        [MethodImpl(MethodImplOptions.Synchronized)]
+        // Lock is taken by the overload below (per product - see CostingLockScope)
         public static bool CreateProductCostsDetails(Ctx ctx, int AD_Client_ID, int AD_Org_ID, MProduct product, int M_ASI_ID,
                      string windowName, MInventoryLine inventoryLine, MInOutLine inoutline, MMovementLine movementline,
                      MInvoiceLine invoiceline, PO po, Decimal Price, Decimal Qty, Trx trxName, out string conversionNotFound,
@@ -642,13 +753,93 @@ namespace VAdvantage.Model
         /// <param name="optionalstr">calling from window / Process</param>
         /// <writer>VIS_0046</writer>
         /// <returns>true, when success</returns>
-        [MethodImpl(MethodImplOptions.Synchronized)]
         public static bool CreateProductCostsDetails(Ctx ctx, int AD_Client_ID, int AD_Org_ID, MProduct product, int M_ASI_ID,
                      string windowName, MInventoryLine inventoryLine, MInOutLine inoutline, MMovementLine movementline,
                      MInvoiceLine invoiceline, PO po, Decimal Price, Decimal Qty, Trx trxName, CostingCheck costingCheck, out string conversionNotFound,
                      string optionalstr = "process")
         {
-            Thread.Sleep(50);
+            // Same product -> sequential, different products -> parallel, no product / landed cost -> exclusive (see CostingLockScope)
+            using (new CostingLockScope(GetCostingLockProductID(windowName, product)))
+            {
+                // timing of the costing engine (excludes the lock wait) - compare the running total with the process duration
+                System.Diagnostics.Stopwatch watch = System.Diagnostics.Stopwatch.StartNew();
+                bool result = false;
+                try
+                {
+                    result = CreateProductCostsDetailsLocked(ctx, AD_Client_ID, AD_Org_ID, product, M_ASI_ID, windowName, inventoryLine, inoutline, movementline,
+                        invoiceline, po, Price, Qty, trxName, costingCheck, out conversionNotFound, optionalstr);
+                }
+                finally
+                {
+                    watch.Stop();
+
+                    // document wise totals (header document of the line)
+                    string document = GetTimingDocumentKey(inventoryLine, inoutline, movementline, invoiceline, po);
+                    if (_documentTimings.Count > 1000)
+                    {
+                        // bound memory - totals restart from here
+                        _documentTimings.Clear();
+                    }
+                    EngineTiming docTiming = _documentTimings.GetOrAdd(document, key => new EngineTiming());
+                    long docTotalMs = Interlocked.Add(ref docTiming.TotalMs, watch.ElapsedMilliseconds);
+                    long docCalls = Interlocked.Increment(ref docTiming.Calls);
+
+                    _log.Info("Costing Engine Timing : " + windowName + " Document = " + document + " Product = " + (product != null ? product.GetM_Product_ID() : 0)
+                        + " Line = " + (inoutline != null ? inoutline.Get_ID() : invoiceline != null ? invoiceline.Get_ID() : inventoryLine != null ? inventoryLine.Get_ID() : movementline != null ? movementline.Get_ID() : 0)
+                        + " took " + watch.ElapsedMilliseconds + " ms"
+                        + " (document calls = " + docCalls + ", document total ms = " + docTotalMs + ")");
+                }
+                return result;
+            }
+        }
+
+        /* running totals per document (e.g. "M_InOut=1000123") for "Costing Engine Timing" log lines */
+        private sealed class EngineTiming
+        {
+            public long TotalMs;
+            public long Calls;
+        }
+        private static readonly ConcurrentDictionary<string, EngineTiming> _documentTimings = new ConcurrentDictionary<string, EngineTiming>();
+
+        /// <summary>
+        /// Header document of the costing call for timing - invoice first, as Match IV / invoice calls also pass the receipt line
+        /// </summary>
+        /// <returns>TableName=Record_ID</returns>
+        private static string GetTimingDocumentKey(MInventoryLine inventoryLine, MInOutLine inoutline, MMovementLine movementline,
+            MInvoiceLine invoiceline, PO po)
+        {
+            if (invoiceline != null && invoiceline.GetC_Invoice_ID() > 0)
+            {
+                return "C_Invoice=" + invoiceline.GetC_Invoice_ID();
+            }
+            if (inoutline != null && inoutline.GetM_InOut_ID() > 0)
+            {
+                return "M_InOut=" + inoutline.GetM_InOut_ID();
+            }
+            if (inventoryLine != null && inventoryLine.GetM_Inventory_ID() > 0)
+            {
+                return "M_Inventory=" + inventoryLine.GetM_Inventory_ID();
+            }
+            if (movementline != null && movementline.GetM_Movement_ID() > 0)
+            {
+                return "M_Movement=" + movementline.GetM_Movement_ID();
+            }
+            if (po != null)
+            {
+                return po.Get_TableName() + "=" + po.Get_ID();
+            }
+            return "Unknown";
+        }
+
+        /// <summary>
+        /// Calculate Product Cost - body of CreateProductCostsDetails, executed while the costing lock of the product is held
+        /// </summary>
+        private static bool CreateProductCostsDetailsLocked(Ctx ctx, int AD_Client_ID, int AD_Org_ID, MProduct product, int M_ASI_ID,
+                     string windowName, MInventoryLine inventoryLine, MInOutLine inoutline, MMovementLine movementline,
+                     MInvoiceLine invoiceline, PO po, Decimal Price, Decimal Qty, Trx trxName, CostingCheck costingCheck, out string conversionNotFound,
+                     string optionalstr)
+        {
+            Thread.Sleep(20);
             MAcctSchema acctSchema = null;
             dynamic pca = null;
             string costingMethodMatchPO = null;
@@ -713,9 +904,9 @@ namespace VAdvantage.Model
                     }
                     else if (costingCheck == null)
                     {
-                        costingCheck = new CostingCheck(ctx);
+                        // accounting schemas / cost elements / LIFO-FIFO element from the client level cache (not queried per line)
+                        costingCheck = CostingCheck.CreateWithClientLookups(ctx, AD_Client_ID);
                         costingCheck.product = product;
-                        costingCheck.dsAccountingSchema = costingCheck.GetAccountingSchema(AD_Client_ID);
                     }
 
                     // Get LIFO and FIFO ID
@@ -769,7 +960,10 @@ namespace VAdvantage.Model
                         Price = receivedPrice;
                         Qty = receivedQty;
                         AD_Org_ID = AD_Org_ID2;
-                        acctSchema = MAcctSchema.Get(ctx, Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_AcctSchema_ID"]), trxName);
+                        // MAcctSchema.Get does not cache when a trx is passed - reuse the schema object across lines via CostingCheck
+                        acctSchema = costingCheck != null
+                            ? costingCheck.GetAcctSchema(ctx, Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_AcctSchema_ID"]), trxName)
+                            : MAcctSchema.Get(ctx, Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_AcctSchema_ID"]), trxName);
                         costingCheck.precision = acctSchema.GetCostingPrecision();
                         if (product != null)
                         {
@@ -3795,7 +3989,7 @@ namespace VAdvantage.Model
                                     costingElementId = costingCheck.Lifo_ID;
                                 }
                                 costElement = MCostElement.Get(ctx, costingElementId);
-                            backwardInOut:
+                                backwardInOut:
                                 if (windowName == "Physical Inventory" || windowName == "Internal Use Inventory")
                                 {
                                     #region Phy. Inventory / Internal Use Inventory
@@ -4127,7 +4321,7 @@ namespace VAdvantage.Model
                                     }
                                     else
                                     {
-                                    backwardSupportPE:
+                                        backwardSupportPE:
                                         //1st entry either of FIFO of LIFO 
                                         if (po.Get_ValueAsInt("ReversalDoc_ID") > 0 && !backwardCompatabilitySupport)
                                         {
@@ -5134,8 +5328,22 @@ namespace VAdvantage.Model
             return true;
         }
 
-        [MethodImpl(MethodImplOptions.Synchronized)]
         public static bool CreateProductCostsDetails(Ctx ctx, int AD_Client_ID, int AD_Org_ID, MProduct product, int M_ASI_ID,
+                     string windowName, MInventoryLine inventoryLine, MInOutLine inoutline, MMovementLine movementline,
+                     MInvoiceLine invoiceline, Decimal Price, Decimal Qty, Trx trxName, int[] acctSchemaRecord, out string conversionNotFound)
+        {
+            // Same product -> sequential, different products -> parallel, no product / landed cost -> exclusive (see CostingLockScope)
+            using (new CostingLockScope(GetCostingLockProductID(windowName, product)))
+            {
+                return CreateProductCostsDetailsLocked(ctx, AD_Client_ID, AD_Org_ID, product, M_ASI_ID, windowName, inventoryLine, inoutline, movementline,
+                    invoiceline, Price, Qty, trxName, acctSchemaRecord, out conversionNotFound);
+            }
+        }
+
+        /// <summary>
+        /// Calculate Product Cost for selected Accounting Schemas - body of CreateProductCostsDetails, executed while the costing lock is held
+        /// </summary>
+        private static bool CreateProductCostsDetailsLocked(Ctx ctx, int AD_Client_ID, int AD_Org_ID, MProduct product, int M_ASI_ID,
                      string windowName, MInventoryLine inventoryLine, MInOutLine inoutline, MMovementLine movementline,
                      MInvoiceLine invoiceline, Decimal Price, Decimal Qty, Trx trxName, int[] acctSchemaRecord, out string conversionNotFound)
         {
@@ -7607,12 +7815,9 @@ namespace VAdvantage.Model
                 Price = Decimal.Negate(Price);
             Price = Decimal.Round(Price, acctSchema.GetCostingPrecision(), MidpointRounding.AwayFromZero);
             //MCostElement costElement = null;
-            X_T_Temp_CostDetail tempCostDetail = null;
             try
             {
                 #region Ist Entry Either FIFO or LIFO
-                MCostQueue costQueue = new MCostQueue(ctx, 0, trxName);
-                costQueue.SetAD_Client_ID(AD_Client_ID);
                 if (windowName == "Physical Inventory" || windowName == "Internal Use Inventory")
                 {
                     AD_Org_ID = inventoryLine.GetAD_Org_ID();
@@ -7625,10 +7830,6 @@ namespace VAdvantage.Model
                 {
                     AD_Org_ID = invoiceline.GetAD_Org_ID();
                 }
-                costQueue.SetAD_Org_ID(AD_Org_ID);
-                costQueue.SetC_AcctSchema_ID(Util.GetValueOfInt(acctSchema.GetC_AcctSchema_ID()));
-                costQueue.SetM_CostType_ID(acctSchema.GetM_CostType_ID());
-                costQueue.SetM_Product_ID(product.GetM_Product_ID());
                 if (costingCheck.MMPolicy.Equals(MProductCategory.MMPOLICY_FiFo))
                 {
                     M_CostElement_ID = costingCheck.Fifo_ID;
@@ -7643,96 +7844,110 @@ namespace VAdvantage.Model
                     costingCheck.errorMessage += "Cost Element missing - LIFO/FIFO";
                     return false;
                 }
-                costQueue.SetM_CostElement_ID(M_CostElement_ID);
-                costQueue.SetM_AttributeSetInstance_ID(M_ASI_ID);
-                costQueue.SetM_Warehouse_ID(cd.GetM_Warehouse_ID());
-                costQueue.SetCurrentQty(Qty);
-                costQueue.SetActualQty(Qty);
                 // change 2-5-2016
+                decimal currentCostPrice = 0;
                 if (Price != 0)
                 {
                     ce = MCostElement.Get(ctx, M_CostElement_ID);
                     amtWithSurcharge = Decimal.Add(Price, Decimal.Round(Decimal.Divide(Decimal.Multiply(Price, ce.GetSurchargePercentage()), 100), acctSchema.GetCostingPrecision(), MidpointRounding.AwayFromZero));
-                    costQueue.SetCurrentCostPrice(amtWithSurcharge);
+                    currentCostPrice = amtWithSurcharge;
                 }
                 else if (policy == "F" && priceFifo > 0)
                 {
-                    costQueue.SetCurrentCostPrice(priceFifo);
+                    currentCostPrice = priceFifo;
                 }
                 else if (policy == "L" && priceLifo > 0)
                 {
-                    costQueue.SetCurrentCostPrice(priceLifo);
+                    currentCostPrice = priceLifo;
                 }
 
-                costQueue.SetQueueDate(System.DateTime.Now.ToLocalTime());
+                DateTime queueDate = System.DateTime.Now.ToLocalTime();
                 if (costingCheck != null && costingCheck.movementDate != null)
                 {
-                    costQueue.Set_Value("MovementDate", costingCheck.movementDate);
-                    DateTime newDateTime = new DateTime(
+                    queueDate = new DateTime(
                         costingCheck.movementDate.Value.Year, costingCheck.movementDate.Value.Month, costingCheck.movementDate.Value.Day,
-                        costQueue.GetQueueDate().Value.Hour, costQueue.GetQueueDate().Value.Minute, costQueue.GetQueueDate().Value.Second, costQueue.GetQueueDate().Value.Millisecond);
-                    costQueue.SetQueueDate(newDateTime);
+                        queueDate.Hour, queueDate.Minute, queueDate.Second, queueDate.Millisecond);
                 }
-                if (!costQueue.Save())
+
+                // Direct insert instead of MCostQueue.Save() - performance
+                CostingInsertBuilder costQueue = new CostingInsertBuilder(ctx, Table_Name, AD_Client_ID, AD_Org_ID, trxName);
+                costQueue.AddInt("C_AcctSchema_ID", acctSchema.GetC_AcctSchema_ID());
+                costQueue.AddInt("M_CostType_ID", acctSchema.GetM_CostType_ID());
+                costQueue.AddInt("M_Product_ID", product.GetM_Product_ID());
+                costQueue.AddInt("M_CostElement_ID", M_CostElement_ID);
+                costQueue.AddInt("M_AttributeSetInstance_ID", M_ASI_ID);
+                costQueue.AddID("M_Warehouse_ID", cd.GetM_Warehouse_ID());
+                costQueue.AddDecimal("CurrentQty", Qty);
+                costQueue.AddDecimal("ActualQty", Qty);
+                costQueue.AddDecimal("CurrentCostPrice", currentCostPrice);
+                costQueue.AddDate("QueueDate", queueDate);
+                if (costingCheck != null && costingCheck.movementDate != null && costQueue.HasColumn("MovementDate"))
                 {
-                    ValueNamePair pp = VLogger.RetrieveError();
+                    costQueue.AddDate("MovementDate", costingCheck.movementDate);
+                }
+                string error;
+                if (!costQueue.Execute(trxName, out error))
+                {
                     costingCheck.errorMessage += "Cost Queue not created";
-                    _log.Info("Cost Queue not saved for  <===> " + product.GetM_Product_ID() + " Error Type is : " + (pp != null ? pp.GetName() : ""));
+                    _log.Info("Cost Queue not saved for  <===> " + product.GetM_Product_ID() + " Error Type is : " + error);
                     return false;
                 }
                 else
                 {
+                    int M_CostQueue_ID = costQueue.ID;
+
                     // Create Cost Queue Transactional Record
                     if (!MCostQueueTransaction.CreateCostQueueTransaction(ctx, AD_Client_ID, AD_Org_ID,
-                        costQueue.GetM_CostQueue_ID(), cd, Qty, costingCheck))
+                        M_CostQueue_ID, cd, Qty, costingCheck))
                     {
                         return false;
                     }
 
-                    costQueueIds += costQueue.GetM_CostQueue_ID();
-                    tempCostDetail = new X_T_Temp_CostDetail(ctx, 0, null);
-                    tempCostDetail.SetAD_Client_ID(AD_Client_ID);
-                    tempCostDetail.SetAD_Org_ID(AD_Org_ID);
-                    tempCostDetail.SetM_CostDetail_ID(cd.GetM_CostDetail_ID());
-                    tempCostDetail.SetM_CostQueue_ID(costQueue.GetM_CostQueue_ID());
-                    tempCostDetail.SetC_AcctSchema_ID(Util.GetValueOfInt(acctSchema.GetC_AcctSchema_ID()));
+                    costQueueIds += M_CostQueue_ID;
+
+                    // Direct insert instead of X_T_Temp_CostDetail.Save() - performance (kept outside the transaction as before)
+                    CostingInsertBuilder tempCostDetail = new CostingInsertBuilder(ctx, X_T_Temp_CostDetail.Table_Name, AD_Client_ID, AD_Org_ID, null);
+                    tempCostDetail.AddID("M_CostDetail_ID", cd.GetM_CostDetail_ID());
+                    tempCostDetail.AddID("M_CostQueue_ID", M_CostQueue_ID);
+                    tempCostDetail.AddID("C_AcctSchema_ID", acctSchema.GetC_AcctSchema_ID());
                     if (invoiceline != null && invoiceline.GetC_InvoiceLine_ID() > 0)
-                        tempCostDetail.SetC_InvoiceLine_ID(invoiceline.GetC_InvoiceLine_ID());
+                        tempCostDetail.AddID("C_InvoiceLine_ID", invoiceline.GetC_InvoiceLine_ID());
                     if (inoutline != null && inoutline.GetC_OrderLine_ID() > 0)
-                        tempCostDetail.SetC_OrderLine_ID(inoutline.GetC_OrderLine_ID());
+                        tempCostDetail.AddID("C_OrderLine_ID", inoutline.GetC_OrderLine_ID());
                     if (inoutline != null && inoutline.GetM_InOutLine_ID() > 0)
-                        tempCostDetail.SetM_InOutLine_ID(inoutline.GetM_InOutLine_ID());
+                        tempCostDetail.AddID("M_InOutLine_ID", inoutline.GetM_InOutLine_ID());
                     if (inventoryLine != null && inventoryLine.GetM_InventoryLine_ID() > 0)
-                        tempCostDetail.SetM_InventoryLine_ID(inventoryLine.GetM_InventoryLine_ID());
+                        tempCostDetail.AddID("M_InventoryLine_ID", inventoryLine.GetM_InventoryLine_ID());
                     if (movementline != null && movementline.GetM_MovementLine_ID() > 0)
-                        tempCostDetail.SetM_MovementLine_ID(movementline.GetM_MovementLine_ID());
-                    //if (inoutline != null && inoutline.GetC_OrderLine_ID() == 0)
-                    //    tempCostDetail.SetisRecordFromForm(true);
-                    tempCostDetail.SetM_Product_ID(product.GetM_Product_ID());
-                    tempCostDetail.SetM_AttributeSetInstance_ID(M_ASI_ID);
-                    tempCostDetail.SetM_Warehouse_ID(cd.GetM_Warehouse_ID());
-                    tempCostDetail.Set_Value("VAFAM_AssetDisposal_ID", cd.Get_Value("VAFAM_AssetDisposal_ID"));
+                        tempCostDetail.AddID("M_MovementLine_ID", movementline.GetM_MovementLine_ID());
+                    tempCostDetail.AddID("M_Product_ID", product.GetM_Product_ID());
+                    tempCostDetail.AddID("M_AttributeSetInstance_ID", M_ASI_ID);
+                    tempCostDetail.AddID("M_Warehouse_ID", cd.GetM_Warehouse_ID());
+                    tempCostDetail.AddValueIfExists("VAFAM_AssetDisposal_ID", cd.Get_Value("VAFAM_AssetDisposal_ID"));
                     if ((windowName.Equals("Out") || windowName.Equals("In")) && !string.IsNullOrEmpty(costingCheck.TableName))
                     {
-                        tempCostDetail.Set_Value(costingCheck.TableName + "_ID", cd.Get_Value(costingCheck.TableName + "_ID"));
+                        tempCostDetail.AddValueIfExists(costingCheck.TableName + "_ID", cd.Get_Value(costingCheck.TableName + "_ID"));
                     }
 
                     // change 2-5-2016
                     if (amtWithSurcharge != 0)
                     {
-                        tempCostDetail.SetAmt(amtWithSurcharge);
+                        tempCostDetail.AddDecimal("Amt", amtWithSurcharge);
                     }
                     else if (policy == "F" && priceFifo > 0)
                     {
                         policy = "L";
-                        tempCostDetail.SetAmt(priceFifo);
+                        tempCostDetail.AddDecimal("Amt", priceFifo);
                     }
                     else if (policy == "L" && priceLifo > 0)
                     {
                         policy = "F";
-                        tempCostDetail.SetAmt(priceLifo);
+                        tempCostDetail.AddDecimal("Amt", priceLifo);
                     }
-                    tempCostDetail.Save();
+                    if (!tempCostDetail.Execute(null, out error))
+                    {
+                        _log.Info("Temp Cost Detail not saved for  <===> " + product.GetM_Product_ID() + " Error Type is : " + error);
+                    }
                 }
                 #endregion
 
@@ -7890,62 +8105,53 @@ namespace VAdvantage.Model
                 return true;
             }
             MCostElement costElement = null;
-            X_T_Temp_CostDetail tempCostDetail = null;
             int M_CostElement_ID = 0;
             string sql = null;
             decimal amtWithSurcharge = 0;
             try
             {
                 #region Ist Entry Either FIFO or LIFO
-                MCostQueue costQueue = new MCostQueue(ctx, 0, trxName);
-                costQueue.SetAD_Client_ID(AD_Client_ID);
-                costQueue.SetAD_Org_ID(AD_Org_ID);
-                costQueue.SetC_AcctSchema_ID(Util.GetValueOfInt(acctSchema.GetC_AcctSchema_ID()));
-                costQueue.SetM_Warehouse_ID(M_Warehouse_ID);
-                costQueue.SetM_CostType_ID(acctSchema.GetM_CostType_ID());
-                costQueue.SetM_Product_ID(product.GetM_Product_ID());
                 sql = @"SELECT M_CostElement_ID FROM M_CostElement WHERE IsActive = 'Y' AND CostingMethod = " +
                     " ( SELECT MMPolicy FROM M_Product_Category WHERE IsActive = 'Y' AND M_Product_Category_ID = " +
                     " (SELECT M_Product_Category_ID FROM M_Product WHERE IsActive = 'Y' AND M_Product_ID = " + product.GetM_Product_ID() + " )) AND AD_Client_ID = " + AD_Client_ID;
                 M_CostElement_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, trxName));
-                costQueue.SetM_CostElement_ID(M_CostElement_ID);
-                costQueue.SetM_AttributeSetInstance_ID(M_ASI_ID);
-                costQueue.SetCurrentQty(Qty);
 
                 costElement = MCostElement.Get(ctx, M_CostElement_ID);
                 amtWithSurcharge = Decimal.Add(Price, Decimal.Round(Decimal.Divide(Decimal.Multiply(Price, costElement.GetSurchargePercentage()), 100), acctSchema.GetCostingPrecision(), MidpointRounding.AwayFromZero));
-                costQueue.SetCurrentCostPrice(amtWithSurcharge);
 
-                //costQueue.SetCurrentCostPrice(Price);
-                costQueue.SetQueueDate(System.DateTime.Now.ToLocalTime());
-                if (!costQueue.Save())
+                // Direct insert instead of MCostQueue.Save() - performance
+                CostingInsertBuilder costQueue = new CostingInsertBuilder(ctx, Table_Name, AD_Client_ID, AD_Org_ID, trxName);
+                costQueue.AddInt("C_AcctSchema_ID", acctSchema.GetC_AcctSchema_ID());
+                costQueue.AddID("M_Warehouse_ID", M_Warehouse_ID);
+                costQueue.AddInt("M_CostType_ID", acctSchema.GetM_CostType_ID());
+                costQueue.AddInt("M_Product_ID", product.GetM_Product_ID());
+                costQueue.AddInt("M_CostElement_ID", M_CostElement_ID);
+                costQueue.AddInt("M_AttributeSetInstance_ID", M_ASI_ID);
+                costQueue.AddDecimal("CurrentQty", Qty);
+                costQueue.AddDecimal("CurrentCostPrice", amtWithSurcharge);
+                costQueue.AddDate("QueueDate", System.DateTime.Now.ToLocalTime());
+                string error;
+                if (!costQueue.Execute(trxName, out error))
                 {
-                    ValueNamePair pp = VLogger.RetrieveError();
-                    _log.Severe("Cost Queue not saved by CreateCostQueueForMatchPO for this product <===> " + product.GetM_Product_ID() + " Error Type is : " + pp.GetName());
+                    _log.Severe("Cost Queue not saved by CreateCostQueueForMatchPO for this product <===> " + product.GetM_Product_ID() + " Error Type is : " + error);
                     return false;
                 }
                 else
                 {
-                    // Create Cost Queue Transactional Record
-                    //if (!MCostQueueTransaction.CreateCostQueueTransaction(ctx, AD_Client_ID, AD_Org_ID, costQueue.GetM_CostQueue_ID(), cd, Qty))
-                    //{
-                    //    return false;
-                    //}
-
-                    tempCostDetail = new X_T_Temp_CostDetail(ctx, 0, null);
-                    tempCostDetail.SetAD_Client_ID(AD_Client_ID);
-                    tempCostDetail.SetAD_Org_ID(AD_Org_ID);
-                    //tempCostDetail.SetM_CostDetail_ID(cd.GetM_CostDetail_ID());
-                    tempCostDetail.SetM_InOutLine_ID(inoutline.GetM_InOutLine_ID());
-                    tempCostDetail.SetM_CostQueue_ID(costQueue.GetM_CostQueue_ID());
-                    tempCostDetail.SetC_AcctSchema_ID(Util.GetValueOfInt(acctSchema.GetC_AcctSchema_ID()));
-                    tempCostDetail.SetM_Warehouse_ID(M_Warehouse_ID);
-                    tempCostDetail.SetisRecordFromForm(true);
-                    tempCostDetail.SetM_Product_ID(product.GetM_Product_ID());
-                    tempCostDetail.SetM_AttributeSetInstance_ID(M_ASI_ID);
-                    //tempCostDetail.SetAmt(Price);
-                    tempCostDetail.SetAmt(amtWithSurcharge);
-                    tempCostDetail.Save();
+                    // Direct insert instead of X_T_Temp_CostDetail.Save() - performance (kept outside the transaction as before)
+                    CostingInsertBuilder tempCostDetail = new CostingInsertBuilder(ctx, X_T_Temp_CostDetail.Table_Name, AD_Client_ID, AD_Org_ID, null);
+                    tempCostDetail.AddID("M_InOutLine_ID", inoutline.GetM_InOutLine_ID());
+                    tempCostDetail.AddID("M_CostQueue_ID", costQueue.ID);
+                    tempCostDetail.AddID("C_AcctSchema_ID", acctSchema.GetC_AcctSchema_ID());
+                    tempCostDetail.AddID("M_Warehouse_ID", M_Warehouse_ID);
+                    tempCostDetail.AddBool("isRecordFromForm", true);
+                    tempCostDetail.AddID("M_Product_ID", product.GetM_Product_ID());
+                    tempCostDetail.AddID("M_AttributeSetInstance_ID", M_ASI_ID);
+                    tempCostDetail.AddDecimal("Amt", amtWithSurcharge);
+                    if (!tempCostDetail.Execute(null, out error))
+                    {
+                        _log.Severe("Temp Cost Detail not saved by CreateCostQueueForMatchPO for this product <===> " + product.GetM_Product_ID() + " Error Type is : " + error);
+                    }
                 }
                 #endregion
 

@@ -340,8 +340,7 @@ namespace VAdvantage.Model
                 if (C_OrderLine_ID != 0)
                 {
                     MOrderLine oLine = new MOrderLine(GetCtx(), C_OrderLine_ID, Get_TrxName());
-                    MOrder ord = new MOrder(GetCtx(), oLine.GetC_Order_ID(), Get_TrxName());          //Added By Bharat
-                                                                                                      //VAI082 12/22/2023  DevOps Task ID:-3579,Set "ContractLine_ID" When user create the invoice with the reference of shipment.
+                    //VAI082 12/22/2023  DevOps Task ID:-3579,Set "ContractLine_ID" When user create the invoice with the reference of shipment.
                     if (oLine.Get_ValueAsInt("VAS_ContractLine_ID") > 0)
                     {
                         Set_Value("VAS_ContractLine_ID", oLine.Get_Value("VAS_ContractLine_ID"));
@@ -353,7 +352,10 @@ namespace VAdvantage.Model
                     }
                     M_AttributeSetInstance_ID = sLine.GetM_AttributeSetInstance_ID();               //Added By Bharat
                     C_UOM_ID = oLine.GetC_UOM_ID();
-                    string docsubTypeSO = Util.GetValueOfString(DB.ExecuteScalar("SELECT DocSubTypeSO FROM C_Doctype WHERE C_DocType_ID = " + ord.GetC_DocTypeTarget_ID()));
+                    // Only the order's target doc sub type is needed - read it directly instead of loading the full order per line
+                    string docsubTypeSO = Util.GetValueOfString(DB.ExecuteScalar(@"SELECT dt.DocSubTypeSO FROM C_Order o
+                                INNER JOIN C_DocType dt ON (dt.C_DocType_ID = o.C_DocTypeTarget_ID)
+                                WHERE o.C_Order_ID = " + oLine.GetC_Order_ID(), null, Get_Trx()));
                     if (docsubTypeSO == "WR")
                     {
                         SetPriceEntered(oLine.GetPriceEntered());
@@ -594,7 +596,7 @@ namespace VAdvantage.Model
                     GetM_Product_ID(), C_BPartner_ID, GetQtyInvoiced(), _IsSOTrx);
                 _productPricing.SetM_PriceList_ID(M_PriceList_ID);
                 _productPricing.SetPriceDate(_DateInvoiced);
-                _productPricing.SetM_AttributeSetInstance_ID(M_AttributeSetInstance_ID);
+                _productPricing.SetM_AttributeSetInstance_ID(GetM_AttributeSetInstance_ID());
                 //Amit 25-nov-2014
                 if (Env.IsModuleInstalled("ED011_"))
                 {
@@ -604,11 +606,12 @@ namespace VAdvantage.Model
                 SetPriceActual(_productPricing.GetPriceStd());
                 SetPriceList(_productPricing.GetPriceList());
                 SetPriceLimit(_productPricing.GetPriceLimit());
-                //
-                if (Decimal.Compare(GetQtyEntered(), GetQtyInvoiced()) == 0)
-                    SetPriceEntered(GetPriceActual());
-                else
-                    SetPriceEntered(Decimal.Multiply(GetPriceActual(), Decimal.Round(Decimal.Divide(GetQtyInvoiced(), GetQtyEntered()), 6)));
+                // VAI_145: 29-July-2026, Already converted value 
+                SetPriceEntered(GetPriceActual());
+                //if (Decimal.Compare(GetQtyEntered(), GetQtyInvoiced()) == 0)
+                //    SetPriceEntered(GetPriceActual());
+                //else
+                //    SetPriceEntered(Decimal.Multiply(GetPriceActual(), Decimal.Round(Decimal.Divide(GetQtyInvoiced(), GetQtyEntered()), 6)));
 
                 //
                 if (GetC_UOM_ID() == 0)
@@ -1313,6 +1316,8 @@ namespace VAdvantage.Model
                     else
                         SetLineTotalAmt(Decimal.Add(GetLineNetAmt(), TaxAmt));
                     base.SetTaxAmt(TaxAmt);
+                    /*VAS_145: 20-July-2026, when we change the tax from surcharge to other than surcharge amount is not clearing*/
+                    SetSurchargeAmt(0);
                 }
             }
             catch (Exception ex)
@@ -5017,7 +5022,7 @@ namespace VAdvantage.Model
                         FROM C_InvoiceLine INNER JOIN C_OrderLine ON C_InvoiceLine.C_OrderLine_ID=C_OrderLine.C_OrderLine_ID
                         INNER JOIN C_Order ON C_OrderLine.C_Order_ID = C_Order.C_Order_ID
                         WHERE C_InvoiceLine.C_Invoice_ID =  " + GetC_Invoice_ID();
-            int no = DataBase.DB.GetSQLValue(Get_Trx(), sql);
+            int no = DataBase.DB.GetSQLValue(Get_Trx(), sql, null);
             if (no > 0)
             {
                 no = DB.ExecuteQuery("UPDATE C_Invoice SET IsHoldPayment = 'Y' WHERE C_Invoice_ID = " + GetC_Invoice_ID(), null, Get_Trx());

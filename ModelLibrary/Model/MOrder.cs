@@ -3832,6 +3832,7 @@ namespace VAdvantage.Model
                                 {
                                     lHist = new MOrderlineHistory(GetCtx(), 0, Get_TrxName());
                                     lHist.SetClientOrg(_lines[i]);
+                                    lHist.Set_ValueNoCheck("C_Order_ID", GetC_Order_ID());
                                     lHist.SetC_OrderLine_ID(_lines[i].Get_ID());
                                     lHist.SetC_Charge_ID(_lines[i].GetC_Charge_ID());
                                     lHist.SetC_Frequency_ID(_lines[i].GetC_Frequency_ID());
@@ -3980,6 +3981,7 @@ namespace VAdvantage.Model
                             {
                                 lHist = new MOrderlineHistory(GetCtx(), 0, Get_TrxName());
                                 lHist.SetClientOrg(_lines[i]);
+                                lHist.Set_ValueNoCheck("C_Order_ID", GetC_Order_ID());
                                 lHist.SetC_OrderLine_ID(_lines[i].Get_ID());
                                 lHist.SetC_Charge_ID(_lines[i].GetC_Charge_ID());
                                 lHist.SetC_Frequency_ID(_lines[i].GetC_Frequency_ID());
@@ -5612,6 +5614,14 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                 String posStatus = "";
                 MWarehouse wh = null;
                 MOrderLine[] oLines = GetLines(true, null);
+
+                // Tenant setting is the same for every line - resolve it once, not per line
+                string allowNonItem = Util.GetValueOfString(GetCtx().GetContext("$AllowNonItem"));
+                if (String.IsNullOrEmpty(allowNonItem))
+                {
+                    allowNonItem = Util.GetValueOfString(DB.ExecuteScalar("SELECT IsAllowNonItem FROM AD_Client WHERE AD_Client_ID = " + GetAD_Client_ID(), null, Get_Trx()));
+                }
+
                 for (int i = 0; i < oLines.Length; i++)
                 {
 
@@ -5659,12 +5669,6 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                     //{
                     // when order line created with charge OR with Product which is not of "item type" then not to create shipment line against this.
                     MProduct oproduct = oLine.GetProduct();
-                    string allowNonItem = Util.GetValueOfString(GetCtx().GetContext("$AllowNonItem"));
-
-                    if (String.IsNullOrEmpty(allowNonItem))
-                    {
-                        allowNonItem = Util.GetValueOfString(DB.ExecuteScalar("SELECT IsAllowNonItem FROM AD_Client WHERE AD_Client_ID = " + GetAD_Client_ID(), null, Get_Trx()));
-                    }
 
                     //Create Lines for Charge / (Resource - Service - Expense) type product based on setting on Tenant to "Allow Non Item type".
                     if ((oproduct == null || !(oproduct != null && oproduct.GetProductType() == MProduct.PRODUCTTYPE_Item))
@@ -5695,23 +5699,25 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                         }
                     }
 
-                    Decimal? QtyAvail = MStorage.GetQtyAvailable(M_Warehouse_ID, oLine.GetM_Product_ID(), oLine.GetM_AttributeSetInstance_ID(), Get_Trx());
-                    if (MovementQty > 0)
-                        QtyAvail += MovementQty;
-
-                    String sql = "SELECT SUM(QtyOnHand) FROM M_Storage s INNER JOIN M_Locator l ON (s.M_Locator_ID=l.M_Locator_ID) WHERE s.M_Product_ID=" + oLine.GetM_Product_ID() + " AND l.M_Warehouse_ID=" + M_Warehouse_ID;
-                    if (oLine.GetM_AttributeSetInstance_ID() != 0)
-                    {
-                        sql += " AND M_AttributeSetInstance_ID=" + oLine.GetM_AttributeSetInstance_ID();
-                    }
-                    // check onhand qty on specified locator
-                    if (M_Locator_ID > 0)
-                    {
-                        sql += " AND l.M_Locator_ID = " + M_Locator_ID;
-                    }
-                    OnHandQty = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, Get_Trx()));
                     if (wh.IsDisallowNegativeInv())
                     {
+                        // Available / OnHand qty are only consulted when negative inventory is disallowed
+                        Decimal? QtyAvail = MStorage.GetQtyAvailable(M_Warehouse_ID, oLine.GetM_Product_ID(), oLine.GetM_AttributeSetInstance_ID(), Get_Trx());
+                        if (MovementQty > 0)
+                            QtyAvail += MovementQty;
+
+                        String sql = "SELECT SUM(QtyOnHand) FROM M_Storage s INNER JOIN M_Locator l ON (s.M_Locator_ID=l.M_Locator_ID) WHERE s.M_Product_ID=" + oLine.GetM_Product_ID() + " AND l.M_Warehouse_ID=" + M_Warehouse_ID;
+                        if (oLine.GetM_AttributeSetInstance_ID() != 0)
+                        {
+                            sql += " AND M_AttributeSetInstance_ID=" + oLine.GetM_AttributeSetInstance_ID();
+                        }
+                        // check onhand qty on specified locator
+                        if (M_Locator_ID > 0)
+                        {
+                            sql += " AND l.M_Locator_ID = " + M_Locator_ID;
+                        }
+                        OnHandQty = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, Get_Trx()));
+
                         if (oLine.GetQtyOrdered() > QtyAvail && (DocSubTypeSO == "WR" || DocSubTypeSO == "WP"))
                         {
                             #region In Case of -- WR (WareHouse Order) / WP (POS Order)
@@ -6135,6 +6141,15 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                     return null;
                 }
 
+                // Skip per-line tax / header total recalculation in MInvoiceLine.AfterSave (same as MInvoice.CopyFrom);
+                // invoice.CompleteIt -> PrepareIt -> CalculateTaxTotal rebuilds taxes, totals and withholding once.
+                // Set in memory only (after header save) - lines share this object as their parent.
+                bool hasConditionalFlag = invoice.Get_ColumnIndex("ConditionalFlag") > -1;
+                if (hasConditionalFlag)
+                {
+                    invoice.SetConditionalFlag(MInvoice.CONDITIONALFLAG_PrepareIt);
+                }
+
                 //	If we have a Shipment - use that as a base
                 if (shipment != null)
                 {
@@ -6142,6 +6157,7 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                         SetInvoiceRule(INVOICERULE_AfterDelivery);
                     //
                     MInOutLine[] sLines = shipment.GetLines(false);
+                    List<int> invoicedShipLineIDs = new List<int>();
                     for (int i = 0; i < sLines.Length; i++)
                     {
                         MInOutLine sLine = sLines[i];
@@ -6160,10 +6176,18 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                             return null;
                         }
                         //
-                        sLine.SetIsInvoiced(true);
-                        if (!sLine.Save(Get_TrxName()))
+                        invoicedShipLineIDs.Add(sLine.GetM_InOutLine_ID());
+                    }
+
+                    // Mark shipment lines invoiced in one statement - a full MInOutLine.Save per line re-ran
+                    // product/stock/cost/margin checks on an already completed shipment just to flip a flag
+                    if (invoicedShipLineIDs.Count > 0)
+                    {
+                        int no = DB.ExecuteQuery("UPDATE M_InOutLine SET IsInvoiced = 'Y' WHERE M_InOutLine_ID IN ("
+                            + string.Join(",", invoicedShipLineIDs) + ")", null, Get_TrxName());
+                        if (no != invoicedShipLineIDs.Count)
                         {
-                            log.Warning("Could not update Shipment line: " + sLine);
+                            log.Warning("Could not update Shipment lines as invoiced: " + shipment);
                         }
                     }
 
@@ -6232,6 +6256,12 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                         }
                     }
                 }
+                // Restore normal line behaviour before completion
+                if (hasConditionalFlag)
+                {
+                    invoice.Set_Value("ConditionalFlag", null);
+                }
+
                 //	Manually Process Invoice
                 String status = invoice.CompleteIt();
                 invoice.SetDocStatus(status);
