@@ -16,6 +16,8 @@ namespace VAS.Controllers
      * - Product Master: M_Product (M_Product_ID, Value, Name, ProductType, IsStocked, M_Product_Category_ID, C_UOM_ID, IsActive)
      * - Product Category: M_Product_Category (M_Product_Category_ID, Name)
      * - Unit of Measure: C_UOM (C_UOM_ID, Name, UOMSymbol)
+     *   Displayed UoM is COALESCE(Name, UOMSymbol) - full value ("Each"), not the short symbol
+     *   ("Ea"), per user request 2026-09-28.
      * - Storage / On-Hand: M_Storage (M_Product_ID, M_Locator_ID, QtyOnHand)
      * - Locator: M_Locator (M_Locator_ID, M_Warehouse_ID, Value, LocatorCombination)
      *   Visible locator value is COALESCE(LocatorCombination, Value) - the source prompt states
@@ -104,15 +106,15 @@ namespace VAS.Controllers
                                       p.Value AS ProductCode, 
                                       p.Name AS ProductName, 
                                       p.ProductType, 
-                                      COALESCE(pc.Name, N'Standard') AS CategoryName, 
-                                      COALESCE(u.UOMSymbol, COALESCE(u.Name, N'Each')) AS UOMName, 
-                                      p.IsActive, 
-                                      COALESCE(SUM(s.QtyOnHand), 0) AS TotalQtyOnHand 
-                               FROM M_Product p 
-                               LEFT JOIN M_Product_Category pc ON (p.M_Product_Category_ID = pc.M_Product_Category_ID) 
-                               LEFT JOIN C_UOM u ON (p.C_UOM_ID = u.C_UOM_ID) 
-                               LEFT JOIN M_Storage s ON (p.M_Product_ID = s.M_Product_ID AND s.IsActive = 'Y') 
-                               LEFT JOIN M_Locator loc ON (s.M_Locator_ID = loc.M_Locator_ID AND loc.IsActive = 'Y') 
+                                      COALESCE(pc.Name, N'Standard') AS CategoryName,
+                                      COALESCE(u.Name, COALESCE(u.UOMSymbol, N'Each')) AS UOMName,
+                                      p.IsActive,
+                                      COALESCE(SUM(s.QtyOnHand), 0) AS TotalQtyOnHand
+                               FROM M_Product p
+                               LEFT JOIN M_Product_Category pc ON (p.M_Product_Category_ID = pc.M_Product_Category_ID)
+                               LEFT JOIN C_UOM u ON (p.C_UOM_ID = u.C_UOM_ID)
+                               LEFT JOIN M_Storage s ON (p.M_Product_ID = s.M_Product_ID AND s.IsActive = 'Y')
+                               LEFT JOIN M_Locator loc ON (s.M_Locator_ID = loc.M_Locator_ID AND loc.IsActive = 'Y')
                                WHERE p.IsActive = 'Y' 
                                  AND p.IsStocked = 'Y' 
                                  AND p.ProductType = 'I'" + searchFilter;
@@ -174,15 +176,15 @@ namespace VAS.Controllers
                                       p.Value AS ProductCode, 
                                       p.Name AS ProductName, 
                                       p.ProductType, 
-                                      COALESCE(pc.Name, N'Standard') AS CategoryName, 
-                                      COALESCE(u.UOMSymbol, COALESCE(u.Name, N'Each')) AS UOMName, 
-                                      p.IsActive, 
-                                      COALESCE(SUM(s.QtyOnHand), 0) AS TotalQtyOnHand 
-                               FROM M_Product p 
-                               LEFT JOIN M_Product_Category pc ON (p.M_Product_Category_ID = pc.M_Product_Category_ID) 
-                               LEFT JOIN C_UOM u ON (p.C_UOM_ID = u.C_UOM_ID) 
-                               LEFT JOIN M_Storage s ON (p.M_Product_ID = s.M_Product_ID AND s.IsActive = 'Y') 
-                               WHERE p.M_Product_ID = " + productId + @" 
+                                      COALESCE(pc.Name, N'Standard') AS CategoryName,
+                                      COALESCE(u.Name, COALESCE(u.UOMSymbol, N'Each')) AS UOMName,
+                                      p.IsActive,
+                                      COALESCE(SUM(s.QtyOnHand), 0) AS TotalQtyOnHand
+                               FROM M_Product p
+                               LEFT JOIN M_Product_Category pc ON (p.M_Product_Category_ID = pc.M_Product_Category_ID)
+                               LEFT JOIN C_UOM u ON (p.C_UOM_ID = u.C_UOM_ID)
+                               LEFT JOIN M_Storage s ON (p.M_Product_ID = s.M_Product_ID AND s.IsActive = 'Y')
+                               WHERE p.M_Product_ID =" + productId + @" 
                                  AND p.IsStocked = 'Y' 
                                  AND p.ProductType = 'I'";
 

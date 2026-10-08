@@ -123,7 +123,9 @@
             $monthSelect = $('<select class="vas-adjwisecount-select">');
             $yearSelect = $('<select class="vas-adjwisecount-select">');
 
-            var months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            // 3-letter month labels in the select (matches VAS_165_LocationWiseInventoryCountWidget) -
+            // full names overflowed the fixed-width control ("Septemb").
+            var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
             for (var m = 0; m < months.length; m++) {
                 var $opt = $('<option value="' + (m + 1) + '">' + months[m] + '</option>');
                 if (m + 1 === selectedMonth) {

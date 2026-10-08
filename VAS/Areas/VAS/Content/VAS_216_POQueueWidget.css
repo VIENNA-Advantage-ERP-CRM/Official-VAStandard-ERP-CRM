@@ -159,7 +159,7 @@
 
 .vas-216-trow {
     display: grid;
-    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.8fr) minmax(0, 1.6fr) minmax(0, 1.1fr) minmax(0, 0.9fr) minmax(0, 1.2fr) minmax(0, 0.85fr) minmax(0, 0.9fr) minmax(0, 1.1fr);
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.8fr) minmax(0, 1.6fr) minmax(0, 1.1fr) minmax(0, 1.2fr) minmax(0, 0.85fr) minmax(0, 0.9fr) minmax(0, 1.1fr);
     gap: 0.75em;
     padding: 0 0.5em;
     align-items: center;
@@ -180,17 +180,23 @@
 .vas-216-tbody {
     display: flex;
     flex-direction: column;
+    justify-content: flex-start;
     flex: 1 1 0;
     min-height: 0;
     overflow: hidden;
 }
 
 .vas-216-tbody .vas-216-trow {
-    flex: 1 1 0;
+    /* Fixed row height (sized so a 5-row page fills the card) stacked from the top: a
+       short page leaves blank space below instead of stretching or centering its rows.
+       flex-shrink is on (min-height is 0) so on a shorter card the rows compress evenly
+       to fit rather than cropping the last one; they never grow past this height. */
+    flex: 0 1 auto;
+    height: 2.75em;
     min-height: 0;
     font-size: 0.75em;
-    padding-top: 0.3em;
-    padding-bottom: 0.3em;
+    padding-top: 0;
+    padding-bottom: 0;
     border-bottom: 1px solid #E2EAF1;
     cursor: pointer;
     transition: background-color 0.15s ease, box-shadow 0.15s ease;

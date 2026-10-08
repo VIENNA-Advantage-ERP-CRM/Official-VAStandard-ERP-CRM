@@ -39,23 +39,17 @@ namespace VIS.Controllers
     ///                          the session's $C_Currency_ID: it always resolves the same
     ///                          accounting-schema currency the value is now guaranteed to be
     ///                          in, so the displayed symbol can never disagree with the figure.
+    ///   Claude      2026-09-28 CurrencyConvert wrapper removed again, per explicit instruction:
+    ///                          Inventory Use window widgets must not call CurrencyConvert at
+    ///                          all - the source amounts are already in base currency, so the
+    ///                          identity conversion added above was pure overhead. TotalValue is
+    ///                          a plain SUM again; the now-unused SchemaCurrencySql/schema_currency
+    ///                          CTE was removed with it. GetCurrencyInfo (display symbol only)
+    ///                          is unaffected.
     /// </summary>
     public class VAS_185_InventoryUseTrendWidgetController : Controller
     {
         private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_185_InventoryUseTrendWidgetController).FullName);
-
-        /// <summary>Single-row tenant accounting (base) currency - id, precision, ISO, symbol.</summary>
-        private const string SchemaCurrencySql = @"
-            SELECT ci.AD_Client_ID AS AD_Client_ID,
-                   cs.C_Currency_ID AS Acct_Currency_ID,
-                   cur.StdPrecision AS Std_Precision,
-                   cur.ISO_Code AS ISO_Code,
-                   CASE WHEN cur.CurSymbol IS NOT NULL THEN cur.CurSymbol ELSE cur.ISO_Code END AS Cur_Symbol
-            FROM AD_ClientInfo ci
-            INNER JOIN C_AcctSchema cs ON (cs.C_AcctSchema_ID=ci.C_AcctSchema1_ID AND cs.IsActive = 'Y')
-            INNER JOIN C_Currency cur ON (cur.C_Currency_ID=cs.C_Currency_ID AND cur.IsActive = 'Y')
-            WHERE ci.IsActive = 'Y'
-              AND ci.AD_Client_ID = @Client_ID";
 
         private class MonthBucket
         {
@@ -104,7 +98,6 @@ namespace VIS.Controllers
 
                 // AddAccessSQL appends its predicate at the end of the statement, so it must be
                 // applied to a plain SELECT (no GROUP BY / ORDER BY) where the alias is in scope.
-                // AD_Org_ID is carried through for the CurrencyConvert call below.
                 string invAccessSql = @"
                     SELECT inv.M_Inventory_ID, inv.MovementDate, inv.AD_Client_ID, inv.AD_Org_ID
                     FROM M_Inventory inv
@@ -117,21 +110,20 @@ namespace VIS.Controllers
                 invAccessSql = MRole.GetDefault(ctx).AddAccessSQL(invAccessSql, "inv", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
                 // Price is M_InventoryLine.CurrentCostPrice directly (no NULLIF/fallback chain,
-                // no product-cost lookup, per explicit instruction), run through CurrencyConvert
-                // into the tenant's base accounting-schema currency, dated on each row's own
-                // MovementDate rather than "today" - per explicit instruction.
+                // no product-cost lookup, per explicit instruction). No CurrencyConvert wrapper:
+                // M_InventoryLine cost values are already in the tenant's base accounting-schema
+                // currency, so converting schema-currency to schema-currency was always a no-op
+                // identity conversion - removed per explicit instruction (2026-09-28) not to run
+                // Inventory Use widgets through CurrencyConvert at all, since the source amounts
+                // never need converting.
                 string sql = @"
-                    WITH schema_currency AS (
-                        " + SchemaCurrencySql + @"
-                    )
                     SELECT
                       TO_CHAR(ai.MovementDate, 'YYYY-MM') AS MonthBucket,
                       SUM(line.QtyInternalUse) AS TotalQty,
-                      SUM(CurrencyConvert(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, 0), sc.Acct_Currency_ID, sc.Acct_Currency_ID, ai.MovementDate, 0, ai.AD_Client_ID, ai.AD_Org_ID)) AS TotalValue,
+                      SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, 0)) AS TotalValue,
                       COUNT(DISTINCT ai.M_Inventory_ID) AS DocCount
                     FROM M_InventoryLine line
                     INNER JOIN (" + invAccessSql + @") ai ON ai.M_Inventory_ID = line.M_Inventory_ID
-                    CROSS JOIN schema_currency sc
                     WHERE line.IsActive = 'Y'
                       AND COALESCE(line.QtyInternalUse, 0) > 0
                     GROUP BY TO_CHAR(ai.MovementDate, 'YYYY-MM')

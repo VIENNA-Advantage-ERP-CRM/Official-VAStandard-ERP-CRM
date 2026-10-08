@@ -132,9 +132,81 @@
     flex: none;
 }
 
+/* Sortable column headings: a plain button that looks like the heading text, with a small
+   arrow - faint up/down pair when idle, a single filled arrow for the active direction. */
+.vas-214-sortbtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    max-width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    color: inherit;
+    text-transform: inherit;
+    cursor: pointer;
+}
+
+.vas-214-sortbtn:hover,
+.vas-214-sortbtn.vas-214-sorted {
+    color: #0083DA;
+}
+
+.vas-214-sortbtn:focus-visible {
+    outline: 2px solid #1F83FF;
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+.vas-214-sortlbl {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.vas-214-sort {
+    flex: none;
+    position: relative;
+    width: 0.6em;
+    height: 0.95em;
+    opacity: 0.45;
+}
+
+.vas-214-sort::before,
+.vas-214-sort::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 0.28em solid transparent;
+    border-right: 0.28em solid transparent;
+}
+
+.vas-214-sort::before {
+    top: 0;
+    border-bottom: 0.32em solid currentColor;
+}
+
+.vas-214-sort::after {
+    bottom: 0;
+    border-top: 0.32em solid currentColor;
+}
+
+.vas-214-sorted .vas-214-sort {
+    opacity: 1;
+}
+
+.vas-214-sorted.vas-214-asc .vas-214-sort::after,
+.vas-214-sorted.vas-214-desc .vas-214-sort::before {
+    display: none;
+}
+
 .vas-214-tbody {
     display: flex;
     flex-direction: column;
+    justify-content: flex-start;
     flex: 1;
     min-height: 0;
     overflow: hidden;
@@ -147,8 +219,14 @@
     align-items: center;
     font-size: 0.75em;
     border-bottom: 1px solid #E2EAF1;
-    flex: 1 1 0;
+    /* Fixed row height (fits the two-line Balance / Paid cell), stacked from the top: a
+       short page leaves blank space below instead of stretching or centering its rows. */
+    flex: 0 1 auto;
     min-height: 0;
+    height: 2.5em;
+    padding-top: 0.1em;
+    padding-bottom: 0.1em;
+    overflow: hidden;
     cursor: pointer;
     border-radius: 8px;
     transition: background 0.15s ease, box-shadow 0.15s ease;

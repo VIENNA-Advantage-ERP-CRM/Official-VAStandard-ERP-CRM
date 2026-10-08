@@ -5,6 +5,17 @@
  *                  (DocStatus = 'CO') with remaining undelivered quantity (QtyOrdered > QtyDelivered).
  * Chronological Development:
  *   2026-08-17   : Created
+ *   Claude 2026-09-29: GetPOsPendingDelivery's aggregate query already zeroed out non-Item
+ *                      quantities per-line via CASE WHEN prod.ProductType = 'I', but line_count
+ *                      and the HAVING clause were not scoped the same way. Added
+ *                      "AND prod.ProductType = 'I'" to the WHERE clause so the join itself only
+ *                      considers Item-type product lines.
+ *   Claude 2026-09-29: ordered_qty/delivered_qty/pending_qty in the main list were computed by
+ *                      multiplying QtyOrdered/QtyDelivered (already in the product's base UOM) by
+ *                      a C_UOM_Conversion-based factor meant for converting FROM entered UOM,
+ *                      double-converting the figures. Replaced with QtyEntered directly (already
+ *                      in the line's selected UOM) and a QtyEntered/QtyOrdered ratio applied to
+ *                      QtyDelivered, matching GetPOLines' own per-line UOM scaling.
  ***********************************************************/
 
 using Newtonsoft.Json;
@@ -94,27 +105,20 @@ namespace VIS.Controllers
                 // Step 2: Query Operational Completed POs with Pending Delivery Lines
                 DateTime today = DateTime.Today;
 
-                // Factor converting a line quantity from the line's entered UOM to the product's
-                // own (selected) UOM, so ordered/pending quantities read in the UOM the product is
-                // defined with (e.g. millilitres). Same rate convention as VAS_186/VAS_188:
-                // C_UOM_Conversion stores C_UOM_ID = product UOM, C_UOM_To_ID = entered UOM, and
-                // qty(product UOM) = qty(entered) * DivideRate. Aliases here: line = "ol", product = "prod".
-
-                string uomFactor = @"
-                          COALESCE(
-                            CASE WHEN COALESCE(ol.C_UOM_ID, 0) = COALESCE(prod.C_UOM_ID, 0) THEN 1 END,
-                            (SELECT conv.DivideRate
-                             FROM (SELECT conv0.DivideRate
-                                   FROM C_UOM_Conversion conv0
-                                   WHERE conv0.IsActive = 'Y'
-                                     AND conv0.M_Product_ID = prod.M_Product_ID
-                                     AND conv0.C_UOM_ID = prod.C_UOM_ID
-                                     AND conv0.C_UOM_To_ID = ol.C_UOM_ID
-                                     AND COALESCE(conv0.DivideRate, 0) <> 0
-                                   ORDER BY conv0.AD_Client_ID DESC, conv0.AD_Org_ID DESC
-                                  ) conv
-                             WHERE ROWNUM = 1),
-                            1)
+                // Ordered/pending quantities are shown in each line's own SELECTED (entered) UOM,
+                // e.g. millilitres - not the product's base/stocking UOM. QtyOrdered/QtyDelivered
+                // are always in the base UOM; QtyEntered is already in the line's entered UOM, so
+                // it is used directly for ordered_qty, and delivered_qty is scaled by the same
+                // entered/ordered ratio GetPOLines (this controller's own drill-down) already uses
+                // per line. The previous uomFactor here (a C_UOM_Conversion lookup) was applied to
+                // QtyOrdered, which is already in the product's base UOM, not "qty entered" as that
+                // factor assumed - it double-converted the quantity, producing wrong figures like
+                // "Ordered 31 / Pending 1" instead of the line's real entered-UOM values.
+                string uomRatio = @"
+                          CASE WHEN COALESCE(ol.QtyOrdered, 0) <> 0
+                               THEN COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) / ol.QtyOrdered
+                               ELSE 1
+                          END
                 ";
                 string sql = @"
                     SELECT
@@ -129,12 +133,12 @@ namespace VIS.Controllers
                         w.Name AS warehouse_name,
                         c.CurSymbol AS doc_cur_symbol,
                         c.ISO_Code AS doc_cur_iso,
-                        SUM(CASE WHEN prod.ProductType = 'I' THEN COALESCE(ol.QtyOrdered, 0) * " + uomFactor + @" ELSE 0 END) AS ordered_qty,
-                        SUM(CASE WHEN prod.ProductType = 'I' THEN COALESCE(ol.QtyDelivered, 0) * " + uomFactor + @" ELSE 0 END) AS delivered_qty,
+                        SUM(CASE WHEN prod.ProductType = 'I' THEN COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) ELSE 0 END) AS ordered_qty,
+                        SUM(CASE WHEN prod.ProductType = 'I' THEN COALESCE(ol.QtyDelivered, 0) * " + uomRatio + @" ELSE 0 END) AS delivered_qty,
                         SUM(
                             CASE
                                 WHEN prod.ProductType = 'I' AND COALESCE(ol.QtyOrdered, 0) > COALESCE(ol.QtyDelivered, 0)
-                                THEN (COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0)) * " + uomFactor + @"
+                                THEN COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) - (COALESCE(ol.QtyDelivered, 0) * " + uomRatio + @")
                                 ELSE 0
                             END
                         ) AS pending_qty,
@@ -163,8 +167,16 @@ namespace VIS.Controllers
                       AND o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
+                      AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
                       AND o.DocStatus = 'CO'
                       AND o.C_Order_ID IN (@P_ORDER_ACCESS@)
+                      -- Charge lines and non-Item products carry no stock movement and can never
+                      -- be delivered. The SUMs above already zeroed them out with a per-line CASE,
+                      -- but line_count (COUNT(ol.C_OrderLine_ID)) and the HAVING clause below did
+                      -- not, so a PO whose only pending line was a charge could still surface here
+                      -- with a pending_qty of 0, and line_count over-reported. Restricting the
+                      -- join itself to ProductType = I fixes both.
+                      AND prod.ProductType = 'I'
                     GROUP BY
                         o.C_Order_ID,
                         o.DocumentNo,
@@ -222,10 +234,11 @@ namespace VIS.Controllers
 
                         decimal orderedQty = Util.GetValueOfDecimal(dr["ordered_qty"]);
                         decimal deliveredQty = Util.GetValueOfDecimal(dr["delivered_qty"]);
-                        // Header roll-ups stay in the product's base UOM. This statement aggregates
-                        // every line of the order, so it carries no QtyEntered column - summing
-                        // quantities across mixed per-line UOMs would be meaningless. Per-line UOM
-                        // scaling belongs in GetPOLines, which selects QtyEntered for that purpose.
+                        // 2026-09-29: ordered_qty/delivered_qty/pending_qty are now scaled to each
+                        // line's own entered (selected) UOM in the SQL itself (see uomRatio above),
+                        // matching GetPOLines' per-line scaling, per user request: "Ordered quantity
+                        // and pending quantity should be visible based on the selected UOM... In
+                        // millilitres."
                         decimal pendingQty = Util.GetValueOfDecimal(dr["pending_qty"]);
                         decimal pendingValueDoc = Util.GetValueOfDecimal(dr["pending_value_document_currency"]);
                         decimal totalOrderVal = Util.GetValueOfDecimal(dr["total_order_value"]);

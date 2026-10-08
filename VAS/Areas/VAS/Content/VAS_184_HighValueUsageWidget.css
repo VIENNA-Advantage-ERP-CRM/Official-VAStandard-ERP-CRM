@@ -14,17 +14,17 @@
 
 .vas-hvu-card {
     font-family: Roboto, Arial, sans-serif;
-    /* Design Specs (dashboard-widgets.md > "Widget Root Anchor"): the canonical widget
-       root is clamp(16px, 1.2cqi, 20px) - this was clamp(14px, 4.5cqi, 36px), a
-       ceiling nearly 2x the spec's 20px and a rate ~3.75x steeper, introduced by a
-       prior pass whose own comment incorrectly asserted 4.5cqi was "the standard".
-       It is not; the 2K Calibration section explicitly documents 20px as the
-       intended ceiling so widget content doesn't read oversized on wide dashboards.
-       cqi resolves against .vas-hvu-root (container-type: inline-size); the
-       JS-driven --widget-inline-size is the fallback for engines without container
-       queries, same as every other widget in this codebase. */
-    font-size: clamp(16px, 1.2cqi, 20px);
-    font-size: clamp(16px, calc(var(--widget-inline-size, 480px) * 0.012), 20px);
+    /* Matched to VAS_183_MaterialConsumptionWidget's root (2026-09-28, user request:
+       "match the font size of high value usage widget to the consumption widget").
+       Both widgets share the same .75em/700 row-label rule, but this root previously
+       resolved to clamp(16px, 1.2cqi, 20px) - the compact-tile canonical anchor from an
+       earlier dashboard-widgets.md "Widget Root Anchor" pass - while VAS_183 (and
+       VAS_188/VAS_187/VAS_185) resolve to the larger clamp(15px, 4cqi, 24px), so the
+       identical .75em rule rendered visibly smaller here than in Consumption. Same
+       formula as VAS_183 now, so "5mm screws" and "1000004 - North Locator" read at the
+       same size. */
+    font-size: clamp(15px, 4cqi, 24px);
+    font-size: clamp(15px, calc(var(--widget-inline-size, var(--dash-inline-size, 480px)) * 0.04), 24px);
     width: 100%;
     height: 100%;
     display: flex;
@@ -36,16 +36,41 @@
     box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
     background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
     backdrop-filter: blur(10px);
-    padding: .85em;
+    /* Matches the Inventory Use window's shared card padding (VAS_188/VAS_183/VAS_186/
+       VAS_178 all use .875em) - was .85em here, a slight but real mismatch. */
+    padding: .875em;
     overflow: hidden;
 }
 
-/* Header & Filters */
+/* Header & Filters
+   Month/year moved into the header row, top-right (2026-09-29, user request: "move the
+   month and year filter on top right corner like other widget example" - matched to
+   VAS_183_MaterialConsumptionWidget's .vas-mcw-head/.vas-mcw-head-left layout, which puts
+   its own period filter in the same spot). */
 .vas-hvu-head {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: .5em;
     flex: 0 0 auto;
+    /* Divider under the heading, matching the modal's own head rule (.vas-hvu-modal-head
+       border-bottom: 1px solid #1F83FF), per user request (2026-09-29): "show line in
+       bottom of heading ... like this" - "this" being the modal's blue divider.
+       padding/margin tightened from .5em to .3em (2026-09-29, "reduce the spacing") - with
+       pageSize now fixed at 4 (recalcPageSize disabled), the head's own footprint had grown
+       enough (sub-heading line + this divider) that the 4th row was clipped by the card's
+       overflow:hidden. */
+    padding-bottom: .3em;
+    margin-bottom: .3em;
+    border-bottom: 1px solid #1F83FF;
+}
+
+.vas-hvu-head-left {
+    display: flex;
+    align-items: center;
+    gap: .5em;
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
 /* Design Specs (dashboard-widgets.md > "Widget Header"): icon well is a soft glass
@@ -74,11 +99,33 @@
    --dash-inline-size clamp, not em against the (widget-scoped) root - this keeps it
    in lockstep with every other widget's title on the same dashboard regardless of
    this widget's own internal em scale. */
+/* Wraps title+sub so they stack vertically as one flex child of .vas-hvu-head-left, the
+   same structure VAS_183_MaterialConsumptionWidget uses for .vas-mcw-head-text. */
+.vas-hvu-head-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
 .vas-hvu-title {
     font-family: 'Roboto', sans-serif;
     font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
     font-weight: 400;
     color: #102C3F;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+/* Sub-heading under the title (2026-09-29, user request: "Show sub heading like this of
+   consumption widget" - matched to VAS_183_MaterialConsumptionWidget's .vas-mcw-sub). */
+.vas-hvu-sub {
+    font-size: .6875em;
+    font-weight: 400;
+    color: #717182;
     line-height: 1.2;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -89,8 +136,6 @@
     display: flex;
     align-items: center;
     gap: .375em;
-    margin-top: .5em;
-    margin-bottom: .375em;
     flex: 0 0 auto;
 }
 
@@ -147,7 +192,9 @@
        when the page is full, which would both distort the design and make the row-height
        measurement that drives the rows-per-page calculation unstable. */
     flex: 0 0 auto;
-    padding: .375em 0;
+    /* Tightened from .375em (2026-09-29, "reduce the spacing") so all 4 rows (pageSize is now
+       fixed at 4) fit within the card without the last one being clipped. */
+    padding: .25em 0;
     border-bottom: 1px solid #E2EAF1;
     border-top: 0;
     border-left: 0;
@@ -208,8 +255,10 @@
     /* foundations.md: Light border / footer band token is #D9E2EB - was the
        non-canonical #EDF2F6. */
     border-top: 1px solid #D9E2EB;
-    padding-top: .4em;
-    margin-top: .25em;
+    /* Tightened from .4em/.25em (2026-09-29, "reduce the spacing") - same 4th-row clipping fix
+       as .vas-hvu-head/.vas-hvu-row above. */
+    padding-top: .25em;
+    margin-top: .15em;
     flex: 0 0 auto;
 }
 

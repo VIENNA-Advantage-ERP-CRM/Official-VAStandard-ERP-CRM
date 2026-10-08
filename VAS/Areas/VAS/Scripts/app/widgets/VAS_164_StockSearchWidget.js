@@ -81,6 +81,27 @@
         return VIS.Msg.getMsg(key);
     }
 
+    /* Attribute display logic (Locators tab and Inventory Counts tab): the Attribute column is
+       shown only when at least one row in the full result set carries a value; otherwise the
+       column is omitted entirely rather than rendered blank.
+       Empty attribute-set instances carry dash-only descriptions ("-", "---") rather than a real
+       null (same ADempiere convention handled in VAS_097_ExpectedGRNWidget.js) - those do not
+       count as a value, and are blanked out per-cell so a real value elsewhere in the result set
+       doesn't leave "---" sitting in the rows that have none. */
+    function cleanAttribute(attributeName) {
+        var text = String(attributeName == null ? '' : attributeName).trim();
+        return (text === '' || /^-+$/.test(text)) ? '' : text;
+    }
+
+    function hasAnyAttribute(rows) {
+        for (var i = 0; i < rows.length; i++) {
+            if (rows[i] && cleanAttribute(rows[i].attribute).length > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     function ensureDashInlineSizeVar($el) {
         var container = $el.closest('.vis-widget-container, [data-dashboard-container], .vis-widget-body, body')[0] || document.documentElement;
         var write = function () {
@@ -476,13 +497,17 @@
                 return;
             }
 
+            // Attribute column is display-logic only: shown when at least one row in the whole
+            // history carries an attribute value, hidden entirely otherwise.
+            var hasAttribute = hasAnyAttribute(counts);
+
             var $table = $(
                 '<table class="vas-stocksearch-table">' +
                 '<thead><tr>' +
                 '<th>' + esc(lbl("VAS_164_DocumentNo")) + '</th>' +
                 '<th>' + esc(lbl("VAS_164_Date")) + '</th>' +
                 '<th>' + esc(lbl("VAS_164_Warehouse")) + '</th>' +
-                '<th>' + esc(lbl("VAS_164_Attribute")) + '</th>' +
+                (hasAttribute ? '<th>' + esc(lbl("VAS_164_Attribute")) + '</th>' : '') +
                 '<th class="right">' + esc(lbl("VAS_164_Book")) + '</th>' +
                 '<th class="right">' + esc(lbl("VAS_164_Counted")) + '</th>' +
                 '<th class="right">' + esc(lbl("VAS_164_Variance")) + '</th>' +
@@ -496,13 +521,14 @@
                 var varClass = variance > 0 ? 'vas-stocksearch-var-pos'
                     : (variance < 0 ? 'vas-stocksearch-var-neg' : '');
                 var varText = variance > 0 ? ('+' + variance) : String(variance);
+                var attrText = cleanAttribute(c.attribute);
 
                 var $tr = $(
                     '<tr class="vas-stocksearch-count-row" data-invid="' + Number(c.inventoryId) + '" title="' + esc(lbl("VAS_164_OpenCountDocument")) + '">' +
                     '<td class="loc-code">' + esc(c.documentNo) + '</td>' +
                     '<td>' + esc(c.movementDate) + '</td>' +
                     '<td class="wh-name" title="' + esc(c.warehouse) + '">' + esc(c.warehouse) + '</td>' +
-                    '<td class="attr-val" title="' + esc(c.attribute || "") + '">' + esc(c.attribute || "") + '</td>' +
+                    (hasAttribute ? '<td class="attr-val" title="' + esc(attrText) + '">' + esc(attrText) + '</td>' : '') +
                     '<td class="qty-val">' + esc(Number(c.qtyBook || 0).toLocaleString()) + '</td>' +
                     '<td class="qty-val">' + esc(Number(c.qtyCount || 0).toLocaleString()) + '</td>' +
                     '<td class="qty-val ' + varClass + '">' + esc(varText) + '</td>' +
@@ -526,6 +552,10 @@
                 return;
             }
 
+            // Attribute column is display-logic only: shown when at least one locator (across all
+            // pages) carries an attribute value, hidden entirely otherwise.
+            var hasAttribute = hasAnyAttribute(locators);
+
             var currentPage = 1;
 
             function getAdaptivePageSize() {
@@ -543,7 +573,7 @@
                 '<tr>' +
                 '<th>' + esc(lbl("VAS_164_LocatorCode")) + '</th>' +
                 '<th>' + esc(lbl("VAS_164_Warehouse")) + '</th>' +
-                '<th>' + esc(lbl("VAS_164_Attribute")) + '</th>' +
+                (hasAttribute ? '<th>' + esc(lbl("VAS_164_Attribute")) + '</th>' : '') +
                 '<th class="right">' + esc(lbl("VAS_164_Qty")) + '</th>' +
                 '</tr>' +
                 '</thead>' +
@@ -580,14 +610,15 @@
                 for (var i = 0; i < pageItems.length; i++) {
                     var item = pageItems[i];
                     var formattedQty = Number(item.qty || 0).toLocaleString();
+                    var attrText = cleanAttribute(item.attribute);
 
                     var $tr = $(
                         '<tr>' +
                         // Qty no longer carries the UoM suffix - UoM is its own field in the header
-                        // grid. Attribute is blank when the stock line has none.
+                        // grid. Attribute column itself is omitted when no locator has a value.
                         '<td class="loc-code" title="' + esc(item.locator) + '">' + esc(item.locator) + '</td>' +
                         '<td class="wh-name" title="' + esc(item.warehouse) + '">' + esc(item.warehouse) + '</td>' +
-                        '<td class="attr-val" title="' + esc(item.attribute || "") + '">' + esc(item.attribute || "") + '</td>' +
+                        (hasAttribute ? '<td class="attr-val" title="' + esc(attrText) + '">' + esc(attrText) + '</td>' : '') +
                         '<td class="qty-val" title="' + esc(formattedQty) + '">' + esc(formattedQty) + '</td>' +
                         '</tr>'
                     );

@@ -152,6 +152,7 @@ namespace VAS.Areas.VAS.Controllers
                       AND o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
+                      AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
                       AND o.DocStatus <> 'VO'
                       AND o.DateOrdered >= " + sqlFromDate + @"
                       AND o.DateOrdered < " + sqlToDate;
@@ -278,6 +279,7 @@ namespace VAS.Areas.VAS.Controllers
                       AND o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
+                      AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
                       AND o.DocStatus <> 'VO'
                       AND o.DateOrdered IS NOT NULL";
                 monthsSql = MRole.GetDefault(ctx).AddAccessSQL(monthsSql, "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
@@ -353,6 +355,7 @@ namespace VAS.Areas.VAS.Controllers
                       AND o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
+                      AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
                       AND o.DocStatus <> 'VO'
                       AND o.DateOrdered >= " + sqlFromDate + @"
                       AND o.DateOrdered < " + sqlToDate;

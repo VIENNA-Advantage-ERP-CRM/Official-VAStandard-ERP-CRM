@@ -472,12 +472,12 @@
 
                 '<div class="vas-er-date-field">' +
                 '<label class="vas-er-date-label">' + lbl("VIS_FromDate", "From Date") + '</label>' +
-                '<input type="date" class="vas-er-date-input vas-er-from-date" />' +
+                '<input type="date" max="9999-12-31" class="vas-er-date-input vas-er-from-date" />' +
                 '</div>' +
 
                 '<div class="vas-er-date-field">' +
                 '<label class="vas-er-date-label">' + lbl("VIS_ToDate", "To Date") + '</label>' +
-                '<input type="date" class="vas-er-date-input vas-er-to-date" />' +
+                '<input type="date" max="9999-12-31" class="vas-er-date-input vas-er-to-date" />' +
                 '</div>' +
 
                 '</div>' +

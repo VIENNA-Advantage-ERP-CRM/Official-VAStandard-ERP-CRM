@@ -325,7 +325,7 @@
 
         /* ══════════════ Filter popover ══════════════
            An Account Date range, a bank account, an amount band and a currency restriction; every
-           bound optional and open-endable. Dates are native <input type="date"> (always ISO on the
+           bound optional and open-endable. Dates are native <input type="date" max="9999-12-31"> (always ISO on the
            wire); the amounts, the bank account and the currency use the framework's own controls
            so the decimal separator and the lookups behave exactly as in a standard window.
            Mirrors the VAS_068 AP Payment search popover. */
@@ -360,8 +360,8 @@
         function dateRangeHtml(title, fromId, toId) {
             return '<div class="vas-rsw-frow"><div class="vas-rsw-flabel">' + escapeHtml(title) + '</div>' +
                 '<div class="vas-rsw-fpair">' +
-                '<label><span>' + escapeHtml(lbl('VAS_063_From', 'From')) + '</span><input type="date" id="' + fromId + '"></label>' +
-                '<label><span>' + escapeHtml(lbl('VAS_063_To', 'To')) + '</span><input type="date" id="' + toId + '"></label>' +
+                '<label><span>' + escapeHtml(lbl('VAS_063_From', 'From')) + '</span><input type="date" max="9999-12-31" id="' + fromId + '"></label>' +
+                '<label><span>' + escapeHtml(lbl('VAS_063_To', 'To')) + '</span><input type="date" max="9999-12-31" id="' + toId + '"></label>' +
                 '</div></div>';
         }
 

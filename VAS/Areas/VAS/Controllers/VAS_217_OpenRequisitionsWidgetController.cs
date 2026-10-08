@@ -271,9 +271,12 @@ namespace VIS.Controllers
 
             // M_RequisitionLine.C_BPartner_ID is not present on every database (absent on DB 1 and DB 2);
             // selecting it unconditionally raised ORA-00904 and no line could ever be picked.
+            // The vendor defaults ONLY from the line's own business partner, and only when that partner is
+            // actually a vendor. The requisition header's business partner is the requestor, not a vendor,
+            // so it is no longer used as a fallback - a line with no vendor is left blank for the user to pick.
             string lineVendorExpr = HasColumn("M_RequisitionLine", "C_BPartner_ID")
-                ? "COALESCE(rl.C_BPartner_ID, r.C_BPartner_ID)"
-                : "r.C_BPartner_ID";
+                ? "rl.C_BPartner_ID"
+                : "NULL";
 
             string rawSql = @"
                 SELECT
@@ -288,7 +291,7 @@ namespace VIS.Controllers
                              THEN COALESCE(asi.Description, N'')
                              ELSE N'' END AS attribute_description,
                     COALESCE(rl.C_UOM_ID, p.C_UOM_ID, 0) AS uom_id,
-                    COALESCE(u.UOMSymbol, u.Name, N'') AS uom_name,
+                    COALESCE(u.Name, u.UOMSymbol, N'') AS uom_name,
                     COALESCE(rl.Qty, 0) AS requested_qty,
                     COALESCE(rl.QtyOrdered, 0) AS already_ordered_qty,
                     CASE
@@ -299,7 +302,7 @@ namespace VIS.Controllers
                     COALESCE(rl.PriceActual, 0) AS requisition_rate,
                     COALESCE(rl.Description, N'') AS description,
                     COALESCE(rl.PrintDescription, N'') AS print_description,
-                    COALESCE(" + lineVendorExpr + @", 0) AS line_vendor_id,
+                    COALESCE(bp.C_BPartner_ID, 0) AS line_vendor_id,
                     COALESCE(bp.Name, N'') AS line_vendor_name
                 FROM M_RequisitionLine rl
                 INNER JOIN M_Requisition r
@@ -312,6 +315,8 @@ namespace VIS.Controllers
                     ON u.C_UOM_ID = COALESCE(rl.C_UOM_ID, p.C_UOM_ID)
                 LEFT JOIN C_BPartner bp
                     ON bp.C_BPartner_ID = " + lineVendorExpr + @"
+                   AND bp.IsVendor = 'Y'
+                   AND bp.IsActive = 'Y'
                 WHERE rl.M_Requisition_ID = @M_Requisition_ID
                   AND rl.IsActive = 'Y'
                   AND r.IsActive = 'Y'
@@ -597,8 +602,15 @@ namespace VIS.Controllers
                     SELECT C_Tax_ID AS id, Name AS name, Rate AS rate
                     FROM C_Tax
                     WHERE IsActive='Y' AND AD_Client_ID IN (0, @AD_Client_ID)
+                      AND IsSurcharge='N'
+                      AND COALESCE(Parent_Tax_ID, 0)=0
+                      AND AD_Org_ID IN (0, @AD_Org_ID)
                     ORDER BY Name ASC";
-                using (IDataReader dr = DB.ExecuteReader(taxSql, new SqlParameter[] { new SqlParameter("@AD_Client_ID", clientId) }))
+                using (IDataReader dr = DB.ExecuteReader(taxSql, new SqlParameter[]
+                {
+                    new SqlParameter("@AD_Client_ID", clientId),
+                    new SqlParameter("@AD_Org_ID", reqOrgId)
+                }))
                 {
                     while (dr != null && dr.Read())
                     {
@@ -881,12 +893,12 @@ namespace VIS.Controllers
                 if (productId > 0)
                 {
                     string uomSql = @"
-                        SELECT u.C_UOM_ID AS id, COALESCE(u.UOMSymbol, u.Name) AS name
+                        SELECT u.C_UOM_ID AS id, COALESCE(u.Name, u.UOMSymbol) AS name
                         FROM C_UOM_Conversion c
                         INNER JOIN C_UOM u ON u.C_UOM_ID = c.C_UOM_To_ID AND u.IsActive = 'Y'
                         WHERE c.IsActive = 'Y' AND c.M_Product_ID = @M_Product_ID
                         UNION
-                        SELECT u.C_UOM_ID AS id, COALESCE(u.UOMSymbol, u.Name) AS name
+                        SELECT u.C_UOM_ID AS id, COALESCE(u.Name, u.UOMSymbol) AS name
                         FROM C_UOM u
                         WHERE u.C_UOM_ID = @Base_UOM_ID AND u.IsActive = 'Y'";
 

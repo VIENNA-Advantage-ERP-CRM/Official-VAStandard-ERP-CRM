@@ -28,7 +28,6 @@
         var $valueEl;
         var $metaEl;
         var $busy;
-        var widgetObserver = null;
 
         function lbl(key, fallback) {
             return VIS.Msg.getMsg(key);
@@ -50,19 +49,6 @@
                 .replace(/>/g, "&gt;")
                 .replace(/"/g, "&quot;")
                 .replace(/'/g, "&#039;");
-        }
-
-        function setupWidgetSizeObserver() {
-            if (typeof ResizeObserver === 'undefined') { return; }
-            widgetObserver = new ResizeObserver(function (entries) {
-                for (var i = 0; i < entries.length; i++) {
-                    var width = entries[i].contentRect.width;
-                    if (width > 0) {
-                        $root[0].style.setProperty('--widget-inline-size', width + 'px');
-                    }
-                }
-            });
-            widgetObserver.observe($wrapper[0]);
         }
 
         this.Initalize = function () {
@@ -126,11 +112,15 @@
         }
 
         function createWidget() {
+            /* Card structure matches VAS_159/VAS_160: label at the top, value+meta wrapped in a
+               "body" pinned to the bottom via margin-top:auto. */
             var $card = $(
                 '<div class="vas-variance-lines-card">' +
                 '<div class="vas-variance-lines-label">' + escapeHtml(lbl("VAS_157_VarianceLines", "Variance Lines")) + '</div>' +
+                '<div class="vas-variance-lines-body">' +
                 '<div class="vas-variance-lines-value">—</div>' +
                 '<div class="vas-variance-lines-meta"></div>' +
+                '</div>' +
                 '</div>'
             );
 
@@ -143,7 +133,6 @@
             $root.append($busy);
 
             $wrapper.append($root);
-            setupWidgetSizeObserver();
         }
 
         this.refreshWidget = function () {
@@ -153,10 +142,6 @@
         this.getRoot = function () { return $wrapper; };
 
         this.disposeComponent = function () {
-            if (widgetObserver) {
-                widgetObserver.disconnect();
-                widgetObserver = null;
-            }
             $wrapper.remove();
         };
     };

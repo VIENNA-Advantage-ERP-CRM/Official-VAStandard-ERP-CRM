@@ -22,7 +22,7 @@
  *   7 | Needed by                                        | VAS_217_NeededBy
  *   8 | Status                                           | VAS_Status
  *   9 | Ready to PO                                      | VAS_ReadyToPO
- *  10 | Partly ordered                                   | VAS_PartlyOrdered
+ *  10 | Partially ordered                                | VAS_PartlyOrdered
  *  11 | Showing                                          | VAS_Showing
  *  12 | of                                               | VAS_Of
  *  13 | select a requisition to raise a PO               | VAS_217_SelectReqToRaisePO
@@ -88,7 +88,7 @@
  *  73 | Failed to load open requisitions                 | VAS_217_FailedToLoadOpenReqs
  *  74 | Retry                                            | VAS_Retry
  *  75 | Standard specification                           | VAS_217_StandardSpecification
- *  76 | Purchase against                                 | VAS_217_PurchaseAgainst
+ *  76 | Purchase against                                 | VAS_PurchaseAgainst
  *  77 | Server error creating Purchase Order             | VAS_217_ServerTimeoutError
  *  78 | select the lines to raise a PO against           | VAS_217_SelectLinesToRaisePO
  *  79 | set quantity and vendor per line                 | VAS_217_SetQtyAndVendorPerLine
@@ -153,7 +153,7 @@
            DEFAULT_PAGE_ROWS is therefore a SEED for the very first paint only - it guarantees
            there is a rendered row to measure. From then on pageSize is whatever actually fits
            at the current widget size, zoom level and screen resolution. */
-        var DEFAULT_PAGE_ROWS = 6;
+        var DEFAULT_PAGE_ROWS = 4; // fixed: four rows a page, each sized to a quarter of the table (see CSS)
         var pageSize = DEFAULT_PAGE_ROWS;
         /* Height of one rendered data row, in px. Cached because it only moves when the widget
            is resized - the row font-size is driven by --widget-inline-size, so a WIDTH change
@@ -183,6 +183,20 @@
 
         function lbl(key, fallback) {
             return VIS.Msg.getMsg(key);
+        }
+
+        // The server sends the requisition status as plain English text. Show it through
+        // the message keys instead, falling back to the corrected text when a key is not
+        // yet defined (getMsg returns the key itself in that case).
+        function statusLabel(status) {
+            var map = {
+                'Ready to PO': ['VAS_ReadyToPO', 'Ready to PO'],
+                'Partly ordered': ['VAS_PartlyOrdered', 'Partially ordered']
+            };
+            var m = map[status];
+            if (!m) { return status; }
+            var txt = lbl(m[0], m[1]);
+            return (!txt || txt === m[0]) ? m[1] : txt;
         }
 
         function esc(s) {
@@ -216,6 +230,14 @@
             }
         }
 
+        // Exact amount for totals: the real value with at most 2 decimals (13.5 -> 13.5, 313.5 -> 313.5,
+        // 314 -> 314), never rounded to a whole number and never abbreviated to L / Cr / k.
+        function fmtExact(v) {
+            var val = Number(v || 0);
+            var sym = curSymbol || '₹';
+            var loc = (curIso === 'INR' || sym === '₹') ? 'en-IN' : undefined;
+            return sym + ' ' + val.toLocaleString(loc, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+        }
         function num(v) {
             var val = Number(v || 0);
             return (curIso === 'INR' || curSymbol === '₹')
@@ -304,10 +326,10 @@
             var R_COLS = 'minmax(0, 1.6fr) minmax(0, 0.6fr) minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 1fr)';
             $tblHead = $('<div class="vas-217-orw-trow vas-217-orw-thead" style="grid-template-columns:' + R_COLS + ';">' +
                 '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_217_Requisition', 'Requisition')) + '">' + esc(lbl('VAS_217_Requisition', 'Requisition')) + '</span>' +
-                '<span class="vas-217-orw-cell right" title="' + esc(lbl('VAS_Lines', 'Lines')) + '">' + esc(lbl('VAS_Lines', 'Lines')) + '</span>' +
-                '<span class="vas-217-orw-cell right" title="' + esc(lbl('VAS_217_PendingQty', 'Pending qty')) + '">' + esc(lbl('VAS_217_PendingQty', 'Pending qty')) + '</span>' +
+                '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_Lines', 'Lines')) + '">' + esc(lbl('VAS_Lines', 'Lines')) + '</span>' +
+                '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_217_PendingQty', 'Pending qty')) + '">' + esc(lbl('VAS_217_PendingQty', 'Pending qty')) + '</span>' +
                 '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_217_NeededBy', 'Needed by')) + '">' + esc(lbl('VAS_217_NeededBy', 'Needed by')) + '</span>' +
-                '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_Status', 'Status')) + '">' + esc(lbl('VAS_Status', 'Status')) + '</span>' +
+                '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_Status', 'Status').replace(/\s*:\s*$/, '')) + '">' + esc(lbl('VAS_Status', 'Status').replace(/\s*:\s*$/, '')) + '</span>' +
                 '</div>');
             $tblBody = $('<div class="vas-217-orw-tbody"></div>');
             $tblContainer.append($tblHead).append($tblBody);
@@ -426,8 +448,8 @@
             for (var i = 0; i < pageSize; i++) {
                 html += '<div class="vas-217-orw-trow" style="grid-template-columns:' + R_COLS + ';">' +
                     '<span class="vas-217-orw-cell"><span style="display:block;width:70%;height:1em;background:#EAF1F7;border-radius:4px;"></span></span>' +
-                    '<span class="vas-217-orw-cell right"><span style="display:inline-block;width:40%;height:1em;background:#EAF1F7;border-radius:4px;"></span></span>' +
-                    '<span class="vas-217-orw-cell right"><span style="display:inline-block;width:50%;height:1em;background:#EAF1F7;border-radius:4px;"></span></span>' +
+                    '<span class="vas-217-orw-cell"><span style="display:inline-block;width:40%;height:1em;background:#EAF1F7;border-radius:4px;"></span></span>' +
+                    '<span class="vas-217-orw-cell"><span style="display:inline-block;width:50%;height:1em;background:#EAF1F7;border-radius:4px;"></span></span>' +
                     '<span class="vas-217-orw-cell"><span style="display:block;width:60%;height:1em;background:#EAF1F7;border-radius:4px;"></span></span>' +
                     '<span class="vas-217-orw-cell"><span style="display:block;width:65%;height:1em;background:#EAF1F7;border-radius:4px;"></span></span>' +
                     '</div>';
@@ -464,6 +486,10 @@
            Returns the CURRENT pageSize whenever it cannot measure (widget not laid out yet,
            hidden tab, no real row on screen) so an unmeasurable moment never changes the page. */
         function rowsThatFit() {
+            // The page is a fixed four rows; each row is a quarter of the table body (CSS), so
+            // there is nothing left to measure and the count never changes with card size.
+            return DEFAULT_PAGE_ROWS;
+            // eslint-disable-next-line no-unreachable
             var el = $tblBody && $tblBody[0];
             if (!el) { return pageSize; }
 
@@ -522,10 +548,10 @@
 
                 rowsHtml += '<div class="vas-217-orw-trow pickable" data-req-id="' + r.requisitionId + '" style="grid-template-columns:' + R_COLS + ';">' +
                     '<span class="vas-217-orw-cell c-link" title="' + esc(reqNo) + '">' + esc(reqNo) + '</span>' +
-                    '<span class="vas-217-orw-cell right c-dark" title="' + r.lineCount + '">' + r.lineCount + '</span>' +
-                    '<span class="vas-217-orw-cell right c-dark" title="' + num(r.pendingQty) + '">' + num(r.pendingQty) + '</span>' +
+                    '<span class="vas-217-orw-cell c-dark" title="' + r.lineCount + '">' + r.lineCount + '</span>' +
+                    '<span class="vas-217-orw-cell c-dark" title="' + num(r.pendingQty) + '">' + num(r.pendingQty) + '</span>' +
                     '<span class="vas-217-orw-cell c-std" title="' + esc(needDisplay) + '">' + esc(needShort) + '</span>' +
-                    '<span class="vas-217-orw-cell" title="' + esc(r.status) + '"><span class="vas-217-orw-chip ' + esc(r.statusChip) + '">' + esc(r.status) + '</span></span>' +
+                    '<span class="vas-217-orw-cell" title="' + esc(statusLabel(r.status)) + '"><span class="vas-217-orw-chip ' + esc(r.statusChip) + '">' + esc(statusLabel(r.status)) + '</span></span>' +
                     '</div>';
             }
 
@@ -548,7 +574,7 @@
 
             // Update footer helper and pager
             var helperString = lbl('VAS_Showing', 'Showing') + ' ' + (startIdx + 1) + '–' + endIdx + ' ' +
-                lbl('VAS_Of', 'of') + ' ' + count + ' · ' + lbl('VAS_217_SelectReqToRaisePO', 'select a requisition to raise a PO');
+                lbl('VAS_Of', 'of') + ' ' + count;
             $helperText.text(helperString);
             $pageText.text((currentPage + 1) + ' ' + lbl('VAS_Of', 'of') + ' ' + totalPages);
 
@@ -600,8 +626,15 @@
             return $modalHost;
         }
 
+        // Set by popModal: the next openModal is a step BACK, so the page being left must not
+        // be pushed onto the history stack again (it was re-pushed by the page's own reopen(),
+        // which made Back from Details return to Lines instead of Select Products).
+        var poppingBack = false;
+
         function openModal(cfg, isBack) {
             var $host = getModalHost();
+            isBack = isBack || poppingBack;
+            poppingBack = false;
             if (!isBack) {
                 if (cfg.isChild && currentModalCfg) {
                     modalStack.push(currentModalCfg);
@@ -667,6 +700,7 @@
                 closeModal();
                 return;
             }
+            poppingBack = true;
             if (typeof prevCfg.reopen === 'function') {
                 prevCfg.reopen();
             } else {
@@ -686,7 +720,9 @@
            STEP 2: PICK PENDING LINES MODAL
            ============================================================ */
 
-        function openStep2LinesModal(req) {
+        // keepLines: coming BACK to this page, so keep the lines already loaded (with the user's
+        // ticks, quantities and vendors) instead of reloading them from the server.
+        function openStep2LinesModal(req, keepLines) {
             activeRequisition = req;
             var reqId = req.requisitionId;
             var reqNo = req.requisitionNumber || ('REQ #' + reqId);
@@ -702,7 +738,7 @@
                 '  <div><div class="l">' + esc(lbl('VAS_217_AlreadyOrdered', 'Already ordered')) + '</div><div class="v">' + (req.alreadyOrderedQty > 0 ? num(req.alreadyOrderedQty) : '—') + '</div></div>' +
                 '  <div><div class="l">' + esc(lbl('VAS_217_PendingQty', 'Pending qty')) + '</div><div class="v">' + num(req.pendingQty) + '</div></div>' +
                 '  <div><div class="l">' + esc(lbl('VAS_217_NeededBy', 'Needed by')) + '</div><div class="v">' + esc(needDisplay) + '</div></div>' +
-                '  <div><div class="l">' + esc(lbl('VAS_Status', 'Status')) + '</div><div class="v">' + esc(req.status) + '</div></div>' +
+                '  <div><div class="l">' + esc(lbl('VAS_Status', 'Status')) + '</div><div class="v">' + esc(statusLabel(req.status)) + '</div></div>' +
                 '</div>' +
                 '<div class="vas-217-orw-msec">' + esc(lbl('VAS_217_RequisitionLines', 'Requisition lines · select one or many')) + '</div>' +
                 '<div class="vas-217-orw-mtwrap" id="vas_217_lines_wrap"></div>';
@@ -713,7 +749,7 @@
                 subtitle: subtitle,
                 body: summaryStripHtml,
                 reopen: function () {
-                    openStep2LinesModal(activeRequisition);
+                    openStep2LinesModal(activeRequisition, true);
                 },
                 foot: function ($foot) {
                     $foot.html('<span class="vas-217-orw-foot-note" id="vas_217_step2_note">' + esc(lbl('VAS_217_NoLinesSelected', 'No lines selected')) + '</span>' +
@@ -728,12 +764,18 @@
                     });
                 },
                 afterRender: function ($host) {
-                    loadRequisitionLines(reqId, $host.find('#vas_217_lines_wrap'));
+                    loadRequisitionLines(reqId, $host.find('#vas_217_lines_wrap'), keepLines);
                 }
             });
         }
 
-        function loadRequisitionLines(reqId, $container) {
+        function loadRequisitionLines(reqId, $container, keepLines) {
+            // Back from Details: the lines (and the user's selections) are still in memory.
+            if (keepLines && activeReqLines && activeReqLines.length && formLookups) {
+                renderPagedStep2LinesTable($container);
+                syncStep2FootNote();
+                return;
+            }
             $container.html('<div class="vas-217-orw-empty-box"><p class="vas-217-orw-empty-msg">' + esc(lbl('VAS_Loading', 'Loading...')) + '</p></div>');
 
             // Load lookups and lines together
@@ -785,10 +827,10 @@
                 '<span class="vas-217-orw-cell"></span>' +
                 '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_Product', 'Product')) + '">' + esc(lbl('VAS_Product', 'Product')) + '</span>' +
                 (showAttr ? '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_Attribute', 'Attribute')) + '">' + esc(lbl('VAS_Attribute', 'Attribute')) + '</span>' : '') +
-                '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_UoM', 'UoM')) + '">' + esc(lbl('VAS_UoM', 'UoM')) + '</span>' +
+                '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_UoM', 'UoM')) + '">' + esc(lbl('VAS_UoM', 'UoM').toUpperCase()) + '</span>' +
                 '<span class="vas-217-orw-cell right" title="' + esc(lbl('VAS_217_ReqQty', 'Req qty')) + '">' + esc(lbl('VAS_217_ReqQty', 'Req qty')) + '</span>' +
                 '<span class="vas-217-orw-cell right" title="' + esc(lbl('VAS_217_AlreadyOrdered', 'Already ordered')) + '">' + esc(lbl('VAS_217_AlreadyOrdered', 'Already ordered')) + '</span>' +
-                '<span class="vas-217-orw-cell right" title="' + esc(lbl('VAS_217_PendingQty', 'Pending')) + '">' + esc(lbl('VAS_217_PendingQty', 'Pending')) + '</span>' +
+                '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_217_PendingQty', 'Pending')) + '">' + esc(lbl('VAS_217_PendingQty', 'Pending')) + '</span>' +
                 '<span class="vas-217-orw-cell right" title="' + esc(lbl('VAS_217_QtyToOrder', 'Qty to order')) + '">' + esc(lbl('VAS_217_QtyToOrder', 'Qty to order')) + '</span>' +
                 '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_Vendor', 'Vendor')) + '">' + esc(lbl('VAS_Vendor', 'Vendor')) + '</span>' +
                 '<span class="vas-217-orw-cell right" title="' + esc(lbl('VAS_Rate', 'Rate')) + '">' + esc(lbl('VAS_Rate', 'Rate')) + '</span>' +
@@ -799,6 +841,9 @@
 
             $tableWrap.append($tableHead).append($tableBody).append($tableFoot);
             $container.append($tableWrap);
+            // The table body is a fixed viewport of --vas-217-orw-rows rows, so a page must hold
+            // exactly that many rows or the rest are clipped while the footer still counts them.
+            lPageSize = parseInt(window.getComputedStyle($tableBody[0]).getPropertyValue('--vas-217-orw-rows'), 10) || 6;
 
             function drawStep2Page() {
                 $tableBody.empty();
@@ -825,11 +870,11 @@
                     var rowHtml = '<div class="vas-217-orw-mrow pick' + (l.selected ? ' sel' : '') + '" data-idx="' + globalIdx + '" style="grid-template-columns:' + LINE_COLS + ';">' +
                         '<span class="vas-217-orw-cell"><input type="checkbox" class="vas-217-orw-chk chk-line" data-idx="' + globalIdx + '"' + (l.selected ? ' checked' : '') + ' aria-label="' + esc(lbl('VAS_217_SelectLine', 'Select line')) + '"></span>' +
                         '<span class="vas-217-orw-cell c-dark" title="' + esc(l.productName) + '">' + esc(l.productName) + '</span>' +
-                        '<span class="vas-217-orw-cell c-std" title="' + esc(l.attributeDescription || lbl('VAS_217_Standard', 'Standard')) + '">' + esc(l.attributeDescription || lbl('VAS_217_Standard', 'Standard')) + '</span>' +
+                        (showAttr ? '<span class="vas-217-orw-cell c-std" title="' + esc(l.attributeDescription || '') + '">' + esc(l.attributeDescription || '') + '</span>' : '') +
                         '<span class="vas-217-orw-cell c-std" title="' + esc(l.uomName) + '">' + esc(l.uomName) + '</span>' +
                         '<span class="vas-217-orw-cell right c-std" title="' + num(l.requestedQty) + '">' + num(l.requestedQty) + '</span>' +
                         '<span class="vas-217-orw-cell right ' + (l.alreadyOrderedQty > 0 ? 'c-dark' : 'c-std') + '" title="' + (l.alreadyOrderedQty > 0 ? num(l.alreadyOrderedQty) : '—') + '">' + (l.alreadyOrderedQty > 0 ? num(l.alreadyOrderedQty) : '—') + '</span>' +
-                        '<span class="vas-217-orw-cell right c-prim" title="' + num(l.pendingQty) + '">' + num(l.pendingQty) + '</span>' +
+                        '<span class="vas-217-orw-cell c-prim" title="' + num(l.pendingQty) + '">' + num(l.pendingQty) + '</span>' +
                         '<span class="vas-217-orw-cell"><input class="vas-217-orw-rowin in-qty" type="number" min="1" max="' + l.pendingQty + '" value="' + (l.orderQty || l.pendingQty) + '" data-idx="' + globalIdx + '" aria-label="' + esc(lbl('VAS_217_QtyToOrder', 'Qty to order')) + '"></span>' +
                         '<span class="vas-217-orw-cell"><select class="vas-217-orw-rowsel sel-vend" data-idx="' + globalIdx + '" aria-label="' + esc(lbl('VAS_Vendor', 'Vendor')) + '">' + vendorOpts + '</select></span>' +
                         '<span class="vas-217-orw-cell"><input class="vas-217-orw-rowin in-rate" type="number" min="0" step="any" value="' + (Number(l.rate) || 0) + '" data-idx="' + globalIdx + '" aria-label="' + esc(lbl('VAS_Rate', 'Rate')) + '"></span>' +
@@ -1046,7 +1091,8 @@
             if (!poHeaderValues.initialized) {
                 poHeaderValues.initialized = true;
                 poHeaderValues.docTypeId = (formLookups.docTypes && formLookups.docTypes[0]) ? formLookups.docTypes[0].id : 0;
-                poHeaderValues.orderReference = 'REF/' + new Date().getFullYear().toString().slice(-2) + '/' + (Math.floor(100 + Math.random() * 800));
+                // Left blank: the user enters the vendor's reference number manually.
+                poHeaderValues.orderReference = '';
                 poHeaderValues.dateOrdered = fIso();
                 // An older requisition's needed-by date can already be past; date promised may not precede the PO date
                 poHeaderValues.datePromised = (activeRequisition.neededBy && activeRequisition.neededBy > poHeaderValues.dateOrdered) ? activeRequisition.neededBy : poHeaderValues.dateOrdered;
@@ -1058,7 +1104,7 @@
                 // Currency is read-only and follows the price list
                 poHeaderValues.currencyId = (defaultPriceList && defaultPriceList.currencyId) || activeRequisition.currencyId || 0;
                 poHeaderValues.conversionTypeId = getDefaultConversionTypeId();
-                poHeaderValues.incotermId = activeRequisition.incotermId || (formLookups.incoterms && formLookups.incoterms[0] ? formLookups.incoterms[0].id : 0);
+                poHeaderValues.incotermId = activeRequisition.incotermId || 0;
                 poHeaderValues.paymentTermId = (formLookups.paymentTerms && formLookups.paymentTerms[0]) ? formLookups.paymentTerms[0].id : 0;
                 poHeaderValues.paymentMethod = (formLookups.paymentMethods && formLookups.paymentMethods[0]) ? String(formLookups.paymentMethods[0].id) : '';
                 poHeaderValues.taxId = (formLookups.taxes && formLookups.taxes[0]) ? formLookups.taxes[0].id : 0;
@@ -1074,7 +1120,7 @@
                     productName: l.productName,
                     productCode: l.productCode,
                     attributeSetInstanceId: l.attributeSetInstanceId,
-                    attributeDescription: l.attributeDescription || lbl('VAS_217_StandardSpecification', 'Standard specification'),
+                    attributeDescription: l.attributeDescription || '',
                     uomId: l.uomId,
                     uomName: l.uomName,
                     orderQty: l.orderQty || l.pendingQty,
@@ -1082,7 +1128,7 @@
                     taxId: poHeaderValues.taxId || (formLookups.taxes && formLookups.taxes[0] ? formLookups.taxes[0].id : 0),
                     taxRate: (formLookups.taxes && formLookups.taxes[0] ? formLookups.taxes[0].rate : 0.18),
                     datePromised: poHeaderValues.datePromised || (activeRequisition.neededBy || fIso()),
-                    description: l.description || (l.productName + ' — ' + (l.attributeDescription || lbl('VAS_217_Standard', 'Standard'))),
+                    description: l.description || (l.attributeDescription ? (l.productName + ' — ' + l.attributeDescription) : l.productName),
                     printDescription: l.printDescription || ''
                 };
             });
@@ -1153,7 +1199,7 @@
                 '  <div><div class="l">' + esc(lbl('VAS_217_SourceRequisition', 'Source requisition')) + '</div><div class="v">' + esc(reqNo) + '</div></div>' +
                 '  <div><div class="l">' + esc(lbl('VAS_Lines', 'Lines')) + '</div><div class="v">' + totals.lineCount + '</div></div>' +
                 '  <div><div class="l">' + esc(lbl('VAS_217_OrderQty', 'Order qty')) + '</div><div class="v">' + num(totals.totalQty) + '</div></div>' +
-                '  <div><div class="l">' + esc(lbl('VAS_217_OrderValue', 'Order value')) + '</div><div class="v">' + fmtMoney(totals.subtotal) + '</div></div>' +
+                '  <div><div class="l">' + esc(lbl('VAS_217_OrderValue', 'Order value')) + '</div><div class="v">' + fmtExact(totals.subtotal) + '</div></div>' +
                 '</div>';
 
             var docTypeOpts = (formLookups.docTypes || []).map(function (d) {
@@ -1176,9 +1222,12 @@
                 return '<option value="' + c.id + '"' + (c.id === poHeaderValues.conversionTypeId ? ' selected' : '') + '>' + esc(c.name) + '</option>';
             }).join('');
 
-            var incoOpts = (formLookups.incoterms || []).map(function (i) {
-                return '<option value="' + i.id + '"' + (i.id === poHeaderValues.incotermId ? ' selected' : '') + '>' + esc(i.name) + '</option>';
-            }).join('');
+            // Incoterm is optional: a blank entry comes first and is the default unless the
+            // requisition itself carries an incoterm.
+            var incoOpts = '<option value="0"' + (!poHeaderValues.incotermId ? ' selected' : '') + '></option>' +
+                (formLookups.incoterms || []).map(function (i) {
+                    return '<option value="' + i.id + '"' + (i.id === poHeaderValues.incotermId ? ' selected' : '') + '>' + esc(i.name) + '</option>';
+                }).join('');
 
             var termOpts = (formLookups.paymentTerms || []).map(function (t) {
                 return '<option value="' + t.id + '"' + (t.id === poHeaderValues.paymentTermId ? ' selected' : '') + '>' + esc(t.name) + '</option>';
@@ -1186,10 +1235,6 @@
 
             var methOpts = (formLookups.paymentMethods || []).map(function (m) {
                 return '<option value="' + m.id + '"' + (m.id === poHeaderValues.paymentMethod ? ' selected' : '') + '>' + esc(m.name) + '</option>';
-            }).join('');
-
-            var taxOpts = (formLookups.taxes || []).map(function (t) {
-                return '<option value="' + t.id + '" data-rate="' + t.rate + '"' + (t.id === poHeaderValues.taxId ? ' selected' : '') + '>' + esc(t.name) + '</option>';
             }).join('');
 
             var prioOpts = (formLookups.priorities || []).map(function (p) {
@@ -1201,10 +1246,10 @@
                 '  <div class="vas-217-orw-formsec">' + esc(lbl('VAS_217_Document', 'Document')) + '</div>' +
                 '  <div class="vas-217-orw-form-grid">' +
                 '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_217_TargetDocType', 'Target document type')) + star + '</label><select class="vas-217-orw-fctl" id="fDocType">' + docTypeOpts + '</select></div>' +
-                '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_217_OrderReference', 'Order reference')) + '</label><input class="vas-217-orw-fctl" id="fOrderRef" value="' + esc(poHeaderValues.orderReference || '') + '"></div>' +
-                '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_PODate', 'PO date')) + star + '</label><input type="date" class="vas-217-orw-fctl" id="fPoDate" value="' + (poHeaderValues.dateOrdered || fIso()) + '"></div>' +
-                '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_217_DatePromised', 'Date promised')) + star + '</label><input type="date" class="vas-217-orw-fctl" id="fPromised" value="' + (poHeaderValues.datePromised || fIso()) + '"></div>' +
-                '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_217_Priority', 'Priority')) + '</label><select class="vas-217-orw-fctl" id="fPriority">' + prioOpts + '</select></div>' +
+                '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_217_OrderReference', 'Order reference')) + '</label><input class="vas-217-orw-fctl" id="fOrderRef" maxlength="20" value="' + esc(poHeaderValues.orderReference || '') + '"></div>' +
+                '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_PODate', 'PO date')) + star + '</label><input type="date" max="9999-12-31" class="vas-217-orw-fctl" id="fPoDate" value="' + (poHeaderValues.dateOrdered || fIso()) + '"></div>' +
+                '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_217_DatePromised', 'Date promised')) + star + '</label><input type="date" max="9999-12-31" class="vas-217-orw-fctl" id="fPromised" value="' + (poHeaderValues.datePromised || fIso()) + '"></div>' +
+                '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_217_Priority', 'Priority')) + star + '</label><select class="vas-217-orw-fctl" id="fPriority">' + prioOpts + '</select></div>' +
                 '  </div>' +
 
                 '  <div class="vas-217-orw-formsec">' + esc(lbl('VAS_217_VendorAndPayment', 'Vendor and payment')) + '</div>' +
@@ -1213,22 +1258,21 @@
                 '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_VendorLocation', 'Vendor location')) + star + '</label><select class="vas-217-orw-fctl" id="fVendLoc"></select></div>' +
                 '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_217_VendorContact', 'Vendor contact')) + '</label><select class="vas-217-orw-fctl" id="fVendCon"></select></div>' +
                 '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_217_PaymentTerm', 'Payment term')) + star + '</label><select class="vas-217-orw-fctl" id="fTerm">' + termOpts + '</select></div>' +
-                '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_217_PaymentMethod', 'Payment method')) + '</label><select class="vas-217-orw-fctl" id="fMethod">' + methOpts + '</select></div>' +
+                '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_217_PaymentMethod', 'Payment method')) + star + '</label><select class="vas-217-orw-fctl" id="fMethod">' + methOpts + '</select></div>' +
                 '  </div>' +
 
                 '  <div class="vas-217-orw-formsec">' + esc(lbl('VAS_217_DeliveryAndPricing', 'Delivery and pricing')) + '</div>' +
-                '  <div class="vas-217-orw-form-grid">' +
+                '  <div class="vas-217-orw-form-grid vas-217-orw-grid-pricing">' +
                 '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_Warehouse', 'Warehouse')) + star + '</label><select class="vas-217-orw-fctl" id="fWh">' + whOpts + '</select></div>' +
-                '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_217_PriceList', 'Price list')) + '</label><select class="vas-217-orw-fctl" id="fPrice">' + plOpts + '</select></div>' +
-                '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_Currency', 'Currency')) + '</label><select class="vas-217-orw-fctl" id="fCur">' + curOpts + '</select></div>' +
-                '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_217_CurrencyRateType', 'Currency rate type')) + '</label><select class="vas-217-orw-fctl" id="fRate">' + convOpts + '</select></div>' +
+                '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_217_PriceList', 'Price list')) + star + '</label><select class="vas-217-orw-fctl" id="fPrice">' + plOpts + '</select></div>' +
+                '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_Currency', 'Currency')) + star + '</label><select class="vas-217-orw-fctl" id="fCur" disabled>' + curOpts + '</select></div>' +
+                '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_217_CurrencyRateType', 'Currency rate type')) + star + '</label><select class="vas-217-orw-fctl" id="fRate">' + convOpts + '</select></div>' +
                 '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_217_Incoterm', 'Incoterm')) + '</label><select class="vas-217-orw-fctl" id="fInco">' + incoOpts + '</select></div>' +
                 '  </div>' +
 
                 '  <div class="vas-217-orw-formsec">' + esc(lbl('VAS_217_TaxAndDescription', 'Tax and description')) + '</div>' +
                 '  <div class="vas-217-orw-form-grid">' +
-                '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_217_Tax', 'Tax')) + star + '</label><select class="vas-217-orw-fctl" id="fTax">' + taxOpts + '</select></div>' +
-                '    <div class="vas-217-orw-field span-2"><label>' + ICON_DESC + esc(lbl('VAS_217_Description', 'Description')) + '</label><input class="vas-217-orw-fctl" id="fDesc" value="' + esc(poHeaderValues.description || '') + '"></div>' +
+                '    <div class="vas-217-orw-field span-2"><label>' + ICON_DESC + esc(lbl('VAS_217_Description', 'Description')) + '</label><input class="vas-217-orw-fctl" id="fDesc" maxlength="255" value="' + esc(poHeaderValues.description || '') + '"></div>' +
                 '  </div>' +
                 '</div>';
 
@@ -1243,7 +1287,7 @@
                     openStep3DetailsPage();
                 },
                 foot: function ($foot) {
-                    $foot.html('<span class="vas-217-orw-foot-note"><span class="vas-217-orw-req-star">*</span> ' + esc(lbl('VAS_217_RequiredLineDetailsOnNextPage', 'required · line details on the next page')) + '</span>' +
+                    $foot.html('<span class="vas-217-orw-foot-note" id="vas_217_details_note"><span class="vas-217-orw-req-star">*</span> ' + esc(lbl('VAS_217_RequiredLineDetailsOnNextPage', 'required · line details on the next page')) + '</span>' +
                         '<span>' +
                         '<button type="button" class="vas-217-orw-btn vas-217-orw-btn-back">' + esc(lbl('VAS_Back', 'Back')) + '</button> ' +
                         '<button type="button" class="vas-217-orw-btn vas-217-orw-btn-primary" id="vas_217_to_lines">' + esc(lbl('VAS_217_ContinueToLines', 'Continue to lines')) + '</button>' +
@@ -1252,19 +1296,23 @@
                     $foot.find('.vas-217-orw-btn-back').on('click', popModal);
                     $foot.find('#vas_217_to_lines').on('click', function () {
                         captureHeaderValues();
-                        if (!validateHeaderDates(getModalHost())) return;
+                        var $hostNow = getModalHost();
+                        // Every mandatory field must be filled before the lines page opens.
+                        if (!validateRequiredHeaderFields($hostNow)) return;
+                        if (!validateHeaderDates($hostNow)) return;
                         openStep3LinesPage();
                     });
                 },
                 afterRender: function ($host) {
                     loadVendorLocationsAndContacts(selectedVendorId, $host);
                     bindHeaderChangeEvents($host);
+                    validateHeaderDates($host);
                 }
             });
         }
 
         function detailsFootNoteHtml() {
-            return '<span class="vas-217-orw-req-star">*</span> ' + esc(lbl('VAS_RequiredLineDetailsOnNextPage', 'required · line details on the next page'));
+            return '<span class="vas-217-orw-req-star">*</span> ' + esc(lbl('VAS_217_RequiredLineDetailsOnNextPage', 'required · line details on the next page'));
         }
 
         function datePromisedErrorText() {
@@ -1276,10 +1324,38 @@
             return !!(promised && ordered && promised < ordered);
         }
 
+        // Header fields marked mandatory (*). A select counts as blank when it has no value or "0".
+        var REQUIRED_HEADER_FIELDS = ['#fDocType', '#fPoDate', '#fPromised', '#fPriority', '#fVendLoc',
+            '#fTerm', '#fMethod', '#fWh', '#fPrice', '#fCur', '#fRate'];
+
+        function isBlankHeaderValue(val) {
+            return val == null || String(val).trim() === '' || String(val) === '0';
+        }
+
+        function validateRequiredHeaderFields($host) {
+            var anyBlank = false;
+            for (var i = 0; i < REQUIRED_HEADER_FIELDS.length; i++) {
+                var $f = $host.find(REQUIRED_HEADER_FIELDS[i]);
+                var blank = isBlankHeaderValue($f.val());
+                $f.toggleClass('vas-217-orw-invalid', blank);
+                if (blank) { anyBlank = true; }
+            }
+            var $note = $('#vas_217_details_note');
+            if (anyBlank) {
+                $note.attr('class', 'vas-217-orw-warnnote')
+                    .text(lbl('VAS_217_FillMandatoryFields', 'Please fill all mandatory fields (*) before continuing'));
+            } else if ($note.hasClass('vas-217-orw-warnnote')) {
+                $note.attr('class', 'vas-217-orw-foot-note').html(detailsFootNoteHtml());
+            }
+            return !anyBlank;
+        }
+
         function validateHeaderDates($host) {
             var invalid = isPromisedBeforeOrdered($host.find('#fPromised').val(), $host.find('#fPoDate').val());
             $host.find('#fPromised').toggleClass('vas-217-orw-invalid', invalid);
-            var $note = $host.find('#vas_217_details_note');
+            // The date picker greys out days before the PO date.
+            $host.find('#fPromised').attr('min', $host.find('#fPoDate').val() || '');
+            var $note = $('#vas_217_details_note');
             if (invalid) {
                 $note.attr('class', 'vas-217-orw-warnnote').text(datePromisedErrorText());
             } else {
@@ -1330,12 +1406,10 @@
                 validateHeaderDates($host);
             });
 
-            $host.find('#fTax').on('change', function () {
-                var taxId = parseInt($(this).val(), 10) || 0;
-                poHeaderValues.taxId = taxId;
-                // Cascade default tax to all lines; tax amounts are recalculated on the server when the lines page opens
-                for (var i = 0; i < poLinesState.length; i++) {
-                    poLinesState[i].taxId = taxId;
+            // Clear the red mark as soon as a mandatory field is filled in.
+            $host.find(REQUIRED_HEADER_FIELDS.join(', ')).on('change input', function () {
+                if (!isBlankHeaderValue($(this).val()) && !$(this).is('#fPromised')) {
+                    $(this).removeClass('vas-217-orw-invalid');
                 }
             });
 
@@ -1365,7 +1439,7 @@
             poHeaderValues.currencyId = parseInt($h.find('#fCur').val(), 10) || 0;
             poHeaderValues.conversionTypeId = parseInt($h.find('#fRate').val(), 10) || 0;
             poHeaderValues.incotermId = parseInt($h.find('#fInco').val(), 10) || 0;
-            poHeaderValues.taxId = parseInt($h.find('#fTax').val(), 10) || 0;
+            // No header Tax field: poHeaderValues.taxId keeps the default tax each line starts with.
             poHeaderValues.description = $h.find('#fDesc').val() || '';
         }
 
@@ -1373,7 +1447,6 @@
             var totals = calculatePoTotals();
             var whName = $('#fWh option:selected').text() || lbl('VAS_Warehouse', 'Warehouse');
             var termName = $('#fTerm option:selected').text() || lbl('VAS_217_PaymentTerm', 'Payment Term');
-            var taxName = $('#fTax option:selected').text() || lbl('VAS_217_Tax', 'Tax');
 
             var recapStripHtml = '<div class="vas-217-orw-posum">' +
                 '  <div><div class="l">' + esc(lbl('VAS_Vendor', 'Vendor')) + '</div><div class="v">' + esc(selectedVendorName) + '</div></div>' +
@@ -1381,17 +1454,19 @@
                 '  <div><div class="l">' + esc(lbl('VAS_217_DatePromised', 'Date promised')) + '</div><div class="v">' + esc(isoDisp(poHeaderValues.datePromised)) + '</div></div>' +
                 '  <div><div class="l">' + esc(lbl('VAS_Warehouse', 'Warehouse')) + '</div><div class="v">' + esc(whName) + '</div></div>' +
                 '  <div><div class="l">' + esc(lbl('VAS_217_PaymentTerm', 'Payment term')) + '</div><div class="v">' + esc(termName) + '</div></div>' +
-                '  <div><div class="l">' + esc(lbl('VAS_217_Tax', 'Tax')) + '</div><div class="v">' + esc(taxName) + '</div></div>' +
                 '</div>' +
-                '<div class="vas-217-orw-msec">' + esc(lbl('VAS_217_POLinesSection', 'Purchase order lines · attribute, UoM, tax, date and text can differ per line')) + '</div>' +
+                '<div class="vas-217-orw-msec">' + esc(lbl('VAS_PurchaseOrderLines', 'Purchase order lines')) + '</div>' +
                 '<div class="vas-217-orw-mtwrap" id="vas_217_polines_table_wrap"></div>' +
                 '<div class="vas-217-orw-totline" id="vas_217_totline">' +
-                '  <span>' + esc(lbl('VAS_217_Subtotal', 'Subtotal')) + ' <b>' + esc(fmtMoney(totals.subtotal)) + '</b></span>' +
-                '  <span>' + esc(lbl('VAS_217_Tax', 'Tax')) + ' <b>' + esc(fmtMoney(totals.taxTotal)) + '</b></span>' +
-                '  <span>' + esc(lbl('VAS_217_OrderTotal', 'Order total')) + ' <b>' + esc(fmtMoney(totals.grandTotal)) + '</b></span>' +
+                '  <span>' + esc(lbl('VAS_217_Subtotal', 'Subtotal')) + ' <b>' + esc(fmtExact(totals.subtotal)) + '</b></span>' +
+                '  <span>' + esc(lbl('VAS_217_Tax', 'Tax')) + ' <b>' + esc(fmtExact(totals.taxTotal)) + '</b></span>' +
+                '  <span>' + esc(lbl('VAS_217_OrderTotal', 'Order total')) + ' <b>' + esc(fmtExact(totals.grandTotal)) + '</b></span>' +
                 '</div>' +
                 '<div class="vas-217-orw-linedesc" id="vas_217_linedesc_box" hidden>' +
-                '  <div class="ldhead">' + esc(lbl('VAS_217_LineText', 'Line text')) + ' · <b id="vas_217_ldName"></b></div>' +
+                '  <div class="ldhead"><span>' + esc(lbl('VAS_217_LineText', 'Line text')) + ' · <b id="vas_217_ldName"></b></span>' +
+                '    <button type="button" class="vas-217-orw-ldclose" id="vas_217_ldClose" aria-label="' + esc(lbl('VAS_Close', 'Close')) + '" title="' + esc(lbl('VAS_Close', 'Close')) + '">' +
+                '      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>' +
+                '    </button></div>' +
                 '  <div class="ldgrid">' +
                 '    <div class="vas-217-orw-field"><label>' + ICON_DESC + esc(lbl('VAS_217_Description', 'Description')) + '</label><textarea class="vas-217-orw-fctl" id="vas_217_ldDesc" rows="2"></textarea></div>' +
                 '    <div class="vas-217-orw-field"><label>' + ICON_PRINT + esc(lbl('VAS_217_PrintDescription', 'Print description')) + '</label><textarea class="vas-217-orw-fctl" id="vas_217_ldPrint" rows="2" placeholder="' + esc(lbl('VAS_217_TextPrintedOnVendorCopy', 'Text printed on the vendor copy')) + '"></textarea></div>' +
@@ -1408,7 +1483,7 @@
                     openStep3LinesPage();
                 },
                 foot: function ($foot) {
-                    $foot.html('<span class="vas-217-orw-foot-note" id="vas_217_step3_footnote">' + poLinesState.length + ' ' + (poLinesState.length > 1 ? esc(lbl('VAS_Lines', 'lines')) : esc(lbl('VAS_217_LineSelected', 'line'))) + ' · ' + num(totals.totalQty) + ' ' + esc(lbl('VAS_Qty', 'qty')) + ' · ' + esc(lbl('VAS_217_OrderTotal', 'order total')) + ' ' + fmtMoney(totals.grandTotal) + '</span>' +
+                    $foot.html('<span class="vas-217-orw-foot-note" id="vas_217_step3_footnote">' + poLinesState.length + ' ' + (poLinesState.length > 1 ? esc(lbl('VAS_Lines', 'lines')) : esc(lbl('VAS_217_LineSelected', 'line'))) + ' · ' + num(totals.totalQty) + ' ' + esc(lbl('VAS_Qty', 'qty')) + ' · ' + esc(lbl('VAS_217_OrderTotal', 'order total')) + ' ' + fmtExact(totals.grandTotal) + '</span>' +
                         '<span>' +
                         '<select class="vas-217-orw-fctl vas-217-orw-stagesel" id="vas_217_po_stage" aria-label="' + esc(lbl('VAS_217_POStage', 'PO stage')) + '">' + docStatusOptionsHtml() + '</select> ' +
                         '<button type="button" class="vas-217-orw-btn vas-217-orw-btn-back">' + esc(lbl('VAS_217_BackToDetails', 'Back to details')) + '</button> ' +
@@ -1469,7 +1544,7 @@
             var $tableHead = $('<div class="vas-217-orw-mrow vas-217-orw-mhead" style="grid-template-columns:' + PO_LINE_COLS + ';">' +
                 '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_Product', 'Product')) + '">' + esc(lbl('VAS_Product', 'Product')) + '</span>' +
                 (showAttr ? '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_Attribute', 'Attribute')) + '">' + esc(lbl('VAS_Attribute', 'Attribute')) + '</span>' : '') +
-                '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_UoM', 'UoM')) + '">' + esc(lbl('VAS_UoM', 'UoM')) + '</span>' +
+                '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_UoM', 'UoM')) + '">' + esc(lbl('VAS_UoM', 'UoM').toUpperCase()) + '</span>' +
                 '<span class="vas-217-orw-cell right" title="' + esc(lbl('VAS_Qty', 'Qty')) + '">' + esc(lbl('VAS_Qty', 'Qty')) + '</span>' +
                 '<span class="vas-217-orw-cell right" title="' + esc(lbl('VAS_Rate', 'Rate')) + '">' + esc(lbl('VAS_Rate', 'Rate')) + '</span>' +
                 '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_217_Tax', 'Tax')) + '">' + esc(lbl('VAS_217_Tax', 'Tax')) + '</span>' +
@@ -1483,6 +1558,7 @@
 
             $tableWrap.append($tableHead).append($tableBody).append($tableFoot);
             $container.append($tableWrap);
+            lPageSize = parseInt(window.getComputedStyle($tableBody[0]).getPropertyValue('--vas-217-orw-rows'), 10) || 6;
 
             function drawStep3Page() {
                 $tableBody.empty();
@@ -1505,16 +1581,15 @@
 
                     var rowHtml = '<div class="vas-217-orw-mrow" data-idx="' + globalIdx + '" style="grid-template-columns:' + PO_LINE_COLS + ';">' +
                         '<span class="vas-217-orw-cell c-dark" title="' + esc(l.productName) + '">' + esc(l.productName) + '</span>' +
-                        '<span class="vas-217-orw-cell" title="' + esc(l.attributeDescription || lbl('VAS_217_Standard', 'Standard')) + '">' + esc(l.attributeDescription || lbl('VAS_217_Standard', 'Standard')) + '</span>' +
+                        (showAttr ? '<span class="vas-217-orw-cell" title="' + esc(l.attributeDescription || '') + '">' + esc(l.attributeDescription || '') + '</span>' : '') +
                         '<span class="vas-217-orw-cell" title="' + esc(l.uomName) + '">' + esc(l.uomName) + '</span>' +
                         '<span class="vas-217-orw-cell right c-dark" title="' + num(l.orderQty) + '">' + num(l.orderQty) + '</span>' +
-                        '<span class="vas-217-orw-cell right c-std" title="' + esc(fmtMoney(l.rate)) + '">' + esc(fmtMoney(l.rate)) + '</span>' +
+                        '<span class="vas-217-orw-cell"><input class="vas-217-orw-rowin in-lrate" type="number" min="0" step="any" value="' + (Number(l.rate) || 0) + '" data-idx="' + globalIdx + '" aria-label="' + esc(lbl('VAS_Rate', 'Rate')) + '"></span>' +
                         '<span class="vas-217-orw-cell"><select class="vas-217-orw-rowsel sel-ltax" data-idx="' + globalIdx + '" aria-label="' + esc(lbl('VAS_217_Tax', 'Tax')) + '">' + taxOptionsHtml + '</select></span>' +
-                        '<span class="vas-217-orw-cell right c-emph" title="' + esc(fmtMoney(amt)) + '">' + esc(fmtMoney(amt)) + '</span>' +
-                        '<span class="vas-217-orw-cell"><input class="vas-217-orw-rowin in-ldate" type="date" value="' + (l.datePromised || fIso()) + '" data-idx="' + globalIdx + '" aria-label="' + esc(lbl('VAS_217_DatePromised', 'Date promised')) + '"></span>' +
+                        '<span class="vas-217-orw-cell right c-emph amt-cell" title="' + esc(fmtMoney(amt)) + '">' + esc(fmtMoney(amt)) + '</span>' +
+                        '<span class="vas-217-orw-cell"><input class="vas-217-orw-rowin in-ldate" type="date" max="9999-12-31" value="' + (l.datePromised || fIso()) + '" data-idx="' + globalIdx + '" aria-label="' + esc(lbl('VAS_217_DatePromised', 'Date promised')) + '"></span>' +
                         '<span class="vas-217-orw-cell vas-217-orw-actcell">' +
                         '  <button type="button" class="vas-217-orw-iconbtn sm btn-act-desc" data-idx="' + globalIdx + '" title="' + esc(lbl('VAS_217_Description', 'Description')) + '">' + ICON_DESC + '</button>' +
-                        '  <button type="button" class="vas-217-orw-iconbtn sm btn-act-print" data-idx="' + globalIdx + '" title="' + esc(lbl('VAS_217_PrintDescription', 'Print description')) + '">' + ICON_PRINT + '</button>' +
                         '</span>' +
                         '</div>';
 
@@ -1585,12 +1660,6 @@
                 var idx = parseInt($(this).data('idx'), 10);
                 showLineDescExpander(idx, false, $host);
             });
-
-            $tableBody.off('click.actprint').on('click.actprint', '.btn-act-print', function (e) {
-                e.stopPropagation();
-                var idx = parseInt($(this).data('idx'), 10);
-                showLineDescExpander(idx, true, $host);
-            });
         }
 
         // A line's date promised may not precede the PO date either
@@ -1616,16 +1685,16 @@
             var $totline = $host.find('#vas_217_totline');
             if ($totline.length) {
                 $totline.html(
-                    '<span>' + esc(lbl('VAS_217_Subtotal', 'Subtotal')) + ' <b>' + esc(fmtMoney(totals.subtotal)) + '</b></span>' +
-                    '<span>' + esc(lbl('VAS_217_Tax', 'Tax')) + ' <b>' + esc(fmtMoney(totals.taxTotal)) + '</b></span>' +
-                    '<span>' + esc(lbl('VAS_217_OrderTotal', 'Order total')) + ' <b>' + esc(fmtMoney(totals.grandTotal)) + '</b></span>'
+                    '<span>' + esc(lbl('VAS_217_Subtotal', 'Subtotal')) + ' <b>' + esc(fmtExact(totals.subtotal)) + '</b></span>' +
+                    '<span>' + esc(lbl('VAS_217_Tax', 'Tax')) + ' <b>' + esc(fmtExact(totals.taxTotal)) + '</b></span>' +
+                    '<span>' + esc(lbl('VAS_217_OrderTotal', 'Order total')) + ' <b>' + esc(fmtExact(totals.grandTotal)) + '</b></span>'
                 );
             }
 
             // While a date error is shown the footer keeps the error; totals return once it is fixed
             var $footNote = $host.find('#vas_217_step3_footnote');
             if ($footNote.length) {
-                $footNote.text(poLinesState.length + ' ' + (poLinesState.length > 1 ? lbl('VAS_Lines', 'lines') : lbl('VAS_217_LineSelected', 'line')) + ' · ' + num(totals.totalQty) + ' ' + lbl('VAS_Qty', 'qty') + ' · ' + lbl('VAS_217_OrderTotal', 'order total') + ' ' + fmtMoney(totals.grandTotal));
+                $footNote.text(poLinesState.length + ' ' + (poLinesState.length > 1 ? lbl('VAS_Lines', 'lines') : lbl('VAS_217_LineSelected', 'line')) + ' · ' + num(totals.totalQty) + ' ' + lbl('VAS_Qty', 'qty') + ' · ' + lbl('VAS_217_OrderTotal', 'order total') + ' ' + fmtExact(totals.grandTotal));
             }
         }
 
@@ -1636,7 +1705,12 @@
             var $box = $host.find('#vas_217_linedesc_box');
             $box.removeAttr('hidden').show();
 
-            $host.find('#vas_217_ldName').text(line.productName + ' · ' + (line.attributeDescription || lbl('VAS_217_Standard', 'Standard')));
+            // Close (x): hides the panel; whatever was typed is already stored on the line.
+            $host.find('#vas_217_ldClose').off('click.ldclose').on('click.ldclose', function () {
+                $box.attr('hidden', 'hidden').hide();
+            });
+
+            $host.find('#vas_217_ldName').text(line.productName + (line.attributeDescription ? ' · ' + line.attributeDescription : ''));
             var $desc = $host.find('#vas_217_ldDesc');
             var $print = $host.find('#vas_217_ldPrint');
 
@@ -1656,6 +1730,8 @@
             } else {
                 $desc.focus();
             }
+            // The body scrolls when the panel does not fit: bring the opened panel into view.
+            if ($box[0] && $box[0].scrollIntoView) { $box[0].scrollIntoView({ block: 'nearest' }); }
         }
 
         /* ============================================================
@@ -1727,8 +1803,8 @@
 
                         // Confirmation with the created document number and stage
                         var lineCountStr = payloadLines.length + ' ' + (payloadLines.length > 1 ? lbl('VAS_Lines', 'lines') : lbl('VAS_217_LineSelected', 'line'));
-                        var docNoStr = (data && data.documentNo) ? ' (' + data.documentNo + (data.docStatus ? ' · ' + getDocStatusName(data.docStatus) : '') + ')' : '';
-                        var confirmMsg = lbl('VAS_217_POCreatedFor', 'Purchase order created for') + ' ' + selectedVendorName + docNoStr + ' · ' + lineCountStr + ' · ' + fmtMoney(totals.grandTotal);
+                        var docNoStr = (data && data.documentNo) ? ' (' + data.documentNo + ')' : '';
+                        var confirmMsg = lbl('VAS_217_POCreatedFor', 'Purchase order created for') + ' ' + selectedVendorName + docNoStr + ' · ' + lineCountStr + ' · ' + fmtExact(totals.grandTotal);
                         var info = (VIS && VIS.ADialog && VIS.ADialog.info) ? VIS.ADialog.info : toast;
                         info(confirmMsg);
                     } else {
@@ -1750,44 +1826,29 @@
            PO RECORD NAVIGATION
            ============================================================ */
 
+        // Canonical Home/Landing-page zoom handling (2026-09-30, per user-supplied reference
+        // pattern): $self.windowNo >= 0 means this widget is hosted inside an actual window tab,
+        // so the host's own tab-panel router relays the value change; otherwise (Home dashboard
+        // placement, windowNo < 0) VAS.ZoomUtil.zoomToRecord resolves and opens the window
+        // directly, caching the resolved window id so repeat clicks skip re-resolving it by name.
+        var poZoomWindowId = 0;
+
         function openPurchaseOrderRecord(orderId) {
             if (!orderId) return;
             closeModal();
 
-            var ZOOM_WINDOW_NAME = 'VAS_PurchaseOrder';
-            var ZOOM_WINDOW_FALLBACK = 'Purchase Order';
-            var ZOOM_TABLE = 'C_Order';
-
-            var navigated = false;
-            try {
-                if ($self.listener && typeof $self.widgetFirevalueChanged === 'function') {
-                    $self.widgetFirevalueChanged({
-                        "TabWhereClause": ZOOM_TABLE + "." + ZOOM_TABLE + "_ID=" + orderId,
-                        "TabLayout": "Y",
-                        "TabIndex": "0",
-                        "AD_Tab_ID": 1002398,
-                        "ActionName": ZOOM_WINDOW_NAME,
-                        "ActionType": "W"
+            if ($self.windowNo >= 0) {
+                var windowParam = {
+                    "TabWhereClause": "C_Order.C_Order_ID=" + orderId,
+                    "TabLayout": "Y",
+                    "TabIndex": "0"
+                };
+                $self.widgetFirevalueChanged(windowParam);
+            } else {
+                VAS.ZoomUtil.zoomToRecord("C_Order_ID", orderId, poZoomWindowId, "VAS_PurchaseOrder", "")
+                    .done(function (id) {
+                        if (id > 0) { poZoomWindowId = id; }
                     });
-                    navigated = true;
-                }
-            } catch (e) { }
-
-            if (!navigated) {
-                try {
-                    if (window.VAS && VAS.ZoomUtil && typeof VAS.ZoomUtil.zoomToRecord === 'function') {
-                        VAS.ZoomUtil.zoomToRecord(ZOOM_TABLE + "_ID", orderId, 0, ZOOM_WINDOW_NAME, ZOOM_WINDOW_FALLBACK);
-                    } else if (window.VIS && VIS.AEnv && typeof VIS.AEnv.zoom === 'function') {
-                        VIS.AEnv.zoom(259, orderId);
-                    } else if (window.VIS && VIS.viewManager && typeof VIS.viewManager.startWindow === 'function') {
-                        var windowId = (VIS.context && VIS.context.getWindowId)
-                            ? (VIS.context.getWindowId(ZOOM_WINDOW_NAME) || VIS.context.getWindowId(ZOOM_TABLE) || 181)
-                            : 181;
-                        var query = new VIS.Query();
-                        query.addRestriction("C_Order_ID", VIS.Query.prototype.EQUAL, orderId);
-                        VIS.viewManager.startWindow(windowId, query);
-                    }
-                } catch (e2) { }
             }
         }
 

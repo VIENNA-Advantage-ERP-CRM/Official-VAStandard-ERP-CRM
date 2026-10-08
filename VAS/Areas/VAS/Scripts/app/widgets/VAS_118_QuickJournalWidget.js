@@ -298,7 +298,7 @@
                 '<div class="vas-qj-row">' +
                 fieldCombo('org', 'vas-qj-org', escapeHtml(lbl("VAS_118_Organization", "Organization")), lbl("VAS_118_SearchOrg", "Search Organization"), true) +
                 fieldWrap(ICON.calendar, escapeHtml(lbl("VAS_118_JournalDate", "Journal Date")) + reqStar(true),
-                    '<input type="date" class="vas-qj-date" />') +
+                    '<input type="date" max="9999-12-31" class="vas-qj-date" />') +
                 '</div>' +
 
                 '<div class="vas-qj-row">' +

@@ -29,6 +29,7 @@
  * 19 | Nos                                    | VAS_184_UomFallback
  * 20 | Cost price                             | VAS_184_CostPricePrefix
  * 21 | Jan,Feb,Mar,...                        | VAS_184_Months
+ * 22 | Top 10 Highest-Value Inventory Transactions | VAS_184_TopTenSub
  */
 ; VAS = window.VAS || {};
 
@@ -72,8 +73,12 @@
         var selectedYear = DateTimeNowYear();
         var productsData = [];
         var pageNo = 1;
-        // Starting guess only: recalcPageSize() replaces this with however many rows actually fit.
-        var pageSize = 3;
+        // Fixed at 4 per explicit, repeated user request (2026-09-29: "change the page size to
+        // 4"). Previously this was only a starting guess that recalcPageSize() (below) would
+        // silently override to whatever the card's measured height happened to fit - which is
+        // why setting this to 4 alone didn't stick (it kept settling back to 3). recalcPageSize
+        // is now a no-op so this value is authoritative.
+        var pageSize = 4;
         var totalPages = 1;
         var isRefitting = false;
         var currencyInfo = { iso: "INR", symbol: "₹", stdPrecision: 2 };
@@ -300,24 +305,12 @@
            grid track at any dashboard size / display resolution. Row height is measured from a
            rendered row rather than assumed, because it scales with the card's clamp() font size.
            Returns true when the page size changed and a re-render is needed. */
+        // Disabled (2026-09-29, user request: "change the page size to 4") - this used to
+        // auto-fit pageSize to however many rows the measured card height could hold, which
+        // fought a fixed pageSize every time (see the pageSize declaration above). Kept as a
+        // no-op rather than removed so the ResizeObserver call site below doesn't need touching.
         function recalcPageSize() {
-            if (!$body || !$body[0]) { return false; }
-
-            var bodyH = $body[0].clientHeight;
-            if (bodyH <= 0) { return false; }
-
-            var $firstRow = $body.children('.vas-hvu-row').first();
-            if (!$firstRow.length) { return false; }
-
-            var rowH = $firstRow[0].getBoundingClientRect().height;
-            if (rowH <= 0) { return false; }
-
-            // Allow a hair of tolerance so a row that fits within a fraction of a pixel counts.
-            var fits = Math.max(1, Math.floor((bodyH + 0.5) / rowH));
-            if (fits === pageSize) { return false; }
-
-            pageSize = fits;
-            return true;
+            return false;
         }
 
         function renderProducts() {
@@ -345,11 +338,16 @@
                 attrMeta += formatQty(item.issuedQty) + ' ' + (item.uomName || label("VAS_184_UomFallback", "Nos"));
 
 // ===== NEW CODE START — currency format (agent A06, 2026-08-19) =====
+                // Row amount is the single-unit cost price (2026-09-29, user request: "show cost
+                // price of single unit" - a brief switch to the total issued value made every row
+                // read as a huge lump sum instead of the per-unit price this "High-Value Usage"
+                // ranking is actually built around; the SQL itself already ranks/sorts by
+                // MAX(CurrentCostPrice) DESC for the same reason).
                 var compactCost = formatMoney(item.costPrice, true);
                 var fullCost = formatMoney(item.costPrice, false);
 
                 rowsHtml +=
-                    '<button type="button" class="vas-hvu-row" data-pid="' + item.productId + '" data-pname="' + escapeHtml(item.productName) + '" data-cost="' + item.costPrice + '" data-attr="' + escapeHtml(item.attribute || "-") + '" data-uom="' + escapeHtml(item.uomName || label("VAS_184_UomFallback", "Nos")) + '" data-qty="' + item.issuedQty + '" data-val="' + item.issuedValue + '">' +
+                    '<button type="button" class="vas-hvu-row" data-pid="' + item.productId + '" data-pname="' + escapeHtml(item.productName) + '" data-cost="' + item.costPrice + '" data-attr="' + escapeHtml(item.attribute || "-") + '" data-uom="' + escapeHtml(item.uomName || label("VAS_184_UomFallback", "Nos")) + '" data-uomid="' + (item.uomId || 0) + '" data-qty="' + item.issuedQty + '" data-val="' + item.issuedValue + '">' +
                     '<div class="vas-hvu-row-left">' +
                     '<div class="vas-hvu-p-name" title="' + escapeHtml(item.productName) + '">' + escapeHtml(item.productName) + '</div>' +
                     '<div class="vas-hvu-p-meta" title="' + escapeHtml(attrMeta) + '">' + escapeHtml(attrMeta) + '</div>' +
@@ -390,7 +388,7 @@
             }
         }
 
-        function openProductIssuesModal(pid, pname, cost, attr, uom, issuedQty, issuedValue) {
+        function openProductIssuesModal(pid, pname, cost, attr, uom, uomId, issuedQty, issuedValue) {
             if ($modal) { $modal.remove(); }
 
             var monthFull = formatMonthName(selectedMonth) + ' ' + selectedYear;
@@ -584,7 +582,7 @@
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_184_HighValueUsageWidget/GetProductIssueHistory',
                 type: 'GET',
-                data: { productId: pid, month: selectedMonth, year: selectedYear },
+                data: { productId: pid, month: selectedMonth, year: selectedYear, uomId: uomId },
                 cache: false,
                 success: function (res) {
 // ===== NEW CODE START — currency format (agent A06, 2026-08-19) =====
@@ -606,18 +604,30 @@
 
         function createWidget() {
             var title = label("VAS_184_HighValueUsage", "High-Value Usage");
+            // Sub-heading under the title (2026-09-29, user request: "Show sub heading like this
+            // of consumption widget" then "Get this text from message and label window" - routed
+            // through the same VAS_184_* message-key convention as every other string in this
+            // file, via the Message and Label window, instead of the hardcoded string this
+            // started as). Matched to VAS_183_MaterialConsumptionWidget's own sub-heading
+            // treatment (.vas-mcw-sub under .vas-mcw-title).
+            var sub = label("VAS_184_TopTenSub", "Top 10 Highest-Value Inventory Transactions");
 
             $card = $(
                 '<div class="vas-hvu-card vas-widget-bg">' +
                 '<div class="vas-hvu-head">' +
+                '<div class="vas-hvu-head-left">' +
                 '<span class="vas-hvu-ico" aria-hidden="true">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>' +
                 '</span>' +
+                '<div class="vas-hvu-head-text">' +
                 '<div class="vas-hvu-title" title="' + escapeHtml(title) + '">' + escapeHtml(title) + '</div>' +
+                '<div class="vas-hvu-sub" title="' + escapeHtml(sub) + '">' + escapeHtml(sub) + '</div>' +
+                '</div>' +
                 '</div>' +
                 '<div class="vas-hvu-filters">' +
                 '<select class="vas-hvu-select vas-hvu-m-sel"></select>' +
                 '<select class="vas-hvu-select vas-hvu-y-sel"></select>' +
+                '</div>' +
                 '</div>' +
                 '<div class="vas-hvu-body"></div>' +
                 '<div class="vas-hvu-foot">' +
@@ -673,9 +683,10 @@
                 var cost = Number($(this).data('cost') || 0);
                 var attr = $(this).data('attr');
                 var uom = $(this).data('uom');
+                var uomId = Number($(this).data('uomid') || 0);
                 var qty = Number($(this).data('qty') || 0);
                 var val = Number($(this).data('val') || 0);
-                openProductIssuesModal(pid, pname, cost, attr, uom, qty, val);
+                openProductIssuesModal(pid, pname, cost, attr, uom, uomId, qty, val);
             });
 
             $root.append($card);

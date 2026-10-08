@@ -1,6 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Linq;
+using System.Text;
 using System.Web.Mvc;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
@@ -12,21 +14,19 @@ namespace VAS.Controllers
 {
     /*
      * TABLE & FIELD MAPPING FOR INVENTORY AGING REPORT:
-     * - Transactions / Aging source: M_Transaction (M_Product_ID, M_AttributeSetInstance_ID,
-     *   M_Locator_ID, MovementDate, MovementQty) - the aging slabs are computed from the
-     *   MovementDate age and the QUANTITY under each slab is the summed MovementQty, per the
-     *   source specification. Only inbound stock counts as aging stock (MovementQty > 0).
-     * - Product Master: M_Product (M_Product_ID, Name)
+     * - Stock movements (in AND out): M_Transaction (M_Product_ID, M_AttributeSetInstance_ID,
+     *   M_Locator_ID, MovementDate, MovementQty[, IsReversed]). MovementQty > 0 is stock-in (receipt,
+     *   production, inbound move, positive inventory), MovementQty < 0 is stock-out (shipment / sale,
+     *   issue, outbound move, negative inventory).
+     * - Costing policy: M_Product_Category.MMPolicy (F = FIFO, L = LIFO) of the product's own
+     *   M_Product.M_Product_Category_ID; AD_Client.MMPolicy and finally FIFO when it is not set.
+     * - Product Master: M_Product (M_Product_ID, Name, M_Product_Category_ID)
      * - Attribute Instance: M_AttributeSetInstance (M_AttributeSetInstance_ID, Description)
      * - Locator: M_Locator (M_Locator_ID, M_Warehouse_ID, Value, LocatorCombination)
-     *   Displayed as COALESCE(LocatorCombination, Value) - the prompt's own mapping says
-     *   "M_Locator.LocatorCombination: preferred locator display / M_Locator.Value: locator
-     *   display fallback". Value alone is a numeric surrogate on this data.
-     * - Movement history: M_Transaction (M_Product_ID, M_AttributeSetInstance_ID, M_Locator_ID,
-     *   MovementDate, MovementQty[, IsReversed]) - the aging basis.
+     *   Displayed as COALESCE(LocatorCombination, Value).
      * - Warehouse: M_Warehouse (M_Warehouse_ID, Value, Name)
-     * Slabs: Fresh Stock (0-30 days), Normal Turnover (31-90), Slow Moving (91-180), Dead Stock (180+).
-     * Cross-Database: Age calculation uses DB.IsPostgreSQL() vs Oracle DB.TO_DATE/SYSDATE and ANSI COALESCE.
+     * Slabs: Fresh Stock (0-30 days), Normal Turnover (31-90), Slow Moving - Watch (91-180), Dead Stock (180+).
+     * Cross-Database: day grouping uses DB.IsPostgreSQL() vs Oracle TRUNC; everything else is ANSI SQL.
      */
 
     [AjaxAuthorize]
@@ -35,112 +35,295 @@ namespace VAS.Controllers
     {
         private static readonly VLogger _log = VLogger.GetVLogger(typeof(VAS_163_InventoryAgingReportWidgetController));
 
-        // M_Transaction.IsReversed exists on some deployments but not others; referencing a
-        // missing column fails the whole query. Same guard and cache as
-        // VAS_078_ProductSearchWidgetController.TransactionHasIsReversed().
-        private static bool? _transactionHasIsReversed;
+        // Column-existence guards (a column missing on a deployment fails the whole query). Same
+        // AD_Column check VAS_078 / VAS_161-165 use; results are cached per column.
+        private static readonly Dictionary<string, bool> _columnExists = new Dictionary<string, bool>();
+        private static readonly object _columnLock = new object();
 
-        private static bool TransactionHasIsReversed()
+        private static bool ColumnExists(string tableName, string columnName)
         {
-            if (_transactionHasIsReversed.HasValue) { return _transactionHasIsReversed.Value; }
+            string cacheKey = tableName.ToUpperInvariant() + "." + columnName.ToUpperInvariant();
+            lock (_columnLock)
+            {
+                bool cached;
+                if (_columnExists.TryGetValue(cacheKey, out cached)) { return cached; }
+            }
 
             string sql = @"
                 SELECT COUNT(1)
                 FROM AD_Column ColumnInfo
                 INNER JOIN AD_Table TableInfo ON (TableInfo.AD_Table_ID=ColumnInfo.AD_Table_ID AND TableInfo.IsActive='Y')
                 WHERE ColumnInfo.IsActive='Y'
-                  AND UPPER(TableInfo.TableName)='M_TRANSACTION'
-                  AND UPPER(ColumnInfo.ColumnName)='ISREVERSED'";
+                  AND UPPER(TableInfo.TableName)='" + tableName.ToUpperInvariant() + @"'
+                  AND UPPER(ColumnInfo.ColumnName)='" + columnName.ToUpperInvariant() + "'";
 
-            _transactionHasIsReversed = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null)) > 0;
-            return _transactionHasIsReversed.Value;
-        }
-
-        // M_Locator.LocatorCombination is not present on every database release (same guard
-        // VAS_146/161-165/184/186/188 already use) - check first and fall back to Value.
-        private static bool? _locatorHasCombination;
-
-        private static bool LocatorHasCombination()
-        {
-            if (_locatorHasCombination.HasValue) { return _locatorHasCombination.Value; }
-
-            string sql = @"
-                SELECT COUNT(1)
-                FROM AD_Column ColumnInfo
-                INNER JOIN AD_Table TableInfo ON (TableInfo.AD_Table_ID=ColumnInfo.AD_Table_ID AND TableInfo.IsActive='Y')
-                WHERE ColumnInfo.IsActive='Y'
-                  AND UPPER(TableInfo.TableName)='M_LOCATOR'
-                  AND UPPER(ColumnInfo.ColumnName)='LOCATORCOMBINATION'";
-
-            _locatorHasCombination = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null)) > 0;
-            return _locatorHasCombination.Value;
+            bool exists = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null)) > 0;
+            lock (_columnLock) { _columnExists[cacheKey] = exists; }
+            return exists;
         }
 
         /*
-         * AGING BASIS (user instruction 2026-08-29, reconfirmed 2026-09-25: "Fetch inventory
-         * aging details from the M_Transaction table and calculate/display the quantity under
-         * the Fresh Stock (0-30), Normal Turnover (31-90), Slow Moving (91-180) and Dead Stock
-         * (180+) slabs based on the MovementDate and MovementQty fields, for the selected
-         * warehouse").
+         * AGING BASIS (revised 2026-10-08, user instruction: "calculate inventory based on both
+         * stock-in (product movement) and stock-out (issue/sale) transactions ... When a product is
+         * issued or sold, reduce the stock quantity from the appropriate aging slab ... Use the
+         * MMPolicy configured for that product category: FIFO deduct the oldest first, LIFO deduct the
+         * newest first ... the widget always shows the actual remaining inventory by age").
          *
-         * The age of one stock position is the age of the OLDEST INBOUND MOVEMENT that put stock
-         * into it: MIN(M_Transaction.MovementDate) over rows with MovementQty > 0 for the same
-         * Product + AttributeSetInstance + Locator - implemented below via AgingTransactionSql,
-         * which both GetAgingSummary and GetBucketDetail share so the two can never disagree.
+         * Before this the widget only summed inbound movements (MovementQty > 0), so issued and sold
+         * stock was never taken off any slab and the slabs overstated what is on hand.
          *
-         * This REPLACES COALESCE(s.DateLastInventory, s.Created), which the widget used before
-         * this basis was chosen and is the original "incorrect data" report: DateLastInventory is
-         * when a position was last COUNTED and Created is when the storage row was first written -
-         * neither is when the stock actually arrived, so a long-held item could look fresh and
-         * vice versa. (An earlier GetAgingJoin() helper carried this old M_Storage-joined
-         * approach; it was dead code - never called - and has been removed so it cannot be
-         * mistaken for the active implementation.)
+         * Each stock position is one Product + AttributeSetInstance + Locator (the "stock layer
+         * owner"). Its movements are replayed day by day in date order:
+         *   - stock-in of a day adds a layer (that movement date, that quantity);
+         *   - stock-out of a day then consumes layers - the OLDEST first under FIFO, the NEWEST first
+         *     under LIFO - using the MMPolicy of that product's category. A stock-out only ever
+         *     consumes layers that existed on or before its own day, because later receipts have not
+         *     been replayed yet, and it only ever touches its own position, so it can never reduce
+         *     another product, attribute or locator.
+         *   - a stock-out larger than the stock then available (negative stock) removes only what is
+         *     there; the excess is ignored rather than creating a negative layer.
+         * What is left in the layers is the real remaining stock by age. Because it is replayed from
+         * the movements on every request, the slabs are recalculated after every stock-out with no
+         * stored state to keep in step. Summary and drill-down share ComputeRemainingLayers, so the
+         * two can never disagree.
          *
-         * The source prompt specifies a fuller FIFO/LIFO algorithm using M_TransactionAllocation
-         * remaining layers. That allocator does not exist: M_TransactionAllocation is referenced
-         * NOWHERE in this solution. The user chose the simple oldest-inbound-MovementDate basis on
-         * 2026-08-29 rather than have it built blind. Recorded so the prompt is not "restored"
-         * later by mistake.
+         * Within one day receipts are applied before issues (the time of day is not used), which is
+         * the usual reading when a product is received and shipped on the same date.
          *
-         * Created remains the fallback (via GetAgeDaysExpression's COALESCE) when a position has
-         * no inbound transaction at all, which is the fallback the prompt itself names.
+         * This is computed straight from M_Transaction. The fuller allocation table the source prompt
+         * mentions (M_TransactionAllocation) does not exist anywhere in this solution, so it is not
+         * relied on. Reversed movements (IsReversed = 'Y', where the column exists) are excluded in
+         * both directions, as before.
          */
-        private static string GetAgeDaysExpression(string dateCol)
+
+        private const string DefaultPolicy = "F"; // FIFO
+
+        private class StockLayer
         {
-            string dateVal = "COALESCE(" + dateCol + ")";
+            public int ProductId;
+            public int AttributeSetInstanceId;
+            public int LocatorId;
+            public int WarehouseId;
+            public DateTime Day;
+            public decimal Qty;
+        }
+
+        private class DayMovement
+        {
+            public DateTime Day;
+            public decimal InQty;
+            public decimal OutQty;
+        }
+
+        private class PositionKey
+        {
+            public int ProductId;
+            public int AttributeSetInstanceId;
+            public int LocatorId;
+            public int WarehouseId;
+        }
+
+        private static string GetDayExpression(string dateCol)
+        {
             if (DB.IsPostgreSQL())
             {
-                return "CAST(CURRENT_DATE - CAST(" + dateVal + " AS DATE) AS INTEGER)";
+                return "CAST(COALESCE(" + dateCol + ") AS DATE)";
             }
-            return "TRUNC(SYSDATE - " + dateVal + ")";
+            return "TRUNC(COALESCE(" + dateCol + "))";
         }
 
         /// <summary>
-        /// Aging source per the source specification: M_Transaction, slabs by
-        /// MovementDate age, quantities summed from MovementQty. Only inbound
-        /// movements (MovementQty &gt; 0) carry stock into a slab - issues,
-        /// shipments and internal use are consumption, not aging stock. A reversed movement
-        /// (IsReversed = 'Y', where the column exists) is excluded the same way - it was
-        /// cancelled and never actually put stock into the position.
-        /// M_Locator_ID is carried through (not just M_Warehouse_ID) so GetBucketDetail can join
-        /// back to the transaction's ACTUAL locator instead of every locator in the warehouse.
+        /// MMPolicy per product: the product category's policy, else the client's, else FIFO.
         /// </summary>
-        private static string AgingTransactionSql(string warehouseFilter, string extraWhere)
+        private static Dictionary<int, string> LoadProductPolicies(Ctx ctx)
         {
-            string ageExpr = GetAgeDaysExpression("t.MovementDate, t.Created");
-            string reversedFilter = TransactionHasIsReversed()
+            Dictionary<int, string> map = new Dictionary<int, string>();
+            int clientId = ctx.GetAD_Client_ID();
+
+            string clientPolicy = DefaultPolicy;
+            if (ColumnExists("AD_Client", "MMPolicy"))
+            {
+                string cp = Util.GetValueOfString(DB.ExecuteScalar(
+                    "SELECT MMPolicy FROM AD_Client WHERE AD_Client_ID = " + clientId, null, null));
+                if (!string.IsNullOrEmpty(cp)) { clientPolicy = cp; }
+            }
+
+            bool categoryHasPolicy = ColumnExists("M_Product_Category", "MMPolicy");
+            string sql = categoryHasPolicy
+                ? @"SELECT p.M_Product_ID AS M_Product_ID, pc.MMPolicy AS MMPolicy
+                    FROM M_Product p
+                    LEFT JOIN M_Product_Category pc ON (pc.M_Product_Category_ID = p.M_Product_Category_ID)
+                    WHERE p.AD_Client_ID IN (0, " + clientId + ")"
+                : @"SELECT p.M_Product_ID AS M_Product_ID, NULL AS MMPolicy
+                    FROM M_Product p
+                    WHERE p.AD_Client_ID IN (0, " + clientId + ")";
+
+            IDataReader dr = null;
+            try
+            {
+                dr = DB.ExecuteReader(sql, null, null);
+                while (dr != null && dr.Read())
+                {
+                    string policy = Util.GetValueOfString(dr["MMPolicy"]);
+                    map[Util.GetValueOfInt(dr["M_Product_ID"])] = string.IsNullOrEmpty(policy) ? clientPolicy : policy;
+                }
+            }
+            finally
+            {
+                if (dr != null) { dr.Close(); dr.Dispose(); }
+            }
+            return map;
+        }
+
+        /// <summary>
+        /// Replays every stock-in and stock-out movement of each Product + Attribute + Locator and
+        /// returns the layers that are still on hand, with the policy-driven deductions applied.
+        /// </summary>
+        private static List<StockLayer> ComputeRemainingLayers(Ctx ctx, int? warehouseId)
+        {
+            string whFilter = (warehouseId.HasValue && warehouseId.Value > 0)
+                ? " AND loc.M_Warehouse_ID = " + warehouseId.Value
+                : "";
+            string reversedFilter = ColumnExists("M_Transaction", "IsReversed")
                 ? " AND COALESCE(t.IsReversed, 'N') = 'N'"
                 : "";
 
-            return @"SELECT t.M_Product_ID,
-                           COALESCE(t.M_AttributeSetInstance_ID, 0) AS M_AttributeSetInstance_ID,
-                           t.M_Locator_ID,
-                           loc.M_Warehouse_ID,
-                           t.MovementQty,
-                           " + ageExpr + @" AS AgeDays
-                    FROM M_Transaction t
-                    JOIN M_Locator loc ON (t.M_Locator_ID = loc.M_Locator_ID)" +
-                    " WHERE t.IsActive = 'Y' AND t.MovementQty > 0" + reversedFilter + warehouseFilter + extraWhere;
+            // Plain SELECT first so MRole.AddAccessSQL can append its predicate at the end; the
+            // aggregation wraps it afterwards (an aggregate or GROUP BY inside breaks the parser).
+            string txSql = @"SELECT t.M_Product_ID,
+                                    COALESCE(t.M_AttributeSetInstance_ID, 0) AS M_AttributeSetInstance_ID,
+                                    t.M_Locator_ID,
+                                    loc.M_Warehouse_ID,
+                                    t.MovementQty,
+                                    " + GetDayExpression("t.MovementDate, t.Created") + @" AS MoveDay
+                             FROM M_Transaction t
+                             JOIN M_Locator loc ON (t.M_Locator_ID = loc.M_Locator_ID)
+                             WHERE t.IsActive = 'Y' AND t.MovementQty <> 0" + reversedFilter + whFilter;
+            txSql = MRole.GetDefault(ctx).AddAccessSQL(txSql, "t", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+            string sql = @"SELECT M_Product_ID, M_AttributeSetInstance_ID, M_Locator_ID, M_Warehouse_ID, MoveDay,
+                                  SUM(CASE WHEN MovementQty > 0 THEN MovementQty ELSE 0 END) AS InQty,
+                                  SUM(CASE WHEN MovementQty < 0 THEN -MovementQty ELSE 0 END) AS OutQty
+                           FROM (" + txSql + @") tx
+                           GROUP BY M_Product_ID, M_AttributeSetInstance_ID, M_Locator_ID, M_Warehouse_ID, MoveDay
+                           ORDER BY M_Product_ID, M_AttributeSetInstance_ID, M_Locator_ID, MoveDay";
+
+            Dictionary<int, string> policies = LoadProductPolicies(ctx);
+
+            List<StockLayer> remaining = new List<StockLayer>();
+            PositionKey currentKey = null;
+            List<DayMovement> currentDays = new List<DayMovement>();
+
+            IDataReader dr = null;
+            try
+            {
+                dr = DB.ExecuteReader(sql, null, null);
+                while (dr != null && dr.Read())
+                {
+                    PositionKey key = new PositionKey
+                    {
+                        ProductId = Util.GetValueOfInt(dr["M_Product_ID"]),
+                        AttributeSetInstanceId = Util.GetValueOfInt(dr["M_AttributeSetInstance_ID"]),
+                        LocatorId = Util.GetValueOfInt(dr["M_Locator_ID"]),
+                        WarehouseId = Util.GetValueOfInt(dr["M_Warehouse_ID"])
+                    };
+
+                    if (currentKey != null && !SamePosition(currentKey, key))
+                    {
+                        ReplayPosition(currentKey, currentDays, policies, remaining);
+                        currentDays = new List<DayMovement>();
+                    }
+                    currentKey = key;
+
+                    DateTime? day = Util.GetValueOfDateTime(dr["MoveDay"]);
+                    currentDays.Add(new DayMovement
+                    {
+                        Day = (day.HasValue ? day.Value : DateTime.Today).Date,
+                        InQty = Util.GetValueOfDecimal(dr["InQty"]),
+                        OutQty = Util.GetValueOfDecimal(dr["OutQty"])
+                    });
+                }
+                if (currentKey != null)
+                {
+                    ReplayPosition(currentKey, currentDays, policies, remaining);
+                }
+            }
+            finally
+            {
+                if (dr != null) { dr.Close(); dr.Dispose(); }
+            }
+
+            return remaining;
+        }
+
+        private static bool SamePosition(PositionKey a, PositionKey b)
+        {
+            return a.ProductId == b.ProductId
+                && a.AttributeSetInstanceId == b.AttributeSetInstanceId
+                && a.LocatorId == b.LocatorId;
+        }
+
+        /// <summary>
+        /// Replays one position's days (already in date order) and appends its remaining layers.
+        /// </summary>
+        private static void ReplayPosition(PositionKey key, List<DayMovement> days,
+            Dictionary<int, string> policies, List<StockLayer> output)
+        {
+            string policy;
+            if (!policies.TryGetValue(key.ProductId, out policy) || string.IsNullOrEmpty(policy))
+            {
+                policy = DefaultPolicy;
+            }
+            bool lifo = string.Equals(policy, "L", StringComparison.OrdinalIgnoreCase);
+
+            LinkedList<StockLayer> layers = new LinkedList<StockLayer>();
+            foreach (DayMovement d in days)
+            {
+                // Stock-in of the day: a new, newest layer.
+                if (d.InQty > 0)
+                {
+                    layers.AddLast(new StockLayer
+                    {
+                        ProductId = key.ProductId,
+                        AttributeSetInstanceId = key.AttributeSetInstanceId,
+                        LocatorId = key.LocatorId,
+                        WarehouseId = key.WarehouseId,
+                        Day = d.Day,
+                        Qty = d.InQty
+                    });
+                }
+
+                // Stock-out of the day: consume oldest first (FIFO) or newest first (LIFO).
+                decimal toDeduct = d.OutQty;
+                while (toDeduct > 0 && layers.Count > 0)
+                {
+                    LinkedListNode<StockLayer> node = lifo ? layers.Last : layers.First;
+                    decimal take = Math.Min(node.Value.Qty, toDeduct);
+                    node.Value.Qty -= take;
+                    toDeduct -= take;
+                    if (node.Value.Qty <= 0) { layers.Remove(node); }
+                }
+                // Anything still left in toDeduct was issued from stock that was not on hand
+                // (negative stock); it cannot reduce a slab below zero, so it is ignored.
+            }
+
+            foreach (StockLayer layer in layers)
+            {
+                if (layer.Qty > 0) { output.Add(layer); }
+            }
+        }
+
+        private static int AgeInDays(StockLayer layer, DateTime today)
+        {
+            return (int)(today - layer.Day).TotalDays;
+        }
+
+        private static string BucketOf(int ageDays)
+        {
+            if (ageDays <= 30) { return "0-30"; }
+            if (ageDays <= 90) { return "31-90"; }
+            if (ageDays <= 180) { return "91-180"; }
+            return "180+";
         }
 
         /// <summary>
@@ -191,9 +374,9 @@ namespace VAS.Controllers
         }
 
         /// <summary>
-        /// Gets the quantity of aging stock per slab: Fresh Stock (0-30),
-        /// Normal Turnover (31-90), Slow Moving (91-180), Dead Stock (180+).
-        /// Quantities come from M_Transaction.MovementQty slabs by MovementDate.
+        /// Gets the REMAINING stock quantity per slab: Fresh Stock (0-30), Normal Turnover (31-90),
+        /// Slow Moving - Watch (91-180), Dead Stock (180+), after stock-out movements have been
+        /// deducted from the layers per the product category's FIFO / LIFO policy.
         /// </summary>
         [HttpGet]
         public JsonResult GetAgingSummary(int? warehouseId)
@@ -209,48 +392,23 @@ namespace VAS.Controllers
             decimal b91_180 = 0;
             decimal b180_plus = 0;
 
-            IDataReader dr = null;
             try
             {
-                string whFilter = "";
-                if (warehouseId.HasValue && warehouseId.Value > 0)
+                DateTime today = DateTime.Today;
+                foreach (StockLayer layer in ComputeRemainingLayers(ctx, warehouseId))
                 {
-                    whFilter = " AND loc.M_Warehouse_ID = " + warehouseId.Value;
-                }
-
-                string txSql = AgingTransactionSql(whFilter, "");
-
-                // Role access applies to the plain SELECT before the aggregate wrapper
-                // (AddAccessSQL appends its predicate at the end of the statement).
-                txSql = MRole.GetDefault(ctx).AddAccessSQL(txSql, "t", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-
-                string sql = @"SELECT
-                                  SUM(CASE WHEN AgeDays <= 30 THEN MovementQty ELSE 0 END) AS B0_30,
-                                  SUM(CASE WHEN AgeDays > 30 AND AgeDays <= 90 THEN MovementQty ELSE 0 END) AS B31_90,
-                                  SUM(CASE WHEN AgeDays > 90 AND AgeDays <= 180 THEN MovementQty ELSE 0 END) AS B91_180,
-                                  SUM(CASE WHEN AgeDays > 180 THEN MovementQty ELSE 0 END) AS B180_Plus
-                               FROM (" + txSql + @") aged";
-
-                dr = DB.ExecuteReader(sql, null, null);
-                if (dr != null && dr.Read())
-                {
-                    b0_30 = Util.GetValueOfDecimal(dr["B0_30"]);
-                    b31_90 = Util.GetValueOfDecimal(dr["B31_90"]);
-                    b91_180 = Util.GetValueOfDecimal(dr["B91_180"]);
-                    b180_plus = Util.GetValueOfDecimal(dr["B180_Plus"]);
+                    switch (BucketOf(AgeInDays(layer, today)))
+                    {
+                        case "0-30": b0_30 += layer.Qty; break;
+                        case "31-90": b31_90 += layer.Qty; break;
+                        case "91-180": b91_180 += layer.Qty; break;
+                        default: b180_plus += layer.Qty; break;
+                    }
                 }
             }
             catch (Exception ex)
             {
                 _log.Severe("VAS_163_InventoryAgingReportWidgetController.GetAgingSummary: " + ex.Message);
-            }
-            finally
-            {
-                if (dr != null)
-                {
-                    dr.Close();
-                    dr.Dispose();
-                }
             }
 
             decimal total = b0_30 + b31_90 + b91_180 + b180_plus;
@@ -266,9 +424,9 @@ namespace VAS.Controllers
         }
 
         /// <summary>
-        /// Gets per-product aging quantities for a specific slab and optional
-        /// warehouse filter, from M_Transaction (MovementQty summed by product /
-        /// ASI / warehouse, AgeDays = age of the newest inbound in the slab).
+        /// Gets per-product remaining quantities for one slab (and optional warehouse): Product +
+        /// Attribute + Locator, with the quantity left in that slab after the FIFO / LIFO
+        /// deductions, and the age (in days) of the newest layer in it.
         /// </summary>
         [HttpGet]
         public JsonResult GetBucketDetail(string bucketId, int? warehouseId)
@@ -280,121 +438,103 @@ namespace VAS.Controllers
             }
 
             List<object> lines = new List<object>();
-            IDataReader dr = null;
             try
             {
-                string whFilter = "";
-                if (warehouseId.HasValue && warehouseId.Value > 0)
-                {
-                    whFilter = " AND loc.M_Warehouse_ID = " + warehouseId.Value;
-                }
+                DateTime today = DateTime.Today;
 
-                // Must match AgingTransactionSql's own internal AgeDays expression (and therefore
-                // GetAgingSummary's bucketing) exactly: COALESCE(MovementDate, Created), not
-                // MovementDate alone. A transaction row with a null MovementDate (Created still
-                // set) ages correctly in the summary via that fallback, but this filter's bucket
-                // comparison (e.g. "AND ageExpr > 30 AND ageExpr <= 90") evaluates to NULL - not
-                // true - for such a row when the fallback is missing, silently dropping it from
-                // the WHERE clause. That is what made a bucket read real quantity on the summary
-                // card (878/120,888/151/23,983) yet return "0 products" in this drill-down.
-                string ageExpr = GetAgeDaysExpression("t.MovementDate, t.Created");
-
-                string ageClause = "";
-                if (bucketId == "0-30")
-                {
-                    ageClause = " AND " + ageExpr + " <= 30";
-                }
-                else if (bucketId == "31-90")
-                {
-                    ageClause = " AND " + ageExpr + " > 30 AND " + ageExpr + " <= 90";
-                }
-                else if (bucketId == "91-180")
-                {
-                    ageClause = " AND " + ageExpr + " > 90 AND " + ageExpr + " <= 180";
-                }
-                else if (bucketId == "180+")
-                {
-                    ageClause = " AND " + ageExpr + " > 180";
-                }
-
-                string txSql = AgingTransactionSql(whFilter, ageClause);
-
-                // Role access applies to the plain SELECT before the aggregate wrapper.
-                txSql = MRole.GetDefault(ctx).AddAccessSQL(txSql, "t", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-
-                // asi.Description is NVARCHAR2 (national character set); 'Standard' is a plain
-                // literal. COALESCE across the two raises ORA-12704 "character set mismatch", the
-                // whole statement fails, the catch below swallows it and the endpoint returns an
-                // empty list - which the modal renders as a blank popup. The fallback is applied in
-                // C# instead: no charset mixing, and it stays portable to PostgreSQL (which has
-                // neither Oracle's N'' literal nor a to_char(text) overload).
-                // LocatorCombination is the full "Warehouse.Aisle.Bin.Level"-style locator name;
-                // Value alone is the numeric surrogate code, which read like a raw locator id to
-                // the user. Matches the class header's own documented mapping (COALESCE
-                // LocatorCombination/Value), which this query had not actually been applying.
-                string locatorSql = LocatorHasCombination()
-                    ? "COALESCE(whLoc.LocatorCombination, whLoc.Value)"
-                    : "whLoc.Value";
-
-                // Claude, 2026-09-25: whLoc used to join ON (whLoc.M_Warehouse_ID =
-                // aged.M_Warehouse_ID) - every locator in the warehouse, not the transaction's
-                // OWN locator (aged never carried M_Locator_ID at all). That fanned each
-                // product/attribute out across every locator the warehouse has, duplicating its
-                // full summed quantity onto each one (e.g. "Lenovo Laptop" showing qty 40 under
-                // BOTH Locator 1234 and Locator 4321, when the real stock sits in only one).
-                // AgingTransactionSql now carries M_Locator_ID through, so this joins to the
-                // exact locator instead, and SUM(aged.MovementQty) aggregates per-locator
-                // correctly.
-                string sql = @"SELECT p.Name AS ProductName,
-                                      asi.Description AS AttributeDesc,
-                                      w.Name AS WarehouseName,
-                                      " + locatorSql + @" AS LocatorValue,
-                                      SUM(aged.MovementQty) AS SlabQty,
-                                      MIN(aged.AgeDays) AS AgeDays
-                               FROM (" + txSql + @") aged
-                               JOIN M_Product p ON (aged.M_Product_ID = p.M_Product_ID)
-                               JOIN M_Locator whLoc ON (whLoc.M_Locator_ID = aged.M_Locator_ID)
-                               JOIN M_Warehouse w ON (aged.M_Warehouse_ID = w.M_Warehouse_ID)
-                               LEFT JOIN M_AttributeSetInstance asi ON (aged.M_AttributeSetInstance_ID = asi.M_AttributeSetInstance_ID)
-                               GROUP BY p.Name, asi.Description, w.Name, " + locatorSql + @"
-                               ORDER BY AgeDays DESC, p.Name ASC";
-
-                dr = DB.ExecuteReader(sql, null, null);
-                while (dr != null && dr.Read())
-                {
-                    // No attribute set instance -> BLANK, not a placeholder (user request
-                    // 2026-08-29). It used to fall back to
-                    // Msg.GetMsg(ctx, "VAS_Standard") ?? "Standard", which carried the usual
-                    // Msg.GetMsg trap too: that call returns "[VAS_Standard]" rather than null
-                    // when the AD_Message row is missing, so the "??" never fired.
-                    string attribute = Util.GetValueOfString(dr["AttributeDesc"]);
-
-                    lines.Add(new
+                // Layers in the requested slab, summed per Product + Attribute + Locator.
+                var groups = ComputeRemainingLayers(ctx, warehouseId)
+                    .Where(layer => BucketOf(AgeInDays(layer, today)) == bucketId)
+                    .GroupBy(layer => new { layer.ProductId, layer.AttributeSetInstanceId, layer.LocatorId, layer.WarehouseId })
+                    .Select(g => new
                     {
-                        product = Util.GetValueOfString(dr["ProductName"]),
-                        attribute = attribute,
-                        warehouse = Util.GetValueOfString(dr["WarehouseName"]),
-                        locator = Util.GetValueOfString(dr["LocatorValue"]),
-                        qty = Util.GetValueOfDecimal(dr["SlabQty"]),
-                        ageDays = Util.GetValueOfInt(dr["AgeDays"])
-                    });
+                        g.Key.ProductId,
+                        g.Key.AttributeSetInstanceId,
+                        g.Key.LocatorId,
+                        g.Key.WarehouseId,
+                        Qty = g.Sum(x => x.Qty),
+                        AgeDays = g.Min(x => AgeInDays(x, today))
+                    })
+                    .ToList();
+
+                if (groups.Count > 0)
+                {
+                    Dictionary<int, string> productNames = LoadNameMap(
+                        "SELECT M_Product_ID AS ID, Name AS Label FROM M_Product WHERE M_Product_ID IN ({0})",
+                        groups.Select(x => x.ProductId));
+                    Dictionary<int, string> attributes = LoadNameMap(
+                        "SELECT M_AttributeSetInstance_ID AS ID, Description AS Label FROM M_AttributeSetInstance WHERE M_AttributeSetInstance_ID IN ({0})",
+                        groups.Where(x => x.AttributeSetInstanceId > 0).Select(x => x.AttributeSetInstanceId));
+                    Dictionary<int, string> warehouses = LoadNameMap(
+                        "SELECT M_Warehouse_ID AS ID, Name AS Label FROM M_Warehouse WHERE M_Warehouse_ID IN ({0})",
+                        groups.Select(x => x.WarehouseId));
+                    // LocatorCombination is the full "Warehouse.Aisle.Bin.Level"-style locator name;
+                    // Value alone is a numeric surrogate. Falls back to Value where the column is absent.
+                    string locatorLabel = ColumnExists("M_Locator", "LocatorCombination")
+                        ? "COALESCE(LocatorCombination, Value)"
+                        : "Value";
+                    Dictionary<int, string> locators = LoadNameMap(
+                        "SELECT M_Locator_ID AS ID, " + locatorLabel + " AS Label FROM M_Locator WHERE M_Locator_ID IN ({0})",
+                        groups.Select(x => x.LocatorId));
+
+                    foreach (var g in groups
+                        .OrderByDescending(x => x.AgeDays)
+                        .ThenBy(x => NameOf(productNames, x.ProductId), StringComparer.OrdinalIgnoreCase))
+                    {
+                        // No attribute set instance -> BLANK, not a placeholder.
+                        lines.Add(new
+                        {
+                            product = NameOf(productNames, g.ProductId),
+                            attribute = g.AttributeSetInstanceId > 0 ? NameOf(attributes, g.AttributeSetInstanceId) : "",
+                            warehouse = NameOf(warehouses, g.WarehouseId),
+                            locator = NameOf(locators, g.LocatorId),
+                            qty = g.Qty,
+                            ageDays = g.AgeDays
+                        });
+                    }
                 }
             }
             catch (Exception ex)
             {
                 _log.Severe("VAS_163_InventoryAgingReportWidgetController.GetBucketDetail: " + ex.Message);
             }
-            finally
-            {
-                if (dr != null)
-                {
-                    dr.Close();
-                    dr.Dispose();
-                }
-            }
 
             return Json(new { details = lines, totalCount = lines.Count }, JsonRequestBehavior.AllowGet);
         }
+
+        private static string NameOf(Dictionary<int, string> map, int id)
+        {
+            string name;
+            return (map != null && map.TryGetValue(id, out name)) ? (name ?? "") : "";
+        }
+
+        /// <summary>
+        /// Loads id -> label pairs for a set of ids (the {0} placeholder takes the id list). The ids
+        /// are integers, so they are inlined; chunked to stay under the IN-list limit of Oracle.
+        /// </summary>
+        private static Dictionary<int, string> LoadNameMap(string sqlTemplate, IEnumerable<int> ids)
+        {
+            Dictionary<int, string> map = new Dictionary<int, string>();
+            List<int> distinct = ids.Where(i => i > 0).Distinct().ToList();
+
+            for (int offset = 0; offset < distinct.Count; offset += 500)
+            {
+                string inList = string.Join(",", distinct.Skip(offset).Take(500).Select(i => i.ToString()));
+                IDataReader dr = null;
+                try
+                {
+                    dr = DB.ExecuteReader(string.Format(sqlTemplate, inList), null, null);
+                    while (dr != null && dr.Read())
+                    {
+                        map[Util.GetValueOfInt(dr["ID"])] = Util.GetValueOfString(dr["Label"]);
+                    }
+                }
+                finally
+                {
+                    if (dr != null) { dr.Close(); dr.Dispose(); }
+                }
+            }
+            return map;
+        }
     }
 }
-

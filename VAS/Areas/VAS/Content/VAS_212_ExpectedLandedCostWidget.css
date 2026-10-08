@@ -155,13 +155,14 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
-    justify-content: space-around;
-    gap: 0.35em;
-    margin-top: 0.4em;
+    justify-content: flex-start;
+    gap: 0.6em;
+    margin-top: 0.6em;
     overflow: hidden;
 }
 
 .vas-elc-row {
+    flex: none;
     padding: 0.24em 0;
     display: flex;
     flex-direction: column;
@@ -430,7 +431,7 @@
     }
 
 .vas-elc-modal-body {
-    flex: 0 1 auto;
+    flex: 1 1 auto;
     min-height: 0;
     overflow: hidden;
     padding: 1.125em 0.875em;
@@ -460,17 +461,19 @@
 .vas-elc-mbody {
     display: flex;
     flex-direction: column;
-    flex: none;
+    flex: 1 1 auto;
     justify-content: flex-start;
     min-height: 0;
-    overflow: hidden;
-    /* Exactly --vas-elc-rows rows tall, whatever the page holds. */
-    height: calc(var(--vas-elc-rows, 6) * var(--vas-elc-row-h, 2.4em));
+    /* Takes whatever height the dialog (capped at 90dvh) can give and scrolls only past
+       that, so every returned PO is reachable at any screen size / zoom. Rows keep a fixed
+       height and stack from the top; a short list leaves blank space below. */
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
     .vas-elc-mbody .vas-elc-mrow {
-        flex: 0 0 calc(100% / var(--vas-elc-rows, 6));
-        min-height: 0;
+        flex: 0 0 auto;
+        min-height: var(--vas-elc-row-h, 2.4em);
         font-size: 0.75em;
         padding: 0.4em 0.5em;
         border-bottom: 1px solid #E2EAF1;
@@ -484,6 +487,28 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.vas-elc-lnk {
+    border: 0;
+    background: none;
+    padding: 0;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: 700;
+    color: #0083DA;
+    cursor: pointer;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+    text-align: left;
+}
+
+.vas-elc-lnk:hover {
+    color: #0069AE;
+    text-decoration: underline;
 }
 
 .vas-elc-mright {

@@ -155,7 +155,7 @@
     overflow: hidden;
     border-top: 1px solid #E2EAF1;
     padding-top: 0.47em;
-    justify-content: space-between;
+    justify-content: flex-start;
 }
 
 .vas-213-hrow {
@@ -172,8 +172,9 @@
     width: 100%;
     text-align: left;
     font-family: inherit;
-    min-height: 0;
-    flex: 1 1 0;
+    /* Fixed row height, stacked from the top - a short list must not stretch its rows. */
+    min-height: 3.2em;
+    flex: 0 0 auto;
     outline: none;
     transition: background-color 0.15s ease, box-shadow 0.15s ease;
 }
