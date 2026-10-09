@@ -531,6 +531,12 @@
  *                          Pending. The delivery order's own type no longer
  *                          switches the Shipped stage (it still feeds Delivered's
  *                          In Progress caption).
+ *   VAI163   2026-10-08  - Shipped follows IsShipConfirm on the document type
+ *                          SELECTED on each DELIVERY ORDER (M_InOut.C_DocType_ID,
+ *                          model side) instead of the sales order's: Y -> the date
+ *                          it reached In Progress (and only once it has - IP, CO or
+ *                          CL); N -> the date it reached Completed; drafted / none
+ *                          -> Pending. Several delivery orders: the earliest date.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -1329,9 +1335,9 @@
         //                   In Progress (its first DocComplete stamp, model side);
         //                   without it, when it completed. Null while nothing has
         //                   shipped that way, which is what leaves the stage
-        //                   Pending. Confirmation is `orderShipConfirm` - IsShipConfirm
-        //                   on the SALES ORDER's selected target type, and nothing
-        //                   else (25-Sep-2026). Shipped is when the goods FIRST went
+        //                   Pending. Confirmation is the delivery order's OWN
+        //                   IsShipConfirm - on the document type selected on it
+        //                   (08-Oct-2026). Shipped is when the goods FIRST went
         //                   out, so it takes the earliest, where Delivered reports the
         //                   latest.
         //   completedDate — the LATEST completed delivery order's completion moment
@@ -1365,11 +1371,12 @@
                 // Delivered's "In Progress" caption still asks whether confirmation
                 // applies by EITHER type (the platform raises it off the shipment's).
                 if (!!orderShipConfirm || !!dv[i].IsShipConfirm) anyConfirm = true;
-                // SHIPPED is decided by the SALES ORDER's selected target document type
-                // alone (25-Sep-2026): IsShipConfirm = Y -> the date the delivery order
-                // reached In Progress; N -> the date it reached Completed. The delivery
-                // order's own type no longer switches this stage (it did since 21-Sep).
-                var confirm = !!orderShipConfirm;
+                // SHIPPED is decided by the document type SELECTED on the DELIVERY
+                // ORDER itself (M_InOut.C_DocType_ID, model side; 08-Oct-2026, as
+                // asked): IsShipConfirm = Y -> the date it reached In Progress;
+                // N -> the date it reached Completed. The sales order's type no
+                // longer switches this stage (it did from 25-Sep).
+                var confirm = !!dv[i].IsShipConfirm;
                 var c = null;
                 if (isDone) {
                     c = parseDbDate(dv[i].CompletedDate, true) ||
@@ -1389,9 +1396,14 @@
                 // This delivery order's own shipping moment, by its own rule: when
                 // it reached In Progress under confirmation, its completion
                 // otherwise — so without confirmation an open delivery order
-                // contributes nothing, and the stage stays Pending.
+                // contributes nothing, and the stage stays Pending. Under
+                // confirmation only a delivery order that actually REACHED In
+                // Progress (or went on to Completed / Closed) counts - one left
+                // Invalid or Not Approved by a failed completion has not shipped.
+                var reachedIP = st === "IP" || isDone;
                 var s = confirm
-                      ? (parseDbDate(dv[i].InProgressDate, true) ||
+                      ? (!reachedIP ? null :
+                         parseDbDate(dv[i].InProgressDate, true) ||
                          parseDbDate(dv[i].CompletedDate, true) ||
                          parseDbDate(dv[i].Created, true))
                       : c;
@@ -1490,11 +1502,11 @@
             // leaves the stage Pending — including on a completed sales order, which
             // says nothing about whether anything has shipped.
             //
-            // The rule is the SALES ORDER's selected target document type's
-            // IsShipConfirm ALONE (25-Sep-2026, as asked): Y -> the earliest delivery
-            // order's In Progress date; N -> the earliest delivery order's Completed
-            // date; a delivery order in draft, or none at all, -> Pending. (From
-            // 21-Sep the delivery order's own type could switch it too; withdrawn.)
+            // The rule is IsShipConfirm on the document type selected on each
+            // DELIVERY ORDER (08-Oct-2026, as asked; the sales order's target type
+            // decided it from 25-Sep): Y -> the date that delivery order reached In
+            // Progress; N -> the date it reached Completed; the earliest such date
+            // across the order's delivery orders; drafted, or none at all, -> Pending.
             // The stage is done exactly when there is a date to show; reaching for
             // another date here would hand one to a stage that has not been reached.
             var shipDate = dl.shippedDate;

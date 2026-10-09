@@ -12,6 +12,15 @@
  *   VAI163         24-Sep-2026 Split out of VAS_107_CreateOrderBottomPanelModel for the
  *                  Purchase Order screen only. Lives in VASLogic.Models.VAS_303 so its data
  *                  classes never collide with VAS_107's in VASLogic.Models.
+ *   VAI163         08-Oct-2026 A product pick no longer re-applies the previous product's
+ *                  C_UOM_ID: the line opens in the vendor's purchasing unit
+ *                  (M_Product_PO), else M_Product.VAS_PurchaseUOM_ID, else the base unit,
+ *                  priced through MOrderLineModel.GetPricesOnProductChange as the window
+ *                  does; RunColumnCallout also returns QtyOrdered.
+ *   VAI163         09-Oct-2026 Release against a price-controlled blanket (VAS_ControlType
+ *                  PRC / PAQ): header flag IsBlanketPriceFixed locks a saved line's
+ *                  price on the client, and a refused save reads "The price can't be
+ *                  changed..." instead of the bare "[PriceCantChange]".
  ******************************************************/
 
 using System;
@@ -967,6 +976,65 @@ namespace VASLogic.Models.VAS_303
                 && data.DocStatus != "VO" && data.DocStatus != "RE";
             if (data.LogicContext.ContainsKey("C_Order_Blanket"))
                 data.C_Order_Blanket = Util.GetValueOfInt(data.LogicContext["C_Order_Blanket"]);
+            data.IsBlanketPriceFixed = IsBlanketPriceControlled(data);
+        }
+
+        /// <summary>Set once C_Order.VAS_ControlType proved unreadable on this database.</summary>
+        private static bool _controlTypeFailed;
+
+        /// <summary>
+        /// True when a SAVED product line of this release order cannot change its price
+        /// (09-Oct-2026): the rule MOrderLine.BeforeSave applies - target document type is
+        /// a release (IsReleaseDocument, base SOO / POO) and the blanket order the HEADER
+        /// names (C_Order_Blanket) has VAS_ControlType PRC (price) or PAQ (price and qty).
+        /// The framework then refuses any update that changes PriceEntered / PriceActual /
+        /// PriceList with "PriceCantChange", so the panel locks the Price cell instead.
+        /// </summary>
+        /// <param name="data">the loaded header context</param>
+        /// <returns>true when the blanket fixes the price</returns>
+        private bool IsBlanketPriceControlled(CreateOrderPanelData data)
+        {
+            if (!data.IsReleaseDoc || data.C_Order_Blanket <= 0 || _controlTypeFailed) return false;
+            if (data.DocBaseType != "SOO" && data.DocBaseType != "POO") return false;
+            try
+            {
+                string ct = Util.GetValueOfString(DB.ExecuteScalar(
+                    "SELECT VAS_ControlType FROM C_Order WHERE C_Order_ID = @id",
+                    new SqlParameter[] { new SqlParameter("@id", data.C_Order_Blanket) }, null));
+                return ct == "PRC" || ct == "PAQ";
+            }
+            catch (Exception e)
+            {
+                _controlTypeFailed = true;
+                log.Warning("VAS_303 VAS_ControlType unreadable: " + e.Message);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// The row message for a line save the framework refused. MOrderLine.BeforeSave
+        /// logs Msg.GetMsg("PriceCantChange") as the TEXT, so on a database without that
+        /// AD_Message the row showed the bare "[PriceCantChange]" (09-Oct-2026). A seeded
+        /// message is kept as is.
+        /// </summary>
+        /// <param name="ctx">session context</param>
+        /// <param name="err">the error text the framework logged</param>
+        /// <param name="C_Order_Blanket">blanket order the release is raised against</param>
+        /// <returns>the message to show on the row</returns>
+        private static string FriendlySaveError(Ctx ctx, string err, int C_Order_Blanket)
+        {
+            if (string.IsNullOrEmpty(err) || err.Trim('[', ']', ' ') != "PriceCantChange") return err;
+            string blanketNo = C_Order_Blanket > 0
+                ? Util.GetValueOfString(DB.ExecuteScalar("SELECT DocumentNo FROM C_Order WHERE C_Order_ID = " + C_Order_Blanket))
+                : "";
+            string msg = Msg.GetMsg(ctx, "VAS_107_BlanketPriceFixed");
+            if (string.IsNullOrEmpty(msg) || msg.StartsWith("[") || msg == "VAS_107_BlanketPriceFixed")
+                msg = "The price can't be changed - it is fixed by blanket order {0}.";
+            if (msg.Contains("{0}"))
+                msg = string.IsNullOrEmpty(blanketNo)
+                    ? msg.Replace(" {0}", "").Replace("{0}", "")
+                    : msg.Replace("{0}", blanketNo);
+            return msg;
         }
 
         /// <summary>The three screens this one panel serves.</summary>
@@ -1903,7 +1971,19 @@ namespace VASLogic.Models.VAS_303
             decimal qty = req.QtyEntered > 0 ? req.QtyEntered : (req.QtyOrdered > 0 ? req.QtyOrdered : 1);
             line.SetQty(qty);
 
-            if (req.C_UOM_ID > 0)
+            // A product PICK takes that product's own purchase unit (08-Oct-2026). The client
+            // sends the row's current C_UOM_ID, which on a product change is the PREVIOUS
+            // product's unit - re-applying it here kept "Litre" on a product sold in "Each".
+            // SetM_Product_ID has already put the new product's base unit on the line.
+            int purchaseUom = 0;
+            if (req.M_Product_ID > 0 && IsProductTrigger(req.TriggerColumn))
+            {
+                int baseUom = line.GetC_UOM_ID();
+                purchaseUom = GetPurchaseUomId(order, req.M_Product_ID);
+                if (purchaseUom <= 0 || purchaseUom == baseUom) purchaseUom = 0;
+                else line.SetC_UOM_ID(purchaseUom);
+            }
+            else if (req.C_UOM_ID > 0)
                 line.SetC_UOM_ID(req.C_UOM_ID);
 
             // MOrderLine.SetC_Charge_ID does not auto-set a UOM (unlike MInvoiceLine).
@@ -1911,7 +1991,15 @@ namespace VASLogic.Models.VAS_303
             if (req.C_Charge_ID > 0 && line.GetC_UOM_ID() <= 0)
                 line.SetC_UOM_ID(GetDefaultUomId(ctx));
 
-            if (req.PriceOverride)
+            if (purchaseUom > 0 && !req.PriceOverride)
+            {
+                // Priced and converted exactly as the window's own product callout does for
+                // a purchasing unit (CalloutOrder.Product -> MOrderLine/GetPricesOnProductChange):
+                // the price list's price for that unit, or the base price x the conversion
+                // rate, and QtyOrdered restated in the base unit.
+                ApplyPurchaseUomPrices(ctx, line, order, qty, purchaseUom);
+            }
+            else if (req.PriceOverride)
             {
                 line.SetPriceEntered(req.PriceEntered);
                 line.SetPriceActual(req.PriceEntered);
@@ -1998,6 +2086,66 @@ namespace VASLogic.Models.VAS_303
                 line.SetC_UOM_ID(pp.GetC_UOM_ID());
         }
 
+        /// <summary>True when the recalculation was triggered by picking a product.</summary>
+        private static bool IsProductTrigger(string trigger)
+        {
+            return trigger == "M_Product_ID" || trigger == "product";
+        }
+
+        /// <summary>
+        /// The unit a purchase line opens in for a product - the platform's rule
+        /// (MOrderLineModel.GetProductInfo / CalloutOrder.Product): the vendor's purchasing
+        /// unit (M_Product_PO.C_UOM_ID for the order's business partner), else the product's
+        /// Default Purchase UOM (M_Product.VAS_PurchaseUOM_ID). 0 = keep the base unit.
+        /// A sales order never takes either.
+        /// </summary>
+        private int GetPurchaseUomId(MOrder order, int M_Product_ID)
+        {
+            if (order == null || order.IsSOTrx() || M_Product_ID <= 0) return 0;
+            int uom = 0;
+            if (order.GetC_BPartner_ID() > 0)
+            {
+                uom = Util.GetValueOfInt(DB.ExecuteScalar(
+                    @"SELECT C_UOM_ID FROM M_Product_PO
+                       WHERE IsActive = 'Y' AND C_BPartner_ID = @bp AND M_Product_ID = @p",
+                    new SqlParameter[] { new SqlParameter("@bp", order.GetC_BPartner_ID()), new SqlParameter("@p", M_Product_ID) }, null));
+            }
+            if (uom <= 0)
+            {
+                uom = Util.GetValueOfInt(DB.ExecuteScalar(
+                    "SELECT VAS_PurchaseUOM_ID FROM M_Product WHERE M_Product_ID = @p",
+                    new SqlParameter[] { new SqlParameter("@p", M_Product_ID) }, null));
+            }
+            return uom;
+        }
+
+        /// <summary>
+        /// Prices a product line opened in its purchasing unit through the platform's own
+        /// MOrderLineModel.GetPricesOnProductChange - the call the window's product callout
+        /// makes for the same case - so the panel and the window agree on price, list price,
+        /// limit and the base-unit QtyOrdered.
+        /// </summary>
+        private void ApplyPurchaseUomPrices(Ctx ctx, MOrderLine line, MOrder order, decimal qty, int uomId)
+        {
+            int productId = line.GetM_Product_ID();
+            Dictionary<string, object> prices = new MOrderLineModel().GetPricesOnProductChange(ctx,
+                productId + "," + ctx.GetAD_Client_ID() + "," + order.GetC_Order_ID() + ","
+                + order.GetC_BPartner_ID() + "," + qty.ToString(CultureInfo.InvariantCulture) + "," + uomId);
+
+            decimal priceEntered = Util.GetValueOfDecimal(prices["PriceEntered"]);
+            line.SetPriceEntered(priceEntered);
+            line.SetPriceActual(priceEntered);
+            line.SetPriceList(Util.GetValueOfDecimal(prices["PriceList"]));
+            line.SetPriceLimit(Util.GetValueOfDecimal(prices["PriceLimit"]));
+
+            // GetPricesOnProductChange reads the quantity as a whole number, so a fractional
+            // (or sub-1) quantity comes back short; convert it here in that case.
+            decimal qtyOrdered = Util.GetValueOfDecimal(prices["QtyOrdered"]);
+            if (qtyOrdered <= 0 || decimal.Truncate(qty) != qty)
+                qtyOrdered = MUOMConversion.ConvertProductFrom(ctx, productId, uomId, qty) ?? qty;
+            line.SetQtyOrdered(qtyOrdered);
+        }
+
         /// <summary>
         /// Reads the AD_Column.Callout for the changed column and executes the equivalent
         /// server-side callout logic, returning the changed columns as a patch object.
@@ -2020,6 +2168,9 @@ namespace VASLogic.Models.VAS_303
             decimal taxAmt = line.GetTaxAmt();
 
             res.Values["C_UOM_ID"] = line.GetC_UOM_ID();
+            // The base-unit quantity, restated when a product pick opened the line in its
+            // purchasing unit - the client callouts read it back (CalloutOrder.Qty / Amt).
+            res.Values["QtyOrdered"] = line.GetQtyOrdered();
             res.Values["PriceEntered"] = line.GetPriceEntered();
             res.Values["PriceActual"] = line.GetPriceActual();
             res.Values["PriceList"] = line.GetPriceList();
@@ -2585,7 +2736,7 @@ namespace VASLogic.Models.VAS_303
                             string val = pp.GetName();
                             if (String.IsNullOrEmpty(val))
                                 val = Msg.GetMsg(ctx, pp.GetValue());
-                            err = val;
+                            err = FriendlySaveError(ctx, val, ctxData.C_Order_Blanket);
                         }
                         log.Warning("VAS_303 SaveLines: line save failed (Line " + input.Line + ") - " + err);
                         res.LineErrors.Add(new OrderLineSaveError
@@ -2804,6 +2955,11 @@ namespace VASLogic.Models.VAS_303
         public string PanelContext { get; set; }
         /// <summary>C_Order.C_Order_Blanket - the blanket order a release is raised against.</summary>
         public int C_Order_Blanket { get; set; }
+        /// <summary>
+        /// The blanket order (C_Order_Blanket) is price-controlled (VAS_ControlType PRC /
+        /// PAQ): a saved product line of this release cannot change its price.
+        /// </summary>
+        public bool IsBlanketPriceFixed { get; set; }
         public bool IsTaxIncluded { get; set; }
         public string DocStatus { get; set; }
         public bool Processed { get; set; }

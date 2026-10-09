@@ -73,6 +73,20 @@
  *                        only; Sales Order (VAS_304_SalesOrderBottom) has its own. Every global
  *                        name (class, routes, CSS classes, DOM ids, event namespaces)
  *                        is this panel's own; AD_Message keys stay VAS_107_* (read-only).
+ *   VAI163   2026-10-08  - Taxable Amount follows the Price (and Quantity) as it is typed,
+ *                          not only once the cell is left / the line saved
+ *                          (previewLineAmount; nothing is committed before blur).
+ *                        - Picking a product opens the line in that product's purchase
+ *                          unit - vendor purchasing UOM, else Default Purchase UOM, else
+ *                          the base unit - instead of keeping the previous product's
+ *                          unit (model BuildCalcLine; QtyOrdered now comes back too).
+ *   VAI163   2026-10-09  - Taxable Amount of an edited line is qty x price: it no longer
+ *                          applies the Discount column, which the price callout sets
+ *                          negative when the price is typed above the list price
+ *                          (2 x 600 over a list price of 100 showed 7,200).
+ *                        - Price is locked on a saved product line of a release against a
+ *                          price-controlled blanket order (IsBlanketPriceFixed), which the
+ *                          framework would refuse to save ("PriceCantChange").
  ************************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -303,8 +317,12 @@
            is the GROSS (price already contains tax); otherwise it is the net. */
         function lineGross(line) {
             var v = line.values;
-            var disc = (+v.Discount || 0) / 100;
-            return (+v.QtyEntered || 0) * (+v.PriceEntered || 0) * (1 - disc);
+            // No Discount factor (09-Oct-2026, as VAS_304): C_OrderLine.Discount is how far
+            // the price sits from the list price, and the price callout restates it from
+            // the typed PriceEntered - typing 600 over a list price of 100 sets it to -500,
+            // so the old (1 - Discount) factor multiplied the line by 6. PriceEntered
+            // already carries any discount; the framework's LineNetAmt is plain qty x price.
+            return (+v.QtyEntered || 0) * (+v.PriceEntered || 0);
         }
         /* Line tax. Tax-inclusive: EXTRACT it from the gross (gross*r/(100+r)) - mirrors
            the framework MTax.CalculateTax(amount, taxIncluded=true). Tax-exclusive: add
@@ -354,7 +372,7 @@
            the framework on save). A clean SAVED line reads TaxableAmt directly
            (authoritative). A new / edited line has no stored value yet, so it falls back
            to lineTaxBaseSaved() which mirrors the framework's taxable-base formula:
-           tax-exclusive = QtyOrdered × PriceEntered × (1 − Discount);
+           tax-exclusive = QtyEntered × PriceEntered (Discount is already in the price);
            tax-inclusive = gross minus extracted tax. */
         function lineAmount(line) {
             // Tax-INCLUSIVE price list: the stored TaxableAmt is the entered (gross) line
@@ -373,6 +391,22 @@
             // Every screen since 23-Sep-2026 - quotations too: the calculation is shared,
             // and the stored TaxableAmt is never read for this column any more.
             return lineTaxBaseSaved(line);
+        }
+        /* Live Taxable Amount while a Price / Quantity cell is being typed in (08-Oct-2026).
+           The cell only commits on blur, so the row used to keep the old amount until the
+           user left the cell (and, to a reader, until Save). The typed figure is applied
+           to a scratch copy of the line, run through lineAmount() - the very formula the
+           committed row uses - and written into the row's amount span. Nothing is
+           committed, dirtied or sent to a callout until blur, exactly as before. */
+        function previewLineAmount(line, field, raw) {
+            var col = field === "price" ? "PriceEntered" : (field === "quantity" ? "QtyEntered" : null);
+            if (!col) return;
+            var v = line.values, keep = v[col], keepDirty = line.dirty, amt;
+            v[col] = parseNum(raw);
+            line.dirty = true;   // a typed value is never the stored one
+            try { amt = lineAmount(line); }
+            finally { v[col] = keep; line.dirty = keepDirty; }
+            $linesBody.find('[data-rowid="' + line.rowId + '"] .vas-po303-amt').text(amt ? fmtMoney(amt) : "");
         }
 
         /* ---------- lifecycle ---------- */
@@ -1383,6 +1417,7 @@
                 if (opts.maxLength > 0) $inp.attr("maxlength", opts.maxLength);   // AD_Column.FieldLength cap
                 if (opts.align === "right") $inp.css("text-align", "right");
                 if (opts.amount) bindAmountInput($inp);
+                if (field === "price") $inp.on("input", function () { previewLineAmount(line, field, $inp.val()); });
                 $inp.on("blur", function () { commitField(line, field, opts.amount ? parseNum($inp.val()) : $inp.val()); editing = null; render(); });
                 $inp.on("keydown", function (e) {
                     e.stopPropagation();
@@ -1399,7 +1434,14 @@
                 setTimeout(function () { $inp.focus(); if (opts.amount) $inp.select(); }, 0);
             } else {
                 var disp = opts.amount ? (value ? fmtMoney(value) : "") : (value || "");
-                wrap.append(dispInput(line, field, disp, { align: opts.align, placeholder: placeholder }));
+                // Price fixed by the blanket order: shown locked, with the reason on hover.
+                var priceLocked = field === "price" && blanketPriceFixed(line);
+                var $disp = dispInput(line, field, disp, { align: opts.align, placeholder: placeholder, readOnly: priceLocked });
+                if (priceLocked) {
+                    $disp.attr("title", lbl("VAS_107_BlanketPriceLocked", "Price is fixed by the blanket order"));
+                    cell.attr("title", $disp.attr("title"));   // a disabled input shows no tooltip of its own
+                }
+                wrap.append($disp);
             }
             return cell;
         }
@@ -1420,6 +1462,7 @@
                 var $q = $('<input type="text" class="vas-po303-cell-edit__input" inputmode="decimal" />').val(fmtAmtInput(v.QtyEntered, 2)).css("text-align", "right");
                 var qLen = colFieldLength("QtyEntered"); if (qLen > 0) $q.attr("maxlength", qLen);   // AD_Column.FieldLength cap
                 bindAmountInput($q);
+                $q.on("input", function () { previewLineAmount(line, "quantity", $q.val()); });
                 $q.on("blur", function () { commitField(line, "quantity", parseNum($q.val())); editing = null; render(); });
                 $q.on("keydown", function (e) {
                     e.stopPropagation();
@@ -2576,12 +2619,23 @@
             // the DB ReadOnlyLogic (e.g. @Processed@=Y) is guarded at the header level
             // by panelEditable() in startEdit, so we skip column-level locking here.
             if (col === "QtyEntered" || col === "QtyOrdered") return false;
+            // A saved product line of a release against a price-controlled blanket order
+            // (VAS_ControlType PRC / PAQ) keeps its price: MOrderLine.BeforeSave refuses the
+            // update with "PriceCantChange" otherwise (09-Oct-2026).
+            if (col === "PriceEntered" && blanketPriceFixed(line)) return true;
             var m = columnMeta[col];
             if (!m) return false;
             if (m.IsReadOnly) return true;
             return !!(m.ReadOnlyLogic && evalLogic(line, m.ReadOnlyLogic));
         }
         var FIELD_COL = { product: "M_Product_ID", charge: "C_Charge_ID", uom: "C_UOM_ID", tax: "C_Tax_ID", quantity: "QtyEntered", price: "PriceEntered", description: "Description" };
+        /* The server's IsBlanketPriceFixed (release document, blanket order PRC / PAQ),
+           for a SAVED PRODUCT line - the framework forces a new line's price from the
+           blanket itself and does not check charge lines. */
+        function blanketPriceFixed(line) {
+            return !!(parent && parent.IsBlanketPriceFixed) && !!(line && line.values)
+                && (+line.values.C_OrderLine_ID || 0) > 0 && (+line.values.M_Product_ID || 0) > 0;
+        }
         function fieldReadOnly(line, field) {
             var col = FIELD_COL[field];
             return col ? isColumnReadOnly(line, col) : false;

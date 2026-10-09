@@ -365,6 +365,12 @@
 ///                        read as "nothing shipped" wherever the ORDER's target
 ///                        type said 'N'. The panel's Shipped stage now treats a
 ///                        delivery as under confirmation when either type says so.
+///   VAI163   2026-10-08  DeliveryData.IsShipConfirm reads the delivery order's
+///                        SELECTED document type (M_InOut.C_DocType_ID) alone; the
+///                        target type no longer answers first. The panel's Shipped
+///                        stage now switches on this flag per delivery order (as
+///                        asked): Y -> when it reached In Progress, N -> when it
+///                        completed, drafted / none -> Pending.
 /// </summary>
 
 using System;
@@ -1701,13 +1707,12 @@ namespace VASLogic.Models
             try
             {
                 // Whether THIS delivery order asks for a shipment confirmation:
-                // IsShipConfirm on its own target document type, the completed type
-                // answering only where the target is unset — the same reading
-                // LoadShipConfirmTarget gives the order. Guarded on both columns, so
-                // an older dictionary reports "no confirmation" rather than failing
-                // the whole delivery list.
+                // IsShipConfirm on the document type SELECTED on it (M_InOut.
+                // C_DocType_ID) and nothing else (08-Oct-2026, as asked — it read
+                // C_DocTypeTarget_ID first until then). Guarded on the column, so an
+                // older dictionary reports "no confirmation" rather than failing the
+                // whole delivery list.
                 bool hasShipConfirm = ColumnExists("C_DocType", "IsShipConfirm");
-                bool hasTargetType  = ColumnExists("M_InOut", "C_DocTypeTarget_ID");
                 string shipConfirmExpr = "'N'";
                 string docTypeJoin = "", docTypeGroup = "";
                 if (hasShipConfirm)
@@ -1715,14 +1720,6 @@ namespace VASLogic.Models
                     docTypeJoin = "LEFT OUTER JOIN C_DocType dt ON (dt.C_DocType_ID = io.C_DocType_ID) ";
                     docTypeGroup = ", dt.IsShipConfirm";
                     shipConfirmExpr = "COALESCE(dt.IsShipConfirm, 'N')";
-                    if (hasTargetType)
-                    {
-                        docTypeJoin += "LEFT OUTER JOIN C_DocType dtt ON (dtt.C_DocType_ID = io.C_DocTypeTarget_ID) ";
-                        docTypeGroup += ", dtt.C_DocType_ID, dtt.IsShipConfirm";
-                        shipConfirmExpr = @"CASE WHEN dtt.C_DocType_ID IS NOT NULL
-                                                 THEN COALESCE(dtt.IsShipConfirm, 'N')
-                                                 ELSE COALESCE(dt.IsShipConfirm, 'N') END";
-                    }
                 }
 
                 string sql = @"SELECT
@@ -3493,11 +3490,10 @@ namespace VASLogic.Models
             /// In Progress, and to CompletedDate once it has completed; null
             /// while drafted.</summary>
             public DateTime? InProgressDate { get; set; }
-            /// <summary>IsShipConfirm on THIS delivery order's target document
-            /// type (falling back to its completed type) — whether it parks In
-            /// Progress awaiting a shipment confirmation. The platform decides
-            /// that off the shipment's own type, so the Shipped stage reads it
-            /// beside the order's <see cref="SalesOrderOverviewData.IsShipConfirmTarget"/>.</summary>
+            /// <summary>IsShipConfirm on the document type SELECTED on this
+            /// delivery order (M_InOut.C_DocType_ID) — whether it parks In
+            /// Progress awaiting a shipment confirmation. The Shipped stage
+            /// switches on it per delivery order (08-Oct-2026).</summary>
             public bool     IsShipConfirm { get; set; }
             public string   TrackingNo    { get; set; }
             public string   WarehouseName { get; set; }

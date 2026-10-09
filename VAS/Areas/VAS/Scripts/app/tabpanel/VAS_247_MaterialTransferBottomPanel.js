@@ -83,6 +83,10 @@
  *                        - Product stays selectable on a new line / Drafted movement
  *                          whatever the dictionary ReadOnlyLogic says, so a save refused
  *                          for insufficient stock no longer freezes the Product field.
+ *   VAI163   2026-10-08  White by default, as VAS_248: the root starts as
+ *                        vas-mtl-root--new and keeps it until a saved movement is loaded;
+ *                        the CSS keeps the panel's white height and paints the framework
+ *                        title strip white, so no blue on Add Record.
  ************************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -283,7 +287,8 @@
                 $(window).off("resize.vasmtl");
                 $root.remove();
             }
-            $root = $('<div class="vas-mtl-root"></div>');
+            // Starts as --new (as VAS_248) so the first paint, before any data, is white.
+            $root = $('<div class="vas-mtl-root vas-mtl-root--new"></div>');
             $body = $('<div class="vas-mtl-body"></div>');
             $emptyState = $('<div class="vas-mtl-empty" style="display:none;"></div>');
             $emptyState.text(lbl("VAS_247_NoMovement", "Select a record to add lines"));
@@ -431,6 +436,7 @@
                 // since 25-Sep-2026 it says nothing at all: no highlighted hint.
                 if ($body) $body.hide();
                 if ($emptyState) $emptyState.hide();
+                markNewRecordHost();
             } else {
                 if ($emptyState) $emptyState.text(lbl("VAS_247_NoMovement", "Select a record to add lines"));
                 // parent is already null here, so this reverts the heading to the neutral
@@ -439,6 +445,17 @@
                 render();
             }
         };
+
+        /* With a new, unsaved header the grid and the message are both hidden, so the root
+           collapses to nothing and the bottom panel shrinks to its tab strip: the window
+           canvas (.vis-ad-w-p-center, painted the theme's blue) then fills the place the
+           panel stands in (08-Oct-2026). This class gives the root its normal white height
+           (CSS) until the header has been saved and real data renders. */
+        function markNewRecordHost() {
+            // White by DEFAULT, as VAS_248: whenever no saved header is loaded - a New
+            // Record, or no record yet - not only while newRecordMode is flagged.
+            if ($root) $root.toggleClass("vas-mtl-root--new", !(parent && parent.M_Movement_ID));
+        }
 
         function fromServerRow(r) {
             // Start from the full column bag (every M_MovementLine column) so the line VO
@@ -663,6 +680,7 @@
         function render() {
             // The catalog dropdown must not outlive the primary cell that opened it.
             if (!(editing && editing.field === "product")) closeCatalog();
+            markNewRecordHost();
             if (!parent || !parent.M_Movement_ID) {
                 lastLockState = null; $body.hide();
                 // A new, unsaved header shows a plain white panel - no message (clear).

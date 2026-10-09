@@ -100,6 +100,13 @@
  *                          in-modal "View only" note instead of a toast.
  *                        - The body-mounted product list sits above its window's own
  *                          stacking context (catalogZIndex).
+ *   VAI163   2026-10-08  - White by default, as VAS_248: the root starts as
+ *                          vas-grn-root--new and keeps it until a saved receipt is
+ *                          loaded; the CSS keeps the panel's white height and paints the
+ *                          framework title strip white, so no blue on Add Record.
+ *                        - A picked / scanned product lands on the line in its default
+ *                          PURCHASE unit (vendor's purchasing unit, then the product's
+ *                          Default Purchase UOM, then base) - resolved by the model.
  ************************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -335,7 +342,8 @@
                 $(window).off("resize.vasgrn");
                 $root.remove();
             }
-            $root = $('<div class="vas-grn-root"></div>');
+            // Starts as --new (as VAS_248) so the first paint, before any data, is white.
+            $root = $('<div class="vas-grn-root vas-grn-root--new"></div>');
             $body = $('<div class="vas-grn-body"></div>');
             $emptyState = $('<div class="vas-grn-empty" style="display:none;"></div>');
             $emptyState.text(lbl("VAS_249_NoReceipt", "Select a record to add lines"));
@@ -497,7 +505,9 @@
            (30-Sep-2026, as VAS_248). This class lets the CSS paint that host white until the
            header has been saved and real data renders; a loaded receipt keeps the host as is. */
         function markNewRecordHost() {
-            if ($root) $root.toggleClass("vas-grn-root--new", !!newRecordMode && !(parent && parent.M_InOut_ID));
+            // White by DEFAULT (08-Oct-2026, as VAS_248): whenever no saved header is loaded -
+            // a New Record, or no record yet - not only while newRecordMode is flagged.
+            if ($root) $root.toggleClass("vas-grn-root--new", !(parent && parent.M_InOut_ID));
         }
 
         /* The hosting tab reports "inserting" for a New Record the framework never tells a

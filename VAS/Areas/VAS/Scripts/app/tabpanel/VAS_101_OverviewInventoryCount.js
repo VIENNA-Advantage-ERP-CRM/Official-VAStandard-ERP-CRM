@@ -156,6 +156,10 @@
  *                        VO) reads "Closed" / "Voided" under the Counted stage in
  *                        place of the date or "Pending"; a voided one is not drawn
  *                        as the active stage.
+ *   VAI163   2026-10-08  Lines table: the Value column shows the line's
+ *                        M_InventoryLine.CurrentCostPrice (model CurrentCostPrice)
+ *                        instead of counted qty x rate. The "Total counted value"
+ *                        footer and the snapshot cards are unchanged.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -1012,9 +1016,10 @@
             $tr.append($('<span class="vas_101-ta-r vas_101-var"></span>').addClass("vas_101-" + vTone)
                 .text(signedNumber(variance, prec)));
 
-            // Value
+            // Value - the line's own M_InventoryLine.CurrentCostPrice (08-Oct-2026).
+            // The totals footer and the snapshot cards stay counted qty x rate.
             $tr.append($('<span class="vas_101-ta-r"></span>').text(
-                formatAmount(+ln.LineValue || 0, cur, data.StdPrecision)));
+                formatAmount(+ln.CurrentCostPrice || 0, cur, data.StdPrecision)));
 
             // Status tag
             var tagKey = variance < 0 ? "VAS_101_Short" : (variance > 0 ? "VAS_101_Excess" : "VAS_101_Match");

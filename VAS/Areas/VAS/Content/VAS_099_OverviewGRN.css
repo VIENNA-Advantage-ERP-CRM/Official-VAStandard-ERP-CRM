@@ -407,8 +407,12 @@
     color: var(--grn-text);
     margin-top: 0.375em;
 }
-.vas_099-contactBit { display: inline-flex; align-items: center; gap: 0.4375em; }
-.vas_099-contactBit .vas_099-ic { color: var(--grn-action); }
+/* A bit never grows past the column: a long e-mail address wraps inside it
+   (breaking anywhere, since an address has no spaces) instead of running past
+   the divider into the receipt fields on the right. */
+.vas_099-contactBit { display: inline-flex; align-items: flex-start; gap: 0.4375em; min-width: 0; max-width: 100%; }
+.vas_099-contactBit > span { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
+.vas_099-contactBit .vas_099-ic { color: var(--grn-action); flex: none; margin-top: 0.15em; }
 
 /* ----------------------------------------------------------- */
 /*  Generated From (origin chip strip)                          */

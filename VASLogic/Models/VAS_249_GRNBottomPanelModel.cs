@@ -46,6 +46,15 @@
  *                  - The purchase order line (C_OrderLine_ID) is written even where
  *                    the dictionary marks the column not updateable, but only when
  *                    the user actually changed it in Additional Info.
+ *   VAI163         08-Oct-2026  Default unit of a picked / scanned product is its
+ *                  default PURCHASE unit, as MInOutModel: M_Product_PO.C_UOM_ID for the
+ *                  receipt's vendor, then M_Product.VAS_PurchaseUOM_ID, then the base
+ *                  C_UOM_ID. The server callout restates it on a product change, and
+ *                  converts the keyed quantity to MovementQty from that unit.
+ *   VAI163         09-Oct-2026  A vendor Purchasing row whose unit is just the
+ *                  product's base unit no longer wins over the Product master's
+ *                  Purchase UOM - such rows are created with the base unit by
+ *                  default, so they hid VAS_PurchaseUOM_ID on most products.
  ******************************************************/
 
 using System;
@@ -1339,10 +1348,41 @@ namespace VASLogic.Models
                 it.HasAttributeSet = Util.GetValueOfInt(r["AttributeSetId"]) > 0;
                 it.ProductType = Util.GetValueOfString(r["ProductType"]);
                 it.C_UOM_ID = Util.GetValueOfInt(r["UomId"]);
-                if (it.C_UOM_ID > 0 && uomNames.ContainsKey(it.C_UOM_ID)) it.UomName = uomNames[it.C_UOM_ID];
                 items.Add(it);
             }
+            // The unit a picked product lands on the line in is its default PURCHASE unit,
+            // not its base unit (08-Oct-2026) - resolved in its own statement, outside
+            // AddAccessSQL, which mis-parses a subquery on M_Product_PO (no key column).
+            ApplyDefaultPurchaseUoms(M_InOut_ID, items);
+            foreach (ReceiptCatalogItem it in items)
+                if (it.C_UOM_ID > 0 && uomNames.ContainsKey(it.C_UOM_ID)) it.UomName = uomNames[it.C_UOM_ID];
             return items;
+        }
+
+        /// <summary>
+        /// Replaces each product row's base unit with the unit DefaultUomExpr resolves for
+        /// it, in one statement for the whole page. Charge rows are left alone.
+        /// </summary>
+        /// <param name="M_InOut_ID">parent receipt (supplies the vendor)</param>
+        /// <param name="items">catalog rows, updated in place</param>
+        private void ApplyDefaultPurchaseUoms(int M_InOut_ID, List<ReceiptCatalogItem> items)
+        {
+            List<int> ids = new List<int>();
+            foreach (ReceiptCatalogItem it in items)
+                if (it.Kind == "P" && it.RecordId > 0 && !ids.Contains(it.RecordId)) ids.Add(it.RecordId);
+            if (ids.Count == 0) return;
+            DataSet ds = DB.ExecuteDataset(
+                "SELECT p.M_Product_ID, " + DefaultUomExpr(M_InOut_ID, "p") + " AS UomId FROM M_Product p"
+                + " WHERE p.M_Product_ID IN (" + string.Join(",", ids) + ")");
+            if (ds == null || ds.Tables.Count == 0) return;
+            Dictionary<int, int> map = new Dictionary<int, int>();
+            foreach (DataRow r in ds.Tables[0].Rows)
+                map[Util.GetValueOfInt(r["M_Product_ID"])] = Util.GetValueOfInt(r["UomId"]);
+            foreach (ReceiptCatalogItem it in items)
+            {
+                int uom;
+                if (it.Kind == "P" && map.TryGetValue(it.RecordId, out uom) && uom > 0) it.C_UOM_ID = uom;
+            }
         }
 
         /// <summary>
@@ -1406,6 +1446,9 @@ namespace VASLogic.Models
                 it.HasAttributeSet = Util.GetValueOfInt(r["AttributeSetId"]) > 0;
                 it.ProductType = Util.GetValueOfString(r["ProductType"]);
                 it.C_UOM_ID = Util.GetValueOfInt(r["UomId"]);
+                // Same default unit as a catalog pick (08-Oct-2026).
+                int purchaseUom = GetDefaultPurchaseUomId(M_InOut_ID, it.RecordId);
+                if (purchaseUom > 0) it.C_UOM_ID = purchaseUom;
                 return it;
             }
             if (!allowNonItem) return none;   // no charge lines on this tenant
@@ -1643,6 +1686,15 @@ namespace VASLogic.Models
             if (req.M_Product_ID <= 0 && req.C_Charge_ID <= 0) return res;
 
             int uom = req.C_UOM_ID;
+            // A product pick puts the product's DEFAULT PURCHASE unit on the line (08-Oct-2026),
+            // whatever unit the previous product left there - the rule the receipt window's own
+            // callout applies (MInOutModel): the vendor's purchasing unit, then the product's
+            // Default Purchase UOM, then its base unit.
+            if (column == "M_Product_ID" && req.M_Product_ID > 0)
+            {
+                int purchaseUom = GetDefaultPurchaseUomId(req.M_InOut_ID, req.M_Product_ID);
+                if (purchaseUom > 0) uom = purchaseUom;
+            }
             if (uom <= 0 && req.M_Product_ID > 0) uom = GetProductUomId(ctx, req.M_Product_ID);
             // A charge line has no product to take a unit from, and the framework does not
             // set one either; a line without a unit fails to save.
@@ -1751,6 +1803,63 @@ namespace VASLogic.Models
             int uom = Util.GetValueOfInt(val);
             _productUom[productId] = uom;
             return uom;
+        }
+
+        private int? _headerBPartner;
+
+        /// <summary>The receipt's vendor (M_InOut.C_BPartner_ID), read once per instance.</summary>
+        /// <param name="M_InOut_ID">parent receipt</param>
+        /// <returns>C_BPartner_ID, or 0</returns>
+        private int GetHeaderBPartnerId(int M_InOut_ID)
+        {
+            if (_headerBPartner.HasValue) return _headerBPartner.Value;
+            int bp = M_InOut_ID > 0
+                ? Util.GetValueOfInt(DB.ExecuteScalar(
+                    "SELECT io.C_BPartner_ID FROM M_InOut io WHERE io.M_InOut_ID = @M_InOut_ID",
+                    new SqlParameter[] { new SqlParameter("@M_InOut_ID", M_InOut_ID) }, null))
+                : 0;
+            _headerBPartner = bp;
+            return bp;
+        }
+
+        /// <summary>
+        /// SQL expression for the unit a NEW line takes when this product is picked
+        /// (08-Oct-2026): the vendor's purchasing unit (M_Product_PO.C_UOM_ID for the
+        /// receipt's partner), then the product's Default Purchase UOM
+        /// (M_Product.VAS_PurchaseUOM_ID), then its base unit - the order MInOutModel
+        /// applies for the receipt window. It used to be the base unit alone, so a product
+        /// bought by the box always arrived on the line in its stocking unit. The partner id
+        /// is inlined as an integer, never bound (Oracle binds positionally).
+        /// A vendor unit equal to the base unit is skipped (09-Oct-2026): a Purchasing row
+        /// takes the base unit by default, and would otherwise hide the Purchase UOM.
+        /// </summary>
+        /// <param name="M_InOut_ID">parent receipt (supplies the vendor)</param>
+        /// <param name="p">M_Product alias</param>
+        /// <returns>SQL expression yielding a C_UOM_ID (0 when none)</returns>
+        private string DefaultUomExpr(int M_InOut_ID, string p)
+        {
+            int bp = GetHeaderBPartnerId(M_InOut_ID);
+            string vendorUom = bp > 0
+                ? "(SELECT MAX(NULLIF(po.C_UOM_ID, 0)) FROM M_Product_PO po WHERE po.M_Product_ID = " + p
+                    + ".M_Product_ID AND po.C_BPartner_ID = " + bp + " AND po.IsActive = 'Y'"
+                    + " AND po.C_UOM_ID <> " + p + ".C_UOM_ID), "
+                : "";
+            return "COALESCE(" + vendorUom + "NULLIF(" + p + ".VAS_PurchaseUOM_ID, 0), " + p + ".C_UOM_ID, 0)";
+        }
+
+        /// <summary>
+        /// The unit DefaultUomExpr resolves, for one product (the server callout on a
+        /// product change).
+        /// </summary>
+        /// <param name="M_InOut_ID">parent receipt</param>
+        /// <param name="M_Product_ID">picked product</param>
+        /// <returns>C_UOM_ID, or 0</returns>
+        private int GetDefaultPurchaseUomId(int M_InOut_ID, int M_Product_ID)
+        {
+            if (M_Product_ID <= 0) return 0;
+            return Util.GetValueOfInt(DB.ExecuteScalar(
+                "SELECT " + DefaultUomExpr(M_InOut_ID, "p") + " FROM M_Product p WHERE p.M_Product_ID = @M_Product_ID",
+                new SqlParameter[] { new SqlParameter("@M_Product_ID", M_Product_ID) }, null));
         }
 
         #endregion
