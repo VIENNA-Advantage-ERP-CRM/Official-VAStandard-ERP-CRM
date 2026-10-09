@@ -1,0 +1,1017 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_256_UnBudgetedActualWidget.css
+ * Unbudgeted Actuals (Budgeting dashboard, 6x2 paginated exception list).
+ *
+ * TWO SOURCES, EACH FOR WHAT IT OWNS.
+ *   design.md -> dashboard-widgets.md owns the SHELL and the ROWS: the glass card,
+ *   the icon well, the title / subtitle clamps, the header pill and chip tiers,
+ *   §Grid Data Rows (transparent header, #C5D2DD head divider, #E2EAF1 row divider,
+ *   last:border-b-0, hover rgba(234,248,255,.6)), the §Widget Footer Pager,
+ *   §No Inner Scrollbars and the widget-root em anchor. That is what makes this card
+ *   sit correctly beside its Budgeting siblings.
+ *   design.md -> windows-and-panels.md > Panel Foundation owns the DRILL-DOWN
+ *   DIALOG: a container-query root, chrome at the document baseline, the canonical
+ *   body anchor, the control reset, and borders / radii / dividers left in px.
+ *   The widget specification owns the FOUR COLUMNS and the amount tone.
+ *
+ * All internal sizing is em-driven off the widget root anchor; borders, radii and
+ * shadows stay in px ("Not Scaled With em"). No native tag selector is styled -
+ * every rule is scoped to a vas-256- class.
+ *
+ * THE ROW GRID is one constant shared by the header row and every body row, so a
+ * column label always sits over its column:
+ *
+ *   1.9fr                    1.2fr                1fr      1fr
+ *   Account                  Organization Unit    Amount   Last posted
+ *
+ * Account takes the most width - "5210 — Freight outward" is the longest text on the
+ * card and the only column with no natural size. Amount and Last posted are
+ * right-aligned: a figure column and a date column are both read against their own
+ * edge, and Amount is the one column a reader scans vertically.
+ *
+ * A MISSING VALUE IS A DASH (.vas-256-nil), on the card and in the dialog alike, never
+ * a blank cell and never an invented word. It trails its track by default, and takes
+ * the START of the track in Organization Unit - the one column wide enough and empty
+ * often enough that a trailing dash reads as belonging to the figures beside it rather
+ * than to the organization. Either way it has to outrank the column alignment rules,
+ * which is why it is declared LAST in this file.
+ *
+ * THE AMOUNT IS ALWAYS THE DANGER TONE. There is no chip and no threshold: every row
+ * on this card is, by definition, money the budget did not anticipate, so the colour
+ * says so without a second element repeating it. The printed minus sign carries the
+ * direction for a credit-heavy account, so the reading never rests on colour alone.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas-256-root {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    box-sizing: border-box;
+    /* Named query container so the row grid and the base font can both step with the
+       CELL, not the viewport. Also the positioning context for the busy overlay. */
+    container: vas-256 / inline-size;
+}
+
+    .vas-256-root,
+    .vas-256-root * {
+        box-sizing: border-box;
+    }
+
+/* Widget root anchor: clamp(16px, 1.2cqi, 20px) expressed against the widget's own
+   measured width when available, falling back to the shared --dash-inline-size
+   contract and finally to the viewport. Everything inside is em against this.
+
+   Width only - the page size is MEASURED from the list height (see syncCapacity in
+   the JS), so a short cell shows fewer rows rather than smaller type. */
+.vas-256-card {
+    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 100vw)) * .012), 20px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: .85em;
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    backdrop-filter: blur(10px);
+    /* §No Inner Scrollbars - a page always fits, so nothing here ever scrolls. */
+    overflow: hidden;
+    font-variant-numeric: tabular-nums;
+}
+
+/* The form-control reset. Without it every em inside a button resolves against the
+   user-agent default (~13.33px), not the widget anchor - and on this card EVERY row
+   is a button, so the whole list would silently drop a type tier. */
+.vas-256-card button {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    color: inherit;
+}
+
+/* ---- Header: icon well + title/subtitle + financial year filter ---- */
+/* Header -> body gap is 0.75em per the design contract. */
+.vas-256-header {
+    display: flex;
+    align-items: flex-start;
+    gap: .625em;
+    min-width: 0;
+    flex: 0 0 auto;
+    margin-bottom: .75em;
+}
+
+/* Icon well: 1.75em on the card's em lever - the sibling widgets' well, so the icons
+   read identically side by side. Flat #EAF8FF tile, 9px radius, no inset ring. */
+.vas-256-icon {
+    width: 1.75em;
+    height: 1.75em;
+    flex: 0 0 auto;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #EAF8FF;
+    color: #0083DA;
+}
+
+    .vas-256-icon svg {
+        width: .95em;
+        height: .95em;
+        display: block;
+    }
+
+.vas-256-head-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+/* §Widget Header title verbatim: the --dash-inline-size clamp, Medium (500),
+   line-height 1.2, #102C3F - the sibling cards' title, so the headings match on a
+   shared row. */
+.vas-256-title {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .011375), 17px);
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Subtitle: the §Widget Header pattern verbatim - Roboto Regular, #717182,
+   line-height 1.3, FIXED 2px top margin. It carries the card's headline figure AND the
+   scope the title cannot state - "$412K posted to expense accounts with no budget line"
+   - instead of a stat block, which is what keeps this card to the two stacking elements
+   that fit an Nx2 cell. One line, ellipsed: the sentence is written short enough to
+   survive the 6-column cell intact, and anything longer must be reworded rather than
+   allowed to wrap. */
+.vas-256-subtitle {
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .009625), 13px);
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.3;
+    margin-top: 2px;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-256-subtitle:empty {
+    display: none;
+}
+
+/* Financial year filter - the interactive pill tier of the two-tier chip system (never
+   a third tier). Absolute clamp rather than an em, like the title: the card base drops
+   in a narrow cell and an em control would follow it down and stop being readable.
+
+   WIDER THAN THE SIBLING PILLS, deliberately. Its label is the shortest on the
+   dashboard ("FY 2026", sometimes just "2026"), so the default padding left it reading
+   as a cramped tag rather than as the control it is. The extra inline padding and the
+   min-width give it presence without letting it crowd the title; the min-width is only
+   a floor, so a tenant whose C_Year.FiscalYear is spelled out at length still ellipses
+   against max-width rather than pushing the header around. */
+.vas-256-year {
+    flex: 0 0 auto;
+    align-self: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-evenly;
+    gap: .35em;
+    min-width: 6.5em;
+    max-width: 42%;
+    font-family: inherit;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * .008125), 13px);
+    font-weight: 500;
+    line-height: 1.15;
+    color: #41576A;
+    background: rgba(255, 255, 255, .66);
+    border: 1px solid #D9E2EB;
+    border-radius: 999px;
+    /* Flatter than it is wide, deliberately. The block padding and the line-height are
+       the only two levers on a pill's height - the radius is 999px, so it stays a
+       capsule whatever the height - and both are pulled in here so the control reads as
+       a slim filter chip beside a two-line header rather than as a button competing
+       with the title. Inline padding is untouched: the width is doing its own job. */
+    padding: .15em 1em;
+    box-shadow: 0 4px 10px rgba(16, 47, 74, .05);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+    .vas-256-year:hover {
+        background: #FFFFFF;
+        border-color: #BFE4FF;
+    }
+
+    .vas-256-year:focus-visible {
+        outline: 2px solid #BFE4FF;
+        outline-offset: 1px;
+    }
+
+    .vas-256-year svg {
+        flex: 0 0 auto;
+        color: #0083DA;
+    }
+
+/* min-width:0 is what actually makes the ellipsis work. A flex item defaults to
+   min-width:auto and refuses to shrink below its content, so without this the label
+   would push past the pill's max-width and squeeze the chevron instead of clipping
+   itself - which is exactly what a long C_Year.FiscalYear would do. */
+.vas-256-year-label {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---- Body ---- */
+.vas-256-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* THE shared row grid - header and body rows both. */
+.vas-256-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.9fr) minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr);
+    gap: .625em;
+    align-items: center;
+}
+
+/* §Grid Data Rows header: 0.6875em Medium, TRANSPARENT background (never a tinted
+   band - it reads inconsistently against different glass gradients), #41576A, with a
+   #C5D2DD divider under it.
+
+   THE TYPE SCALE GOES ON THE CELLS, NOT ON THE ROW - and that is load-bearing, not
+   style. .vas-256-row sizes nothing in em here, but the CELLS do, and a font-size on
+   the row would also cascade into the grid's own gap. Keeping the row at 1em keeps its
+   tracks identical to the body's, which is what puts each label over its column. */
+.vas-256-ghead {
+    flex: 0 0 auto;
+    background: transparent;
+    padding: 0 .125em .5em .125em;
+    border-bottom: 1px solid #C5D2DD;
+}
+
+    .vas-256-ghead > span {
+        font-size: .6875em;
+        font-weight: 500;
+        color: #41576A;
+        line-height: 1.25;
+        text-transform: capitalize;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+/* The list holds exactly ONE page and never scrolls - the page size is measured from
+   this element's height (see syncCapacity in the JS), so overflow:hidden here is what
+   makes the measurement meaningful rather than a fallback. */
+.vas-256-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* §Grid Data Rows body row: 0.625em vertical padding, 1px #E2EAF1 divider, none on the
+   last, hover rgba(234,248,255,.6). Every row is a real <button>, so the button chrome
+   is stripped back to nothing but the divider - a row must read as a row, and the hover
+   lift is what says it is activatable.
+
+   NO FONT-SIZE HERE, and that is the whole reason the columns line up. The row shares
+   .vas-256-row's `gap: .625em` with the header, and an em resolves against the element's
+   OWN font-size - so a font-size on this row computed a SMALLER gap than the header's,
+   every track came out a different width, and each caption drifted off its column. The
+   scale belongs on the cells below, exactly as it does in the header. The horizontal
+   padding must stay identical to the header's for the same reason. */
+.vas-256-brow {
+    width: 100%;
+    padding: .625em .125em;
+    border: 0;
+    border-bottom: 1px solid #E2EAF1;
+    border-radius: 0;
+    background: transparent;
+    color: #102C3F;
+    text-align: left;
+    cursor: pointer;
+}
+
+    .vas-256-brow:last-child {
+        border-bottom: 0;
+    }
+
+    .vas-256-brow:hover {
+        background: rgba(234, 248, 255, .6);
+    }
+
+    /* A POINTER CLICK LEAVES NO RING. The row keeps DOM focus after a mouse click - it
+       is a button - and the user-agent's own outline would sit on it long after the
+       dialog it opened has been dismissed, reading as "this row is still selected".
+       Suppressing plain :focus and styling only :focus-visible is what separates the two:
+       the ring appears for keyboard navigation and never for a click. The order matters -
+       both selectors have the same specificity, so :focus-visible must come second to
+       win. The JS half of this is in the row click handler, which only restores focus to
+       the row when the dialog was opened from the keyboard. */
+    .vas-256-brow:focus {
+        outline: none;
+    }
+
+    .vas-256-brow:focus-visible {
+        outline: 2px solid #BFE4FF;
+        outline-offset: -2px;
+    }
+
+/* §Body cell: 0.75em. The scale lives here, on the cells, never on the row - see the
+   note above .vas-256-brow. */
+.vas-256-brow > span {
+    font-size: .75em;
+    line-height: 1.4;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The account is the row's identity, so it carries the row's weight and is the widest
+   thing on the line. */
+.vas-256-account {
+    font-weight: 400;
+    color: #102C3F;
+}
+
+.vas-256-dim {
+    font-weight: 400;
+    color: #5F7283;
+}
+
+.vas-256-num {
+    text-align: right;
+}
+
+/* Money the budget did not anticipate - the danger tone says so without a chip. */
+.vas-256-amt {
+    font-weight: 400;
+    color: #A33F3F;
+}
+
+.vas-256-posted {
+    font-weight: 400;
+    color: #5F7283;
+}
+
+/* Nothing unbudgeted is GOOD news, not an error - it is said inside the list and the
+   header keeps its title, subtitle and column labels. Only a load failure or a missing
+   configuration takes the whole card over (.vas-256-state below). */
+.vas-256-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 0 1em;
+    font-size: .8125em;
+    color: #5F7283;
+    text-align: center;
+}
+
+/* ---- Footer pager (design.md §Widget Footer Pager) ----
+   Reserve the pager's height even on a single page so the list's measured height is
+   constant whether or not the pager is shown - otherwise the adaptive row-fit would
+   re-clip every time the pager appeared. The pager itself still hides on one page. */
+.vas-256-pagerwrap {
+    flex-shrink: 0;
+    min-height: 2.5em;
+}
+
+/* Body -> footer gap 0.625em, border-top 1px #D9E2EB, padding-top 0.5em - the design
+   contract's footer, and the middle tone of the three dividers (header #C5D2DD >
+   footer #D9E2EB > rows #E2EAF1). */
+.vas-256-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75em;
+    margin-top: .625em;
+    padding-top: .5em;
+    border-top: 1px solid #D9E2EB;
+}
+
+.vas-256-pager-info {
+    font-size: .6875em;
+    color: #748494;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.vas-256-pager-nav {
+    display: flex;
+    align-items: center;
+    gap: .35em;
+    flex-shrink: 0;
+}
+
+.vas-256-pager-label {
+    font-size: .75em;
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.vas-256-pgbtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5em;
+    height: 1.5em;
+    padding: 0;
+    border: 1px solid #D9E2EB;
+    border-radius: 6px;
+    background: #FFFFFF;
+    color: #0083DA;
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+}
+
+    .vas-256-pgbtn:hover:not(:disabled) {
+        background: #EAF4FC;
+        border-color: #C6D6E4;
+    }
+
+    /* A disabled control is visibly inert as well as programmatically disabled - it
+       keeps its box and reports its state, it is never hidden. */
+    .vas-256-pgbtn:disabled {
+        color: #B8C6D2;
+        border-color: #E2EAF1;
+        cursor: default;
+    }
+
+    .vas-256-pgbtn:focus-visible {
+        outline: 2px solid #BFE4FF;
+        outline-offset: 2px;
+    }
+
+/* ---- State takeover: a load failure or a missing configuration ---- */
+.vas-256-state {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 1em;
+    font-size: .8125em;
+    font-weight: 400;
+    color: #5F7283;
+    line-height: 1.35;
+    text-align: center;
+}
+
+.vas-256-hidden {
+    display: none !important;
+}
+
+/* ---- Financial year picker (body-mounted, so NOT scoped under .vas-256-root) ----
+   Fixed-position panel anchored to the pill by script. rem-based, not em: it lives on
+   <body> and has no widget root anchor to scale against. Identical in shape to the
+   sibling cards' popovers. */
+.vas-256-pp {
+    position: fixed;
+    /* Same narrow band the sibling popovers use: above the glass cards, below every
+       framework layer (jQuery UI .ui-front = 100, dialogs 101+). */
+    z-index: 95;
+    box-sizing: border-box;
+    min-width: 200px;
+    max-width: calc(100vw - 16px);
+    max-height: 60vh;
+    overflow: auto;
+    padding: 6px;
+    background: #FFFFFF;
+    border: 1px solid #E4EDF4;
+    border-radius: 12px;
+    box-shadow: 0 16px 40px rgba(8, 24, 38, .22);
+    color: #102C3F;
+}
+
+    .vas-256-pp * {
+        box-sizing: border-box;
+    }
+
+.vas-256-pp-h {
+    font-size: .6875rem;
+    font-weight: 700;
+    color: #748494;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    padding: 8px 10px 4px;
+}
+
+.vas-256-pp-empty {
+    padding: 8px 10px 10px;
+    font-size: .8125rem;
+    color: #748494;
+}
+
+.vas-256-pp-opt {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: .875rem;
+    color: #102C3F;
+    padding: 9px 10px;
+    border-radius: 8px;
+    text-align: left;
+}
+
+    .vas-256-pp-opt:hover {
+        background: #EAF8FF;
+    }
+
+    .vas-256-pp-opt[aria-selected="true"] {
+        background: #EAF8FF;
+        font-weight: 700;
+        color: #0083DA;
+    }
+
+    .vas-256-pp-opt:focus-visible {
+        outline: 2px solid #BFE4FF;
+        outline-offset: -2px;
+    }
+
+.vas-256-pp-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-256-pp-tick {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    width: 16px;
+    height: 16px;
+    color: #0083DA;
+    opacity: 0;
+}
+
+.vas-256-pp-opt[aria-selected="true"] .vas-256-pp-tick {
+    opacity: 1;
+}
+
+/* ==========================================================
+   Drill-down dialog — the Actual postings behind one row
+   windows-and-panels.md > Panel Foundation: a real dialog with a modal scrim, chrome
+   at the document baseline, and Escape / scrim / close-button dismissal. Server-side
+   paged, and its body height is pinned to one page so the panel never resizes between
+   pages, rows or states.
+   ========================================================== */
+.vas-256-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 96;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(8, 24, 38, .45);
+}
+
+.vas-256-modal {
+    position: relative;
+    /* Panel Foundation rule 1 - the panel is a container-query root. */
+    container-type: inline-size;
+    display: flex;
+    flex-direction: column;
+    width: min(980px, 100%);
+    max-height: 82vh;
+    overflow: hidden;
+    background: #FFFFFF;
+    border-radius: 16px;
+    box-shadow: 0 24px 60px rgba(8, 24, 38, .3);
+    color: #102C3F;
+}
+
+/* Busy layer over the whole panel - shown from the moment the dialog opens and on
+   every page turn, so the user never faces an empty box. */
+.vas-256-modal-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, .6);
+    border-radius: 16px;
+    z-index: 1;
+}
+
+.vas-256-modal-head {
+    flex: 0 0 auto;
+    min-height: 56px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 20px;
+    border-bottom: 1px solid #E4EDF4;
+}
+
+/* The card's header glyph carried into the dialog. Fixed px rather than the card's
+   --dash-inline-size clamp: the dialog is a document-baseline surface. */
+.vas-256-modal-ico {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(232, 244, 255, 0.96));
+    box-shadow: inset 0 0 0 1px rgba(0, 131, 218, 0.10);
+    color: #0083DA;
+}
+
+.vas-256-modal-ico svg {
+    width: 18px;
+    height: 18px;
+}
+
+.vas-256-modal-heads {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+/* A dialog title is Bold - unlike the card title, which is Medium. */
+.vas-256-modal-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-256-modal-sub {
+    font-size: .8125rem;
+    font-weight: 400;
+    color: #5F7283;
+    margin-top: 1px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-256-modal-close {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    color: #141414;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+}
+
+.vas-256-modal-close:hover {
+    background: #F0F4F8;
+}
+
+.vas-256-modal-close svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* The body is pinned to one page's worth of rows by an inline height the widget sets
+   from the page size. min-height:0 stays so the flex item can still shrink under the
+   dialog's 82vh cap on a short viewport. scrollbar-gutter reserves the scrollbar's
+   width whether or not it is showing - without it a page that scrolls and a page that
+   does not would render the columns at two different widths.
+
+   NO padding-top, deliberately. A sticky header pins to the top of its scroll
+   container's PADDING box, not its content box - any padding-top here would leave a
+   band above the pinned header through which scrolled rows stay visible, so the list
+   appears to run over its own column captions. */
+.vas-256-modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-gutter: stable;
+    padding: 0 20px 16px;
+    /* Panel Foundation rules 1 and 3: the body is a container-query root and carries the
+       CANONICAL PANEL ANCHOR. Everything inside is em against this, which is what makes
+       the dialog's type scale (header 0.6875em, cells 0.75em) mean the same thing as the
+       card's. Sizing the grid in rem instead - against the root's 16px, with no anchor at
+       all - is what made the dialog's column captions render a tier larger than the
+       spec's. */
+    container-type: inline-size;
+    --panel-anchor: clamp(16px, 1vw, 18px);
+    font-size: var(--panel-anchor);
+}
+
+/* Panel Foundation control reset - every em inside a control resolves against the
+   panel, not the user-agent default. */
+.vas-256-modal-body button,
+.vas-256-modal-body input,
+.vas-256-modal-body select,
+.vas-256-modal-body textarea {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    color: inherit;
+}
+
+.vas-256-modal-state {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: .8125em;
+    color: #748494;
+}
+
+.vas-256-modal-state-error {
+    color: #D14545;
+}
+
+/* ---- Detail grid: ONE shared column template ----
+   Seven columns: date · screen · description · business partner · debit · credit · net
+   amount. The description takes the most slack and the partner the next most - they are
+   the two free-text columns and the only ones without a natural width, while the date,
+   the two sides and the net are all fixed-shape content. */
+/* Neither row carries a font-size - the same rule as the card's grid, and for the same
+   reason: they share this `gap`, an em resolves against the element's own font-size, and
+   a size on one row would compute a different gap and shift every track out from under
+   its caption. The scale is on .vas-256-dcell below. */
+.vas-256-dhead,
+.vas-256-drow {
+    display: grid;
+    grid-template-columns:
+        minmax(0, .9fr) minmax(0, 1.2fr) minmax(0, 1.7fr) minmax(0, 1.3fr)
+        minmax(0, .95fr) minmax(0, .95fr) minmax(0, 1fr);
+    gap: .75em;
+    align-items: center;
+}
+
+/* Header separator is darker than the body row separator. The opaque background and
+   the z-index are what a row passes UNDER as it scrolls - both are load-bearing, not
+   decoration. */
+.vas-256-dhead {
+    position: sticky;
+    top: 0;
+    background: #FFFFFF;
+    padding: .6875em 0 .625em;
+    border-bottom: 1px solid #C5D2DD;
+    z-index: 2;
+}
+
+/* §Grid header row: 0.6875em Medium, #41576A, capitalize - the same tier the card's own
+   column captions use, so the dialog reads as the card opened up rather than as a
+   different screen. */
+.vas-256-dhead .vas-256-dcell {
+    font-size: .6875em;
+    font-weight: 500;
+    color: #41576A;
+    text-transform: capitalize;
+    line-height: 1.3;
+}
+
+.vas-256-drow {
+    padding: .75em 0;
+    border-bottom: 1px solid #E2EAF1;
+}
+
+.vas-256-drow:last-child {
+    border-bottom: 0;
+}
+
+/* §Body cell: 0.75em, secondary 400 #5F7283. Every cell truncates and carries its raw
+   value in `title` - clipping is acceptable, loss of information is not. */
+.vas-256-dcell {
+    font-size: .75em;
+    line-height: 1.4;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #5F7283;
+}
+
+.vas-256-dcell-b {
+    font-weight: 700;
+    color: #102C3F;
+}
+
+/* Numeric columns right-aligned so values line up across rows - header included,
+   otherwise the caption floats away from its own column. */
+.vas-256-dcell-num {
+    text-align: right;
+}
+
+/* The net amount is the row's conclusion and carries the card's danger tone, the same
+   reading the widget row gave it. */
+.vas-256-drow .vas-256-dcell-amt {
+    font-weight: 700;
+    color: #A33F3F;
+}
+
+/* Source screen = the zoom affordance. Styled as a link, built as a button: it opens a
+   window rather than following a URL. Only rendered as a link when the server
+   confirmed the row really is navigable. */
+.vas-256-dcell-doc {
+    display: block;
+}
+
+.vas-256-doclink {
+    max-width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: 700;
+    line-height: inherit;
+    color: #106AB0;
+    text-align: left;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-256-doclink:hover {
+    text-decoration: underline;
+    color: #0083DA;
+}
+
+.vas-256-doclink:focus-visible {
+    outline: 2px solid #BFE4FF;
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+/* ---- Modal footer: the canonical widget pager, in the dialog ----
+   Always present, even on the empty and error states (with both arrows disabled) - a
+   footer that came and went would change the dialog's height. */
+.vas-256-modal-foot {
+    flex: 0 0 auto;
+    min-height: 49px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 20px;
+    border-top: 1px solid #D9E2EB;
+}
+
+/* The dialog is a document-baseline surface, so its pager sizes in rem rather than
+   against the card's em anchor. */
+.vas-256-modal-foot .vas-256-pager-info {
+    font-size: .8125rem;
+    line-height: 1.3;
+}
+
+.vas-256-modal-foot .vas-256-pager-label {
+    font-size: .8125rem;
+    min-width: 3.5em;
+    text-align: center;
+}
+
+.vas-256-modal-foot .vas-256-pgbtn {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+}
+
+.vas-256-modal-foot .vas-256-pgbtn svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* ==========================================================
+   RTL
+   Only the things that are genuinely directional are flipped. The numeric columns are
+   NOT: a figure column is read against its own edge in both directions, and
+   text-align:right on a numeric cell in an RTL row would put it on the wrong side of
+   the grid track. `text-align: end` resolves per direction and does both at once.
+   ========================================================== */
+.vas-256-num,
+.vas-256-dcell-num {
+    text-align: end;
+}
+
+[dir="rtl"] .vas-256-brow,
+[dir="rtl"] .vas-256-pp-opt,
+[dir="rtl"] .vas-256-doclink {
+    text-align: right;
+}
+
+/* ==========================================================
+   Narrow cells
+   Columns fold away widest-first, and Account and Amount always survive: between them
+   they say what the finding is and what it is worth. Last posted goes first - it is on
+   the row tooltip and is the least decisive of the four - then Organization Unit. No
+   horizontal scrollbar is ever introduced to preserve the desktop columns.
+
+   The nth-child indices track the header's own four spans, in the order Account(1),
+   Organization Unit(2), Amount(3), Last posted(4).
+   ========================================================== */
+@container vas-256 (max-width: 460px) {
+    .vas-256-row {
+        grid-template-columns: minmax(0, 1.9fr) minmax(0, 1.2fr) minmax(0, 1fr);
+        gap: .5em;
+    }
+
+    /* 4 = Last posted */
+    .vas-256-ghead > span:nth-child(4),
+    .vas-256-brow > .vas-256-posted {
+        display: none;
+    }
+}
+
+@container vas-256 (max-width: 320px) {
+    .vas-256-row {
+        grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr);
+    }
+
+    /* 2 = Organization Unit */
+    .vas-256-ghead > span:nth-child(2),
+    .vas-256-brow > .vas-256-dim {
+        display: none;
+    }
+}
+
+/* ---- Narrow cells: step the card base font down so the em scale follows ----
+ *
+ * The sibling widgets' breakpoints and values. The overrides are ABSOLUTE px, never a
+ * relative `em` - an em override here would resolve against the inherited page font
+ * rather than the clamp and collapse the anchor unpredictably. */
+@container vas-256 (max-width: 300px) {
+    .vas-256-card {
+        font-size: 13px;
+    }
+}
+
+@container vas-256 (max-width: 220px) {
+    .vas-256-card {
+        font-size: 11px;
+    }
+}
+
+/* ==========================================================
+   Missing value — DECLARED LAST, and that is load-bearing
+   The dash sits CENTRED in whatever cell it stands in, on the card and in the dialog
+   alike. Centring is the point: a dash pushed to the left of a text column or to the
+   right of a figure column reads as a very short value, while one in the middle of its
+   track reads as an absence. That means it has to beat `.vas-256-num` /
+   `.vas-256-dcell-num` (text-align:end) and the plain left alignment of the text
+   columns - all single-class selectors of equal specificity - so it wins on source
+   order and must stay at the bottom of this file. No !important is needed or wanted.
+
+   The muted tone is one step lighter than a real value's: present enough to be read as
+   deliberate, quiet enough that a column of dashes never competes with the figures
+   beside it. Weight is normal even in the columns that are Bold, because the dash is
+   not the row's identity or its conclusion - it is the absence of one.
+   ========================================================== */
+/* THE DASH FOLLOWS ITS OWN COLUMN'S ALIGNMENT. A text column reads from the start of
+   its track, so its dash sits there too - where a real value would have begun, directly
+   under its own header caption. A figure column reads against its trailing edge, so its
+   dash trails with the figures it stands among. Aligning every dash the same way is what
+   made the Organization Unit and Business partner dashes float away from their captions
+   and crowd the numbers beside them.
+
+   `start` / `end`, never `left` / `right`, so the whole scheme flips under [dir="rtl"]
+   with the rest of the row. */
+.vas-256-nil {
+    text-align: start;
+    color: #9AA7B4;
+    font-weight: 400;
+}
+
+/* The numeric columns, on the card and in the dialog alike. Two classes, so they outrank
+   the single-class rule above whatever the source order. */
+.vas-256-nil.vas-256-num,
+.vas-256-nil.vas-256-dcell-num {
+    text-align: end;
+}

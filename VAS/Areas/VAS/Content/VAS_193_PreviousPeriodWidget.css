@@ -1,0 +1,205 @@
+/* VAS_193_PreviousPeriodWidget.css
+   Previous Period KPI tile (Period Control dashboard, 2x1).
+   Design source: design.md -> dashboard-widgets.md "KPI And Summary Widget".
+   Same tile as VAS_192_CurrentPeriodWidget under its own vas-193-* namespace, so
+   the two Period Control tiles stay visually identical without either one
+   depending on the other's stylesheet.
+   All internal sizing is em-driven off the widget root anchor; borders, radii and
+   shadows stay in px because they are physical edges (see "Not Scaled With em"). */
+
+.vas-193-root {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    box-sizing: border-box;
+    /* Named query container (mirrors VAS_018's .vas-opwdg-root) so a narrow or
+       zoomed-in cell can step the card base font below its 16px clamp floor. */
+    container: vas-193 / inline-size;
+}
+
+/* Widget root anchor: clamp(16px, 1.2cqi, 20px) expressed against the widget's own
+   measured width when available, falling back to the shared --dash-inline-size
+   contract and finally to the viewport. Matches the VAS_180 / VAS_168 KPI family.
+   Stack layout mirrors VAS_018: header / value row / meta distributed by
+   space-between with a .5em stack gap, so the content centres on zoom-out instead
+   of hugging the top. */
+.vas-193-card {
+    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 100vw)) * .012), 20px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: .5em;
+    text-align: left;
+    padding: .875em;
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    backdrop-filter: blur(10px);
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+/* Overlapping-period configuration: keep the glass surface, flag it on the edge
+   only (semantic meaning comes from border/text, never a tinted card). */
+.vas-193-card.vas-193-warn-overlap {
+    border-color: #F0DEB4;
+}
+
+/* ---- Header: "Previous Period" is the widget header row (mirrors VAS_018's
+   .vas-opwdg-header stack; no icon well, this tile carries no semantic tint). ---- */
+.vas-193-header {
+    display: flex;
+    align-items: center;
+    gap: .625em;
+    min-width: 0;
+}
+
+/* The stat label IS the widget title - shared header clamp off --dash-inline-size
+   so it never depends on a container-query ancestor. Sits in the header stack, so
+   no bottom margin here. */
+.vas-193-label {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .011375), 17px);
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+    margin-bottom: 0;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Value + status badge share one row; the badge wraps below the period name only
+   when the cell is too narrow to hold both. Sits in the space-between stack, so the
+   bottom margin (plus the card's .5em gap) is the breathing room before the meta
+   line - same treatment as VAS_018's value. */
+.vas-193-valrow {
+    display: flex;
+    align-items: center;
+    gap: .5em;
+    flex-wrap: wrap;
+    margin-bottom: .5em;
+    min-width: 0;
+}
+
+.vas-193-value {
+    font-size: 1.75em;
+    font-weight: 600;
+    color: #102C3F;
+    line-height: 1.05;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-193-meta {
+    font-size: .7875em;
+    font-weight: 400;
+    color: #748494;
+    line-height: 1.3;
+    margin-top: .125em;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Compact status pill. One shape, tone carried by the modifier class only. */
+.vas-193-pill {
+    font-size: .6875em;
+    font-weight: 500;
+    line-height: 1.3;
+    padding: .18em .6em;
+    border-radius: 999px;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: .35em;
+    flex: 0 0 auto;
+}
+
+.vas-193-pill:empty {
+    display: none;
+}
+
+.vas-193-pill::before {
+    content: "";
+    width: .45em;
+    height: .45em;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: .9;
+    flex: 0 0 auto;
+}
+
+/* Open */
+.vas-193-pill-ok {
+    color: #0B6B45;
+    background: #E6F6F0;
+}
+
+/* Partially Open / Not Configured */
+.vas-193-pill-warn {
+    color: #9A6500;
+    background: #FBF1DF;
+}
+
+/* Closed */
+.vas-193-pill-plain {
+    color: #41576A;
+    background: #EEF2F6;
+}
+
+/* Permanently Closed */
+.vas-193-pill-dark {
+    color: #FFFFFF;
+    background: #41576A;
+}
+
+/* Never Opened */
+.vas-193-pill-muted {
+    color: #5F7283;
+    background: #EDF2F6;
+}
+
+.vas-193-busy {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    border-radius: 14px;
+}
+
+.vas-193-hidden {
+    display: none !important;
+}
+
+/* ---- Responsive ----
+   The card interior scales off the em anchor clamp on .vas-193-card, so no
+   per-breakpoint font stepping is needed at normal widths. Only a narrow or
+   zoomed-in cell needs the base font pushed below the 16px clamp floor, and that
+   is a container concern, not a viewport one (mirrors VAS_018). */
+@container vas-193 (max-width: 300px) {
+    .vas-193-card { font-size: 13px; }
+}
+
+@container vas-193 (max-width: 220px) {
+    .vas-193-card { font-size: 11px; }
+}
+
+/* Small viewports: tighten the value/badge row so the pill stays on the value line
+   for one more step before it wraps. */
+@media (max-width: 768px) {
+    .vas-193-valrow { gap: .35em; }
+}

@@ -18,7 +18,7 @@
         var $maindiv = null;
         var precision = 0;
         var vDifferentYearDataList = null;
-        var $root = $('<div class="h-100 w-100 vas-cashFlow-background">');
+        var $root = $('<div class="h-100 w-100 vas-cashFlow-background vas-widget-bg">');
 
         /** Load Design on Load */
         this.initalize = function () {
@@ -29,11 +29,11 @@
             createBusyIndicator();
 
             $maindiv = $('<div id="VAS-BarLine-ERP_' + widgetID + '" class="vas-barline-cashFlow-container">');
-            var MainHeadingComboDiv = $('<div class="d-flex justify-content-between vas-cashFlow-heading">');
+            var MainHeadingComboDiv = $('<div class="d-flex justify-content-between vas-cashFlow-heading vas-common-heading">');
             var HeadingDiv = $('<div class= "vas-cf-heading">' + VIS.Msg.getMsg("VAS_CashFlowWidget") + '</div>');
 
             // Create Control Div
-            $DifferentYearDataListDiv = $('<div class="input-group vis-input-wrap">');
+            $DifferentYearDataListDiv = $('<div class="input-group vis-input-wrap vas-removemandatory">');
             /* parameters are: context, windowno., coloumn id, display type, DB coloumn name, Reference key, Is parent, Validation Code*/
             $DifferentYearDataListLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), widgetID, 0, VIS.DisplayType.List, "VAS_CashFlowWidgetList", ColumnIds.AD_Reference_ID, false, null);
             // Parameters are: columnName, mandatory, isReadOnly, isUpdateable, lookup,display length
@@ -43,6 +43,7 @@
             var $DifferentYearDataListControlWrap = $('<div class="vis-control-wrap">');
             $DifferentYearDataListDiv.append($DifferentYearDataListControlWrap);
             $DifferentYearDataListControlWrap.append(vDifferentYearDataList.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' '));
+            vDifferentYearDataList.getControl().addClass('vas-removemandatory');
             $DifferentYearDataListDiv.append($DifferentYearDataListControlWrap);
 
             // Add Control into Maine Heading Div
@@ -157,7 +158,7 @@
                                         grid: {
                                             display: false, // Hide grid lines on the y-axis
                                         },
-                                      //beginAtZero: true, // Ensure y-axis starts at 0
+                                        //beginAtZero: true, // Ensure y-axis starts at 0
                                     },
                                 },
                                 plugins: {

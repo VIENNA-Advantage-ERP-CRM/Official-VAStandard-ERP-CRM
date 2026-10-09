@@ -1,0 +1,147 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * Cash Journal – Cash In KPI Widget
+ * Design source : docs/dashboard-widgets.md · docs/foundations.md
+ * Namespace     : vas-cashgl-*
+ * Unit rules    : em for all typography and spacing (per CLAUDE.md).
+ *                 px only for: border widths, border-radius, box-shadow offsets.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+/* ── Root ─────────────────────────────────────────────────────────────── */
+
+.vas-cashgl-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+    font-family: Roboto, sans-serif;
+    /* Widget root anchor: scales content with dashboard container width. */
+    font-size: clamp(16px, 1.4cqi, 24px);
+}
+
+.vas-cashgl-root,
+.vas-cashgl-root * {
+    box-sizing: border-box;
+}
+
+/* ── Loading overlay ──────────────────────────────────────────────────── */
+
+.vas-cashgl-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 14px;
+    z-index: 999;
+}
+
+/* ── Glass card (success tint) ────────────────────────────────────────── */
+
+.vas-cashgl-card {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    /* Vertical gaps between the three rows: label, value, footer. */
+    gap: 0.25em;
+    /* Foundations: success-tinted glass surface (mint → white). */
+    background: linear-gradient(135deg, rgba(220, 252, 231, 0.72), rgba(255, 255, 255, 0.55));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    /* Widget edge spacing: 0.875em = 14px at base. */
+    padding: 0.875em;
+    overflow: hidden;
+}
+
+/* ── Top row: label (left) + date badge (right) ───────────────────────── */
+
+.vas-cashgl-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* KPI label — body token (0.8125em / 13px at base), muted. */
+.vas-cashgl-label {
+    font-size: 1.125em;
+    font-weight: 700;
+
+    color: #5F7283;
+    line-height: 1.3;
+}
+
+/* "TODAY" badge — xs token (0.6875em / 11px), pill shape. */
+.vas-cashgl-date {
+    font-size: 0.6875em;
+    font-weight: 500;
+    color: #5F7283;
+    background: rgba(255, 255, 255, 0.70);
+    border: 1px solid #E4EDF4;
+    border-radius: 999px;
+    /* Vertical/horizontal pill padding in em so it scales. */
+    padding: 0.2em 0.6em;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+/* ── KPI value — xl token (1.375em / 22px at base) ───────────────────── */
+
+.vas-cashgl-value {
+    font-size: 1.375em;
+    font-weight: 700;
+    color: #102C3F;
+    line-height: 1.1;
+}
+
+/* Currency symbol sits slightly smaller than the number. */
+.vas-cashgl-cur {
+    font-size: 0.8em;
+    font-weight: 600;
+    margin-right: 0.1em;
+}
+
+/* ── Footer: delta + meta ─────────────────────────────────────────────── */
+
+/* xs token (0.6875em / 11px at base) — one step below the label. */
+.vas-cashgl-footer {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.375em;
+    font-size: 0.6875em;
+    color: #5F7283;
+    line-height: 1.3;
+}
+
+/* Delta chip: arrow icon + percentage. */
+.vas-cashgl-delta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2em;
+    font-weight: 600;
+}
+
+.vas-cashgl-delta svg {
+    width: 0.9em;
+    height: 0.9em;
+    flex-shrink: 0;
+}
+
+/* Semantic color: success (up) and danger (down). */
+.vas-cashgl-delta--up {
+    color: #019D89;
+}
+
+.vas-cashgl-delta--down {
+    color: #D14545;
+}
+
+/* "vs 7-day avg · N receipts" — muted secondary text. */
+.vas-cashgl-meta {
+    color: #5F7283;
+    font-weight: 400;
+}

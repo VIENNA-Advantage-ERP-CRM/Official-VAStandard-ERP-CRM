@@ -1,0 +1,258 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * Top Debtors Widget — list card (Onfinity design system, see design.md §8).
+ * Glass surface, tinted icon well, header with "Chase all" action, and a
+ * scrollable list of debtor rows (avatar · name/overdue · amount + risk chip).
+ * Inner sizing is em-based off a per-widget base font-size so the whole card
+ * scales as one unit; container queries lower that base on narrow dashboard
+ * cells to avoid overflow. RTL-safe via flex + logical properties. All
+ * selectors are namespaced vas-td-* to avoid collisions.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas-td-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    /*font-family: Roboto, sans-serif;*/
+    /* Positioning context for the absolute busy overlay below. */
+    position: relative;
+}
+
+/* Busy/loading overlay over the card while data is fetched (initial load + refresh);
+   the inner spinner uses the core busy-indicator classes. */
+.vas-td-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 14px;
+    z-index: 999;
+}
+
+.vas-td-card {
+    /* Base em-lever: 2K calibration clamp — ceiling 20px, not 32px
+       (dashboard-widgets.md §"Widget Root Anchor"). Every em below rescales. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    /* Glass widget surface — top fully opaque, bottom lets the workspace bleed
+       through (foundations.md §"Standard Gradients"). */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    /* Physical edges stay in px (not scaled with em). */
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    overflow: hidden;
+    padding: 0.85em;
+    gap: .05em;
+}
+
+/* ── Header: icon + title/subtitle on the left, "Chase all" on the right ── */
+.vas-td-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+}
+
+.vas-td-header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;                    /* 10px */
+    min-width: 0;
+}
+
+.vas-td-icon {
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    flex-shrink: 0;
+    border-radius: 0.5625em;
+    background: linear-gradient(180deg, #FFFFFF, #EAF4FE);
+    border: 0.0625em solid rgba(255, 255, 255, 0.9);
+    color: #106AB0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vas-td-icon svg {
+    width: 1.125em;
+    height: 1.125em;
+}
+
+.vas-td-title {
+    /* Shared viewport-anchored title clamp (dashboard-widgets.md §"Widget
+       Header"): same resolved px in every widget at any screen size. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    font-weight: 400;
+    color: #102C3F;
+    line-height: 1.2;
+}
+
+.vas-td-subtitle {
+    /* Shared viewport-anchored subtitle clamp (dashboard-widgets.md §"Widget
+       Header"): same resolved px in every widget at any screen size. */
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.3;
+    margin-top: 2px;
+}
+
+.vas-td-header-right {
+    display: flex;
+    align-items: center;
+    gap: 0.25em;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.vas-td-chase-all {
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    font-weight: 600;
+    color: #0083DA;
+}
+
+.vas-td-header-right svg {
+    width: 0.875em;                  /* 14px */
+    height: 0.875em;
+}
+
+/* ── List body — no scroll: the top-N rows fit within the card, with a little
+   breathing room below the last row so its chip never touches the edge. ── */
+.vas-td-list-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: hidden;
+    padding-bottom: 0.75em;
+}
+
+.vas-td-list-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;                     /* 12px */
+    padding: 0.1em 0.125em;         /* 12px / 18px — aligns with header */
+    transition: background 0.15s;
+    cursor: pointer;
+}
+
+.vas-td-list-row:not(:last-child) {
+    /* Body row divider (dashboard-widgets.md §"Row And Header Separators");
+       physical edge stays in px. Last row removes its border. */
+    border-bottom: 1px solid #E2EAF1;
+}
+
+.vas-td-list-row:hover {
+    background: #F8FBFF;
+}
+
+/* ── Avatar (cycled palette via vas-td-avatar-N classes) ── */
+.vas-td-avatar {
+    width: 2em;                      /* slightly smaller so all top-N rows fit */
+    height: 2em;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.vas-td-avatar-0 { background: #DBEAFE; color: #1E40AF; }
+.vas-td-avatar-1 { background: #FCE7F3; color: #9D174D; }
+.vas-td-avatar-2 { background: #D1FAE5; color: #065F46; }
+.vas-td-avatar-3 { background: #FEF3C7; color: #92400E; }
+.vas-td-avatar-4 { background: #EDE9FE; color: #5B21B6; }
+.vas-td-avatar-5 { background: #FFE4E6; color: #9F1239; }
+
+/* ── Name + overdue status ── */
+.vas-td-name-wrap {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.vas-td-name {
+    /* Row primary — sm token, one step below the title (List/Grid Hierarchy Rule). */
+    font-size: 0.75em;
+    font-weight: 400;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-td-overdue-wrap {
+    margin-top: -0.325em;
+}
+
+.vas-td-overdue-label {
+    /* Row secondary metadata — xs token, muted (Cell Types §"Secondary metadata"). */
+    font-size: 0.6875em;
+    color: #5F7283;
+    line-height: 1.3;
+}
+
+/* ── Amount + risk chip ── */
+.vas-td-amount-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.25em;
+    flex-shrink: 0;
+}
+
+.vas-td-amount {
+    /* Emphasized value cell — sm token, Bold, dark (Cell Types §"Emphasized value"). */
+    font-size: 0.75em;
+    font-weight: 400;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    text-align: right;
+}
+
+/* Base-currency symbol prefixed before the amount (RTL-safe spacing). */
+.vas-td-cur {
+    font-weight: inherit;
+    margin-inline-end: 0.08em;
+    vertical-align: baseline;
+}
+
+.vas-td-chip {
+    display: inline-block;
+    padding: 0.1875em 0.625em;       /* 3px 10px */
+    border-radius: 999px;            /* physical edge — stays in px */
+    font-size: 0.5875em;             /* xs token */
+    font-weight: 700;
+    white-space: nowrap;
+    letter-spacing: 0.04em;
+}
+
+/* Two-tier chip system (Header Stat Pill tone pairings). */
+.vas-td-chip-risk    { background: #FFE4E4; color: #A33F3F; }
+.vas-td-chip-ontrack { background: #DDF4E8; color: #0B6B45; }
+
+/* ── Loading / empty state ── */
+.vas-td-nodata {
+    text-align: center;
+    padding: 1.5em 1em;
+    color: #748494;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
+}
+
+/* ── Responsive: shrink the whole card by lowering its base font-size on
+ *    narrow dashboard cells. Inner em sizing scales automatically. ── */
+@container (max-width: 300px) {
+    .vas-td-card { font-size: 0.875em; }
+}
+
+@container (max-width: 240px) {
+    .vas-td-card { font-size: 0.75em; }
+}

@@ -1,0 +1,567 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * Unreconciled Receipts (Widget 05) — KPI count glass card (tint-info) +
+ * drill-down modal. Design source: design.md (Onfinity) + image_2 (card) and
+ * image_1 (modal). Per CLAUDE.md project rule, every CSS value is in `em`.
+ * `1em` resolves to the widget's base font-size (16px on card and dialog).
+ * Namespaced vas-unr-*.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas-unr-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+    /*font-family: Roboto, sans-serif;*/
+}
+
+    .vas-unr-root,
+    .vas-unr-root * {
+        box-sizing: border-box;
+    }
+
+.vas-unr-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 14px;
+    z-index: 999;
+}
+
+/* ── KPI card (glass, neutral surface) ──────────────────────────────── */
+
+.vas-unr-card {
+    /* Widget root anchor: scale the whole card with the cell so it fills tall cells on
+       large dashboards instead of staying 16px. cqi resolves against .vas-unr-root
+       (container-type: inline-size). Only grows past 16px on wide cells. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 0.5em;
+    /* Canonical glass surface (foundations.md §Standard Gradients): top fully opaque.
+       Borders/radii/shadows stay px. */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    padding: 0.85em;
+    overflow: hidden;
+    cursor: pointer;
+    transition: box-shadow 180ms ease;
+}
+
+    .vas-unr-card:hover {
+        box-shadow: 0 14px 30px rgba(15, 61, 97, 0.10);
+    }
+
+    .vas-unr-card:focus-visible {
+        outline: 2px solid #0083DA;
+        outline-offset: 2px;
+    }
+
+/* ── Header: icon + label (left) · View hint (right) ──────────────── */
+
+.vas-unr-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.625em;
+    min-width: 0;
+}
+
+.vas-unr-head-left {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+/* Title + subtitle stacked next to the icon */
+.vas-unr-label-group {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.vas-unr-subtitle {
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .00963), 13px);
+    font-weight: 400;
+    color: #5F7283;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 0.125em;
+}
+
+.vas-unr-icon {
+    /* Icon well tracks the title lever (dashboard-widgets.md §Widget Header):
+       ~2× the title clamp, capped at 40px. Radius stays px. */
+    width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    height: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    min-width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    border-radius: 12px;
+    background: linear-gradient(180deg, #FFFFFF, #EAF4FE);
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    color: #106AB0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+    .vas-unr-icon svg {
+        /* Glyph ≈ 1.1× the title clamp (dashboard-widgets.md §Widget Header). */
+        width: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
+        height: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
+        stroke: currentColor;
+    }
+
+/* Widget header label — Medium (500). Shared dashboard-width-anchored title
+   clamp (dashboard-widgets.md §"Widget Header"): same resolved px in every
+   widget at any screen size. */
+.vas-unr-label {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    color: #102C3F;
+    font-weight: 400;
+    line-height: 1.2;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Metric: big bold info-blue count ─────────────────────────────── */
+
+.vas-unr-metric {
+    padding-left: 0.3125em;
+    /* KPI value on the em lever (dashboard-widgets.md §Widget Stat Values): 1.75em
+       SemiBold. Warning amber — unreconciled receipts flag an exception to act on. */
+    font-size: 1.75em;
+    font-weight: 600;
+    color: #D78B10;
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    font-variant-numeric: tabular-nums;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    align-self: flex-start;
+    max-width: 100%;
+}
+
+/* ── Detail: plain text "Not yet matched to statement" (no pill) ──── */
+
+.vas-unr-detail-text {
+    display: block;
+    align-self: flex-start;
+    max-width: 100%;
+    /* KPI meta (dashboard-widgets.md §KPI And Summary Widget): xs on the em lever, muted. */
+    font-size: 0.6875em;
+    line-height: 1.3;
+    color: #5F7283;
+    font-weight: 400;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Card responsive (container queries on the widget cell) ───────── */
+
+@container (max-width: 18.75em) {     /* < 300px */
+    .vas-unr-card { font-size: 0.8125em; }
+}
+
+@container (max-width: 13.75em) {     /* < 220px */
+    .vas-unr-card { font-size: 0.6875em; }
+    .vas-unr-view span { display: none; }
+}
+
+/* ───────────────────────────────────────────────────────────────────
+ * Drill-down modal (image_1). Attached to <body>; fixed positioning.
+ * ─────────────────────────────────────────────────────────────────── */
+
+.vas-unr-body-lock {
+    overflow: hidden;
+}
+
+.vas-unr-dialog {
+    /*font-family: Roboto, sans-serif;*/
+    /* Viewport-anchored dialog base (0.75em of it = the shared data clamp
+       0.88vw): dialog data matches widget data px and the whole em-sized
+       dialog scales in proportion. 16px floor = unchanged small screens. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011733), 32px);
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25em;
+}
+
+    .vas-unr-dialog,
+    .vas-unr-dialog * {
+        box-sizing: border-box;
+    }
+
+.vas-unr-dialog-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 27, 45, 0.42);
+    backdrop-filter: blur(0.125em);
+}
+
+.vas-unr-dialog-card {
+    position: relative;
+    width: min(62em, 100%);
+    /* Tall enough for a full 10-row page so the body doesn't scroll on a full
+       page; clamps to the viewport on short screens. */
+    height: min(32em, 100%);
+    background: #FFFFFF;
+    border-radius: 1em;
+    box-shadow: 0 1.5em 3em rgba(15, 61, 97, 0.22);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.vas-unr-dialog-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75em;
+    padding: 1em 1em 1em 1.125em;
+    border-bottom: 1px solid #D9E2EB;
+    flex-shrink: 0;
+}
+
+.vas-unr-dialog-icon {
+    /* Family icon well (2em, glass gradient) — matches the widget header icon. */
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #FFFFFF, #EAF4FE);
+    border: 1px solid #BFE4FF;
+    color: #106AB0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+    .vas-unr-dialog-icon svg {
+        width: 1.125em;
+        height: 1.125em;
+        stroke: currentColor;
+    }
+
+.vas-unr-dialog-title-group {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.vas-unr-dialog-title {
+    /* Shared title clamp (dashboard-widgets.md §Widget Header) — matches the widget title. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    font-weight: 400;
+    color: #102C3F;
+    line-height: 1.2;
+}
+
+.vas-unr-dialog-subtitle {
+    margin-top: 2px;
+    /* Shared subtitle clamp (dashboard-widgets.md §Widget Header) — matches the widget subtitle. */
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
+    color: #717182;
+    line-height: 1.3;
+}
+
+.vas-unr-dialog-close {
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    width: 2em;
+    height: 2em;
+    border-radius: 0.5em;
+    color: #5F7283;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+    .vas-unr-dialog-close svg {
+        width: 1em;
+        height: 1em;
+        stroke: currentColor;
+    }
+
+    .vas-unr-dialog-close:hover {
+        background: #F3F7FB;
+        color: #102C3F;
+    }
+
+.vas-unr-dialog-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 0 1.125em;
+    position: relative;
+}
+
+.vas-unr-dialog-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.62);
+    z-index: 5;
+}
+
+.vas-unr-dialog-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 0.875em;
+}
+
+    .vas-unr-dialog-table thead th {
+        position: sticky;
+        top: 0;
+        /* Rail header (dashboard-widgets.md §Header Row): never tint — the dialog body
+           is white, so this reads as a transparent header band. */
+        background: #FFFFFF;
+        font-size: 0.6875em;          /* smaller than the row data (sm) */
+        font-weight: 500;             /* Medium */
+        text-transform: capitalize;   /* applied in CSS, not the data layer */
+        color: #41576A;
+        text-align: left;
+        padding: 0.5em 0.75em;
+        /* Header divider is the darkest tone (#C5D2DD > footer #D9E2EB > body #E2EAF1). */
+        border-bottom: 1px solid #C5D2DD;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+        .vas-unr-dialog-table thead th.vas-unr-th-amount {
+            text-align: right;
+        }
+
+        .vas-unr-dialog-table thead th.vas-unr-th-currency {
+            text-align: center;
+        }
+
+    .vas-unr-dialog-table tbody td {
+        padding: 0.875em 0.75em;
+        border-bottom: 1px solid #E2EAF1;
+        font-size: 0.75em; /* sm — one step below the title */
+        color: #5F7283;
+        vertical-align: middle;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* Last body row drops its divider (dashboard-widgets.md §Row And Header Separators). */
+    .vas-unr-dialog-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    .vas-unr-dialog-table tbody tr:hover td {
+        background: #F8FBFE;
+    }
+
+/* Column widths — explicit on all six so surplus distributes proportionally
+   (table-layout:fixed) instead of pooling in one greedy column. Date fits the
+   full "12 May 2026"; Amount never truncates (requirement #8). */
+.vas-unr-th-date,     .vas-unr-td-date     { width: 8em; }
+.vas-unr-th-doc,      .vas-unr-td-doc      { width: 8em; }
+.vas-unr-th-customer, .vas-unr-td-customer { width: 12em; }
+.vas-unr-th-bank,     .vas-unr-td-bank     { width: 13em; }
+.vas-unr-th-currency, .vas-unr-td-currency { width: 6em; text-align: center; }
+.vas-unr-th-amount,   .vas-unr-td-amount   { width: 9.5em; text-align: right; }
+
+.vas-unr-truncate {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-unr-td-date {
+    color: #5F7283;                   /* standard regular cell */
+}
+
+.vas-unr-td-doc {
+    /*font-family: "Roboto Mono", "Roboto", monospace;*/
+    color: #5F7283;                   /* standard regular cell */
+}
+
+.vas-unr-td-customer {
+    /* Primary identity cell — Bold, dark (dashboard-widgets.md §Cell Types). */
+    font-weight: 400;
+    color: #102C3F;
+}
+
+.vas-unr-td-bank {
+    color: #5F7283;
+}
+
+.vas-unr-td-currency {
+    text-align: center;
+    color: #5F7283;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+}
+
+/* Amount: emphasized value cell — Bold, right-aligned, full value never ellipsis-clipped. */
+.vas-unr-td-amount {
+    text-align: right;
+    font-weight: 400;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
+}
+
+.vas-unr-cur-inline {
+    margin-inline-end: 0.2em;
+    font-weight: inherit;
+    color: inherit;
+}
+
+/* No-data cell centered in the middle of the (fixed-height) dialog body:
+   stretch the table to fill only in the empty state so the single row's
+   vertical-align:middle lands the muted line dead-center on both axes. */
+.vas-unr-dialog-table:has(.vas-unr-dialog-empty) {
+    height: 100%;
+}
+
+.vas-unr-dialog-empty {
+    padding: 2.25em 1em;
+    text-align: center;
+    vertical-align: middle;
+    color: #5F7283;
+    font-size: 0.75em;               /* sm — matches the table data */
+    background: #FFFFFF;
+}
+
+/* Footer: helper (left) · compact pager (right). */
+.vas-unr-dialog-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    padding: 0.75em 1.125em;
+    /* Footer top divider (dashboard-widgets.md §Row And Header Separators). */
+    border-top: 1px solid #D9E2EB;
+    background: #FAFCFE;
+    flex-shrink: 0;
+}
+
+.vas-unr-pager-helper {
+    font-size: 0.75em;               /* helper reads as supporting chrome */
+    color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.vas-unr-pager {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-shrink: 0;
+}
+
+.vas-unr-pager-btn {
+    /* Spec §Pager Buttons: 24px square (1.5em) with a 14px (0.875em)
+       chevron — same as the widget footer pagers. */
+    width: 1.5em;
+    height: 1.5em;
+    padding: 0;
+    border: 1px solid #D9E2EB;
+    border-radius: 6px;
+    background: #FBFDFF;
+    color: #0083DA;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    .vas-unr-pager-btn svg {
+        width: 0.875em;
+        height: 0.875em;
+        stroke: currentColor;
+    }
+
+    .vas-unr-pager-btn:hover:not(:disabled) {
+        background: #EAF8FF;
+        border-color: #BFE4FF;
+    }
+
+    .vas-unr-pager-btn:disabled {
+        color: #B8C6D2;
+        cursor: default;
+    }
+
+.vas-unr-pager-text {
+    min-width: 3em;
+    text-align: center;
+    font-size: 0.8125em;             /* page text one notch above the helper */
+    font-weight: 500;                /* Medium */
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* ── Dialog responsive — small screens ────────────────────────────── */
+
+@media (max-width: 40em) {            /* ~640px */
+    .vas-unr-dialog { padding: 0; }
+    .vas-unr-dialog-card {
+        width: 100%;
+        height: 100%;
+        max-height: 100%;
+        border-radius: 0;
+    }
+
+    .vas-unr-dialog-table thead th,
+    .vas-unr-dialog-table tbody td {
+        padding: 0.625em 0.5em;
+    }
+
+    .vas-unr-td-doc { font-size: 0.75em; }
+
+    /* Drop Bank account + Payment Currency on phones — keep
+       Date/Receipt/Customer/Amount (amount keeps its currency symbol). */
+    .vas-unr-th-bank,
+    .vas-unr-td-bank,
+    .vas-unr-th-currency,
+    .vas-unr-td-currency { display: none; }
+
+    .vas-unr-th-amount, .vas-unr-td-amount { width: 9em; }
+
+    .vas-unr-dialog-footer {
+        flex-wrap: wrap;
+        gap: 0.625em;
+    }
+
+    .vas-unr-pager-helper { flex: 1 1 100%; order: 2; text-align: center; }
+    .vas-unr-pager { order: 1; margin: 0 auto; }
+}

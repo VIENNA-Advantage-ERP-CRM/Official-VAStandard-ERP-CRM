@@ -1,0 +1,1045 @@
+/************************************************************
+ * Module Name    : VAS
+ * Purpose        : Styles for the Product Overview right tab panel
+ *                  (VAS.VAS_190_ProductOverviewRightPanel). All classes are
+ *                  panel-prefixed (vas_190-) and scoped under .vas_190-root so
+ *                  they cannot collide with another panel's or repaint a
+ *                  base-theme selector.
+ *
+ *                  Sizing follows the approved prototype: the panel body is the
+ *                  measuring anchor (container-type + a clamped font-size) and
+ *                  every internal size, padding, margin and gap is expressed in
+ *                  em against it. Borders, dividers and radii stay in px so they
+ *                  do not scale with the text.
+ *
+ *                  The panel SHELL — width, collapse strip, header, close
+ *                  button — belongs to the VIS tab-panel host and is deliberately
+ *                  not styled here.
+ * Chronological development:
+ *   VAI163   2026-08-10  Created.
+ *   VAI163   2026-08-18  - A metric caption carrying several facts wraps rather
+ *                          than clipping (.vas_190-mMetaWrap): half a metric card
+ *                          is not wide enough for the open orders behind a figure
+ *                          AND that order's dates on one line.
+ *                        - The Document cell of a transaction row is two lines
+ *                          (.vas_190-gDoc / -gSub): the document above, where the
+ *                          movement happened below it, since one document posts a
+ *                          row per line.
+ *                        - Activity is VAS_092's feed (.vas_190-actList / -actItem
+ *                          / -actRow / -actTag / -actTitle / -actLead / -actSub /
+ *                          -actDelta / -cvOld / -cvArrow / -cvNew / -actWhen /
+ *                          -actCaret / -actBody). The timeline of cards on a rail
+ *                          (.vas_190-timeline / -tlEntry / -tlRail / -tlDot /
+ *                          -tlTrail / -tlCard / -tlTop / -tlTitle / -tlMeta) and
+ *                          the in-card mail block (.vas_190-mailInline) went with
+ *                          it: no other overview panel used that shape, and it
+ *                          spent most of a 440px panel on the rail and the card
+ *                          borders.
+ *   VAI163   2026-08-19  - The hero image is CONTAINED in its box, not cropped
+ *                          to fill it: a product photograph is rarely square and
+ *                          cover showed a strip out of the middle of it.
+ *                        - The latest quality check is a bordered card above the
+ *                          configured parameters (.vas_190-qcCard / -qcHead /
+ *                          -qcTitle) — what was found must not read as another
+ *                          line of what will be checked.
+ *                        - A BOM row's detail line wraps (.vas_190-eM): it
+ *                          carries the attribute set the detail line is for, and
+ *                          clipped, the one thing that tells two rows of the same
+ *                          parent apart lived on the tooltip alone.
+ *   VAI163   2026-08-21  Nothing overlaps anything at any zoom level. The hero and
+ *                        detail cards' two halves took the minmax(0, 1fr) floor,
+ *                        so a long value can no longer widen its half and push the
+ *                        other out from under it. The grid header's cells carry
+ *                        min-width:0 to match the body's. In the compact and
+ *                        entity lists the right-hand value still holds its width
+ *                        (the label gives way first) but clips rather than running
+ *                        back over the label when even that is not enough.
+ *   VAI163   2026-08-26  .vas_190-colsTx runs FOUR tracks, not five: the Unit cost
+ *                        column is gone from Recent transactions. The width it
+ *                        gave up goes to the Document cell (2fr -> 2.9fr) rather
+ *                        than being shared out — that cell carries the document
+ *                        TYPE in front of the number on every row now, so it is
+ *                        the one that wanted the room.
+ ***********************************************************/
+
+.vas_190-root {
+    /* Canonical palette */
+    --p190-text:        #102C3F;
+    --p190-secondary:   #41576A;
+    --p190-muted:       #5F7283;
+    --p190-divider:     #E2EAF1;
+    --p190-card-bd:     #D9E2EB;
+    --p190-action:      #0083DA;
+    --p190-disabled:    #9AB0C0;
+
+    --p190-info-bg:     #EAF8FF;  --p190-info-tx:    #0083DA;
+    --p190-ok-bg:       #E7F7EF;  --p190-ok-tx:      #0B6B45;
+    --p190-warn-bg:     #FFF6E2;  --p190-warn-tx:    #9A6500;
+    --p190-crit-bg:     #FCEFEF;  --p190-crit-tx:    #A33F3F;
+    --p190-purple-bg:   #EFEEFF;  --p190-purple-tx:  #5F4AA6;
+    --p190-neutral-bg:  #F1F4F8;  --p190-neutral-tx: #41576A;
+
+    --p190-radius-card: 12px;
+    --p190-radius-hero: 14px;
+
+    position: relative;
+    height: 100%;
+    background: #FFFFFF;
+    font-family: Roboto, "Segoe UI", Arial, sans-serif;
+    color: var(--p190-text);
+}
+
+/* The measuring anchor. Everything inside is em against this. */
+.vas_190-body {
+    container-type: inline-size;
+    font-size: clamp(16px, 1vw, 18px);
+    height: 100%;
+    overflow: auto;
+    overflow-x: hidden;
+    padding: 1.125em 0.875em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875em;
+    background: #FFFFFF;
+}
+
+.vas_190-empty {
+    padding: 2em 1em;
+    text-align: center;
+    font-size: 0.875em;
+    color: var(--p190-muted);
+}
+.vas_190-emptyTitle { font-weight: 700; color: var(--p190-secondary); }
+.vas_190-emptyHint { margin-top: 0.25em; }
+
+/* ----------------------------------------------------------- */
+/*  Activity detail sheet                                       */
+/* ----------------------------------------------------------- */
+/* One activity entry, opened over the whole panel: a labelled header, the
+   fields that entry actually carries, its content, and its actions pinned to
+   the bottom. It replaces the drawer that used to fold open under a mail row,
+   which could hold a message body and nothing else — an appointment's people,
+   its meeting link and its transcript had nowhere to go.
+
+   Positioned against .vas_190-root (position:relative) so it covers the panel
+   and nothing outside it, and it carries its own font-size anchor because the
+   body's container query does not reach it. */
+.vas_190-sheet {
+    position: absolute;
+    inset: 0;
+    z-index: 1000;
+    background: #FFFFFF;
+    font-size: clamp(16px, 1vw, 18px);
+    display: flex;
+    flex-direction: column;
+}
+
+.vas_190-sheetHead {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5em;
+    padding: 1em 0.875em 0.75em;
+    border-bottom: 1px solid var(--p190-divider);
+}
+.vas_190-sheetTitle {
+    flex: 1;
+    min-width: 0;
+    font-weight: 700;
+    font-size: 0.875em;
+    color: var(--p190-text);
+    /* The subject WRAPS here. The row it was opened from clipped it to one
+       line, and this is the place a reader comes to read the whole of it. */
+    overflow-wrap: anywhere;
+}
+.vas_190-sheetX {
+    flex-shrink: 0;
+    width: 1.5em;
+    height: 1.5em;
+    border: none;
+    background: none;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--p190-muted);
+    cursor: pointer;
+    padding: 0;
+}
+.vas_190-sheetX:hover { background: #F2F6FA; color: var(--p190-text); }
+.vas_190-sheetX:focus-visible { outline: 2px solid var(--p190-action); outline-offset: 1px; }
+.vas_190-sheetX .vas_190-ic svg { width: 1em; height: 1em; }
+
+.vas_190-sheetBody {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    overflow-x: hidden;
+    padding: 0.875em;
+}
+
+/* Label left, value right — the shape the engagement view on the customer
+   master uses, so a reader who knows one knows this. */
+.vas_190-sheetRow {
+    display: flex;
+    gap: 0.75em;
+    padding: 0.375em 0;
+    font-size: 0.75em;
+    border-bottom: 1px solid var(--p190-divider);
+}
+.vas_190-sheetRow:last-of-type { border-bottom: none; }
+.vas_190-sheetK {
+    width: 7em;
+    flex-shrink: 0;
+    color: var(--p190-muted);
+}
+.vas_190-sheetV {
+    flex: 1;
+    min-width: 0;
+    color: var(--p190-text);
+    overflow-wrap: anywhere;
+}
+.vas_190-sheetV a { color: var(--p190-action); }
+
+.vas_190-sheetLabel {
+    margin-top: 1em;
+    margin-bottom: 0.375em;
+    font-weight: 700;
+    font-size: 0.6875em;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--p190-muted);
+}
+/* The message, comment or note itself. Its own line breaks are the author's,
+   so they are kept. */
+.vas_190-sheetText {
+    font-size: 0.75em;
+    line-height: 1.55;
+    color: var(--p190-secondary);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+/* A mail body rendered as the sender wrote it. Everything here is containment:
+   the markup is somebody else's, it was authored for a full-width mail client,
+   and it is being shown in a narrow side panel.
+
+   pre-wrap is turned OFF — the sender's own block elements do the wrapping now,
+   and leaving it on would add a blank line for every newline between their
+   tags. */
+.vas_190-sheetHtml {
+    white-space: normal;
+    /* Long enough to read in, bounded so a newsletter cannot push the Close
+       button off the sheet. */
+    max-height: 22em;
+    overflow: auto;
+}
+/* A mail's own font sizes and colours are its own; only the extremes are
+   overridden, so the message still looks like itself inside the panel. */
+.vas_190-sheetHtml img { max-width: 100%; height: auto; }
+/* A fixed-width table is the usual way a mail is laid out, and it is usually
+   wider than this panel. It scrolls in its own right rather than widening the
+   sheet. */
+.vas_190-sheetHtml table { max-width: 100%; display: block; overflow-x: auto; }
+.vas_190-sheetHtml td, .vas_190-sheetHtml th { padding: 0.15em 0.35em; }
+.vas_190-sheetHtml a { color: var(--p190-link, #1D4ED8); }
+.vas_190-sheetHtml pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+/* A quoted reply chain arrives as nested blockquotes and can indent the text
+   off the panel after three or four rounds. */
+.vas_190-sheetHtml blockquote {
+    margin: 0.4em 0 0.4em 0.6em;
+    padding-left: 0.6em;
+    border-left: 2px solid var(--p190-border, #E5E7EB);
+}
+.vas_190-sheetHtml h1, .vas_190-sheetHtml h2, .vas_190-sheetHtml h3 { font-size: 1.15em; }
+
+.vas_190-sheetFoot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5em;
+    padding: 0.75em 0.875em;
+    border-top: 1px solid var(--p190-divider);
+    background: #FFFFFF;
+}
+.vas_190-sheetBtn {
+    font: inherit;
+    font-size: 0.75em;
+    padding: 0.5em 1em;
+    border: 1px solid var(--p190-card-bd);
+    border-radius: 8px;
+    background: #FFFFFF;
+    color: var(--p190-secondary);
+    cursor: pointer;
+}
+.vas_190-sheetBtn:hover { background: #F2F6FA; }
+.vas_190-sheetBtn:focus-visible { outline: 2px solid var(--p190-action); outline-offset: 1px; }
+.vas_190-sheetBtn--primary {
+    border-color: var(--p190-action);
+    background: var(--p190-action);
+    color: #FFFFFF;
+}
+.vas_190-sheetBtn--primary:hover { background: #0071BD; }
+.vas_190-sheetBtn--sm { padding: 0.25em 0.625em; font-size: 0.6875em; }
+
+/* A meeting's transcript, under its fields (18-Sep-2026): the heading and the
+   download side by side, the lines in a bounded box beneath so a long
+   recording never pushes the Close button off the sheet. */
+.vas_190-sheetTranscript { margin-top: 0.5em; }
+.vas_190-sheetTrHead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5em;
+}
+.vas_190-sheetTrHead .vas_190-sheetLabel { margin-bottom: 0; }
+.vas_190-sheetTrBox {
+    margin-top: 0.375em;
+    max-height: 18em;
+    overflow: auto;
+    padding: 0.5em 0.625em;
+    border: 1px solid var(--p190-divider);
+    border-radius: 8px;
+    background: #F8FAFC;
+    white-space: normal;
+}
+.vas_190-sheetTrLine { margin: 0 0 0.35em; }
+.vas_190-sheetTrLine:last-child { margin-bottom: 0; }
+.vas_190-sheetTrSpeaker { font-weight: 700; color: var(--p190-text, #0F172A); }
+
+/* ----------------------------------------------------------- */
+/*  Task priority badge                                         */
+/* ----------------------------------------------------------- */
+/* In front of a task's headline, in the colours the task screens use. It is
+   the first thing a reader sorts on and it was not on the row at all. */
+.vas_190-prio {
+    display: inline-block;
+    margin-right: 0.375em;
+    padding: 0 0.5em;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 0.8125em;
+    line-height: 1.5em;
+    vertical-align: baseline;
+}
+/* The TASK FORM's own priority colours (25-Sep-2026) - the exact values the
+   platform's task views paint a PriorityKey in (VIS history panel): Urgent
+   #f60000, High #fb9300, Medium #6f04e8, Low #03e5f3, Minor #42d819. The word is
+   in that colour on a light wash of it, so the chip reads as the same priority
+   the task form shows. (The earlier VAS_105 set mapped only "1" correctly.) */
+.vas_190-prio-urgent { background: rgba(246, 0, 0, 0.12);    color: #f60000; }
+.vas_190-prio-high   { background: rgba(251, 147, 0, 0.14);  color: #fb9300; }
+.vas_190-prio-medium { background: rgba(111, 4, 232, 0.12);  color: #6f04e8; }
+.vas_190-prio-low    { background: rgba(3, 229, 243, 0.14);  color: #03e5f3; }
+.vas_190-prio-minor  { background: rgba(66, 216, 25, 0.14);  color: #42d819; }
+.vas_190-prio-none   { background: rgba(15, 23, 42, 0.06);   color: var(--p190-secondary, #475569); }
+
+/* ----------------------------------------------------------- */
+/*  Section header                                              */
+/* ----------------------------------------------------------- */
+.vas_190-sec { min-width: 0; }
+
+.vas_190-secHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    margin: 0.5em 0;
+    padding-bottom: 0.375em;
+    border-bottom: 1px solid var(--p190-divider);
+}
+/* The first section sits flush with the top of the body. */
+.vas_190-body > .vas_190-sec:first-child .vas_190-secHead { margin-top: 0; }
+
+.vas_190-secTitle {
+    font-weight: 700;
+    font-size: 1em;
+    color: var(--p190-text);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_190-secSum {
+    font-weight: 400;
+    font-size: 0.75em;
+    color: var(--p190-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+    max-width: 55%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ----------------------------------------------------------- */
+/*  Chips                                                       */
+/* ----------------------------------------------------------- */
+.vas_190-chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.3125em 0.625em;
+    font-weight: 700;
+    font-size: 0.6875em;
+    line-height: 1;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.vas_190-chip.vas_190-tone-info    { background: var(--p190-info-bg);    color: var(--p190-info-tx); }
+.vas_190-chip.vas_190-tone-ok      { background: var(--p190-ok-bg);      color: var(--p190-ok-tx); }
+.vas_190-chip.vas_190-tone-warn    { background: var(--p190-warn-bg);    color: var(--p190-warn-tx); }
+.vas_190-chip.vas_190-tone-crit    { background: var(--p190-crit-bg);    color: var(--p190-crit-tx); }
+.vas_190-chip.vas_190-tone-purple  { background: var(--p190-purple-bg);  color: var(--p190-purple-tx); }
+.vas_190-chip.vas_190-tone-neutral { background: var(--p190-neutral-bg); color: var(--p190-neutral-tx); font-weight: 500; }
+/* On the tinted hero the chip carries a white ground so it stays legible. */
+.vas_190-chip.vas_190-onTint { background: #FFFFFF; }
+
+/* ----------------------------------------------------------- */
+/*  Hero (product summary)                                      */
+/* ----------------------------------------------------------- */
+.vas_190-hero {
+    border-radius: var(--p190-radius-hero);
+    padding: 0.75em 0.875em;
+    border: 1px solid #CFE0ED;
+    background: linear-gradient(180deg, #EEF8FF 0%, #F7FBFF 100%);
+}
+.vas_190-hero.vas_190-tone-warn {
+    border-color: #EBD7A6;
+    background: linear-gradient(180deg, #FFF8E8 0%, #FBFAF3 100%);
+}
+.vas_190-hero.vas_190-tone-risk {
+    border-color: #EDC8C8;
+    background: linear-gradient(180deg, #FCEFEF 0%, #FBF7F7 100%);
+}
+
+.vas_190-heroTop { display: flex; align-items: flex-start; gap: 0.75em; }
+
+.vas_190-imgBox {
+    flex-shrink: 0;
+    width: 3.5em;
+    height: 3.5em;
+    border-radius: var(--p190-radius-card);
+    border: 1px solid #CFE0ED;
+    background: #FFFFFF;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+/* The WHOLE picture, inside the box. It was cover, which fills the square by
+   cropping whatever does not fit — and a product photograph is rarely square,
+   so the box showed a strip out of the middle of it and cut the item's ends
+   off. contain fits it instead and pads what is left over. */
+.vas_190-imgBox img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    display: block;
+}
+/* No stored image: a dashed placeholder rather than an empty white square. */
+.vas_190-imgBox.vas_190-imgEmpty { border-style: dashed; color: var(--p190-disabled); }
+.vas_190-imgBox.vas_190-imgEmpty .vas_190-ic svg { width: 1.75em; height: 1.75em; }
+
+.vas_190-heroId { min-width: 0; flex: 1; }
+.vas_190-heroName {
+    font-weight: 700;
+    font-size: 1.125em;
+    color: var(--p190-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_190-heroSub {
+    font-weight: 400;
+    font-size: 0.75em;
+    color: var(--p190-secondary);
+    margin-top: 0.25em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas_190-statusLine { margin-top: 0.5em; font-weight: 700; font-size: 0.75em; }
+.vas_190-statusLine.vas_190-lineRisk { color: var(--p190-crit-tx); }
+.vas_190-statusLine.vas_190-lineWarn { color: var(--p190-warn-tx); }
+
+/* minmax(0, 1fr), not a bare 1fr: a bare fr track cannot shrink below its own
+   content, so one long value widened its half of the card and pushed the other
+   half out from under it. */
+.vas_190-heroGrid {
+    margin-top: 0.75em;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 0.875em;
+    row-gap: 0.375em;
+}
+
+/* ----------------------------------------------------------- */
+/*  Metric cells and detail cards                               */
+/* ----------------------------------------------------------- */
+.vas_190-mcell { min-width: 0; }
+.vas_190-mLabel { font-weight: 400; font-size: 0.6875em; color: var(--p190-muted); }
+.vas_190-mVal {
+    font-weight: 700;
+    font-size: 0.8125em;
+    color: var(--p190-text);
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_190-mMeta {
+    font-weight: 400;
+    font-size: 0.6875em;
+    color: var(--p190-muted);
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* A caption carrying several facts — the open orders behind a figure and that
+   order's dates — wraps rather than clipping. Half a metric card is not wide
+   enough for it on one line, and clipped it would leave every fact after the
+   first on the tooltip alone. */
+.vas_190-mMeta.vas_190-mMetaWrap { white-space: normal; overflow: visible; }
+
+/* A bordered white card is reserved for the hero, the detail cards and the
+   timeline entries — lists sit flat on the panel. */
+.vas_190-detailCard {
+    border-radius: var(--p190-radius-card);
+    border: 1px solid var(--p190-card-bd);
+    background: #FFFFFF;
+    padding: 0.875em;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 0.875em;
+    row-gap: 0.625em;
+}
+
+/* ----------------------------------------------------------- */
+/*  Compact list                                                */
+/* ----------------------------------------------------------- */
+.vas_190-clist { min-width: 0; }
+
+.vas_190-clRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    padding: 0.625em 0.75em;
+    border-bottom: 1px solid var(--p190-divider);
+}
+.vas_190-clRow:last-child { border-bottom: none; }
+
+/* A row that navigates is focusable and says so on hover. */
+.vas_190-clRow.vas_190-clickable { cursor: pointer; border-radius: 8px; }
+.vas_190-clRow.vas_190-clickable:hover { background: #F7FBFF; }
+.vas_190-clRow.vas_190-clickable:focus-visible {
+    outline: 2px solid var(--p190-action);
+    outline-offset: -2px;
+}
+
+.vas_190-clLhs { min-width: 0; }
+.vas_190-clP {
+    font-weight: 700;
+    font-size: 0.75em;
+    color: var(--p190-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_190-clP .vas_190-soft { font-weight: 400; color: var(--p190-muted); }
+.vas_190-clM {
+    font-weight: 400;
+    font-size: 0.75em;
+    color: var(--p190-secondary);
+    margin-top: 0.1875em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The right-hand side holds its width (flex-shrink:0) so the figure is never the
+   part that gives way — the label on the left shrinks first. min-width:0 with a
+   clip is the floor under that: where even the right side alone is wider than the
+   row, it truncates rather than running back over the label. */
+.vas_190-clRhs { flex-shrink: 0; min-width: 0; max-width: 100%; display: flex; align-items: center; gap: 0.625em; }
+.vas_190-clVal {
+    min-width: 0;
+    font-weight: 700;
+    font-size: 0.8125em;
+    color: var(--p190-text);
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.vas_190-clSub {
+    display: block;
+    font-weight: 400;
+    font-size: 0.8461em;
+    color: var(--p190-muted);
+    margin-top: 0.15em;
+}
+
+/* ----------------------------------------------------------- */
+/*  Latest quality check                                        */
+/* ----------------------------------------------------------- */
+/* A bordered card above the configured parameters: the plan says what WILL be
+   checked, this says what WAS found, and the two must not read as one list. */
+.vas_190-qcCard {
+    border-radius: var(--p190-radius-card);
+    border: 1px solid var(--p190-card-bd);
+    background: #FFFFFF;
+    padding: 0.625em 0.25em 0.25em;
+    margin-bottom: 0.75em;
+}
+.vas_190-qcHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    padding: 0 0.5em 0.5em;
+    border-bottom: 1px solid var(--p190-divider);
+}
+.vas_190-qcTitle {
+    font-weight: 700;
+    font-size: 0.8125em;
+    color: var(--p190-text);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ----------------------------------------------------------- */
+/*  Entity list (BOMs)                                          */
+/* ----------------------------------------------------------- */
+.vas_190-elist { min-width: 0; }
+
+.vas_190-eRow {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75em;
+    padding: 0.625em 0;
+    border-bottom: 1px solid var(--p190-divider);
+}
+.vas_190-eRow:last-child { border-bottom: none; }
+
+.vas_190-tile {
+    flex-shrink: 0;
+    width: 2.25em;
+    height: 2.25em;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--p190-info-bg);
+    color: var(--p190-action);
+}
+.vas_190-tile .vas_190-ic svg { width: 1.25em; height: 1.25em; }
+
+.vas_190-eId { min-width: 0; flex: 1; }
+.vas_190-eTitleRow { display: flex; align-items: center; gap: 0.5em; flex-wrap: wrap; min-width: 0; }
+.vas_190-eP {
+    font-weight: 700;
+    font-size: 0.875em;
+    color: var(--p190-text);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* A BOM row's detail line WRAPS. It carries the attribute set the detail line
+   is specified for and when that line was added, and clipped to one line the
+   attribute — the whole reason two rows of the same parent differ — would exist
+   only on the tooltip. The section pages at five, so the height stays bounded. */
+.vas_190-eM {
+    font-weight: 400;
+    font-size: 0.75em;
+    color: var(--p190-muted);
+    margin-top: 0.1875em;
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    line-height: 1.45;
+}
+/* Same as the compact list: the value holds its width so the title shrinks
+   first, and clips rather than overlapping it if even that is not enough. */
+.vas_190-eVal { flex-shrink: 0; min-width: 0; max-width: 100%; text-align: right; }
+.vas_190-eV { font-weight: 700; font-size: 0.9375em; color: var(--p190-text); white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+.vas_190-eS { font-weight: 400; font-size: 0.75em; color: var(--p190-muted); white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+/* A BOM row whose right-hand slot carries the attribute set it is specified for.
+   The slot does not shrink by default — a quantity is short and must never be
+   clipped — but an attribute set runs to a sentence, and at flex-shrink 0 it
+   pushed the row wider than the panel and took the name on the left off the
+   screen with it. Capped at a share of the row and left to the ellipsis its own
+   lines already carry. */
+.vas_190-eVal.vas_190-eVal-attr { flex-shrink: 1; max-width: 45%; }
+
+/* ----------------------------------------------------------- */
+/*  Data grid (stock details, transactions)                     */
+/* ----------------------------------------------------------- */
+/* A leading icon column then the named columns. Every track is minmax(0, Nfr):
+   a bare Nfr cannot shrink below its content, so one long warehouse name would
+   push the row wider than the panel and clip the right-hand columns away. */
+.vas_190-grid { width: 100%; min-width: 0; }
+
+.vas_190-gHead,
+.vas_190-gRow {
+    display: grid;
+    align-items: center;
+    column-gap: 0.5em;
+}
+.vas_190-colsStock .vas_190-gHead,
+.vas_190-colsStock .vas_190-gRow {
+    grid-template-columns: 1.75em minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 1.2fr) minmax(0, 0.7fr);
+}
+/* Icon, Document, Date, Qty — four tracks since the Unit cost column went. The
+   Document cell carries the document TYPE name in front of the number, so it
+   keeps more of the row than the other two put together, and the width the
+   money column gave up goes to it rather than being shared out. */
+.vas_190-colsTx .vas_190-gHead,
+.vas_190-colsTx .vas_190-gRow {
+    grid-template-columns: 1.75em minmax(0, 2.9fr) minmax(0, 0.9fr) minmax(0, 0.6fr);
+}
+
+.vas_190-gHead { padding: 0 0 0.375em; border-bottom: 1px solid var(--p190-card-bd); }
+.vas_190-gHead > span {
+    font-weight: 500;
+    font-size: 0.6875em;
+    color: var(--p190-muted);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas_190-gRow { padding: 0.625em 0; border-bottom: 1px solid var(--p190-divider); }
+.vas_190-gRow:last-child { border-bottom: none; }
+.vas_190-gRow > span {
+    font-weight: 400;
+    font-size: 0.75em;
+    color: var(--p190-secondary);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_190-gRow > span.vas_190-gId { font-weight: 700; color: var(--p190-text); }
+
+/* The Document cell of a transaction row is TWO lines: the document above,
+   where the movement happened below it. One document posts a row per line, so
+   without the second line two movements on the same receipt are the same row
+   printed twice. Both lines clip on their own; the cell's tooltip carries the
+   whole of it. */
+.vas_190-gRow > span.vas_190-gDoc {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    white-space: normal;          /* the children clip, not the cell */
+    overflow: hidden;
+}
+.vas_190-gDoc > .vas_190-gId,
+.vas_190-gDoc > .vas_190-gSub {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_190-gDoc > .vas_190-gSub {
+    font-size: 0.8461em;          /* ~0.635em against the body anchor */
+    font-weight: 400;
+    color: var(--p190-muted);
+    margin-top: 0.125em;
+}
+/* The link colour belongs to the document line, not to the locator under it. */
+.vas_190-gRow > span.vas_190-gDoc.vas_190-gLink { color: inherit; }
+.vas_190-gRow > span.vas_190-gDoc.vas_190-gLink > .vas_190-gId { color: var(--p190-action); }
+.vas_190-gRow.vas_190-clickable:hover > span.vas_190-gDoc.vas_190-gLink { text-decoration: none; }
+.vas_190-gRow.vas_190-clickable:hover > span.vas_190-gDoc.vas_190-gLink > .vas_190-gId {
+    text-decoration: underline;
+}
+
+/* A grid row that opens its document. The whole row is the target — the cell
+   is coloured as the affordance so it reads as a link without nesting an
+   anchor inside a row that is itself a button. */
+.vas_190-gRow.vas_190-clickable { cursor: pointer; }
+.vas_190-gRow.vas_190-clickable:hover { background: #F7FBFF; }
+.vas_190-gRow.vas_190-clickable:focus-visible {
+    outline: 2px solid var(--p190-action);
+    outline-offset: -2px;
+}
+.vas_190-gRow > span.vas_190-gLink { color: var(--p190-action); }
+.vas_190-gRow.vas_190-clickable:hover > span.vas_190-gLink { text-decoration: underline; }
+
+/* Numeric columns line up digit for digit rather than drifting with
+   proportional glyph widths. */
+.vas_190-grid .vas_190-num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.vas_190-gIcon { display: flex; align-items: center; justify-content: center; }
+.vas_190-gIcon .vas_190-ic svg { width: 1em; height: 1em; }
+.vas_190-ic-ok     { color: var(--p190-ok-tx); }
+.vas_190-ic-info   { color: var(--p190-action); }
+.vas_190-ic-warn   { color: var(--p190-warn-tx); }
+.vas_190-ic-purple { color: var(--p190-purple-tx); }
+
+/* ----------------------------------------------------------- */
+/*  Section pager                                               */
+/* ----------------------------------------------------------- */
+/* Centred beneath the section content. Never an inner scrollbar: the panel body
+   owns scrolling, and a section that paginates does not grow its own. */
+/* What is on screen at the leading edge, the controls at the trailing one. The
+   three used to sit together in the middle: that said which page you were on
+   but never how much there was to page through. */
+.vas_190-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    padding-top: 0.5em;
+}
+.vas_190-pgRange {
+    font-size: 0.6875em;
+    color: var(--p190-muted);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_190-pgRange b { font-weight: 700; color: var(--p190-text); }
+.vas_190-pgCtl {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-shrink: 0;
+}
+.vas_190-pgBtn {
+    width: 1.5em;
+    height: 1.5em;
+    border: none;
+    background: none;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--p190-action);
+    cursor: pointer;
+    padding: 0;
+}
+.vas_190-pgBtn:hover:not(:disabled) { background: #EEF8FF; }
+.vas_190-pgBtn:disabled { color: var(--p190-disabled); cursor: not-allowed; background: none; }
+.vas_190-pgBtn:focus-visible { outline: 2px solid var(--p190-action); outline-offset: 1px; }
+.vas_190-pgBtn .vas_190-ic svg { width: 0.875em; height: 0.875em; }
+.vas_190-pgText { font-weight: 400; font-size: 0.6875em; color: var(--p190-muted); }
+
+/* ----------------------------------------------------------- */
+/*  Activity feed                                               */
+/* ----------------------------------------------------------- */
+/* VAS_092's feed, to the row: a bordered list of rows, each one a tag chip, a
+   headline with its sub-lines, and the timestamp and author right-aligned. It
+   was a timeline of cards on a rail — a shape no other overview panel uses and
+   one that spent most of a 440px panel on the rail and the card borders. */
+.vas_190-actList {
+    border: 1px solid var(--p190-card-bd);
+    border-radius: var(--p190-radius-card);
+    background: #fff;
+    overflow: hidden;
+}
+
+/* Row + its folded body are one item, so the pager owns them together. */
+.vas_190-actItem { border-bottom: 1px solid var(--p190-divider); }
+.vas_190-actItem:last-child { border-bottom: none; }
+
+/* The row wraps, so on a narrow panel the timestamp drops to its own line
+   (still right-aligned) instead of being clipped off the edge. */
+.vas_190-actRow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25em 0.625em;
+    padding: 0.625em 0.75em;
+}
+
+/* Tag chip — tinted, with a leading icon. */
+.vas_190-actTag {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125em;
+    border-radius: 999px;
+    padding: 0.1875em 0.5em;
+    font-size: 0.6875em;
+    font-weight: 700;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+.vas_190-actTag .vas_190-ic { color: currentColor; }
+.vas_190-actTag .vas_190-ic svg { width: 0.9375em; height: 0.9375em; }
+.vas_190-actTag.vas_190-tone-info    { background: var(--p190-info-bg);    color: var(--p190-info-tx); }
+.vas_190-actTag.vas_190-tone-ok      { background: var(--p190-ok-bg);      color: var(--p190-ok-tx); }
+.vas_190-actTag.vas_190-tone-warn    { background: var(--p190-warn-bg);    color: var(--p190-warn-tx); }
+.vas_190-actTag.vas_190-tone-purple  { background: var(--p190-purple-bg);  color: var(--p190-purple-tx); }
+.vas_190-actTag.vas_190-tone-neutral { background: var(--p190-neutral-bg); color: var(--p190-neutral-tx); }
+
+.vas_190-actTitle {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.8125em;
+    color: var(--p190-text);
+    line-height: 1.35;
+}
+
+/* The headline clips to one line so the row height stays predictable — its
+   tooltip carries the whole of it. */
+.vas_190-actLead,
+.vas_190-actSub { display: block; }
+.vas_190-actLead {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* A sub-line WRAPS instead of clipping: it lists a mail's addresses in full,
+   and an address cut off mid-domain identifies nobody. break-word rather than
+   a plain wrap, since a single long address has no space to break at. */
+.vas_190-actSub {
+    font-size: 0.8462em;
+    color: var(--p190-muted);
+    margin-top: 0.125em;
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    line-height: 1.45;
+}
+
+/* "was X → now Y" under an edited field's name. */
+.vas_190-actDelta {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25em 0.375em;
+}
+.vas_190-cvOld {
+    color: var(--p190-muted);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+    overflow-wrap: break-word; word-break: break-word;
+}
+.vas_190-cvArrow { flex: none; color: var(--p190-muted); }
+.vas_190-cvNew {
+    color: var(--p190-text); font-weight: 700;
+    overflow-wrap: break-word; word-break: break-word;
+}
+
+.vas_190-actWhen {
+    flex: none;
+    margin-left: auto;      /* right-aligned even when wrapped to its own line */
+    max-width: 100%;
+    font-size: 0.6875em;
+    color: var(--p190-muted);
+    white-space: nowrap;
+}
+
+/* A mail row opens its message on click; the caret shows the state. */
+.vas_190-actRow.vas_190-is-openable { cursor: pointer; }
+.vas_190-actRow.vas_190-is-openable:hover { background: #F7FBFF; }
+.vas_190-actRow.vas_190-is-openable:focus-visible {
+    outline: 2px solid var(--p190-action);
+    outline-offset: -2px;
+}
+.vas_190-actCaret {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    color: var(--p190-muted);
+    transition: transform .15s ease;
+}
+.vas_190-actCaret svg { width: 0.875em; height: 0.875em; }
+.vas_190-actRow.vas_190-is-open .vas_190-actCaret {
+    transform: rotate(90deg);
+    color: var(--p190-action);
+}
+
+/* ----------------------------------------------------------- */
+/*  Mail body, folded under its row                             */
+/* ----------------------------------------------------------- */
+.vas_190-actBody {
+    background: #F7FAFD;
+    border-top: 1px solid var(--p190-divider);
+    padding: 0.625em 0.875em 0.75em 2.5em;
+}
+
+.vas_190-mailSub { font-weight: 700; font-size: 0.8125em; color: var(--p190-text); }
+.vas_190-mailMeta { margin-top: 0.5em; display: flex; flex-direction: column; gap: 0.1875em; }
+.vas_190-mailRow { display: flex; gap: 0.5em; font-size: 0.6875em; }
+.vas_190-mailK { flex-shrink: 0; width: 2.6em; font-weight: 500; color: var(--p190-muted); }
+.vas_190-mailV { font-weight: 400; color: var(--p190-secondary); word-break: break-word; min-width: 0; }
+
+/* Under the platform composer's To / Cc / Bcc box (25-Sep-2026): the whole list,
+   wrapping, so a recipient list longer than the single-line box is readable in
+   full. The composer mounts outside this panel's root, so no panel tokens. */
+.vas_190-mailAllRcpt {
+    /* A sibling of the composer's field rows, which are 100%-wide floats
+       (01-Oct-2026): floated and cleared the same way, so it stacks under its
+       row instead of sliding up behind it. */
+    float: left;
+    clear: both;
+    box-sizing: border-box;
+    flex-basis: 100%;
+    width: 100%;
+    margin: 0.25em 0 0.375em;
+    font-size: 12px;
+    line-height: 1.4;
+    color: #41576A;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+/* The body keeps the line breaks the message was written with. */
+.vas_190-mailBody {
+    margin-top: 0.625em;
+    padding-top: 0.625em;
+    border-top: 1px solid var(--p190-divider);
+    font-weight: 400;
+    font-size: 0.75em;
+    color: var(--p190-secondary);
+    line-height: 1.6;
+    white-space: pre-line;
+    word-break: break-word;
+}
+
+/* ----------------------------------------------------------- */
+/*  Icons                                                       */
+/* ----------------------------------------------------------- */
+.vas_190-ic { display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+.vas_190-ic svg { width: 1em; height: 1em; display: block; }
+
+/* ----------------------------------------------------------- */
+/*  Narrow panel                                                */
+/* ----------------------------------------------------------- */
+/* Two metric columns are too cramped below this — a single stack keeps the
+   values readable instead of ellipsising every one of them. */
+@container (max-width: 320px) {
+    .vas_190-heroGrid,
+    .vas_190-detailCard { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ----------------------------------------------------------- */
+/*  RTL                                                         */
+/* ----------------------------------------------------------- */
+[dir="rtl"] .vas_190-clVal,
+[dir="rtl"] .vas_190-eVal { text-align: left; }
+[dir="rtl"] .vas_190-grid .vas_190-num { text-align: left; }
+[dir="rtl"] .vas_190-pgBtn .vas_190-ic svg { transform: scaleX(-1); }
+/* The activity caret points INTO the row's reading direction, and its open
+   state rotates the other way to match. */
+[dir="rtl"] .vas_190-actBody { padding-left: 0.875em; padding-right: 2.5em; }
+[dir="rtl"] .vas_190-actCaret svg { transform: scaleX(-1); }
+[dir="rtl"] .vas_190-actRow.vas_190-is-open .vas_190-actCaret { transform: rotate(-90deg); }
+
+/* Each e-mail sent against an appointment or task, inside that row's drawer.
+   The second and later ones are ruled off, so several notices about the same
+   meeting do not read as one long message. */
+.vas_190-actMailSplit {
+    margin-top: 0.625em;
+    padding-top: 0.625em;
+    border-top: 1px solid var(--p190-divider);
+}

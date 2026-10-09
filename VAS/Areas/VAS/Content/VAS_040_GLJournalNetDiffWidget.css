@@ -1,0 +1,212 @@
+/* ==========================================================================
+   VAS GL Journal Net Difference KPI Widget
+   File  : VAS_040_GLJournalNetDiffWidget.css
+   Scope : .VAS-gljnd-root
+   ========================================================================== */
+
+/* ── Root wrapper ────────────────────────────────────────────────────────── */
+.VAS-gljnd-root {
+    --on-text-muted: #748494;
+    height: 100%;
+    width: 100%;
+    container-type: inline-size;
+}
+
+/* ── KPI card container ──────────────────────────────────────────────────── */
+.VAS-gljnd-root .kpi {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+    padding: 0.85em;
+    border-radius: 14px;
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    position: relative;
+    overflow: hidden;
+    box-sizing: border-box;
+    /* Widget-root anchor — design.md clamp(16px, 1.2cqi, 20px) expressed on the
+       dashboard-width variable (0.012 ≈ 1.2 % of dashboard width). NO cqi. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
+}
+
+/* design.md: KPI surface stays the shared glass — semantic meaning comes from
+   value text + icon color, NOT a tinted surface. Teal tint is neutralized. */
+.VAS-gljnd-root .kpi.kpi-teal {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+}
+
+/* ── Header row ──────────────────────────────────────────────────────────── */
+.VAS-gljnd-root .w-head {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+}
+
+/* Glass icon well + glyph — scale on --dash-inline-size (design.md Widget Header).
+   KEEP the #0083DA icon accent. */
+.VAS-gljnd-root .w-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    height: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    flex-shrink: 0;
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(232, 244, 255, 0.96));
+    box-shadow: inset 0 0 0 1px rgba(31, 131, 255, 0.10);
+    color: #0083DA;
+}
+
+.VAS-gljnd-root .w-icon svg {
+    width: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
+    height: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
+    stroke: currentColor;
+}
+
+/* Title — Roboto Regular 400, clamp ceiling 17px (design.md Widget Header) */
+.VAS-gljnd-root .w-title {
+    font-family: 'Roboto', sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    font-weight: 400;
+    line-height: 1.2;
+    letter-spacing: 0;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* DR − CR badge — pushed to the far right */
+.VAS-gljnd-drcr {
+    font-size: 0.7em;
+    font-weight: 600;
+    color: #748494;
+    letter-spacing: 0.04em;
+    margin-left: auto;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+/* ── Period toggle ───────────────────────────────────────────────────────── */
+.VAS-gljnd-period-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.35em;
+    flex-shrink: 0;
+}
+
+.VAS-gljnd-period {
+    font-size: 0.75em;
+    font-weight: 500;
+    color: #748494;
+    cursor: pointer;
+    padding: 0.15em 0.3em;
+    border-radius: 0.3em;
+    transition: color 0.12s, background 0.12s;
+    user-select: none;
+}
+
+.VAS-gljnd-period:hover {
+    color: #0083DA;
+}
+
+.VAS-gljnd-period-active {
+    color: #0083DA;
+    font-weight: 700;
+}
+
+.VAS-gljnd-sep {
+    font-size: 0.75em;
+    color: #C0CBD3;
+    user-select: none;
+}
+
+/* ── KPI value — design.md 1.75em Roboto SemiBold 600, line-height 1.05.
+   Semantic accent is carried by the value color, not the surface.
+   KEEP the baseline flex + currency-prefix layout. ─────────────────────────── */
+.VAS-gljnd-root .kpi-value {
+    display: flex;
+    align-items: baseline;
+    gap: 0;
+    font-size: 1.75em;
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+    color: #102C3F;
+    padding-left: 0.3125em;
+}
+
+/* Green when books are in balance */
+.VAS-gljnd-root .kpi-value.VAS-gljnd-balanced {
+    color: #0B6B45;
+}
+
+/* Amber when out of balance */
+.VAS-gljnd-root .kpi-value.VAS-gljnd-unbalanced {
+    color: #D78B10;
+}
+
+/* Currency prefix — same style as amount */
+.VAS-gljnd-prefix {
+    font-size: inherit;
+    font-weight: inherit;
+    color: inherit;
+    flex: 0 0 auto;
+}
+
+/* ── Status / Why section ────────────────────────────────────────────────── */
+.VAS-gljnd-root .kpi-why {
+    display: flex;
+    align-items: flex-start;
+    border-radius: 0.5em;
+}
+
+.VAS-gljnd-root .kpi-why-label {
+    font-size: 0.6875em;
+    font-weight: 700;
+    color: #0083DA;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    flex-shrink: 0;
+    line-height: 1.4;
+}
+
+/* KPI meta — design.md xs (0.6875em of root), muted, line-height 1.3 */
+.VAS-gljnd-root .kpi-why-text {
+    font-size: 0.6875em;
+    font-weight: 400;
+    line-height: 1.3;
+    color: #5F7283;
+}
+
+/* Balanced — muted status text */
+.VAS-gljnd-root .kpi-why-text.VAS-gljnd-status-ok {
+    color: #748494;
+    font-weight: 500;
+}
+
+/* Unbalanced — muted warning status text */
+.VAS-gljnd-root .kpi-why-text.VAS-gljnd-status-warn {
+    color: #748494;
+    font-weight: 500;
+}
+
+/* Widget content scales off the widget-root font-size lever above, not px
+   breakpoints. The old per-viewport font-size hacks are removed per design.md
+   (Widget Internal Sizing) — one em lever drives every internal value. */
+
+/* RTL support */
+html[dir="rtl"] .VAS-gljnd-root .w-head {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .VAS-gljnd-drcr {
+    margin-left: unset;
+    margin-right: auto;
+}
+
+html[dir="rtl"] .VAS-gljnd-root .kpi-why {
+    flex-direction: row-reverse;
+}

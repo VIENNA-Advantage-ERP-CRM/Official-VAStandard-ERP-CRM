@@ -1,0 +1,814 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_298 Recent Updates — 3x2 glass ranked list (Customers dashboard) +
+ * customer detail modal (shared with VAS_126/138/295/296/297) + shared
+ * VAS_135 projects modal. Design: recent-updates.html (attached) + Design
+ * Specs/dashboard-widgets.md "Grid Data Widget". Glass surface, icon-well
+ * header, ranked rows (paged 7) with a kind-specific icon/colour (note/email/
+ * call/meeting) set inline per row, circular pager; customer detail with
+ * identity block, fact grid and signal list; project modal with five
+ * activity-state cells, per-project progress bars and an activity-detail
+ * filter; "All" full-list modal. Widget scales in em against the widget
+ * root; modals are px/rem overlays. MPC-prefixed.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas298-root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    color: #102C3F;
+    font-family: Roboto, sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 20px);
+}
+
+    .vas298-root,
+    .vas298-root * {
+        box-sizing: border-box;
+    }
+
+.vas298-card {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0.875em 1em 1.125em;
+    border: 2px solid #FFFFFF;                  /* px */
+    border-radius: 14px;                        /* px */
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.49));
+    backdrop-filter: blur(10px);
+}
+
+/* Header. */
+.vas298-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    margin-bottom: 0.625em;
+    flex-shrink: 0;
+}
+
+.vas298-head-l {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+}
+
+.vas298-iconwell {
+    width: 2em;
+    height: 2em;
+    flex-shrink: 0;
+    border-radius: 10px;                        /* px */
+    display: grid;
+    place-items: center;
+    background: linear-gradient(180deg, #FFFFFF, #F1F8FF);
+    border: 1px solid #BFE4FF;                  /* px */
+    color: #0083DA;
+}
+
+    .vas298-iconwell svg {
+        width: 1.05em;
+        height: 1.05em;
+    }
+
+.vas298-head-txt {
+    min-width: 0;
+}
+
+.vas298-title {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    font-weight: 500;
+    color: #000000;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas298-sub {
+    font-size: 0.7em;
+    color: #717182;
+    margin-top: 1px;                            /* px */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas298-alllink {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;                                   /* px */
+    background: transparent;
+    border: none;
+    color: #0083DA;
+    font-family: inherit;
+    font-weight: 500;
+    font-size: 0.78em;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+    .vas298-alllink svg {
+        width: 0.8em;
+        height: 0.8em;
+    }
+
+/* Body + rows. */
+.vas298-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.vas298-list {
+    flex: 1;
+    min-height: 0;
+}
+
+    /* Widget body: split the available height into `pageSize` equal rows so the
+     * records fill the card top-to-bottom (grid-template-rows set inline in JS).
+     * Partial pages leave empty tracks at the bottom rather than stretching.
+     * Matches VAS_135/138/294/295/296/297. */
+    .vas298-body > .vas298-list {
+        display: grid;
+        grid-auto-rows: minmax(0, 1fr);
+    }
+
+    /* Modal list: a normal flowing column of natural-height rows. */
+    .vas298-pbody .vas298-list {
+        display: flex;
+        flex-direction: column;
+    }
+
+.vas298-row {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    width: 100%;
+    padding: 0.4em 0.25em;
+    border: none;
+    border-bottom: 1px solid #EDF2F6;           /* px */
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    min-height: 0;
+    overflow: hidden;
+}
+
+    .vas298-row:last-child {
+        border-bottom: none;
+    }
+
+    .vas298-row:hover {
+        background: rgba(31, 131, 255, 0.05);
+    }
+
+    .vas298-pbody .vas298-row {
+        overflow: visible;
+    }
+
+/* Kind icon: colour/background set inline per row (note/email/call/meeting -
+   each its own palette entry, per the brief). */
+.vas298-row-ic {
+    width: 1.875em;
+    height: 1.875em;
+    border-radius: 9px;                         /* px */
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+}
+
+    .vas298-row-ic svg {
+        width: 0.95em;
+        height: 0.95em;
+    }
+
+.vas298-row-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas298-row-title {
+    font-size: 0.85em;
+    font-weight: 700;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas298-row-meta {
+    font-size: 0.72em;
+    color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Tags: tier (row + customer detail), project status. */
+.vas298-tag {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.6875em;
+    font-weight: 600;
+    padding: 0.1875em 0.5em;
+    border-radius: 6px;                         /* px */
+    line-height: 1.2;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.vas298-tag-violet { background: #EFEAFF; color: #5F4AA6; }
+.vas298-tag-amber { background: #FCEBD3; color: #9A6500; }
+.vas298-tag-info { background: #DFF1FF; color: #0E5DA8; }
+.vas298-tag-neutral { background: #EEF2F6; color: #5F7283; }
+.vas298-tag-delayed { background: #FAD7D7; color: #8F2D2D; }
+.vas298-tag-ontime { background: #E7F7EF; color: #0B6B45; }
+.vas298-tag-ongoing { background: #DFF1FF; color: #0E5DA8; }
+.vas298-tag-upcoming { background: #EFEAFF; color: #5F4AA6; }
+
+/* Footer pager (widget + modals) — dashboard-widgets.md §"Widget Footer Pager":
+   two zones, the result-range helper on the left and a compact
+   prev · "N of M" · next control on the right. */
+.vas298-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    padding-top: 0.5em;
+    margin-top: 0.25em;
+    flex-shrink: 0;
+}
+
+.vas298-pglabel {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.75em;
+    color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas298-pgctl {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-shrink: 0;
+}
+
+.vas298-pgtext {
+    min-width: 3em;
+    text-align: center;
+    font-size: 0.8125em;
+    font-weight: 500;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.vas298-pgbtn {
+    width: 1.5em;                               /* 24px */
+    height: 1.5em;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #E4EDF4;                  /* px */
+    border-radius: 6px;                         /* px */
+    background: #FBFDFF;
+    color: #0083DA;
+    cursor: pointer;
+}
+
+    .vas298-pgbtn:hover:not(:disabled) {
+        background: #EAF8FF;
+        border-color: #BFE4FF;
+    }
+
+    .vas298-pgbtn:disabled {
+        color: #B8C6D2;
+        cursor: default;
+    }
+
+    .vas298-pgbtn svg {
+        width: 0.875em;                         /* 14px */
+        height: 0.875em;
+        stroke: currentColor;
+    }
+
+.vas298-state {
+    padding: 0.9em 0.25em;
+    font-size: 0.82em;
+    color: #748494;
+}
+
+/* ── Shared modal chrome ──────────────────────────────────────────────────── */
+
+.vas298-dialog,
+.vas298-detail,
+.vas298-proj-modal {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;                              /* px */
+    font-family: Roboto, sans-serif;
+    color: #102C3F;
+}
+
+.vas298-dialog { z-index: 5000; }
+.vas298-detail { z-index: 5100; }
+.vas298-proj-modal { z-index: 5150; }
+
+    .vas298-dialog.is-open,
+    .vas298-detail.is-open,
+    .vas298-proj-modal.is-open {
+        display: flex;
+    }
+
+    .vas298-dialog *, .vas298-detail *, .vas298-proj-modal *,
+    .vas298-dialog, .vas298-detail, .vas298-proj-modal {
+        box-sizing: border-box;
+    }
+
+.vas298-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(2, 20, 34, 0.42);
+    backdrop-filter: blur(2px);
+}
+
+.vas298-panel,
+.vas298-dpanel,
+.vas298-ppanel {
+    position: relative;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    background: #FFFFFF;
+    border-radius: 18px;                        /* px */
+    box-shadow: 0 30px 80px rgba(2, 20, 34, 0.35);
+    overflow: hidden;
+    max-height: 86vh;
+}
+
+.vas298-panel { max-width: 640px; }         /* px */
+.vas298-dpanel { max-width: 760px; }        /* px */
+.vas298-ppanel { max-width: 720px; }        /* px */
+
+.vas298-phead {
+    flex-shrink: 0;
+    height: 56px;                               /* px */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;                            /* px */
+    border-bottom: 1px solid #E4EDF4;           /* px */
+}
+
+.vas298-ptitle {
+    font-size: 16px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas298-phead-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;                                  /* px */
+}
+
+.vas298-pcount,
+.vas298-dsummary,
+.vas298-psummary {
+    font-size: 13px;                            /* px */
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 260px;                           /* px */
+}
+
+.vas298-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;                         /* px */
+    display: grid;
+    place-items: center;
+    background: transparent;
+    border: none;
+    color: #102C3F;
+    cursor: pointer;
+}
+
+    .vas298-close:hover {
+        background: #F1F4F8;
+    }
+
+    .vas298-close svg {
+        width: 20px;
+        height: 20px;
+    }
+
+.vas298-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;                                   /* px */
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 13px;                            /* px */
+    font-weight: 600;
+    padding: 8px 16px;                          /* px */
+    border: none;
+    cursor: pointer;
+}
+
+    .vas298-btn svg {
+        width: 14px;
+        height: 14px;
+    }
+
+.vas298-btn-ghost {
+    background: #FFFFFF;
+    border: 1px solid #BFE4FF;                  /* px */
+    color: #0083DA;
+}
+
+    .vas298-btn-ghost:hover {
+        background: #EAF8FF;
+    }
+
+.vas298-btn-primary {
+    background: #1F83FF;
+    color: #FFFFFF;
+}
+
+    .vas298-btn-primary:hover {
+        background: #1F83FF;
+    }
+
+/* All-list modal. */
+.vas298-pbody {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 4px 20px 8px;                      /* px */
+    font-size: 16px;                            /* px — modal rows use fixed sizing */
+}
+
+.vas298-pfoot {
+    flex-shrink: 0;
+    padding: 10px 20px 16px;                    /* px */
+    border-top: 1px solid #E4EDF4;              /* px */
+    background: #FBFDFF;
+}
+
+    /* Spec §Alignment Rules: helper stays left, control stays right — the modal
+       footer no longer centres the pager. */
+    .vas298-pfoot .vas298-pager {
+        padding-top: 0;
+        margin-top: 0;
+    }
+
+    .vas298-pbody .vas298-row {
+        padding: 0.7em 0.5em;
+    }
+
+/* ── Customer detail modal ────────────────────────────────────────────────── */
+
+.vas298-dbody {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 20px 24px;                         /* px */
+}
+
+.vas298-dfoot {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;                                  /* px */
+    padding: 14px 24px;                         /* px */
+    border-top: 1px solid #E4EDF4;              /* px */
+    background: #FBFDFF;
+}
+
+.vas298-id {
+    display: flex;
+    align-items: center;
+    gap: 14px;                                  /* px */
+    padding-bottom: 18px;                       /* px */
+    border-bottom: 1px solid #E4EDF4;           /* px */
+    margin-bottom: 18px;                        /* px */
+}
+
+.vas298-id-avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 12px;                        /* px */
+    display: grid;
+    place-items: center;
+    font-size: 16px;                            /* px */
+    font-weight: 700;
+    color: #FFFFFF;
+    flex-shrink: 0;
+}
+
+.vas298-id-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.vas298-id-name {
+    font-size: 22px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas298-id-sub {
+    font-size: 13px;                            /* px */
+    color: #5F7283;
+    margin-top: 2px;                            /* px */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas298-id-tier {
+    flex-shrink: 0;
+}
+
+.vas298-factgrid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px 18px;                             /* px */
+    padding-bottom: 18px;                       /* px */
+    border-bottom: 1px solid #E4EDF4;           /* px */
+}
+
+.vas298-fl {
+    font-size: 11px;                            /* px */
+    color: #748494;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;                      /* px */
+}
+
+.vas298-fv {
+    font-size: 15px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    margin-top: 3px;                            /* px */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas298-signals {
+    padding-top: 16px;                          /* px */
+}
+
+.vas298-sig-title {
+    font-size: 14px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    margin-bottom: 6px;                         /* px */
+}
+
+.vas298-signal {
+    display: flex;
+    align-items: center;
+    gap: 12px;                                  /* px */
+    padding: 11px 0;                            /* px */
+    border-bottom: 1px solid #EDF2F6;           /* px */
+}
+
+    .vas298-signal:last-child {
+        border-bottom: none;
+    }
+
+.vas298-sig-ic {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;                         /* px */
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+}
+
+    .vas298-sig-ic svg {
+        width: 16px;
+        height: 16px;
+    }
+
+.vas298-sig-name {
+    font-size: 14px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas298-sig-detail {
+    font-size: 12px;                            /* px */
+    color: #5F7283;
+}
+
+/* ── Projects modal (shared VAS_135 shape) ────────────────────────────────── */
+
+.vas298-projbody {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 18px 24px;                         /* px */
+}
+
+/* Five activity-state cells. */
+.vas298-statgrid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;                                   /* px */
+    margin-bottom: 16px;                        /* px */
+}
+
+.vas298-astat {
+    border: 1px solid #E4EDF4;                  /* px */
+    border-radius: 10px;                        /* px */
+    padding: 9px;                               /* px */
+    text-align: center;
+    cursor: pointer;
+    background: #FFFFFF;
+    font-family: inherit;
+}
+
+    .vas298-astat:hover {
+        border-color: #BFE4FF;
+    }
+
+    .vas298-astat.is-active {
+        border-color: #1F83FF;
+        box-shadow: 0 0 0 1px #1F83FF inset;
+    }
+
+    .vas298-astat b {
+        display: block;
+        font-size: 1.25rem;                     /* px-ish */
+        line-height: 1;
+    }
+
+    .vas298-astat span {
+        font-size: 11px;                        /* px */
+        color: #5F7283;
+    }
+
+.MPC-astat-delayed b { color: #ED1C24; }
+.MPC-astat-ontime b { color: #20A464; }
+.MPC-astat-ongoing b { color: #0083DA; }
+.MPC-astat-upcoming b { color: #5F4AA6; }
+.MPC-astat-completed b { color: #20A464; }
+
+/* Activity-detail list (state filter). */
+.vas298-actdetail:empty {
+    display: none;
+}
+
+.vas298-actlist {
+    border: 1px solid #E4EDF4;                  /* px */
+    border-radius: 10px;                        /* px */
+    padding: 4px 12px;                          /* px */
+    margin-bottom: 16px;                        /* px */
+    background: #FBFDFF;
+}
+
+.vas298-act {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;                                  /* px */
+    padding: 9px 0;                             /* px */
+    border-bottom: 1px solid #EDF2F6;           /* px */
+}
+
+    .vas298-act:last-child {
+        border-bottom: none;
+    }
+
+.vas298-act-main {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas298-act-name {
+    font-size: 13px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas298-act-proj {
+    font-size: 11px;                            /* px */
+    color: #748494;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas298-act-due {
+    font-size: 12px;                            /* px */
+    color: #5F7283;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.vas298-proj {
+    padding: 12px 0;                            /* px */
+    border-bottom: 1px solid #EDF2F6;           /* px */
+}
+
+    .vas298-proj:last-child {
+        border-bottom: none;
+    }
+
+.vas298-proj-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;                                  /* px */
+    margin-bottom: 8px;                         /* px */
+}
+
+.vas298-proj-name {
+    font-size: 14px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.vas298-proj-bd {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;                                   /* px */
+    margin-bottom: 8px;                         /* px */
+}
+
+.vas298-bd {
+    font-size: 11px;                            /* px */
+    font-weight: 600;
+    padding: 2px 7px;                           /* px */
+    border-radius: 6px;                         /* px */
+    white-space: nowrap;
+}
+
+.MPC-bd-delayed { background: #FAD7D7; color: #8F2D2D; }
+.MPC-bd-ontime { background: #E7F7EF; color: #0B6B45; }
+.MPC-bd-ongoing { background: #DFF1FF; color: #0E5DA8; }
+.MPC-bd-upcoming { background: #EFEAFF; color: #5F4AA6; }
+.MPC-bd-completed { background: #E7F7EF; color: #0B6B45; }
+
+.vas298-bar {
+    height: 8px;                                /* px */
+    border-radius: 999px;
+    background: rgba(15, 61, 97, 0.07);
+    overflow: hidden;
+}
+
+    .vas298-bar > div {
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #0083DA, #1F83FF);
+    }
+
+.vas298-proj-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;                                  /* px */
+    margin-top: 6px;                            /* px */
+    font-size: 12px;                            /* px */
+    color: #5F7283;
+}
+
+body.vas298-modal-open {
+    overflow: hidden;
+}

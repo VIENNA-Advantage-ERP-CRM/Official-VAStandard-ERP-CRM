@@ -1,0 +1,494 @@
+﻿﻿﻿﻿﻿/************************************************************
+ * Module Name    : VAS
+ * Purpose        : Controller for Drafted / In-Process POs Widget (Purchase Order Dashboard)
+ *                  Provides aggregate counts, server-side converted values, and
+ *                  drill-down document records for Drafted ('DR') and In Progress ('IP') POs.
+ * Chronological  : Development
+ * Created Date   : 17 August 2026
+ * Widget ID      : VAS_207_DraftedInProcessPOsWidget
+ * Claude 2026-09-30: GetDraftedInProcessPOsData's line_count/po_value aggregates counted every
+ *                    order line, including charge lines and non-Item products. Added a JOIN to
+ *                    M_Product and "AND prod.ProductType = 'I'" so only Item-type product lines
+ *                    are counted/summed, matching VAS_206_POsPendingDeliveryWidget's same fix.
+ * Claude 2026-09-30: GetOrderLines showed "Couldn't load" for every PO - it called
+ *                    MRole.AddAccessSQL directly on a 6-JOIN + ORDER BY statement, which
+ *                    AccessSqlParser cannot reliably parse (same documented issue as
+ *                    VAS_216_POQueueWidget / this file's own GetDraftedInProcessPOsData). Switched
+ *                    to the same safe sub-query access pattern used elsewhere in this file.
+ ***********************************************************/
+
+using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Data.SqlClient;
+using System.Globalization;
+using System.Web.Mvc;
+using VAdvantage.Classes;
+using VAdvantage.DataBase;
+using VAdvantage.Logging;
+using VAdvantage.Model;
+using VAdvantage.Utility;
+using VIS.Filters;
+
+namespace VIS.Controllers
+{
+    /// <summary>
+    /// Controller for Widget 05: Drafted / In-Process POs.
+    /// Internal PO work queue containing only Drafted ('DR') and In Progress ('IP') Purchase Orders.
+    /// </summary>
+    public class VAS_207_DraftedInProcessPOsWidgetController : Controller
+    {
+        private static readonly VLogger _log = VLogger.GetVLogger(typeof(VAS_207_DraftedInProcessPOsWidgetController).FullName);
+
+        [Authorize]
+        public ActionResult Index()
+        {
+            return View();
+        }
+
+        /// <summary>
+        /// Returns summary KPI metrics and the full list of Drafted and In Progress purchase orders
+        /// with amounts converted server-side into the client's accounting schema functional currency.
+        /// </summary>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetDraftedInProcessPOsData()
+        {
+            if (Session["ctx"] == null)
+            {
+                return Json(new { error = Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired" }, JsonRequestBehavior.AllowGet);
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+            if (ctx == null)
+            {
+                return Json(new { error = "Invalid Context" }, JsonRequestBehavior.AllowGet);
+            }
+
+            try
+            {
+                int clientId = ctx.GetAD_Client_ID();
+                int orgId = ctx.GetAD_Org_ID();
+
+                // Step 1: Resolve functional base currency from the accounting schema
+                CurrencyInfo baseCurrency = GetAccountingCurrency(ctx, clientId);
+
+                // Step 2: Query Drafted and In Progress purchase orders
+                string sql = @"
+                    SELECT
+                        o.C_Order_ID            AS purchase_order_id,
+                        o.DocumentNo            AS purchase_order_number,
+                        o.DateOrdered           AS order_date,
+                        o.Created               AS created_on,
+                        o.DocStatus             AS document_status,
+                        o.C_Currency_ID         AS currency_id,
+                        o.C_ConversionType_ID   AS conversion_type_id,
+                        bp.Name                 AS vendor_name,
+                        rep.Name                AS representative_name,
+                        COUNT(ol.C_OrderLine_ID) AS line_count,
+                        SUM(COALESCE(ol.LineNetAmt, 0)) AS po_value_document_currency
+                    FROM C_Order o
+                    LEFT JOIN C_OrderLine ol
+                        ON ol.C_Order_ID = o.C_Order_ID
+                       AND ol.IsActive = 'Y'
+                    LEFT JOIN M_Product prod
+                        ON prod.M_Product_ID = ol.M_Product_ID
+                    INNER JOIN C_BPartner bp
+                        ON bp.C_BPartner_ID = o.C_BPartner_ID
+                    LEFT JOIN AD_User rep
+                        ON rep.AD_User_ID = o.SalesRep_ID
+                    WHERE o.AD_Client_ID = " + clientId + @"
+                      AND o.IsActive = 'Y'
+                      AND o.IsSOTrx = 'N'
+                      AND COALESCE(o.IsReturnTrx, 'N') = 'N'
+                      AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
+                      AND o.DocStatus IN ('DR', 'IP')
+                      -- Per specification this widget covers the Purchase Order screen only;
+                      -- Blanket Purchase Order documents are excluded (C_DocType.IsBlanketTrx).
+                      AND NOT EXISTS (
+                          SELECT 1 FROM C_DocType dt
+                          WHERE dt.C_DocType_ID = o.C_DocTypeTarget_ID
+                            AND COALESCE(dt.IsBlanketTrx, 'N') = 'Y')
+                      AND o.C_Order_ID IN (@P_ORDER_ACCESS@)
+                      AND prod.ProductType = 'I'
+                    GROUP BY
+                        o.C_Order_ID,
+                        o.DocumentNo,
+                        o.DateOrdered,
+                        o.Created,
+                        o.DocStatus,
+                        o.C_Currency_ID,
+                        o.C_ConversionType_ID,
+                        bp.Name,
+                        rep.Name
+                    ORDER BY o.Created DESC, o.DocumentNo DESC";
+
+                // MRole.AddAccessSQL cannot parse this statement (GROUP BY / derived tables /
+                // several JOIN..ON clauses). AccessSqlParser mis-locates the insertion point and
+                // appends the access predicates after GROUP BY / HAVING / ORDER BY, producing
+                // ORA-00933 / ORA-00979 / ORA-00904. Apply the same role access through a simple,
+                // parseable sub-query on C_Order instead.
+                string orderAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                    "SELECT accessOrd.C_Order_ID FROM C_Order accessOrd WHERE accessOrd.AD_Client_ID = " + clientId,
+                    "accessOrd", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                sql = sql.Replace("@P_ORDER_ACCESS@", orderAccessSql);
+
+                List<DraftedPORecord> records = new List<DraftedPORecord>();
+                int draftedCount = 0;
+                int inProgressCount = 0;
+                decimal totalValueConverted = 0;
+
+                IDataReader dr = null;
+                try
+                {
+                    dr = DB.ExecuteReader(sql);
+                    while (dr != null && dr.Read())
+                    {
+                        int orderId = Util.GetValueOfInt(dr["purchase_order_id"]);
+                        string docNo = Util.GetValueOfString(dr["purchase_order_number"]);
+                        DateTime? orderDate = Util.GetValueOfDateTime(dr["order_date"]);
+                        DateTime? createdOn = Util.GetValueOfDateTime(dr["created_on"]);
+                        string docStatus = Util.GetValueOfString(dr["document_status"]);
+                        int currencyId = Util.GetValueOfInt(dr["currency_id"]);
+                        int convTypeId = Util.GetValueOfInt(dr["conversion_type_id"]);
+                        string vendorName = Util.GetValueOfString(dr["vendor_name"]);
+                        string repName = Util.GetValueOfString(dr["representative_name"]);
+                        int lineCount = Util.GetValueOfInt(dr["line_count"]);
+                        decimal lineNetAmt = Util.GetValueOfDecimal(dr["po_value_document_currency"]);
+
+                        // Status tracking
+                        if (docStatus == "DR")
+                        {
+                            draftedCount++;
+                        }
+                        else if (docStatus == "IP")
+                        {
+                            inProgressCount++;
+                        }
+
+                        // Server-side Currency Conversion
+                        decimal convertedAmt = lineNetAmt;
+                        if (baseCurrency.CurrencyId > 0 && currencyId > 0 && currencyId != baseCurrency.CurrencyId)
+                        {
+                            try
+                            {
+                                convertedAmt = MConversionRate.Convert(
+                                    ctx,
+                                    lineNetAmt,
+                                    currencyId,
+                                    baseCurrency.CurrencyId,
+                                    orderDate.HasValue ? orderDate.Value : DateTime.Now,
+                                    convTypeId,
+                                    clientId,
+                                    orgId
+                                );
+                            }
+                            catch (Exception exConv)
+                            {
+                                _log.Warning("VAS_207: Rate conversion failed for C_Order_ID " + orderId + ": " + exConv.Message);
+                                convertedAmt = lineNetAmt;
+                            }
+                        }
+
+                        totalValueConverted += convertedAmt;
+
+                        records.Add(new DraftedPORecord
+                        {
+                            PurchaseOrderId = orderId,
+                            PurchaseOrderNumber = docNo,
+                            OrderDate = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
+                            OrderDateFormatted = orderDate.HasValue ? orderDate.Value.ToString("dd MMM yyyy", CultureInfo.InvariantCulture) : "",
+                            CreatedOn = createdOn.HasValue ? createdOn.Value.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) : "",
+                            CreatedOnFormatted = createdOn.HasValue ? createdOn.Value.ToString("dd MMM yyyy", CultureInfo.InvariantCulture) : "",
+                            DocStatus = docStatus,
+                            DocStatusName = docStatus == "DR" ? (Msg.GetMsg(ctx, "Drafted") ?? "Drafted") : (Msg.GetMsg(ctx, "InProgress") ?? "In Progress"),
+                            CurrencyId = currencyId,
+                            VendorName = vendorName,
+                            RepresentativeName = string.IsNullOrEmpty(repName) ? "—" : repName,
+                            LineCount = lineCount,
+                            DocValue = lineNetAmt,
+                            ConvertedValue = convertedAmt
+                        });
+                    }
+                }
+                finally
+                {
+                    if (dr != null)
+                    {
+                        dr.Close();
+                        dr.Dispose();
+                    }
+                }
+
+                var response = new
+                {
+                    success = true,
+                    totalDocuments = records.Count,
+                    draftedCount = draftedCount,
+                    inProgressCount = inProgressCount,
+                    totalValue = totalValueConverted,
+                    currencySymbol = baseCurrency.Symbol,
+                    currencyIso = baseCurrency.IsoCode,
+                    precision = baseCurrency.Precision,
+                    records = records
+                };
+
+                return Json(JsonConvert.SerializeObject(response), JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("VAS_207_DraftedInProcessPOsWidget.GetDraftedInProcessPOsData: " + ex.ToString());
+                return Json(new { error = ex.Message }, JsonRequestBehavior.AllowGet);
+            }
+        }
+
+        /// <summary>
+        /// Retrieves line details for a given purchase order (for line modal drill-down).
+        /// </summary>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetOrderLines(int C_Order_ID)
+        {
+            if (Session["ctx"] == null)
+            {
+                return Json(new { error = Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired" }, JsonRequestBehavior.AllowGet);
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+            if (ctx == null || C_Order_ID <= 0)
+            {
+                return Json(new { error = "Invalid Request" }, JsonRequestBehavior.AllowGet);
+            }
+
+            try
+            {
+                // Raw string columns selected without COALESCE-against-a-literal: mixing an
+                // NVARCHAR2 literal (N'') with a VARCHAR2 column (p.Value, u.UOMSymbol, p.ProductType
+                // are all VARCHAR2/CHAR, not NVARCHAR2) raises ORA-12704 character-set mismatch -
+                // same established pattern as VAS_161/163/164/165. Null/default handling moved to C#.
+                string sql = @"
+                    SELECT
+                        ol.C_OrderLine_ID             AS line_id,
+                        ol.Line                       AS line_no,
+                        -- A charge line, or a product that is not of Item type, carries no
+                        -- stock movement: the widget shows its name, UOM, ordered, rate and
+                        -- amount, and dashes for received / pending / line status.
+                        CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0 THEN ch.Name ELSE p.Name END AS product_name_raw,
+                        ol.Description AS line_description_raw,
+                        CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0 THEN 'Y'
+                             WHEN ol.M_Product_ID IS NOT NULL AND COALESCE(p.ProductType, 'I') <> 'I' THEN 'Y'
+                             ELSE 'N' END AS IsNonStock,
+                        p.Value                        AS product_code_raw,
+                        CASE WHEN COALESCE(ol.M_AttributeSetInstance_ID, 0) > 0
+                             THEN asi.Description ELSE NULL END AS attribute_desc_raw,
+                        u.UOMSymbol                    AS uom_symbol_raw,
+                        u.Name                         AS uom_name_raw,
+                        p.ProductType                  AS product_type_raw,
+                        COALESCE(ol.QtyOrdered, 0)    AS qty_ordered,
+                        -- QtyEntered is expressed in the line's own C_UOM_ID (the UOM the buyer
+                        -- picked); QtyOrdered / QtyDelivered are in the product's base UOM. The
+                        -- widget shows the selected UOM, so quantities are scaled to it.
+                        COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) AS QtyEntered,
+                        COALESCE(ol.QtyDelivered, 0)  AS qty_delivered,
+                        CASE WHEN COALESCE(ol.QtyOrdered, 0) > COALESCE(ol.QtyDelivered, 0)
+                             THEN COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0)
+                             ELSE 0 END               AS qty_pending,
+                        COALESCE(ol.PriceActual, 0)   AS price_actual,
+                        COALESCE(ol.LineNetAmt, 0)    AS line_net_amt,
+                        o.DocStatus                   AS doc_status,
+                        cur.CurSymbol                 AS cur_symbol,
+                        cur.ISO_Code                  AS cur_iso
+                    FROM C_OrderLine ol
+                    INNER JOIN C_Order o ON o.C_Order_ID = ol.C_Order_ID
+                    LEFT JOIN M_Product p ON p.M_Product_ID = ol.M_Product_ID
+                    LEFT JOIN C_Charge ch ON (ch.C_Charge_ID = ol.C_Charge_ID)
+                    LEFT JOIN C_UOM u ON u.C_UOM_ID = ol.C_UOM_ID
+                    LEFT JOIN M_AttributeSetInstance asi ON asi.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID
+                    LEFT JOIN C_Currency cur ON cur.C_Currency_ID = o.C_Currency_ID
+                    WHERE ol.C_Order_ID = " + C_Order_ID + @"
+                      AND ol.IsActive = 'Y'
+                      AND ol.C_Order_ID IN (@P_ORDER_ACCESS@)
+                    ORDER BY ol.Line ASC, ol.C_OrderLine_ID ASC";
+
+                // MRole.AddAccessSQL cannot reliably parse a multi-JOIN + ORDER BY statement like
+                // this one - AccessSqlParser mis-locates the insertion point (same documented
+                // problem as VAS_216_POQueueWidget and this controller's own
+                // GetDraftedInProcessPOsData), which either throws or silently produces a query
+                // that matches nothing, surfacing here as "Couldn't load". Applying role access via
+                // a small, easily-parsed sub-query on C_Order instead.
+                string orderAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                    "SELECT accessOrd.C_Order_ID FROM C_Order accessOrd WHERE accessOrd.AD_Client_ID = " + ctx.GetAD_Client_ID(),
+                    "accessOrd", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                sql = sql.Replace("@P_ORDER_ACCESS@", orderAccessSql);
+
+                List<object> lines = new List<object>();
+                IDataReader dr = null;
+
+                try
+                {
+                    dr = DB.ExecuteReader(sql);
+                    while (dr != null && dr.Read())
+                    {
+                        decimal qtyOrdered = Util.GetValueOfDecimal(dr["qty_ordered"]);
+                        decimal qtyDelivered = Util.GetValueOfDecimal(dr["qty_delivered"]);
+
+                        // Quantities are shown in the UOM the line was entered in. QtyEntered is in the
+                        // line's own C_UOM_ID; QtyOrdered / QtyDelivered are in the product's base UOM,
+                        // so delivered is scaled by this line's own entered/ordered ratio. Header
+                        // roll-ups above stay in the base UOM - summing mixed UOMs is meaningless.
+                        decimal enteredQtyUom = Util.GetValueOfDecimal(dr["QtyEntered"]);
+                        decimal uomRatio = (qtyOrdered != 0) ? (enteredQtyUom / qtyOrdered) : 1m;
+                        qtyOrdered = enteredQtyUom;
+                        qtyDelivered = qtyDelivered * uomRatio;
+                        decimal qtyPending = Util.GetValueOfDecimal(dr["qty_pending"]);
+                        // Pending follows the converted figures, not the base-UOM value.
+                        qtyPending = Math.Max(0m, qtyOrdered - qtyDelivered);
+                        string parentDocStatus = Util.GetValueOfString(dr["doc_status"]);
+
+                        string lineStatus = "Pending";
+                        if (parentDocStatus == "DR")
+                        {
+                            lineStatus = "Drafted";
+                        }
+                        else if (qtyDelivered >= qtyOrdered && qtyOrdered > 0)
+                        {
+                            lineStatus = "Received";
+                        }
+                        else if (qtyDelivered > 0 && qtyDelivered < qtyOrdered)
+                        {
+                            lineStatus = "Partial received";
+                        }
+
+                        string productName = Util.GetValueOfString(dr["product_name_raw"]);
+                        if (string.IsNullOrEmpty(productName))
+                        {
+                            productName = Util.GetValueOfString(dr["line_description_raw"]);
+                        }
+                        if (string.IsNullOrEmpty(productName))
+                        {
+                            productName = "—";
+                        }
+
+                        string uom = Util.GetValueOfString(dr["uom_symbol_raw"]);
+                        if (string.IsNullOrEmpty(uom))
+                        {
+                            uom = Util.GetValueOfString(dr["uom_name_raw"]);
+                        }
+
+                        lines.Add(new
+                        {
+                            LineId = Util.GetValueOfInt(dr["line_id"]),
+                            LineNo = Util.GetValueOfInt(dr["line_no"]),
+                            ProductName = productName,
+                            ProductCode = Util.GetValueOfString(dr["product_code_raw"]),
+                            AttributeDesc = Util.GetValueOfString(dr["attribute_desc_raw"]),
+                            UOM = uom,
+                            ProductType = Util.GetValueOfString(dr["product_type_raw"]),
+                            QtyOrdered = qtyOrdered,
+                            QtyDelivered = qtyDelivered,
+                            QtyPending = qtyPending,
+                            PriceActual = Util.GetValueOfDecimal(dr["price_actual"]),
+                            LineNetAmt = Util.GetValueOfDecimal(dr["line_net_amt"]),
+                            // Charge / non-Item lines are never received - the client renders dashes
+                            // for received, pending and line status.
+                            isNonStock = Util.GetValueOfString(dr["IsNonStock"]) == "Y",
+                            LineStatus = lineStatus,
+                            CurrencySymbol = Util.GetValueOfString(dr["cur_symbol"]),
+                            CurrencyIso = Util.GetValueOfString(dr["cur_iso"])
+                        });
+                    }
+                }
+                finally
+                {
+                    if (dr != null)
+                    {
+                        dr.Close();
+                        dr.Dispose();
+                    }
+                }
+
+                return Json(JsonConvert.SerializeObject(new { success = true, lines = lines }), JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("VAS_207_DraftedInProcessPOsWidget.GetOrderLines: " + ex.ToString());
+                return Json(new { error = ex.Message }, JsonRequestBehavior.AllowGet);
+            }
+        }
+
+        #region Helper Classes and Methods
+
+        private CurrencyInfo GetAccountingCurrency(Ctx ctx, int clientId)
+        {
+            CurrencyInfo info = new CurrencyInfo { CurrencyId = 0, Symbol = "₹", IsoCode = "INR", Precision = 2 };
+
+            string sql = @"
+                SELECT cs.C_Currency_ID, c.CurSymbol, c.ISO_Code, COALESCE(c.StdPrecision, 2) AS StdPrecision
+                FROM C_AcctSchema cs
+                INNER JOIN AD_ClientInfo ci ON (ci.C_AcctSchema1_ID = cs.C_AcctSchema_ID)
+                INNER JOIN C_Currency c ON (cs.C_Currency_ID = c.C_Currency_ID)
+                WHERE ci.AD_Client_ID = " + clientId + @"
+                  AND ci.IsActive = 'Y'
+                  AND cs.IsActive = 'Y'
+                  AND c.IsActive = 'Y'";
+
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "cs", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+            IDataReader dr = null;
+            try
+            {
+                dr = DB.ExecuteReader(sql);
+                if (dr != null && dr.Read())
+                {
+                    info.CurrencyId = Util.GetValueOfInt(dr["C_Currency_ID"]);
+                    info.Symbol = Util.GetValueOfString(dr["CurSymbol"]);
+                    info.IsoCode = Util.GetValueOfString(dr["ISO_Code"]);
+                    info.Precision = Util.GetValueOfInt(dr["StdPrecision"]);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Warning("VAS_207: Error fetching accounting currency: " + ex.Message);
+            }
+            finally
+            {
+                if (dr != null)
+                {
+                    dr.Close();
+                    dr.Dispose();
+                }
+            }
+
+            return info;
+        }
+
+        private class CurrencyInfo
+        {
+            public int CurrencyId { get; set; }
+            public string Symbol { get; set; }
+            public string IsoCode { get; set; }
+            public int Precision { get; set; }
+        }
+
+        private class DraftedPORecord
+        {
+            public int PurchaseOrderId { get; set; }
+            public string PurchaseOrderNumber { get; set; }
+            public string OrderDate { get; set; }
+            public string OrderDateFormatted { get; set; }
+            public string CreatedOn { get; set; }
+            public string CreatedOnFormatted { get; set; }
+            public string DocStatus { get; set; }
+            public string DocStatusName { get; set; }
+            public int CurrencyId { get; set; }
+            public string VendorName { get; set; }
+            public string RepresentativeName { get; set; }
+            public int LineCount { get; set; }
+            public decimal DocValue { get; set; }
+            public decimal ConvertedValue { get; set; }
+        }
+
+        #endregion
+    }
+}

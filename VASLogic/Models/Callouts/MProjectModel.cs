@@ -97,6 +97,84 @@ namespace VIS.Models
 
             return result;
         }
+        /// <summary>
+        /// GetProjectDetail
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="fields"></param>
+        /// <returns></returns>
+        public Dictionary<string, object> GetVASProjectDetail(Ctx ctx, string fields)
+        {
+            string[] paramValue = fields.Split(',');
+            int  OpportunityID = 0, ProductID = 0, Attribute_ID = 0, UOM_ID = 0;
+            OpportunityID = Util.GetValueOfInt(paramValue[0].ToString());
+            ProductID = Util.GetValueOfInt(paramValue[1].ToString());
+            Attribute_ID = Util.GetValueOfInt(paramValue[2].ToString());
+            UOM_ID = Util.GetValueOfInt(paramValue[3].ToString());
+            Dictionary<string, object> result = null;
+            string Sql = $@"SELECT
+	PriceList,
+	PriceStd,
+	PriceLimit,
+	C_UOM_ID
+FROM
+	M_ProductPrice
+WHERE
+	M_PriceList_Version_ID = (
+	SELECT
+		c.M_PriceList_Version_ID
+	FROM
+		VAS_Opportunity c
+	WHERE
+		c.VAS_Opportunity_ID = {OpportunityID})
+	AND M_Product_ID = {ProductID}
+	AND NVL(M_AttributeSetInstance_ID, 0)= {Attribute_ID}";
+
+          
+            //VAI050-Give priority to Sales UOM  On Product
+
+            string query = "SELECT C_UOM_ID,VAS_SalesUOM_ID FROM M_Product WHERE M_Product_ID= " + ProductID;
+            DataSet ds1 = DB.ExecuteDataset(query, null, null);
+
+            if (ds1 != null && ds1.Tables.Count > 0 && ds1.Tables[0].Rows.Count > 0)
+            {
+                if (Util.GetValueOfInt(ds1.Tables[0].Rows[0]["VAS_SalesUOM_ID"]) > 0)
+                {
+                    Sql += " AND C_UOM_ID =" + Util.GetValueOfInt(ds1.Tables[0].Rows[0]["VAS_SalesUOM_ID"]);
+                }
+                else
+                {
+                    if (UOM_ID > 0)
+                    {
+                        Sql += " AND C_UOM_ID=" + UOM_ID;
+                    }
+                    else
+                    {
+                        Sql += " AND C_UOM_ID =" + Util.GetValueOfInt(ds1.Tables[0].Rows[0]["C_UOM_ID"]);
+                    }
+
+                }
+            }
+            else
+            {
+                if (UOM_ID > 0)
+                {
+                    Sql += " AND C_UOM_ID=" + UOM_ID;
+                }                                                                                                            
+            }
+
+            DataSet ds = DB.ExecuteDataset(Sql, null, null);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+                result = new Dictionary<string, object>();
+                result["PriceList"] = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["PriceList"]);
+                result["PriceStd"] = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["PriceStd"]);
+                result["PriceLimit"] = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["PriceLimit"]);
+                result["C_UOM_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_UOM_ID"]);
+            }
+
+            return result;
+        }
 
         /// <summary>
         /// (VAI094):Fill Product Type on selection of Product
@@ -128,6 +206,28 @@ namespace VIS.Models
 
             Sql = "SELECT PriceLimit FROM M_ProductPrice WHERE M_PriceList_Version_ID = (SELECT c.M_PriceList_Version_ID FROM  C_Project c WHERE c.C_Project_ID = "
                 + projID + ")  AND M_Product_ID=" + ProductID;
+            Decimal PriceLimit = Util.GetValueOfDecimal(DB.ExecuteScalar(Sql, null, null));
+            return PriceLimit;
+        }
+        public Decimal GetVASProjectPriceLimit(Ctx ctx, string fields)
+        {
+            string[] paramValue = fields.Split(',');
+            int OpportunityID = 0, ProductID = 0;
+            OpportunityID = Util.GetValueOfInt(paramValue[0].ToString());
+            ProductID = Util.GetValueOfInt(paramValue[1].ToString());
+            string Sql = $@"SELECT
+	PriceLimit
+FROM
+	M_ProductPrice
+WHERE
+	M_PriceList_Version_ID = (
+	SELECT
+		c.M_PriceList_Version_ID
+	FROM
+		VAS_Opportunity c
+	WHERE
+		c.VAS_Opportunity_ID = {OpportunityID})
+	AND M_Product_ID = {ProductID}";
             Decimal PriceLimit = Util.GetValueOfDecimal(DB.ExecuteScalar(Sql, null, null));
             return PriceLimit;
         }

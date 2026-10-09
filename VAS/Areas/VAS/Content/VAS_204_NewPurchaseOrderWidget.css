@@ -1,0 +1,100 @@
+﻿/* VAS_204_NewPurchaseOrderWidget - 1x1 quick action tile.
+   Mirrors the VAS_082_NewGRNWidget tile design exactly (same geometry, palette,
+   icon well and type scale), namespaced as .vas-npo-* so the two widgets stay
+   independent. The tile opens the Purchase Order window on a new record; it has
+   no dialog, so no modal rules are needed. */
+
+.vas-npo-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+}
+
+    .vas-npo-root,
+    .vas-npo-root * {
+        box-sizing: border-box;
+    }
+
+.vas-npo-card {
+    font-family: Roboto, Arial, sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 32px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    text-align: left;
+    /* The tile paints its own surface rather than leaning on the shared
+       .vas-widget-bg, so its appearance cannot shift with stylesheet load order
+       or with any state the host puts on the button. */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    border: 2px solid #fff;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    padding: .875em;
+    cursor: pointer;
+    color: #102C3F;
+    -webkit-appearance: none;
+    appearance: none;
+    outline: none;
+    transition: box-shadow 180ms ease;
+}
+
+    /* Pressing and releasing must not repaint the tile: pin the surface for every
+       interactive state so only the shadow reacts. */
+    .vas-npo-card:active,
+    .vas-npo-card:focus {
+        background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+        border-color: #fff;
+        outline: none;
+    }
+
+    .vas-npo-card:hover {
+        box-shadow: 0 14px 30px rgba(15, 61, 97, .13);
+    }
+
+    .vas-npo-card:focus-visible {
+        outline: 2px solid #1F83FF;
+        outline-offset: 2px;
+    }
+
+.vas-npo-iconrow {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.vas-npo-ico {
+    width: 1.75em;
+    height: 1.75em;
+    border-radius: 10px;
+    background: #1F83FF;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    .vas-npo-ico svg {
+        width: 1em;
+        height: 1em;
+    }
+
+.vas-npo-title {
+    font-size: .75em;
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+}
+
+.vas-npo-sub {
+    font-size: .625em;
+    font-weight: 400;
+    color: #5F7283;
+    line-height: 1.25;
+    margin-top: .25em;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}

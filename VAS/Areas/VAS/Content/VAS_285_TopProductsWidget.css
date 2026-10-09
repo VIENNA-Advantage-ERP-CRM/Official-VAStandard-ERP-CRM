@@ -1,0 +1,500 @@
+/* VAS_285_TopProductsWidget.css
+ * Onfinity 2x2 compact ranked horizontal bar-list widget with a Month/Year filter
+ * (user override - the paired mock ships with none) and a row-click drill-down
+ * modal, per 18-top-products.html / .md. CSS namespaced vas285-* (module-prefixed,
+ * matching every other dashboard widget in this codebase). The modal shell / stat
+ * tiles / table / chip rules mirror VAS_270-284's own shared Sales Order
+ * record-preview modal styling - duplicated here as this widget's own
+ * self-contained copy. No footer/pager on the main list - exactly four rows is the
+ * whole dataset for this widget.
+ */
+
+.vas285-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+}
+
+    .vas285-root,
+    .vas285-root * {
+        box-sizing: border-box;
+    }
+
+/* ---------- widget shell ---------- */
+.vas285-shell {
+    font-family: Roboto, Arial, sans-serif;
+    font-size: clamp(16px, 1.2cqi, 20px);
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, .6));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    padding: .85em;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.vas285-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: .5em;
+    flex: none;
+    margin-bottom: .75em;
+}
+
+.vas285-head-txt { min-width: 0; }
+
+.vas285-title {
+    font-weight: 400;
+    color: #102C3F;
+    line-height: 1.2;
+    margin: 0;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .011375), 17px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas285-sub {
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.3;
+    margin: 2px 0 0 0;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .009625), 13px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---------- Month / Year filter ---------- */
+.vas285-mfilter {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: none;
+}
+
+.vas285-msel {
+    appearance: none;
+    -webkit-appearance: none;
+    font-family: inherit;
+    font-size: .6875em;
+    font-weight: 500;
+    color: #41576A;
+    background-color: #fff;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2341576A' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right .45em center;
+    border: 1px solid #D9E2EB;
+    border-radius: 8px;
+    padding: .3em 1.35em .3em .55em;
+    line-height: 1.1;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(16, 47, 74, .04);
+    max-width: 7.2em;
+    /* Without a min-width, the flex row (.vas285-mfilter) can shrink this select
+       below its own content width on a real (narrower-than-the-mockup) dashboard,
+       clipping the last digit of a 4-digit year. flex-shrink:0 belt-and-suspenders
+       the same guarantee regardless of the parent's flex context. */
+    min-width: 4.6em;
+    flex-shrink: 0;
+}
+
+.vas285-msel:hover { background-color: #F7FBFF; border-color: #BFE4FF; }
+
+/* ---------- horizontal bar list ---------- */
+.vas285-hlist {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+/* Fewer than four rows (sparse period data): space-between would stretch 1-3 rows
+   to the two extreme edges of the cell, leaving a large dead gap in the middle.
+   Stack them from the top with normal spacing instead. */
+.vas285-hlist.vas285-hlist-top {
+    justify-content: flex-start;
+    gap: .5em;
+}
+
+.vas285-hrow {
+    padding: .28em .3em;
+    border-radius: 8px;
+    cursor: pointer;
+    background: none;
+    border: 0;
+    width: 100%;
+    text-align: left;
+    font-family: inherit;
+}
+
+.vas285-hrow:hover { background: #F4FAFF; }
+
+.vas285-hrow .vas285-line {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: .5em;
+}
+
+.vas285-nm {
+    display: block;
+    font-size: .75em;
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.vas285-vl {
+    font-size: .75em;
+    font-weight: 700;
+    color: #0083DA;
+    flex: none;
+}
+
+.vas285-track {
+    height: 7px;
+    border-radius: 999px;
+    background: #EEF3F8;
+    margin-top: .3em;
+    overflow: hidden;
+    display: flex;
+}
+
+.vas285-fill { height: 100%; }
+
+/* loading skeleton */
+.vas285-skel-row { padding: .28em .3em; }
+.vas285-skel-nm {
+    display: block;
+    width: 55%;
+    height: .95em;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #EEF3F8 25%, #F7FAFC 37%, #EEF3F8 63%);
+    background-size: 200% 100%;
+    animation: vas285-shimmer 1.4s ease infinite;
+}
+.vas285-skel-row .vas285-track { background: #EEF3F8; }
+.vas285-skel-row .vas285-fill { width: 40%; background: #E2EAF1; }
+
+@keyframes vas285-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.vas285-empty {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .75em;
+    color: #5F7283;
+    text-align: center;
+}
+
+/* ---------- modal ---------- */
+.vas285-mask {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: rgba(0, 38, 64, .34);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: min(4vh, 28px) min(3vw, 28px);
+    font-family: Roboto, Arial, sans-serif;
+}
+
+.vas285-mask.is-open { display: flex; }
+
+.vas285-modal {
+    width: min(1240px, 94vw);
+    max-height: min(880px, 90dvh);
+    background: #FFFFFF;
+    border: 1px solid #D9E2EB;
+    border-radius: 16px;
+    box-shadow: 0 28px 64px rgba(15, 61, 97, .26);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.vas285-modal.sm { width: min(760px, 94vw); }
+.vas285-modal.md { width: min(1000px, 94vw); }
+
+.vas285-mhead {
+    height: 56px;
+    flex: none;
+    padding: 0 16px;
+    border-bottom: 1px solid #1F83FF;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.vas285-mhead .vas285-htxt { min-width: 0; display: flex; align-items: center; gap: 8px; }
+
+.vas285-mhead h2 {
+    margin: 0;
+    font-size: 1em;
+    font-weight: 400;
+    color: #141414;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas285-msub {
+    font-size: .8125em;
+    color: #717182;
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas285-xbtn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 0;
+    background: transparent;
+    color: #141414;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    flex: none;
+}
+
+.vas285-xbtn:hover { background: #F1F4F8; }
+.vas285-xbtn svg { width: 20px; height: 20px; }
+
+.vas285-mbody {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding: 1.125em .875em;
+    display: flex;
+    flex-direction: column;
+    gap: .75em;
+    container-type: inline-size;
+    font-size: clamp(18px, 1vw, 20px);
+}
+
+.vas285-mfoot {
+    flex: none;
+    border-top: 1px solid #D9E2EB;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: #FBFDFF;
+}
+
+.vas285-foot-note { font-size: 13px; color: #5F7283; }
+
+.vas285-btn {
+    border-radius: 999px;
+    padding: .5em .875em;
+    font-size: .8125em;
+    font-family: inherit;
+    border: 1px solid #0083DA;
+    background: #fff;
+    color: #0083DA;
+    cursor: pointer;
+}
+
+.vas285-btn:hover { background: #EEF8FF; }
+
+.vas285-mstats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .5em;
+    flex: none;
+}
+
+@container (max-width: 700px) {
+    .vas285-mstats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.vas285-mstat {
+    border: 1px solid #D9E2EB;
+    border-radius: 10px;
+    padding: .4em .6em;
+    background: #FBFDFF;
+    min-width: 0;
+}
+
+.vas285-mstat .l { font-size: .6875em; color: #5F7283; line-height: 1.3; }
+.vas285-mstat .v {
+    font-size: .875em;
+    font-weight: 600;
+    color: #102C3F;
+    line-height: 1.2;
+    margin-top: .1em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas285-msec {
+    font-size: .9375em;
+    font-weight: 500;
+    color: #102C3F;
+    margin: .25em 0 .35em;
+    padding-bottom: .3em;
+    border-bottom: 1px solid #E2EAF1;
+    flex: none;
+}
+
+.vas285-polink {
+    display: flex;
+    align-items: center;
+    gap: .5em;
+    font-size: .75em;
+    color: #5F7283;
+    flex: none;
+}
+
+.vas285-mtwrap { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+.vas285-mtbl { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+
+.vas285-mrow {
+    display: grid;
+    gap: .75em;
+    padding: 0 .5em;
+    align-items: center;
+}
+
+.vas285-mhead-row {
+    font-size: .6875em;
+    font-weight: 500;
+    color: #41576A;
+    text-transform: capitalize;
+    padding: .5em .5em;
+    border-bottom: 1px solid #C5D2DD;
+    flex: none;
+}
+
+.vas285-mbody-rows { overflow: hidden; flex: 1; min-height: 0; }
+.vas285-mbody-rows .vas285-mrow {
+    font-size: .75em;
+    padding: .55em .5em;
+    border-bottom: 1px solid #E2EAF1;
+}
+
+.vas285-mbody-rows .vas285-mrow:last-child { border-bottom: 0; }
+
+.vas285-cell {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.vas285-cell.right { text-align: right; }
+.vas285-cell.center { display: flex; justify-content: center; }
+.vas285-c-prim { font-weight: 700; color: #102C3F; }
+.vas285-c-std { color: #5F7283; }
+.vas285-c-emph { font-weight: 700; color: #0083DA; }
+.vas285-c-short { font-weight: 700; color: #A33F3F; }
+.vas285-c-ok { font-weight: 700; color: #0B6B45; }
+
+.vas285-lnk {
+    border: 0;
+    background: none;
+    padding: 0;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: 700;
+    color: #0083DA;
+    cursor: pointer;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+    text-align: left;
+}
+
+.vas285-lnk:hover { color: #0069AE; }
+
+.vas285-iconbtn {
+    width: 1.5em;
+    height: 1.5em;
+    border-radius: 7px;
+    border: 1px solid #D9E2EB;
+    background: #fff;
+    display: grid;
+    place-items: center;
+    color: #0083DA;
+    cursor: pointer;
+    padding: 0;
+    flex: none;
+}
+
+.vas285-iconbtn:hover { background: #EEF8FF; border-color: #BFE4FF; }
+.vas285-iconbtn svg { width: .8em; height: .8em; }
+
+.vas285-mtfoot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75em;
+    border-top: 1px solid #D9E2EB;
+    padding-top: .5em;
+    margin-top: .5em;
+    flex: none;
+}
+
+.vas285-helper { font-size: .75em; color: #748494; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vas285-pager { display: flex; align-items: center; gap: 6px; flex: none; }
+
+.vas285-pbtn {
+    width: 1.5em;
+    height: 1.5em;
+    border-radius: 7px;
+    border: 1px solid #D9E2EB;
+    background: #fff;
+    display: grid;
+    place-items: center;
+    color: #0083DA;
+    cursor: pointer;
+    padding: 0;
+}
+
+.vas285-pbtn:hover:not(:disabled) { background: #EEF8FF; }
+.vas285-pbtn:disabled { color: #B8C6D2; cursor: default; }
+.vas285-pbtn svg { width: .75em; height: .75em; }
+.vas285-ptxt { font-size: .8125em; font-weight: 500; color: #102C3F; min-width: 3.4em; text-align: center; }
+
+.vas285-chip {
+    display: inline-block;
+    border-radius: 999px;
+    padding: .3125em .625em;
+    font-size: .6875em;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.vas285-chip-info { background: #EAF8FF; color: #0083DA; }
+.vas285-chip-ok { background: #E7F7EF; color: #0B6B45; }
+.vas285-chip-warn { background: #FFF6E2; color: #9A6500; }
+.vas285-chip-neutral { background: #F1F4F8; color: #41576A; font-weight: 500; }
+
+.vas285-mstate { padding: 1em; font-size: .8125em; color: #5F7283; text-align: center; }

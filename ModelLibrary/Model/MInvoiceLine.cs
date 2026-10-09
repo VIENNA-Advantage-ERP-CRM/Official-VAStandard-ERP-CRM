@@ -340,7 +340,7 @@ namespace VAdvantage.Model
                 if (C_OrderLine_ID != 0)
                 {
                     MOrderLine oLine = new MOrderLine(GetCtx(), C_OrderLine_ID, Get_TrxName());
-                    //VAI082 12/22/2023  DevOps Task ID:-3579,Set "ContractLine_ID" When user create the invoice with the reference of shipment.
+                                                                                                      //VAI082 12/22/2023  DevOps Task ID:-3579,Set "ContractLine_ID" When user create the invoice with the reference of shipment.
                     if (oLine.Get_ValueAsInt("VAS_ContractLine_ID") > 0)
                     {
                         Set_Value("VAS_ContractLine_ID", oLine.Get_Value("VAS_ContractLine_ID"));
@@ -5022,7 +5022,7 @@ namespace VAdvantage.Model
                         FROM C_InvoiceLine INNER JOIN C_OrderLine ON C_InvoiceLine.C_OrderLine_ID=C_OrderLine.C_OrderLine_ID
                         INNER JOIN C_Order ON C_OrderLine.C_Order_ID = C_Order.C_Order_ID
                         WHERE C_InvoiceLine.C_Invoice_ID =  " + GetC_Invoice_ID();
-            int no = DataBase.DB.GetSQLValue(Get_Trx(), sql, null);
+            int no = DataBase.DB.GetSQLValue(Get_Trx(), sql);
             if (no > 0)
             {
                 no = DB.ExecuteQuery("UPDATE C_Invoice SET IsHoldPayment = 'Y' WHERE C_Invoice_ID = " + GetC_Invoice_ID(), null, Get_Trx());

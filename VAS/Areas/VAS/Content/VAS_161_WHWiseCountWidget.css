@@ -1,0 +1,634 @@
+/* VAS_161_WHWiseCountWidget.css */
+
+.vas-whwisecount-container {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    box-sizing: border-box;
+}
+
+.vas-whwisecount-root {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    font-size: clamp(16px, 1.2cqi, 20px);
+    font-size: clamp(16px, calc(var(--widget-inline-size, 480px) * 0.045), 20px);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    padding: 0.85em;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    font-family: 'Roboto', sans-serif;
+    user-select: none;
+}
+
+/* Header Row */
+.vas-whwisecount-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-sizing: border-box;
+}
+
+.vas-whwisecount-left-cluster {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    min-width: 0;
+    flex: 1;
+}
+
+.vas-whwisecount-icon-well {
+    width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.02275), 40px);
+    height: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.02275), 40px);
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(232, 244, 255, 0.96));
+    box-shadow: inset 0 0 0 1px rgba(0, 131, 218, 0.20);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #0083DA;
+    font-size: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.0125), 22px);
+    flex-shrink: 0;
+}
+
+.vas-whwisecount-title-block {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.vas-whwisecount-title {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    color: #102C3F;
+    line-height: 1.2;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-whwisecount-subtitle {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
+    color: #717182;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Right Filter Cluster */
+.vas-whwisecount-filter-cluster {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+.vas-whwisecount-select {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    background-image: none !important;
+    font-size: 0.75em;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 500;
+    color: #102C3F;
+    background-color: #FFFFFF;
+    border: 1px solid #D9E2EB;
+    border-radius: 8px;
+    padding: 0.35em 0.75em;
+    min-width: 4.5em;
+    /* Alignment is deliberately SPLIT (user request 2026-08-29):
+         - text-align      -> inherited by the <option> elements, so the list inside the OPEN
+                              dropdown reads left aligned;
+         - text-align-last -> governs the single displayed line of the CLOSED control, so the
+                              selected value stays centred, as AGENTS.md Rule 13 specifies.
+       Rule 13's "text-align: center" was centring both; only the selected value was meant to be. */
+    text-align: left;
+    text-align-last: center;
+    outline: none;
+    cursor: pointer;
+    box-sizing: border-box;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+/* Explicit, for engines that do not inherit text-align into the native popup list. */
+.vas-whwisecount-select option {
+    text-align: left;
+    color: #102C3F;
+    background-color: #FFFFFF;
+}
+
+.vas-whwisecount-select:hover {
+    background-color: #EEF8FF;
+    border-color: #0083DA;
+}
+
+.vas-whwisecount-select:focus {
+    border-color: #0083DA;
+}
+
+
+
+/* Widget Body Grid */
+.vas-whwisecount-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    margin-top: 0.75em;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas-whwisecount-grid-template {
+    display: grid;
+    /* THREE tracks: Warehouse | Counts | Qty Counted.
+       The card's "Count Locators" column was removed on 2026-09-02 (user decision). The
+       detail popup KEEPS its own Locator column - that one is governed by
+       .vas-whwisecount-modal-grid-template further down and is deliberately untouched.
+       The locator track's 1.3fr was folded into the Warehouse track (1.4fr -> 2.7fr) rather
+       than spread around, so the two right-aligned numeric columns keep exactly the widths
+       they had and the long warehouse name/code absorbs the freed space instead of a gap
+       opening between the header and the rows.
+       Track count must match the cell count emitted by BOTH the card header grid and
+       appendFillerRows() in VAS_161_WHWiseCountWidget.js. */
+    grid-template-columns: minmax(0, 2.7fr) minmax(0, 0.9fr) minmax(0, 1.4fr);
+    gap: 0.5em;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+.vas-whwisecount-header-row {
+    padding: 0.5em 0.5em;
+    border-bottom: 1px solid #C5D2DD;
+    background: transparent;
+}
+
+.vas-whwisecount-th {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 500;
+    font-size: 0.6875em;
+    color: #5F7283;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-whwisecount-th-right {
+    text-align: right;
+}
+
+
+.vas-whwisecount-rows-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas-whwisecount-row-btn {
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid #E2EAF1;
+    padding: 0.375em 0.5em;
+    cursor: pointer;
+    text-align: left;
+    transition: background-color 0.15s ease;
+    box-sizing: border-box;
+    outline: none;
+}
+
+.vas-whwisecount-row-btn:last-child {
+    border-bottom: none;
+}
+
+.vas-whwisecount-row-btn:hover,
+.vas-whwisecount-row-btn:focus-visible {
+    background-color: rgba(234, 248, 255, 0.7);
+    border-radius: 8px;
+    box-shadow: inset 0 0 0 1px #0083DA;
+    outline: none;
+}
+
+
+.vas-whwisecount-cell {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-sizing: border-box;
+}
+
+.vas-whwisecount-wh-title {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    font-size: 0.75em;
+    color: #102C3F;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-whwisecount-wh-code {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: 0.6875em;
+    color: #5F7283;
+    line-height: 1.2;
+    margin-top: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-whwisecount-locators-text {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: 0.75em;
+    color: #5F7283;
+}
+
+.vas-whwisecount-counts-num {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: 0.75em;
+    color: #41576A;
+    text-align: right;
+}
+
+.vas-whwisecount-qty-num {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    font-size: 0.75em;
+    color: #0083DA;
+    text-align: right;
+}
+
+/* Footer Pager Band */
+.vas-whwisecount-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid #D9E2EB;
+    padding-top: 8px;
+    margin-top: 10px;
+    box-sizing: border-box;
+}
+
+.vas-whwisecount-footer-text {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: 0.75em;
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-whwisecount-pager {
+    display: flex;
+    align-items: center;
+    gap: 0.375em;
+}
+
+.vas-whwisecount-pager-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    border: 1px solid #D9E2EB;
+    background-color: #FFFFFF;
+    color: #0083DA;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    font-size: 14px;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.vas-whwisecount-pager-btn:hover:not(:disabled) {
+    background-color: #EAF8FF;
+}
+
+.vas-whwisecount-pager-btn:disabled {
+    color: #B8C6D2;
+    cursor: not-allowed;
+}
+
+.vas-whwisecount-pager-info {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 500;
+    font-size: 0.8125em;
+    color: #102C3F;
+    padding: 0 0.25em;
+}
+
+/* Modal Overlay & Dialog */
+.vas-whwisecount-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(4, 22, 38, 0.45);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    box-sizing: border-box;
+    font-family: 'Roboto', sans-serif;
+}
+
+.vas-whwisecount-modal-dialog {
+    width: clamp(340px, 85vw, 1400px);
+    /* Height follows the CONTENT: header + a full page of rows + footer. It was a fixed
+       clamp(420px, 85vh, 900px), which made the popup ~900px tall on a normal screen while the
+       table only ever held a handful of rows - that is the large empty band under the lines.
+       Short pages are padded with filler rows in JS, so the height is still identical on every
+       page and does not jump while paging. max-height keeps it inside small viewports. */
+    height: auto;
+    max-height: clamp(420px, 85vh, 900px);
+    font-size: clamp(14px, 1.2vw, 22px);
+    background-color: #FFFFFF;
+    border-radius: 16px;
+    box-shadow: 0 24px 60px rgba(4, 22, 38, 0.28);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+}
+
+/* Modal Header Chrome (56px) */
+.vas-whwisecount-modal-header {
+    height: 56px;
+    min-height: 56px;
+    padding: 0 16px;
+    border-bottom: 2px solid #1F83FF;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-sizing: border-box;
+}
+
+.vas-whwisecount-modal-header-left {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5em;
+    min-width: 0;
+    flex: 1;
+}
+
+.vas-whwisecount-modal-title {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    font-size: 1em;
+    color: #102C3F;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-whwisecount-modal-subtitle {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: 0.75em;
+    color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-whwisecount-modal-close {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    color: #141414;
+    cursor: pointer;
+    font-size: 20px;
+    transition: background-color 0.15s ease;
+    padding: 0;
+}
+
+.vas-whwisecount-modal-close:hover {
+    background-color: #EEF6FF;
+}
+
+/* Modal Body */
+.vas-whwisecount-modal-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0.875em 0.875em 0.5em;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+}
+
+
+
+.vas-whwisecount-modal-grid-template {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 0.8fr) minmax(0, 1.4fr) minmax(0, 0.6fr);
+    gap: 0.75em;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+.vas-whwisecount-modal-data-row {
+    padding: 0.5em 0.5em;
+    border-bottom: 1px solid #E2EAF1;
+    box-sizing: border-box;
+}
+
+.vas-whwisecount-modal-data-row:last-child {
+    border-bottom: none;
+}
+
+.vas-whwisecount-prod-title {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    font-size: 0.8125em;
+    color: #102C3F;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+
+.vas-whwisecount-prod-attr {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: 0.6875em;
+    color: #5F7283;
+    line-height: 1.2;
+    margin-top: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Inventory Type Chips */
+.vas-whwisecount-chip-info {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 0.3125em 0.625em;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    font-size: 0.6875em;
+    background-color: #EAF8FF;
+    color: #0083DA;
+    white-space: nowrap;
+}
+
+.vas-whwisecount-chip-neutral {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 0.3125em 0.625em;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 500;
+    font-size: 0.6875em;
+    background-color: #F1F4F8;
+    color: #41576A;
+    white-space: nowrap;
+}
+
+/* Modal Footer */
+.vas-whwisecount-modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid #D9E2EB;
+    padding: 0.5em 0.875em;
+    box-sizing: border-box;
+    font-size: clamp(14px, 0.85vw, 16px);
+}
+
+.vas-whwisecount-modal-footer-left {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    min-width: 0;
+    flex: 1;
+}
+
+.vas-whwisecount-modal-total-qty {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    font-size: 0.8125em;
+    color: #0083DA;
+    white-space: nowrap;
+}
+
+.vas-whwisecount-message {
+    text-align: center;
+    padding: 2em 1em;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: 0.75em;
+    color: #5F7283;
+}
+
+/* ============================================================================
+   Modal row area (2026-08-18).
+   The dialog is a FIXED clamp(420px, 85vh, 900px) tall per the global design
+   standard, so the rows container must absorb that height rather than let the
+   table sit small at the top of a large empty popup. Row count is measured in
+   JS; these rules make the space available to measure.
+   ============================================================================ */
+.vas-whwisecount-rows-container {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+    /* Rows keep their NATURAL height (padding + font from the modal's clamp anchor).
+       They must not stretch: measureModalPageSize() measures a rendered row, so a
+       stretching row would make row height depend on row count and the calculation
+       would feed back on itself. The leftover space is taken up by filler rows
+       instead, which is what keeps the table a constant height on every page. */
+    .vas-whwisecount-rows-container > .vas-whwisecount-row-btn {
+        flex: 0 0 auto;
+    }
+
+/* Spacer rows: hold the height, show nothing, take no interaction. */
+.vas-whwisecount-filler {
+    pointer-events: none;
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    cursor: default;
+}
+
+    .vas-whwisecount-filler:hover {
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+
+/* Detail popup rows: keep their natural height and never stretch, so a page of 3 real rows
+   plus 4 fillers is exactly as tall as a page of 7 real rows. */
+.vas-whwisecount-modal-rows-container > .vas-whwisecount-modal-data-row {
+    flex: 0 0 auto;
+}
+
+/* ============================================================================
+   DETAIL POPUP — DETERMINISTIC HEIGHT (redesign 2026-08-18)
+
+   Requirement: the popup is always the size needed for MODAL_PAGE_ROWS lines and
+   does NOT resize with how many lines a page happens to hold. A page with 3
+   records must be exactly as tall as a page with 7.
+
+   Previous attempts relied on filler rows to pad the height. That is fragile:
+   the rows were content-sized, so a filler was only ever *approximately* the
+   height of a real row, and the container height still followed its children.
+
+   This version fixes the geometry instead of approximating it:
+     --vas-row-h    one row's height, in em -> scales with the modal clamp() anchor
+     --vas-rows     how many lines the popup shows before paging
+   The rows container is set to exactly rows x row-height, so its height is
+   identical whether it contains 0, 3 or 7 children. Fillers now only preserve
+   the divider rhythm; the height no longer depends on them.
+   Everything stays relative (em) - no hardcoded px, per the global standard.
+   ============================================================================ */
+.vas-whwisecount-modal-dialog {
+    --vas-rows: 7;
+    --vas-row-h: 3.1em;
+}
+
+.vas-whwisecount-modal-rows-container {
+    /* Exactly N rows tall, always. Not flex:1, not auto. */
+    flex: 0 0 auto;
+    height: calc(var(--vas-rows) * var(--vas-row-h));
+    display: block;
+    overflow: hidden;
+}
+
+/* Every row - real or filler - occupies exactly one row height. */
+.vas-whwisecount-modal-rows-container > .vas-whwisecount-modal-data-row {
+    height: var(--vas-row-h);
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+/* The body no longer stretches; it wraps header + fixed rows + footer. */
+.vas-whwisecount-modal-body {
+    flex: 0 0 auto;
+}

@@ -1,0 +1,1687 @@
+/**
+ * VAS_028_PaidThisMonthAPPaymentWidget
+ *
+ * ── Labels / Message Keys ─────────────────────────────────────────────────────
+ *  #  | Current Text                                      | Message Key
+ * ----+---------------------------------------------------+------------------------------
+ *  1  | Paid This Month                                   | VAS_028_MessagePaidThisMonth
+ *  1b | Total Vendor Payments                             | VAS_028_MessageTotalVendorPayments
+ *  2  | Loading                                           | VAS_028_MessageLoading
+ *  3  | Could not load data                               | VAS_ErrorLoading
+ *  4  | vendor                                            | VAS_028_MessageVendor
+ *  5  | vendors                                           | VAS_028_MessageVendors
+ *  6  | Paid to                                           | VAS_028_MessagePaidTo
+ *  7  | so far this month                                 | VAS_028_MessageSoFarThisMonth
+ *  8  | No payments this month.                           | VAS_028_MessageNoPaymentsThisMonth
+ * 10  | Cash paid                                         | VAS_028_MessageCashPaid
+ * 11  | payments                                          | VAS_028_MessagePayments
+ * 12  | Not Specified                                     | VAS_028_MessageNotSpecified
+ * 13  | Showing                                           | VAS_Showing
+ * 14  | of                                                | VAS_Of
+ * 15  | Cleared                                           | VAS_028_MessageCleared
+ * 16  | Bounced                                           | VAS_028_MessageBounced
+ * 17  | In transit                                        | VAS_028_MessageInTransit
+ * 18  | Close                                             | VAS_Close
+ * 22  | Payment No.                                       | VAS_028_MessagePaymentNo
+ * 23  | Date                                              | VAS_028_MessageDate
+ * 24  | Vendor                                            | VAS_028_MessageVendor
+ * 25  | Bank account                                      | VAS_028_BankAccount
+ * 26  | Currency                                          | VAS_PaymentCurrency
+ * 27  | Amount                                            | VAS_028_MessageAmount
+ * 28  | Payment Method                                    | VAS_028_MessageMethod
+ * 29  | Execution Status                                  | VAS_028_MessageStatus
+ * 30  | Previous                                          | VAS_Previous
+ * 31  | Next                                              | VAS_Next
+ * 32  | MTD                                               | VAS_028_MessageMTD
+ * ──────────────────────────────────────────────────────────────────────────────
+ */
+
+/*
+ * Labels / Message Keys
+ * #  | Current Text                                      | Message Key
+ * ---+---------------------------------------------------+------------------------------
+ * 1  | Paid This Month                                   | VAS_028_MessagePaidThisMonth
+ * 2  | Loading                                           | VAS_028_MessageLoading
+ * 3  | Could not load data                               | VAS_ErrorLoading
+ * 4  | vendor                                            | VAS_028_MessageVendor
+ * 5  | vendors                                           | VAS_028_MessageVendors
+ * 6  | Paid to                                           | VAS_028_MessagePaidTo
+ * 7  | so far this month                                 | VAS_028_MessageSoFarThisMonth
+ * 8  | No payments this month.                           | VAS_028_MessageNoPaymentsThisMonth
+ * 10 | Cash paid                                         | VAS_028_MessageCashPaid
+ * 11 | payments                                          | VAS_028_MessagePayments
+ * 12 | Not Specified                                     | VAS_028_MessageNotSpecified
+ * 13 | Showing                                           | VAS_Showing
+ * 14 | of                                                | VAS_Of
+ * 15 | Cleared                                           | VAS_028_MessageCleared
+ * 16 | Bounced                                           | VAS_028_MessageBounced
+ * 17 | In transit                                        | VAS_028_MessageInTransit
+ * 18 | Close                                             | VAS_Close
+ * 22 | Payment No.                                       | VAS_028_MessagePaymentNo
+ * 23 | Date                                              | VAS_028_MessageDate
+ * 24 | Vendor                                            | VAS_028_MessageVendor
+ * 25 | Bank account                                      | VAS_028_BankAccount
+ * 26 | Currency                                          | VAS_PaymentCurrency
+ * 27 | Amount                                            | VAS_028_MessageAmount
+ * 28 | Payment Method                                    | VAS_028_MessageMethod
+ * 29 | Execution Status                                  | VAS_028_MessageStatus
+ * 30 | Previous                                          | VAS_Previous
+ * 31 | Next                                              | VAS_Next
+ * 32 | MTD                                               | VAS_028_MessageMTD
+ */
+
+; VAS = window.VAS || {};
+
+; (function (VAS, $) {
+    "use strict";
+
+    VAS.VAS_028_PaidThisMonthAPPaymentWidget = function () {
+        var self = this;
+
+        this.frame = null;
+        this.windowNo = 0;
+        this.AD_UserHomeWidgetID = 0;
+
+        var $root = $('<div class="vas-ptm-root vas-ptm-ap-root">');
+
+        var $metricEl = null;
+        var $whyText = null;
+        var $body = null;
+        var $why = null;
+        var $busy = null;
+        var $state = null;
+
+        var $dialog = null;
+        var $dialogTitle = null;
+        var $dialogSubtitle = null;
+        var $dialogBody = null;
+        var $dialogTbody = null;
+        var $dialogBusy = null;
+
+        var $pagerHelper = null;
+        var $pagerPrev = null;
+        var $pagerNext = null;
+        var $pagerText = null;
+
+        var isDisposed = false;
+        var rowsLoaded = false;
+        var rowsLoading = false;
+
+        var pageNo = 1;
+        var pageSize = 8;
+        var totalPages = 0;
+        var totalRecords = 0;
+
+        /*
+         * The dialog body is a flex scroll area, so the number of rows that
+         * fit follows the popup's rendered height instead of a fixed page
+         * size. The row height is measured from a real row when one exists
+         * and falls back to this estimate while the table is still empty.
+         */
+        var dialogResizeObserver = null;
+        var adaptiveResizeHandler = null;
+        var adaptiveResizeFrame = null;
+        var dialogRowHeightEstimate = 44;
+        var dialogMinimumRows = 3;
+        var adaptiveAdjustCount = 0;
+
+        var lastData = null;
+
+        function lbl(key, fallback) {
+            return VIS.Msg.getMsg(key);
+        }
+
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function normalizeResponse(response) {
+            if (typeof response !== 'string') {
+                return response;
+            }
+
+            try {
+                return JSON.parse(response);
+            }
+            catch (e) {
+                return null;
+            }
+        }
+
+        function showBusy(show) {
+            if ($busy && $busy.length) {
+                $busy.toggleClass('is-visible', !!show);
+            }
+        }
+
+        function showState(show, message) {
+            if ($state && $state.length) {
+                $state
+                    .text(message || '')
+                    .toggleClass('is-visible', !!show);
+            }
+
+            if ($body) {
+                $body.toggle(!show);
+            }
+
+            if ($why) {
+                $why.toggle(!show);
+            }
+        }
+
+        function showDialogBusy(show) {
+            if ($dialogBusy && $dialogBusy.length) {
+                $dialogBusy.toggleClass('is-visible', !!show);
+            }
+        }
+
+        this.Initalize = function () {
+            createWidget();
+            loadData();
+        };
+
+        function createWidget() {
+            var uid = self.AD_UserHomeWidgetID || 'ptm';
+
+            var $card = $('<div class="vas-ptmonth-card">');
+
+            $card.attr({
+                role: 'button',
+                tabindex: '0'
+            });
+
+            var $header = $('<div class="vas-ptmonth-header">');
+
+            var $icon = $(
+                '<div class="vas-ptm-icon">' +
+                '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">' +
+                '<polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline>' +
+                '<polyline points="17 18 23 18 23 12"></polyline>' +
+                '</svg>' +
+                '</div>'
+            );
+
+            var $headerText = $('<div class="vas-ptm-header-text">');
+
+            var $title = $('<div class="vas-ptm-title">').text(
+                lbl(
+                    'VAS_028_MessagePaidThisMonth',
+                    'Paid This Month'
+                )
+            );
+
+            var $sub = $('<div class="vas-ptm-sub">').text(
+                lbl(
+                    'VAS_028_MessageTotalVendorPayments',
+                    'Total Vendor Payments'
+                )
+            );
+
+            $headerText.append($title).append($sub);
+            $header.append($icon).append($headerText);
+
+            $body = $('<div class="vas-ptm-body">');
+
+            $metricEl = $('<div>')
+                .attr('id', 'vis-ptm-metric-' + uid)
+                .addClass('vas-ptm-metric')
+                .text('—');
+
+            $body.append($metricEl);
+
+            $why = $('<div class="vas-ptm-why-wrap">');
+
+            $whyText = $('<span>')
+                .attr('id', 'vis-ptm-why-' + uid)
+                .addClass('vas-ptm-why-text')
+                .text(
+                    lbl(
+                        'VAS_028_MessageLoading',
+                        'Loading'
+                    )
+                );
+
+            $why.append($whyText);
+
+            $busy = $(
+                '<div class="vas-ptm-ap-busy">' +
+                '<div class="vis-busyindicatorinnerwrap">' +
+                '<i class="vis_widgetloader"></i>' +
+                '</div>' +
+                '</div>'
+            );
+
+            $state = $('<div class="vas-ptm-state-message">');
+
+            $card
+                .append($header)
+                .append($body)
+                .append($why)
+                .append($busy)
+                .append($state);
+
+            $root.empty().append($card);
+
+            $card.on('click', function () {
+                openDialog();
+            });
+
+            $card.on('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    openDialog();
+                }
+            });
+
+            createDialog();
+        }
+
+        function loadData() {
+            if (isDisposed) {
+                return;
+            }
+
+            showBusy(true);
+            showState(false, '');
+
+            $.ajax({
+                url:
+                    VIS.Application.contextUrl +
+                    'VAS_028_PaidThisMonthAPPaymentWidget/GetPaidThisMonth',
+
+                type: 'GET',
+                dataType: 'json',
+                cache: false,
+
+                success: function (response) {
+                    if (isDisposed) {
+                        return;
+                    }
+
+                    var data = normalizeResponse(response);
+
+                    if (!data || data.error) {
+                        showState(
+                            true,
+                            lbl(
+                                'VAS_ErrorLoading',
+                                'Could not load data'
+                            )
+                        );
+
+                        return;
+                    }
+
+                    renderMetric(data);
+                },
+
+                error: function () {
+                    if (!isDisposed) {
+                        showState(
+                            true,
+                            lbl(
+                                'VAS_ErrorLoading',
+                                'Could not load data'
+                            )
+                        );
+                    }
+                },
+
+                complete: function () {
+                    if (!isDisposed) {
+                        showBusy(false);
+                    }
+                }
+            });
+        }
+
+        function renderMetric(data) {
+            lastData = data || {};
+
+            var amount = Number(data.totalPaidAmount);
+
+            if (isNaN(amount)) {
+                amount = Number(data.paidThisMonth);
+            }
+
+            if (isNaN(amount)) {
+                amount = Number(data.value);
+            }
+
+            /*
+             * A month with no payments is a real answer, not a failure, so
+             * the card keeps its normal layout and reads the zero amount
+             * (for example ID0.00) instead of swapping in a "No Data"
+             * state. Only a load error still takes over the card.
+             */
+            if (isNaN(amount)) {
+                amount = 0;
+            }
+
+            showState(false, '');
+
+            var symbol =
+                data.symbol ||
+                data.currencySymbol ||
+                '';
+
+            var precision = normalizePrecision(
+                data.precision
+            );
+            var currencyISO =
+                data.currencyISO ||
+                data.currencyISOCode ||
+                data.isoCode ||
+                '';
+
+            /*
+             * The current controller returns customerCount.
+             * For AP Payment this value represents distinct vendors.
+             */
+            var vendorCount = Number(
+                data.vendorCount ||
+                data.customerCount ||
+                data.paymentCount ||
+                0
+            );
+
+            if ($metricEl) {
+                $metricEl.text(
+                    formatMetric(
+                        amount,
+                        symbol,
+                        currencyISO,
+                        precision
+                    )
+                );
+            }
+
+            if ($whyText) {
+                $whyText.text(
+                    getWhyText(
+                        vendorCount,
+                        data.description
+                    )
+                );
+            }
+
+            if ($dialog && $dialog.is(':visible')) {
+                rowsLoaded = false;
+                pageNo = 1;
+                loadRows();
+            }
+        }
+
+        function getWhyText(vendorCount, fallbackDescription) {
+            if (vendorCount > 0) {
+                var vendorLabel = vendorCount === 1
+                    ? lbl(
+                        'VAS_028_MessageVendor',
+                        'vendor'
+                    )
+                    : lbl(
+                        'VAS_028_MessageVendors',
+                        'vendors'
+                    );
+
+                return (
+                    lbl(
+                        'VAS_028_MessagePaidTo',
+                        'Paid to'
+                    ) +
+                    ' ' +
+                    vendorCount +
+                    ' ' +
+                    vendorLabel +
+                    ' ' +
+                    lbl(
+                        'VAS_028_MessageSoFarThisMonth',
+                        'so far this month'
+                    )
+                );
+            }
+
+            return (
+                fallbackDescription ||
+                lbl(
+                    'VAS_028_MessageNoPaymentsThisMonth',
+                    'No payments this month.'
+                )
+            );
+        }
+
+        function formatMetric(value, symbol, currencyISO, precision) {
+            var numericValue = Number(value || 0);
+            var sign = numericValue < 0 ? '-' : '';
+            var absoluteValue = Math.abs(numericValue);
+            var amountText =
+                VIS &&
+                    VIS.Util &&
+                    VIS.Util.formatCompactAmount
+                    ? VIS.Util.formatCompactAmount(
+                        absoluteValue,
+                        currencyISO,
+                        precision
+                    )
+                    : formatAmount(
+                        absoluteValue,
+                        precision
+                    );
+
+            return (
+                sign +
+                symbol +
+                amountText
+            );
+        }
+
+        function formatAmount(value, precision) {
+            var numericValue = Number(value || 0);
+
+            return numericValue.toLocaleString(
+                window.navigator.language,
+                {
+                    minimumFractionDigits: precision,
+                    maximumFractionDigits: precision
+                }
+            );
+        }
+
+        function normalizePrecision(precision) {
+            var stdPrecision = Number(precision);
+
+            if (
+                !isNaN(stdPrecision) &&
+                stdPrecision >= 0
+            ) {
+                return stdPrecision;
+            }
+
+            if (
+                VIS &&
+                VIS.Env &&
+                VIS.Env.getCtx &&
+                VIS.Env.getCtx().getStdPrecision
+            ) {
+                stdPrecision = Number(
+                    VIS.Env.getCtx().getStdPrecision()
+                );
+            }
+
+            if (
+                isNaN(stdPrecision) ||
+                stdPrecision < 0
+            ) {
+                return 2;
+            }
+
+            return stdPrecision;
+        }
+
+        function openDialog() {
+            if (!$dialog || isDisposed) {
+                return;
+            }
+
+            if (
+                $state &&
+                $state.hasClass('is-visible')
+            ) {
+                return;
+            }
+
+            $dialog.show();
+
+            $('body').addClass(
+                'vas-ptm-body-lock'
+            );
+
+            setupAdaptivePagination();
+
+            if (!rowsLoaded) {
+                pageNo = 1;
+                loadRows();
+            }
+        }
+
+        function closeDialog() {
+            if (!$dialog) {
+                return;
+            }
+
+            teardownAdaptivePagination();
+
+            $dialog.hide();
+
+            $('body').removeClass(
+                'vas-ptm-body-lock'
+            );
+
+            pageNo = 1;
+            rowsLoaded = false;
+        }
+
+        function measureDialogRowHeight() {
+            var $row = $dialogTbody
+                ? $dialogTbody
+                    .find('tr')
+                    .not(':has(.vas-ptm-dialog-empty)')
+                    .first()
+                : null;
+
+            var measured =
+                $row && $row.length
+                    ? $row.outerHeight()
+                    : 0;
+
+            return measured > 0
+                ? measured
+                : dialogRowHeightEstimate;
+        }
+
+        function updateAdaptivePageSize() {
+            if (
+                isDisposed ||
+                !$dialogBody ||
+                !$dialogBody[0] ||
+                !$dialogTbody ||
+                !$dialogTbody[0] ||
+                !$dialog ||
+                !$dialog.is(':visible')
+            ) {
+                return;
+            }
+
+            var container = $dialogBody[0];
+
+            if (container.clientHeight <= 0) {
+                return;
+            }
+
+            /*
+             * Whatever sits above the first row inside the scroll area - the
+             * table header, padding, any summary strip - is measured from the
+             * tbody's own position rather than assumed, so the row space left
+             * over is exact.
+             */
+            var headerOffset =
+                (
+                    $dialogTbody[0].getBoundingClientRect().top -
+                    container.getBoundingClientRect().top
+                ) + container.scrollTop;
+
+            var availableHeight = Math.max(
+                0,
+                container.clientHeight - headerOffset
+            );
+
+            var rowHeight = measureDialogRowHeight();
+
+            if (rowHeight <= 0) {
+                return;
+            }
+
+            var nextPageSize = Math.max(
+                dialogMinimumRows,
+                Math.floor(availableHeight / rowHeight)
+            );
+
+            if (nextPageSize === pageSize) {
+                adaptiveAdjustCount = 0;
+                return;
+            }
+
+            /*
+             * Each render re-checks the fit, so cap the corrections to stop a
+             * layout that never settles from looping.
+             */
+            if (adaptiveAdjustCount >= 4) {
+                return;
+            }
+
+            if (rowsLoading) {
+                return;
+            }
+
+            adaptiveAdjustCount++;
+
+            // Keep the record the user is looking at on screen.
+            var firstVisibleRecord =
+                ((pageNo - 1) * pageSize) + 1;
+
+            pageSize = nextPageSize;
+
+            pageNo = Math.max(
+                1,
+                Math.ceil(firstVisibleRecord / pageSize)
+            );
+
+            loadRows();
+        }
+
+        function setupAdaptivePagination() {
+            if (!$dialogBody || !$dialogBody[0]) {
+                return;
+            }
+
+            updateAdaptivePageSize();
+
+            window.setTimeout(function () {
+                updateAdaptivePageSize();
+            }, 0);
+
+              if (
+                  window.ResizeObserver &&
+                  !dialogResizeObserver
+              ) {
+                dialogResizeObserver = new ResizeObserver(
+                    function () {
+                        updateAdaptivePageSize();
+                    }
+                );
+
+                dialogResizeObserver.observe($dialogBody[0]);
+
+                /*
+                 * The scroll area keeps a fixed height, so only the row
+                 * container changes size when rows arrive. Watching it is
+                 * what corrects the estimate the first pass had to use.
+                 */
+                if ($dialogTbody && $dialogTbody[0]) {
+                      dialogResizeObserver.observe($dialogTbody[0]);
+                  }
+              }
+
+              if (!adaptiveResizeHandler) {
+                  adaptiveResizeHandler = function () {
+                      if (adaptiveResizeFrame !== null) {
+                          return;
+                      }
+
+                      adaptiveResizeFrame = window.requestAnimationFrame(function () {
+                          adaptiveResizeFrame = null;
+                          adaptiveAdjustCount = 0;
+                          updateAdaptivePageSize();
+                      });
+                  };
+
+                  window.addEventListener('resize', adaptiveResizeHandler);
+
+                  if (window.visualViewport) {
+                      window.visualViewport.addEventListener('resize', adaptiveResizeHandler);
+                  }
+              }
+          }
+
+          function teardownAdaptivePagination() {
+            if (dialogResizeObserver) {
+                  dialogResizeObserver.disconnect();
+                  dialogResizeObserver = null;
+              }
+
+              if (adaptiveResizeHandler) {
+                  window.removeEventListener('resize', adaptiveResizeHandler);
+
+                  if (window.visualViewport) {
+                      window.visualViewport.removeEventListener('resize', adaptiveResizeHandler);
+                  }
+
+                  adaptiveResizeHandler = null;
+              }
+
+              if (adaptiveResizeFrame !== null) {
+                  window.cancelAnimationFrame(adaptiveResizeFrame);
+                  adaptiveResizeFrame = null;
+              }
+          }
+
+        function loadRows() {
+            if (
+                !$dialogTbody ||
+                isDisposed ||
+                rowsLoading
+            ) {
+                return;
+            }
+
+            rowsLoading = true;
+
+            showDialogBusy(true);
+            updatePagerControls(0, 0);
+
+            $.ajax({
+                url:
+                    VIS.Application.contextUrl +
+                    'VAS_028_PaidThisMonthAPPaymentWidget/GetPaidThisMonthRows',
+
+                type: 'GET',
+                dataType: 'json',
+                cache: false,
+
+                data: {
+                    pageNo: pageNo,
+                    pageSize: pageSize
+                },
+
+                success: function (response) {
+                    if (isDisposed) {
+                        return;
+                    }
+
+                    var data = normalizeResponse(response);
+
+                    if (!data || data.error) {
+                        renderRowsResult({
+                            rows: [],
+                            totalRecords: 0,
+                            totalPages: 0,
+                            pageNo: pageNo
+                        });
+
+                        return;
+                    }
+
+                    renderRowsResult(data);
+                    rowsLoaded = true;
+                },
+
+                error: function () {
+                    if (!isDisposed) {
+                        renderRowsResult({
+                            rows: [],
+                            totalRecords: 0,
+                            totalPages: 0,
+                            pageNo: pageNo
+                        });
+                    }
+                },
+
+                complete: function () {
+                    if (!isDisposed) {
+                        rowsLoading = false;
+                        showDialogBusy(false);
+                        updateAdaptivePageSize();
+                        updatePagerFromCurrent();
+                    }
+                }
+            });
+        }
+
+        function renderRowsResult(data) {
+            var rows =
+                data &&
+                    $.isArray(data.rows)
+                    ? data.rows
+                    : [];
+
+            totalRecords = Number(
+                data && data.totalRecords
+                    ? data.totalRecords
+                    : 0
+            );
+
+            totalPages = Number(
+                data && data.totalPages
+                    ? data.totalPages
+                    : 0
+            );
+
+            if (
+                data &&
+                typeof data.pageNo !== 'undefined'
+            ) {
+                pageNo = Number(data.pageNo);
+            }
+
+            if (
+                pageNo > totalPages &&
+                totalPages > 0
+            ) {
+                pageNo = totalPages;
+            }
+
+            if (pageNo < 1 || isNaN(pageNo)) {
+                pageNo = 1;
+            }
+
+            renderDialogHeader(data || {});
+            renderRows(rows);
+
+            var from = totalRecords === 0
+                ? 0
+                : (pageNo - 1) * pageSize;
+
+            var to = Math.min(
+                from + rows.length,
+                totalRecords
+            );
+
+            updatePagerControls(from, to);
+        }
+
+        function renderDialogHeader(data) {
+            if ($dialogTitle) {
+                $dialogTitle.text(
+                    data.title ||
+                    lbl(
+                        'VAS_028_MessagePaidThisMonth',
+                        'Paid This Month'
+                    )
+                );
+            }
+
+            if ($dialogSubtitle) {
+                $dialogSubtitle.text(
+                    data.subtitle ||
+                    getFallbackDialogSubtitle()
+                );
+            }
+        }
+
+        function getFallbackDialogSubtitle() {
+            if (!lastData) {
+                return lbl(
+                    'VAS_028_MessageCashPaid',
+                    'Cash paid'
+                );
+            }
+
+            var paymentCount = Number(
+                totalRecords ||
+                lastData.paymentCount ||
+                0
+            );
+
+            var amount = Number(
+                lastData.totalPaidAmount ||
+                lastData.paidThisMonth ||
+                lastData.value ||
+                0
+            );
+
+            var symbol =
+                lastData.symbol ||
+                lastData.currencySymbol ||
+                '';
+
+            return (
+                paymentCount +
+                ' ' +
+                lbl(
+                    'VAS_028_MessagePayments',
+                    'payments'
+                ) +
+                ' · ' +
+                lbl('VAS_028_MessageMTD') +
+                ' ' +
+                formatHeaderAmount(
+                    amount,
+                    symbol,
+                    lastData.currencyISO
+                )
+            );
+        }
+
+        function renderRows(rows) {
+            if (!$dialogTbody) {
+                return;
+            }
+
+            $dialogTbody.empty();
+
+            if (!rows || rows.length === 0) {
+                $dialogTbody.html(
+                    '<tr>' +
+                    '<td class="vas-ptm-dialog-empty" colspan="8">' +
+                    escapeHtml(
+                        lbl(
+                            'VAS_028_MessageNoPaymentsThisMonth',
+                            'No payments this month.'
+                        )
+                    ) +
+                    '</td>' +
+                    '</tr>'
+                );
+
+                return;
+            }
+
+            for (var i = 0; i < rows.length; i++) {
+                var row = rows[i];
+
+                var dateText = formatDate(
+                    row.date
+                );
+
+                var bankText = formatBankAccount(
+                    row
+                );
+
+                var precision = normalizePrecision(
+                    row.stdPrecision
+                );
+
+                var amountText = formatCurrencyAmount(
+                    row.amount,
+                    row.paymentCurrencySymbol,
+                    row.paymentCurrency,
+                    precision
+                );
+
+                var statusType = row.allocated
+                    ? 'cleared'
+                    : 'intransit';
+
+                var executionStatusName = row.executionStatusName;
+
+                var statusClass = getStatusClass(
+                    statusType
+                );
+
+                var statusText = getStatusText(
+                    statusType, executionStatusName
+                );
+
+                var supplierName =
+                    row.supplier || '';
+
+                var paymentMethod =
+                    row.paymentMethodName || '';
+
+                $dialogTbody.append(
+                    '<tr>' +
+
+                    '<td class="vas-ptm-td-doc" title="' +
+                    escapeHtml(row.documentNo || '') +
+                    '">' +
+                    escapeHtml(row.documentNo || '') +
+                    '</td>' +
+
+                    '<td class="vas-ptm-td-date" title="' +
+                    escapeHtml(dateText) +
+                    '">' +
+                    escapeHtml(dateText) +
+                    '</td>' +
+
+                    '<td class="vas-ptm-td-vendor" title="' +
+                    escapeHtml(supplierName) +
+                    '">' +
+                    escapeHtml(supplierName) +
+                    '</td>' +
+
+                    '<td class="vas-ptm-td-bank" title="' +
+                    escapeHtml(bankText) +
+                    '">' +
+                    escapeHtml(bankText) +
+                    '</td>' +
+
+                    '<td class="vas-ptm-td-currency" title="' +
+                    escapeHtml(row.paymentCurrency || '') +
+                    '">' +
+                    escapeHtml(row.paymentCurrency || '') +
+                    '</td>' +
+
+                    '<td class="vas-ptm-td-method" title="' +
+                    escapeHtml(paymentMethod) +
+                    '">' +
+                    escapeHtml(paymentMethod) +
+                    '</td>' +
+
+                    '<td class="vas-ptm-td-status">' +
+                    '<span class="vas-ptm-dialog-status ' +
+                    statusClass +
+                    '">' +
+                    escapeHtml(statusText) +
+                    '</span>' +
+                    '</td>' +
+
+
+                    '<td class="vas-ptm-td-amount" title="' +
+                    escapeHtml(amountText) +
+                    '">' +
+                    escapeHtml(amountText) +
+                    '</td>' +
+
+
+                    '</tr>'
+                );
+            }
+        
+            updateAdaptivePageSize();
+        }
+
+        function updatePagerFromCurrent() {
+            var from = totalRecords === 0
+                ? 0
+                : (pageNo - 1) * pageSize;
+
+            var to = Math.min(
+                pageNo * pageSize,
+                totalRecords
+            );
+
+            updatePagerControls(from, to);
+        }
+
+        function updatePagerControls(from, to) {
+            if ($pagerHelper) {
+                if (totalRecords > 0) {
+                    $pagerHelper.text(
+                        lbl(
+                            'VAS_Showing',
+                            'Showing'
+                        ) +
+                        ' ' +
+                        (from + 1) +
+                        '-' +
+                        to +
+                        ' ' +
+                        lbl(
+                            'VAS_Of',
+                            'of'
+                        ) +
+                        ' ' +
+                        totalRecords
+                    );
+                }
+                else {
+                    $pagerHelper.text('');
+                }
+            }
+
+            /* The indicator always reads, down to "1 of 1" on an empty or
+               single-page list: blanking it left the two arrows framing a gap,
+               which looks like a pager that failed to load rather than one
+               with nowhere to go. Being disabled is what says that. */
+            if ($pagerText) {
+                $pagerText.text(
+                    pageNo +
+                    ' ' +
+                    lbl(
+                        'VAS_Of',
+                        'of'
+                    ) +
+                    ' ' +
+                    Math.max(1, totalPages)
+                );
+            }
+
+            if ($pagerPrev) {
+                $pagerPrev.prop(
+                    'disabled',
+                    rowsLoading ||
+                    pageNo <= 1
+                );
+            }
+
+            if ($pagerNext) {
+                $pagerNext.prop(
+                    'disabled',
+                    rowsLoading ||
+                    totalPages <= 1 ||
+                    pageNo >= totalPages
+                );
+            }
+        }
+
+        /*
+         * Amounts shown in the dialog header are rounded to whole
+         * numbers and the currency symbol is printed without the
+         * trailing separator that comes from the currency setup,
+         * for example ID12,000. Table cells keep the exact amount.
+         */
+        function formatHeaderAmount(
+            value,
+            symbol,
+            iso
+        ) {
+            var numericValue = Number(value || 0);
+
+            if (isNaN(numericValue)) {
+                numericValue = 0;
+            }
+
+            var sign = numericValue < 0
+                ? '-'
+                : '';
+
+            var amount = Math.abs(
+                numericValue
+            ).toLocaleString(
+                window.navigator.language,
+                {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0
+                }
+            );
+
+            var cleanSymbol = String(
+                symbol || ''
+            ).replace(/[\s-]+$/, '');
+
+            if (cleanSymbol) {
+                return sign + cleanSymbol + amount;
+            }
+
+            return iso
+                ? sign + amount + ' ' + iso
+                : sign + amount;
+        }
+
+        function formatCurrencyAmount(
+            value,
+            symbol,
+            iso,
+            precision
+        ) {
+            var numericValue = Number(value || 0);
+
+            if (isNaN(numericValue)) {
+                numericValue = 0;
+            }
+
+            var sign = numericValue < 0
+                ? '-'
+                : '';
+
+            var amount = Math.abs(
+                numericValue
+            ).toLocaleString(
+                window.navigator.language,
+                {
+                    minimumFractionDigits: precision,
+                    maximumFractionDigits: precision
+                }
+            );
+
+            if (symbol) {
+                return sign + symbol + amount;
+            }
+
+            return iso
+                ? sign + amount + ' ' + iso
+                : sign + amount;
+        }
+
+        function formatDate(value) {
+            if (!value) {
+                return '';
+            }
+
+            /*
+             * The controller returns yyyy-MM-dd.
+             * Adding T00:00:00 prevents timezone conversion
+             * from changing the displayed date.
+             */
+            var normalizedValue = String(value);
+
+            if (
+                /^\d{4}-\d{2}-\d{2}$/.test(
+                    normalizedValue
+                )
+            ) {
+                normalizedValue += 'T00:00:00';
+            }
+
+            var date = new Date(
+                normalizedValue
+            );
+
+            if (isNaN(date.getTime())) {
+                return value;
+            }
+
+            return date.toLocaleDateString(
+                window.navigator.language,
+                {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric'
+                }
+            );
+        }
+
+        function formatBankAccount(row) {
+            var bankName =
+                row &&
+                    row.bankName
+                    ? String(row.bankName).trim()
+                    : '';
+
+            var accountNo =
+                row &&
+                    row.accountNo
+                    ? String(row.accountNo).trim()
+                    : '';
+
+            var last4 = accountNo
+                ? (
+                    accountNo.length > 4
+                        ? accountNo.slice(-4)
+                        : accountNo
+                )
+                : '';
+
+            if (bankName && last4) {
+                return (
+                    bankName +
+                    ' ****' +
+                    last4
+                );
+            }
+
+            if (bankName) {
+                return bankName;
+            }
+
+            return last4
+                ? '****' + last4
+                : '';
+        }
+
+        function getStatusClass(statusType) {
+            if (statusType === 'cleared') {
+                return 'vas-ptm-dialog-status-cleared';
+            }
+
+            if (
+                statusType === 'bounced' ||
+                statusType === 'B' ||
+                statusType === 'C'
+            ) {
+                return 'vas-ptm-dialog-status-bounced';
+            }
+
+            return 'vas-ptm-dialog-status-intransit';
+        }
+
+        function getStatusText(statusType, executionStatusName = "") {
+            if (statusType === 'cleared') {
+                return lbl(
+                    'VAS_028_MessageCleared',
+                    'Cleared'
+                );
+            }
+
+            if (
+                statusType === 'bounced' ||
+                statusType === 'B' ||
+                statusType === 'C'
+            ) {
+                return lbl(
+                    'VAS_028_MessageBounced',
+                    'Bounced'
+                );
+            }
+
+            return executionStatusName;
+        }
+
+        function createDialog() {
+            if ($dialog) {
+                return;
+            }
+
+            $dialog = $(
+                '<div class="vas-ptm-dialog" style="display:none;" role="dialog" aria-modal="true">' +
+
+                '<div class="vas-ptm-dialog-scrim"></div>' +
+
+                '<div class="vas-ptm-dialog-card">' +
+
+                '<div class="vas-ptm-dialog-header">' +
+
+                '<div class="vas-ptm-dialog-icon">' +
+                '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">' +
+                '<polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline>' +
+                '<polyline points="17 18 23 18 23 12"></polyline>' +
+                '</svg>' +
+                '</div>' +
+
+                '<div class="vas-ptm-dialog-title-group">' +
+                '<div class="vas-ptm-dialog-title"></div>' +
+                '<div class="vas-ptm-dialog-subtitle"></div>' +
+                '</div>' +
+
+                '<button type="button" class="vas-ptm-dialog-close" aria-label="' +
+                escapeHtml(
+                    lbl(
+                        'VAS_Close',
+                        'Close'
+                    )
+                ) +
+                '">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+                '<line x1="18" y1="6" x2="6" y2="18"></line>' +
+                '<line x1="6" y1="6" x2="18" y2="18"></line>' +
+                '</svg>' +
+                '</button>' +
+
+                '</div>' +
+
+                '<div class="vas-ptm-dialog-body">' +
+
+                '<div class="vas-ptm-dialog-busy">' +
+                '<div class="vis-busyindicatorinnerwrap">' +
+                '<i class="vis_widgetloader"></i>' +
+                '</div>' +
+                '</div>' +
+
+                '<table class="vas-ptm-dialog-table">' +
+
+                '<thead>' +
+                '<tr>' +
+
+                '<th>' +
+                escapeHtml(
+                    lbl(
+                        'VAS_028_MessagePaymentNo',
+                        'Payment No.'
+                    )
+                ) +
+                '</th>' +
+
+                '<th>' +
+                escapeHtml(
+                    lbl(
+                        'VAS_028_MessageDate',
+                        'Date'
+                    )
+                ) +
+                '</th>' +
+
+                '<th>' +
+                escapeHtml(
+                    lbl(
+                        'VAS_028_MessageVendor',
+                        'Vendor'
+                    )
+                ) +
+                '</th>' +
+
+                '<th>' +
+                escapeHtml(
+                    lbl(
+                        'VAS_028_BankAccount',
+                        'Bank account'
+                    )
+                ) +
+                '</th>' +
+
+                '<th>' +
+                escapeHtml(
+                    lbl(
+                        'VAS_PaymentCurrency',
+                        'Currency'
+                    )
+                ) +
+                '</th>' +
+
+                '<th>' +
+                escapeHtml(
+                    lbl(
+                        'VAS_028_MessageMethod',
+                        'Payment Method'
+                    )
+                ) +
+                '</th>' +
+
+                '<th>' +
+                escapeHtml(
+                    lbl(
+                        'VAS_028_MessageStatus',
+                        'Execution Status'
+                    )
+                ) +
+                '</th>' +
+
+
+                '<th class="vas-ptm-th-amount">' +
+                escapeHtml(
+                    lbl(
+                        'VAS_028_MessageAmount',
+                        'Amount'
+                    )
+                ) +
+                '</th>' +
+
+
+                '</tr>' +
+                '</thead>' +
+
+                '<tbody class="vas-ptm-dialog-tbody"></tbody>' +
+
+                '</table>' +
+
+                '</div>' +
+
+                '<div class="vas-ptm-dialog-footer">' +
+
+                '<span class="vas-ptm-pager-helper"></span>' +
+
+                '<div class="vas-ptm-pager">' +
+
+                '<button type="button" class="vas-ptm-pager-btn vas-ptm-pager-prev" aria-label="' +
+                escapeHtml(
+                    lbl(
+                        'VAS_Previous',
+                        'Previous'
+                    )
+                ) +
+                '">‹</button>' +
+
+                '<span class="vas-ptm-pager-text"></span>' +
+
+                '<button type="button" class="vas-ptm-pager-btn vas-ptm-pager-next" aria-label="' +
+                escapeHtml(
+                    lbl(
+                        'VAS_Next',
+                        'Next'
+                    )
+                ) +
+                '">›</button>' +
+
+                '</div>' +
+
+                '</div>' +
+
+                '</div>' +
+
+                '</div>'
+            );
+
+            $dialogTitle = $dialog.find(
+                '.vas-ptm-dialog-title'
+            );
+
+            $dialogSubtitle = $dialog.find(
+                '.vas-ptm-dialog-subtitle'
+            );
+
+            $dialogBody = $dialog.find(
+                '.vas-ptm-dialog-body'
+            );
+
+            $dialogTbody = $dialog.find(
+                '.vas-ptm-dialog-tbody'
+            );
+
+            $dialogBusy = $dialog.find(
+                '.vas-ptm-dialog-busy'
+            );
+
+            $pagerHelper = $dialog.find(
+                '.vas-ptm-pager-helper'
+            );
+
+            $pagerPrev = $dialog.find(
+                '.vas-ptm-pager-prev'
+            );
+
+            $pagerNext = $dialog.find(
+                '.vas-ptm-pager-next'
+            );
+
+            $pagerText = $dialog.find(
+                '.vas-ptm-pager-text'
+            );
+
+            $dialog
+                .find('.vas-ptm-dialog-close')
+                .on('click', function (e) {
+                    e.stopPropagation();
+                    closeDialog();
+                });
+
+            $pagerPrev.on('click', function () {
+                if (
+                    rowsLoading ||
+                    pageNo <= 1
+                ) {
+                    return;
+                }
+
+                pageNo--;
+                loadRows();
+            });
+
+            $pagerNext.on('click', function () {
+                if (
+                    rowsLoading ||
+                    pageNo >= totalPages
+                ) {
+                    return;
+                }
+
+                pageNo++;
+                loadRows();
+            });
+
+            $('body').append($dialog);
+
+            renderDialogHeader({});
+        }
+
+        this.refreshData = function () {
+            rowsLoaded = false;
+            rowsLoading = false;
+
+            pageNo = 1;
+            totalPages = 0;
+            totalRecords = 0;
+
+            loadData();
+        };
+
+        this.getRoot = function () {
+            return $root;
+        };
+
+        this.disposeComponent = function () {
+            isDisposed = true;
+
+            teardownAdaptivePagination();
+
+            $(document).off(
+                'keydown.vas-ptm-dialog-' +
+                self.AD_UserHomeWidgetID
+            );
+
+            $('body').removeClass(
+                'vas-ptm-body-lock'
+            );
+
+            if ($dialog) {
+                $dialog.remove();
+                $dialog = null;
+            }
+
+            $root.remove();
+
+            $metricEl = null;
+            $whyText = null;
+            $body = null;
+            $why = null;
+            $busy = null;
+            $state = null;
+
+            $dialogTitle = null;
+            $dialogSubtitle = null;
+            $dialogBody = null;
+            $dialogTbody = null;
+            $dialogBusy = null;
+
+            $pagerHelper = null;
+            $pagerPrev = null;
+            $pagerNext = null;
+            $pagerText = null;
+
+            lastData = null;
+        };
+    };
+
+    VAS.VAS_028_PaidThisMonthAPPaymentWidget.prototype.init = function (
+        windowNo,
+        frame
+    ) {
+        this.frame = frame;
+        this.windowNo = windowNo;
+
+        if (frame && frame.widgetInfo) {
+            this.AD_UserHomeWidgetID =
+                frame.widgetInfo.AD_UserHomeWidgetID;
+        }
+
+        this.Initalize();
+
+        if (
+            this.frame &&
+            this.frame.getContentGrid
+        ) {
+            this.frame
+                .getContentGrid()
+                .append(this.getRoot());
+        }
+    };
+
+    VAS.VAS_028_PaidThisMonthAPPaymentWidget.prototype.widgetSizeChange = function (
+        height,
+        width
+    ) {
+        var $root = this.getRoot();
+
+        if (!$root) {
+            return;
+        }
+
+        $root.toggleClass(
+            'vas-ptm-compact',
+            (width && width < 240) ||
+            (height && height < 160)
+        );
+    };
+
+    VAS.VAS_028_PaidThisMonthAPPaymentWidget.prototype.refreshWidget = function () {
+        this.refreshData();
+    };
+
+    VAS.VAS_028_PaidThisMonthAPPaymentWidget.prototype.dispose = function () {
+        this.disposeComponent();
+
+        if (
+            this.frame &&
+            this.frame.dispose
+        ) {
+            this.frame.dispose();
+        }
+
+        this.frame = null;
+    };
+
+})(VAS, jQuery);

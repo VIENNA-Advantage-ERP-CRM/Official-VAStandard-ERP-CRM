@@ -16,7 +16,7 @@
         var $bsyDiv;
         var $self = this;
         var ctx = this.ctx;
-        var $root = $('<div class="h-100 w-100">'); // Root container
+        var $root = $('<div class="h-100 w-100 vas-widget-bg">'); // Root container
         var orgControlDiv;
         var unit = null;
         var sqlWHERE = "";
@@ -162,11 +162,21 @@
                 $self.totalPages = productList.length; // Update totalPages
                 var $pagination = $('<div class="VAS-pagination-col">' +
                     '<div class="VAS-arrow-col">' +
-                    '<a href="#" id="VAS_Prev_Page_' + widgetID + '"><span class="fa fa-arrow-left"></span></a>' +
-                    '<a href="#" id="VAS_Next_Page_' + widgetID + '"><span class="fa fa-arrow-right"></span></a>' +
+                    '<a href="#" id="VAS_Prev_Page_' + widgetID + '"><span class="fa fa-arrow-circle-left"></span></a>' +
+                    '<div class="VAS-page-count vas-page-count-product"><span id="VAS_PageCount_' + widgetID + '">1 of ' + $self.totalPages + '</span></div>' +
+                    '<a href="#" id="VAS_Next_Page_' + widgetID + '"><span class="fa fa-arrow-circle-right"></span></a>' +
                     '</div>' +
-                    '<div class="VAS-page-count"><span id="VAS_PageCount_' + widgetID + '">1 of ' + $self.totalPages + '</span></div>' +
                     '</div>');
+
+
+                //var $pagination = $('<div class="VAS-pagination-col">' +
+                //    '<div class= "VAS-arrow-col">' +
+                //    '<a href="javascript:void(0);"><span class="fa fa-arrow-circle-left" id="VAS_Prev_' + widgetID + '"></span></a>' +
+                //    '<div class="VAS-page-count" id="VAS_spnPageCount_' + widgetID + '">1 of 10</div>' +
+                //    '<a href="javascript:void(0);"><span class="fa fa-arrow-circle-right" id="VAS_Next_' + widgetID + '"></span></a>' +
+                //    '</div>' +
+                //    '</div>');
+
 
                 // Add event listeners for arrows
                 $pagination.find('#VAS_Prev_Page_' + widgetID + '').on('click', function (e) {

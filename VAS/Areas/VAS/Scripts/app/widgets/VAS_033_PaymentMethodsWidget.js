@@ -1,0 +1,721 @@
+﻿/**
+ * Payment methods
+ * Purpose - Shows the distribution of outgoing AP payments by payment method.
+ *
+ * ── Labels / Message Keys ─────────────────────────────────────────────
+ *  #  | Current Text                         | Message Key
+ * ----+--------------------------------------+--------------------------------
+ *  1  | Payment methods                      | VAS_033_MessagePaymentMethods
+ *  3  | Loading                              | VAS_033_MessageLoading
+ *  4  | No Data                              | VAS_033_MessageNoData
+ *  5  | Not Specified                        | VAS_033_MessageNotSpecified
+ *  6  | Previous                             | VAS_Previous
+ *  7  | Next                                 | VAS_Next
+ *  8  | Could not load data                  | VAS_ErrorLoading
+ *  9  | Of                                   | VAS_Of
+ * 10  | Year to date                         | VAS_033_MessageYearToDate
+ * 11  | This period                          | VAS_033_MessageThisPeriod
+ * ─────────────────────────────────────────────────────────────────────
+ */
+
+; VAS = window.VAS || {};
+
+; (function (VAS, $) {
+
+    VAS.VAS_033_PaymentMethodsWidget = function () {
+
+        this.frame;
+        this.windowNo;
+        this.AD_UserHomeWidgetID;
+
+        var $root = $('<div class="vas-payment-methods-root">');
+        var $card;
+        var $subtitle;
+        var $body;
+        var $foot;
+        var $pager;
+        var $pagerPrev;
+        var $pagerNext;
+        var $pagerText;
+        var $showingText;
+        var $busy;
+        var $state;
+        var isDisposed = false;
+        var methodsData = [];
+        var pageNo = 1;
+        var pageSize = 3;
+        var totalPages = 0;
+        var resizeObserver = null;
+        var adaptiveResizeHandler = null;
+        var adaptiveResizeFrame = null;
+        var widgetRowHeight = 50;
+        var widgetMinimumRows = 2;
+        var adaptiveAdjustCount = 0;
+
+        function lbl(key, fallback) {
+            return VIS.Msg.getMsg(key);
+        }
+
+        this.Initalize = function () {
+            createWidget();
+            setupAdaptivePagination();
+            loadData();
+        };
+
+        function createWidget() {
+            $card = $('<div class="vas-payment-methods-card">');
+
+            var $head = $('<div class="vas-payment-methods-head">');
+            var $iconBox = $('<span class="vas-payment-methods-icon-box">');
+            var $icon = $(
+                '<svg class="vas-payment-methods-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
+                '<path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path>' +
+                '<path d="M22 12A10 10 0 0 0 12 2v10z"></path>' +
+                '</svg>'
+            );
+            var $headText = $('<div class="vas-payment-methods-head-text">');
+            var $title = $('<div class="vas-payment-methods-title">').text(lbl('VAS_033_MessagePaymentMethods', 'Payment methods'));
+
+            /* The figures only cover the current accounting period, so the
+               header carries that period as a subtitle -- otherwise a monthly
+               share reads as an all-time one. */
+            $subtitle = $('<div class="vas-payment-methods-subtitle">');
+
+            $pager = $('<div class="vas-payment-methods-pager">');
+            $pagerPrev = $('<button type="button" class="vas-payment-methods-page-btn" aria-label="' + lbl('VAS_Previous', 'Previous') + '">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<polyline points="15 18 9 12 15 6"></polyline>' +
+                '</svg>' +
+                '</button>');
+            $pagerText = $('<span class="vas-payment-methods-page-text">');
+            $pagerNext = $('<button type="button" class="vas-payment-methods-page-btn" aria-label="' + lbl('VAS_Next', 'Next') + '">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<polyline points="9 18 15 12 9 6"></polyline>' +
+                '</svg>' +
+                '</button>');
+
+            $pager.append($pagerPrev).append($pagerText).append($pagerNext);
+
+            $iconBox.append($icon);
+            $headText.append($title).append($subtitle);
+            $head.append($iconBox).append($headText);
+
+            $body = $('<div class="vas-payment-methods-body">');
+
+            $foot = $('<div class="vas-payment-methods-foot">');
+
+            $showingText = $('<span class="vas-payment-methods-showing">');
+
+            $foot.append($showingText).append($pager);
+            $busy = $('<div class="vas-payment-methods-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
+            $state = $('<div class="vas-payment-methods-state-message">');
+
+            $card.append($head).append($body).append($foot).append($busy).append($state);
+            $root.empty().append($card);
+
+            $pagerPrev.on('click', function () {
+                if (pageNo <= 1) {
+                    return;
+                }
+
+                pageNo--;
+                renderPage();
+            });
+
+            $pagerNext.on('click', function () {
+                if (totalPages <= 1 || pageNo >= totalPages) {
+                    return;
+                }
+
+                pageNo++;
+                renderPage();
+            });
+        }
+
+        function loadData() {
+            if (isDisposed) {
+                return;
+            }
+
+            showBusy(true);
+            showState(false, '');
+
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_033_PaymentMethodsWidget/GetPaymentMethods',
+                type: 'GET',
+                dataType: 'json',
+                cache: false,
+                success: function (response) {
+                    if (isDisposed) {
+                        return;
+                    }
+
+                    var data = response;
+
+                    if (typeof response === 'string') {
+                        try {
+                            data = JSON.parse(response);
+                        }
+                        catch (e) {
+                            showState(true, lbl('VAS_ErrorLoading', 'Could not load data'));
+                            return;
+                        }
+                    }
+
+                    if (!data || data.error) {
+                        showState(true, lbl('VAS_ErrorLoading', 'Could not load data'));
+                        return;
+                    }
+
+                    renderData(data);
+                },
+                error: function () {
+                    if (!isDisposed) {
+                        showState(true, lbl('VAS_ErrorLoading', 'Could not load data'));
+                    }
+                },
+                complete: function () {
+                    if (!isDisposed) {
+                        showBusy(false);
+                    }
+                }
+            });
+        }
+
+        function renderData(data) {
+            renderPeriodSubtitle(data);
+
+            methodsData = $.isArray(data.methods)
+                ? $.grep(data.methods, function (method) {
+                    return method != null;
+                })
+                : [];
+
+            methodsData.sort(function (left, right) {
+                return Math.abs(Number(right.paymentAmount || 0)) -
+                    Math.abs(Number(left.paymentAmount || 0));
+            });
+
+            if (methodsData.length === 0) {
+                setNoData();
+                return;
+            }
+
+            pageNo = 1;
+            totalPages = Math.ceil(methodsData.length / pageSize);
+            renderPage();
+        }
+
+        /*
+         * The period name ("Sep-26") is what the user recognises, so it is the
+         * subtitle; the exact range it stands for is kept in the tooltip rather
+         * than spent on header width. A client without seeded periods still
+         * gets the range itself.
+         */
+        function renderPeriodSubtitle(data) {
+            if (!$subtitle) {
+                return;
+            }
+
+            var periodName = data && data.periodName ? String(data.periodName) : '';
+            var rangeText = formatPeriodRange(
+                data ? data.dateFrom : '',
+                data ? data.dateTo : ''
+            );
+
+            var label = periodName;
+
+            if (!label && data && String(data.periodFilter).toUpperCase() === 'YTD') {
+                label = lbl('VAS_033_MessageYearToDate', 'Year to date');
+            }
+
+            if (!label) {
+                label = rangeText;
+            }
+
+            if (!label) {
+                label = lbl('VAS_033_MessageThisPeriod', 'This period');
+            }
+
+            var tooltip = rangeText && rangeText !== label
+                ? label + ' | ' + rangeText
+                : label;
+
+            $subtitle.text(label).attr('title', tooltip);
+        }
+
+        /*
+         * Dates arrive as plain "yyyy-MM-dd" strings. Date.parse would read
+         * them as UTC midnight and shift the day backwards west of Greenwich,
+         * so the parts are handed to the local-time constructor instead.
+         */
+        function parseServerDate(value) {
+            if (!value) {
+                return null;
+            }
+
+            var parts = String(value).split('-');
+
+            if (parts.length < 3) {
+                return null;
+            }
+
+            var year = parseInt(parts[0], 10);
+            var month = parseInt(parts[1], 10);
+            var day = parseInt(parts[2], 10);
+
+            if (isNaN(year) || isNaN(month) || isNaN(day)) {
+                return null;
+            }
+
+            var date = new Date(year, month - 1, day);
+
+            return isNaN(date.getTime()) ? null : date;
+        }
+
+        function formatShortDate(date) {
+            if (!date) {
+                return '';
+            }
+
+            return date.toLocaleDateString(window.navigator.language, {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+            });
+        }
+
+        function formatPeriodRange(dateFrom, dateTo) {
+            var from = parseServerDate(dateFrom);
+            var to = parseServerDate(dateTo);
+
+            if (from && to) {
+                return formatShortDate(from) + ' – ' + formatShortDate(to);
+            }
+
+            return formatShortDate(from || to);
+        }
+
+        function renderPage() {
+            if (!methodsData || methodsData.length === 0) {
+                setNoData();
+                return;
+            }
+
+            totalPages = Math.max(1, Math.ceil(methodsData.length / pageSize));
+
+            if (pageNo < 1) {
+                pageNo = 1;
+            }
+
+            if (pageNo > totalPages) {
+                pageNo = totalPages;
+            }
+
+            showState(false, '');
+            $body.empty();
+            $foot.show();
+
+            var startIndex = (pageNo - 1) * pageSize;
+            var pageItems = methodsData.slice(startIndex, startIndex + pageSize);
+
+            for (var i = 0; i < pageItems.length; i++) {
+                $body.append(createMethodRow(pageItems[i]));
+            }
+
+            updatePager();
+
+            // Real rows exist now, so re-check the fit against their height.
+            updateAdaptivePageSize();
+        }
+
+        /*
+         * The fixed height is only a starting guess; once a row is on screen
+         * its real height is used so the count matches what actually fits.
+         */
+        function measureWidgetRowHeight() {
+            var $row = $body
+                ? $body.find('.vas-payment-methods-row').first()
+                : null;
+
+            var measured = $row && $row.length
+                ? $row.outerHeight(true)
+                : 0;
+
+            return measured > 0 ? measured : widgetRowHeight;
+        }
+
+        function measureWidgetRowGap() {
+            if (!$body || !$body[0] || !window.getComputedStyle) {
+                return 0;
+            }
+
+            var bodyStyle = window.getComputedStyle($body[0]);
+            var measuredGap = parseFloat(bodyStyle.rowGap || bodyStyle.gap);
+
+            return isNaN(measuredGap) ? 0 : measuredGap;
+        }
+
+        function updateAdaptivePageSize() {
+            if (!$body || !$body[0]) {
+                return;
+            }
+
+            var rowHeight = measureWidgetRowHeight();
+            var rowGap = measureWidgetRowGap();
+            var nextPageSize = Math.max(
+                widgetMinimumRows,
+                Math.floor(($body[0].clientHeight + rowGap) / (rowHeight + rowGap))
+            );
+
+            if (nextPageSize === pageSize) {
+                adaptiveAdjustCount = 0;
+                return;
+            }
+
+            /*
+             * Each render re-checks the fit, so cap the corrections to stop a
+             * layout that never settles from looping.
+             */
+            if (adaptiveAdjustCount >= 4) {
+                return;
+            }
+
+            adaptiveAdjustCount++;
+
+            var firstVisibleRecord = ((pageNo - 1) * pageSize) + 1;
+
+            pageSize = nextPageSize;
+            pageNo = Math.max(1, Math.ceil(firstVisibleRecord / pageSize));
+
+            if (methodsData && methodsData.length > 0) {
+                renderPage();
+            }
+        }
+
+        function setupAdaptivePagination() {
+            if (!$body || !$body[0]) {
+                return;
+            }
+
+            updateAdaptivePageSize();
+
+            window.setTimeout(function () {
+                updateAdaptivePageSize();
+            }, 0);
+
+            if (window.ResizeObserver) {
+                resizeObserver = new ResizeObserver(function () {
+                    updateAdaptivePageSize();
+                });
+
+                resizeObserver.observe($body[0]);
+            }
+
+            if (!adaptiveResizeHandler) {
+                adaptiveResizeHandler = function () {
+                    if (adaptiveResizeFrame !== null) {
+                        return;
+                    }
+
+                    adaptiveResizeFrame = window.requestAnimationFrame(function () {
+                        adaptiveResizeFrame = null;
+                        adaptiveAdjustCount = 0;
+                        updateAdaptivePageSize();
+                    });
+                };
+
+                window.addEventListener('resize', adaptiveResizeHandler);
+
+                if (window.visualViewport) {
+                    window.visualViewport.addEventListener('resize', adaptiveResizeHandler);
+                }
+            }
+        }
+
+        function teardownAdaptivePagination() {
+            if (resizeObserver) {
+                resizeObserver.disconnect();
+                resizeObserver = null;
+            }
+
+            if (adaptiveResizeHandler) {
+                window.removeEventListener('resize', adaptiveResizeHandler);
+
+                if (window.visualViewport) {
+                    window.visualViewport.removeEventListener('resize', adaptiveResizeHandler);
+                }
+
+                adaptiveResizeHandler = null;
+            }
+
+            if (adaptiveResizeFrame !== null) {
+                window.cancelAnimationFrame(adaptiveResizeFrame);
+                adaptiveResizeFrame = null;
+            }
+        }
+
+        function updatePager() {
+            if (!$pager) {
+                return;
+            }
+
+            if ($showingText) {
+                var count = methodsData.length;
+                var startIndex = count > 0 ? ((pageNo - 1) * pageSize) + 1 : 0;
+                var endIndex = count > 0 ? Math.min(pageNo * pageSize, count) : 0;
+
+                $showingText.text(
+                    count > 0
+                        ? lbl('VAS_Showing', 'Showing') + ' ' +
+                          startIndex + '–' + endIndex + ' ' +
+                          lbl('VAS_Of', 'of') + ' ' + count
+                        : ''
+                );
+            }
+
+            /* A single page still says where you are: blanking the indicator
+               left the two arrows framing an empty gap, which reads as a pager
+               that failed to load rather than one with nowhere to go. The
+               arrows below already carry that by being disabled. */
+            if ($pagerText) {
+                $pagerText.text(pageNo + ' ' + lbl('VAS_Of', 'of') + ' ' + Math.max(1, totalPages));
+            }
+
+            if ($pagerPrev) {
+                $pagerPrev.prop('disabled', pageNo <= 1 || totalPages <= 1);
+            }
+
+            if ($pagerNext) {
+                $pagerNext.prop('disabled', totalPages <= 1 || pageNo >= totalPages);
+            }
+        }
+
+        function createMethodRow(method) {
+            var methodName = method.paymentMethodName || lbl('VAS_033_MessageNotSpecified', 'Not Specified');
+            var percentage = Number(method.percentage || 0);
+            var amountText = formatWidgetCompactAmount(
+                method.paymentAmount,
+                method.currencySymbol || method.symbol,
+                method.currencyISO || method.currencyISOCode || method.isoCode,
+                method.stdPrecision
+            );
+
+            if (isNaN(percentage)) {
+                percentage = 0;
+            }
+
+            if (percentage > 100) {
+                percentage = 100;
+            }
+
+            var $row = $('<div class="vas-payment-methods-row">');
+            var $top = $('<div class="vas-payment-methods-row-top">');
+            var $name = $('<span class="vas-payment-methods-name">').text(methodName);
+            var $metrics = $('<span class="vas-payment-methods-metrics">');
+            var percentText = formatPercentage(percentage);
+            var $percent = $('<span class="vas-payment-methods-percent">').text(percentText);
+            var $amount = $('<span class="vas-payment-methods-amount">').text(amountText);
+            var tooltipText = methodName + ' | ' + percentText + ' | ' + amountText;
+            var $track = $('<div class="vas-payment-methods-track">').attr({
+                role: 'progressbar',
+                tabindex: '0',
+                title: tooltipText,
+                'aria-label': tooltipText,
+                'aria-valuemin': 0,
+                'aria-valuemax': 100,
+                'aria-valuenow': percentage
+            });
+            var $fill = $('<div class="vas-payment-methods-fill">').addClass(getMethodClass(methodName));
+            var $tooltip = $('<div class="vas-payment-methods-tooltip">').text(tooltipText);
+
+            $fill.css('width', percentage + '%');
+
+            $metrics.append($amount).append($percent);
+            $top.append($name).append($metrics);
+            $track.append($fill);
+            $row.append($top).append($track).append($tooltip);
+
+            return $row;
+        }
+
+        function getMethodClass(methodName) {
+            var name = (methodName || '').toLowerCase();
+
+            if (name.indexOf('rtgs') >= 0) {
+                return 'vas-payment-methods-fill-rtgs';
+            }
+
+            if (name.indexOf('upi') >= 0) {
+                return 'vas-payment-methods-fill-upi';
+            }
+
+            if (name.indexOf('card') >= 0) {
+                return 'vas-payment-methods-fill-card';
+            }
+
+            if (name.indexOf('cheque') >= 0 || name.indexOf('check') >= 0) {
+                return 'vas-payment-methods-fill-cheque';
+            }
+
+            return 'vas-payment-methods-fill-neft';
+        }
+
+        function formatPercentage(value) {
+            var numericValue = Number(value || 0);
+
+            return numericValue.toLocaleString(window.navigator.language, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }) + '%';
+        }
+
+        function formatCurrencyAmount(value, currencySymbol, currencyISO, precision) {
+            var numericValue = Number(value || 0);
+            var stdPrecision = normalizePrecision(precision);
+            var sign = numericValue < 0 ? '-' : '';
+            var absValue = Math.abs(numericValue);
+
+            var amount = absValue.toLocaleString(window.navigator.language, {
+                minimumFractionDigits: stdPrecision,
+                maximumFractionDigits: stdPrecision
+            });
+
+            if (currencySymbol) {
+                return sign + currencySymbol + amount;
+            }
+
+            return currencyISO ? sign + amount + ' ' + currencyISO : sign + amount;
+        }
+
+        function formatWidgetCompactAmount(value, currencySymbol, currencyISO, precision) {
+            var numericValue = Number(value || 0);
+            var stdPrecision = normalizePrecision(precision);
+            var sign = numericValue < 0 ? '-' : '';
+            var amount =
+                VIS &&
+                    VIS.Util &&
+                    VIS.Util.formatCompactAmount
+                    ? VIS.Util.formatCompactAmount(
+                        Math.abs(numericValue),
+                        currencyISO,
+                        stdPrecision
+                    )
+                    : Math.abs(numericValue).toLocaleString(window.navigator.language, {
+                        minimumFractionDigits: stdPrecision,
+                        maximumFractionDigits: stdPrecision
+                    });
+
+            if (currencySymbol) {
+                return sign + currencySymbol + amount;
+            }
+
+            return currencyISO ? sign + amount + ' ' + currencyISO : sign + amount;
+        }
+
+        function getStdPrecision() {
+            var stdPrecision = 2;
+
+            if (VIS && VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
+                stdPrecision = Number(VIS.Env.getCtx().getStdPrecision());
+            }
+
+            if (isNaN(stdPrecision) || stdPrecision < 0) {
+                stdPrecision = 2;
+            }
+
+            return stdPrecision;
+        }
+
+        function normalizePrecision(precision) {
+            var stdPrecision = Number(precision);
+
+            if (isNaN(stdPrecision) || stdPrecision < 0) {
+                stdPrecision = getStdPrecision();
+            }
+
+            return stdPrecision;
+        }
+
+        function showBusy(show) {
+            if ($busy) {
+                $busy.toggleClass('is-visible', !!show);
+            }
+        }
+
+        function showState(show, message) {
+            if ($state) {
+                $state.text(message || '').toggleClass('is-visible', !!show);
+            }
+
+            if ($foot) {
+                $foot.toggle(!show);
+            }
+
+            if ($body) {
+                $body.toggle(!show);
+            }
+
+            if ($pager) {
+                $pager.toggle(!show);
+            }
+        }
+
+        function setNoData() {
+            showState(true, lbl('VAS_033_MessageNoData', 'No Data'));
+        }
+
+        this.refreshWidget = function () {
+            loadData();
+        };
+
+        this.getRoot = function () {
+            return $root;
+        };
+
+        this.disposeComponent = function () {
+            isDisposed = true;
+
+            teardownAdaptivePagination();
+
+            $root.remove();
+            $card = null;
+            $subtitle = null;
+            $body = null;
+            $foot = null;
+            $pager = null;
+            $pagerPrev = null;
+            $pagerNext = null;
+            $pagerText = null;
+            $busy = null;
+            $state = null;
+            methodsData = [];
+        };
+    };
+
+    VAS.VAS_033_PaymentMethodsWidget.prototype.init = function (windowNo, frame) {
+        this.frame = frame;
+        this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
+        this.windowNo = windowNo;
+        this.Initalize();
+        this.frame.getContentGrid().append(this.getRoot());
+    };
+
+    VAS.VAS_033_PaymentMethodsWidget.prototype.widgetSizeChange = function (height, width) {
+    };
+
+    VAS.VAS_033_PaymentMethodsWidget.prototype.refreshWidget = function () {
+        this.refreshWidget();
+    };
+
+    VAS.VAS_033_PaymentMethodsWidget.prototype.dispose = function () {
+        this.disposeComponent();
+
+        if (this.frame) {
+            this.frame.dispose();
+        }
+
+        this.frame = null;
+    };
+
+})(VAS, jQuery);

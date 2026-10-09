@@ -64,7 +64,7 @@
         };
         /** Create dummy div to append in structure */
         function createDummyDiv() {
-            $dummDiv = '<div class="VAS-cashDetail-box VAS-cashDummy-div">' +
+            $dummDiv = '<div class="VAS-cashDetail-box VAS-cashDummy-div vas-separator-row">' +
                 '<div class="VAS-cashbook-name"> - </div>' +
                 '<div class="VAS-CashBaldata"><div class="VAS-cashISOCode">-' +
                 '</div> <div class="VAS-cashbook-amount">-' +
@@ -87,7 +87,7 @@
                 $pageInfo.html(TxtPageFooter);
                 var width = $divCashBal.width();
                 for (var i = start; i < end; i++) {
-                    $divCashBody.append('<div class="VAS-cashDetail-box" id="div_cashDetail_' + widgetID + '">'
+                    $divCashBody.append('<div class="VAS-cashDetail-box vas-separator-row" id="div_cashDetail_' + widgetID + '">'
                         + '<div class="VAS-cashbook-name" title="' + cashBalData[i].Name + '">' + cashBalData[i].Name + '</div>'
                         + '<div class="VAS-CashBaldata"><div class="VAS-cashISOCode"> ' + cashBalData[i].CurSymbol + '</div> <div class="VAS-cashbook-amount">'
                         + cashBalData[i].CompletedBalance.toLocaleString(window.navigator.language,
@@ -195,11 +195,11 @@
             if (widgetID == 0) {
                 widgetID = $self.windowNo;
             }
-            $root = $('<div class="VAS-cashroot"  id="VAS_cashroot_"></div>');
+            $root = $('<div class="VAS-cashroot vas-widget-bg"  id="VAS_cashroot_"></div>');
             createBusyIndicator();
             $root.append('<div class="VAS-cashbalance-container" id="div_cashBal_widget_' + widgetID + '">' +
                 '<div class="VAS-cashwidget-header">' +
-                '<h1>' + VIS.Msg.getMsg("VAS_CashBalance") + '</h1>' +
+                '<div>' + VIS.Msg.getMsg("VAS_CashBalance") + '</div>' +
                 '<div class="VAS-casharrow-control">' +
                 '<a href="#"><i id="VAS_CashPrevArrow_' + widgetID + '" class="fa fa-arrow-circle-left VAS-cashwidget-leftar" aria-hidden="true"></i></a>' +
                 '<span id="VAS_PageInfo_' + widgetID + '" class="vas-cashwidget-pageInfo"></span>' +

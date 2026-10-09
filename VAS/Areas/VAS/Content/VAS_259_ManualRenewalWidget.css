@@ -1,0 +1,827 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_259 Manual Renewals — Act Before Notice — c4 x r3 action-list widget +
+ * "All" list modal + contract detail modal (Service Contracts dashboard).
+ * Design: manual-renewals.html (single-widget preview of the parent
+ * dashboard's own manualRenewalWidget()) is the pixel-level source of truth -
+ * .svc-widget-bg glass surface, state-tinted leading clock-icon tile (amber
+ * Act soon / red Overdue), a coloured notice-status chip (danger/warn - NOT
+ * the neutral "renewal type" chip VAS_258 uses; this is a mock-t-danger/t-warn
+ * tinted chip). The list-modal/detail-modal chrome mirrors VAS_241/244/245/
+ * 246/258's own (same glass/modal tokens incl. the 900px "wide" panel,
+ * vas259-* prefixed). Internal type / spacing in em against the widget-root
+ * font-size; borders / radii / shadows in px (physical edges).
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas259-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+    font-family: Roboto, sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 20px);
+    display: flex;
+    flex-direction: column;
+    padding: 0.875em 1em 1em 1em;
+    background: linear-gradient(0deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 1));
+    border: 2px solid #FFFFFF;
+    border-radius: 0.875em;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    color: #102C3F;
+    overflow: hidden;
+}
+
+    .vas259-root,
+    .vas259-root * {
+        box-sizing: border-box;
+    }
+
+/* ── Header: icon well + title/sub + "All" link ──────────────────────────── */
+
+.vas259-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    margin-bottom: 0.625em;
+    flex-shrink: 0;
+}
+
+.vas259-head-l {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+}
+
+.vas259-iconwell {
+    width: 2em;
+    height: 2em;
+    flex-shrink: 0;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #FFFFFF, #F1F8FF);
+    border: 1px solid #E8F2FB;
+    display: grid;
+    place-items: center;
+    color: #0083DA;
+}
+
+    .vas259-iconwell svg { width: 1.05em; height: 1.05em; }
+
+.vas259-head-text {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas259-title {
+    font-weight: 500;
+    font-size: 1.0625rem;
+    color: #000000;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas259-sub {
+    font-weight: 400;
+    font-size: 0.7rem;
+    color: #717182;
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas259-alllink {
+    flex-shrink: 0;
+    background: transparent;
+    border: none;
+    color: #0083DA;
+    font-weight: 500;
+    font-size: 0.78rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+    .vas259-alllink svg { width: 13px; height: 13px; }
+    .vas259-alllink:hover { color: #1F83FF; }
+
+.vas259-skel-sub {
+    display: inline-block;
+    width: 12em;
+    height: 0.7em;
+    border-radius: 6px;
+    background: #E6EBF1;
+    color: transparent !important;
+    animation: vas259-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes vas259-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .vas259-skel-sub { animation: none; }
+}
+
+/* ── Body: always-visible @7 row list + pager (never resizes) ───────────── */
+
+.vas259-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.vas259-list {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas259-state {
+    padding: 1em;
+    font-size: 0.8125em;
+    color: #748494;
+    text-align: center;
+}
+
+.vas259-empty {
+    padding: 0.875em 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    font-size: 0.72rem;
+    color: #748494;
+}
+
+    .vas259-empty svg { width: 16px; height: 16px; color: #20A464; flex-shrink: 0; }
+
+/* Row structural sizing below (gap/padding/tile/text) is fixed px or rem
+   (document-root-relative), matching the mock's own .prow/.na-ic/.row-title/
+   .row-meta literally - NOT em relative to .vas259-root's own dashboard-
+   scaled font-size (the em-vs-fixed-px/rem mismatch VAS_263 needed a fix
+   for, 2026-09-08 - applied here 2026-09-09 after the same visible mismatch
+   was reported for this widget). */
+.vas259-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #EDF2F6;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 120ms ease;
+}
+
+    .vas259-row:last-child { border-bottom: none; }
+    .vas259-row:hover { background: rgba(31, 131, 255, 0.05); }
+
+/* Leading state-tinted clock-icon tile - amber Act soon / red Overdue. */
+.vas259-ic {
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+    border-radius: 9px;
+    display: grid;
+    place-items: center;
+}
+
+    .vas259-ic svg { width: 15px; height: 15px; }
+
+.vas259-ic-warn   { background: rgba(215, 139, 16, 0.12); color: #D78B10; }
+.vas259-ic-danger { background: rgba(216, 67, 74, 0.12);  color: #D8434A; }
+
+.vas259-row-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas259-row-name {
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas259-row-meta {
+    font-size: 0.72rem;
+    color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Compound selector (not a bare class) so this always wins over the later,
+   equal-specificity shared .vas259-btn base regardless of source order -
+   the cascade bug VAS_263's Renew/Invoice button needed a fix for, 2026-09-08. */
+.vas259-btn.vas259-btn-sm {
+    padding: 0.28rem 0.6rem;
+    font-size: 0.72rem;
+    border-radius: 999px;
+    flex-shrink: 0;
+}
+
+/* ── Body pager (within the widget's own fixed footprint) ───────────────── */
+
+.vas259-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 0.5rem;
+    margin-top: auto;
+    flex-shrink: 0;
+}
+
+.vas259-pager:empty { display: none; }
+
+.vas259-pglabel {
+    font-size: 0.73rem;
+    color: #5F7283;
+}
+
+/* ── Notice status chip: tinted surface (danger/warn), NOT neutral ──────── */
+
+.vas259-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 600;
+    font-size: 0.6875rem;
+    padding: 0.1875rem 0.5rem;
+    border-radius: 6px;
+    line-height: 1.2;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.vas259-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    flex-shrink: 0;
+}
+
+.vas259-chip-danger { background: #FAD7D7; color: #8F2D2D; }
+.vas259-chip-danger .vas259-dot { background: #D8434A; }
+
+.vas259-chip-warn { background: #FCEBD3; color: #9A6500; }
+.vas259-chip-warn .vas259-dot { background: #D78B10; }
+
+/* ── Shared modal / dialog chrome (list modal + contract detail) ────────
+ * Fixed scrim + white panel on <body>, own font anchor, px chrome.
+ * ───────────────────────────────────────────────────────────────────── */
+
+.vas259-modal,
+.vas259-dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 10060;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    font-family: Roboto, sans-serif;
+    font-size: 14px;
+    color: #102C3F;
+}
+
+    .vas259-modal.is-open,
+    .vas259-dialog.is-open {
+        display: flex;
+    }
+
+    .vas259-modal *,
+    .vas259-modal,
+    .vas259-dialog *,
+    .vas259-dialog {
+        box-sizing: border-box;
+    }
+
+.vas259-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(16, 44, 63, 0.45);
+}
+
+.vas259-panel {
+    position: relative;
+    width: 100%;
+    max-width: 900px;
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    background: #FFFFFF;
+    border-radius: 18px;
+    box-shadow: 0 24px 60px rgba(15, 61, 97, 0.28);
+    overflow: hidden;
+}
+
+.vas259-mhead,
+.vas259-phead {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    padding: 1em 1.25em;
+    border-bottom: 1px solid #EDF2F6;
+}
+
+.vas259-mtitle,
+.vas259-ptitle {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: 1.05em;
+    font-weight: 700;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas259-mhead-meta,
+.vas259-pcount {
+    flex-shrink: 0;
+    font-size: 0.8em;
+    color: #748494;
+    white-space: nowrap;
+}
+
+.vas259-mclose,
+.vas259-close {
+    width: 2em;
+    height: 2em;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    color: #748494;
+    cursor: pointer;
+}
+
+    .vas259-mclose:hover,
+    .vas259-close:hover {
+        color: #102C3F;
+        background: rgba(16, 44, 63, 0.08);
+    }
+
+    .vas259-mclose svg,
+    .vas259-close svg {
+        width: 1em;
+        height: 1em;
+    }
+
+.vas259-mbody,
+.vas259-pbody {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 1.25em;
+}
+
+.vas259-mfoot,
+.vas259-pfoot {
+    padding: 0.85em 1.25em;
+    border-top: 1px solid #EDF2F6;
+    background: #FBFDFF;
+}
+
+.vas259-mfoot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6em;
+}
+
+.vas259-pfoot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+}
+
+.vas259-pfoot-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+}
+
+.vas259-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.6em 1.1em;
+    border-radius: 10px;
+    font-size: 0.875em;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+}
+
+    .vas259-btn svg { width: 0.9em; height: 0.9em; }
+    .vas259-btn:disabled { opacity: 0.55; cursor: default; }
+
+.vas259-btn-ghost {
+    background: #FFFFFF;
+    color: #0083DA;
+    border: 1px solid #B6DEFB;
+}
+
+    .vas259-btn-ghost:hover:not(:disabled) { background: #EEF6FF; }
+
+.vas259-btn-primary {
+    background: #0083DA;
+    color: #FFFFFF;
+}
+
+    .vas259-btn-primary:hover:not(:disabled) { background: #1F83FF; }
+
+body.vas259-modal-open { overflow: hidden; }
+
+.vas259-band {
+    display: inline-flex;
+    align-items: center;
+    font-weight: 500;
+    font-size: 0.6875em;
+    padding: 0.16em 0.66em;
+    border-radius: 999px;
+    line-height: 1.2;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.vas259-band-ok     { background: #E4F6EC; color: #0B6B45; }
+.vas259-band-warn   { background: #FCEBD3; color: #9A6500; }
+.vas259-band-danger { background: #FCE4E4; color: #B3241C; }
+.vas259-band-info   { background: #DFF1FF; color: #0E5DA8; }
+
+/* ── Confirm dialog (app-styled - replaces the native window.confirm(), which
+ * renders as an unstyled "<host> says" browser chrome popup). Small centered
+ * box on <body>, above the detail modal (z-index 10070 > 10060). ───────── */
+
+.vas259-confirm-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10070;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    font-family: Roboto, sans-serif;
+}
+
+    .vas259-confirm-overlay.is-open { display: flex; }
+
+    .vas259-confirm-overlay *,
+    .vas259-confirm-overlay {
+        box-sizing: border-box;
+    }
+
+.vas259-confirm-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(16, 44, 63, 0.45);
+}
+
+.vas259-confirm-box {
+    position: relative;
+    width: 100%;
+    max-width: 380px;
+    background: #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 24px 60px rgba(15, 61, 97, 0.28);
+    padding: 20px;
+}
+
+.vas259-confirm-msg {
+    margin: 0 0 16px;
+    font-size: 14px;
+    line-height: 1.4;
+    color: #102C3F;
+}
+
+.vas259-confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6em;
+}
+
+/* ── "All" manual-renewal list modal: column header + rows ───────────────── */
+
+.vas259-colhead {
+    display: grid;
+    grid-template-columns: 1.9fr 1fr 1fr 1fr;
+    gap: 1em;
+    align-items: center;
+    padding: 0.6em 1.25em;
+    font-size: 0.72em;
+    font-weight: 600;
+    color: #94A4B4;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    border-bottom: 1px solid #EDF2F6;
+}
+
+.vas259-col-r { text-align: right; }
+
+.vas259-mtrow {
+    display: grid;
+    grid-template-columns: 1.9fr 1fr 1fr 1fr;
+    gap: 1em;
+    align-items: center;
+    padding: 0.7em 0;
+    border-top: 1px solid #F1F5F8;
+    cursor: pointer;
+    transition: background 120ms ease;
+}
+
+    .vas259-mtrow:first-child { border-top: none; }
+    .vas259-mtrow:hover { background: #F8FBFD; }
+
+.vas259-mtc-main {
+    display: flex;
+    align-items: center;
+    gap: 0.65em;
+    min-width: 0;
+}
+
+.vas259-mtc-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.vas259-avatar {
+    width: 2.2em;
+    height: 2.2em;
+    flex-shrink: 0;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    font-size: 0.75em;
+    font-weight: 700;
+    color: #FFFFFF;
+}
+
+@container (max-width: 40em) {
+    .vas259-colhead, .vas259-mtrow { grid-template-columns: 1fr 5em 6.5em; }
+    .vas259-colhead span:nth-child(3), .vas259-mtrow span:nth-child(3) { display: none; }
+}
+
+/* ── Pager (list modal) ───────────────────────────────────────────────── */
+
+.vas259-pager2 {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    font-size: 0.8em;
+    color: #748494;
+}
+
+.vas259-pgctl {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+}
+
+.vas259-pgbtn {
+    width: 1.9em;
+    height: 1.9em;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    border: 1px solid #E4EDF4;
+    background: #FFFFFF;
+    color: #102C3F;
+    cursor: pointer;
+}
+
+    .vas259-pgbtn:hover:not(:disabled) { background: #EEF6FF; }
+    .vas259-pgbtn:disabled { opacity: 0.4; cursor: default; }
+    .vas259-pgbtn svg { width: 0.8em; height: 0.8em; }
+
+/* ── Contract detail modal (mirrors VAS_241/244/245/246/258's own detail layout) ── */
+
+.vas259-dtop2 {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85em;
+    padding-bottom: 1em;
+    margin-bottom: 1em;
+    border-bottom: 1px solid #EDF2F6;
+}
+
+.vas259-davatar {
+    width: 2.75em;
+    height: 2.75em;
+    flex-shrink: 0;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    font-size: 0.9em;
+    font-weight: 700;
+    color: #FFFFFF;
+}
+
+.vas259-dhead-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15em;
+}
+
+.vas259-dname {
+    font-size: 1.15em;
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas259-dsub {
+    font-size: 0.8em;
+    color: #748494;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas259-dhead-right {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.35em;
+}
+
+.vas259-dcycles {
+    font-size: 0.75em;
+    color: #748494;
+    white-space: nowrap;
+}
+
+.vas259-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1em 1.25em;
+    padding-bottom: 1.1em;
+    margin-bottom: 1.1em;
+    border-bottom: 1px solid #EDF2F6;
+}
+
+.vas259-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25em;
+    min-width: 0;
+}
+
+.vas259-slabel {
+    font-size: 0.68em;
+    font-weight: 600;
+    color: #94A4B4;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.vas259-sval {
+    font-size: 0.9em;
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@container (max-width: 40em) {
+    .vas259-stats { grid-template-columns: repeat(2, 1fr); }
+}
+
+.vas259-attn { margin-bottom: 1.1em; }
+
+.vas259-attn-title {
+    font-size: 0.85em;
+    font-weight: 700;
+    color: #102C3F;
+    margin-bottom: 0.6em;
+}
+
+.vas259-attn-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.7em;
+    padding: 0.7em 0;
+    border-top: 1px solid #F1F5F8;
+}
+
+    .vas259-attn-card:first-of-type { border-top: none; }
+
+.vas259-attn-ic {
+    width: 2em;
+    height: 2em;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    background: rgba(0, 131, 218, 0.10);
+    color: #0083DA;
+}
+
+    .vas259-attn-ic svg { width: 1em; height: 1em; }
+
+.vas259-attn-ic-danger {
+    background: rgba(216, 67, 74, 0.12);
+    color: #D8434A;
+}
+
+.vas259-attn-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15em;
+}
+
+.vas259-attn-title2 {
+    font-size: 0.875em;
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas259-attn-desc {
+    font-size: 0.78em;
+    color: #748494;
+}
+
+.vas259-attn-empty {
+    font-size: 0.8em;
+    color: #94A4B4;
+}
+
+.vas259-sched-title {
+    font-size: 0.85em;
+    font-weight: 700;
+    color: #102C3F;
+    margin-bottom: 0.6em;
+}
+
+.vas259-sched-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.vas259-sched-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    padding: 0.65em 0;
+    border-top: 1px solid #F1F5F8;
+    font-size: 0.85em;
+}
+
+    .vas259-sched-row:first-child { border-top: none; }
+
+.vas259-sched-left {
+    color: #102C3F;
+    font-weight: 500;
+}
+
+.vas259-sched-right {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+}
+
+.vas259-sched-amt {
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas259-mmsg {
+    display: none;
+    padding: 0.6em 1.25em;
+    font-size: 0.8em;
+    color: #0B6B45;
+    background: #E4F6EC;
+    border-top: 1px solid #EDF2F6;
+}
+
+    .vas259-mmsg.is-open { display: block; }
+    .vas259-mmsg.is-error { color: #B3241C; background: #FCE4E4; }

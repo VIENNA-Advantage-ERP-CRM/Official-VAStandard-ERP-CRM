@@ -1,0 +1,995 @@
+/************************************************************
+ * Module Name    : VAS
+ * Purpose        : Styles for the Payment Overview tab panel
+ *                  (VAS.VAS_191_APPaymentDetailPanel). Every class is panel
+ *                  prefixed (vas_191-) and scoped under .vas_191-root so it can
+ *                  neither collide with another panel nor repaint a base-theme
+ *                  selector.
+ *
+ *                  Panel Foundation (windows-and-panels.md > Panel Foundation):
+ *                    1. root     - solid white working surface. In THIS host the
+ *                                  root IS the panel body: it owns height:100% +
+ *                                  overflow-y:auto (the scroller), the
+ *                                  container-type and the canonical anchor
+ *                                  --panel-anchor: clamp(16px, 1vw, 18px).
+ *                                  Putting the scroller on an inner element does
+ *                                  not work here - the host's container has no
+ *                                  definite height for a percentage child to
+ *                                  resolve against, so the panel would simply
+ *                                  clip its content instead of scrolling. Same
+ *                                  arrangement as VAS_189_ARInvoiceDetailPanel.
+ *                    2. header   - owned by the VIS tab-panel host, not styled here
+ *                    3. body     - a plain flow child: padding + column gap only,
+ *                                  no height and no overflow of its own
+ *                    4. reset    - nested form controls inherit the anchor, so a
+ *                                  chip inside a button is the same size as one
+ *                                  outside it
+ *                    5. units    - px for borders, dividers, radii, dots and
+ *                                  shadow offsets; em for every text size,
+ *                                  padding, margin, gap and scalable height
+ *
+ *                  COMPOSITION comes from the approved reference HTML
+ *                  (ap_payment_overview_panel.html); SIZES come from design.md,
+ *                  not from the prototype's rem values - those resolve oversized
+ *                  against the 16-18px panel anchor. Token set in use: panel
+ *                  title on the shared dashboard lever
+ *                  clamp(16px, --dash-inline-size * 0.011375, 17px), section /
+ *                  block title 1em/700, card value 0.9375em/700, eyebrow +
+ *                  card meta + table head 0.6875em, row cells 0.75em, amounts
+ *                  and chips-in-content 0.8125em, chip 0.6875em. Nothing below
+ *                  0.6875em; weights are 400 / 500 / 700 only.
+ *
+ *                  The action-bar buttons are the one deliberate step BELOW the
+ *                  token scale (0.75em, padding 0.375em 0.75em) - see the Action
+ *                  bar block for why.
+ * Chronological development:
+ *   VAI163   2026-08-17  Created.
+ *   VAI163   2026-08-18  Action-bar buttons trimmed (0.6875em / 0.25em padding);
+ *                        Withholding table added to the shared Data Grid rules -
+ *                        same chrome as the Allocation table, no palette of its own.
+ ***********************************************************/
+
+/* ----------------------------------------------------------- */
+/*  1. Panel wrapper                                            */
+/* ----------------------------------------------------------- */
+.vas_191-root {
+    /* Canonical palette */
+    --p191-text:        #102C3F;
+    --p191-secondary:   #41576A;
+    --p191-muted:       #5F7283;
+    --p191-divider:     #E2EAF1;
+    --p191-head-bd:     #C5D2DD;
+    --p191-card-bd:     #D9E2EB;
+    --p191-action:      #0083DA;
+    --p191-action-deep: #005FA3;
+    --p191-disabled:    #9AB0C0;
+
+    --p191-info-bg:     #EAF8FF;  --p191-info-tx:    #0083DA;
+    --p191-ok-bg:       #E7F7EF;  --p191-ok-tx:      #0B6B45;
+    --p191-warn-bg:     #FFF6E2;  --p191-warn-tx:    #9A6500;
+    --p191-crit-bg:     #FCEFEF;  --p191-crit-tx:    #A33F3F;
+    --p191-purple-bg:   #EFEEFF;  --p191-purple-tx:  #5F4AA6;
+    --p191-neutral-bg:  #F1F4F8;  --p191-neutral-tx: #41576A;
+
+    --p191-radius-card: 12px;
+    --p191-radius-hero: 14px;
+
+    /* THE ROOT IS THE SCROLLER. The host hands the panel a container whose own
+       height is not always definite, so a height:100% child cannot resolve one
+       and never scrolls - the content is simply clipped at the panel edge. The
+       root therefore owns height + overflow (the same arrangement the AR invoice
+       panel uses in this host), and the body below is a plain flow child. */
+    position: relative;
+    height: 100%;
+    width: 100%;
+    /* min-width:0 lets the fr-based tables shrink to the host instead of forcing
+       a horizontal scrollbar on the whole window. */
+    min-width: 0;
+    max-width: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: auto;
+    box-sizing: border-box;
+
+    /* The canonical panel anchor + container context live here for the same
+       reason: this element IS the panel body in this host. */
+    container-type: inline-size;
+    --panel-anchor: clamp(16px, 1vw, 18px);
+    font-size: var(--panel-anchor);
+
+    background: #FFFFFF;
+    font-family: Roboto, "Segoe UI", Arial, sans-serif;
+    color: var(--p191-text);
+}
+.vas_191-root * { box-sizing: border-box; }
+
+/* ----------------------------------------------------------- */
+/*  3. Panel body - sections stack, the root scrolls them        */
+/* ----------------------------------------------------------- */
+.vas_191-body {
+    min-width: 0;
+    padding: 1.125em 0.875em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875em;
+    background: #FFFFFF;
+}
+
+/* ----------------------------------------------------------- */
+/*  4. Body reset - nested controls inherit the anchor          */
+/* ----------------------------------------------------------- */
+/* Scoped to the panel, never to '*': without it every em inside a button
+   resolves against the user agent's ~13.33px default instead of the anchor. */
+.vas_191-root button,
+.vas_191-root input,
+.vas_191-root select,
+.vas_191-root textarea,
+.vas_191-root optgroup {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    color: inherit;
+}
+
+.vas_191-empty {
+    padding: 2em 1em;
+    text-align: center;
+    font-size: 0.875em;
+    color: var(--p191-muted);
+}
+
+/* ----------------------------------------------------------- */
+/*  Section header                                              */
+/* ----------------------------------------------------------- */
+.vas_191-sec { min-width: 0; }
+
+.vas_191-secHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    margin: 0.5em 0;
+    padding-bottom: 0.375em;
+    border-bottom: 1px solid var(--p191-divider);
+}
+/* The first section sits flush with the top of the body. */
+.vas_191-body > .vas_191-sec:first-child .vas_191-secHead { margin-top: 0; }
+
+.vas_191-secTitle {
+    font-weight: 700;
+    font-size: 1em;
+    color: var(--p191-text);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_191-secSum {
+    font-weight: 400;
+    font-size: 0.75em;
+    color: var(--p191-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+    max-width: 55%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ----------------------------------------------------------- */
+/*  Chips (glance labels) - one tier, no bespoke sizes          */
+/* ----------------------------------------------------------- */
+.vas_191-chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.3125em 0.625em;
+    font-weight: 700;
+    font-size: 0.6875em;
+    line-height: 1;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.vas_191-chip.vas_191-tone-info    { background: var(--p191-info-bg);    color: var(--p191-info-tx); }
+.vas_191-chip.vas_191-tone-ok      { background: var(--p191-ok-bg);      color: var(--p191-ok-tx); }
+.vas_191-chip.vas_191-tone-warn    { background: var(--p191-warn-bg);    color: var(--p191-warn-tx); }
+.vas_191-chip.vas_191-tone-crit    { background: var(--p191-crit-bg);    color: var(--p191-crit-tx); }
+.vas_191-chip.vas_191-tone-purple  { background: var(--p191-purple-bg);  color: var(--p191-purple-tx); }
+.vas_191-chip.vas_191-tone-neutral { background: var(--p191-neutral-bg); color: var(--p191-neutral-tx); font-weight: 500; }
+/* Inside a tinted card the chip takes a white ground - the two-layer tint reads
+   muddy otherwise. */
+.vas_191-chip.vas_191-onTint { background: #FFFFFF; }
+
+/* ----------------------------------------------------------- */
+/*  Header                                                      */
+/* ----------------------------------------------------------- */
+/* Sizes follow design.md's token set, NOT the reference HTML's rem values - the
+   prototype's 1.5rem h1 / 0.875rem sub read oversized once they resolve against
+   the 16-18px panel anchor. See review-checklist.md > Panel HTML Token Audit. */
+.vas_191-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1em;
+    flex-wrap: wrap;
+}
+.vas_191-headLeft { min-width: 0; flex: 1; }
+
+/* Panel title on the shared dashboard title lever: it reads the global
+   --dash-inline-size (the visible content width in px, published on :root by the
+   widget host) and clamps between 16 and 17px, so the panel title lands at the
+   same physical size as every widget title on the same screen. 100vw is the
+   documented fallback for a host that never sets the variable. */
+.vas_191-h1 {
+    font-weight: 700;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    line-height: 1.3;
+    color: var(--p191-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_191-sub {
+    font-weight: 400;
+    font-size: 0.75em;
+    color: var(--p191-muted);
+    margin-top: 0.25em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ----------------------------------------------------------- */
+/*  Info trio                                                   */
+/* ----------------------------------------------------------- */
+/* Three per-item cards on the reference's 1.7 / 1.1 / 1 track list, each with
+   its own border: a strip of independently readable numbers, not one grouped
+   block. */
+.vas_191-info {
+    display: grid;
+    grid-template-columns: 1.7fr 1.1fr 1fr;
+    gap: 0.75em;
+}
+
+.vas_191-icard {
+    min-width: 0;
+    background: #FFFFFF;
+    border: 1px solid var(--p191-card-bd);
+    border-radius: var(--p191-radius-hero);
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    padding: 0.9375em 1.0625em;
+}
+/* Amber only while something is still open - a settled payment is not a
+   warning. */
+.vas_191-icard.vas_191-amber {
+    background: var(--p191-warn-bg);
+    border-color: #F0DBA8;
+}
+
+.vas_191-eyebrow {
+    font-weight: 500;
+    font-size: 0.6875em;
+    letter-spacing: 0.6px;
+    color: var(--p191-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_191-icard.vas_191-amber .vas_191-eyebrow { color: var(--p191-warn-tx); }
+
+/* Stat Grid tile value - 0.9375em Bold. The reference's 1.25rem is the
+   "larger widget-KPI treatment" the token audit calls out as a fail. */
+.vas_191-big {
+    font-weight: 700;
+    font-size: 0.9375em;
+    line-height: 1.3;
+    color: var(--p191-text);
+    margin-top: 0.25em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_191-big.vas_191-bigLink { color: var(--p191-action); }
+.vas_191-icard.vas_191-amber .vas_191-big { color: var(--p191-warn-tx); }
+
+.vas_191-imeta {
+    font-weight: 400;
+    font-size: 0.6875em;
+    color: var(--p191-muted);
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_191-icard.vas_191-amber .vas_191-imeta { color: #A8782B; }
+
+/* ----------------------------------------------------------- */
+/*  Advance banner                                              */
+/* ----------------------------------------------------------- */
+/* Dashed outline, no warning fill: an unapplied advance is often intentional,
+   so the banner states the fact and offers the action. */
+.vas_191-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    flex-wrap: wrap;
+    padding: 0.875em 1em;
+    border: 2px dashed #9ED1FF;
+    border-radius: var(--p191-radius-hero);
+    background: linear-gradient(180deg, #F3F9FF 0%, #FFFFFF 100%);
+}
+.vas_191-banner-l {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    min-width: 0;
+}
+.vas_191-well {
+    flex-shrink: 0;
+    width: 2.5em;
+    height: 2.5em;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #1F83FF;
+    color: #FFFFFF;
+    box-shadow: 0 8px 18px rgba(31, 131, 255, 0.22);
+}
+.vas_191-well .vas_191-ic svg { width: 1.25em; height: 1.25em; }
+
+.vas_191-banner-tx { min-width: 0; }
+.vas_191-banner-a {
+    font-weight: 700;
+    font-size: 0.875em;
+    color: var(--p191-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_191-banner-b {
+    font-weight: 400;
+    font-size: 0.75em;
+    color: var(--p191-secondary);
+    margin-top: 0.1875em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ----------------------------------------------------------- */
+/*  Approval rail                                               */
+/* ----------------------------------------------------------- */
+.vas_191-vsteps { padding: 0.5em 1.125em 1em; }
+
+.vas_191-vstep { display: flex; gap: 0.75em; }
+
+.vas_191-rail {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+/* A reached step: filled green marker with a check, 22px as in the reference. */
+.vas_191-node {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #20A464;
+    background: #20A464;
+    color: #FFFFFF;
+    flex-shrink: 0;
+}
+.vas_191-node .vas_191-ic svg { width: 0.75em; height: 0.75em; }
+/* The connector fills the gap down to the next node. */
+.vas_191-line {
+    flex: 1;
+    width: 2px;
+    min-height: 0.625em;
+    margin: 0.1875em 0;
+    background: var(--p191-card-bd);
+}
+
+.vas_191-vc { min-width: 0; padding-bottom: 0.875em; }
+.vas_191-vstep:last-child .vas_191-vc { padding-bottom: 0; }
+/* Step Flow card title / meta tokens. */
+.vas_191-st {
+    font-weight: 500;
+    font-size: 0.8125em;
+    color: var(--p191-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_191-mt {
+    font-weight: 400;
+    font-size: 0.6875em;
+    color: var(--p191-muted);
+    margin-top: 0.1875em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ----------------------------------------------------------- */
+/*  Block card                                                  */
+/* ----------------------------------------------------------- */
+/* The shape the AR invoice panel uses for its detail, allocation and posting
+   sections: a bordered card with a title row, the content, and an optional
+   tinted footer band. */
+.vas_191-block {
+    background: #FFFFFF;
+    border: 1px solid var(--p191-card-bd);
+    border-radius: var(--p191-radius-hero);
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    overflow: hidden;
+}
+
+.vas_191-block-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    flex-wrap: wrap;
+    padding: 0.9375em 1.125em;
+}
+.vas_191-block-h {
+    font-weight: 700;
+    font-size: 1em;
+    color: var(--p191-text);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_191-block-r {
+    font-weight: 400;
+    font-size: 0.75em;
+    color: var(--p191-muted);
+    white-space: nowrap;
+}
+
+.vas_191-block-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    flex-wrap: wrap;
+    padding: 0.75em 1.125em;
+    background: #FBFDFF;
+    border-top: 1px solid var(--p191-divider);
+    font-weight: 400;
+    font-size: 0.75em;
+    color: var(--p191-secondary);
+}
+.vas_191-block-foot b {
+    font-weight: 700;
+    color: var(--p191-text);
+}
+
+/* A document number that opens its record. Inherits the cell's size so it sits
+   on the same baseline as the plain text beside it. */
+.vas_191-doclink {
+    color: var(--p191-action-deep);
+    font: inherit;
+    text-decoration: none;
+    cursor: pointer;
+}
+.vas_191-doclink:hover,
+.vas_191-doclink:focus {
+    text-decoration: underline;
+}
+
+/* View ledger entry flashes the section it scrolled to. */
+@keyframes vas191Flash {
+    0%   { box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06); }
+    28%  { box-shadow: 0 0 0 3px rgba(31, 131, 255, 0.45), 0 10px 24px rgba(15, 61, 97, 0.06); }
+    100% { box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06); }
+}
+.vas_191-block.vas_191-flash {
+    animation: vas191Flash 1.25s ease;
+}
+
+/* ----------------------------------------------------------- */
+/*  Key / value list (Payment details)                          */
+/* ----------------------------------------------------------- */
+.vas_191-kv {
+    padding: 0.25em 1.125em 1em;
+}
+.vas_191-kv.vas_191-cols2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 1.625em;
+}
+
+.vas_191-kv-r {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.875em;
+    padding: 0.5625em 0;
+    border-bottom: 1px solid var(--p191-divider);
+}
+.vas_191-kv-k {
+    font-weight: 400;
+    font-size: 0.75em;
+    color: var(--p191-secondary);
+    flex-shrink: 0;
+}
+.vas_191-kv-v {
+    font-weight: 600;
+    font-size: 0.8125em;
+    color: var(--p191-text);
+    text-align: right;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Roomier variant for the Payment details block. The reference also scales its
+   TYPE up here (block title 1.1875rem, k 0.875rem, v 1.0625rem); those are
+   dropped - the token audit fails a 1.1875em section title - so the variant
+   differs in breathing space only, not in type size. */
+.vas_191-details-lg .vas_191-block-head { padding: 1.125em 1.375em; }
+.vas_191-details-lg .vas_191-kv { padding: 0.5em 1.375em 1.25em; }
+.vas_191-details-lg .vas_191-kv.vas_191-cols2 { column-gap: 2.125em; }
+.vas_191-details-lg .vas_191-kv-r { padding: 0.6875em 0; }
+
+/* ----------------------------------------------------------- */
+/*  Action bar                                                  */
+/* ----------------------------------------------------------- */
+/* The reference wraps the buttons in a faint blue rounded band, and carries
+   four button treatments: filled primary, outlined, ghost (neutral border) and
+   a borderless text action pushed to the far end of the row.
+
+   Button METRICS are deliberately BELOW the Action Pill token (0.8125em,
+   padding 0.5em 0.875em) and below VAS_189's .btn: this bar carries up to five
+   actions on a panel that is mostly dense read-only content, and at the token
+   size it dominated the header. 0.6875em with 0.25em vertical padding keeps the
+   control ~22px tall while the label stays on the panel's type scale. The band
+   tightens with it so the bar does not regain in padding what the buttons gave
+   up. The band and the four treatments are kept from the reference layout. */
+.vas_191-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5em;
+    padding: 0.3125em 0.5em;
+    background: rgba(238, 246, 255, 0.5);
+    border-radius: 12px;
+}
+
+.vas_191-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4375em;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    background: #FFFFFF;
+    color: var(--p191-action);
+    padding: 0.25em 0.75em;
+    font-weight: 400;
+    font-size: 0.6875em;
+    line-height: 1.2;
+    cursor: pointer;
+    transition: background .15s, border-color .15s, color .15s;
+}
+.vas_191-pill .vas_191-ic svg { width: 1em; height: 1em; }
+.vas_191-pill:focus-visible { outline: 2px solid var(--p191-action); outline-offset: 1px; }
+
+/* Filled - the one primary record action. */
+.vas_191-pill.vas_191-is-primary {
+    background: #1F83FF;
+    border-color: #1F83FF;
+    color: #FFFFFF;
+}
+.vas_191-pill.vas_191-is-primary:hover:not(:disabled) {
+    background: #0069AE;
+    border-color: #0069AE;
+}
+
+/* Outlined - secondary document actions. */
+.vas_191-pill.vas_191-is-outline {
+    border-color: #1F83FF;
+    color: #1F83FF;
+}
+.vas_191-pill.vas_191-is-outline:hover:not(:disabled) { background: #EEF8FF; }
+
+/* Ghost - neutral utilities (print, share). */
+.vas_191-pill.vas_191-is-ghost {
+    border-color: var(--p191-card-bd);
+    color: var(--p191-secondary);
+}
+.vas_191-pill.vas_191-is-ghost:hover:not(:disabled) {
+    border-color: #BFE4FF;
+    color: var(--p191-text);
+}
+
+/* Text - the trailing navigation action; margin-left pushes it to the end. */
+.vas_191-pill.vas_191-is-text {
+    background: none;
+    border-color: transparent;
+    color: var(--p191-muted);
+    padding: 0.25em 0.375em;
+    margin-left: auto;
+}
+.vas_191-pill.vas_191-is-text:hover:not(:disabled) { color: var(--p191-action-deep); }
+
+.vas_191-pill:disabled {
+    border-color: var(--p191-disabled);
+    color: var(--p191-disabled);
+    background: #FFFFFF;
+    cursor: not-allowed;
+}
+.vas_191-pill.vas_191-is-primary:disabled { background: #FFFFFF; }
+
+/* ----------------------------------------------------------- */
+/*  Stage pipeline (payment lifecycle)                          */
+/* ----------------------------------------------------------- */
+.vas_191-pipe {
+    position: relative;
+    width: 100%;
+    padding: 0.75em 0 0.5em;
+}
+.vas_191-pipeGrid { display: grid; }
+
+.vas_191-pipeCol {
+    position: relative;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* The segment runs from this circle's centre to the next one's; the circle's
+   z-index covers it, so the rail reads as one line broken by circles. */
+.vas_191-pipeSeg {
+    position: absolute;
+    left: 50%;
+    right: -50%;
+    top: 1em;
+    height: 2px;
+    transform: translateY(-1px);
+    background: var(--p191-divider);
+}
+.vas_191-pipeSeg.vas_191-done { background: var(--p191-action); }
+
+.vas_191-pipeDot {
+    position: relative;
+    z-index: 10;
+    width: 2em;
+    height: 2em;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #FFFFFF;
+    border: 2px solid var(--p191-card-bd);
+}
+.vas_191-pipeDot.vas_191-done {
+    background: var(--p191-action);
+    border-color: var(--p191-action);
+    color: #FFFFFF;
+}
+.vas_191-pipeDot.vas_191-done .vas_191-ic svg { width: 1em; height: 1em; }
+.vas_191-pipeDot.vas_191-active { border-color: var(--p191-action); }
+.vas_191-pipeDot.vas_191-active i {
+    width: 0.5em;
+    height: 0.5em;
+    border-radius: 50%;
+    background: var(--p191-action);
+    display: block;
+}
+.vas_191-pipeDot.vas_191-blocked {
+    background: #D14545;
+    border-color: #D14545;
+    color: #FFFFFF;
+}
+.vas_191-pipeDot.vas_191-blocked .vas_191-ic svg { width: 1em; height: 1em; }
+
+.vas_191-pipeLbl {
+    margin-top: 0.5em;
+    width: 100%;
+    text-align: center;
+    font-size: 0.8125em;
+    font-weight: 400;
+    color: var(--p191-disabled);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_191-pipeLbl.vas_191-done   { font-weight: 500; color: var(--p191-action); }
+.vas_191-pipeLbl.vas_191-active { font-weight: 700; color: var(--p191-action); }
+.vas_191-pipeLbl.vas_191-blocked { font-weight: 700; color: #D14545; }
+
+/* ----------------------------------------------------------- */
+/*  Tables inside a block (Payment Allocate, Allocation Detail,  */
+/*  Withholding)                                                 */
+/* ----------------------------------------------------------- */
+/* One shared column template across the header and every body row, every track
+   minmax(0, Nfr): a bare Nfr cannot shrink below its content, so one long
+   document number would push the row wider than the panel. */
+.vas_191-pa-head,
+.vas_191-pa-row,
+.vas_191-alloc-head,
+.vas_191-alloc-row,
+.vas_191-wh-head,
+.vas_191-wh-row {
+    display: grid;
+    align-items: center;
+    gap: 0.75em;
+    padding: 0 1.125em;
+}
+
+.vas_191-pa-head,
+.vas_191-alloc-head,
+.vas_191-wh-head {
+    padding-bottom: 0.625em;
+    border-bottom: 1px solid var(--p191-divider);
+}
+.vas_191-pa-head > span,
+.vas_191-alloc-head > span,
+.vas_191-wh-head > span {
+    font-weight: 400;
+    font-size: 0.6875em;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--p191-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_191-pa-head > span.right,
+.vas_191-alloc-head > span.right,
+.vas_191-wh-head > span.right { text-align: right; }
+
+/* No font-size on the row itself: each cell carries the reference's own size,
+   so nothing compounds. */
+.vas_191-pa-row,
+.vas_191-alloc-row,
+.vas_191-wh-row {
+    padding: 0.8125em 1.125em;
+    border-bottom: 1px solid var(--p191-divider);
+}
+.vas_191-pa-row:last-of-type,
+.vas_191-alloc-row:last-of-type,
+.vas_191-wh-row:last-of-type { border-bottom: none; }
+
+.vas_191-pa-row > div,
+.vas_191-alloc-row > div,
+.vas_191-wh-row > div {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Data Grid body tokens: row cells 0.75em, the identity cell bold, the amount
+   one step up at 0.8125em so the money column still leads the row. */
+.vas_191-pa-row .p,
+.vas_191-alloc-row .p,
+.vas_191-wh-row .p {
+    font-size: 0.75em;
+    font-weight: 700;
+    color: var(--p191-text);
+}
+.vas_191-pa-row .c,
+.vas_191-alloc-row .c,
+.vas_191-wh-row .c {
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--p191-secondary);
+}
+.vas_191-pa-row .amt,
+.vas_191-alloc-row .amt,
+.vas_191-wh-row .amt {
+    font-size: 0.8125em;
+    font-weight: 700;
+    color: var(--p191-text);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Payment Allocate: document · schedule · amount · discount · write-off. */
+.vas_191-pa-head,
+.vas_191-pa-row {
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 0.9fr);
+}
+
+/* Allocation Detail: reference · allocation no. · date · applied to · amount. */
+.vas_191-alloc-head,
+.vas_191-alloc-row {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 1.1fr);
+}
+
+/* Withholding: type · base amount · rate · withholding amount. The block takes
+   no palette of its own - it is the Allocation table with four columns, so the
+   two read as one family. */
+.vas_191-wh-head,
+.vas_191-wh-row {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.1fr) minmax(0, 0.8fr) minmax(0, 1.2fr);
+}
+
+/* The reference cell carries a second line naming what the reference IS; the
+   withholding type cell carries the same shape for its "Backup withholding"
+   qualifier. */
+.vas_191-alloc-row .col-a,
+.vas_191-wh-row .col-t { white-space: normal; }
+.vas_191-alloc-row .col-a .p,
+.vas_191-wh-row .col-t .p {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_191-alloc-row .col-a .s,
+.vas_191-wh-row .col-t .s {
+    font-size: 0.6875em;
+    font-weight: 400;
+    color: var(--p191-muted);
+    margin-top: 0.1875em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ----------------------------------------------------------- */
+/*  Posted entry (columns set inline per visible dimension)      */
+/* ----------------------------------------------------------- */
+.vas_191-je-head,
+.vas_191-je-row,
+.vas_191-je-total {
+    display: grid;
+    align-items: center;
+    gap: 0.75em;
+    padding: 0 1.125em;
+}
+
+.vas_191-je-head {
+    padding-bottom: 0.625em;
+    border-bottom: 1px solid var(--p191-divider);
+}
+.vas_191-je-head > span {
+    font-weight: 400;
+    font-size: 0.6875em;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--p191-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_191-je-head > span.right { text-align: right; }
+
+.vas_191-je-row {
+    padding: 0.75em 1.125em;
+    border-bottom: 1px solid var(--p191-divider);
+}
+.vas_191-je-row:last-of-type { border-bottom: none; }
+.vas_191-je-row > div {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_191-je-row .acct .code {
+    font-weight: 700;
+    font-size: 0.75em;
+    color: var(--p191-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* Second line under the account: what the fact line is for. */
+.vas_191-je-row .acct .nm {
+    font-weight: 400;
+    font-size: 0.6875em;
+    color: var(--p191-muted);
+    margin-top: 0.1875em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_191-je-row .acct { white-space: normal; }
+.vas_191-je-row .dimc {
+    font-weight: 400;
+    font-size: 0.75em;
+    color: var(--p191-secondary);
+}
+.vas_191-je-row .num {
+    font-weight: 700;
+    font-size: 0.75em;
+    color: var(--p191-text);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+/* A leg that did not move reads as a dash, so the eye lands on the side that did. */
+.vas_191-je-row .num.zero { font-weight: 400; color: #9F9F9F; }
+
+.vas_191-je-total {
+    padding: 0.8125em 1.125em;
+    border-top: 1px solid var(--p191-card-bd);
+    background: #FBFDFF;
+}
+.vas_191-je-total .tlab {
+    font-weight: 700;
+    font-size: 0.8125em;
+    color: var(--p191-text);
+}
+.vas_191-je-total .num {
+    font-weight: 700;
+    font-size: 0.8125em;
+    color: var(--p191-text);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ----------------------------------------------------------- */
+/*  Section pager                                               */
+/* ----------------------------------------------------------- */
+/* Centred beneath the section content. Never an inner scrollbar: the panel body
+   owns scrolling, and a section that paginates does not grow its own. */
+.vas_191-pager {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5em;
+    padding: 0.5em 1em;
+}
+.vas_191-pgBtn {
+    width: 1.5em;
+    height: 1.5em;
+    border: none;
+    background: none;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--p191-action);
+    cursor: pointer;
+    padding: 0;
+}
+.vas_191-pgBtn:hover:not(:disabled) { background: #EEF8FF; }
+.vas_191-pgBtn:disabled { color: var(--p191-disabled); cursor: not-allowed; background: none; }
+.vas_191-pgBtn:focus-visible { outline: 2px solid var(--p191-action); outline-offset: 1px; }
+.vas_191-pgBtn .vas_191-ic svg { width: 0.875em; height: 0.875em; }
+.vas_191-pgText { font-weight: 400; font-size: 0.6875em; color: var(--p191-muted); }
+
+/* ----------------------------------------------------------- */
+/*  Icons                                                       */
+/* ----------------------------------------------------------- */
+/* Inline SVG only - the host shell may not carry an icon font, which would
+   leave blank boxes in the panel. */
+.vas_191-ic { display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+.vas_191-ic svg { width: 1em; height: 1em; display: block; }
+
+/* ----------------------------------------------------------- */
+/*  Narrow panel                                                */
+/* ----------------------------------------------------------- */
+/* Two key/value columns are too cramped below this - a single stack keeps the
+   values readable instead of ellipsising every one of them. */
+@container (max-width: 430px) {
+    .vas_191-kv.vas_191-cols2 { grid-template-columns: minmax(0, 1fr); }
+    /* Three summary cards side by side ellipsise every value below this. */
+    .vas_191-info { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+@container (max-width: 320px) {
+    .vas_191-info { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ----------------------------------------------------------- */
+/*  RTL                                                         */
+/* ----------------------------------------------------------- */
+[dir="rtl"] .vas_191-pa-row .amt,
+[dir="rtl"] .vas_191-alloc-row .amt,
+[dir="rtl"] .vas_191-je-row .num,
+[dir="rtl"] .vas_191-je-total .num,
+[dir="rtl"] .vas_191-kv-v { text-align: left; }
+[dir="rtl"] .vas_191-pa-head > span.right,
+[dir="rtl"] .vas_191-alloc-head > span.right,
+[dir="rtl"] .vas_191-je-head > span.right { text-align: left; }
+[dir="rtl"] .vas_191-pgBtn .vas_191-ic svg { transform: scaleX(-1); }
+[dir="rtl"] .vas_191-pipeSeg { left: -50%; right: 50%; }

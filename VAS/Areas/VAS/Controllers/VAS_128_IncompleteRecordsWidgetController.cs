@@ -1,0 +1,619 @@
+using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Data.SqlClient;
+using System.Globalization;
+using System.Linq;
+using System.Web.Mvc;
+using VAdvantage.DataBase;
+using VAdvantage.Model;
+using VAdvantage.Utility;
+using VIS.Filters;
+
+namespace VAS.Controllers
+{
+    /// <summary>
+    /// Module Name : VAS_128_IncompleteRecordsWidget (Product Master dashboard)
+    /// Purpose     : Data endpoints for the 5x3 "Incomplete Records" widget - a
+    ///               data-hygiene worklist of active, non-summary products that
+    ///               are missing one or more master-data fields the CURRENT USER
+    ///               chose to track. Each user's tracked-field set is stored as
+    ///               one AD_Preference row per field (Attribute 'PM.IR.*', scoped
+    ///               by client+user, Org 0, Window NULL); a missing row means the
+    ///               field is tracked (selected = Y), so new fields are on by
+    ///               default. The load endpoint returns the tracked set and the
+    ///               incomplete products with their ordered missing-field keys;
+    ///               the save endpoint persists one field's Y/N immediately, and
+    ///               its batch form persists a whole Select all / Clear in one
+    ///               request instead of one round trip per checkbox.
+    ///               Verified is only a miss for BOM products. Preferred Vendor
+    ///               means an active M_Product_PO with IsCurrentVendor='Y' to an
+    ///               active vendor. Category is mandatory and never tracked.
+    ///               MRole is applied to the primary fetched table (M_Product) on
+    ///               the product read; all input is parameterized; the SQL uses
+    ///               only COALESCE / CASE / EXISTS / NULLIF / TRIM (no NVL,
+    ///               DECODE, LISTAGG, FETCH/LIMIT/OFFSET, DB date formatting or
+    ///               DB-specific upsert), so it runs unchanged on Oracle and
+    ///               PostgreSQL. The VA010 Quality field is schema-guarded: on a
+    ///               database without M_Product.VA010_QualityPlan_ID it is simply
+    ///               dropped from the catalog and never flagged.
+    /// Widget size : 5 columns x 3 rows.
+    /// Widget number 128.
+    /// Chronological development:
+    ///   &lt;EmpCode&gt;   2026-07-20 Created
+    /// </summary>
+    public class VAS_128_IncompleteRecordsWidgetController : Controller
+    {
+        // Preference attribute prefix (one AD_Preference row per tracked field).
+        private const string PREF_PREFIX = "PM.IR.";
+
+        /// <summary>
+        /// DB-appropriate character literal. On this schema the text columns are
+        /// national-character (NVARCHAR), so a plain '' / 'text' literal combined
+        /// with them inside COALESCE / NULLIF raises ORA-12704 on Oracle; the
+        /// N'..' prefix fixes it. PostgreSQL has no N'..' syntax, so it stays a
+        /// plain quoted literal there.
+        /// </summary>
+        private static string NLiteral(string text)
+        {
+            return DB.IsPostgreSQL() ? "'" + text + "'" : "N'" + text + "'";
+        }
+
+        /// <summary>
+        /// The fixed 15-field catalog, in chip/settings order. Each entry pairs
+        /// the frontend field key with its AD_Preference attribute suffix. The
+        /// order here IS the required display order.
+        /// </summary>
+        private static readonly Tuple<string, string>[] Catalog = new[]
+        {
+            Tuple.Create("hsn", "HSN"),
+            Tuple.Create("barcode", "BARCODE"),
+            Tuple.Create("sku", "SKU"),
+            Tuple.Create("image", "IMAGE"),
+            Tuple.Create("description", "DESCRIPTION"),
+            Tuple.Create("brand", "BRAND"),
+            Tuple.Create("salesRep", "SALESREP"),
+            Tuple.Create("revenueRecognition", "REVREC"),
+            Tuple.Create("mailTemplate", "MAIL"),
+            Tuple.Create("qualityCriteria", "QUALITY"),
+            Tuple.Create("verified", "VERIFIED"),
+            Tuple.Create("preferredVendor", "PREFVENDOR"),
+            Tuple.Create("guaranteeDetails", "GUARANTEE"),
+            Tuple.Create("attributeGroup", "ATTRGROUP"),
+            Tuple.Create("customTariff", "TARIFF")
+        };
+
+        /// <summary>
+        /// Loads the current user's tracked-field preferences and the products
+        /// that are missing at least one tracked field.
+        /// </summary>
+        /// <returns>JSON { trackedFields[], availableFields[], items[] }.</returns>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetIncompleteRecords()
+        {
+            if (Session["ctx"] == null)
+            {
+                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+
+            try
+            {
+                // Quality is schema-guarded: on a DB without the VA010 column the
+                // field is not available at all (never tracked, never flagged).
+                bool qualityAvailable = HasColumn("M_Product", "VA010_QualityPlan_ID");
+
+                List<string> availableFields = Catalog
+                    .Where(c => qualityAvailable || c.Item1 != "qualityCriteria")
+                    .Select(c => c.Item1)
+                    .ToList();
+
+                // Preference map: field key -> 'Y'/'N' (missing row => 'Y').
+                Dictionary<string, string> prefByKey = ReadPreferences(ctx);
+                HashSet<string> tracked = new HashSet<string>();
+                foreach (Tuple<string, string> field in Catalog)
+                {
+                    if (!availableFields.Contains(field.Item1)) { continue; }
+                    string value;
+                    bool selected = !prefByKey.TryGetValue(field.Item1, out value) || !"N".Equals(value, StringComparison.OrdinalIgnoreCase);
+                    if (selected) { tracked.Add(field.Item1); }
+                }
+
+                List<object> items = LoadIncompleteProducts(ctx, tracked, availableFields, qualityAvailable);
+
+                return Ok(new
+                {
+                    trackedFields = Catalog.Where(c => tracked.Contains(c.Item1)).Select(c => c.Item1).ToList(),
+                    availableFields = availableFields,
+                    items = items
+                });
+            }
+            catch (Exception ex)
+            {
+                return Fail(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Persists one tracked-field preference for the current user, updating
+        /// the existing AD_Preference row or inserting a new one.
+        /// </summary>
+        /// <param name="fieldKey">Catalog field key (e.g. "hsn").</param>
+        /// <param name="value">'Y' to track, 'N' to stop tracking.</param>
+        /// <returns>JSON { success, fieldKeys, value }.</returns>
+        [HttpPost]
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult SaveFieldPreference(string fieldKey = "", string value = "Y")
+        {
+            return SaveFieldPreferences(fieldKey, value);
+        }
+
+        /// <summary>
+        /// Persists the SAME value for one or more tracked-field preferences in a
+        /// single request. "Select all" / "Clear" change up to 15 fields at once;
+        /// firing 15 separate POSTs made that visibly slow (ASP.NET serializes
+        /// requests per session, so they queued) and left the widget open to a
+        /// half-written selection whenever the user pressed Done before the last
+        /// one landed. One request writes them all, and one query reads every
+        /// existing row id up front instead of one SELECT per field.
+        /// </summary>
+        /// <param name="fieldKeys">Comma-separated catalog field keys.</param>
+        /// <param name="value">'Y' to track, 'N' to stop tracking.</param>
+        /// <returns>JSON { success, fieldKeys, value, failedKeys }.</returns>
+        [HttpPost]
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult SaveFieldPreferences(string fieldKeys = "", string value = "Y")
+        {
+            if (Session["ctx"] == null)
+            {
+                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+
+            // Catalog lookup doubles as validation - anything not in the fixed
+            // catalog is rejected, so no caller-supplied text reaches the DB.
+            List<Tuple<string, string>> requested = (fieldKeys ?? "")
+                .Split(',')
+                .Select(k => k.Trim())
+                .Where(k => k.Length > 0)
+                .Distinct()
+                .Select(k => Catalog.FirstOrDefault(c => c.Item1 == k))
+                .ToList();
+
+            if (requested.Count == 0 || requested.Any(c => c == null))
+            {
+                return Fail("Unknown field.");
+            }
+
+            string prefValue = "N".Equals(value, StringComparison.OrdinalIgnoreCase) ? "N" : "Y";
+
+            try
+            {
+                Dictionary<string, int> idByAttribute = ReadPreferenceIds(ctx);
+
+                List<string> savedKeys = new List<string>();
+                List<string> failedKeys = new List<string>();
+
+                foreach (Tuple<string, string> field in requested)
+                {
+                    string attribute = PREF_PREFIX + field.Item2;
+                    int preferenceId;
+                    if (!idByAttribute.TryGetValue(attribute, out preferenceId)) { preferenceId = 0; }
+
+                    // Use the AD_Preference model (the project's ID-generator /
+                    // repository convention) rather than a raw INSERT, so this works
+                    // the same on Oracle and PostgreSQL - no MERGE / ON CONFLICT.
+                    // Existing row loaded by id already carries the attribute; a new
+                    // row gets it from the constructor (the proven VAS_080 pattern).
+                    MPreference preference = preferenceId > 0
+                        ? new MPreference(ctx, preferenceId, null)
+                        : new MPreference(ctx, attribute, prefValue, null);
+                    preference.SetValue(prefValue);
+                    preference.SetAD_User_ID(ctx.GetAD_User_ID());
+                    // Org 0: the user's tracked set follows them across organizations
+                    // (matches the load-query filter). AD_Window_ID is deliberately
+                    // LEFT NULL: forcing it to 0 violated the AD_Preference ->
+                    // AD_Window foreign key (there is no AD_Window row with ID 0 -
+                    // verified on both project Oracle DBs), so every save failed with
+                    // ORA-02291 and the settings panel showed "Preference not saved."
+                    // The column is nullable and both load queries filter with
+                    // COALESCE(AD_Window_ID, 0) = 0, which a NULL row satisfies.
+                    preference.SetAD_Org_ID(0);
+
+                    if (preference.Save()) { savedKeys.Add(field.Item1); }
+                    else { failedKeys.Add(field.Item1); }
+                }
+
+                if (savedKeys.Count == 0)
+                {
+                    return Fail("Preference could not be saved.");
+                }
+
+                return Ok(new
+                {
+                    success = failedKeys.Count == 0,
+                    fieldKeys = savedKeys,
+                    failedKeys = failedKeys,
+                    value = prefValue
+                });
+            }
+            catch (Exception ex)
+            {
+                return Fail(ex.Message);
+            }
+        }
+
+        /// <summary>Current user's PM.IR.* preferences, newest active row per key.</summary>
+        private Dictionary<string, string> ReadPreferences(Ctx ctx)
+        {
+            Dictionary<string, string> map = new Dictionary<string, string>();
+
+            string sql = @"
+                SELECT p.Attribute AS PreferenceKey,
+                       p.Value AS PreferenceValue,
+                       p.Updated AS UpdatedAt
+                FROM AD_Preference p
+                WHERE p.AD_Client_ID=@AD_Client_ID
+                  AND p.AD_User_ID=@AD_User_ID
+                  AND p.AD_Org_ID=0
+                  AND COALESCE(p.AD_Window_ID, 0)=0
+                  AND p.IsActive='Y'
+                  AND p.Attribute LIKE 'PM.IR.%'
+                ORDER BY p.Attribute, p.Updated DESC";
+
+            // Reverse the suffix->key lookup once.
+            Dictionary<string, string> keyBySuffix = new Dictionary<string, string>();
+            foreach (Tuple<string, string> field in Catalog) { keyBySuffix[field.Item2] = field.Item1; }
+
+            IDataReader dr = null;
+            try
+            {
+                dr = DB.ExecuteReader(sql, new SqlParameter[]
+                {
+                    new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
+                    new SqlParameter("@AD_User_ID", ctx.GetAD_User_ID())
+                });
+
+                while (dr != null && dr.Read())
+                {
+                    string attribute = Util.GetValueOfString(dr["PreferenceKey"]);
+                    if (string.IsNullOrEmpty(attribute) || !attribute.StartsWith(PREF_PREFIX)) { continue; }
+                    string suffix = attribute.Substring(PREF_PREFIX.Length);
+                    string key;
+                    if (!keyBySuffix.TryGetValue(suffix, out key)) { continue; }
+                    // ORDER BY newest-first per attribute: keep the first seen.
+                    if (!map.ContainsKey(key))
+                    {
+                        map[key] = Util.GetValueOfString(dr["PreferenceValue"]);
+                    }
+                }
+            }
+            finally
+            {
+                if (dr != null) { dr.Close(); dr.Dispose(); }
+            }
+
+            return map;
+        }
+
+        /// <summary>
+        /// AD_Preference_ID of the current user's newest active row for every
+        /// PM.IR.* attribute, keyed by attribute. One query serves a whole
+        /// "Select all" / "Clear" batch - the previous per-field lookup issued
+        /// one SELECT per checkbox.
+        /// </summary>
+        private Dictionary<string, int> ReadPreferenceIds(Ctx ctx)
+        {
+            Dictionary<string, int> map = new Dictionary<string, int>();
+
+            string sql = @"
+                SELECT p.AD_Preference_ID AS PreferenceId,
+                       p.Attribute AS PreferenceKey,
+                       p.Updated AS UpdatedAt
+                FROM AD_Preference p
+                WHERE p.AD_Client_ID=@AD_Client_ID
+                  AND p.AD_User_ID=@AD_User_ID
+                  AND p.AD_Org_ID=0
+                  AND COALESCE(p.AD_Window_ID, 0)=0
+                  AND p.IsActive='Y'
+                  AND p.Attribute LIKE 'PM.IR.%'
+                ORDER BY p.Attribute, p.Updated DESC";
+
+            IDataReader dr = null;
+            try
+            {
+                dr = DB.ExecuteReader(sql, new SqlParameter[]
+                {
+                    new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
+                    new SqlParameter("@AD_User_ID", ctx.GetAD_User_ID())
+                });
+                while (dr != null && dr.Read())
+                {
+                    string attribute = Util.GetValueOfString(dr["PreferenceKey"]);
+                    if (string.IsNullOrEmpty(attribute)) { continue; }
+                    // ORDER BY newest-first per attribute: keep the first seen.
+                    if (!map.ContainsKey(attribute))
+                    {
+                        map[attribute] = Util.GetValueOfInt(dr["PreferenceId"]);
+                    }
+                }
+            }
+            finally
+            {
+                if (dr != null) { dr.Close(); dr.Dispose(); }
+            }
+
+            return map;
+        }
+
+        /// <summary>
+        /// Products missing at least one tracked field, newest update first, with
+        /// the ordered missing-field keys built in code (never aggregated in SQL).
+        /// </summary>
+        private List<object> LoadIncompleteProducts(Ctx ctx, HashSet<string> tracked, List<string> availableFields, bool qualityAvailable)
+        {
+            // Quality CASE is present only when the column exists; otherwise the
+            // flag is a constant 0, so the field can never be a miss.
+            string missQuality = qualityAvailable
+                ? "CASE WHEN COALESCE(p.VA010_QualityPlan_ID, 0) = 0 THEN 1 ELSE 0 END"
+                : "0";
+
+            // Empty-string / 'Unknown' literals must carry the national-character
+            // prefix on Oracle where they combine with NVARCHAR columns (12704).
+            string E = NLiteral("");
+
+            string innerSql = @"
+                SELECT p.M_Product_ID AS ProductId,
+                       p.Name AS ProductName,
+                       p.Value AS ProductCode,
+                       pc.Name AS CategoryName,
+                       p.Updated AS UpdatedAt,
+                       COALESCE(u.Name, u.Value, " + NLiteral("Unknown") + @") AS UpdatedByName,
+                       CASE WHEN p.IsBOM = 'Y' THEN 1 ELSE 0 END AS HasBom,
+                       CASE WHEN NULLIF(TRIM(p.VAS_HSN_SACCode), " + E + @") IS NULL THEN 1 ELSE 0 END AS MissHsn,
+                       CASE WHEN NULLIF(TRIM(p.UPC), " + E + @") IS NULL THEN 1 ELSE 0 END AS MissBarcode,
+                       CASE WHEN NULLIF(TRIM(p.SKU), " + E + @") IS NULL THEN 1 ELSE 0 END AS MissSku,
+                       CASE WHEN COALESCE(p.AD_Image_ID, 0) = 0 THEN 1 ELSE 0 END AS MissImage,
+                       CASE WHEN NULLIF(TRIM(p.Description), " + E + @") IS NULL THEN 1 ELSE 0 END AS MissDescription,
+                       CASE WHEN COALESCE(p.M_Brand_ID, 0) = 0 THEN 1 ELSE 0 END AS MissBrand,
+                       CASE WHEN COALESCE(p.SalesRep_ID, 0) = 0 THEN 1 ELSE 0 END AS MissSalesRep,
+                       CASE WHEN COALESCE(p.C_RevenueRecognition_ID, 0) = 0 THEN 1 ELSE 0 END AS MissRevenueRec,
+                       CASE WHEN COALESCE(p.R_MailText_ID, 0) = 0 THEN 1 ELSE 0 END AS MissMailTemplate,
+                       " + missQuality + @" AS MissQualityCriteria,
+                       CASE WHEN p.IsBOM = 'Y' AND COALESCE(p.IsVerified, 'N') <> 'Y' THEN 1 ELSE 0 END AS MissVerified,
+                       CASE WHEN pv.M_Product_ID IS NULL THEN 1 ELSE 0 END AS MissPreferredVendor,
+                       CASE WHEN p.GuaranteeDays IS NULL THEN 1 ELSE 0 END AS MissGuarantee,
+                       CASE WHEN COALESCE(p.M_AttributeSet_ID, 0) = 0 THEN 1 ELSE 0 END AS MissAttributeGroup,
+                       CASE WHEN COALESCE(p.M_CustomTariff_ID, 0) = 0 THEN 1 ELSE 0 END AS MissCustomTariff
+                FROM M_Product p
+                JOIN M_Product_Category pc ON (pc.M_Product_Category_ID = p.M_Product_Category_ID)
+                LEFT JOIN AD_User u ON (u.AD_User_ID = p.UpdatedBy)
+                LEFT JOIN PrefVendor pv ON (pv.M_Product_ID = p.M_Product_ID AND pv.AD_Client_ID = p.AD_Client_ID)
+                WHERE p.AD_Client_ID = @AD_Client_ID
+                  AND p.IsActive = 'Y'
+                  AND COALESCE(p.IsSummary, 'N') = 'N'";
+
+            // MRole (org/role data-access) on the primary table. AddAccessSQL
+            // hands the statement to AccessSqlParser, which finds the main table
+            // by the FIRST " FROM " it sees and only recognises a sub-select
+            // spelled exactly "(SELECT". The preferred-vendor test used to be a
+            // correlated EXISTS in the SELECT list written as "EXISTS (" +
+            // newline + "SELECT", so the parser missed it, read
+            // "FROM M_Product_PO po" as the main FROM, and appended the private
+            // record-access predicate against that alias:
+            //   AND po.M_Product_PO_ID NOT IN (SELECT Record_ID FROM AD_Private_Access ...)
+            // "po" only exists inside the sub-select, so Oracle raised
+            // ORA-00904 "PO"."M_PRODUCT_PO_ID": invalid identifier and the
+            // widget showed "Couldn't load" (the trigger is per database - the
+            // predicate is only emitted where the role carries private-access
+            // rows for that table). The vendor test now lives in the PrefVendor
+            // CTE below, so this statement contains no sub-select at all: the
+            // parser always resolves M_Product/p and qualifies its predicate
+            // with "p.", whatever the formatting.
+            innerSql = MRole.GetDefault(ctx).AddAccessSQL(
+                innerSql,
+                "p",
+                MRole.SQL_FULLYQUALIFIED,
+                MRole.SQL_RO
+            );
+
+            // The tracked set is known server-side, so the OR filter is BUILT from
+            // it - only tracked fields' branches are emitted, as plain "flag = 1"
+            // conditions with no parameters. The original version instead bound a
+            // @Track_Y/@Track_N marker per branch (15 extra placeholder
+            // occurrences): the app's Oracle layer never sets BindByName, so
+            // ODP.NET binds BY POSITION, and any bind name that appears more
+            // often in the SQL than in the parameter list throws ORA-01008
+            // ("not all variables bound") before a single row is read - this is
+            // exactly why the widget said "Couldn't load" on every Oracle DB.
+            // With this rewrite @AD_Client_ID is the only placeholder and it
+            // occurs exactly once, so positional binding is safe.
+            Dictionary<string, string> flagByKey = new Dictionary<string, string>
+            {
+                { "hsn", "MissHsn" },
+                { "barcode", "MissBarcode" },
+                { "sku", "MissSku" },
+                { "image", "MissImage" },
+                { "description", "MissDescription" },
+                { "brand", "MissBrand" },
+                { "salesRep", "MissSalesRep" },
+                { "revenueRecognition", "MissRevenueRec" },
+                { "mailTemplate", "MissMailTemplate" },
+                { "qualityCriteria", "MissQualityCriteria" },
+                { "verified", "MissVerified" },
+                { "preferredVendor", "MissPreferredVendor" },
+                { "guaranteeDetails", "MissGuarantee" },
+                { "attributeGroup", "MissAttributeGroup" },
+                { "customTariff", "MissCustomTariff" }
+            };
+
+            // Nothing tracked -> nothing can be incomplete; never emit an empty
+            // WHERE (it would select every product).
+            List<string> orBranches = Catalog
+                .Where(c => tracked.Contains(c.Item1) && flagByKey.ContainsKey(c.Item1))
+                .Select(c => "s." + flagByKey[c.Item1] + " = 1")
+                .ToList();
+            if (orBranches.Count == 0)
+            {
+                return new List<object>();
+            }
+
+            // PrefVendor carries the "has a preferred vendor" set that used to be
+            // a correlated EXISTS inside ProdStatus. It is keyed by client as
+            // well as product so the LEFT JOIN reproduces the old correlation
+            // exactly, and DISTINCT keeps it one row per (product, client) so
+            // the join can never duplicate a product row. It needs no bind
+            // variable of its own: @AD_Client_ID still occurs exactly once in
+            // the whole statement, which positional binding requires.
+            string sql = @"
+                WITH PrefVendor AS (
+                    SELECT DISTINCT po.M_Product_ID AS M_Product_ID,
+                                    po.AD_Client_ID AS AD_Client_ID
+                    FROM M_Product_PO po
+                    JOIN C_BPartner v ON (v.C_BPartner_ID = po.C_BPartner_ID AND v.AD_Client_ID = po.AD_Client_ID)
+                    WHERE po.IsActive = 'Y'
+                      AND po.IsCurrentVendor = 'Y'
+                      AND v.IsActive = 'Y'
+                      AND v.IsVendor = 'Y'
+                ),
+                ProdStatus AS (
+                    " + innerSql + @"
+                )
+                SELECT s.ProductId, s.ProductName, s.ProductCode, s.CategoryName,
+                       s.UpdatedAt, s.UpdatedByName, s.HasBom,
+                       s.MissHsn, s.MissBarcode, s.MissSku, s.MissImage, s.MissDescription,
+                       s.MissBrand, s.MissSalesRep, s.MissRevenueRec, s.MissMailTemplate,
+                       s.MissQualityCriteria, s.MissVerified, s.MissPreferredVendor,
+                       s.MissGuarantee, s.MissAttributeGroup, s.MissCustomTariff
+                FROM ProdStatus s
+                WHERE " + string.Join(@"
+                   OR ", orBranches) + @"
+                ORDER BY s.UpdatedAt DESC, s.ProductName, s.ProductCode";
+
+            // Column-flag -> field key, in fixed catalog order (missingKeys order).
+            Tuple<string, string>[] flagColumns = new[]
+            {
+                Tuple.Create("MissHsn", "hsn"),
+                Tuple.Create("MissBarcode", "barcode"),
+                Tuple.Create("MissSku", "sku"),
+                Tuple.Create("MissImage", "image"),
+                Tuple.Create("MissDescription", "description"),
+                Tuple.Create("MissBrand", "brand"),
+                Tuple.Create("MissSalesRep", "salesRep"),
+                Tuple.Create("MissRevenueRec", "revenueRecognition"),
+                Tuple.Create("MissMailTemplate", "mailTemplate"),
+                Tuple.Create("MissQualityCriteria", "qualityCriteria"),
+                Tuple.Create("MissVerified", "verified"),
+                Tuple.Create("MissPreferredVendor", "preferredVendor"),
+                Tuple.Create("MissGuarantee", "guaranteeDetails"),
+                Tuple.Create("MissAttributeGroup", "attributeGroup"),
+                Tuple.Create("MissCustomTariff", "customTariff")
+            };
+
+            List<object> items = new List<object>();
+            IDataReader dr = null;
+            try
+            {
+                dr = DB.ExecuteReader(sql, new SqlParameter[]
+                {
+                    new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+                });
+
+                while (dr != null && dr.Read())
+                {
+                    bool hasBom = Util.GetValueOfInt(dr["HasBom"]) == 1;
+                    List<string> missingKeys = new List<string>();
+                    foreach (Tuple<string, string> flag in flagColumns)
+                    {
+                        string key = flag.Item2;
+                        if (!tracked.Contains(key)) { continue; }
+                        if (Util.GetValueOfInt(dr[flag.Item1]) != 1) { continue; }
+                        // Verified is only a miss for BOM products (defensive -
+                        // the SQL already enforces this).
+                        if (key == "verified" && !hasBom) { continue; }
+                        missingKeys.Add(key);
+                    }
+
+                    if (missingKeys.Count == 0) { continue; }
+
+                    DateTime? updatedAt = Util.GetValueOfDateTime(dr["UpdatedAt"]);
+                    items.Add(new
+                    {
+                        productId = Util.GetValueOfInt(dr["ProductId"]),
+                        name = Util.GetValueOfString(dr["ProductName"]),
+                        code = Util.GetValueOfString(dr["ProductCode"]),
+                        category = Util.GetValueOfString(dr["CategoryName"]),
+                        updatedAt = updatedAt.HasValue ? updatedAt.Value.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) : "",
+                        updatedBy = Util.GetValueOfString(dr["UpdatedByName"]),
+                        hasBom = hasBom,
+                        missingKeys = missingKeys
+                    });
+                }
+            }
+            finally
+            {
+                if (dr != null) { dr.Close(); dr.Dispose(); }
+            }
+
+            return items;
+        }
+
+        /// <summary>True when the physical column exists on the active database.</summary>
+        private bool HasColumn(string tableName, string columnName)
+        {
+            string sql;
+            if (DB.IsPostgreSQL())
+            {
+                sql = @"
+                    SELECT COUNT(1)
+                    FROM information_schema.columns
+                    WHERE UPPER(table_name)=UPPER(@TableName)
+                      AND UPPER(column_name)=UPPER(@ColumnName)";
+            }
+            else
+            {
+                sql = @"
+                    SELECT COUNT(1)
+                    FROM USER_TAB_COLUMNS
+                    WHERE TABLE_NAME=UPPER(@TableName)
+                      AND COLUMN_NAME=UPPER(@ColumnName)";
+            }
+
+            try
+            {
+                return Util.GetValueOfInt(DB.ExecuteScalar(sql, new SqlParameter[]
+                {
+                    new SqlParameter("@TableName", tableName),
+                    new SqlParameter("@ColumnName", columnName)
+                }, null)) > 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>Wraps a success payload as a serialized JSON result.</summary>
+        private JsonResult Ok(object result)
+        {
+            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>Wraps a failure message as a serialized JSON result.</summary>
+        private JsonResult Fail(string message)
+        {
+            return Json(JsonConvert.SerializeObject(new
+            {
+                success = false,
+                error = message,
+                message = message
+            }), JsonRequestBehavior.AllowGet);
+        }
+    }
+}

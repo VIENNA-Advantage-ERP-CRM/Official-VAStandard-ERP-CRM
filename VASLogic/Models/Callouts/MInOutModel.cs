@@ -155,10 +155,12 @@ namespace VIS.Models
         {
             string[] paramValue = fields.Split(',');
             Dictionary<string, object> obj = null;
-            string sql1 = "SELECT SUM(ConfirmedQty +scrappedqty) FROM M_PackageLine WHERE M_Package_ID = " + paramValue[1] + " and m_inoutline_id = " + paramValue[2];
+            string sql1 = "SELECT SUM(ConfirmedQty +scrappedqty) FROM M_PackageLine WHERE M_Package_ID = " 
+                + Util.GetValueOfInt(paramValue[1]) + " AND M_InOutLine_ID = " + Util.GetValueOfInt(paramValue[2]);
             obj = new Dictionary<string, object>();
             obj["totalConfirmedAndScrapped"] = Util.GetValueOfDecimal(DB.ExecuteScalar(sql1, null, null));
-            string sql = @"SELECT M_Product_ID , movementqty , M_AttributeSetInstance_ID FROM M_InOutLine WHERE M_InOutLine_ID=" + paramValue[0];
+            string sql = @"SELECT M_Product_ID, movementqty, M_AttributeSetInstance_ID 
+                        FROM M_InOutLine WHERE M_InOutLine_ID=" + Util.GetValueOfInt(paramValue[0]);
             DataSet ds = DB.ExecuteDataset(sql, null, null);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
             {

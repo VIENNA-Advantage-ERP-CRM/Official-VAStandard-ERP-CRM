@@ -1,0 +1,238 @@
+/**
+ * VAS KPI Drill-Through — shared drill-down modal for the KPI tiles.
+ * Purpose - One reusable, paged modal that lists the records contributing to a KPI
+ *           tile's value (overdue schedules, open opportunities, customers, ...).
+ *           Each KPI widget (VAS_122 / VAS_124 / VAS_125) creates one instance,
+ *           makes its card clickable, and opens the modal on click; a row click
+ *           routes to that record via the widget's navigate callback. Reuses the
+ *           existing list endpoints (VAS_138 / VAS_139 / VAS_122) - no new list UI
+ *           per widget. CSS namespaced MPC-kpidrill-* (MPC prefix rule).
+ *
+ * Usage   - var drill = VAS.KpiDrill({
+ *               title: 'Overdue receivables',
+ *               endpoint: 'VAS_138_DelayedPaymentsListWidget/GetRows',
+ *               extraParams: {},                 // optional static query params
+ *               pageSize: 7,                     // default 7
+ *               mapData: function (data) { return { items, total, currency }; },
+ *               mapRow: function (item, cur, h) { return { bpId, title, meta, valueText, valueTone }; },
+ *               navigate: function (recordId, kind) { ... }
+ *           });
+ *           drill.open(); drill.close(); drill.dispose();
+ *
+ * 2026-08-17 - a row used to be clickable whenever mapRow ran, even when it resolved to
+ *           no record: VAS_125's pipeline list includes lead-backed accounts, which carry
+ *           bpId 0 because there is no C_BPartner to open, so the row rendered as a
+ *           <button data-bp="0"> and the click guard below silently dropped it. The row
+ *           looked clickable and then did nothing - reported as "drill-through not showing
+ *           the record". Two changes:
+ *             - mapRow may return navId / navKind when the row opens something OTHER than
+ *               a business partner (a lead, say). navId defaults to bpId, and navKind is
+ *               handed to navigate() as its second argument, so a caller that only deals
+ *               in customers keeps its one-argument navigate untouched.
+ *             - a row with no positive navId is rendered as inert markup rather than a
+ *               button, so the affordance always matches what the row can do.
+ */
+; VAS = window.VAS || {};
+
+; (function (VAS, $) {
+
+    var AVATAR_COLORS = ['#1F83FF', '#5F4AA6', '#0B6B45', '#D78B10', '#0083DA', '#A33F3F'];
+
+    function label(key, fallback) {
+        return VIS.Msg.getMsg(key);
+    }
+    function escapeHtml(value) {
+        if (value == null) { return ''; }
+        return String(value).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+    function parseResponse(response) {
+        var parsed = response;
+        if (typeof parsed === 'string' && parsed.length) { parsed = JSON.parse(parsed); }
+        if (typeof parsed === 'string' && parsed.length) { parsed = JSON.parse(parsed); }
+        return parsed || {};
+    }
+    function formatCount(value) {
+        var n = Number(value || 0);
+        if (!isFinite(n)) { n = 0; }
+        return Math.round(n).toLocaleString(window.navigator.language);
+    }
+    // Standard precision of the base currency, falling back to the session context
+    // when the endpoint did not send one.
+    function precisionOf(cur) {
+        var p = Number(cur && cur.precision);
+        if (!isNaN(p) && p >= 0) { return p; }
+        if (VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
+            p = Number(VIS.Env.getCtx().getStdPrecision());
+        }
+        return !isNaN(p) && p >= 0 ? p : 0;
+    }
+    // Compact money against the base (accounting-schema) currency the endpoint
+    // reported. VIS.Util.formatCompactAmount supplies the scaled magnitude at the
+    // system-configured precision; the sign is composed before the symbol here.
+    function formatMoney(value, cur) {
+        var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
+        var sign = n < 0 ? '-' : '';
+        var iso = (cur && cur.iso) || '';
+        var symbol = (cur && (cur.symbol || cur.iso)) || '';
+        return sign + symbol + VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
+    }
+    function avatarColor(text) {
+        var hash = 0, value = String(text || '');
+        for (var i = 0; i < value.length; i++) { hash = (hash * 31 + value.charCodeAt(i)) % AVATAR_COLORS.length; }
+        return AVATAR_COLORS[hash];
+    }
+    function initials(name) {
+        return String(name || '').split(' ').slice(0, 2).map(function (w) { return w.charAt(0); }).join('').toUpperCase();
+    }
+    function icon(name) {
+        if (name === 'chev') { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>'; }
+        if (name === 'chevL') { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>'; }
+        if (name === 'close') { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>'; }
+        return '';
+    }
+
+    var HELPERS = { formatMoney: formatMoney, formatCount: formatCount, escapeHtml: escapeHtml };
+
+    VAS.KpiDrill = function (opts) {
+        opts = opts || {};
+        var pageSize = opts.pageSize || 7;
+        var offset = 0, total = 0, seq = 0, currency = { symbol: '', iso: '', precision: 2 };
+        var $modal, $body, $pager, $count;
+
+        function build() {
+            $modal = $(
+                '<div class="MPC-kpidrill" role="dialog" aria-modal="true" aria-hidden="true" aria-label="' + escapeHtml(opts.title || '') + '">' +
+                    '<div class="MPC-kpidrill-scrim"></div>' +
+                    '<section class="MPC-kpidrill-panel">' +
+                        '<header class="MPC-kpidrill-head">' +
+                            '<h2 class="MPC-kpidrill-title">' + escapeHtml(opts.title || '') + '</h2>' +
+                            '<div class="MPC-kpidrill-head-r"><span class="MPC-kpidrill-count"></span>' +
+                                '<button type="button" class="MPC-kpidrill-close" data-drill-close aria-label="' + escapeHtml(label('VAS_KpiDrill_Close', 'Close')) + '">' + icon('close') + '</button></div>' +
+                        '</header>' +
+                        '<div class="MPC-kpidrill-body"></div>' +
+                        '<footer class="MPC-kpidrill-foot"><div class="MPC-kpidrill-pager"></div></footer>' +
+                    '</section>' +
+                '</div>'
+            );
+            $('body').append($modal);
+            $body = $modal.find('.MPC-kpidrill-body');
+            $pager = $modal.find('.MPC-kpidrill-pager');
+            $count = $modal.find('.MPC-kpidrill-count');
+            $modal.on('click', '[data-drill-close]', close);
+            $modal.on('click', '.MPC-kpidrill-row', function () {
+                var id = Number($(this).attr('data-bp'));
+                if (id > 0 && typeof opts.navigate === 'function') {
+                    opts.navigate(id, $(this).attr('data-kind') || '');
+                }
+            });
+            $modal.on('click', '.MPC-kpidrill-pgbtn', function () { turnPage($(this).attr('data-dir')); });
+        }
+
+        function load() {
+            var mySeq = ++seq;
+            $body.html('<div class="MPC-kpidrill-state">' + escapeHtml(label('Loading', 'Loading…')) + '</div>');
+            $pager.empty();
+            var data = { offset: offset, limit: pageSize };
+            if (opts.extraParams) { for (var k in opts.extraParams) { if (opts.extraParams.hasOwnProperty(k)) { data[k] = opts.extraParams[k]; } } }
+            $.ajax({
+                url: VIS.Application.contextUrl + opts.endpoint,
+                type: 'GET', cache: false, data: data,
+                success: function (response) {
+                    if (mySeq !== seq) { return; }
+                    var parsed = parseResponse(response);
+                    if (parsed && parsed.error) { renderError(); return; }
+                    var mapped = opts.mapData ? opts.mapData(parsed) : { items: parsed.items || [], total: Number(parsed.total || 0), currency: {} };
+                    total = Number(mapped.total || 0);
+                    currency = mapped.currency || currency;
+                    $count.text(formatCount(total));
+                    renderRows(mapped.items || []);
+                },
+                error: function () { if (mySeq === seq) { renderError(); } }
+            });
+        }
+
+        function renderError() {
+            $body.html('<div class="MPC-kpidrill-state">' + escapeHtml(label('VAS_KpiDrill_Error', 'Unable to load.')) + '</div>');
+            $pager.empty();
+        }
+
+        function renderRows(items) {
+            if (!items.length) {
+                $body.html('<div class="MPC-kpidrill-state">' + escapeHtml(label('VAS_KpiDrill_Empty', 'Nothing here right now.')) + '</div>');
+                $pager.empty();
+                return;
+            }
+            var rows = items.map(function (item) {
+                var r = opts.mapRow(item, currency, HELPERS) || {};
+                var name = r.title || '';
+                var toneCls = r.valueTone === 'danger' ? ' MPC-kpidrill-val-danger' : '';
+
+                /* Only a row that resolves to a record gets the clickable treatment - see
+                   the note in the file header. navId lets a row open something other than
+                   a business partner; it falls back to bpId for the customer-only callers.
+                   Everything with nothing to open is an inert <div>. */
+                var navId = Number(r.navId != null ? r.navId : r.bpId) || 0;
+                var canOpen = navId > 0 && typeof opts.navigate === 'function';
+                var tag = canOpen ? 'button' : 'div';
+
+                return '<' + tag +
+                    (canOpen ? ' type="button" data-bp="' + navId + '" data-kind="' + escapeHtml(r.navKind || '') + '"' : '') +
+                    ' class="MPC-kpidrill-row' + (canOpen ? '' : ' MPC-kpidrill-row-static') + '">' +
+                    '<span class="MPC-kpidrill-avatar" style="background:' + avatarColor(name) + '">' + escapeHtml(initials(name)) + '</span>' +
+                    '<span class="MPC-kpidrill-main">' +
+                        '<span class="MPC-kpidrill-rtitle" title="' + escapeHtml(name) + '">' + escapeHtml(name) + '</span>' +
+                        (r.meta ? '<span class="MPC-kpidrill-rmeta" title="' + escapeHtml(r.meta) + '">' + escapeHtml(r.meta) + '</span>' : '') +
+                    '</span>' +
+                    (r.valueText ? '<span class="MPC-kpidrill-rval' + toneCls + '">' + escapeHtml(r.valueText) + '</span>' : '') +
+                '</' + tag + '>';
+            }).join('');
+            $body.html('<div class="MPC-kpidrill-list">' + rows + '</div>');
+
+            var start = offset + 1, end = offset + items.length;
+            var pages = Math.max(1, Math.ceil(total / pageSize));
+            var current = Math.floor(offset / pageSize);
+            /* Footer pager (dashboard-widgets.md §"Widget Footer Pager"): helper
+               left, compact prev · "N of M" · next right. The control stays put
+               on a single page with both arrows disabled. */
+            var of = label('VAS_KpiDrill_Of', 'of');
+            var helper = label('VAS_KpiDrill_Showing', 'Showing') + ' ' + start + '–' + end + ' ' + of + ' ' + formatCount(total);
+            $pager.html(
+                '<span class="MPC-kpidrill-pglabel">' + escapeHtml(helper) + '</span>' +
+                '<span class="MPC-kpidrill-pgctl">' +
+                    '<button type="button" class="MPC-kpidrill-pgbtn" data-dir="prev" aria-label="' + escapeHtml(label('VAS_KpiDrill_PrevPage', 'Previous page')) + '" ' + (current <= 0 ? 'disabled' : '') + '>' + icon('chevL') + '</button>' +
+                    '<span class="MPC-kpidrill-pgtext">' + escapeHtml((current + 1) + ' ' + of + ' ' + pages) + '</span>' +
+                    '<button type="button" class="MPC-kpidrill-pgbtn" data-dir="next" aria-label="' + escapeHtml(label('VAS_KpiDrill_NextPage', 'Next page')) + '" ' + (current >= pages - 1 ? 'disabled' : '') + '>' + icon('chev') + '</button>' +
+                '</span>'
+            );
+        }
+
+        function turnPage(dir) {
+            var next = offset + (dir === 'next' ? pageSize : -pageSize);
+            if (next < 0) { next = 0; }
+            if (next >= total) { return; }
+            offset = next;
+            load();
+        }
+
+        function open() {
+            if (!$modal) { build(); }
+            offset = 0;
+            $modal.addClass('is-open').attr('aria-hidden', 'false');
+            $('body').addClass('MPC-kpidrill-open');
+            load();
+        }
+        function close() {
+            if (!$modal) { return; }
+            if (document.activeElement && $modal[0].contains(document.activeElement)) { document.activeElement.blur(); }
+            $modal.removeClass('is-open').attr('aria-hidden', 'true');
+            $('body').removeClass('MPC-kpidrill-open');
+        }
+        function isOpen() { return !!($modal && $modal.hasClass('is-open')); }
+        function dispose() { if ($modal) { $modal.remove(); $modal = null; } }
+
+        return { open: open, close: close, isOpen: isOpen, dispose: dispose };
+    };
+
+})(VAS, jQuery);

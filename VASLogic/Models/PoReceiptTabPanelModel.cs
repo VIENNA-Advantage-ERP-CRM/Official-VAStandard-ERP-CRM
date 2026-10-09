@@ -19,6 +19,7 @@ using VAdvantage.Model;
 using VAdvantage.DataBase;
 using VAdvantage.ProcessEngine;
 using ViennaAdvantage.Process;
+using System.Data.SqlClient;
 
 namespace VASLogic.Models
 {
@@ -1307,12 +1308,23 @@ namespace VASLogic.Models
         /// <author>VIS_427</author>
         public int GetWindowId(string NewScreen, string OldScreen)
         {
+            SqlParameter[] param = new SqlParameter[1];
             int AD_Window_ID = 0;
-            AD_Window_ID = Util.GetValueOfInt(DB.ExecuteScalar($@"SELECT AD_Window_ID FROM AD_Window WHERE Name={ GlobalVariable.TO_STRING(NewScreen)}", null, null));
+            param[0] = new SqlParameter("@param", NewScreen);
+            AD_Window_ID = Util.GetValueOfInt(DB.ExecuteScalar($@"SELECT AD_Window_ID FROM AD_Window WHERE IsActive = 'Y' AND Name=@param", param, null));
+            if (AD_Window_ID == 0 && !string.IsNullOrEmpty(OldScreen))
+            {
+                param[0] = new SqlParameter("@param", OldScreen);
+                AD_Window_ID = Util.GetValueOfInt(DB.ExecuteScalar($@"SELECT AD_Window_ID FROM AD_Window WHERE IsActive = 'Y' AND Name=@param", param, null));
+            }
             if (AD_Window_ID == 0)
             {
-                AD_Window_ID = Util.GetValueOfInt(DB.ExecuteScalar($@"SELECT AD_Window_ID FROM AD_Window WHERE Name={ GlobalVariable.TO_STRING(OldScreen)}", null, null));
+                param[0] = new SqlParameter("@param", NewScreen);
+                AD_Window_ID = Util.GetValueOfInt(DB.ExecuteScalar($@"SELECT w.AD_Window_ID FROM VAS_ZoomScreenConfig zs 
+                                INNER JOIN AD_Window w ON (zs.Value = w.Name) 
+                                WHERE w.IsActive = 'Y' AND zs.IsActive = 'Y' AND zs.Name=@param", param, null));
             }
+
             return AD_Window_ID;
         }
         /// <summary>
@@ -1325,7 +1337,9 @@ namespace VASLogic.Models
         public Dictionary<string, int> GetColumnIds(Ctx ct, string refernceName)
         {
             Dictionary<string, int> ColumnInfo = new Dictionary<string, int>();
-            ColumnInfo["AD_Reference_ID"] = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT AD_Reference_ID FROM AD_Reference WHERE Name='" + refernceName + "'", null, null));
+            SqlParameter[] param = new SqlParameter[1];
+            param[0] = new SqlParameter("@param1", refernceName);
+            ColumnInfo["AD_Reference_ID"] = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT AD_Reference_ID FROM AD_Reference WHERE Name=@param1", param, null));
             return ColumnInfo;
         }
         /// <summary>
@@ -1337,10 +1351,9 @@ namespace VASLogic.Models
         /// <author>VIS_427 </author>
         public Dictionary<string, int> GetColumnIDForExpPayment(Ctx ct, dynamic columnDataArray)
         {
-            //Dictionary<string, int> ColumnInfo = new Dictionary<string, int>();
-            //ColumnInfo["AD_Reference_ID"] = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT AD_Reference_ID FROM AD_Reference WHERE Name='" + refernceName + "'", null, null));
-            //return ColumnInfo;
             Dictionary<string, int> ColumnInfo = new Dictionary<string, int>();
+            SqlParameter[] param = new SqlParameter[1];
+
             foreach (var item in columnDataArray)
             {
                 // Extract column name and table name
@@ -1348,14 +1361,16 @@ namespace VASLogic.Models
                 string ColumnName = item.ColumnName;
                 if (!String.IsNullOrEmpty(refernceName))
                 {
-                    ColumnInfo[refernceName] = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT AD_Reference_ID FROM AD_Reference WHERE Name='" + refernceName + "'", null, null));
+                    param[0] = new SqlParameter("@param1", refernceName);
+                    ColumnInfo[refernceName] = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT AD_Reference_ID FROM AD_Reference WHERE Name=@param1", param, null));
                 }
                 if (!String.IsNullOrEmpty(ColumnName))
                 {
+                    param[0] = new SqlParameter("@param1", ColumnName);
                     string sql = @"SELECT AD_Column_ID FROM AD_Column 
-                               WHERE ColumnName ='" + ColumnName + @"' 
+                               WHERE ColumnName =@param1 
                                AND AD_Table_ID = (SELECT AD_Table_ID FROM AD_Table WHERE TableName='C_Payment')";
-                    ColumnInfo[ColumnName] = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+                    ColumnInfo[ColumnName] = Util.GetValueOfInt(DB.ExecuteScalar(sql, param, null));
                 }
             }
             return ColumnInfo;
@@ -1649,7 +1664,13 @@ namespace VASLogic.Models
             List<dynamic> retData = new List<dynamic>();
             string[] NotIncludeCol = { "AD_Client_ID", "AD_Org_ID", "Export_ID", "CreatedBy", "UpdatedBy", "Created", "Updated", "IsActive", "DATA_OBJECT" };
             NotIncludeCol = NotIncludeCol.Select(s => s.ToUpper()).ToArray();
-
+            if (!string.IsNullOrEmpty(tableName))
+            {
+                if (DBFunctionCollection.CheckTableViewExistence(DB.GetSchema(), tableName) <= 0)
+                {
+                    return retData;
+                }
+            }
             string sql = @"SELECT * FROM " + tableName.ToUpper() + " WHERE AD_Client_ID = " + ctx.GetAD_Client_ID() + " AND AD_Org_ID = " + AD_Org_ID;
             //sql = MRole.GetDefault(ctx).AddAccessSQL(sql, tableName, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW);
             DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null, pageSize, pageNo);
@@ -2129,7 +2150,8 @@ namespace VASLogic.Models
                              CASE WHEN cd.DocBaseType IN ('ARC','APC') THEN - cs.DueAmt
                              ELSE cs.DueAmt END AS DueAmt,
                              ci.DocumentNo,cb.Name,pm.VA009_Name,cy.ISO_Code,CASE WHEN cy.Cursymbol IS NOT NULL THEN cy.Cursymbol ELSE cy.ISO_Code END AS Symbol,
-                             cy.StdPrecision,cb.pic,custimg.ImageExtension,'Invoice' AS WindowType,cd.IsExpenseInvoice AS IsExInv
+                             cy.StdPrecision,cb.pic,custimg.ImageExtension,'Invoice' AS WindowType,cd.IsExpenseInvoice AS IsExInv,
+                             cd.Name AS DocTypeName
                              FROM C_InvoicePaySchedule cs
                              INNER JOIN C_Invoice ci ON (cs.C_Invoice_ID = ci.C_Invoice_ID)
                              INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
@@ -2216,7 +2238,8 @@ namespace VASLogic.Models
                              SELECT DISTINCT co.C_Order_ID AS Record_ID,ps.DueDate,
                              ps.DueAmt AS DueAmt,
                              co.DocumentNo,cb.Name,pm.VA009_Name,cy.ISO_Code,CASE WHEN cy.Cursymbol IS NOT NULL THEN cy.Cursymbol ELSE cy.ISO_Code END AS Symbol,
-                             cy.StdPrecision,cb.pic,custimg.ImageExtension,'Order' AS WindowType,'N' AS IsExInv
+                             cy.StdPrecision,cb.pic,custimg.ImageExtension,'Order' AS WindowType,'N' AS IsExInv,
+                             dt.Name AS DocTypeName
                              FROM VA009_OrderPaySchedule ps
                              INNER JOIN C_Order co ON (ps.C_Order_ID = co.C_Order_ID)
                              INNER JOIN C_Doctype dt ON (dt.C_Doctype_ID = co.C_Doctype_ID)
@@ -2323,6 +2346,8 @@ namespace VASLogic.Models
                     obj.PayMethod = Util.GetValueOfString(ds.Tables[0].Rows[i]["VA009_Name"]);
                     obj.ISO_Code = Util.GetValueOfString(ds.Tables[0].Rows[i]["ISO_Code"]);
                     obj.windowType = Util.GetValueOfString(ds.Tables[0].Rows[i]["WindowType"]);
+                    //Document type name of the underlying transaction (AR/AP invoice, credit memo, sales/purchase order, ...)
+                    obj.DocTypeName = Util.GetValueOfString(ds.Tables[0].Rows[i]["DocTypeName"]);
                     if (Util.GetValueOfString(ds.Tables[0].Rows[i]["WindowType"]) == "Order")
                     {
                         obj.Window_ID = OrderWinId;
@@ -3351,6 +3376,8 @@ namespace VASLogic.Models
         public string ISO_Code { get; set; }
         public string PayMethod { get; set; }
         public string windowType { get; set; }
+        /// <summary>Name of the transaction's document type (C_DocType.Name).</summary>
+        public string DocTypeName { get; set; }
 
     }
 

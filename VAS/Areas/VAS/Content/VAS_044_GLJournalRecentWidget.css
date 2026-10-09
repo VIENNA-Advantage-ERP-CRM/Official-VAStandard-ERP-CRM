@@ -1,0 +1,387 @@
+/* ==========================================================================
+   VAS GL Journal Recent Entries Widget
+   File  : VAS_044_GLJournalRecentWidget.css
+   Scope : .VAS-gljr-root
+
+   Redesigned to the Onfinity design system (design.md):
+     - Glass widget surface, shared Widget Header (icon + title + subtitle).
+     - Row-based list follows the "List Widget" / "Grid Data Widget" pattern:
+       one internal em lever (widget-root clamp), row cells strictly SMALLER
+       than the widget title, xs meta line, load-bearing body dividers.
+     - No inner scrollbars: the body clips and the footer pager (24px buttons)
+       pages the rest; row count is fitted to the cell height at runtime.
+   The shared journal detail dialog is styled separately (VAS-glje-* in
+   VAS_041_GLJournalEntriesWidget.css); this file only owns the widget card.
+   ========================================================================== */
+
+/* ── Root wrapper ────────────────────────────────────────────────────────── */
+.VAS-gljr-root {
+    --on-text-muted: #748494;
+    height: 100%;
+    width: 100%;
+    container-type: inline-size;
+}
+
+/* ── Card container — canonical glass surface + widget-root em lever ──────── */
+.VAS-gljr-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 0.85em;
+    box-sizing: border-box;
+    overflow: hidden;
+    border-radius: 14px;
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    /* Widget-root anchor — design.md clamp(16px, 1.2cqi, 20px) expressed on the
+       dashboard-width variable (cqi is unusable: this root sets its own
+       container-type, so cqi would resolve against the narrow widget cell). */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
+}
+
+/* ── Header row (shared Widget Header) ───────────────────────────────────── */
+.VAS-gljr-root .w-head {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    flex-shrink: 0;
+    margin-bottom: 0.5em;
+}
+
+/* Icon well + glyph — scale off the same --dash-inline-size lever as the title */
+.VAS-gljr-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    height: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    flex-shrink: 0;
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(232, 244, 255, 0.96));
+    box-shadow: inset 0 0 0 1px rgba(31, 131, 255, 0.10);
+    color: #0083DA;
+}
+
+.VAS-gljr-icon svg {
+    width: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
+    height: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
+    stroke: currentColor;
+}
+
+/* Title + subtitle stack */
+.VAS-gljr-title-wrap {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+/* Title — Roboto Regular, clamp ceiling 17px (design.md Widget Header) */
+.VAS-gljr-root .w-title {
+    font-family: 'Roboto', sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    font-weight: 400;
+    line-height: 1.2;
+    letter-spacing: 0;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Subtitle — Roboto Regular, clamp ceiling 13px, muted */
+.VAS-gljr-subtitle {
+    font-family: 'Roboto', sans-serif;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
+    font-weight: 400;
+    line-height: 1.3;
+    letter-spacing: 0;
+    color: #5F7283;
+    margin-top: 0.125em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── Body — fills remaining space, clips (no inner scroll) ────────────────── */
+.VAS-gljr-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    /* Adaptive paging fits the rows to this height, so the body never scrolls
+       (design.md "No Inner Scrollbars"); clip the in-progress measurement frame. */
+    overflow: hidden;
+}
+
+.VAS-gljr-body.is-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ── Row list ────────────────────────────────────────────────────────────── */
+.VAS-gljr-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+/* ── Single entry row ────────────────────────────────────────────────────── */
+.VAS-gljr-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+    padding: 0.55em 0.1em;
+    cursor: pointer;
+    background: transparent;
+    /* Body row divider — load-bearing, #E2EAF1 (design.md Row And Header Separators) */
+    border-bottom: 1px solid #E2EAF1;
+    transition: background 0.1s;
+}
+
+.VAS-gljr-list .VAS-gljr-item:last-child {
+    border-bottom: 0;
+}
+
+.VAS-gljr-item:hover {
+    background: #F8FBFE;
+}
+
+/* ── Left status stripe ──────────────────────────────────────────────────── */
+.VAS-gljr-mrk {
+    width: 0.22em;
+    align-self: stretch;
+    flex-shrink: 0;
+    border-radius: 999px;
+    background: #0083DA;
+}
+
+.VAS-gljr-mrk-danger { background: #ED1C24; }
+.VAS-gljr-mrk-warn   { background: #D78B10; }
+.VAS-gljr-mrk-ok     { background: #16A34A; }
+.VAS-gljr-mrk-info   { background: #0083DA; }
+
+/* ── Row body (title + meta) ─────────────────────────────────────────────── */
+.VAS-gljr-body-row {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15em;
+}
+
+/* Title line — document no. + description; sm (0.75em), smaller than the widget title */
+.VAS-gljr-title {
+    font-family: 'Roboto', sans-serif;
+    font-size: 0.75em;
+    font-weight: 400;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Document number acts as a zoom link to the GL Journal record */
+.VAS-gljr-doc-zoom {
+    color: #0069AE;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.VAS-gljr-doc-zoom:hover,
+.VAS-gljr-doc-zoom:focus {
+    text-decoration: underline;
+    outline: none;
+}
+
+/* Meta line — status pill + date; xs (0.6875em), muted */
+.VAS-gljr-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    font-size: 0.6875em;
+    font-weight: 400;
+    color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    letter-spacing: 0;
+}
+
+.VAS-gljr-meta-date {
+    color: #5F7283;
+}
+
+/* Accounting schema name */
+.VAS-gljr-meta-schema {
+    color: #5F7283;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Unbalanced note — amber, calls out a debit≠credit journal */
+.VAS-gljr-meta-unbal {
+    color: #B5740C;
+    font-weight: 600;
+}
+
+/* ── Amounts — debit over credit, stacked right, tabular ─────────────────── */
+.VAS-gljr-amounts {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.1em;
+    flex-shrink: 0;
+    text-align: right;
+}
+
+.VAS-gljr-amt {
+    font-size: 0.75em;
+    font-weight: 400;
+    color: #102C3F;
+    white-space: nowrap;
+    line-height: 1.25;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Credit reads one tone lighter than debit so the pair is scannable */
+.VAS-gljr-amt-cr {
+    font-weight: 400;
+    color: #41576A;
+}
+
+/* Short Dr / Cr tag before each value */
+.VAS-gljr-amt-lbl {
+    font-size: 0.85em;
+    font-weight: 500;
+    color: #8A99A8;
+    margin-right: 0.15em;
+    letter-spacing: 0.02em;
+}
+
+/* ── Empty / error state ─────────────────────────────────────────────────── */
+.VAS-gljr-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 6em;
+    font-size: 0.8em;
+    color: #748494;
+    text-align: center;
+}
+
+/* ── Status pills ────────────────────────────────────────────────────────── */
+/* Nested inside .VAS-gljr-meta (0.6875em), so em compounds — 0.75em here mirrors
+   the proven VAS_045 pill size and reads as a compact chip beside the meta text. */
+.VAS-gljr-pill {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.75em;
+    font-weight: 500;
+    padding: 0.2em 0.55em;
+    border-radius: 999px;
+    white-space: nowrap;
+    line-height: 1.4;
+    letter-spacing: 0;
+}
+
+.VAS-gljr-pill-draft   { background: #F1F5F9; color: #64748B; }
+.VAS-gljr-pill-submit  { background: #DBEAFE; color: #1D4ED8; }
+.VAS-gljr-pill-posted  { background: #DCFCE7; color: #15803D; }
+.VAS-gljr-pill-closed  { background: #E0E7FF; color: #3730A3; }
+.VAS-gljr-pill-pending { background: #FEF3C7; color: #92400E; }
+.VAS-gljr-pill-voided  { background: #FEE2E2; color: #B91C1C; }
+.VAS-gljr-pill-reverse { background: #F3E8FF; color: #7E22CE; }
+
+/* ── Footer pager (design.md Widget Footer Pager — 24px buttons) ─────────── */
+.VAS-gljr-pager {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    width: 100%;
+    flex-shrink: 0;
+    margin: 3px 0 0;
+    padding: 8px 2px 0;
+    border-top: 1px solid #D9E2EB;
+    background: transparent;
+    box-sizing: border-box;
+}
+
+.VAS-gljr-page-btn {
+    width: 24px;
+    min-width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid #E4EDF4;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.88);
+    color: #0083DA;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.VAS-gljr-page-btn:hover:not(:disabled) {
+    background: #EAF8FF;
+    border-color: #BFE4FF;
+}
+
+.VAS-gljr-page-btn:disabled {
+    background: rgba(255, 255, 255, 0.72);
+    color: #B8C6D2;
+    cursor: default;
+}
+
+.VAS-gljr-page-text {
+    min-width: 116px;
+    margin-right: auto;
+    text-align: left;
+    font-size: 11.5px;
+    font-family: 'Roboto Mono', monospace;
+    color: var(--on-text-muted);
+    letter-spacing: 0.02em;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.VAS-gljr-page-count {
+    min-width: 48px;
+    text-align: center;
+    font-size: 11.5px;
+    font-family: 'Roboto Mono', monospace;
+    color: var(--on-text-muted);
+    letter-spacing: 0.02em;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* ── RTL support ─────────────────────────────────────────────────────────── */
+html[dir="rtl"] .VAS-gljr-root .w-head {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .VAS-gljr-item {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .VAS-gljr-amt {
+    text-align: left;
+}
+
+html[dir="rtl"] .VAS-gljr-page-text {
+    margin-right: 0;
+    margin-left: auto;
+    text-align: right;
+}
+
+.VAS-gljr-body-lock {
+    overflow: hidden;
+}

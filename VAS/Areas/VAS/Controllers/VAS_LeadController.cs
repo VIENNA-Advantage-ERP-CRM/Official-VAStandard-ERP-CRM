@@ -11,7 +11,7 @@ namespace VAS.Controllers
 {
     public class VAS_LeadController : Controller
     {
-        public JsonResult GetUserImg(string rec_ID)
+        public JsonResult GetUserImg(int rec_ID)
         {
             VAS_LeadModel model = new VAS_LeadModel();
             string result = model.UserImage(rec_ID);

@@ -1,0 +1,575 @@
+/**
+ * Inventory Aging Report Widget & Modal (Inventory Count Dashboard)
+ * Purpose - 3x2 glass card categorizing on-hand stock into 4 age buckets (0-30, 31-90, 91-180, 180+ days).
+ *           Clicking a bucket opens a detailed product breakdown modal with warehouse filter.
+ * Prefix  - VAS_163_
+ *
+ * Labels / Message Keys Table:
+ *  #  | Fallback Text                                    | Message Key
+ * ----+--------------------------------------------------+-----------------------------------
+ *  1  | Inventory Aging Report                           | VAS_163_InventoryAgingReport
+ *  2  | All Warehouses                                   | VAS_163_AllWarehouses
+ *  3  | Fresh Stock (0-30 Days)                          | VAS_163_FreshStock0_30
+ *  4  | Moderate Age (31-90 Days)                        | VAS_163_ModerateAge31_90
+ *  5  | Aging Stock (91-180 Days)                        | VAS_163_AgingStock91_180
+ *  6  | Dead Stock (180+ Days)                           | VAS_163_DeadStock180_Plus
+ *  7  | Product Name & Attribute                         | VAS_163_ProductNameAttribute
+ *  8  | Warehouse                                        | VAS_163_Warehouse
+ *  9  | Locator                                          | VAS_163_Locator
+ * 10  | Age                                              | VAS_163_Age
+ * 11  | Qty On Hand                                      | VAS_163_QtyOnHand
+ * 12  | Page                                             | VAS_163_Page
+ * 13  | of                                               | VAS_163_Of
+ * 14  | Close                                            | VAS_163_Close
+ * 15  | No stock items found in this age bucket          | VAS_163_NoStockInBucket
+ * 16  | Unable to load inventory aging summary           | VAS_163_UnableToLoadAgingSummary
+ * 17  | Products on hand by age                          | VAS_163_ProductsOnHandByAge
+ * 18  | 0-30 days                                         | VAS_163_Days0_30
+ * 19  | Fresh stock                                      | VAS_163_FreshStockMeta
+ * 20  | 31-90 days                                        | VAS_163_Days31_90
+ * 21  | Normal turnover                                  | VAS_163_NormalTurnoverMeta
+ * 22  | 91-180 days                                       | VAS_163_Days91_180
+ * 23  | Slow moving - watch                               | VAS_163_SlowMovingWatchMeta
+ * 24  | 180+ days                                         | VAS_163_Days180Plus
+ * 25  | Dead stock                                        | VAS_163_DeadStockMeta
+ * 26  | View                                              | VAS_163_ViewPrefix
+ * 27  | product                                           | VAS_163_Product
+ * 28  | products                                          | VAS_163_Products
+ * 29  | Inventory Aging                                   | VAS_163_InventoryAgingPrefix
+ * 30  | Loading...                                        | VAS_163_Loading
+ * 31  | Close modal                                       | VAS_163_CloseModal
+ * 32  | Age Bucket                                        | VAS_163_AgeBucket
+ * 33  | Category Status                                   | VAS_163_CategoryStatus
+ * 34  | Scope                                             | VAS_163_Scope
+ * 35  | All Stocked Items                                 | VAS_163_AllStockedItems
+ * 36  | Loading products...                              | VAS_163_LoadingProducts
+ * 37  | No products found in this age bucket.            | VAS_163_NoProductsFoundBucket
+ * 38  | Unable to load product list.                     | VAS_163_UnableToLoadProductList
+ * 39  | Products in this bucket                          | VAS_163_ProductsInBucket
+ * 40  | Item / Attributes                                | VAS_163_ItemAttributes
+ * 41  | Qty                                               | VAS_163_Qty
+ * 42  | Showing                                           | VAS_163_Showing
+ * 43  | Previous page                                     | VAS_163_PreviousPage
+ * 44  | Next page                                         | VAS_163_NextPage
+ */
+; VAS = window.VAS || {};
+
+; (function (VAS, $) {
+
+    /* Only used until a real row can be measured - see getAdaptivePageSize(). */
+    var FALLBACK_MODAL_ROWS = 7;
+
+    function lbl(key) {
+        return VIS.Msg.getMsg(key);
+    }
+
+    function ensureDashInlineSizeVar($el) {
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container], .vis-widget-body, body')[0] || document.documentElement;
+        var write = function () {
+            var w = container.clientWidth || window.innerWidth;
+            if (w > 0) {
+                document.documentElement.style.setProperty('--dash-inline-size', w + 'px');
+            }
+        };
+
+        if (!window.__vasDashInlineSizeObserver && typeof ResizeObserver !== 'undefined') {
+            window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+            window.__vasDashInlineSizeObserver.observe(container);
+            window.addEventListener('resize', write);
+        }
+        write();
+    }
+
+    VAS.VAS_163_InventoryAgingReportWidget = function () {
+
+        this.frame;
+        this.windowNo;
+        this.AD_UserHomeWidgetID = 0;
+
+        var $self = this;
+        var $wrapper = $('<div class="vas-invaging-container">');
+        var $root = $('<div class="vas-invaging-root">');
+        var $whSelect;
+
+        var selectedWarehouseId = null;
+        var selectedWarehouseName = lbl("VAS_163_AllWarehouses");
+        var warehousesList = [];
+        var summaryData = { b0_30: 0, b31_90: 0, b91_180: 0, b180_plus: 0, totalQty: 0 };
+
+        var $bucketBtns = {};
+        var widgetObserver = null;
+        var $modalOverlay = null;
+
+        var bucketsConfig = [
+            { id: "0-30", label: lbl("VAS_163_Days0_30"), meta: lbl("VAS_163_FreshStockMeta"), color: "#20A464" },
+            { id: "31-90", label: lbl("VAS_163_Days31_90"), meta: lbl("VAS_163_NormalTurnoverMeta"), color: "#0083DA" },
+            { id: "91-180", label: lbl("VAS_163_Days91_180"), meta: lbl("VAS_163_SlowMovingWatchMeta"), color: "#D78B10" },
+            { id: "180+", label: lbl("VAS_163_Days180Plus"), meta: lbl("VAS_163_DeadStockMeta"), color: "#D14545" }
+        ];
+
+        this.Initalize = function () {
+            createWidget();
+            loadWarehouses();
+        };
+
+        function createWidget() {
+            // Header Row
+            var $headerRow = $('<div class="vas-invaging-header-row">');
+
+            var $leftCluster = $('<div class="vas-invaging-left-cluster">');
+            var $iconWell = $('<div class="vas-invaging-icon-well"><i class="fa fa-clock-o"></i></div>');
+            var $titleBlock = $('<div class="vas-invaging-title-block">');
+            var $title = $('<h3 class="vas-invaging-title">' + lbl("VAS_163_InventoryAgingReport") + '</h3>');
+            var $subtitle = $('<span class="vas-invaging-subtitle">' + lbl("VAS_163_ProductsOnHandByAge") + '</span>');
+            $titleBlock.append($title).append($subtitle);
+            $leftCluster.append($iconWell).append($titleBlock);
+
+            // Native Warehouse Select Control (Unclipped by container overflow:hidden)
+            $whSelect = $('<select class="vas-invaging-wh-select">');
+            $whSelect.append('<option value="">' + lbl("VAS_163_AllWarehouses") + '</option>');
+
+            $headerRow.append($leftCluster).append($whSelect);
+            $root.append($headerRow);
+
+            // Body — 4 Stacked Bucket Rows
+            var $body = $('<div class="vas-invaging-body">');
+
+            for (var i = 0; i < bucketsConfig.length; i++) {
+                var b = bucketsConfig[i];
+                var $btn = $('<button type="button" class="vas-invaging-bucket-btn" data-id="' + b.id + '" aria-label="' + lbl("VAS_163_ViewPrefix") + ' ' + b.label + ' ' + lbl("VAS_163_Products") + '">');
+
+                var $topLine = $('<div class="vas-invaging-top-line">');
+                var $labelCluster = $('<div class="vas-invaging-label-cluster">');
+                var $dot = $('<div class="vas-invaging-dot" style="background-color: ' + b.color + ';"></div>');
+                var $bTitle = $('<span class="vas-invaging-bucket-title">' + b.label + '</span>');
+                $labelCluster.append($dot).append($bTitle);
+
+                var $countText = $('<span class="vas-invaging-count-text" style="color: ' + b.color + ';">0 ' + lbl("VAS_163_Products") + '</span>');
+                $topLine.append($labelCluster).append($countText);
+
+                var $metaText = $('<div class="vas-invaging-meta-text">' + b.meta + '</div>');
+
+                var $barTrack = $('<div class="vas-invaging-bar-track">');
+                var $barFill = $('<div class="vas-invaging-bar-fill" style="background-color: ' + b.color + '; width: 0%;"></div>');
+                $barTrack.append($barFill);
+
+                $btn.append($topLine).append($metaText).append($barTrack);
+                $body.append($btn);
+
+                $bucketBtns[b.id] = {
+                    $btn: $btn,
+                    $countText: $countText,
+                    $barFill: $barFill,
+                    config: b
+                };
+
+                (function (bConfig, $b) {
+                    $b.on('click', function () {
+                        openDetailModal(bConfig, $b);
+                    });
+                })(b, $btn);
+            }
+
+            $root.append($body);
+            $wrapper.append($root);
+
+            // Self-Sizing Observer
+            if (window.ResizeObserver && $wrapper[0]) {
+                widgetObserver = new ResizeObserver(function (entries) {
+                    for (var i = 0; i < entries.length; i++) {
+                        var width = entries[i].contentRect.width;
+                        if (width > 0 && $root[0]) {
+                            $root[0].style.setProperty('--widget-inline-size', width + 'px');
+                        }
+                    }
+                });
+                widgetObserver.observe($wrapper[0]);
+            }
+
+            // Dropdown Change Handler
+            $whSelect.on('change', function () {
+                var val = $(this).val();
+                selectedWarehouseId = val ? parseInt(val, 10) : null;
+
+                if (selectedWarehouseId) {
+                    var selectedOpt = $(this).find('option:selected').text();
+                    selectedWarehouseName = selectedOpt || lbl("VAS_163_Warehouse");
+                } else {
+                    selectedWarehouseName = lbl("VAS_163_AllWarehouses");
+                }
+
+                loadSummary();
+            });
+        }
+
+        function loadWarehouses() {
+            $.ajax({
+                url: VIS.Application.contextUrl + "VAS_163_InventoryAgingReportWidget/GetWarehouses",
+                type: "GET",
+                dataType: "json",
+                success: function (res) {
+                    if (res && res.warehouses) {
+                        warehousesList = res.warehouses;
+                        renderWarehouseOptions();
+                    }
+                    loadSummary();
+                },
+                error: function (err) {
+                    console.error("VAS_163_InventoryAgingReportWidget: Error loading warehouses", err);
+                    loadSummary();
+                }
+            });
+        }
+
+        function renderWarehouseOptions() {
+            $whSelect.empty();
+            $whSelect.append('<option value="">' + lbl("VAS_163_AllWarehouses") + '</option>');
+
+            for (var i = 0; i < warehousesList.length; i++) {
+                var wh = warehousesList[i];
+                var $opt = $('<option value="' + wh.warehouseId + '">' + wh.name + '</option>');
+                if (selectedWarehouseId && selectedWarehouseId === wh.warehouseId) {
+                    $opt.attr('selected', 'selected');
+                }
+                $whSelect.append($opt);
+            }
+        }
+
+        function loadSummary() {
+            var url = VIS.Application.contextUrl + "VAS_163_InventoryAgingReportWidget/GetAgingSummary";
+            if (selectedWarehouseId) {
+                url += "?warehouseId=" + selectedWarehouseId;
+            }
+
+            $.ajax({
+                url: url,
+                type: "GET",
+                dataType: "json",
+                success: function (res) {
+                    if (res) {
+                        summaryData = res;
+                        updateWidgetUI();
+                    }
+                },
+                error: function (err) {
+                    console.error("VAS_163_InventoryAgingReportWidget: Error loading summary", err);
+                }
+            });
+        }
+
+        function updateWidgetUI() {
+            // Bucket values are aging QUANTITIES from M_Transaction.MovementQty
+            // (not product counts), so the share bars compare quantity share.
+            var total = summaryData.totalQty || 0;
+
+            for (var i = 0; i < bucketsConfig.length; i++) {
+                var b = bucketsConfig[i];
+                var count = 0;
+
+                if (b.id === "0-30") count = summaryData.b0_30 || 0;
+                else if (b.id === "31-90") count = summaryData.b31_90 || 0;
+                else if (b.id === "91-180") count = summaryData.b91_180 || 0;
+                else if (b.id === "180+") count = summaryData.b180_plus || 0;
+
+                var btnObj = $bucketBtns[b.id];
+                if (btnObj) {
+                    btnObj.$countText.text(count.toLocaleString() + " " + lbl("VAS_Qty", "qty"));
+
+                    var pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                    btnObj.$barFill.css("width", pct + "%");
+                }
+            }
+        }
+
+        function openDetailModal(bConfig, $originBtn) {
+            if ($modalOverlay) {
+                $modalOverlay.remove();
+            }
+
+            var $overlay = $('<div class="vas-invaging-modal-overlay">');
+            var $dialog = $('<div class="vas-invaging-modal-dialog" role="dialog" aria-modal="true">');
+
+            // Header (Chrome 56px)
+            var $header = $('<div class="vas-invaging-modal-header">');
+            var $headerLeft = $('<div class="vas-invaging-modal-header-left">');
+            var $title = $('<h3 class="vas-invaging-modal-title">' + lbl("VAS_163_InventoryAgingPrefix") + ' · ' + bConfig.label + '</h3>');
+            var $pill = $('<span class="vas-invaging-modal-pill">' + lbl("VAS_163_Loading") + '</span>');
+            $headerLeft.append($title).append($pill);
+
+            var $closeBtn = $('<button type="button" class="vas-invaging-modal-close" aria-label="' + lbl("VAS_163_CloseModal") + '">&times;</button>');
+            $header.append($headerLeft).append($closeBtn);
+            $dialog.append($header);
+
+            // Summary Field Grid
+            var $summaryGrid = $(
+                '<div class="vas-invaging-summary-grid">' +
+                '<div class="vas-invaging-summary-cell"><span class="vas-invaging-summary-label">' + lbl("VAS_163_AgeBucket") + '</span><span class="vas-invaging-summary-val" style="color:' + bConfig.color + ';">' + bConfig.label + '</span></div>' +
+                '<div class="vas-invaging-summary-cell"><span class="vas-invaging-summary-label">' + lbl("VAS_163_CategoryStatus") + '</span><span class="vas-invaging-summary-val">' + bConfig.meta + '</span></div>' +
+                '<div class="vas-invaging-summary-cell"><span class="vas-invaging-summary-label">' + lbl("VAS_163_Scope") + '</span><span class="vas-invaging-summary-val">' + lbl("VAS_163_AllStockedItems") + '</span></div>' +
+                '<div class="vas-invaging-summary-cell"><span class="vas-invaging-summary-label">' + lbl("VAS_163_Warehouse") + '</span><span class="vas-invaging-summary-val">' + selectedWarehouseName + '</span></div>' +
+                '</div>'
+            );
+            $dialog.append($summaryGrid);
+
+            // Modal Body
+            var $body = $('<div class="vas-invaging-modal-body">');
+            $body.html('<div class="vas-invaging-message">' + lbl("VAS_163_LoadingProducts") + '</div>');
+            $dialog.append($body);
+
+            $overlay.append($dialog);
+            $('body').append($overlay);
+            $modalOverlay = $overlay;
+
+            $closeBtn.focus();
+
+            var closeModal = function () {
+                $overlay.remove();
+                $modalOverlay = null;
+                if ($originBtn) {
+                    $originBtn.focus();
+                }
+            };
+
+            $closeBtn.on('click', closeModal);
+
+            // Fetch Bucket Details
+            var url = VIS.Application.contextUrl + "VAS_163_InventoryAgingReportWidget/GetBucketDetail?bucketId=" + encodeURIComponent(bConfig.id);
+            if (selectedWarehouseId) {
+                url += "&warehouseId=" + selectedWarehouseId;
+            }
+
+            $.ajax({
+                url: url,
+                type: "GET",
+                dataType: "json",
+                success: function (res) {
+                    if (res && res.details) {
+                        var totalCount = res.totalCount || res.details.length;
+                        $pill.text(totalCount === 1 ? "1 " + lbl("VAS_163_Product") : totalCount + " " + lbl("VAS_163_Products"));
+                        renderModalGrid($body, res.details, totalCount);
+                    } else {
+                        $pill.text("0 " + lbl("VAS_163_Products"));
+                        $body.html('<div class="vas-invaging-message">' + lbl("VAS_163_NoProductsFoundBucket") + '</div>');
+                    }
+                },
+                error: function (err) {
+                    console.error("VAS_163_InventoryAgingReportWidget: Error loading bucket detail", err);
+                    $pill.text("0 " + lbl("VAS_163_Products"));
+                    $body.html('<div class="vas-invaging-message">' + lbl("VAS_163_UnableToLoadProductList") + '</div>');
+                }
+            });
+        }
+
+        function renderModalGrid($body, details, totalCount) {
+            $body.empty();
+
+            var modalPage = 1;
+
+            /* Rows the popup can actually show right now.
+
+               The previous version guessed with two magic numbers - it subtracted a hardcoded 90px
+               of chrome from the BODY height and divided by an assumed 54px row:
+
+                   var available = ($body.height() || 400) - 90;
+                   return Math.max(3, Math.floor(available / 54));
+
+               Neither constant survives a different resolution or zoom level. Row height comes
+               from the modal's own font clamp, and the chrome is a section title + header grid +
+               footer whose heights also scale, so at the user's resolution it computed 9 while
+               only 8 rows fit - the reported "shows 8 records, pagination says 46-54".
+
+               Now measured: the ROWS CONTAINER's own height divided by a real rendered row.
+               Both are read after the first paint, so nothing is assumed. */
+            var measuredRowHeight = 0;
+
+            function getAdaptivePageSize() {
+                var el = $rowsContainer && $rowsContainer[0];
+                if (!el) { return FALLBACK_MODAL_ROWS; }
+
+                var available = el.clientHeight;
+                if (!available) { return FALLBACK_MODAL_ROWS; }
+
+                if (!measuredRowHeight) {
+                    var probe = el.querySelector('.vas-invaging-modal-data-row');
+                    if (probe) {
+                        var h = probe.getBoundingClientRect().height;
+                        if (h > 0) { measuredRowHeight = h; }
+                    }
+                }
+
+                if (!measuredRowHeight) { return FALLBACK_MODAL_ROWS; }
+
+                /* Half a pixel of slack absorbs sub-pixel row heights, which would otherwise
+                   round a row that does fit down to one that does not. */
+                return Math.max(1, Math.floor((available + 0.5) / measuredRowHeight));
+            }
+
+            var modalPageSize = FALLBACK_MODAL_ROWS;
+
+            var $sectionTitle = $('<div class="vas-invaging-table-header">' + lbl("VAS_163_ProductsInBucket") + '</div>');
+            $body.append($sectionTitle);
+
+            var $headerGrid = $(
+                '<div class="vas-invaging-modal-grid-template vas-invaging-header-row" style="padding: 0.375em 0.5em; border-bottom: 1px solid #D7D7D7;">' +
+                '<div class="vas-invaging-modal-th">' + lbl("VAS_163_ItemAttributes") + '</div>' +
+                '<div class="vas-invaging-modal-th">' + lbl("VAS_163_Warehouse") + '</div>' +
+                '<div class="vas-invaging-modal-th">' + lbl("VAS_163_Locator") + '</div>' +
+                '<div class="vas-invaging-modal-th vas-invaging-modal-th-right">' + lbl("VAS_163_Qty") + '</div>' +
+                '</div>'
+            );
+            $body.append($headerGrid);
+
+            var $rowsContainer = $('<div class="vas-invaging-modal-rows-container" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;"></div>');
+            $body.append($rowsContainer);
+
+            var $footer = $(
+                '<div class="vas-invaging-modal-footer">' +
+                '<div class="vas-invaging-modal-footer-text vas-m-helper">' + lbl("VAS_163_Showing") + ' 0-0 ' + lbl("VAS_163_Of") + ' 0 ' + lbl("VAS_163_Products") + '</div>' +
+                '<div class="vas-invaging-pager">' +
+                '<button type="button" class="vas-invaging-pager-btn vas-m-prev" aria-label="' + lbl("VAS_163_PreviousPage") + '">&lsaquo;</button>' +
+                '<span class="vas-invaging-pager-info vas-m-info">1 ' + lbl("VAS_163_Of") + ' 1</span>' +
+                '<button type="button" class="vas-invaging-pager-btn vas-m-next" aria-label="' + lbl("VAS_163_NextPage") + '">&rsaquo;</button>' +
+                '</div>' +
+                '</div>'
+            );
+            $body.append($footer);
+
+            function updateModalPage(isRefit) {
+                $rowsContainer.empty();
+                var totalPages = Math.ceil(totalCount / modalPageSize) || 1;
+
+                if (modalPage > totalPages) modalPage = totalPages;
+                if (modalPage < 1) modalPage = 1;
+
+                var start = (modalPage - 1) * modalPageSize;
+                var end = Math.min(start + modalPageSize, totalCount);
+                var pageItems = details.slice(start, end);
+
+                for (var i = 0; i < pageItems.length; i++) {
+                    var item = pageItems[i];
+                    var formattedQty = Number(item.qty || 0).toLocaleString();
+
+                    /* Blank when the product has no attribute - no hyphen, no "Standard". Some
+                       attribute set instances carry a lone dash ("-"/"–"/"—") as their
+                       stored Description instead of being genuinely empty; treat that the same
+                       as no attribute rather than displaying it as if it were real data. */
+                    var rawAttribute = item.attribute || '';
+                    var attributeIsBlank = !rawAttribute.trim() || /^[-‐-―]+$/.test(rawAttribute.trim());
+                    var attributeText = attributeIsBlank ? '' : rawAttribute;
+
+                    var $mRow = $(
+                        '<div class="vas-invaging-modal-grid-template vas-invaging-modal-data-row">' +
+                        '<div class="vas-invaging-cell">' +
+                        '<div class="vas-invaging-prod-name" title="' + item.product + '">' + item.product + '</div>' +
+                        /* The element is still rendered (with &nbsp;) so the row keeps its height. */
+                        '<div class="vas-invaging-prod-attr" title="' + attributeText + '">' + (attributeText || '&nbsp;') + '</div>' +
+                        '</div>' +
+                        '<div class="vas-invaging-cell vas-invaging-cell-text" title="' + item.warehouse + '">' + item.warehouse + '</div>' +
+                        '<div class="vas-invaging-cell vas-invaging-cell-text" title="' + item.locator + '">' + item.locator + '</div>' +
+                        '<div class="vas-invaging-cell vas-invaging-cell-qty" title="' + formattedQty + '">' + formattedQty + '</div>' +
+                        '</div>'
+                    );
+                    $rowsContainer.append($mRow);
+                }
+
+                /* Rows exist now, so one can be measured. If the number that fits differs from the
+                   number just rendered, adopt it and repaint once. isRefit stops the second pass
+                   from measuring again, so this cannot loop. */
+                if (!isRefit) {
+                    var fit = getAdaptivePageSize();
+                    if (fit !== modalPageSize) {
+                        modalPageSize = fit;
+                        var refitPages = Math.ceil(totalCount / modalPageSize) || 1;
+                        if (modalPage > refitPages) { modalPage = refitPages; }
+                        updateModalPage(true);
+                        return;
+                    }
+                }
+
+                $footer.find('.vas-m-helper').text(lbl("VAS_163_Showing") + ' ' + (totalCount > 0 ? (start + 1) : 0) + '–' + end + ' ' + lbl("VAS_163_Of") + ' ' + totalCount + ' ' + (totalCount === 1 ? lbl("VAS_163_Product") : lbl("VAS_163_Products")));
+                $footer.find('.vas-m-info').text(modalPage + ' ' + lbl("VAS_163_Of") + ' ' + totalPages);
+
+                var $mPrev = $footer.find('.vas-m-prev');
+                var $mNext = $footer.find('.vas-m-next');
+
+                $mPrev.prop('disabled', modalPage === 1);
+                $mNext.prop('disabled', modalPage === totalPages);
+
+                $mPrev.off('click').on('click', function () {
+                    if (modalPage > 1) {
+                        modalPage--;
+                        updateModalPage();
+                    }
+                });
+
+                $mNext.off('click').on('click', function () {
+                    if (modalPage < totalPages) {
+                        modalPage++;
+                        updateModalPage();
+                    }
+                });
+
+                if (totalPages <= 1) {
+                    $footer.find('.vas-invaging-pager').hide();
+                } else {
+                    $footer.find('.vas-invaging-pager').show();
+                }
+            }
+
+            updateModalPage();
+
+            $(window).off('resize.vas-invaging-modal').on('resize.vas-invaging-modal', function () {
+                if ($modalOverlay) {
+                    /* Row height is driven by the dialog's clamp(..., 1.2vw, ...) font anchor, so
+                       resizing the window changes it. The cached measurement must be dropped or
+                       the refit would divide the new height by the old row height. */
+                    measuredRowHeight = 0;
+                    updateModalPage();
+                }
+            });
+        }
+
+        this.getRoot = function () {
+            return $wrapper;
+        };
+
+        this.refreshData = function () {
+            loadSummary();
+        };
+
+        this.disposeComponent = function () {
+            if (widgetObserver) {
+                widgetObserver.disconnect();
+                widgetObserver = null;
+            }
+            if ($modalOverlay) {
+                $modalOverlay.remove();
+                $modalOverlay = null;
+            }
+            $(window).off('resize.vas-invaging-modal');
+            $wrapper.remove();
+        };
+    };
+
+    VAS.VAS_163_InventoryAgingReportWidget.prototype.init = function (windowNo, frame) {
+        this.frame = frame;
+        this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
+        this.windowNo = windowNo;
+        this.Initalize();
+        this.frame.getContentGrid().append(this.getRoot());
+        ensureDashInlineSizeVar(this.getRoot());
+    };
+
+    VAS.VAS_163_InventoryAgingReportWidget.prototype.widgetSizeChange = function (height, width) { };
+
+    VAS.VAS_163_InventoryAgingReportWidget.prototype.refreshWidget = function () {
+        this.refreshData();
+    };
+
+    VAS.VAS_163_InventoryAgingReportWidget.prototype.dispose = function () {
+        this.disposeComponent();
+        if (this.frame) { this.frame.dispose(); }
+        this.frame = null;
+    };
+
+})(VAS, jQuery);

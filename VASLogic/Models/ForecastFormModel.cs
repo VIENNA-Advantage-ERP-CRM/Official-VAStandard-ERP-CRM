@@ -9,6 +9,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Linq;
 using System.Text;
 using System.Web;
@@ -62,9 +63,15 @@ namespace VIS.Models
         public Dictionary<string, object> GetTableAndRecordInfo(Ctx ctx, string AD_Table_ID, string AD_Record_ID)
         {
             Dictionary<string, object> info = new Dictionary<string, object>();
+            SqlParameter[] param = new SqlParameter[1];
+            param[0] = new SqlParameter("@param1", SqlDbType.Int);
+            param[0].Value = Util.GetValueOfInt(AD_Record_ID);
+
             info["Table_Name"] = MTable.GetTableName(ctx, Util.GetValueOfInt(AD_Table_ID));
+
             info["AD_Org_ID"] = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Org_ID FROM " + Util.GetValueOfString(info["Table_Name"]) +
-                @" WHERE " + Util.GetValueOfString(info["Table_Name"]) + "_ID = " + AD_Record_ID));
+                @" WHERE " + Util.GetValueOfString(info["Table_Name"]) + "_ID = @param1" , param , null));
+
             if (Util.GetValueOfString(info["Table_Name"]).Equals(MMasterForecast.Table_Name))
             {
                 info["TeamColumn_ID"] = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Column_ID FROM AD_Column " +

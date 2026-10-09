@@ -478,8 +478,9 @@ namespace ViennaAdvantage.Process
                     msg = "ImportedSuccessfully";// Msg.GetMsg(GetCtx(), "ImportedSuccessfully");
                     return msg;
                 }
-                catch
+                catch(Exception ex)
                 {
+                    log.Log(Level.SEVERE, "Chart of Accounts (Exception) --> " + ex);
                     if (_message != "")
                     {
                         msg = _message;

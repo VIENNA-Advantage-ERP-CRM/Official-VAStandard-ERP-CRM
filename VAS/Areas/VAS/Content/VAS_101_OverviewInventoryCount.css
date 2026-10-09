@@ -1,0 +1,921 @@
+﻿/************************************************************
+ * Module Name : VAS
+ * Purpose     : Styles for the Inventory Count Overview tab panel
+ *               (VAS.VAS_101_OverviewInventoryCount). All classes are
+ *               panel-prefixed (vas_101-*) and scoped under the panel root to
+ *               avoid global collisions. Shares the Onfinity windows-and-panels
+ *               em-anchored body language with VAS_099 / VAS_100 — Roboto, white
+ *               surfaces, soft blue borders, KPI tiles with accent rails, pastel
+ *               stepper, segmented filter, status-summary cards and a flat table
+ *               with signed variance cells.
+ * Chronological development:
+ *   VAI163   2026-07-06  Created
+ *   VAI163   2026-07-17  Header title strip is now untinted (gradient dropped),
+ *                        matching VAS_106_OverviewSalesOrder.
+ *   VAI163   2026-07-17  Header identity card aligned to VAS_106: 1.4fr/1fr
+ *                        columns with a divider between them (stacking to a
+ *                        bottom rule when narrow), plus its RTL mirror.
+ *   VAI163   2026-07-31  Header aligned to the VAS_092 Purchase Order Overview
+ *                        standard: details card is 40%/1fr (was 1.4fr/1fr) and
+ *                        its field column (-hdrColR) is a two-across grid
+ *                        instead of a single tall stack, collapsing to one
+ *                        column under 460px. Field values wrap rather than
+ *                        ellipsis-truncate now that the column is narrower.
+ *   VAI163   2026-08-05  Class prefix renamed MPC-vasic- -> vas_101- so the panel's
+ *                        styles cannot collide with another panel's.
+ *   VAI163   2026-08-07  Modifier classes that were still written bare
+ *                        (.is-link, .ta-r, .on, .tone-*, .s-*, .btn-*) now
+ *                        carry the vas_101- prefix too. Sharing a name with a
+ *                        base-theme rule meant the base design won and
+ *                        repainted the panel; scoping them to the panel ends
+ *                        that.
+ *   VAI163   2026-08-12  - Added the line's Attribute Set Instance sub-line
+ *                          (.vas_101-itAttr).
+ *                        - Added the three sections now below the lines: Related
+ *                          Documents (.vas_101-docRow / -docItem / -docTxt, rows
+ *                          clickable via .vas_101-is-link), Notes
+ *                          (.vas_101-textCard / -noteLbl) and Activity
+ *                          (.vas_101-actList / -actRow / -actTag with its own
+ *                          .vas_101-tone-* set / -actTitle / -actLead / -actWhen),
+ *                          plus the activity pager (.vas_101-pager / -pgRange /
+ *                          -pgCtrls / -pgPos / -pgBtn) and a toast
+ *                          (.vas_101-toast) for the record-open path.
+ *                        - The Complete / Post adjustments buttons are gone from
+ *                          the panel, so .vas_101-actions and the .vas_101-btn
+ *                          family style nothing now. They are left in place:
+ *                          .vas_101-is-disabled is shared with the pager.
+ *   VAI163   2026-08-12  Added the Activity e-mail rows: the recipient sub-line
+ *                        (.vas_101-actSub, wrapping so addresses read in full), the
+ *                        openable row and its caret (.vas_101-actRow.-is-openable /
+ *                        -is-open / -actCaret) and the message body that opens
+ *                        under it (.vas_101-actBody / -actMeta).
+ *   VAI163   2026-08-12  The count-card row gains a fourth card carrying a MONEY
+ *                        figure (Variance Value), so a status value can now be an
+ *                        amount: .vas_101-statVal-amt takes a notch less size and
+ *                        clips to one line rather than wrapping inside its card.
+ *                        Activity gains field-change rows — the value move under
+ *                        the field's name (.vas_101-actDelta / -cvOld / -cvArrow /
+ *                        -cvNew), with the old value struck through and the new
+ *                        one carrying the weight.
+ *   VAI163   2026-08-14  - Added .vas_101-baseUom: the product's base unit named
+ *                          after the On Hand figure, muted and a size down so the
+ *                          quantity still reads first.
+ *                        - The count table's tracks are minmax(0, Nfr) and its
+ *                          cells clip inside their own track
+ *                          (.vas_101-tRow > span), so a long value can no longer
+ *                          widen a column and push the right-hand ones out of the
+ *                          frame — On Hand now carries a unit name as well as a
+ *                          number, and it is a notch wider (0.9fr -> 1.15fr) for
+ *                          it. Follows VAS_099, which took the same treatment.
+ *   VAI163   2026-08-17  - The data tables SHRINK to the panel instead of taking
+ *                          their own horizontal scrollbar: the rows' floor
+ *                          widths and the card's overflow-x are gone. A
+ *                          scrollbar inside a card hides the columns it pushes
+ *                          out — it has to be found and dragged before it says
+ *                          anything is there — where a compressed column is
+ *                          visibly present and keeps its ellipsis and tooltip.
+ *   VAI163   2026-08-21  Nothing overlaps anything at any zoom level. Stage labels
+ *                        break inside their word (overflow-wrap): the step is
+ *                        already allowed to shrink, so without the break a long
+ *                        stage name painted over the stage beside it. The
+ *                        snapshot, status and header grids took the minmax(0, 1fr)
+ *                        floor, so a long figure can no longer widen its own card
+ *                        and push the row past the panel. The line table was
+ *                        already correct.
+ ***********************************************************/
+
+.vas_101-root {
+    /* Canonical palette */
+    --ic-text:        #102C3F;
+    --ic-muted:       #5F7283;
+    --ic-sub:         #41576A;
+    --ic-action:      #0083DA;
+    --ic-action-dk:   #005FA3;
+    --ic-link:        #106AB0;
+    --ic-card-bd:     #D9E2EB;
+    --ic-row-div:     #E2EAF1;
+    --ic-card-radius: 12px;
+    /* Semantic tones */
+    --ic-info-bg:     #EAF8FF;  --ic-info-tx:    #0083DA;
+    --ic-success-bg:  #E9F6EE;  --ic-success-tx: #0B6B45;
+    --ic-warning-bg:  #FFF6E2;  --ic-warning-tx: #9A6500;
+    --ic-risk-bg:     #FCEFEF;  --ic-risk-tx:    #D14545;
+    --ic-neutral-bg:  #EEF1F4;  --ic-neutral-tx: #5F7283;
+
+    position: relative;
+    height: 100%;
+    overflow-y: auto;
+    color: var(--ic-text);
+    font-family: Roboto, "Segoe UI", Arial, sans-serif;
+    container-type: inline-size;
+    box-sizing: border-box;
+}
+
+.vas_101-root * { box-sizing: border-box; }
+
+.vas_101-body {
+    font-size: clamp(15px, 2.8cqi, 17px);
+    padding: 1.125em 0.875em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875em;
+}
+
+.vas_101-empty {
+    padding: 40px 18px;
+    text-align: center;
+    color: var(--ic-muted);
+    font-size: 0.875em;
+}
+
+/* ----------------------------------------------------------- */
+/*  Section + Section Header                                    */
+/* ----------------------------------------------------------- */
+.vas_101-sec { display: block; }
+
+.vas_101-secHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    margin-bottom: 0.5em;
+}
+
+.vas_101-secTitle {
+    font-size: 1em;
+    font-weight: 700;
+    color: var(--ic-text);
+    margin: 0;
+    line-height: 1.2;
+    flex: 1 1 auto;
+}
+
+.vas_101-secSummary {
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--ic-muted);
+    flex: none;
+}
+
+/* ----------------------------------------------------------- */
+/*  Icon wrapper                                               */
+/* ----------------------------------------------------------- */
+.vas_101-ic { display: inline-flex; align-items: center; flex: none; }
+.vas_101-ic svg { display: block; }
+
+/* ----------------------------------------------------------- */
+/*  Header — title strip                                        */
+/* ----------------------------------------------------------- */
+.vas_101-hdr {
+    border-radius: 14px;
+    padding: 0.875em 1em;
+}
+
+.vas_101-hdrTop {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.875em;
+}
+
+.vas_101-hdrTitleWrap { min-width: 0; }
+
+.vas_101-hdrTitle {
+    font-size: 1.25em;
+    font-weight: 700;
+    color: var(--ic-text);
+    line-height: 1.2;
+}
+
+.vas_101-hdrSub {
+    font-size: 0.75em;
+    color: var(--ic-sub);
+    margin-top: 0.3125em;
+}
+
+.vas_101-hdrPills {
+    flex: none;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5em;
+}
+
+.vas_101-hdrPill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125em;
+    border-radius: 999px;
+    padding: 0.3125em 0.625em;
+    font-size: 0.6875em;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.vas_101-hdrPill.vas_101-tone-info    { background: var(--ic-info-bg);    color: var(--ic-info-tx); }
+.vas_101-hdrPill.vas_101-tone-success { background: var(--ic-success-bg); color: var(--ic-success-tx); }
+.vas_101-hdrPill.vas_101-tone-warning { background: var(--ic-warning-bg); color: var(--ic-warning-tx); }
+.vas_101-hdrPill.vas_101-tone-risk    { background: var(--ic-risk-bg);    color: var(--ic-risk-tx); }
+.vas_101-hdrPill.vas_101-tone-neutral { background: var(--ic-neutral-bg); color: var(--ic-neutral-tx); }
+
+.vas_101-hdrPill .vas_101-ic { color: currentColor; }
+
+.vas_101-hdrDot {
+    width: 0.5em;
+    height: 0.5em;
+    border-radius: 50%;
+    background: currentColor;
+    flex: none;
+}
+
+/* ----------------------------------------------------------- */
+/*  Header — details card (warehouse | document)               */
+/* ----------------------------------------------------------- */
+/* Identity takes 40% of the card; the fields take the rest and run two across,
+   so short fields sit in rows instead of stacking into a tall column that
+   leaves the identity half empty. */
+.vas_101-hdrCard {
+    display: grid;
+    grid-template-columns: 40% minmax(0, 1fr);
+    gap: 0.875em 1.75em;
+    border: 1px solid var(--ic-card-bd);
+    border-radius: var(--ic-card-radius);
+    background: #fff;
+    padding: 0.875em 1em;
+}
+
+.vas_101-hdrColL { min-width: 0; border-right: 1px solid var(--ic-row-div); padding-right: 1.25em; }
+
+.vas_101-hdrColR {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75em 1.5em;
+    align-content: start;
+}
+
+.vas_101-hdrField { min-width: 0; }
+
+.vas_101-fLabel {
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--ic-muted);
+    line-height: 1.3;
+}
+
+.vas_101-fVal {
+    font-size: 0.8125em;
+    font-weight: 700;
+    color: var(--ic-text);
+    line-height: 1.35;
+    margin-top: 0.125em;
+    overflow-wrap: break-word;   /* a long value wraps instead of being clipped */
+}
+.vas_101-fVal.vas_101-is-link { color: var(--ic-link); }
+
+@container (max-width: 460px) {
+    .vas_101-hdrCard { grid-template-columns: minmax(0, 1fr); }
+    .vas_101-hdrColL { border-right: none; padding-right: 0; border-bottom: 1px solid var(--ic-row-div); padding-bottom: 0.75em; }
+    /* Two field columns are too cramped this narrow — back to a single stack. */
+    .vas_101-hdrColR { grid-template-columns: minmax(0, 1fr); }
+    .vas_101-hdrTop  { flex-direction: column; }
+    .vas_101-hdrPills { justify-content: flex-start; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Warehouse identity                                          */
+/* ----------------------------------------------------------- */
+.vas_101-vendName {
+    font-size: 0.9375em;
+    font-weight: 700;
+    color: var(--ic-text);
+    margin-top: 0.1875em;
+}
+
+.vas_101-vendContact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375em 1.125em;
+    font-size: 0.75em;
+    color: var(--ic-text);
+    margin-top: 0.375em;
+}
+.vas_101-contactBit { display: inline-flex; align-items: center; gap: 0.4375em; }
+.vas_101-contactBit .vas_101-ic { color: var(--ic-action); }
+
+/* ----------------------------------------------------------- */
+/*  Snapshot (KPI metric grid)                                  */
+/* ----------------------------------------------------------- */
+.vas_101-snap {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75em;
+}
+
+.vas_101-metric {
+    min-width: 0;
+    border: 1px solid var(--ic-card-bd);
+    border-left: 3px solid var(--ic-neutral-tx);
+    border-radius: var(--ic-card-radius);
+    background: #fff;
+    padding: 0.75em 0.875em;
+}
+
+.vas_101-metric.vas_101-tone-total    { border-left-color: var(--ic-info-tx); }
+.vas_101-metric.vas_101-tone-short    { border-left-color: var(--ic-risk-tx); }
+.vas_101-metric.vas_101-tone-excess   { border-left-color: #E08A1E; }
+.vas_101-metric.vas_101-tone-variance { border-left-color: #E08A1E; }
+.vas_101-metric.vas_101-tone-lines    { border-left-color: var(--ic-neutral-tx); }
+
+.vas_101-mHead {
+    display: flex;
+    align-items: center;
+    gap: 0.375em;
+    margin-bottom: 0.375em;
+}
+
+.vas_101-mLabel {
+    min-width: 0;
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--ic-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas_101-metric.vas_101-tone-total    .vas_101-mHead .vas_101-ic { color: var(--ic-info-tx); }
+.vas_101-metric.vas_101-tone-short    .vas_101-mHead .vas_101-ic { color: var(--ic-risk-tx); }
+.vas_101-metric.vas_101-tone-excess   .vas_101-mHead .vas_101-ic { color: #E08A1E; }
+.vas_101-metric.vas_101-tone-variance .vas_101-mHead .vas_101-ic { color: #E08A1E; }
+.vas_101-metric.vas_101-tone-lines    .vas_101-mHead .vas_101-ic { color: var(--ic-neutral-tx); }
+
+.vas_101-mVal {
+    font-size: 1.25em;
+    font-weight: 700;
+    color: var(--ic-text);
+    line-height: 1.15;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_101-metric.vas_101-tone-short  .vas_101-mVal { color: var(--ic-risk-tx); }
+.vas_101-metric.vas_101-tone-excess .vas_101-mVal { color: #9A6500; }
+
+.vas_101-mSub {
+    font-size: 0.6875em;
+    color: var(--ic-muted);
+    margin-top: 0.25em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@container (max-width: 620px) {
+    .vas_101-snap { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container (max-width: 340px) {
+    .vas_101-snap { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ----------------------------------------------------------- */
+/*  Status summary cards (Matched / Short / Excess / Lines)     */
+/* ----------------------------------------------------------- */
+.vas_101-status {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75em;
+}
+
+.vas_101-statCard {
+    min-width: 0;
+    border: 1px solid var(--ic-card-bd);
+    border-radius: var(--ic-card-radius);
+    background: #FBFDFF;
+    padding: 0.625em 0.75em;
+    text-align: center;
+}
+.vas_101-statVal { font-size: 1.25em; font-weight: 700; line-height: 1.1; color: var(--ic-text); }
+/* A money figure carries a currency token and two decimals, so it is far longer
+   than a line count — at the count cards' size it would wrap inside its own
+   card. It takes a notch less and clips to one line, with the full figure on the
+   element's tooltip. */
+.vas_101-statVal.vas_101-statVal-amt {
+    font-size: 1em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_101-statLbl { font-size: 0.6875em; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; color: var(--ic-muted); margin-top: 0.25em; }
+
+.vas_101-statCard.vas_101-tone-match  .vas_101-statVal { color: var(--ic-success-tx); }
+.vas_101-statCard.vas_101-tone-short  .vas_101-statVal { color: var(--ic-risk-tx); }
+.vas_101-statCard.vas_101-tone-excess .vas_101-statVal { color: #9A6500; }
+
+@container (max-width: 620px) {
+    .vas_101-status { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container (max-width: 340px) {
+    .vas_101-status { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ----------------------------------------------------------- */
+/*  Count timeline (3-node stepper)                             */
+/* ----------------------------------------------------------- */
+.vas_101-stepper {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+}
+
+.vas_101-step {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.vas_101-stepRail {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.vas_101-stepLine {
+    flex: 1 1 auto;
+    height: 2px;
+    background: #D9E6F2;
+}
+.vas_101-step:first-child .vas_101-stepLine-l,
+.vas_101-step:last-child  .vas_101-stepLine-r { visibility: hidden; }
+
+.vas_101-step.vas_101-is-done   .vas_101-stepLine-r,
+.vas_101-step.vas_101-is-done   .vas_101-stepLine-l,
+.vas_101-step.vas_101-is-active .vas_101-stepLine-l { background: #67B98A; }
+
+.vas_101-stepDot {
+    flex: none;
+    width: 2em;
+    height: 2em;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8125em;
+    font-weight: 700;
+    line-height: 1;
+    background: #EEF2F6;
+    color: #8A99A8;
+    border: 1.5px solid #DCE5EE;
+}
+.vas_101-stepDot .vas_101-ic { display: inline-flex; }
+
+.vas_101-step.vas_101-is-done .vas_101-stepDot {
+    background: #E4F3EC;
+    color: #1F9D5B;
+    border-color: #BFE6D2;
+}
+.vas_101-step.vas_101-is-active .vas_101-stepDot {
+    background: #fff;
+    color: #E08A1E;
+    border: 2px solid #F0A93D;
+}
+
+.vas_101-stepLabel {
+    margin-top: 0.5em;
+    text-align: center;
+    padding: 0 0.25em;
+    min-width: 0;
+}
+
+/* A stage name is a single unbreakable word ("Completed", "Counted"). The step
+   is allowed to shrink (min-width:0), so without a break inside the word the
+   label paints over the stage beside it; without the shrink it would set the
+   stepper's floor and push the panel sideways instead. Breaking inside the word
+   keeps every stage on one rail at any panel width or zoom level. */
+.vas_101-stepTitle {
+    font-size: 0.8125em;
+    font-weight: 700;
+    color: var(--ic-text);
+    overflow-wrap: anywhere;
+}
+
+.vas_101-stepMeta {
+    font-size: 0.6875em;
+    color: var(--ic-muted);
+    margin-top: 0.25em;
+    overflow-wrap: anywhere;
+}
+.vas_101-step.vas_101-is-active .vas_101-stepMeta { color: #E08A1E; font-weight: 600; }
+
+/* ----------------------------------------------------------- */
+/*  Segmented filter (All lines / Variances only)              */
+/* ----------------------------------------------------------- */
+.vas_101-seg {
+    flex: none;
+    display: inline-flex;
+    border: 1px solid #BFE4FF;
+    border-radius: 999px;
+    overflow: hidden;
+}
+.vas_101-seg button {
+    border: none;
+    background: #fff;
+    color: var(--ic-link);
+    font-family: inherit;
+    font-size: 0.6875em;
+    font-weight: 700;
+    padding: 0.4375em 0.875em;
+    cursor: pointer;
+}
+.vas_101-seg button.vas_101-on { background: var(--ic-info-bg); color: var(--ic-info-tx); }
+
+/* ----------------------------------------------------------- */
+/*  Count line table                                           */
+/* ----------------------------------------------------------- */
+.vas_101-table {
+    border: 1px solid var(--ic-card-bd);
+    border-radius: var(--ic-card-radius);
+    background: #fff;
+    overflow: hidden;
+}
+
+.vas_101-tRow {
+    display: grid;
+    align-items: center;
+    gap: 0.625em;
+    padding: 0.625em 0.875em;
+    /* On Hand (3rd) is a notch wider than the quantity columns beside it: it
+       carries the base unit's name after the figure, where they carry a figure
+       alone. Every track is minmax(0, Nfr) so a long value clips inside its own
+       column instead of widening the track and pushing the right-hand columns
+       out of the frame. */
+    grid-template-columns:
+        minmax(0, 2.4fr) minmax(0, 0.7fr) minmax(0, 1.15fr) minmax(0, 0.9fr)
+        minmax(0, 0.9fr) minmax(0, 1.1fr) minmax(0, 0.9fr);
+}
+
+/* Cells clip inside their own track rather than widening it — the counterpart to
+   the minmax(0, Nfr) tracks above. The item cell's children carry their own
+   ellipsis, so it is unharmed by the clip. */
+.vas_101-tRow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.vas_101-tHead > span,
+.vas_101-tRow > span.vas_101-ta-r,
+.vas_101-tRow > span.vas_101-ta-c { white-space: nowrap; }
+
+.vas_101-tHead {
+    background: #F5F8FB;
+    border-bottom: 1px solid var(--ic-card-bd);
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+    color: var(--ic-muted);
+}
+
+.vas_101-tBody {
+    border-bottom: 1px solid var(--ic-row-div);
+    font-size: 0.8125em;
+    color: var(--ic-text);
+}
+.vas_101-tBody:last-of-type { border-bottom: none; }
+.vas_101-tBody:hover { background: #FAFCFE; }
+
+/* The base unit named after the On Hand figure. Muted and a size down, so the
+   quantity still reads first and the unit qualifies it. */
+.vas_101-baseUom {
+    margin-left: 0.3125em;
+    color: var(--ic-muted);
+    font-size: 0.9231em;
+    font-weight: 400;
+}
+
+.vas_101-table .vas_101-ta-r { text-align: right; justify-content: flex-end; }
+.vas_101-table .vas_101-ta-c { text-align: center; justify-content: center; }
+
+.vas_101-itItem { min-width: 0; }
+.vas_101-itName {
+    font-size: 1.0769em;
+    font-weight: 700;
+    color: var(--ic-text);
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_101-itSku {
+    font-size: 0.9231em;
+    color: var(--ic-muted);
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* Attribute Set Instance (lot / serial / size ...), directly under the product
+   name — the attribute qualifies WHICH stock was counted. Darker than the
+   search-key / locator line below it: it identifies the goods, where that only
+   locates them. */
+.vas_101-itAttr {
+    font-size: 0.9231em;
+    color: var(--ic-sub, var(--ic-text));
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Signed variance cell */
+.vas_101-var { font-weight: 700; }
+.vas_101-var.vas_101-short  { color: var(--ic-risk-tx); }
+.vas_101-var.vas_101-excess { color: #9A6500; }
+.vas_101-var.vas_101-match  { color: var(--ic-muted); font-weight: 500; }
+
+/* Status tag */
+.vas_101-tag {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.1875em 0.5em;
+    font-size: 0.9231em;
+    font-weight: 700;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+.vas_101-tag.vas_101-s-match  { background: var(--ic-success-bg); color: var(--ic-success-tx); }
+.vas_101-tag.vas_101-s-short  { background: var(--ic-risk-bg);    color: var(--ic-risk-tx); }
+.vas_101-tag.vas_101-s-excess { background: var(--ic-warning-bg); color: var(--ic-warning-tx); }
+
+.vas_101-tEmpty {
+    padding: 1.25em 0.875em;
+    text-align: center;
+    font-size: 0.8125em;
+    color: var(--ic-muted);
+    border-bottom: 1px solid var(--ic-row-div);
+}
+
+/* Totals footer */
+.vas_101-tFoot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 1.375em;
+    padding: 0.6875em 0.875em;
+    background: #F5F8FB;
+    border-top: 1px solid var(--ic-card-bd);
+    font-size: 0.8125em;
+}
+.vas_101-tf { color: var(--ic-muted); }
+.vas_101-tf b { color: var(--ic-text); font-weight: 700; margin-left: 0.375em; }
+.vas_101-tf.vas_101-is-grand { color: var(--ic-text); font-weight: 700; }
+.vas_101-tf.vas_101-is-grand b { color: var(--ic-action); margin-left: 0.5em; font-size: 1.15em; }
+
+/* A narrow panel SHRINKS the table; it never scrolls it sideways. Under 620px
+   the rows used to take a floor width and the card its own horizontal
+   scrollbar, which hides the right-hand columns behind a control the reader has
+   to find and drag. Every track is minmax(0, Nfr) and every cell carries
+   min-width: 0 with an ellipsis, so the columns compress instead and a clipped
+   value stays readable through the row's tooltip. */
+
+/* ----------------------------------------------------------- */
+/*  Related Documents                                           */
+/* ----------------------------------------------------------- */
+/* Reuses the count table's frame with one full-width track: the section lists
+   documents, not columns of figures. */
+.vas_101-docRow {
+    display: flex; align-items: center; gap: 0.625em;
+    padding: 0.625em 0.875em; min-width: 0;
+}
+.vas_101-docItem { display: flex; align-items: center; gap: 0.5em; min-width: 0; flex: 1; }
+.vas_101-docTxt { min-width: 0; flex: 1; }
+/* A whole row is clickable — the open arrow and the identifier tint on hover. */
+.vas_101-docRow.vas_101-is-link { cursor: pointer; }
+.vas_101-docRow.vas_101-is-link:hover { background: #F2F8FD; }
+.vas_101-docRow.vas_101-is-link .vas_101-docItem > .vas_101-ic:last-child { color: var(--ic-muted); flex: none; }
+.vas_101-docRow.vas_101-is-link:hover .vas_101-docItem > .vas_101-ic:last-child,
+.vas_101-docRow.vas_101-is-link:hover .vas_101-itName { color: var(--ic-action); }
+
+/* ----------------------------------------------------------- */
+/*  Notes                                                       */
+/* ----------------------------------------------------------- */
+.vas_101-textCard {
+    border: 1px solid var(--ic-card-bd); border-radius: var(--ic-card-radius);
+    background: #fff; padding: 0.875em 1em;
+    font-size: 0.8125em; color: var(--ic-text); line-height: 1.55;
+}
+.vas_101-textCard p { margin: 0; white-space: pre-wrap; word-break: break-word; }
+.vas_101-textCard p + p { margin-top: 0.625em; }
+/* Caption above a LINE's own note ("Line 10 — Steel Bolt M8"), so a reader knows
+   which row it annotates. */
+.vas_101-noteLbl {
+    margin-top: 0.875em; font-size: 0.8462em; font-weight: 700; letter-spacing: .3px;
+    text-transform: uppercase; color: var(--ic-muted); line-height: 1.3;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vas_101-noteLbl + p { margin-top: 0.1875em; }
+.vas_101-textCard > .vas_101-noteLbl:first-child { margin-top: 0; }
+
+/* ----------------------------------------------------------- */
+/*  Activity                                                    */
+/* ----------------------------------------------------------- */
+.vas_101-actList {
+    border: 1px solid var(--ic-card-bd); border-radius: var(--ic-card-radius);
+    background: #fff; padding: 0 0.875em;
+}
+/* A wrapping flex row: the badge, the headline, then "when · by whom" held right
+   by margin-left:auto — which keeps its place when the row wraps on a narrow
+   panel. */
+.vas_101-actRow {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 0.25em 0.625em;
+    padding: 0.5625em 0; border-bottom: 1px solid var(--ic-row-div); font-size: 0.8125em;
+}
+.vas_101-actRow:last-child { border-bottom: none; }
+.vas_101-actTag {
+    display: inline-flex; align-items: center; gap: 0.375em; flex: none;
+    border-radius: 999px; padding: 0.25em 0.625em;
+    font-size: 0.8462em; font-weight: 700; line-height: 1.2; white-space: nowrap;
+}
+.vas_101-actTag .vas_101-ic { color: currentColor; }
+/* Tag tones. Scoped to the tag so they cannot collide with the header pill's own
+   .vas_101-tone-* rules, which are scoped the same way. */
+.vas_101-actTag.vas_101-tone-neutral { background: var(--ic-neutral-bg); color: var(--ic-neutral-tx); }
+.vas_101-actTag.vas_101-tone-info    { background: var(--ic-info-bg);    color: var(--ic-info-tx); }
+.vas_101-actTag.vas_101-tone-success { background: var(--ic-success-bg); color: var(--ic-success-tx); }
+.vas_101-actTag.vas_101-tone-warning { background: var(--ic-warning-bg); color: var(--ic-warning-tx); }
+.vas_101-actTag.vas_101-tone-risk    { background: var(--ic-risk-bg);    color: var(--ic-risk-tx); }
+.vas_101-actTag.vas_101-tone-purple  { background: #EFEAFF;              color: #5F4AA6; }
+.vas_101-actTitle { flex: 1 1 auto; min-width: 0; color: var(--ic-text); overflow: hidden; }
+.vas_101-actLead { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A NOTE's headline is the comment itself: it wraps (to three lines) rather than
+   ellipsising, since that text is what the reader came for. */
+.vas_101-actLead.vas_101-multiline {
+    white-space: normal; overflow-wrap: break-word; word-break: break-word; line-height: 1.45;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+}
+.vas_101-actWhen {
+    flex: none; margin-left: auto; max-width: 100%; text-align: right;
+    color: var(--ic-muted); font-size: 0.9231em; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ---- Activity: e-mail rows ---- */
+/* The recipient line under an e-mail's subject. It WRAPS rather than clipping:
+   it lists the mail's addresses in full, and an address cut off mid-domain
+   identifies nobody. break-word, since a single long address has no space to
+   break at. */
+.vas_101-actSub {
+    display: block; font-size: 0.8462em; color: var(--ic-muted); margin-top: 0.125em;
+    white-space: normal; overflow-wrap: break-word; word-break: break-word; line-height: 1.45;
+}
+
+/* ---- Activity: field-change rows ---- */
+/* "was X → now Y" under the field's name. The two values are what the reader
+   came for, so they carry the row's colour while the arrow between them stays
+   muted; both wrap rather than clip, since a truncated value is no value. */
+.vas_101-actDelta {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25em 0.375em;
+}
+.vas_101-cvOld {
+    color: var(--ic-muted);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+    overflow-wrap: break-word; word-break: break-word;
+}
+.vas_101-cvArrow { flex: none; color: var(--ic-muted); }
+.vas_101-cvNew {
+    color: var(--ic-text); font-weight: 700;
+    overflow-wrap: break-word; word-break: break-word;
+}
+.vas_101-actRow.vas_101-is-openable { cursor: pointer; }
+.vas_101-actRow.vas_101-is-openable:hover { background: #F7FBFE; }
+.vas_101-actCaret {
+    display: inline-flex; align-items: center; flex: none;
+    color: var(--ic-muted); transition: transform .15s ease;
+}
+.vas_101-actRow.vas_101-is-open .vas_101-actCaret {
+    transform: rotate(90deg); color: var(--ic-action);
+}
+/* The message body, revealed under its row. */
+.vas_101-actBody {
+    background: #F7FAFD; border-bottom: 1px solid var(--ic-row-div);
+    padding: 0.625em 0.875em 0.75em 2.5em;
+    font-size: 0.8125em; color: var(--ic-text); line-height: 1.55;
+}
+.vas_101-actBody p { margin: 0; white-space: pre-wrap; word-break: break-word; }
+/* From / To / Cc / Bcc heading the opened message — wraps on the address, for
+   the same reason the row's recipient line does. */
+.vas_101-actMeta {
+    font-size: 0.8462em; color: var(--ic-muted); margin-bottom: 0.3125em;
+    overflow-wrap: break-word; word-break: break-word;
+}
+
+/* Activity pager — a sibling of the list card, so the controls keep their place
+   while the card's rows are replaced underneath them. */
+.vas_101-pager {
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+    gap: 0.5em 0.875em; margin-top: 0.5625em; font-size: 0.75em; color: var(--ic-muted);
+}
+.vas_101-pgCtrls { display: inline-flex; align-items: center; gap: 0.5em; }
+.vas_101-pgPos { color: var(--ic-text); font-weight: 700; }
+.vas_101-pgBtn {
+    display: inline-flex; align-items: center; gap: 0.3125em;
+    border: 1px solid var(--ic-card-bd); border-radius: 999px;
+    padding: 0.25em 0.625em; background: #fff; color: var(--ic-text);
+    font-weight: 700; line-height: 1; cursor: pointer; user-select: none; white-space: nowrap;
+}
+.vas_101-pgBtn:hover { background: var(--ic-info-bg); border-color: var(--ic-action); }
+.vas_101-pgBtn.vas_101-is-disabled {
+    opacity: .45; cursor: default; pointer-events: none; color: var(--ic-muted);
+}
+
+/* Toast (record-open feedback) */
+.vas_101-toast {
+    position: absolute; left: 50%; bottom: 1em; transform: translate(-50%, 0.75em);
+    max-width: 90%; padding: 0.5em 0.875em; border-radius: 8px;
+    background: #102C3F; color: #fff; font-size: 0.8125em; line-height: 1.4;
+    box-shadow: 0 6px 18px rgba(16,44,63,0.25);
+    opacity: 0; z-index: 1000; pointer-events: none;
+    transition: opacity .25s ease, transform .25s ease;
+}
+.vas_101-toast.vas_101-show { opacity: 1; transform: translate(-50%, 0); }
+.vas_101-toast.vas_101-err  { background: #B23636; }
+.vas_101-toast.vas_101-ok   { background: #0C5D38; }
+
+/* ----------------------------------------------------------- */
+/*  Actions (visual buttons) — no longer rendered               */
+/* ----------------------------------------------------------- */
+/* The Complete / Post adjustments buttons are gone from the panel, so
+   .vas_101-actions and the .vas_101-btn family style nothing now. They are left
+   in place: .vas_101-is-disabled is shared with the pager above, and these are
+   the panel's only record of its own control styling should an action return. */
+.vas_101-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.625em;
+    padding-top: 0.125em;
+}
+
+.vas_101-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4375em;
+    height: 2.25em;
+    padding: 0 1.125em;
+    border-radius: 999px;
+    font-size: 0.8125em;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    user-select: none;
+}
+.vas_101-btn .vas_101-ic { color: currentColor; }
+
+.vas_101-btn.vas_101-btn-pri {
+    background: var(--ic-action);
+    border: 1px solid var(--ic-action);
+    color: #fff;
+}
+.vas_101-btn.vas_101-btn-pri:hover { background: var(--ic-action-dk); border-color: var(--ic-action-dk); }
+
+.vas_101-btn.vas_101-btn-sec {
+    background: #fff;
+    border: 1px solid var(--ic-action);
+    color: var(--ic-action);
+}
+.vas_101-btn.vas_101-btn-sec:hover { background: var(--ic-info-bg); }
+
+.vas_101-btn.vas_101-is-disabled {
+    background: #F1F4F7;
+    border-color: #DCE5EE;
+    color: #A6B2BD;
+    cursor: default;
+    pointer-events: none;
+}
+
+/* ----------------------------------------------------------- */
+/*  RTL                                                         */
+/* ----------------------------------------------------------- */
+[dir="rtl"] .vas_101-hdrColL { border-right: none; border-left: 1px solid var(--ic-row-div); padding-right: 0; padding-left: 1.25em; }
+[dir="rtl"] .vas_101-table .vas_101-ta-r { text-align: left; justify-content: flex-start; }
+[dir="rtl"] .vas_101-tFoot { justify-content: flex-start; }
+[dir="rtl"] .vas_101-tf b { margin-left: 0; margin-right: 0.375em; }
+[dir="rtl"] .vas_101-tf.vas_101-is-grand b { margin-left: 0; margin-right: 0.5em; }
+[dir="rtl"] .vas_101-actions { justify-content: flex-start; }
+
+/* Each e-mail sent against an appointment or task, inside that row's drawer.
+   The second and later ones are ruled off, so several notices about the same
+   meeting do not read as one long message. */
+.vas_101-actMailSplit {
+    margin-top: 0.625em;
+    padding-top: 0.625em;
+    border-top: 1px solid var(--ic-card-bd);
+}

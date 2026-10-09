@@ -1,0 +1,1398 @@
+﻿/************************************************************
+ * Module Name : VAS
+ * Purpose     : Styles for the Delivery Order (DO) Overview tab panel
+ *               (VAS.VAS_100_OverviewDO). All classes are panel-prefixed
+ *               (vas_100-*) and scoped under the panel root to avoid global
+ *               collisions. Shares the Onfinity windows-and-panels em-anchored
+ *               body language with VAS_099_OverviewGRN / VAS_092 — Roboto,
+ *               white surfaces, soft blue borders, KPI tiles with accent rails,
+ *               pastel stepper and a flat line table.
+ * Chronological development:
+ *   VAI163   2026-07-06  Created
+ *   VAI163   2026-07-17  Header title strip is now untinted (gradient dropped),
+ *                        matching VAS_106_OverviewSalesOrder.
+ *   VAI163   2026-07-17  Header identity card aligned to VAS_106: 1.4fr/1fr
+ *                        columns with a divider between them (stacking to a
+ *                        bottom rule when narrow), plus its RTL mirror.
+ *   VAI163   2026-07-31  Header aligned to the VAS_092 Purchase Order Overview
+ *                        standard: details card is 40%/1fr (was 1.4fr/1fr) and
+ *                        its field column (-hdrColR) is a two-across grid
+ *                        instead of a single tall stack, collapsing to one
+ *                        column under 460px. Field values wrap rather than
+ *                        ellipsis-truncate now that the column is narrower.
+ *   VAI163   2026-08-05  Class prefix renamed MPC-vasdo- -> vas_100- so the panel's
+ *                        styles cannot collide with another panel's.
+ *   VAI163   2026-08-07  Modifier classes that were still written bare
+ *                        (.is-link, .ta-r, .full, .tone-*, .btn-*) now carry
+ *                        the vas_100- prefix too. Sharing a name with a
+ *                        base-theme rule meant the base design won and
+ *                        repainted the panel; scoping them to the panel ends
+ *                        that.
+ *   VAI163   2026-08-13  Identity column now carries the customer detail fields
+ *                        (-custFields grid) instead of the vehicle / tracking
+ *                        contact bits, which moved to the field column with the
+ *                        rest of the dispatch and shipping-method fields; the
+ *                        -vendContact / -contactBit rules went with them.
+ *   VAI163   2026-08-13  Added the Reference chip strip (.vas_100-genfrom /
+ *                        .vas_100-chip / .vas_100-pill) and the record-open
+ *                        toast (.vas_100-toast), both ported from VAS_092.
+ *                        The action-button rules (.vas_100-actions /
+ *                        .vas_100-btn*) went with the buttons they styled.
+ *                        Snapshot tiles hold their wide four-across row only
+ *                        from 700px (was 620px) and use minmax(0, 1fr) tracks,
+ *                        so the single-record view breaks them into two rows of
+ *                        two instead of crushing four onto one line — the
+ *                        VAS_099 GRN behaviour.
+ *   VAI163   2026-08-13  Added the lines pager (.vas_100-pager / -pgRange /
+ *                        -pgCtrls / -pgPos / -pgBtn, plus its RTL chevron
+ *                        mirror), modelled on the VAS_106 pager, and the Notes
+ *                        card (.vas_100-noteCard) for the entered description.
+ *   VAI163   2026-08-14  - The Product / Service cell's third and fourth lines:
+ *                          .vas_100-itAttr (the attributes, a notch darker than
+ *                          the code line — it qualifies WHICH stock went out) and
+ *                          .vas_100-itDrop (drop shipment, muted while it reads
+ *                          "No" and taking the accent via .vas_100-is-drop when
+ *                          it reads "Yes").
+ *                        - Added the Documents table (.vas_100-docRow / -docItem
+ *                          / -docTxt, rows clickable via .vas_100-is-link) and
+ *                          the Activity feed (.vas_100-actList / -actRow /
+ *                          -actTag with its own .vas_100-tone-* set / -actTitle /
+ *                          -actLead / -actSub / -actWhen, the openable row and
+ *                          its caret / body / meta). The status tag gained the
+ *                          tone-* vocabulary the Documents rows need, where the
+ *                          line table's own tag has only Full / Partial / Short.
+ *                        - The pager fits itself to the panel rather than
+ *                          wrapping onto a second line: under 520px the
+ *                          "Showing a-b of N" caption goes and the controls take
+ *                          the row alone, under 360px the button labels go and
+ *                          the chevrons stand by themselves. In the single-record
+ *                          view the controls used to drop below the caption,
+ *                          putting the buttons furthest from the table.
+ *   VAI163   2026-08-14  Quality confirmation, ported from VAS_099:
+ *                        - The snapshot runs THREE-up under .vas_100-has-qc, so
+ *                          the set forms even rows once the two confirmation
+ *                          cards join it, and gained the tone accents those cards
+ *                          need (-quality / -accepted / -rejected).
+ *                        - The line table takes a seventh track for the Quality
+ *                          column under .vas_100-has-q — added only when a line
+ *                          actually has QA parameters, so the table reserves no
+ *                          room for a column that is not drawn. The item column
+ *                          gives up the width.
+ *                        - Added the line marker (.vas_100-qMark / -q-on / -q-off),
+ *                          the expand caret (.vas_100-qpToggle, rotating 90deg
+ *                          when open) and the parameter drawer
+ *                          (.vas_100-qpDrawer / -qpNote / -qpMini / -qpMiniRow /
+ *                          -qpMiniHead / -qpName), a full-width SIBLING of the
+ *                          line row so it is not trapped in one grid cell, plus
+ *                          the verdict pills (.vas_100-q-pass / -q-fail / -q-wait).
+ *   VAI163   2026-08-14  - The customer block takes the Sales Order overview's
+ *                          shape: labelled address lines (.vas_100-addrLabel /
+ *                          -addrVal, each inside the existing .vas_100-vendAddr)
+ *                          and the contact as a row of icon-led bits
+ *                          (.vas_100-custContact / -contactBit) rather than three
+ *                          labelled field boxes.
+ *                        - Added .vas_100-shipCard: the new Shipment Details
+ *                          section reuses .vas_100-hdrCard wholesale so it reads
+ *                          as part of the same panel, and only has to drop the
+ *                          top margin, its own section heading providing the
+ *                          spacing above it.
+ *   VAI163   2026-08-17  - The data tables SHRINK to the panel instead of taking
+ *                          their own horizontal scrollbar: the rows' floor
+ *                          widths and the card's overflow-x are gone. A
+ *                          scrollbar inside a card hides the columns it pushes
+ *                          out — it has to be found and dragged before it says
+ *                          anything is there — where a compressed column is
+ *                          visibly present and keeps its ellipsis and tooltip.
+ *                        - Added the Activity field-change delta
+ *                          (.vas_100-actDelta / -cvOld / -cvArrow / -cvNew):
+ *                          "was X → now Y" under the field's name, the old
+ *                          value struck through and the new one carrying the
+ *                          row's colour. Matches VAS_101 / VAS_104.
+ *   VAI163   2026-08-20  The Quality track floors at min-content rather than 0.
+ *                        Its cells hold a tick, but its HEADING holds the word
+ *                        "Quality", and at minmax(0, 0.7fr) — the narrowest track
+ *                        in the row — the word was cut off by the table's own
+ *                        overflow, so the one column whose label explains what
+ *                        its marks MEAN was the one column that could not be
+ *                        read. min-content is the width of the longest
+ *                        unbreakable word in the column, so the heading fits in
+ *                        any language and the track still flexes above it.
+ *   VAI163   2026-08-21  Nothing overlaps anything at any zoom level. The delivery
+ *                        table had minmax(0, Nfr) tracks but no cell rule, which
+ *                        is only half the fix: a grid ITEM keeps min-width:auto —
+ *                        its own content-based minimum — so a cell stayed as wide
+ *                        as its text and printed over the column beside it even
+ *                        though the track underneath had compressed. Cells now
+ *                        carry min-width:0 with overflow:hidden. Stage labels
+ *                        break inside their word (overflow-wrap) so a shrunken
+ *                        step cannot paint over its neighbour, and the header /
+ *                        customer grids took the minmax floor.
+ *   VAI163   2026-09-15  Single-record (narrow) view:
+ *                        - The Activity row is a GRID: tag | headline | stamp
+ *                          [| caret] on the first line and the sub-lines
+ *                          (.vas_100-actSubs) on a second spanning to the row's
+ *                          right edge. As a wrapping flex row the sub-lines
+ *                          lived inside the headline's cell, which is only as
+ *                          wide as the stamp and caret leave it, so an e-mail's
+ *                          recipient list wrapped into a tall, narrow column
+ *                          beside an empty right half of the row. Under 620px
+ *                          the headline keeps a third of the row; under 440px
+ *                          the stamp drops to its own line.
+ *                        - The line table under 560px wraps its headings instead
+ *                          of ellipsising them ("ORDER…", "DELIVER…"), drops the
+ *                          Delivered mini bar, tightens its gaps and lets a value
+ *                          break at a space, and the Line Value track grows at
+ *                          the item column's expense — "₹ 3,000…" lost the one
+ *                          figure the row states.
+ ***********************************************************/
+
+.vas_100-root {
+    /* Canonical palette */
+    --do-text:        #102C3F;
+    --do-muted:       #5F7283;
+    --do-sub:         #41576A;
+    --do-action:      #0083DA;
+    --do-action-dk:   #005FA3;
+    --do-link:        #106AB0;
+    --do-card-bd:     #D9E2EB;
+    --do-row-div:     #E2EAF1;
+    --do-card-radius: 12px;
+    /* Semantic tones */
+    --do-info-bg:     #EAF8FF;  --do-info-tx:    #0083DA;
+    --do-success-bg:  #E9F6EE;  --do-success-tx: #0B6B45;
+    --do-warning-bg:  #FFF6E2;  --do-warning-tx: #9A6500;
+    --do-risk-bg:     #FCEFEF;  --do-risk-tx:    #D14545;
+    --do-purple-bg:   #EFEEFF;  --do-purple-tx:  #5F4AA6;
+    --do-neutral-bg:  #EEF1F4;  --do-neutral-tx: #5F7283;
+
+    position: relative;
+    height: 100%;
+    overflow-y: auto;
+    color: var(--do-text);
+    font-family: Roboto, "Segoe UI", Arial, sans-serif;
+    container-type: inline-size;
+    box-sizing: border-box;
+}
+
+.vas_100-root * { box-sizing: border-box; }
+
+.vas_100-body {
+    font-size: clamp(15px, 2.8cqi, 17px);
+    padding: 1.125em 0.875em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875em;
+}
+
+.vas_100-empty {
+    padding: 40px 18px;
+    text-align: center;
+    color: var(--do-muted);
+    font-size: 0.875em;
+}
+
+/* ----------------------------------------------------------- */
+/*  Section + Section Header                                    */
+/* ----------------------------------------------------------- */
+.vas_100-sec { display: block; }
+
+.vas_100-secHead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75em;
+    margin-bottom: 0.5em;
+}
+
+.vas_100-secTitle {
+    font-size: 1em;
+    font-weight: 700;
+    color: var(--do-text);
+    margin: 0;
+    line-height: 1.2;
+}
+
+.vas_100-secSummary {
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--do-muted);
+    flex: none;
+}
+
+/* ----------------------------------------------------------- */
+/*  Icon wrapper                                               */
+/* ----------------------------------------------------------- */
+.vas_100-ic { display: inline-flex; align-items: center; flex: none; }
+.vas_100-ic svg { display: block; }
+
+/* ----------------------------------------------------------- */
+/*  Header — title strip                                        */
+/* ----------------------------------------------------------- */
+.vas_100-hdr {
+    border-radius: 14px;
+    padding: 0.875em 1em;
+}
+
+.vas_100-hdrTop {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.875em;
+}
+
+.vas_100-hdrTitleWrap { min-width: 0; }
+
+.vas_100-hdrTitle {
+    font-size: 1.25em;
+    font-weight: 700;
+    color: var(--do-text);
+    line-height: 1.2;
+}
+
+.vas_100-hdrSub {
+    font-size: 0.75em;
+    color: var(--do-sub);
+    margin-top: 0.3125em;
+}
+
+.vas_100-hdrPills {
+    flex: none;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5em;
+}
+
+.vas_100-hdrPill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125em;
+    border-radius: 999px;
+    padding: 0.3125em 0.625em;
+    font-size: 0.6875em;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.vas_100-hdrPill.vas_100-tone-info    { background: var(--do-info-bg);    color: var(--do-info-tx); }
+.vas_100-hdrPill.vas_100-tone-success { background: var(--do-success-bg); color: var(--do-success-tx); }
+.vas_100-hdrPill.vas_100-tone-warning { background: var(--do-warning-bg); color: var(--do-warning-tx); }
+.vas_100-hdrPill.vas_100-tone-risk    { background: var(--do-risk-bg);    color: var(--do-risk-tx); }
+.vas_100-hdrPill.vas_100-tone-purple  { background: var(--do-purple-bg);  color: var(--do-purple-tx); }
+.vas_100-hdrPill.vas_100-tone-neutral { background: var(--do-neutral-bg); color: var(--do-neutral-tx); }
+
+.vas_100-hdrPill .vas_100-ic { color: currentColor; }
+
+.vas_100-hdrDot {
+    width: 0.5em;
+    height: 0.5em;
+    border-radius: 50%;
+    background: currentColor;
+    flex: none;
+}
+
+/* ----------------------------------------------------------- */
+/*  Header — details card (customer | dispatch)                 */
+/* ----------------------------------------------------------- */
+/* Identity takes 40% of the card; the fields take the rest and run two across,
+   so short fields sit in rows instead of stacking into a tall column that
+   leaves the identity half empty. */
+.vas_100-hdrCard {
+    display: grid;
+    grid-template-columns: 40% minmax(0, 1fr);
+    gap: 0.875em 1.75em;
+    border: 1px solid var(--do-card-bd);
+    border-radius: var(--do-card-radius);
+    background: #fff;
+    padding: 0.875em 1em;
+}
+
+.vas_100-hdrColL { min-width: 0; border-right: 1px solid var(--do-row-div); padding-right: 1.25em; }
+
+.vas_100-hdrColR {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75em 1.5em;
+    align-content: start;
+}
+
+.vas_100-hdrField { min-width: 0; }
+
+.vas_100-fLabel {
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--do-muted);
+    line-height: 1.3;
+}
+
+.vas_100-fVal {
+    font-size: 0.8125em;
+    font-weight: 700;
+    color: var(--do-text);
+    line-height: 1.35;
+    margin-top: 0.125em;
+    overflow-wrap: break-word;   /* a long value wraps instead of being clipped */
+}
+.vas_100-fVal.vas_100-is-link { color: var(--do-link); }
+
+@container (max-width: 460px) {
+    .vas_100-hdrCard { grid-template-columns: minmax(0, 1fr); }
+    .vas_100-hdrColL { border-right: none; padding-right: 0; border-bottom: 1px solid var(--do-row-div); padding-bottom: 0.75em; }
+    /* Two field columns are too cramped this narrow — back to a single stack. */
+    .vas_100-hdrColR { grid-template-columns: minmax(0, 1fr); }
+    .vas_100-hdrTop  { flex-direction: column; }
+    .vas_100-hdrPills { justify-content: flex-start; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Customer identity                                           */
+/* ----------------------------------------------------------- */
+.vas_100-vendName {
+    font-size: 0.9375em;
+    font-weight: 700;
+    color: var(--do-text);
+    margin-top: 0.1875em;
+}
+
+.vas_100-vendAddr {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5em;
+    font-size: 0.75em;
+    color: var(--do-muted);
+    line-height: 1.45;
+    margin-top: 0.25em;
+}
+.vas_100-vendAddr .vas_100-ic { color: var(--do-muted); margin-top: 0.15em; }
+
+/* Bill to / Ship to each take their own line, and each is introduced by its own
+   label so the reader is never left guessing WHICH address they are looking at.
+   The label is a separate element rather than text prefixed into the address, so
+   it can carry its own weight without the address inheriting it. */
+.vas_100-addrLabel {
+    flex: none;
+    font-weight: 700;
+    color: var(--do-sub);
+}
+.vas_100-addrVal {
+    min-width: 0;
+    overflow-wrap: break-word;
+}
+
+/* The contact as one row of icon-led bits — name, phone, e-mail — rather than
+   three labelled field boxes. It reads as one person that way instead of as
+   three separate facts. Wraps rather than clipping: a phone number or an
+   address cut in half identifies nobody. */
+.vas_100-custContact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25em 0.875em;
+    margin-top: 0.5em;
+    font-size: 0.75em;
+    color: var(--do-sub);
+}
+.vas_100-contactBit {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375em;
+    min-width: 0;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+.vas_100-contactBit .vas_100-ic { flex: none; color: var(--do-action); }
+
+/* Customer detail fields under the identity line. Two across while there is
+   room — the column is already the narrower half of the card, so it drops to a
+   single stack early. */
+.vas_100-custFields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.625em 1.25em;
+    align-content: start;
+    margin-top: 0.625em;
+}
+
+@container (max-width: 620px) {
+    .vas_100-custFields { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ----------------------------------------------------------- */
+/*  Shipment Details                                            */
+/* ----------------------------------------------------------- */
+/* The header card's own layout, reused under the lines so the section reads as
+   part of the same panel rather than as a different kind of thing. It sits
+   inside a section, which already carries the heading and the spacing above it,
+   so the card only has to drop the top margin the header's copy carries. */
+.vas_100-shipCard { margin-top: 0; }
+
+/* ----------------------------------------------------------- */
+/*  Reference (Generated From chip strip)                       */
+/* ----------------------------------------------------------- */
+/* Light rounded strip carrying an uppercase caption and one chip per origin
+   document (Sales Order / Project / Reversal / RMA). */
+.vas_100-genfrom {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5em 0.875em;
+    border: 1px solid var(--do-card-bd);
+    border-radius: var(--do-card-radius);
+    background: #F6FAF6;
+    padding: 0.625em 0.75em;
+}
+
+.vas_100-gfLabel {
+    flex: none;
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--do-muted);
+}
+
+.vas_100-gfChips {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5em;
+    min-width: 0;
+}
+
+/* Chip: white pill with a leading (tinted) icon, grey label, dark value and an
+   optional trailing status pill. The chip never outgrows the strip that holds
+   it — it caps at the strip width and the value truncates inside it, so one
+   long document number cannot run past the panel edge. */
+.vas_100-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4375em;
+    max-width: 100%;
+    background: #fff;
+    border: 1px solid var(--do-card-bd);
+    border-radius: 999px;
+    padding: 0.3125em 0.5625em;
+    font-size: 0.75em;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+
+.vas_100-chip .vas_100-ic          { color: var(--do-muted); }
+.vas_100-chip.vas_100-ic-info    .vas_100-ic { color: var(--do-info-tx); }
+.vas_100-chip.vas_100-ic-success .vas_100-ic { color: var(--do-success-tx); }
+.vas_100-chip.vas_100-ic-warning .vas_100-ic { color: var(--do-warning-tx); }
+.vas_100-chip.vas_100-ic-purple  .vas_100-ic { color: var(--do-purple-tx); }
+.vas_100-chip.vas_100-ic-muted   .vas_100-ic { color: var(--do-muted); }
+
+.vas_100-chipLabel { flex: none; color: var(--do-muted); }
+.vas_100-chipVal   {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--do-text);
+    font-weight: 700;
+}
+
+/* Trailing status pill inside a chip (e.g. "Origin"). */
+.vas_100-pill {
+    flex: none;
+    border-radius: 999px;
+    padding: 0.125em 0.4375em;
+    margin-left: 0.0625em;
+    font-size: 0.9167em;
+    font-weight: 700;
+    line-height: 1.3;
+}
+.vas_100-pill.vas_100-tone-info    { background: var(--do-info-bg);    color: var(--do-info-tx); }
+.vas_100-pill.vas_100-tone-success { background: var(--do-success-bg); color: var(--do-success-tx); }
+.vas_100-pill.vas_100-tone-warning { background: var(--do-warning-bg); color: var(--do-warning-tx); }
+.vas_100-pill.vas_100-tone-purple  { background: var(--do-purple-bg);  color: var(--do-purple-tx); }
+.vas_100-pill.vas_100-tone-neutral { background: var(--do-neutral-bg); color: var(--do-neutral-tx); }
+
+/* Clickable origin chip — opens the source record. */
+.vas_100-chip.vas_100-is-link { cursor: pointer; }
+.vas_100-chip.vas_100-is-link:hover {
+    border-color: var(--do-action);
+    box-shadow: 0 0 0 1px var(--do-action) inset;
+}
+.vas_100-chip.vas_100-is-link > .vas_100-ic:last-child { color: var(--do-action); }
+
+/* ----------------------------------------------------------- */
+/*  Snapshot (metric grid)                                      */
+/* ----------------------------------------------------------- */
+/* minmax(0, 1fr), not 1fr: a long amount in one tile must not widen its track
+   and push the row past the panel. */
+.vas_100-snap {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75em;
+}
+
+.vas_100-metric {
+    min-width: 0;
+    border: 1px solid var(--do-card-bd);
+    border-left: 3px solid var(--do-neutral-tx);
+    border-radius: var(--do-card-radius);
+    background: #fff;
+    padding: 0.75em 0.875em;
+}
+
+/* With the confirmation cards in play the grid runs THREE-up, so the set forms
+   even rows instead of leaving one card alone at the end of a four-up row. */
+.vas_100-snap.vas_100-has-qc { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+.vas_100-metric.vas_100-tone-total    { border-left-color: var(--do-info-tx); }
+.vas_100-metric.vas_100-tone-lines    { border-left-color: var(--do-neutral-tx); }
+.vas_100-metric.vas_100-tone-received { border-left-color: var(--do-success-tx); }
+.vas_100-metric.vas_100-tone-order    { border-left-color: var(--do-purple-tx); }
+.vas_100-metric.vas_100-tone-quality  { border-left-color: var(--do-action); }
+.vas_100-metric.vas_100-tone-accepted { border-left-color: var(--do-success-tx); }
+.vas_100-metric.vas_100-tone-rejected { border-left-color: var(--do-risk-tx); }
+
+.vas_100-mHead {
+    display: flex;
+    align-items: center;
+    gap: 0.375em;
+    margin-bottom: 0.375em;
+}
+
+.vas_100-mLabel {
+    min-width: 0;
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--do-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas_100-metric.vas_100-tone-total    .vas_100-mHead .vas_100-ic { color: var(--do-info-tx); }
+.vas_100-metric.vas_100-tone-lines    .vas_100-mHead .vas_100-ic { color: var(--do-neutral-tx); }
+.vas_100-metric.vas_100-tone-received .vas_100-mHead .vas_100-ic { color: var(--do-success-tx); }
+.vas_100-metric.vas_100-tone-order    .vas_100-mHead .vas_100-ic { color: var(--do-purple-tx); }
+.vas_100-metric.vas_100-tone-quality  .vas_100-mHead .vas_100-ic { color: var(--do-action); }
+.vas_100-metric.vas_100-tone-accepted .vas_100-mHead .vas_100-ic { color: var(--do-success-tx); }
+.vas_100-metric.vas_100-tone-rejected .vas_100-mHead .vas_100-ic { color: var(--do-risk-tx); }
+
+.vas_100-mVal {
+    font-size: 1.25em;
+    font-weight: 700;
+    color: var(--do-text);
+    line-height: 1.15;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas_100-mSub {
+    font-size: 0.6875em;
+    color: var(--do-muted);
+    margin-top: 0.25em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Narrow panels: 2-up (two rows of two), then single-column.
+
+   The four-across row needs real room: each card carries an uppercase label, a
+   1.25em figure and a caption, all of which clip to one line. At 620px a card is
+   ~145px of content — a delivery value with its currency ellipsises there. The
+   single-record view is exactly that narrow, which is what left the summary
+   crushed on one line. Matching VAS_099, the wide row only holds from 700px. */
+@container (max-width: 700px) {
+    .vas_100-snap,
+    .vas_100-snap.vas_100-has-qc { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container (max-width: 340px) {
+    .vas_100-snap,
+    .vas_100-snap.vas_100-has-qc { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ----------------------------------------------------------- */
+/*  Fulfilment lifecycle (horizontal stepper)                   */
+/* ----------------------------------------------------------- */
+.vas_100-stepper {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+}
+
+.vas_100-step {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.vas_100-stepRail {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.vas_100-stepLine {
+    flex: 1 1 auto;
+    height: 2px;
+    background: #D9E6F2;
+}
+.vas_100-step:first-child .vas_100-stepLine-l,
+.vas_100-step:last-child  .vas_100-stepLine-r { visibility: hidden; }
+
+.vas_100-step.vas_100-is-done   .vas_100-stepLine-r,
+.vas_100-step.vas_100-is-done   .vas_100-stepLine-l,
+.vas_100-step.vas_100-is-active .vas_100-stepLine-l { background: #67B98A; }
+
+.vas_100-stepDot {
+    flex: none;
+    width: 2em;
+    height: 2em;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8125em;
+    font-weight: 700;
+    line-height: 1;
+    background: #EEF2F6;
+    color: #8A99A8;
+    border: 1.5px solid #DCE5EE;
+}
+.vas_100-stepDot .vas_100-ic { display: inline-flex; }
+
+.vas_100-step.vas_100-is-done .vas_100-stepDot {
+    background: #E4F3EC;
+    color: #1F9D5B;
+    border-color: #BFE6D2;
+}
+.vas_100-step.vas_100-is-active .vas_100-stepDot {
+    background: #fff;
+    color: #E08A1E;
+    border: 2px solid #F0A93D;
+}
+
+.vas_100-stepLabel {
+    margin-top: 0.5em;
+    text-align: center;
+    padding: 0 0.25em;
+    min-width: 0;
+}
+
+/* A stage name is a single unbreakable word ("Completed", "In Transit"). The
+   step is allowed to shrink (min-width:0), so without a break inside the word
+   the label paints over the stage beside it; without the shrink it would set the
+   stepper's floor and push the panel sideways instead. Breaking inside the word
+   keeps every stage on one rail at any panel width or zoom level. */
+.vas_100-stepTitle {
+    font-size: 0.8125em;
+    font-weight: 700;
+    color: var(--do-text);
+    overflow-wrap: anywhere;
+}
+
+.vas_100-stepMeta {
+    font-size: 0.6875em;
+    color: var(--do-muted);
+    margin-top: 0.25em;
+    overflow-wrap: anywhere;
+}
+.vas_100-step.vas_100-is-active .vas_100-stepMeta { color: #E08A1E; font-weight: 600; }
+
+/* ----------------------------------------------------------- */
+/*  Delivery line table                                         */
+/* ----------------------------------------------------------- */
+.vas_100-table {
+    border: 1px solid var(--do-card-bd);
+    border-radius: var(--do-card-radius);
+    background: #fff;
+    overflow: hidden;
+}
+
+.vas_100-tRow {
+    display: grid;
+    align-items: center;
+    gap: 0.625em;
+    padding: 0.625em 0.875em;
+    grid-template-columns:
+        minmax(0, 2.6fr) minmax(0, 0.7fr) minmax(0, 0.9fr)
+        minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(0, 0.9fr);
+}
+
+/* A seventh track for the Quality marker, added only when at least one line of
+   the delivery has QA parameters — the panel does not draw the column at all
+   otherwise, so the table must not reserve room for it either. The item column
+   gives up the width: it is the widest track and the one that ellipsises most
+   gracefully.
+
+   That track's floor is min-content, not 0. Its cells hold a tick, but its
+   HEADING holds the word "Quality", and at minmax(0, 0.7fr) — the narrowest
+   track in the row — the word was cut off by the table's own overflow: the
+   column that says what the ticks MEAN was the one column whose label could not
+   be read. min-content is the width of the longest unbreakable word in the
+   column, so the heading always fits, in any language, and the track still
+   flexes above that floor like the rest. */
+.vas_100-table.vas_100-has-q .vas_100-tRow {
+    grid-template-columns:
+        minmax(0, 2.2fr) minmax(0, 0.7fr) minmax(0, 0.9fr) minmax(0, 1.1fr)
+        minmax(0, 1.1fr) minmax(0, 0.9fr) minmax(min-content, 0.7fr);
+}
+
+/* Cells clip inside their own track rather than spilling out of it. The tracks
+   above are minmax(0, Nfr), so a track compresses freely — but a grid ITEM keeps
+   min-width:auto, which is its own content-based minimum, so the cell stayed as
+   wide as its text and printed straight over the column beside it. min-width:0
+   plus overflow:hidden is what confines a cell to the track it was given; the
+   item cell's children carry their own ellipsis and the Received cell is a flex
+   column, so neither is harmed by the clip. Header and body are separate grid
+   containers, so this also keeps a body column under the heading that names it.
+   Numeric and header cells never wrap — a wrapped figure would sit off the
+   shared baseline. */
+.vas_100-tRow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.vas_100-tHead > span,
+.vas_100-tRow > span.vas_100-ta-r,
+.vas_100-tRow > span.vas_100-ta-c { white-space: nowrap; }
+
+.vas_100-tHead {
+    background: #F5F8FB;
+    border-bottom: 1px solid var(--do-card-bd);
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+    color: var(--do-muted);
+}
+
+.vas_100-tBody {
+    border-bottom: 1px solid var(--do-row-div);
+    font-size: 0.8125em;
+    color: var(--do-text);
+}
+.vas_100-tBody:last-of-type { border-bottom: none; }
+.vas_100-tBody:hover { background: #FAFCFE; }
+
+.vas_100-table .vas_100-ta-r { text-align: right; justify-content: flex-end; }
+.vas_100-table .vas_100-ta-c { text-align: center; justify-content: center; }
+
+.vas_100-itItem { min-width: 0; }
+.vas_100-itName {
+    font-size: 1.0769em;
+    font-weight: 700;
+    color: var(--do-text);
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_100-itSku {
+    font-size: 0.9231em;
+    color: var(--do-muted);
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The Product / Service cell reads down in four lines: name, attributes, code +
+   locator, drop shipment. Each clips to its own line and carries its full text
+   as a tooltip, so the row height is the same whatever any one of them holds. */
+
+/* Line 2 — the lot / serial / attribute set, when the product carries one. A
+   notch darker than the code line beneath it: the attribute qualifies WHICH
+   stock went out, which is closer to the product's identity than to its
+   reference data. */
+.vas_100-itAttr {
+    font-size: 0.9231em;
+    color: var(--do-sub);
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Line 4 — drop shipment. Drawn only on a line that IS one, so it always takes
+   the accent: goods that never pass through our warehouse are the exception
+   worth seeing. The muted "No" state it used to carry no longer renders. */
+.vas_100-itDrop {
+    font-size: 0.9231em;
+    color: var(--do-action-dk);
+    font-weight: 700;
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Delivered cell (mini bar + value) */
+.vas_100-recv {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    justify-content: flex-end;
+}
+.vas_100-recvBar {
+    width: 40px;
+    height: 5px;
+    border-radius: 999px;
+    background: #E7EEF4;
+    overflow: hidden;
+    flex: none;
+}
+.vas_100-recvBar i { display: block; height: 100%; border-radius: 999px; }
+.vas_100-recv.vas_100-full i { background: var(--do-success-tx); }
+.vas_100-recv.vas_100-part i { background: var(--do-warning-tx); }
+.vas_100-recv.vas_100-none i { background: #CBD5DF; }
+.vas_100-recv.vas_100-full { color: var(--do-success-tx); font-weight: 500; }
+.vas_100-recv.vas_100-part { color: var(--do-warning-tx); font-weight: 500; }
+.vas_100-recv.vas_100-none { color: var(--do-muted); }
+
+/* Status tag */
+.vas_100-tag {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.1875em 0.5em;
+    font-size: 0.9231em;
+    font-weight: 700;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+.vas_100-tag.vas_100-s-full  { background: var(--do-success-bg); color: var(--do-success-tx); }
+.vas_100-tag.vas_100-s-part  { background: var(--do-warning-bg); color: var(--do-warning-tx); }
+.vas_100-tag.vas_100-s-short { background: var(--do-risk-bg);    color: var(--do-risk-tx); }
+
+/* Totals footer */
+.vas_100-tFoot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 1.375em;
+    padding: 0.6875em 0.875em;
+    background: #F5F8FB;
+    border-top: 1px solid var(--do-card-bd);
+    font-size: 0.8125em;
+}
+.vas_100-tf { color: var(--do-muted); }
+.vas_100-tf b { color: var(--do-text); font-weight: 700; margin-left: 0.375em; }
+.vas_100-tf.vas_100-is-grand { color: var(--do-text); font-weight: 700; }
+.vas_100-tf.vas_100-is-grand b { color: var(--do-action); margin-left: 0.5em; font-size: 1.15em; }
+
+/* A narrow panel SHRINKS the table; it never scrolls it sideways. Under 620px
+   the rows used to take a floor width and the card its own horizontal
+   scrollbar — which hides the right-hand columns behind a control the reader
+   has to find and drag. Every track is minmax(0, Nfr) and every cell carries
+   min-width: 0 with an ellipsis, so the columns simply compress and a clipped
+   value stays readable through the row's tooltip.
+
+   Below 560px compressing alone is not enough: in the single-record view the
+   headings read "ORDER…", "DELIVER…", "LINE VAL…" and the line value itself
+   was cut to "₹ 3,000…" — the one figure the row is there to state. So the
+   table gives up what it can spare before it clips: the cell gap and padding
+   tighten, the Delivered mini bar goes (the figure and the status tag already
+   say how much went out), the headings wrap onto a second line instead of
+   ellipsising, and the value cells may break at a space ("₹" over "3,000.00")
+   rather than lose their digits. The Line Value track grows at the item
+   column's expense — the item column has three lines of tooltip-backed text
+   and ellipsises most gracefully. */
+@container (max-width: 560px) {
+    .vas_100-tRow {
+        gap: 0.375em;
+        padding: 0.625em 0.625em;
+        grid-template-columns:
+            minmax(0, 1.9fr) minmax(0, 0.7fr) minmax(0, 0.8fr)
+            minmax(0, 0.9fr) minmax(0, 1.4fr) minmax(0, 0.9fr);
+    }
+    .vas_100-table.vas_100-has-q .vas_100-tRow {
+        grid-template-columns:
+            minmax(0, 1.6fr) minmax(0, 0.7fr) minmax(0, 0.8fr) minmax(0, 0.9fr)
+            minmax(0, 1.4fr) minmax(0, 0.9fr) minmax(min-content, 0.6fr);
+    }
+    .vas_100-tHead { align-items: end; letter-spacing: 0; line-height: 1.2; }
+    /* Wrap at spaces only: "LINE VALUE" takes two lines, while a single word
+       the track still cannot hold ("DELIVERED") ellipsises on its line rather
+       than breaking as "DELIVER / ED". */
+    .vas_100-tHead > span,
+    .vas_100-tRow > span.vas_100-ta-r {
+        white-space: normal;
+        overflow-wrap: normal;
+    }
+    /* The tag stays one piece — "Partial" split over two lines is not a tag. */
+    .vas_100-tRow > span.vas_100-ta-c { white-space: nowrap; }
+    .vas_100-recvBar { display: none; }
+    .vas_100-recv { display: inline; }
+    .vas_100-tFoot { padding: 0.6875em 0.625em; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Quality: the line marker and the per-line parameter drawer  */
+/* ----------------------------------------------------------- */
+/* The expand caret, on the product name of a line that has parameters. Rotates
+   a quarter turn when its drawer is open. */
+.vas_100-qpToggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    margin-right: 0.3125em;
+    color: var(--do-muted);
+    cursor: pointer;
+    user-select: none;
+    transition: transform .15s ease, color .15s ease;
+}
+.vas_100-qpToggle:hover { color: var(--do-action); }
+.vas_100-qpToggle.vas_100-is-open { transform: rotate(90deg); color: var(--do-action); }
+
+/* Tick / cross in the Quality column. The word travels as the cell's tooltip
+   and aria-label, so the mark is never the only statement of what it means. */
+.vas_100-qMark { display: inline-flex; align-items: center; justify-content: center; }
+.vas_100-qMark.vas_100-q-on  { color: var(--do-success-tx); }
+.vas_100-qMark.vas_100-q-off { color: var(--do-muted); opacity: .65; }
+
+/* A SIBLING of the line row, not a child, so it spans the table's full width
+   instead of being trapped in one grid cell. */
+.vas_100-qpDrawer {
+    border-bottom: 1px solid var(--do-row-div);
+    background: #F7FAFD;
+    padding: 0.5em 0.875em 0.75em 2.25em;
+}
+
+/* Said once above the table rather than left for the reader to infer from a
+   column of Pending tags. */
+.vas_100-qpNote {
+    font-size: 0.75em;
+    color: var(--do-muted);
+    font-style: italic;
+    margin-bottom: 0.4375em;
+}
+
+.vas_100-qpMini {
+    border: 1px solid var(--do-card-bd);
+    border-radius: 8px;
+    background: #fff;
+    overflow: hidden;
+}
+
+/* Parameter | To Verify | Acceptable | Actual Value | QA Date | Status. */
+.vas_100-qpMiniRow {
+    display: grid;
+    align-items: center;
+    gap: 0.625em;
+    padding: 0.5em 0.75em;
+    grid-template-columns:
+        minmax(0, 1.6fr) minmax(0, 0.8fr) minmax(0, 1fr)
+        minmax(0, 1fr)   minmax(0, 1fr)   minmax(0, 0.9fr);
+    font-size: 0.8125em;
+    color: var(--do-text);
+    border-bottom: 1px solid var(--do-row-div);
+}
+.vas_100-qpMiniRow:last-child { border-bottom: none; }
+.vas_100-qpMiniRow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* To Verify is a quantity, so it is held to the right edge of its track in the
+   head and the body alike. Stated as justify-self as well as text-align: the
+   drawer is a grid inside the line table, and a grid item placed at the end of
+   its track sits right whatever a competing rule does to text-align. */
+.vas_100-qpMini .vas_100-qpMiniRow > span.vas_100-ta-r {
+   /* justify-self: end;*/
+    max-width: 100%;
+    text-align: left;
+    font-variant-numeric: tabular-nums;
+}
+.vas_100-qpMini .vas_100-qpMiniRow > span.vas_100-ta-c {
+    justify-self: center;
+    max-width: 100%;
+    text-align: center;
+}
+
+.vas_100-qpMiniHead {
+    background: #F5F8FB;
+    border-bottom: 1px solid var(--do-card-bd);
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+    color: var(--do-muted);
+}
+
+.vas_100-qpName {
+    font-weight: 700;
+    color: var(--do-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Verdict pills. Pending is a parameter not yet inspected, not a failure, so it
+   reads neutral rather than warning. */
+.vas_100-tag.vas_100-q-pass { background: var(--do-success-bg); color: var(--do-success-tx); }
+.vas_100-tag.vas_100-q-fail { background: var(--do-risk-bg);    color: var(--do-risk-tx); }
+.vas_100-tag.vas_100-q-wait { background: var(--do-neutral-bg); color: var(--do-neutral-tx); }
+
+/* ----------------------------------------------------------- */
+/*  Lines pager                                                 */
+/* ----------------------------------------------------------- */
+/* A sibling of the table, not a row inside it: the table takes its own
+   horizontal scroll on a narrow panel and the controls must not scroll away
+   with the columns. Modelled on the VAS_106 pager. */
+.vas_100-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5em 0.75em;
+    margin-top: 0.5em;
+    font-size: 0.75em;
+    color: var(--do-muted);
+}
+
+.vas_100-pgCtrls { display: inline-flex; align-items: center; gap: 0.5em; }
+.vas_100-pgPos   { color: var(--do-text); font-weight: 700; }
+
+.vas_100-pgBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125em;
+    border: 1px solid var(--do-card-bd);
+    border-radius: 999px;
+    background: #fff;
+    padding: 0.3125em 0.75em;
+    color: var(--do-action);
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+.vas_100-pgBtn:hover { background: var(--do-info-bg); border-color: var(--do-action); }
+.vas_100-pgBtn .vas_100-ic { color: currentColor; }
+.vas_100-pgBtn.vas_100-is-disabled {
+    opacity: .45;
+    cursor: default;
+    pointer-events: none;
+    color: var(--do-muted);
+}
+
+/* The pager fits itself to the panel instead of wrapping onto a second line.
+   In the single-record view the panel is narrow enough that the "Showing 1-25
+   of 60" caption and the Previous / Page / Next controls cannot share a line,
+   and the controls dropped below the caption — the buttons a reader is reaching
+   for ended up furthest from the table.
+
+   Narrow: the caption goes (the "Page n of m" between the buttons already says
+   where the reader is) and the controls take the row on their own. Narrower
+   still: the button LABELS go and the chevrons stand alone, which is the last
+   thing that can shrink before the controls would have to wrap again. */
+@container (max-width: 520px) {
+    .vas_100-pager   { flex-wrap: nowrap; justify-content: flex-end; }
+    .vas_100-pgRange { display: none; }
+}
+@container (max-width: 360px) {
+    .vas_100-pgBtn span:not(.vas_100-ic) { display: none; }
+    .vas_100-pgBtn { padding: 0.3125em 0.5em; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Documents raised against the delivery                       */
+/* ----------------------------------------------------------- */
+/* Reuses the line table's frame with four tracks of its own: Document | Date |
+   Status | Amount. Every track is minmax(0, Nfr) so a long document number
+   clips inside its own column instead of widening the track and pushing the
+   right-hand ones out of the frame. */
+.vas_100-docRow {
+    display: grid;
+    align-items: center;
+    gap: 0.625em;
+    padding: 0.625em 0.875em;
+    grid-template-columns:
+        minmax(0, 2.6fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+}
+.vas_100-docRow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* A row that opens its document reads as a link and lifts on hover. */
+.vas_100-docRow.vas_100-is-link { cursor: pointer; }
+.vas_100-docRow.vas_100-is-link:hover { background: var(--do-info-bg); }
+.vas_100-docRow.vas_100-is-link:hover .vas_100-itName { color: var(--do-link); }
+
+.vas_100-docItem { display: flex; align-items: center; gap: 0.5em; min-width: 0; }
+.vas_100-docTxt  { min-width: 0; flex: 1; }
+.vas_100-docItem > .vas_100-ic { flex: none; color: var(--do-action); }
+
+/* ----------------------------------------------------------- */
+/*  Activity (audit trail)                                      */
+/* ----------------------------------------------------------- */
+.vas_100-actList {
+    border: 1px solid var(--do-card-bd);
+    border-radius: var(--do-card-radius);
+    background: #fff;
+    overflow: hidden;
+}
+
+/* tag | headline | right-aligned "when · by whom" [| caret] on the first line,
+   and the row's sub-lines (recipients, the line an edit landed on, the delta)
+   on a second line that spans from under the headline to the row's right edge.
+
+   A grid, not a wrapping flex row. As a flex row the sub-lines lived inside
+   the headline's cell, which was only as wide as what the stamp and the caret
+   left it — so an e-mail's To / Cc / Bcc list wrapped into a tall, narrow
+   column beside an empty right half of the row. On the second grid line
+   nothing sits to their right, so they get the row's full width. The first
+   line's items centre on the tag pill, the tallest of them, so the headline
+   and the stamp sit level with it. */
+.vas_100-actRow {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 0.25em 0.625em;
+    padding: 0.625em 0.875em;
+    border-bottom: 1px solid var(--do-row-div);
+    font-size: 0.8125em;
+    color: var(--do-text);
+}
+.vas_100-actRow:last-child { border-bottom: none; }
+/* A note's headline wraps to three lines; its tag and stamp stay at the top
+   rather than floating beside the middle line. */
+.vas_100-actRow:has(.vas_100-multiline) { align-items: start; }
+/* A row with nothing to open has no caret, so it has no caret column either:
+   the stamp then ends at the same right edge as the headline. */
+.vas_100-actRow:not(.vas_100-is-openable) { grid-template-columns: auto minmax(0, 1fr) auto; }
+
+.vas_100-actTag {
+    grid-row: 1;
+    grid-column: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125em;
+    border-radius: 999px;
+    padding: 0.1875em 0.5em;
+    font-size: 0.8462em;
+    font-weight: 700;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+
+.vas_100-actTag.vas_100-tone-info    { background: var(--do-info-bg);    color: var(--do-info-tx); }
+.vas_100-actTag.vas_100-tone-success { background: var(--do-success-bg); color: var(--do-success-tx); }
+.vas_100-actTag.vas_100-tone-warning { background: var(--do-warning-bg); color: var(--do-warning-tx); }
+.vas_100-actTag.vas_100-tone-risk    { background: var(--do-risk-bg);    color: var(--do-risk-tx); }
+.vas_100-actTag.vas_100-tone-purple  { background: var(--do-purple-bg);  color: var(--do-purple-tx); }
+.vas_100-actTag.vas_100-tone-neutral { background: var(--do-neutral-bg); color: var(--do-neutral-tx); }
+
+/* The Documents status tag borrows the same tone vocabulary as the header pill,
+   where the line table's own tag has only Full / Partial / Short. */
+.vas_100-tag.vas_100-tone-info    { background: var(--do-info-bg);    color: var(--do-info-tx); }
+.vas_100-tag.vas_100-tone-success { background: var(--do-success-bg); color: var(--do-success-tx); }
+.vas_100-tag.vas_100-tone-warning { background: var(--do-warning-bg); color: var(--do-warning-tx); }
+.vas_100-tag.vas_100-tone-risk    { background: var(--do-risk-bg);    color: var(--do-risk-tx); }
+.vas_100-tag.vas_100-tone-purple  { background: var(--do-purple-bg);  color: var(--do-purple-tx); }
+.vas_100-tag.vas_100-tone-neutral { background: var(--do-neutral-bg); color: var(--do-neutral-tx); }
+
+.vas_100-actTitle { grid-row: 1; grid-column: 2; min-width: 0; }
+
+/* The headline clips to one line — it has a tooltip carrying the whole of it —
+   except a note, whose text IS what the reader came for and wraps to three. */
+.vas_100-actLead {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The sub-lines, under the headline and spanning to the row's right edge. Only
+   rendered when the row has any, so a plain row stays a single line. */
+.vas_100-actSubs {
+    grid-row: 2;
+    grid-column: 2 / -1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125em;
+}
+.vas_100-actLead.vas_100-multiline {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+}
+
+/* The recipient list and the line an edit landed on. Both WRAP instead of
+   clipping: an address cut off mid-domain identifies nobody, and break-word
+   because a single long address has no space to break at. */
+.vas_100-actSub {
+    display: block;
+    min-width: 0;
+    font-size: 0.8462em;
+    color: var(--do-muted);
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    line-height: 1.45;
+}
+
+.vas_100-actWhen {
+    grid-row: 1;
+    grid-column: 3;
+    justify-self: end;
+    min-width: 0;
+    max-width: 100%;
+    font-size: 0.8462em;
+    color: var(--do-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* A row carrying an e-mail body opens it on click; the caret shows the state. */
+.vas_100-actRow.vas_100-is-openable { cursor: pointer; }
+.vas_100-actRow.vas_100-is-openable:hover { background: var(--do-info-bg); }
+.vas_100-actCaret {
+    grid-row: 1;
+    grid-column: 4;
+    display: inline-flex;
+    color: var(--do-muted);
+    transition: transform .15s ease;
+}
+.vas_100-actRow.vas_100-is-open .vas_100-actCaret { transform: rotate(90deg); }
+
+.vas_100-actBody {
+    padding: 0.625em 0.875em 0.875em 2.5em;
+    border-bottom: 1px solid var(--do-row-div);
+    background: #F7FAFD;
+    font-size: 0.8125em;
+    color: var(--do-text);
+}
+.vas_100-actBody p {
+    margin: 0.5em 0 0;
+    line-height: 1.55;
+    /* The body is text flattened from the mail — keep its line breaks. */
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+}
+.vas_100-actMeta {
+    font-size: 0.9231em;
+    color: var(--do-muted);
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+/* Narrow: the headline keeps at least a third of the row, so a long subject
+   cannot be squeezed to a few characters by the stamp — the stamp ellipsises
+   instead (it carries its full text as a tooltip). The drawer's left inset
+   also shrinks; it was indenting the mail's own text past what a narrow panel
+   can spare. */
+@container (max-width: 620px) {
+    .vas_100-actRow { grid-template-columns: auto minmax(35%, 1fr) auto auto; }
+    .vas_100-actRow:not(.vas_100-is-openable) { grid-template-columns: auto minmax(35%, 1fr) auto; }
+    .vas_100-actBody { padding-left: 0.875em; }
+}
+
+/* Narrower still: the stamp drops to its own line under the headline and the
+   sub-lines follow it on a third. The caret keeps the last column of the first
+   line, beside the headline whose body it opens; the stamp may wrap now that
+   nothing sits to its right. */
+@container (max-width: 440px) {
+    .vas_100-actRow { grid-template-columns: auto minmax(0, 1fr) auto; row-gap: 0.125em; }
+    .vas_100-actRow:not(.vas_100-is-openable) { grid-template-columns: auto minmax(0, 1fr); }
+    .vas_100-actCaret { grid-column: 3; }
+    .vas_100-actWhen {
+        grid-row: 2;
+        grid-column: 2 / -1;
+        justify-self: start;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+    }
+    .vas_100-actSubs { grid-row: 3; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Notes (entered description)                                 */
+/* ----------------------------------------------------------- */
+.vas_100-noteCard {
+    border: 1px solid var(--do-card-bd);
+    border-radius: var(--do-card-radius);
+    background: #fff;
+    padding: 0.875em 1em;
+    font-size: 0.8125em;
+    color: var(--do-text);
+    line-height: 1.55;
+    /* The description is free text a user typed — keep their line breaks and
+       let a long unbroken run wrap instead of widening the panel. */
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+}
+/* One paragraph per note — the header's, then each line's. */
+.vas_100-noteCard p { margin: 0; }
+.vas_100-noteCard p + p { margin-top: 0.5em; }
+
+/* ----------------------------------------------------------- */
+/*  Toast (record-open fallback notice)                         */
+/* ----------------------------------------------------------- */
+/* Shown only when a Reference chip cannot resolve a window to open, so a click
+   reports something instead of doing nothing. */
+.vas_100-toast {
+    position: absolute;
+    left: 50%;
+    bottom: 1.25em;
+    transform: translate(-50%, 0.75em);
+    max-width: 90%;
+    border-radius: 8px;
+    padding: 0.5em 0.875em;
+    font-size: 0.8125em;
+    font-weight: 700;
+    line-height: 1.35;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .25s ease, transform .25s ease;
+    z-index: 1000;
+}
+.vas_100-toast.vas_100-ok  { background: var(--do-info-bg); color: var(--do-info-tx); }
+.vas_100-toast.vas_100-err { background: var(--do-risk-bg); color: var(--do-risk-tx); }
+.vas_100-toast.vas_100-show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ----------------------------------------------------------- */
+/*  RTL                                                         */
+/* ----------------------------------------------------------- */
+[dir="rtl"] .vas_100-hdrColL { border-right: none; border-left: 1px solid var(--do-row-div); padding-right: 0; padding-left: 1.25em; }
+[dir="rtl"] .vas_100-table .vas_100-ta-r { text-align: left; justify-content: flex-start; }
+[dir="rtl"] .vas_100-recv { justify-content: flex-start; }
+[dir="rtl"] .vas_100-tFoot { justify-content: flex-start; }
+[dir="rtl"] .vas_100-tf b { margin-left: 0; margin-right: 0.375em; }
+[dir="rtl"] .vas_100-tf.vas_100-is-grand b { margin-left: 0; margin-right: 0.5em; }
+[dir="rtl"] .vas_100-chip .vas_100-pill { margin-left: 0; margin-right: 0.0625em; }
+[dir="rtl"] .vas_100-pgBtn .vas_100-ic svg { transform: scaleX(-1); }
+
+/* ---- Activity: field-change rows ---- */
+/* "was X → now Y" under the field's name. The two values are what the reader
+   came for, so they carry the row's colour while the arrow between them stays
+   muted; both wrap rather than clip, since a truncated value is no value.
+   Matches VAS_101 / VAS_104. */
+.vas_100-actDelta {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25em 0.375em;
+}
+.vas_100-cvOld {
+    color: var(--do-muted);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+    overflow-wrap: break-word; word-break: break-word;
+}
+.vas_100-cvArrow { flex: none; color: var(--do-muted); }
+.vas_100-cvNew {
+    color: var(--do-text); font-weight: 700;
+    overflow-wrap: break-word; word-break: break-word;
+}
+
+/* Each e-mail sent against an appointment or task, inside that row's drawer.
+   The second and later ones are ruled off, so several notices about the same
+   meeting do not read as one long message. */
+.vas_100-actMailSplit {
+    margin-top: 0.625em;
+    padding-top: 0.625em;
+    border-top: 1px solid var(--do-card-bd);
+}

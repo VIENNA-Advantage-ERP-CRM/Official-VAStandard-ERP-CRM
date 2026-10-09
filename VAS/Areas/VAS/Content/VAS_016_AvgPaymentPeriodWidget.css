@@ -1,0 +1,130 @@
+/* ==========================================================
+   VAS AP "Avg Days to Pay" KPI Widget  —  vas-apwdg-* namespace
+   ========================================================== */
+
+.vas-apwdg-root {
+    /* Positioning context only (mirrors VIS.OutstandingSalesOrderWidget's root);
+       the glass surface lives on the card (.vas-apwdg-container) below. No
+       overflow:hidden here so the card's drop-shadow is not clipped. */
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    position: relative;
+    font-family: Roboto, sans-serif;
+    /* Named query container so narrow/zoomed cells can step the card base font
+       below its 16px clamp floor (mirrors VIS.OutstandingSalesOrderWidget's root). */
+    container: vas-apwdg / inline-size;
+}
+
+/* ---- Busy indicator overlay ---- */
+.vas-widget-busy-wrap {
+    position: absolute;
+    width: 98%;
+    height: 97%;
+    text-align: center;
+    z-index: 999;
+}
+
+/* The card: glass surface + layout + base font-size anchor for all em sizing
+   (mirrors VIS.OutstandingSalesOrderWidget's card). */
+.vas-apwdg-container {
+    /* Widget root anchor: every internal value below is em against this clamp. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 0.5em;                      /* spec stack gap between header / value / why */
+    padding: 0.875em;                /* Widget Edge Spacing */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    position: relative;
+    overflow: hidden;
+}
+
+/* ---- Header: tinted icon well + title (mirrors AvgDaysToPayWidget) ---- */
+.vas-apwdg-header {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+}
+
+.vas-apwdg-icon {
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    flex-shrink: 0;
+    border-radius: 0.5625em;
+    /* Violet tint to match this widget's semantic; the SVG stroke inherits
+       this color via currentColor. */
+    background: linear-gradient(180deg, #FFFFFF, #EFEEFF);
+    color: #5F4AA6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vas-apwdg-icon svg {
+    width: 1.125em;
+    height: 1.125em;
+}
+
+.vas-apwdg-title {
+    /* Widget title (shared Widget Header clamp), Roboto Regular. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    font-weight: 400;
+    color: #102C3F;
+    line-height: 1.2;
+    margin: 0;
+}
+
+.vas-apwdg-value {
+    font-size: 1.75em;
+    font-weight: 700; /* Roboto Bold (spec weight palette: 400/500/700) */
+    color: #5F4AA6;
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+    margin-bottom: 0.5em;   /* mirror VAS_025 value: sit in the space-between stack */
+    padding-left: 0.3125em;
+    font-family: Roboto, sans-serif;
+}
+
+/* Muted 'd' day suffix trailing the big metric number. */
+.vas-apwdg-metric-suffix {
+    font-size: 0.5em;
+    font-weight: 500;
+    color: #5F7283;
+    margin-left: 0.15em;
+}
+
+/* ---- Comparison line vs last quarter (mirrors AvgDaysToPayWidget's subtitle) ---- */
+.vas-apwdg-why-wrap {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.375em;
+    /* Was margin-top:auto (pinned the value to the top); mirror VAS_025 so the value
+       distributes via the container's justify-content:space-between (centers on zoom-out). */
+    margin-top: 0.125em;
+}
+
+.vas-apwdg-why-text {
+    font-size: 0.6875em;
+    color: #717182;
+    line-height: 1.3;
+}
+
+/* ---- Responsive ----
+   Widget interior scales via the em anchor clamp on .vas-apwdg-container.
+   Narrow/zoomed-in cell: step the card base font below the 16px clamp floor so the
+   content doesn't overflow (mirrors VIS.OutstandingSalesOrderWidget's @container steps). */
+@container vas-apwdg (max-width: 300px) {
+    .vas-apwdg-container { font-size: 13px; }
+}
+
+@container vas-apwdg (max-width: 220px) {
+    .vas-apwdg-container { font-size: 11px; }
+}

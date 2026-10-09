@@ -1,0 +1,312 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * Outstanding vs Received (VAS_015) — glass 6x2 widget: bold title + subtitle,
+ * an inline-SVG combo chart (pale-blue outstanding bars + green received line
+ * with point markers, light gridlines, dated x-axis) and a legend below.
+ * Design: design.md + PROMPT.md "Widget 13" + image_1. Per CLAUDE.md every CSS
+ * value is in `em` (SVG geometry uses unitless user-units, not px). Namespaced
+ * vas-ovr-*.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas-ovr-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+    /*font-family: Roboto, sans-serif;*/
+}
+
+    .vas-ovr-root,
+    .vas-ovr-root * {
+        box-sizing: border-box;
+    }
+
+.vas-ovr-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 14px;
+    z-index: 999;
+}
+
+/* ── Glass card ───────────────────────────────────────────────────── */
+
+.vas-ovr-card {
+    /* dashboard-widgets.md §"Widget Root Anchor": one font-size lever per widget;
+       every inner value is em so the whole card rescales with the cell. The root
+       declares its own container-type, so use the shared --dash-inline-size lever
+       (not cqi, which would pin to the floor against the cell). 2K Calibration
+       clamp — content stops growing at 20px on wide dashboards. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.625em;
+    /* Canonical glass surface (foundations.md §"Standard Gradients"): top pulled to
+       fully opaque white. Borders/radii/shadows stay px. */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    padding: 0.85em;                 /* dashboard-widgets.md §"Widget Edge Spacing" */
+    overflow: hidden;
+}
+
+/* ── Header: icon + bold title + subtitle ─────────────────────────── */
+
+.vas-ovr-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75em;
+    min-width: 0;
+    flex-shrink: 0;
+}
+
+.vas-ovr-head-left {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.vas-ovr-icon {
+    /* Fixed 2em well (dashboard-widgets.md §"Widget Header"): equivalent to the
+       32–40px title-lever well at the 16–20 base. Radius/border stay px. */
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(232, 244, 255, 0.96));
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    color: #1F83FF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+    .vas-ovr-icon svg {
+        width: 1.125em;
+        height: 1.125em;
+        stroke: currentColor;
+    }
+
+.vas-ovr-title-group {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+/* dashboard-widgets.md §"Widget Header": dark #102C3F title, Roboto Regular (400).
+   Shared dashboard-width-anchored title clamp (ceiling 17px on 2K) so every
+   widget's title resolves to the same px at any screen size. */
+.vas-ovr-title {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    font-weight: 400;
+    color: #102C3F;
+    line-height: 1.2;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-ovr-subtitle {
+    margin-top: 2px; /* fixed — pairs the two lines at every width */
+    /* Shared width-anchored subtitle clamp (dashboard-widgets.md §"Widget
+       Header"): ceiling 13px, muted. */
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
+    color: #717182;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Chart area (SVG redrawn in JS to the measured box) ───────────── */
+
+.vas-ovr-chart {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    position: relative;
+}
+
+.vas-ovr-svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.vas-ovr-grid {
+    stroke: #EDF2F6;
+    stroke-width: 1;
+}
+
+/* Outstanding receivable — pale-blue bars. */
+.vas-ovr-bar {
+    fill: #BFE4FF;
+    opacity: 0.85;
+}
+
+/* Received in period — green line + white-filled point markers. */
+.vas-ovr-line {
+    fill: none;
+    stroke: #019D89;
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+.vas-ovr-dot {
+    fill: #FFFFFF;
+    stroke: #019D89;
+    stroke-width: 2;
+}
+
+/* ── Hover: guide line + two-value tooltip ────────────────────────── */
+
+.vas-ovr-hover-line {
+    stroke: #5F7283;
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+.vas-ovr-tooltip {
+    position: absolute;
+    transform: translate(-50%, calc(-100% - 0.625em));
+    background: #102C3F;
+    color: #FFFFFF;
+    border-radius: 6px;
+    padding: 0.4375em 0.5625em;
+    font-size: 0.6875em;
+    line-height: 1.35;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 4px 12px rgba(15, 61, 97, 0.25);
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125em;
+}
+
+.vas-ovr-tt-date {
+    color: #AFC4D6;
+    margin-bottom: 0.0625em;
+}
+
+.vas-ovr-tt-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+}
+
+.vas-ovr-tt-key {
+    position: relative;
+    padding-left: 0.875em;
+    color: #C9D7E2;
+}
+
+    .vas-ovr-tt-key::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 0.5em;
+        height: 0.5em;
+        border-radius: 999em;
+    }
+
+.vas-ovr-tt-key-out::before {
+    background: #BFE4FF;
+}
+
+.vas-ovr-tt-key-rec::before {
+    background: #019D89;
+}
+
+.vas-ovr-tt-amt {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.vas-ovr-axis-label {
+    /* Chart axis labels: xs token, muted (foundations.md §"Text"). */
+    fill: #5F7283;
+    /*font-family: Roboto, sans-serif;*/
+    font-size: 0.6875em;
+}
+
+.vas-ovr-empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #5F7283;
+    font-size: 0.75em;               /* sm — canonical no-data size, matches sibling widgets */
+}
+
+/* ── Legend ───────────────────────────────────────────────────────── */
+
+.vas-ovr-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5em 1.5em;
+    flex-shrink: 0;
+    min-height: 0;
+}
+
+.vas-ovr-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375em;
+    /* xs token on the widget-root em lever — legend reads as chart chrome. */
+    font-size: 0.6875em;
+    min-width: 0;
+}
+
+.vas-ovr-swatch {
+    flex-shrink: 0;
+}
+
+.vas-ovr-swatch-bar {
+    width: 0.75em;
+    height: 0.75em;
+    border-radius: 0.1875em;
+    background: #BFE4FF;
+}
+
+.vas-ovr-swatch-line {
+    width: 0.875em;
+    height: 0.25em;
+    border-radius: 999em;
+    background: #019D89;
+}
+
+.vas-ovr-legend-label {
+    color: #5F7283;
+}
+
+/* ── Responsive (container queries on the widget cell) ────────────── */
+
+@container (max-width: 30em) {
+    .vas-ovr-card { font-size: 0.875em; }
+}
+
+@container (max-width: 22em) {
+    .vas-ovr-card {
+        font-size: 0.75em;
+    }
+
+    .vas-ovr-subtitle { display: none; }
+}

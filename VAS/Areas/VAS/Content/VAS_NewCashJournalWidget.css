@@ -1,0 +1,126 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_NewCashJournalWidget — Quick Action dashboard widget that opens a new
+ * Cash Journal (C_Cash) on the host Cash Journal window.
+ *
+ * Design: dashboard-widgets.md §"Quick Action Widget" — mirrors
+ * VAS_CreateARInvoice.css:
+ *   2px #9ED1FF border, pale blue-to-white gradient surface, 14px radius,
+ *   0.85em padding. Flex column: solid-blue icon well pinned top-left, title
+ *   pushed to the bottom (Regular title).
+ * Internal type/spacing use em against the widget root anchor
+ * (clamp(16px, 1.25cqi, 32px) → dashboard-relative via --dash-inline-size);
+ * physical edges (border, radius, shadow) stay in px. Namespaced vas-ncj-*.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas-ncj-root {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;           /* prevent card min-height from bleeding outside the cell */
+    container-type: inline-size;
+}
+
+    .vas-ncj-root,
+    .vas-ncj-root * {
+        box-sizing: border-box;
+    }
+
+/* ── Quick-action card — icon top-left, title bottom-left ────────────────
+   The card is a div with role="button" (not a native button), so the
+   type / colour / alignment resets a button would inherit are set here. */
+
+.vas-ncj-card {
+    width: 100%;
+    height: 100%;
+    /* Widget root anchor (dashboard-widgets.md §"Widget Root Anchor"): 2K
+       calibration clamp — floor 16px, dashboard-relative via
+       --dash-inline-size (≡ 1.25cqi of the dashboard content width). */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
+    font-family: inherit;
+    /* Action border + pale blue-to-white surface signal "create new". */
+    border: 2px #9ED1FF;
+    border-radius: 14px;
+    box-shadow: 0 6px 14px rgba(16, 47, 74, 0.05);
+    background: linear-gradient(180deg, rgba(255,255,255,1), rgba(255,255,255,0.6));
+    padding: 0.85em;
+    /* Column layout: icon anchored top-left, title pushed to the bottom via
+       margin-top:auto on the title. */
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    cursor: pointer;
+    text-align: left;
+    color: #102C3F;
+    transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+    overflow: hidden;
+    /* No text selection on a click target that behaves like a button. */
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+    .vas-ncj-card:hover {
+        border-color: #7CC0FF;
+        background: linear-gradient(180deg, #DEEEFC 0%, #F0F7FD 100%);
+        box-shadow: 0 8px 18px rgba(16, 47, 74, 0.08);
+    }
+
+    .vas-ncj-card:focus-visible {
+        outline: 0.125em solid #0083DA;
+        outline-offset: 0.125em;
+    }
+
+    .vas-ncj-card:active {
+        transform: scale(0.99);
+    }
+
+/* ── Icon well: solid blue rounded square with white glyph ─────────────── */
+
+.vas-ncj-icon {
+    width: 2.5em;
+    height: 2.5em;
+    min-width: 2.5em;
+    border-radius: 10px;
+    background: #1F83FF;
+    color: #FFFFFF;
+    box-shadow: 0 10px 24px rgba(31, 131, 255, 0.22);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    align-self: flex-start;
+}
+
+    .vas-ncj-icon svg {
+        /* Glyph ≈ 1em, white via currentColor. */
+        width: 1.25em;
+        height: 1.25em;
+        stroke: currentColor;
+    }
+
+/* ── Title: bottom-left, dark ──────────────────────────────────────────── */
+
+.vas-ncj-title {
+    display: block;
+    font-size: clamp(18px, calc(var(--dash-inline-size, 100vw) * .01), 32px);
+    margin-top: auto;           /* push the title to the bottom of the card */
+    align-self: flex-start;
+    font-weight: 700;
+    color: #102C3F;
+    line-height: 1.2;
+    min-width: 0;               /* allow the flex item to shrink below content width */
+    max-width: 100%;
+    white-space: normal;        /* wrap rather than truncate — show the full name */
+    overflow-wrap: break-word;
+}
+
+/* ── Responsive: shrink the whole card on narrow dashboard cells by
+ *    lowering its base font-size. Inner em sizing scales automatically. */
+@container (max-width: 12.5em) { /* < 200px */
+    .vas-ncj-card { font-size: 0.875em; }
+}
+
+@container (max-width: 10em) { /* < 160px */
+    .vas-ncj-card {
+        font-size: 0.8125em;
+        padding: 0.75em;
+    }
+}

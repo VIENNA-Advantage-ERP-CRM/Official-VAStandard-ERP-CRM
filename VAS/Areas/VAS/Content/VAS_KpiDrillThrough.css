@@ -1,0 +1,296 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS KPI Drill-Through — shared modal for KPI tile drill-downs (VAS_122/124/125).
+ * A paged list of the records contributing to a KPI value; each row opens the
+ * record. Overlay in px. All selectors MPC-kpidrill-* (MPC prefix rule).
+ * ───────────────────────────────────────────────────────────────────────── */
+
+/* Clickable KPI tile affordance (added to the KPI card by each widget:
+   VAS_122 Total Customers, VAS_124 Delayed Payments, VAS_125 Open Pipeline).
+   2026-08-06 — the hover lift (translateY(-2px) + 0 14px 30px rgba(15,61,97,.12))
+   was removed on request, so these tiles no longer move or re-elevate on hover.
+   The pointer cursor and the keyboard focus ring stay: both are affordances for
+   the drill-through, not hover decoration. The transition went with the lift —
+   there is nothing left to animate. */
+.MPC-kpi-clickable {
+    cursor: pointer;
+}
+
+    .MPC-kpi-clickable:focus-visible {
+        outline: 2px solid #1F83FF;
+        outline-offset: 2px;
+    }
+
+/* Modal shell. */
+.MPC-kpidrill {
+    position: fixed;
+    inset: 0;
+    z-index: 5000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;                              /* px */
+    font-family: Roboto, sans-serif;
+    color: #102C3F;
+}
+
+    .MPC-kpidrill.is-open {
+        display: flex;
+    }
+
+    .MPC-kpidrill *,
+    .MPC-kpidrill {
+        box-sizing: border-box;
+    }
+
+.MPC-kpidrill-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(2, 20, 34, 0.42);
+    backdrop-filter: blur(2px);
+}
+
+.MPC-kpidrill-panel {
+    position: relative;
+    width: 100%;
+    max-width: 600px;                           /* px */
+    max-height: 84vh;
+    display: flex;
+    flex-direction: column;
+    background: #FFFFFF;
+    border-radius: 18px;                        /* px */
+    box-shadow: 0 30px 80px rgba(2, 20, 34, 0.35);
+    overflow: hidden;
+}
+
+.MPC-kpidrill-head {
+    flex-shrink: 0;
+    height: 56px;                               /* px */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;                            /* px */
+    border-bottom: 1px solid #E4EDF4;           /* px */
+}
+
+.MPC-kpidrill-title {
+    font-size: 16px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-kpidrill-head-r {
+    display: flex;
+    align-items: center;
+    gap: 14px;                                  /* px */
+    flex-shrink: 0;
+}
+
+.MPC-kpidrill-count {
+    font-size: 13px;                            /* px */
+    color: #748494;
+    white-space: nowrap;
+}
+
+.MPC-kpidrill-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;                         /* px */
+    display: grid;
+    place-items: center;
+    background: transparent;
+    border: none;
+    color: #102C3F;
+    cursor: pointer;
+}
+
+    .MPC-kpidrill-close:hover {
+        background: #F1F4F8;
+    }
+
+    .MPC-kpidrill-close svg {
+        width: 20px;
+        height: 20px;
+    }
+
+.MPC-kpidrill-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 6px 14px 8px;                      /* px */
+}
+
+.MPC-kpidrill-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.MPC-kpidrill-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;                                  /* px */
+    width: 100%;
+    padding: 10px 8px;                          /* px */
+    border: none;
+    border-bottom: 1px solid #EDF2F6;           /* px */
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+}
+
+    .MPC-kpidrill-row:last-child {
+        border-bottom: none;
+    }
+
+    .MPC-kpidrill-row:hover {
+        background: rgba(31, 131, 255, 0.05);
+    }
+
+    /* A row that resolves to no record (e.g. a lead-backed pipeline account, which has
+       no C_BPartner to open) is rendered inert - it must not offer a click affordance. */
+    .MPC-kpidrill-row-static {
+        cursor: default;
+    }
+
+        .MPC-kpidrill-row-static:hover {
+            background: transparent;
+        }
+
+.MPC-kpidrill-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;                        /* px */
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    font-size: 12px;                            /* px */
+    font-weight: 700;
+    color: #FFFFFF;
+}
+
+.MPC-kpidrill-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.MPC-kpidrill-rtitle {
+    font-size: 14px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-kpidrill-rmeta {
+    font-size: 12px;                            /* px */
+    color: #5F7283;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-kpidrill-rval {
+    font-size: 13px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.MPC-kpidrill-val-danger {
+    color: #8F2D2D;
+}
+
+.MPC-kpidrill-state {
+    padding: 18px 8px;                          /* px */
+    font-size: 13px;                            /* px */
+    color: #748494;
+    text-align: center;
+}
+
+.MPC-kpidrill-foot {
+    flex-shrink: 0;
+    padding: 10px 20px 16px;                    /* px */
+    border-top: 1px solid #E4EDF4;              /* px */
+    background: #FBFDFF;
+}
+
+/* Footer pager — dashboard-widgets.md §"Widget Footer Pager": two zones, the
+   result-range helper on the left and a compact prev · "N of M" · next control
+   on the right. Shared by VAS_122, VAS_124 and VAS_125. 2026-08-06: replaced the
+   centred solid-blue 34px circles with the 24px rounded-square buttons / 14px
+   chevrons from §Pager Buttons. Sizes stay px — this is modal chrome. */
+.MPC-kpidrill-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;                                  /* px */
+}
+
+.MPC-kpidrill-pglabel {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 12px;                            /* px */
+    color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-kpidrill-pgctl {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;                                   /* px */
+    flex-shrink: 0;
+}
+
+.MPC-kpidrill-pgtext {
+    min-width: 48px;                            /* px */
+    text-align: center;
+    font-size: 13px;                            /* px */
+    font-weight: 500;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.MPC-kpidrill-pgbtn {
+    width: 24px;                                /* px */
+    height: 24px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #E4EDF4;                  /* px */
+    border-radius: 6px;                         /* px */
+    background: #FBFDFF;
+    color: #0083DA;
+    cursor: pointer;
+}
+
+    .MPC-kpidrill-pgbtn:hover:not(:disabled) {
+        background: #EAF8FF;
+        border-color: #BFE4FF;
+    }
+
+    .MPC-kpidrill-pgbtn:disabled {
+        color: #B8C6D2;
+        cursor: default;
+    }
+
+    .MPC-kpidrill-pgbtn svg {
+        width: 14px;                            /* px */
+        height: 14px;
+        stroke: currentColor;
+    }
+
+body.MPC-kpidrill-open {
+    overflow: hidden;
+}

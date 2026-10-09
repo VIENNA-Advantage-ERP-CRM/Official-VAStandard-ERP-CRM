@@ -1,0 +1,458 @@
+/* VAS_187_RecentInventoryUseWidget Stylesheet (4x2 Recent List Widget) */
+
+.vas-riu-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+}
+
+    .vas-riu-root,
+    .vas-riu-root * {
+        box-sizing: border-box;
+    }
+
+.vas-riu-card {
+    font-family: Roboto, Arial, sans-serif;
+    /* Reverted to clamp(15px, 4cqi, 24px) (2026-09-28, user request): a prior pass had
+       shrunk this to the compact-tile canonical clamp(16px, 1.2cqi, 20px) per
+       dashboard-widgets.md's generic "Widget Root Anchor" formula, but that formula is
+       sized for small KPI/quick-action tiles, not this 4x2 ranked-list widget. That made
+       this widget read noticeably smaller than its true sibling in the same Inventory
+       Use window, VAS_188_TopUsedProductsWidget (also a 4x2 ranked-list widget), which
+       still correctly uses 4cqi/15-24px. Container-query scaling first (cqi resolves
+       against the root, which sets container-type: inline-size), with the JS-driven
+       --widget-inline-size as the fallback for engines without container queries. Same
+       rate in both: 4cqi == 0.04. */
+    font-size: clamp(15px, 4cqi, 24px);
+    font-size: clamp(15px, calc(var(--widget-inline-size, var(--dash-inline-size, 480px)) * 0.04), 24px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    text-align: left;
+    border: 2px solid #fff;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    backdrop-filter: blur(10px);
+    /* Design Specs (dashboard-widgets.md > "Widget Edge Spacing"): default inner
+       padding is 0.85em, not 0.875em. */
+    /* Matches the Inventory Use window's shared card padding (VAS_188/VAS_183/VAS_186/
+       VAS_178 all use .875em) - was .85em here, a slight but real mismatch. */
+    padding: .875em;
+    overflow: hidden;
+}
+
+/* Header & Filter */
+.vas-riu-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5em;
+    flex: 0 0 auto;
+    margin-bottom: .4em;
+}
+
+.vas-riu-head-left {
+    display: flex;
+    align-items: center;
+    /* Design Specs (dashboard-widgets.md > "Widget Header"): icon-to-title gap is 0.625em. */
+    gap: .625em;
+    min-width: 0;
+}
+
+/* Design Specs (dashboard-widgets.md > "Widget Header"): icon well is a soft glass
+   tile sized ~2x the title clamp, not a bare colored glyph. Sizes read off the same
+   --dash-inline-size lever as the title so the well never shrinks next to a
+   growing title on wide dashboards. */
+.vas-riu-ico {
+    width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    height: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(232, 244, 255, 0.96));
+    box-shadow: inset 0 0 0 1px #BFE4FF;
+    color: #0083DA;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+
+    .vas-riu-ico svg {
+        width: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
+        height: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
+    }
+
+/* Design Specs (dashboard-widgets.md > "Widget Header"): title/subtitle use their
+   own --dash-inline-size clamps, not em against the (widget-scoped) root - this is
+   what keeps the title in lockstep with every other widget's header on the same
+   dashboard regardless of this widget's own internal em scale. Weight is Regular
+   (400), not bold - was .9em/700 here. */
+.vas-riu-title {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    color: #102C3F;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-riu-sub {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
+    color: #717182;
+    line-height: 1.3;
+    margin-top: 2px;
+}
+
+.vas-riu-filter-wrap {
+    position: relative;
+    flex: 0 0 auto;
+}
+
+/* Icon-only control (label removed per explicit instruction - the funnel glyph alone
+   is enough, and the accessible name still lives in aria-label/title on the button).
+   Fixed px, not em against the card's local root - same convention already used by
+   .vas-riu-pager-btn below (24px square, per dashboard-widgets.md "Pager Buttons").
+   This control used to scale with the card's own font-size root; after that root was
+   corrected to the larger 4cqi/15-24px rate (matching sibling widgets), the button and
+   its dropdown grew to a disproportionately large size - fixed px insulates it from
+   the row-content root entirely, matching how the pager buttons already behave. */
+.vas-riu-filter-btn {
+    font-family: inherit;
+    color: #41576A;
+    background: #fff;
+    border: 1px solid #D9E2EB;
+    border-radius: 8px;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    outline: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+
+    .vas-riu-filter-btn svg {
+        width: 14px;
+        height: 14px;
+        flex: 0 0 auto;
+    }
+
+    .vas-riu-filter-btn:hover {
+        background: #F7FAFC;
+    }
+
+.vas-riu-filter-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    background: #fff;
+    border: 1px solid #D9E2EB;
+    border-radius: 10px;
+    box-shadow: 0 8px 20px rgba(15, 61, 97, .12);
+    padding: 5px;
+    min-width: 150px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    z-index: 20;
+}
+
+.vas-riu-filter-opt {
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    text-align: left;
+    color: #41576A;
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    padding: 8px 10px;
+    cursor: pointer;
+}
+
+    .vas-riu-filter-opt:hover {
+        background: #EAF8FF;
+    }
+
+    .vas-riu-filter-opt.active {
+        background: #0083DA;
+        color: #fff;
+    }
+
+/* Document Row Items */
+.vas-riu-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    overflow: hidden;
+}
+
+.vas-riu-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5em;
+    /* Fixed height, not a stretchy share: 1/3 of the body = 1/pageSize (pageSize
+       lowered 4 -> 3, user request, to give each row more room and fix the
+       congested look). flex: 1 1 0 used to divide the body EVENLY among
+       however many rows actually rendered, so a page with only 1-2 records (e.g. a
+       status filter with few matches) stretched that single row across the whole
+       body - it read as floating in the middle of an empty card instead of sitting
+       at the top like a full page does. flex-grow: 0 stops that: every row is
+       always exactly 1/3 of the body regardless of row count, rows stack from the
+       top (.vas-riu-body's default flex-start), and any leftover slots are simply
+       blank space below the last row rather than redistributed into it.
+       min-height: 0 is still required so a row can shrink below its content's
+       natural height on a short/laptop-height dashboard - see the row-clipping
+       history this replaced (flex: 1 1 0), same fix as .vas-mcw-row (VAS_183). */
+    flex: 0 0 33.3333%;
+    min-height: 0;
+    /* Row content must not exceed this shrunk height: the row itself has no overflow
+       clipping of its own (only .vas-riu-body does), so taller-than-allotted content
+       does not get clipped - it visually spills past the row's box into the next row's
+       space, which reads as the wrong Lines/Amount values sitting next to the wrong
+       document. Added 2026-09-18 after the redesign's two-line stat blocks first hit
+       this: overflow: hidden here clips instead of bleeding, as a safety net on top of
+       keeping the row's actual content height tight (see doc-meta / stat-lbl below). */
+    overflow: hidden;
+    /* Increased from .4em (user request: rows read as congested once the wider
+       page-size-3 rows had room to breathe but still touched edge-to-edge). */
+    padding: .75em 0;
+    border-bottom: 1px solid #E2EAF1;
+    border-top: 0;
+    border-left: 0;
+    border-right: 0;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+    transition: background 150ms ease;
+}
+
+    .vas-riu-row:last-child {
+        border-bottom: 0;
+    }
+
+    .vas-riu-row:hover {
+        background: rgba(234, 248, 255, 0.6);
+    }
+
+.vas-riu-row-left {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas-riu-doc-head {
+    display: flex;
+    align-items: center;
+    gap: .5em;
+}
+
+/* Design Specs (dashboard-widgets.md > "List / Grid Hierarchy Rule"): row/list item
+   text must resolve smaller than the widget title at every dashboard width - the sm
+   token (0.75em), not .85em (which can tie or exceed the title's own clamp on wide
+   dashboards). Weight/color still differentiate this primary cell from secondary
+   ones at the shared sm size. */
+.vas-riu-doc-no {
+    /* 2026-09-29, user request: "Do the font size changes as shown in image" - values tuned
+       live in DevTools (.vas-riu-doc-no/.vas-riu-badge/.vas-riu-doc-meta), persisted here. */
+    font-size: .62em;
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas-riu-badge {
+    font-size: .605em;
+    font-weight: 700;
+    padding: .15em .5em .15em .4em;
+    border-radius: 999px;
+    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    gap: .3em;
+}
+
+    .vas-riu-badge-ico {
+        display: inline-flex;
+        flex: 0 0 auto;
+    }
+
+        .vas-riu-badge-ico svg {
+            width: 1em;
+            height: 1em;
+        }
+
+    .vas-riu-badge.co {
+        background: #EAF8F0;
+        color: #2E7D32;
+    }
+
+    .vas-riu-badge.dr {
+        background: #F1F4F8;
+        color: #5F7283;
+    }
+
+    .vas-riu-badge.ip {
+        background: #FFF8E1;
+        color: #D78B10;
+    }
+
+.vas-riu-doc-meta {
+    font-size: .605em;
+    color: #5F7283;
+    margin-top: .15em;
+    display: flex;
+    align-items: center;
+    gap: .35em;
+    overflow: hidden;
+    line-height: 1.2;
+}
+
+    .vas-riu-doc-meta span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+.vas-riu-cal-ico {
+    width: .95em;
+    height: .95em;
+    flex: 0 0 auto;
+    color: #8FA3B3;
+}
+
+.vas-riu-row-right {
+    display: flex;
+    align-items: center;
+    gap: .75em;
+    flex: 0 0 auto;
+}
+
+.vas-riu-stat {
+    text-align: right;
+}
+
+.vas-riu-stat-lbl {
+    font-size: .625em;
+    font-weight: 400;
+    color: #8FA3B3;
+    text-transform: capitalize;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.vas-riu-stat-val {
+    font-size: .75em;
+    font-weight: 700;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.vas-riu-divider {
+    width: 1px;
+    align-self: stretch;
+    background: #E2EAF1;
+}
+
+/* Footer Pager */
+.vas-riu-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    /* foundations.md > Dividers: footer band is #D9E2EB, not the non-canonical
+       #EDF2F6 this used to read. */
+    border-top: 1px solid #D9E2EB;
+    padding-top: .4em;
+    margin-top: .25em;
+    flex: 0 0 auto;
+}
+
+/* Reverted to em against the card's local root (2026-09-29, user request: match
+   VAS_184_HighValueUsageWidget's footer, which uses this same em-against-local-root
+   pattern). The earlier fixed-px override was working around this widget's root
+   anchor being mismatched against its siblings; that root has since been corrected
+   (matches VAS_184/VAS_185/VAS_188 at clamp(15px, 4cqi, 24px)), so the shared em
+   multiplier now resolves to the same physical size on every widget in this family
+   without needing to opt out of the local root. */
+.vas-riu-foot-helper {
+    font-size: .75em;
+    color: #748494;
+}
+
+.vas-riu-pager {
+    display: flex;
+    align-items: center;
+    gap: .4em;
+    font-size: .8125em;
+    color: #102C3F;
+    font-weight: 500;
+}
+
+.vas-riu-pager-btn {
+    width: 24px;
+    height: 24px;
+    border: 1px solid #D9E2EB;
+    /* Design Specs (dashboard-widgets.md > "Pager Buttons"): "do not use circular-only
+       arrow buttons as the only option; prefer the compact rounded-square/capsule
+       treatment" - was 50% (fully circular). */
+    border-radius: 6px;
+    background: #fff;
+    color: #0083DA;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+}
+
+    .vas-riu-pager-btn svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .vas-riu-pager-btn:disabled {
+        color: #B8C6D2;
+        cursor: default;
+    }
+
+.vas-riu-empty {
+    padding: 2em 1em;
+    text-align: center;
+    color: #5F7283;
+    font-size: .75em;
+}
+
+.vas-riu-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, .62);
+    border-radius: 14px;
+    z-index: 5;
+}
+
+.vas-riu-hidden {
+    display: none !important;
+}
+
+/* NOTE: a duplicated, unscoped ".vas-modal-*" block used to live here (and in five sibling
+   widget stylesheets). It was dead code - no JavaScript referenced those class names, this
+   widget uses its own scoped modal classes - and it carried hardcoded px font sizes with
+   !important, which breaks the Universal Dynamic Responsive System rule. Removed 2026-08-12. */

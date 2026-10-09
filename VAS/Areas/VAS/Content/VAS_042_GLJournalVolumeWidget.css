@@ -1,0 +1,256 @@
+/* ==========================================================================
+   VAS GL Journal Volume by Day Chart Widget
+   File  : VAS_042_GLJournalVolumeWidget.css
+   Scope : .VAS-gljv-root
+   Onfinity design system (design.md + dashboard-widgets.md)
+   ========================================================================== */
+
+/* ── Root wrapper ────────────────────────────────────────────────────────── */
+.VAS-gljv-root {
+    --on-text-muted: #748494;
+    height: 100%;
+    width: 100%;
+    container-type: inline-size;
+}
+
+/* ── Card container ──────────────────────────────────────────────────────────
+   Shared glass surface (identical to VAS_036). Root anchor font-size clamps on
+   --dash-inline-size (NOT cqi, because this root sets its own container-type).
+   design.md: clamp(16px, 1.2cqi, 20px) → 0.012 ≈ 1.2 % of dashboard width. */
+.VAS-gljv-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 0.85em;
+    border-radius: 14px;
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    box-sizing: border-box;
+    overflow: hidden;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
+}
+
+/* ── Header row ──────────────────────────────────────────────────────────── */
+.VAS-gljv-root .w-head {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    flex-shrink: 0;
+    margin-bottom: 0.5em;
+}
+
+/* Glass icon well + glyph — scale on --dash-inline-size (design.md Widget Header).
+   Accent (#0083DA) carried by the glyph color, not the surface. */
+.VAS-gljv-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    height: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    flex-shrink: 0;
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(232, 244, 255, 0.96));
+    box-shadow: inset 0 0 0 1px rgba(31, 131, 255, 0.10);
+    color: #0083DA;
+}
+
+.VAS-gljv-icon svg {
+    width: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
+    height: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
+    stroke: currentColor;
+}
+
+/* Title + subtitle stack */
+.VAS-gljv-title-wrap {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+/* Title — Roboto Regular 400, clamp ceiling 17px (design.md Widget Header) */
+.VAS-gljv-root .w-title {
+    font-family: 'Roboto', sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    font-weight: 400;
+    line-height: 1.2;
+    letter-spacing: 0;
+    color: #102C3F;
+    white-space: nowrap;
+}
+
+/* Subtitle — data source descriptor, Roboto Regular, clamp ceiling 13px, muted
+   (design.md Widget Header subtitle) */
+.VAS-gljv-subtitle {
+    font-family: 'Roboto', sans-serif;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
+    font-weight: 400;
+    line-height: 1.3;
+    letter-spacing: 0;
+    color: #5F7283;
+    margin-top: 0.125em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Sub-label meta: "APR 1–18 · Count vs Value" — xs muted, smaller than title */
+.VAS-gljv-sub {
+    font-size: 0.6875em;
+    font-weight: 400;
+    line-height: 1.3;
+    color: #748494;
+    letter-spacing: 0;
+    margin-left: auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── Week / Month toggle (control chrome — px box like the widget pager) ──── */
+.VAS-gljv-period-group {
+    display: inline-flex;
+    align-items: stretch;
+    gap: 0;
+    flex-shrink: 0;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid #BFE4FF;
+    border-radius: 8px;
+    background: #FFFFFF;
+}
+
+.VAS-gljv-period-btn {
+    min-width: 54px;
+    height: 26px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 0;
+    background: #FFFFFF;
+    color: #748494;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+    transition: background 0.14s ease, color 0.14s ease;
+}
+
+.VAS-gljv-period-btn + .VAS-gljv-period-btn {
+    border-left: 1px solid #BFE4FF;
+}
+
+.VAS-gljv-period-btn:hover {
+    background: #F4FBFF;
+    color: #0083DA;
+}
+
+.VAS-gljv-period-btn.is-active {
+    background: #EAF8FF;
+    color: #0083DA;
+}
+
+/* ── Chart area ──────────────────────────────────────────────────────────── */
+.VAS-gljv-chart-wrap {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    align-items: stretch;
+}
+
+/* The injected SVG fills the wrap */
+.VAS-gljv-chart-wrap svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* Bars / trend dots keep the JS-set semantic colors; CSS handles interaction. */
+.VAS-gljv-bar,
+.VAS-gljv-dot {
+    cursor: pointer;
+}
+
+.VAS-gljv-bar:hover {
+    opacity: 1;
+    filter: drop-shadow(0 2px 3px rgba(0, 83, 180, 0.18));
+}
+
+.VAS-gljv-dot:hover {
+    r: 4;
+}
+
+/* ── Legend row → rail style (design.md in-card header/legend row) ─────────
+   Transparent bg, capitalize, header divider #C5D2DD; text #41576A Medium 500,
+   xs. Swatches keep their semantic accent colors. */
+.VAS-gljv-legend {
+    display: flex;
+    align-items: center;
+    gap: 1em;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    margin-top: 0.5em;
+    padding-top: 0.5em;
+    background: transparent;
+    border-top: 1px solid #C5D2DD;
+}
+
+.VAS-gljv-leg-item {
+    display: flex;
+    align-items: center;
+    gap: 0.35em;
+    font-size: 0.6875em;
+    font-weight: 500;
+    line-height: 1.3;
+    color: #41576A;
+    text-transform: capitalize;
+    white-space: nowrap;
+}
+
+/* ── Legend swatches (semantic accents preserved) ────────────────────────── */
+.VAS-gljv-swatch {
+    display: inline-block;
+    width: 0.75em;
+    height: 0.75em;
+    border-radius: 0.15em;
+    flex-shrink: 0;
+}
+
+/* Posted — solid blue */
+.VAS-gljv-sw-posted {
+    background: #0083DA;
+}
+
+/* Weekend — faded blue */
+.VAS-gljv-sw-weekend {
+    background: #DFF1FF;
+}
+
+/* This week — bright blue */
+.VAS-gljv-sw-week {
+    background: #1F83FF;
+}
+
+/* Net value trend — green line swatch */
+.VAS-gljv-sw-trend {
+    background: #019D89;
+    height: 0.2em;
+    border-radius: 999px;
+    align-self: center;
+    width: 1em;
+}
+
+/* ── RTL support ─────────────────────────────────────────────────────────── */
+html[dir="rtl"] .VAS-gljv-root .w-head {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .VAS-gljv-sub {
+    margin-left: unset;
+    margin-right: auto;
+}
+
+html[dir="rtl"] .VAS-gljv-legend {
+    flex-direction: row-reverse;
+}

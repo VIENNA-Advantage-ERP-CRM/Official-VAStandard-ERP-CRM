@@ -28,7 +28,7 @@
         //Page size to show data in main div
         var arrayPageSize = 6;
         var countRecord = 6;
-        var $root = $('<div class="h-100 w-100">');
+        var $root = $('<div class="h-100 w-100 vas-widget-bg">');
         var $maindiv = null;
         var gridDataResult = null;
         var $FilterHeader = null
@@ -65,11 +65,11 @@
             } else if (value === "VAS_ARReceipt" || value === "Y") {
                 isSOTrx = true;
             }
-            
-                
+
+
             $maindiv = $('<div class="vas-expay-expected-payment">')
-            var headingDiv = $('<div class="vas-expay-expected-heading">');
-            var HeadingLabelDiv = $('<div style="font-size:1.4em">' + (isSOTrx == true ? VIS.Msg.getMsg("VAS_ExpectedReceipt") : VIS.Msg.getMsg("VAS_ExpectedPayment")) + '</div>')
+            var headingDiv = $('<div class="vas-expay-expected-heading vas-common-heading">');
+            var HeadingLabelDiv = $('<div style="/*font-size:1.4em*/">' + (isSOTrx == true ? VIS.Msg.getMsg("VAS_ExpectedReceipt") : VIS.Msg.getMsg("VAS_ExpectedPayment")) + '</div>')
             var filetrDiv = $("<div class='vas-expay-filter dropdown'>" +
                 "<div class='vas-expay-icondiv'>" +
                 "<span class='vas-expay-filterspn btn d-flex position-relative' type='button' id='vas_expay_dropdownMenu_" + $self.windowNo + "'>" +
@@ -83,7 +83,7 @@
             $maindiv.append(headingDiv);
             /*Find FilterDiv which will open filter section on click of filter button*/
             var FilterToClickDiv = filetrDiv.find("#vas_expay_dropdownMenu_" + $self.windowNo);
-            FilterToClickDiv.on("click", function () {              
+            FilterToClickDiv.on("click", function () {
                 if (!IsFilterBtnClicked) {
                     filetrDiv.addClass('vas-disableArrow');
                     IsFilterBtnClicked = true;
@@ -233,8 +233,8 @@
                 else {
                     $FilterHeader.remove();
                     IsFilterBtnClicked = false;
-                }               
-            })          
+                }
+            })
         };
 
         /*This function will load data in widget */
@@ -334,18 +334,19 @@
                     }
                 }
                 // Create the widget data design element
-                var widgetDataDesign = '<div class="vas-expay-payments-box">' +
+                var widgetDataDesign = '<div class="vas-expay-payments-box vas-separator-row">' +
                     '<span class="VAS-expay-searchLinkIconBlock">' +
                     '<i class="glyphicon glyphicon-zoom-in" data-Record_ID="' + gridDataResult[i].Record_ID + '" data-windowId="' + gridDataResult[i].Window_ID +
                     '" data-Primary_ID="' + gridDataResult[i].Primary_ID + '" id="VAS-unAllocatedZoom_' + $self.windowNo + '" title="' + VIS.Msg.getMsg("VAS_Zoom") + '"></i>' +
                     '</span>' +
                     '<div class="vas-expay-payments-detail">' +
                     '<div class="vas-expay-payment-w-amount">' +
-                    '<div class="vas-expay-payment-lbl vas-expay-com-name vas-expay-head-font"  title="' + VIS.Msg.getMsg("VAS_Type") + ': ' + headingText+'">' + headingText + '</div>' +
+                    '<div class="vas-expay-payment-lbl vas-expay-com-name vas-expay-head-font"  title="' + VIS.Msg.getMsg("VAS_Type") + ': ' + headingText + '">' + headingText + '</div>' +
                     '</div>' +
                     '<div class="vas-expay-payment-w-amount">' +
                     '<div class="vas-expay-payment-lbl vas-expay-text-align vas-expay-com-name vas-expay-rtl" title="' + VIS.Msg.getMsg("VAS_DueDate")
-                    + ': ' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].OrderdDate).toLocaleDateString(window.navigator.language, {day: '2-digit', month: '2-digit', year: 'numeric'
+                    + ': ' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].OrderdDate).toLocaleDateString(window.navigator.language, {
+                        day: '2-digit', month: '2-digit', year: 'numeric'
                     }) + '">' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].OrderdDate).toLocaleDateString(window.navigator.language, {
                         day: '2-digit', month: '2-digit', year: 'numeric'
                     }) + '</div>' +
@@ -391,9 +392,13 @@
             var arrowDiv = $(
                 '<div class="vas-expay-pagingdiv">' +
                 '<div class="vas-expay-slider-arrows" id="vas_arrawcontainer_' + widgetID + '">' +
+                '<a href="#">' +
                 '<i class= "fa fa-arrow-circle-left vas-expay-leftar" aria-hidden="true"></i>' +
-                '<span class="vas-expay-pagespan">' + '<span>' + CurrentPage + ' ' + '</span>' + '<span>' + VIS.Msg.getMsg("VAS_Of") + ' ' + '</span>' + '<span>' + TotalPagesofrecords + '</span>'+ '</span > ' +
+                '</a>' +
+                '<span class="vas-expay-pagespan">' + '<span>' + CurrentPage + ' ' + '</span>' + '<span>' + VIS.Msg.getMsg("VAS_Of") + ' ' + '</span>' + '<span>' + TotalPagesofrecords + '</span>' + '</span > ' +
+                '<a href="#">' +
                 '<i class="fa fa-arrow-circle-right vas-expay-rightar" aria-hidden="true"></i>' +
+                '</a>' +
                 '</div>' +
                 '</div>');
             $maindiv.append(listDesign).append(arrowDiv);

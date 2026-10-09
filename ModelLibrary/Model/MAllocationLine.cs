@@ -163,6 +163,37 @@ namespace VAdvantage.Model
         /// <returns>true if success</returns>
         protected override bool BeforeSave(bool newRecord)
         {
+            TsBeforeSaveStart = System.Diagnostics.Stopwatch.GetTimestamp();
+            bool ok = BeforeSaveLine(newRecord);
+            TsBeforeSaveEnd = System.Diagnostics.Stopwatch.GetTimestamp();
+            return ok;
+        }
+
+        /// <summary>
+        /// After Save - only records when it was reached, see TsAfterSaveStart
+        /// </summary>
+        /// <param name="newRecord">new</param>
+        /// <param name="success">success</param>
+        /// <returns>success</returns>
+        protected override bool AfterSave(bool newRecord, bool success)
+        {
+            TsAfterSaveStart = System.Diagnostics.Stopwatch.GetTimestamp();
+            return success;
+        }
+
+        /// <summary>
+        /// Stopwatch timestamps taken inside Save (0 when not reached), so a caller can split a slow save into
+        /// before BeforeSave / BeforeSave itself / BeforeSave→AfterSave (validators, insert, reload) / after AfterSave
+        /// </summary>
+        public long TsBeforeSaveStart, TsBeforeSaveEnd, TsAfterSaveStart;
+
+        /// <summary>
+        /// Before Save logic
+        /// </summary>
+        /// <param name="newRecord">new</param>
+        /// <returns>true if success</returns>
+        private bool BeforeSaveLine(bool newRecord)
+        {
             if (!newRecord
                 && (Is_ValueChanged("C_BPartner_ID") || Is_ValueChanged("C_Invoice_ID")))
             {
@@ -171,10 +202,31 @@ namespace VAdvantage.Model
             }
 
             //	Set BPartner/Order from Invoice
-            if (GetC_BPartner_ID() == 0 && GetInvoice() != null)
-                SetC_BPartner_ID(GetInvoice().GetC_BPartner_ID());
-            if (GetC_Order_ID() == 0 && GetInvoice() != null)
-                SetC_Order_ID(GetInvoice().GetC_Order_ID());
+            if (GetC_Invoice_ID() != 0 && (GetC_BPartner_ID() == 0 || GetC_Order_ID() == 0))
+            {
+                if (_invoice != null)
+                {
+                    if (GetC_BPartner_ID() == 0)
+                        SetC_BPartner_ID(_invoice.GetC_BPartner_ID());
+                    if (GetC_Order_ID() == 0)
+                        SetC_Order_ID(_invoice.GetC_Order_ID());
+                }
+                else
+                {
+                    // only two columns are needed - read them instead of loading the whole invoice, which ran for every
+                    // saved line (an invoice without an order always has C_Order_ID = 0 here)
+                    DataSet ds = DB.ExecuteDataset("SELECT C_BPartner_ID, C_Order_ID FROM C_Invoice WHERE C_Invoice_ID = " + GetC_Invoice_ID(),
+                        null, Get_Trx());
+                    if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                    {
+                        DataRow dr = ds.Tables[0].Rows[0];
+                        if (GetC_BPartner_ID() == 0)
+                            SetC_BPartner_ID(Util.GetValueOfInt(dr["C_BPartner_ID"]));
+                        if (GetC_Order_ID() == 0)
+                            SetC_Order_ID(Util.GetValueOfInt(dr["C_Order_ID"]));
+                    }
+                }
+            }
             //
             return true;
         }
@@ -244,6 +296,20 @@ namespace VAdvantage.Model
         /// <returns>C_BPartner_ID</returns>
         public int ProcessIt(bool reverse)
         {
+            return ProcessIt(reverse, null);
+        }
+
+        /// <summary>
+        /// Process Allocation (does not update line).
+        /// - Update and Link Invoice/Payment/Cash
+        /// </summary>
+        /// <param name="reverse">reverse if true allocation is reversed</param>
+        /// <param name="testedPayments">payments already tested in this completion; when given, a payment shared
+        /// by several lines is tested and saved only for its first line. Its allocated amount is summed from all
+        /// saved lines, so repeating the test for every line gives the same result.</param>
+        /// <returns>C_BPartner_ID</returns>
+        public int ProcessIt(bool reverse, HashSet<int> testedPayments)
+        {
             log.Fine("Reverse=" + reverse + " - " + ToString());
             int C_Invoice_ID = GetC_Invoice_ID();
             MInvoicePaySchedule invoiceSchedule = null;
@@ -262,7 +328,7 @@ namespace VAdvantage.Model
             int C_CashLine_ID = GetC_CashLine_ID();
 
             //	Update Payment
-            if (C_Payment_ID != 0)
+            if (C_Payment_ID != 0 && (reverse || testedPayments == null || testedPayments.Add(C_Payment_ID)))
             {
                 payment = new MPayment(GetCtx(), C_Payment_ID, Get_TrxName());
                 if (GetC_BPartner_ID() != payment.GetC_BPartner_ID())
@@ -356,13 +422,13 @@ namespace VAdvantage.Model
                         + " Linked to C_Invoice_ID=" + C_Invoice_ID);
                 }
 
-                //	Link to Order
+                //	Link to Order - only an invoice with an order has one to link; filtering on the order key instead of
+                //	"WHERE EXISTS (… C_Invoice …)" keeps this from scanning C_Order once per allocation line
                 String update = "UPDATE C_Order o "
                     + "SET C_Payment_ID="
                         + (reverse ? "NULL " : "(SELECT C_Payment_ID FROM C_Invoice WHERE C_Invoice_ID=" + C_Invoice_ID + ") ")
-                    + "WHERE EXISTS (SELECT * FROM C_Invoice i "
-                        + "WHERE o.C_Order_ID=i.C_Order_ID AND i.C_Invoice_ID=" + C_Invoice_ID + ")";
-                if (DataBase.DB.ExecuteQuery(update, null, Get_TrxName()) > 0)
+                    + "WHERE o.C_Order_ID=" + invoice.GetC_Order_ID();
+                if (invoice.GetC_Order_ID() > 0 && DataBase.DB.ExecuteQuery(update, null, Get_TrxName()) > 0)
                 {
                     log.Fine("C_Payment_ID=" + C_Payment_ID
                         + (reverse ? " UnLinked from" : " Linked to")
@@ -391,13 +457,12 @@ namespace VAdvantage.Model
                         + " Linked to C_Invoice_ID=" + C_Invoice_ID);
                 }
 
-                //	Link to Order
+                //	Link to Order - filtered on the order key, see the payment case above
                 String update = "UPDATE C_Order o "
                     + "SET C_CashLine_ID="
                         + (reverse ? "NULL " : "(SELECT C_CashLine_ID FROM C_Invoice WHERE C_Invoice_ID=" + C_Invoice_ID + ") ")
-                    + "WHERE EXISTS (SELECT * FROM C_Invoice i "
-                        + "WHERE o.C_Order_ID=i.C_Order_ID AND i.C_Invoice_ID=" + C_Invoice_ID + ")";
-                if (DataBase.DB.ExecuteQuery(update, null, Get_TrxName()) > 0)
+                    + "WHERE o.C_Order_ID=" + invoice.GetC_Order_ID();
+                if (invoice.GetC_Order_ID() > 0 && DataBase.DB.ExecuteQuery(update, null, Get_TrxName()) > 0)
                 {
                     log.Fine("C_CashLine_ID=" + C_CashLine_ID
                         + (reverse ? " UnLinked from" : " Linked to")

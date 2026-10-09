@@ -303,9 +303,9 @@
                 recordID: self.$super.record_ID,
                 pageNo: pNo,
 
-                isBaseLangss: isBaseLangs,
+                isBaseLangss: VIS.secureEngine.encrypt(isBaseLangs),
                 cInvoiceID: C_Invoice_ID,
-                mProductIDs: mProductID
+                mProductIDs: VIS.secureEngine.encrypt(mProductID)
             },
             error: function (e) {
                 alert(VIS.Msg.getMsg('ErrorWhileGettingData'));

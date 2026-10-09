@@ -1,0 +1,648 @@
+/*
+ * VAS_053_ApprovalQueueCashJournalWidget.css
+ * Widget : Approval Queue - Cash Journal
+ * Screen : Cash Journal
+ * Prefix : VAS_053_
+ * Scope  : All selectors are scoped under the widget root.
+ */
+
+.VAS_053_approval-root,
+.VAS_053_approval-root * {
+    box-sizing: border-box;
+}
+
+.VAS_053_approval-root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    /* Query container only — no font-size (see card), so container-query em
+       breakpoints resolve against 16px like ExpectedThisWeek. */
+    container-type: inline-size;
+    font-family: Roboto, Arial, sans-serif;
+    color: #102C3F;
+}
+
+.VAS_053_approval-card {
+    /* Widget root anchor on the dashboard-width lever (ExpectedThisWeek pattern):
+       lives on the card, not the query-container root. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875em;
+    padding: 0.85em;
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    color: #102C3F;
+}
+
+.VAS_053_approval-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    min-width: 0;
+    flex-shrink: 0;
+}
+
+/* Fills the header so the meta chip can be pushed to the far right edge
+   (see the margin-left:auto on .VAS_053_approval-meta). */
+.VAS_053_approval-title-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.VAS_053_approval-icon {
+    width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    height: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    min-width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    border-radius: 12px;
+    background: linear-gradient(180deg, #FFFFFF, #E8F4FF);
+    color: #3B7DD8;
+}
+
+.VAS_053_approval-icon svg {
+    width: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
+    height: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
+}
+
+/* Widget title — shared Widget Header style (self-sufficient --dash-inline-size clamp) */
+/* Title + subtitle stack next to the header icon. */
+.VAS_053_approval-title-wrap {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+}
+
+/* Header subtitle — shared Widget Header subtitle clamp. */
+.VAS_053_approval-subtitle {
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
+    line-height: 1.3;
+    font-weight: 400;
+    letter-spacing: 0;
+    color: #717182;
+}
+
+.VAS_053_approval-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    line-height: 1.2;
+    font-weight: 400;
+    letter-spacing: 0;
+    color: #102C3F;
+}
+
+/* Header meta — neutral Chip token (sentence case, no tracking).
+   Right-aligned: the auto left margin absorbs the free header space so the
+   chip sits against the card's right edge, not next to the title. */
+.VAS_053_approval-meta {
+    flex: 0 0 auto;
+    margin-left: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0.25em 0.5em;
+    border-radius: 999px;
+    background: #F1F4F8;
+    font-size: 0.6875em;
+    line-height: 1.2;
+    font-weight: 500;
+    letter-spacing: 0;
+    color: #41576A;
+}
+
+.VAS_053_approval-header-actions {
+    min-width: 0;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625em;
+}
+
+.VAS_053_approval-pager {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625em;
+}
+
+.VAS_053_approval-footer {
+    min-width: 0;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-top: 0.625em;
+    border-top: 1px solid #D9E2EB;
+}
+
+.VAS_053_approval-page-btn {
+    width: 1.5em;
+    height: 1.5em;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid #cfe9ff;
+    border-radius: 0.5em;
+    background: rgba(255, 255, 255, 0.86);
+    color: #0083DA;
+    font: inherit;
+    font-size: 0.875em;
+    line-height: 1;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.VAS_053_approval-page-btn:hover:not(:disabled) {
+    background: #eaf8ff;
+    border-color: #9ed1ff;
+}
+
+.VAS_053_approval-page-btn:disabled {
+    color: #B8C6D2;
+    background: rgba(255, 255, 255, 0.64);
+    cursor: default;
+}
+
+.VAS_053_approval-page-text {
+    min-width: 3em;
+    text-align: center;
+    font-size: 0.8125em;
+    line-height: 1.2;
+    font-weight: 500;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+}
+
+.VAS_053_approval-action {
+    flex: 0 0 auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #3B7DD8;
+    font: inherit;
+    font-size: 0.75em;
+    line-height: 1.2;
+    font-weight: 700;
+    letter-spacing: 0;
+    cursor: pointer;
+}
+
+.VAS_053_approval-list {
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    overflow: hidden;
+}
+
+.VAS_053_approval-row {
+    min-width: 0;
+    min-height: 4em;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: stretch;
+    gap: 0.625em;
+    padding: 0.625em 0;
+    border-bottom: 1px solid #E2EAF1;
+}
+
+.VAS_053_approval-row:last-child {
+    border-bottom: 0;
+}
+
+.VAS_053_approval-row-main {
+    min-width: 0;
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25em;
+    align-self: stretch;
+}
+
+.VAS_053_approval-row-top {
+    display: flex;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 0.375em;
+    row-gap: 0.5em;
+    min-width: 0;
+}
+
+.VAS_053_approval-row-title {
+    flex: 1 1 9em;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.75em;
+    line-height: 1.2;
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.VAS_053_approval-priority {
+    flex: 0 0 auto;
+    padding: 0.25em 0.5em;
+    border-radius: 6px;
+    font-size: 0.6875em;
+    line-height: 1.1;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.VAS_053_approval-priority-high {
+    background: #FCEFEF;
+    color: #A33F3F;
+}
+
+.VAS_053_approval-priority-med {
+    background: #FFF6E2;
+    color: #9A6500;
+}
+
+/* Low priority carries no signal worth a pill — hidden so only High / Med
+   stand out on the row. */
+.VAS_053_approval-priority-low {
+    display: none;
+}
+
+.VAS_053_approval-row-sub,
+.VAS_053_approval-message {
+    min-width: 0;
+    font-size: 0.6875em;
+    line-height: 1.25;
+    color: #5F7283;
+}
+
+.VAS_053_approval-row-sub {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.VAS_053_approval-message {
+    display: -webkit-box;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    margin-top: 0.125em;
+    color: #7C8795;
+}
+
+.VAS_053_approval-side {
+    min-width: 13em;
+    flex: 0 0 13em;
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.625em;
+}
+
+.VAS_053_approval-amount {
+    flex: 0 0 auto;
+    width: auto;
+    max-width: 100%;
+    margin-inline-start: auto;
+    overflow: visible;
+    white-space: nowrap;
+    text-align: right;
+    display: inline-flex;
+    align-items: baseline;
+    justify-content: flex-end;
+    gap: 0;
+    font-size: 0.6875em;
+    line-height: 1;
+    font-weight: 700;
+    color: #0083DA;
+}
+
+.VAS_053_approval-amount .VAS-cash-amount-prefix {
+    flex: 0 0 auto;
+    margin-top: 0.08em;
+    font-size: 0.72em;
+    line-height: 1;
+    font-weight: 500;
+    color: currentColor;
+    opacity: 0.78;
+}
+
+.VAS_053_approval-amount .VAS-cash-amount-prefix:empty,
+.VAS_053_approval-amount .VAS-cash-amount-decimal:empty {
+    display: none;
+    margin: 0;
+}
+
+.VAS_053_approval-amount .VAS-cash-amount-main {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 1em;
+    line-height: 1;
+    color: currentColor;
+}
+
+.VAS_053_approval-amount .VAS-cash-amount-decimal {
+    flex: 0 0 auto;
+    margin-top: 0.26em;
+    font-size: 0.72em;
+    line-height: 1;
+    font-weight: 500;
+    color: currentColor;
+    opacity: 0.66;
+}
+
+.VAS_053_approval-amount .VAS-cash-amount-prefix,
+.VAS_053_approval-amount .VAS-cash-amount-decimal {
+    align-self: baseline;
+    margin-top: 0;
+    color: currentColor;
+    font-size: 1em;
+    font-weight: 700;
+    opacity: 1;
+}
+
+.VAS_053_approval-actions {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375em;
+}
+
+.VAS_053_approval-btn {
+    width: 1.75em;
+    height: 1.75em;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.68);
+    color: #60748A;
+    cursor: pointer;
+}
+
+.VAS_053_approval-btn svg {
+    width: 0.875em;
+    height: 0.875em;
+    stroke-width: 2.4;
+}
+
+.VAS_053_approval-btn-approve {
+    background: rgba(12, 116, 87, 0.10);
+    color: #0C7457;
+}
+
+.VAS_053_approval-btn-reject {
+    background: rgba(196, 63, 68, 0.12);
+    color: #B44045;
+}
+
+/* Document number rendered as a hyperlink inside the row title — clicking it
+   zooms to the cash journal record. The rest of the title stays plain text. */
+.VAS_053_approval-row-link {
+    color: #0083DA;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+    .VAS_053_approval-row-link:hover,
+    .VAS_053_approval-row-link:focus-visible {
+        color: #0069AE;
+        text-decoration: underline;
+        outline: none;
+    }
+
+.VAS_053_approval-busy {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 0.875em;
+    background: rgba(255, 255, 255, 0.76);
+    color: #60748A;
+    font-size: 0.8125em;
+    line-height: 1.35;
+    font-weight: 600;
+    text-align: center;
+    border-radius: 14px;
+}
+
+.VAS_053_approval-busy.is-visible {
+    display: flex;
+}
+
+.VAS_053_approval-state {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: none;
+    pointer-events: none;
+    align-items: center;
+    justify-content: center;
+    padding: 0.875em;
+    color: #60748A;
+    font-size: 0.8125em;
+    line-height: 1.35;
+    font-weight: 600;
+    text-align: center;
+    border-radius: 14px;
+}
+
+.VAS_053_approval-state.is-visible {
+    display: flex;
+}
+
+@container (max-width: 24em) {
+    .VAS_053_approval-card {
+        padding: 0.75em;
+        border-radius: 12px;
+        gap: 0.375em;
+    }
+
+    .VAS_053_approval-meta {
+        display: none;
+    }
+
+    .VAS_053_approval-header-actions {
+        gap: 0.5em;
+    }
+
+    .VAS_053_approval-page-text {
+        min-width: 2.25em;
+    }
+
+    .VAS_053_approval-row {
+        min-height: 4em;
+    }
+}
+
+@container (max-width: 16em) {
+    .VAS_053_approval-card {
+        padding: 0.625em;
+    }
+
+    .VAS_053_approval-icon {
+        width: 1.75em;
+        height: 1.75em;
+        border-radius: 0.375em;
+    }
+
+    .VAS_053_approval-header {
+        gap: 0.5em;
+    }
+
+    .VAS_053_approval-header-actions {
+        gap: 0.375em;
+    }
+
+    .VAS_053_approval-page-btn {
+        width: 1.6em;
+        height: 1.6em;
+    }
+
+    .VAS_053_approval-page-text {
+        display: none;
+    }
+
+    .VAS_053_approval-row {
+        padding: 0.5625em 0.625em;
+    }
+
+    .VAS_053_approval-btn {
+        width: 1.75em;
+        height: 1.75em;
+    }
+
+    .VAS_053_approval-amount {
+        max-width: none;
+    }
+
+    .VAS_053_approval-side {
+        min-width: 7em;
+        flex-basis: 7em;
+    }
+}
+
+.VAS_053_approval-pager {
+    gap: 0.625em;
+}
+
+.VAS_053_approval-page-btn {
+    width: 1.5em;
+    height: 1.5em;
+    border: 1px solid #cfe9ff;
+    border-radius: 0.5em;
+    background: rgba(255, 255, 255, 0.86);
+    color: #0083DA;
+}
+
+.VAS_053_approval-page-btn:hover:not(:disabled) {
+    background: #eaf8ff;
+    border-color: #9ed1ff;
+}
+
+.VAS_053_approval-page-btn:disabled {
+    color: #B8C6D2;
+    background: rgba(255, 255, 255, 0.64);
+}
+
+.VAS_053_approval-page-text {
+    display: inline-block;
+    min-width: 3em;
+    font-size: 0.8125em;
+    font-weight: 500;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Hover expand: show full text on pointer-over ─────────────────────── */
+.VAS_053_approval-row-title,
+.VAS_053_approval-row-sub {
+    cursor: default;
+}
+
+/* Responsive shrink — VAS_012 pattern: step the whole card font-size down on
+   narrow cells so all em-based content scales together. */
+@container (max-width: 18.75em) {
+    .VAS_053_approval-card { font-size: 0.8125em; }
+}
+
+@container (max-width: 13.75em) {
+    .VAS_053_approval-card { font-size: 0.6875em; }
+}
+/*
+.VAS_053_approval-row-title:hover,
+.VAS_053_approval-row-sub:hover {
+    overflow: visible;
+    white-space: normal;
+    word-break: break-word;
+    position: relative;
+    z-index: 30;
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 4px 16px rgba(15, 61, 97, 0.14);
+    border-radius: 6px;
+    padding: 0.25em 0.5em;
+    margin: -0.25em -0.5em;
+}*/
+
+/* Canonical dashboard widget footer pager. */
+.VAS_053_approval-footer {
+    justify-content: flex-end;
+}
+
+.VAS_053_approval-page-btn {
+    width: 24px;
+    height: 24px;
+    font-size: 14px;
+    color: #0083DA;
+}
+
+.VAS_053_approval-page-btn:disabled {
+    color: #B8C6D2;
+}
+
+.VAS_053_approval-page-text {
+    font-size: 0.8125em;
+}

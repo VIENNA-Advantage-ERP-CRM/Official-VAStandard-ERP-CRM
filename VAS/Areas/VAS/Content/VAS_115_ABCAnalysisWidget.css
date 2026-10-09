@@ -1,0 +1,514 @@
+/* Product section "ABC Analysis" (warehouse Pareto) widget. All selectors are
+   MPC-abc- prefixed. Internal sizing in em; borders / radii / shadows in px.
+   Widget number 115. */
+
+.MPC-abc-root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    color: #102c3f;
+    font-family: Roboto, sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 32px);
+}
+
+.MPC-abc-root,
+.MPC-abc-root * {
+    box-sizing: border-box;
+}
+
+.MPC-abc-busy-hidden {
+    visibility: hidden;
+}
+
+.MPC-abc-card {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 0.875em;
+    overflow: hidden;
+    border: 2px solid #fff;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.49));
+    backdrop-filter: blur(10px);
+}
+
+/* Header */
+.MPC-abc-head {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    margin-bottom: 0.625em;
+    flex: 0 0 auto;
+    min-width: 0;
+}
+
+.MPC-abc-ico {
+    width: 2em;
+    height: 2em;
+    flex: 0 0 2em;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 131, 218, 0.1);
+    color: #0083da;
+}
+
+    .MPC-abc-ico svg {
+        width: 1em;
+        height: 1em;
+    }
+
+.MPC-abc-titles {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.MPC-abc-title {
+    font-size: clamp(13px, 1.1375cqi, 16px);
+    font-weight: 500;
+    color: #102c3f;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-abc-sub {
+    font-size: clamp(11px, .9625cqi, 13px);
+    font-weight: 400;
+    color: #717182;
+    margin-top: 2px;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-abc-spacer {
+    flex: 1;
+}
+
+/* Warehouse dropdown - compact, truncates long names, never pushes the title out */
+.MPC-abc-select {
+    flex: 0 1 auto;
+    max-width: 9em;
+    min-width: 0;
+    font-family: inherit;
+    font-size: 0.6875em;
+    font-weight: 500;
+    color: #102c3f;
+    padding: 0.4em 0.6em;
+    border: 1px solid #e4edf4;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.8);
+    cursor: pointer;
+    text-overflow: ellipsis;
+}
+
+    .MPC-abc-select:focus-visible {
+        outline: 2px solid #1f83ff;
+        outline-offset: 1px;
+    }
+
+    .MPC-abc-select:disabled {
+        color: #b8c6d2;
+        cursor: default;
+    }
+
+/* Body */
+.MPC-abc-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.MPC-abc-msg {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75em;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: #748494;
+    font-size: 0.75em;
+    padding: 1em;
+}
+
+.MPC-abc-retry {
+    font-family: inherit;
+    font-size: 1em;
+    font-weight: 500;
+    color: #0083da;
+    padding: 0.4em 1em;
+    border: 1px solid #bfe4ff;
+    border-radius: 8px;
+    background: #eef6ff;
+    cursor: pointer;
+}
+
+/* Class rows */
+.MPC-abc-list {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.7em;
+    justify-content: center;
+}
+
+.MPC-abc-row {
+    display: flex;
+    align-items: center;
+    gap: 0.7em;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    border: 0;
+    border-radius: 8px;
+    padding: 0.25em;
+    background: transparent;
+}
+
+    .MPC-abc-row:hover {
+        background: rgba(0, 131, 218, 0.05);
+    }
+
+    .MPC-abc-row:focus-visible {
+        outline: 2px solid #1f83ff;
+        outline-offset: 1px;
+    }
+
+.MPC-abc-badge {
+    width: 1.9em;
+    height: 1.9em;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875em;
+    font-weight: 700;
+    color: #fff;
+    flex: 0 0 auto;
+}
+
+.MPC-abc-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.MPC-abc-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5em;
+    margin-bottom: 0.32em;
+}
+
+.MPC-abc-cls {
+    font-size: 0.75em;
+    font-weight: 700;
+    color: #102c3f;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+    .MPC-abc-cls small {
+        font-weight: 400;
+        color: #748494;
+        font-size: 0.85em;
+        margin-left: 0.4em;
+    }
+
+.MPC-abc-val {
+    font-size: 0.75em;
+    font-weight: 700;
+    flex: 0 0 auto;
+}
+
+.MPC-abc-bar {
+    display: block;
+    width: 100%;
+    height: 0.45em;
+    border-radius: 999px;
+    background: rgba(16, 44, 63, 0.06);
+    overflow: hidden;
+}
+
+.MPC-abc-fill {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+}
+
+/* Modal (lives on <body>, own em scaling lever) */
+.MPC-abc-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10050;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 2em;
+    color: #102c3f;
+    font-family: Roboto, sans-serif;
+    font-size: clamp(12px, min(calc(var(--dash-inline-size, 100vw) * 0.014), 1.92vh), 36px);
+}
+
+    .MPC-abc-modal,
+    .MPC-abc-modal * {
+        box-sizing: border-box;
+    }
+
+.MPC-abc-modal.MPC-abc-modal-open {
+    display: flex;
+}
+
+.MPC-abc-modal-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(2, 38, 64, 0.28);
+    backdrop-filter: blur(2px);
+}
+
+.MPC-abc-modal-dialog {
+    position: relative;
+    width: min(50em, calc(100vw - 2em));
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 30px 70px rgba(2, 38, 64, 0.3);
+}
+
+.MPC-abc-modal-head {
+    flex: 0 0 auto;
+    height: 3.5em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    padding: 0 1.25em;
+    background: rgba(255, 255, 255, 0.9);
+    border-bottom: 1px solid #1f83ff;
+}
+
+.MPC-abc-modal-title-wrap {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+}
+
+.MPC-abc-modal-title {
+    min-width: 0;
+    overflow: hidden;
+    color: #141414;
+    font-size: 1em;
+    font-weight: 400;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-abc-modal-badge {
+    flex: 0 0 auto;
+    font-size: 0.72em;
+}
+
+.MPC-abc-pill {
+    display: inline-block;
+    padding: 0.18em 0.7em;
+    border-radius: 999px;
+    font-size: 0.92em;
+    font-weight: 500;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+.MPC-abc-pill-ok {
+    background: #e2f6ef;
+    color: #0b6b45;
+}
+
+.MPC-abc-pill-info {
+    background: #dff1ff;
+    color: #106ab0;
+}
+
+.MPC-abc-pill-warn {
+    background: #fcf1dd;
+    color: #9a6500;
+}
+
+.MPC-abc-modal-close {
+    width: 2em;
+    height: 2em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    padding: 0;
+    color: #141414;
+    background: transparent;
+    border: 0;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+    .MPC-abc-modal-close:hover,
+    .MPC-abc-modal-close:focus-visible {
+        color: #0083da;
+        background: #eef6ff;
+        outline: none;
+    }
+
+    .MPC-abc-modal-close svg {
+        width: 1.25em;
+        height: 1.25em;
+    }
+
+.MPC-abc-modal-body {
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 1.375em 1.5em;
+}
+
+/* Modal form-grid */
+.MPC-abc-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0 1.5em;
+}
+
+.MPC-abc-field {
+    padding: 0.75em 0 0.5em;
+    border-bottom: 1px solid #d7d7d7;
+}
+
+.MPC-abc-field-label {
+    font-size: 0.75em;
+    color: #748494;
+    margin-bottom: 0.375em;
+}
+
+.MPC-abc-field-value {
+    font-size: 1em;
+    color: #102c3f;
+}
+
+    .MPC-abc-field-value.MPC-abc-strong {
+        font-weight: 700;
+    }
+
+/* Modal mini-table */
+.MPC-abc-group-head {
+    font-size: 1em;
+    font-weight: 700;
+    color: #000;
+    padding: 1.125em 0 0.5em;
+}
+
+.MPC-abc-mini-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+    .MPC-abc-mini-table th {
+        text-align: left;
+        font-size: 0.75em;
+        color: #748494;
+        padding: 0.375em 0.5em;
+        border-bottom: 1px solid #edf2f6;
+    }
+
+    .MPC-abc-mini-table td {
+        font-size: 0.875em;
+        padding: 0.5em;
+        border-bottom: 1px solid #edf2f6;
+        color: #5f7283;
+    }
+
+.MPC-abc-th-r,
+.MPC-abc-td-r {
+    text-align: right;
+}
+
+.MPC-abc-td-s {
+    font-weight: 700;
+    color: #102c3f;
+}
+
+.MPC-abc-td-empty {
+    text-align: center;
+    color: #748494;
+    padding: 1.25em 0.5em;
+}
+
+/* Filler rows keep the modal a constant height on short pages (blank, no divider). */
+.MPC-abc-filler td {
+    border-bottom-color: transparent;
+}
+
+/* Modal pager */
+.MPC-abc-modal-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 1em;
+}
+
+.MPC-abc-mp-info {
+    font-size: 0.8125em;
+    color: #748494;
+}
+
+.MPC-abc-mp-ctrl {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+.MPC-abc-mp-btn {
+    width: 1.75em;
+    height: 1.75em;
+    border-radius: 8px;
+    border: 1px solid #e4edf4;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #0083da;
+    cursor: pointer;
+}
+
+    .MPC-abc-mp-btn:disabled {
+        color: #b8c6d2;
+        cursor: default;
+    }
+
+    .MPC-abc-mp-btn svg {
+        width: 0.875em;
+        height: 0.875em;
+    }
+
+.MPC-abc-mp-text {
+    font-size: 0.875em;
+    font-weight: 500;
+}

@@ -5373,7 +5373,7 @@ namespace VAdvantage.Model
                     }
 
                     //Create RecognoitionPlan and RecognitiontionRun
-                    if (Env.IsModuleInstalled("FRPT_") && line.Get_ColumnIndex("C_RevenueRecognition_ID") >= 0 &&
+                    if (Env.IsModuleInstalled("FRPT_") && line.Get_ColumnIndex("C_RevenueRecognition_ID") >= 0 && 
                         Util.GetValueOfInt(line.Get_Value("C_RevenueRecognition_ID")) > 0 && !IsReversal())
                     {
                         if (!MRevenueRecognition.CreateRevenueRecognitionPlan(line.GetC_InvoiceLine_ID(), Util.GetValueOfInt(line.Get_Value("C_RevenueRecognition_ID")), this))

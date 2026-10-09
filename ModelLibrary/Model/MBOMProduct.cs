@@ -261,6 +261,16 @@ namespace VAdvantage.Model
 
             }
 
+            // VAS147: For a SFG component (has its own child BOM via M_ProductBOMVersion_ID),
+            // Unit Cost is rolled up from that child BOM's own Detail lines (Unit Cost + Labour Cost)
+            // instead of being entered directly on this line.
+            if (GetM_ProductBOMVersion_ID() != 0)
+            {
+                Decimal childUnitCost = Util.GetValueOfDecimal(DB.ExecuteScalar(@"SELECT SUM(NVL(VAS_BOMCost, 0) + NVL(VAS_LabourOH, 0))
+                            FROM M_BOM WHERE M_BOM_ID=" + GetM_ProductBOMVersion_ID() + " AND IsActive='Y'", null, Get_Trx()));
+                Set_Value("VAS_CurrentCostPrice", childUnitCost);
+            }
+
             return true;
         }
 
@@ -286,6 +296,10 @@ namespace VAdvantage.Model
                 return false;
             }
             //}
+
+            // VAS147: Keep the BOM header's Unit Cost in sync after a Detail line is removed.
+            MBOM.UpdateUnitCost(GetCtx(), GetM_BOM_ID(), Get_Trx());
+
             return true;
         }
 
@@ -612,6 +626,13 @@ namespace VAdvantage.Model
                 }
                 //	Invalidate Products where BOM is used
             }
+
+            // VAS147: Keep the BOM header's Unit Cost in sync with the sum of Unit Cost of all its Detail lines.
+            if (success)
+            {
+                MBOM.UpdateUnitCost(GetCtx(), GetM_BOM_ID(), Get_Trx());
+            }
+
             return success;
         }
 

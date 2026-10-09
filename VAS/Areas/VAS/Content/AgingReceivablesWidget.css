@@ -1,0 +1,200 @@
+.vas-ar-root {
+    height: 100%;
+    width: 100%;
+    /* Positioning context for the absolute busy overlay below. */
+    position: relative;
+    /* Enable cell-based @container queries on this widget. */
+    container-type: inline-size;
+}
+
+.vas-ar-root,
+.vas-ar-root * {
+    box-sizing: border-box;
+}
+
+/* Busy/loading overlay over the card while data is fetched (initial load + refresh);
+   the inner spinner uses the core busy-indicator classes. */
+.vas-ar-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 14px;
+    z-index: 999;
+}
+
+.vas-ar-nodata {
+    text-align: center;
+    padding: 1em;
+    color: #5F7283;
+    font-size: 0.75em;
+}
+
+/* Bucket row: label + amount + track bar. Rows are separated by the body
+   divider (design.md > Grid Data Widget > Row And Header Separators). */
+.vas-ar-bucket {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4375em;
+    /*padding-bottom: 0.5em;*/
+    /*border-bottom: 1px solid #E2EAF1;*/
+}
+
+.vas-ar-bucket:last-of-type {
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+
+.vas-ar-bucket-label-wrap {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.75em;
+    /* Row cell text one step below the widget title (sm token). Label = standard
+       muted cell; the amount carries the emphasis (see .vas-ar-bucket-val). */
+    font-size: 0.75em;
+    color: #5F7283;
+}
+
+.vas-ar-bucket-val {
+    font-weight: 400;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    flex-shrink: 0;
+    text-align: right;
+}
+
+/* Base-currency symbol prefixed before the amount */
+.vas-ar-cur {
+    font-weight: inherit;
+    margin-inline-end: 0.08em;
+    vertical-align: baseline;
+}
+
+.vas-ar-bucket-track {
+    height: 0.4375em;
+    background: #E2EAF1;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.vas-ar-bucket-bar {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.8s ease-out;
+}
+
+.vas-ar-why-block {
+    /* Explanatory helper caption — secondary metadata (xs token), muted. */
+    font-size: 0.6875em;
+    color: #5F7283;
+    margin-top: 0.375em;
+    line-height: 1.3;
+    font-style: normal;
+}
+
+.vas-ar-why-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25em;
+    background: oklch(0.96 0.03 220);
+    padding: 0.0625em 0.375em;
+    border-radius: 6.25em;
+    margin-inline-end: 0.375em;
+    font-size: 0.5625em;
+    color: oklch(0.45 0.15 220);
+    letter-spacing: 0.05em;
+    font-weight: bold;
+}
+
+.vas-ar-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875em;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    padding: 0.85em;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    /* Widget root em-lever (dashboard-widgets.md > Widget Root Anchor):
+       one knob rescales every internal em. Ceiling 20px on 2K dashboards. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
+}
+
+.vas-ar-header {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+}
+
+.vas-ar-icon {
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    flex-shrink: 0;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #FFFFFF, #EAF4FE);
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    color: #0C7DB4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vas-ar-icon svg {
+    width: 1.125em;
+    height: 1.125em;
+}
+
+.vas-ar-title {
+    /* Shared width-anchored title clamp (dashboard-widgets.md > Widget Header):
+       same resolved px in every widget at any screen size; ceiling 17px. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    font-weight: 400;
+    color: #102C3F;
+    line-height: 1.2;
+}
+
+.vas-ar-subtitle {
+    /* Shared width-anchored subtitle clamp (dashboard-widgets.md > Widget
+       Header): ceiling 13px, muted. */
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
+    color: #717182;
+    line-height: 1.3;
+    margin-top: 2px;
+}
+
+.vas-ar-content-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 0.425em;
+}
+
+.vas-ar-loading {
+    text-align: center;
+    color: #5F7283;
+    font-size: 0.75em;
+}
+
+/* ── Cell-based responsive steps (reference list-card pattern) ── */
+@container (max-width: 18.75em) {
+    .vas-ar-card {
+        font-size: 0.875em;
+    }
+}
+
+@container (max-width: 13.75em) {
+    .vas-ar-card {
+        font-size: 0.75em;
+        padding: 0.875em;
+    }
+}

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data.SqlClient;
 using System.Linq;
 using System.Text;
 using System.Web;
@@ -65,11 +66,15 @@ namespace VIS.Models
             StringBuilder _sql = new StringBuilder();
             _sql.Append("SELECT M_AttributeSet_ID FROM M_Product WHERE M_Product_ID = " + Util.GetValueOfInt(Values[0]));
             attributeSet_ID = Util.GetValueOfInt(DB.ExecuteScalar(_sql.ToString()));
-            _sql.Clear();
+            
             if (attributeSet_ID > 0)
             {
-                _sql.Append("SELECT M_AttributeSetInstance_ID FROM M_ProductAttributes WHERE UPC = '" + Values[1] + "' AND M_Product_ID = " + Util.GetValueOfInt(Values[0]));
-                Attribute_ID = Util.GetValueOfInt(DB.ExecuteScalar(_sql.ToString()));
+                _sql.Clear();
+                SqlParameter[] param = new SqlParameter[2];
+                param[0] = new SqlParameter("@param1", Util.GetValueOfInt(Values[0]));
+                param[1] = new SqlParameter("@param2", Values[1]);
+                _sql.Append("SELECT M_AttributeSetInstance_ID FROM M_ProductAttributes WHERE M_Product_ID=@param1 AND UPC=@param2");
+                Attribute_ID = Util.GetValueOfInt(DB.ExecuteScalar(_sql.ToString(), param, null));
             }
             return Attribute_ID;
         }

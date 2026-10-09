@@ -1,0 +1,245 @@
+/* ==========================================================================
+   VAS GL Journal Total Debit KPI Widget
+   File  : VAS_037_GLJournalTotalDebitWidget.css
+   Scope : .VAS-gljtd-root
+   ========================================================================== */
+
+/* ── Root wrapper ────────────────────────────────────────────────────────── */
+.VAS-gljtd-root {
+    --on-text-muted: #748494;
+    height: 100%;
+    width: 100%;
+}
+
+/* ── KPI card container ──────────────────────────────────────────────────── */
+.VAS-gljtd-root .kpi {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+    padding: 0.85em;
+    border-radius: 14px;
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    position: relative;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+/* design.md: KPI surface stays the shared glass — semantic meaning comes from
+   value text + icon color, NOT a tinted surface. Tint variant is neutralized. */
+.VAS-gljtd-root .kpi.kpi-green {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+}
+
+/* ── Header row ──────────────────────────────────────────────────────────── */
+.VAS-gljtd-root .w-head {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+}
+
+/* Icon well — glass, green (#019D89) glyph */
+.VAS-gljtd-root .w-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(232, 244, 255, 0.96));
+    box-shadow: inset 0 0 0 1px rgba(31, 131, 255, 0.10);
+    color: #019D89;
+}
+
+.VAS-gljtd-root .w-icon svg {
+    stroke: currentColor;
+}
+
+/* Title label */
+.VAS-gljtd-root .w-title {
+    font-size: 0.8125em;
+    font-weight: 400;
+    color: #102C3F;
+    letter-spacing: 0.015em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── Period toggle (APR · YTD) — pushed to far right of header ───────────── */
+.VAS-gljtd-period-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.35em;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.VAS-gljtd-period {
+    font-size: 0.75em;
+    font-weight: 500;
+    color: #748494;
+    cursor: pointer;
+    padding: 0.15em 0.3em;
+    border-radius: 0.3em;
+    transition: color 0.12s, background 0.12s;
+    user-select: none;
+}
+
+.VAS-gljtd-period:hover {
+    color: #019D89;
+}
+
+.VAS-gljtd-period-active {
+    color: #019D89;
+    font-weight: 700;
+}
+
+.VAS-gljtd-sep {
+    font-size: 0.75em;
+    color: #C0CBD3;
+    user-select: none;
+}
+
+/* ── KPI value — green/success accent kept on the value text (design.md:
+   semantic meaning lives in the value color, not the surface) ────────────── */
+.VAS-gljtd-root .kpi-value {
+    display: flex;
+    align-items: baseline;
+    gap: 0;
+    min-width: 0;
+    font-size: 1.75em;
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+    color: #019D89;
+    padding-left: 0.3125em;
+}
+
+/* Currency prefix — same style as amount */
+.VAS-gljtd-prefix {
+    font-size: inherit;
+    font-weight: inherit;
+    color: inherit;
+    flex: 0 0 auto;
+}
+
+/* ── Why section ─────────────────────────────────────────────────────────── */
+.VAS-gljtd-root .kpi-why {
+    display: flex;
+    align-items: flex-start;
+    border-radius: 0.5em;
+}
+
+.VAS-gljtd-root .kpi-why-label {
+    font-size: 0.6875em;
+    font-weight: 700;
+    color: #019D89;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    flex-shrink: 0;
+    line-height: 1.4;
+}
+
+.VAS-gljtd-root .kpi-why-text {
+    font-size: 0.6875em;
+    font-weight: 400;
+    color: #5F7283;
+    line-height: 1.3;
+}
+
+/* Widget content scales off the widget-root font-size lever (set below), not
+   px breakpoints. The old per-viewport font-size hacks are removed per design.md
+   (Widget Internal Sizing) — one em lever drives every internal value. */
+
+/* RTL support */
+html[dir="rtl"] .VAS-gljtd-root .w-head {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .VAS-gljtd-period-toggle {
+    margin-left: unset;
+    margin-right: auto;
+}
+
+html[dir="rtl"] .VAS-gljtd-root .kpi-why {
+    flex-direction: row-reverse;
+}
+
+/* ==========================================================================
+   design.md widget-internal sizing (Widget Internal Sizing / Widget Header)
+   Root font-size is the single em lever; the header title/subtitle/icon are
+   self-sufficient and clamp on --dash-inline-size. cqi is NOT usable here
+   because this root sets its own container-type, so cqi would resolve against
+   the narrow widget cell — the codebase anchors on --dash-inline-size instead.
+   ========================================================================== */
+.VAS-gljtd-root {
+    container-type: inline-size;
+}
+
+/* Widget-root anchor — design.md clamp(16px, 1.2cqi, 20px) expressed on the
+   dashboard-width variable (0.012 ≈ 1.2 % of dashboard width). */
+.VAS-gljtd-root .kpi {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+}
+
+/* Title — Roboto Regular 400, clamp ceiling 17px (design.md Widget Header) */
+.VAS-gljtd-root .w-title {
+    font-family: 'Roboto', sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    font-weight: 400;
+    line-height: 1.2;
+    letter-spacing: 0;
+    color: #102C3F;
+}
+
+/* Glass icon well + glyph — scale on --dash-inline-size (design.md Widget Header) */
+.VAS-gljtd-root .w-icon {
+    width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    height: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(232, 244, 255, 0.96));
+    box-shadow: inset 0 0 0 1px rgba(31, 131, 255, 0.10);
+    color: #019D89;
+}
+
+.VAS-gljtd-root .w-icon svg {
+    width: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
+    height: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
+    stroke: currentColor;
+}
+
+/* KPI value — design.md 1.75em Roboto SemiBold 600, line-height 1.05.
+   Semantic accent (#019D89) is carried by the value color, not the surface. */
+.VAS-gljtd-root .kpi-value {
+    font-size: 1.75em;
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+    color: #019D89;
+}
+
+.VAS-gljtd-root .kpi-why-label,
+.VAS-gljtd-period-active,
+.VAS-gljtd-period:hover {
+    color: #019D89;
+}
+
+/* KPI meta — design.md xs (0.6875em of root), muted, line-height 1.3 */
+.VAS-gljtd-root .kpi-why-text {
+    font-size: 0.6875em;
+    font-weight: 400;
+    line-height: 1.3;
+    color: #5F7283;
+}
+
+/* Selected period must win over the muted .VAS-gljtd-period rule above
+   (same specificity, so it has to come last) — matches VAS_040 behaviour. */
+.VAS-gljtd-period-active {
+    color: #019D89;
+    font-weight: 700;
+}

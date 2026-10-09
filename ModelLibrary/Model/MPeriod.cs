@@ -218,7 +218,7 @@ namespace VAdvantage.Model
             + "FROM C_Period "
             + "WHERE C_Year_ID IN "
                 + "(SELECT C_Year_ID FROM C_Year WHERE IsActive = 'Y' AND C_Calendar_ID= @calendarID)"
-            + " AND @dateAcc BETWEEN TRUNC(StartDate,'DD') AND TRUNC(EndDate,'DD')"
+            + " AND TRUNC(@dateAcc) BETWEEN TRUNC(StartDate,'DD') AND TRUNC(EndDate,'DD')"
             + " AND IsActive='Y' AND PeriodType='S'";
             try
             {

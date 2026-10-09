@@ -365,17 +365,17 @@ namespace VAdvantage.Model
                 changed = true;
             }
             //
-            if (parent.GetC_UOM_ID() != GetC_UOM_ID())
+            if (parent.GetC_UOM_ID() > 0 && parent.GetC_UOM_ID() != GetC_UOM_ID())
             {
                 SetC_UOM_ID(parent.GetC_UOM_ID());
                 changed = true;
             }
-            if (parent.GetM_Product_Category_ID() != GetM_Product_Category_ID())
+            if (parent.GetM_Product_Category_ID() > 0 && parent.GetM_Product_Category_ID() != GetM_Product_Category_ID())
             {
                 SetM_Product_Category_ID(parent.GetM_Product_Category_ID());
                 changed = true;
             }
-            if (parent.GetC_TaxCategory_ID() != GetC_TaxCategory_ID())
+            if (parent.GetC_TaxCategory_ID() > 0 && parent.GetC_TaxCategory_ID() != GetC_TaxCategory_ID())
             {
                 SetC_TaxCategory_ID(parent.GetC_TaxCategory_ID());
                 changed = true;

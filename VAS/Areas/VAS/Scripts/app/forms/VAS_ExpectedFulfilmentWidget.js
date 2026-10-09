@@ -14,13 +14,13 @@
         this.widgetInfo;
         var $bsyDiv;
         var $self = this;
-        var $root = $('<div class="h-100 w-100">'); // Root container
+        var $root = $('<div class="h-100 w-100 vas-widget-bg">'); // Root container
         this.currentPage = 1;
         this.totalPages = 0;
         var widgetID = 0;
         // Create a map to store child records by document number
         var childRecordsMap = {};
-        var pageSize = 4;
+        var pageSize = 5;
         var selectedOrderLineIDs = []; // Array to keep track of selected order line IDs
         var AD_Window_ID = 0;
         var childRecords = [];
@@ -33,11 +33,12 @@
             const orderContainer =
                 '<div id="VAS_DeliveryContainer_' + widgetID + '" class="VAS-Expected-fulfilment-container">' +
                 '    <div class="VAS-orders-heading">' +
-                '        <h6>' + VIS.Msg.getMsg("VAS_ExpectedFulfilments") + '</h6>' +
+                '        <div>' + VIS.Msg.getMsg("VAS_ExpectedFulfilments") + '</div>' +
+                ' <span id="VAS_DeliveryCount_' + widgetID + '">0</span>' +
                 '    </div>' +
-                '    <div class="VAS-delivery-count">' +
-                '        <div class="VAS-count-lbl">' + VIS.Msg.getMsg("VAS_Fulfilments") + ' <span id="VAS_DeliveryCount_' + widgetID + '">0</span></div>' +
-                '    </div>' +
+                //'    <div class="VAS-delivery-count">' +
+                //'        <div class="VAS-count-lbl">' + VIS.Msg.getMsg("VAS_Fulfilments") + ' <span id="VAS_DeliveryCount_' + widgetID + '">0</span></div>' +
+                //'    </div>' +
                 '    <div class="VAS-delivery-detail">' +
                 '        <div class="VAS-box-heading">' +
                 '        </div>' +

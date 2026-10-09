@@ -281,8 +281,8 @@
                 pageNo: pNo,
 
                 mInOutId: M_InOut_ID,
-                isBaseLanguages: isBaseLangage,
-                mProductIDD: mProductIDs,
+                isBaseLanguages: VIS.secureEngine.encrypt(isBaseLangage),
+                mProductIDD: VIS.secureEngine.encrypt(mProductIDs),
             },
             error: function (e) {
                 alert(VIS.Msg.getMsg('ErrorWhileGettingData'));

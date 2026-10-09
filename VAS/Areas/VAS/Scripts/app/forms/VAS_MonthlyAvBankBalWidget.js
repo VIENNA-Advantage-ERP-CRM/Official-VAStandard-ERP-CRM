@@ -16,7 +16,7 @@
         var $bsyDiv;
         var $self = this;
         var $maindiv = null;
-        var $root = $('<div class="h-100 w-100 vas-monAvBbal-background">');
+        var $root = $('<div class="h-100 w-100 vas-widget-bg">');
         var BankAccountDiv = null;
         var C_BankAccount_ID = 0;
         var cmbBankAccount = null;
@@ -28,11 +28,11 @@
             createBusyIndicator();
 
             $maindiv = $('<div id="VAS-BarLine-MABB_' + widgetID + '" class="vas-barline-monAvBbal-container">');
-            var MainHeadingComboDiv = $('<div class="d-flex justify-content-between vas-monAvBbal-heading">');
+            var MainHeadingComboDiv = $('<div class="d-flex justify-content-between vas-monAvBbal-heading vas-common-heading">');
             var HeadingDiv = $('<div class= "">' + VIS.Msg.getMsg("VAS_MonthlyAvBalWidget") + '</div>');
             /*Created Bank Account Control*/
             BankAccountDiv = $('<div class="vas-exinvd-BankAccountrDiv">');
-            var $BankAccountDiv = $('<div class="input-group vis-input-wrap">');
+            var $BankAccountDiv = $('<div class="input-group vis-input-wrap vas-bankacc-select">');
             /* If selected organisation is * then show all bank account else show bank account 
              which are created in particular organization*/
             var AD_Org_ID = VIS.Env.getCtx().getAD_Org_ID();
@@ -47,12 +47,13 @@
             var $BankAccountControlWrap = $('<div class="vis-control-wrap">');
             var $BankAccountButtonWrap = $('<div class="input-group-append">');
             $BankAccountDiv.append($BankAccountControlWrap);
-            $BankAccountControlWrap.append(cmbBankAccount.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label style="background: rgba(255, 236, 236)">'
-            + VIS.Msg.getMsg("VAS_BankAccount") + '</label>');
+            $BankAccountControlWrap.append(cmbBankAccount.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label>'
+                + VIS.Msg.getMsg("VAS_BankAccount") + '</label>');
             $BankAccountDiv.append($BankAccountControlWrap);
             $BankAccountButtonWrap.append(cmbBankAccount.getBtn(0));
             $BankAccountDiv.append($BankAccountButtonWrap);
             BankAccountDiv.append($BankAccountDiv);
+            cmbBankAccount.getControl().addClass("vas-avr-ctl-size");
             //Get lookUp Data
             var data = BankAccountlookUp.getData(true, true, false, false);
             if (data != null && data != undefined && data.length > 0) {
@@ -89,165 +90,165 @@
 
             // Define your AJAX request
             VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS/PoReceipt/GetMonthlyAvBankBalData", { "C_BankAccount_ID": C_BankAccount_ID }, function (dr) {
-                    var MontlyAvBalData = dr;
+                var MontlyAvBalData = dr;
 
-                    // Remove existing canvas if exists
-                    $root.find('canvas').remove();
+                // Remove existing canvas if exists
+                $root.find('canvas').remove();
 
-                    if (MontlyAvBalData != null && MontlyAvBalData.ErrorMessage != null) {
-                        $maindiv.append('<div class="vas-igwidg-notfounddiv" id="vas_norecordcont_' + widgetID + '">' + VIS.Msg.getMsg("VAS_RecordNotFound") + '</div>')
-                        $root.append($maindiv);
-                    }
-                    else {
-                        //getting precision
-                        var precision = MontlyAvBalData.stdPrecision;
-                        var ISO_Code = MontlyAvBalData.ISO_Code;
-                        var currencyDiv = $('<div id="vas_currencyrecord_' + widgetID + '" class="vas-monAvbal-curr">' + VIS.Msg.getMsg("VAS_AmountIsIn") + ' : '+ ISO_Code + '</div>');
-                        $maindiv.append(currencyDiv);
-                        // Define static labels
-                        const labels = MontlyAvBalData.labels;
+                if (MontlyAvBalData != null && MontlyAvBalData.ErrorMessage != null) {
+                    $maindiv.append('<div class="vas-igwidg-notfounddiv" id="vas_norecordcont_' + widgetID + '">' + VIS.Msg.getMsg("VAS_RecordNotFound") + '</div>')
+                    $root.append($maindiv);
+                }
+                else {
+                    //getting precision
+                    var precision = MontlyAvBalData.stdPrecision;
+                    var ISO_Code = MontlyAvBalData.ISO_Code;
+                    var currencyDiv = $('<div id="vas_currencyrecord_' + widgetID + '" class="vas-monAvbal-curr">' + VIS.Msg.getMsg("VAS_AmountIsIn") + ' : ' + ISO_Code + '</div>');
+                    $maindiv.append(currencyDiv);
+                    // Define static labels
+                    const labels = MontlyAvBalData.labels;
 
-                        // Prepare the data object for the chart
-                        const data = {
-                            labels: labels, // Dynamic labels
-                            datasets: [
-                                {
-                                    label: VIS.Msg.getMsg("VAS_Payments"),
-                                    data: MontlyAvBalData.APPayAmt,
-                                    borderColor: 'rgba(0,0,0,0)', // Transparent border color
-                                    borderWidth: 0, // No border
-                                    backgroundColor: 'rgb(0, 132, 196)',
-                                    order: 1
-                                },
-                                {
-                                    label: VIS.Msg.getMsg("VAS_Receipts"),
-                                    data: MontlyAvBalData.ARPayAmt,
-                                    borderColor: 'rgba(0,0,0,0)', // Transparent border color
-                                    borderWidth: 0, // No border
-                                    backgroundColor: 'rgba(255,124,128)',
-                                    order: 1
-                                },
-                                {
-                                    label: VIS.Msg.getMsg("VAS_Balances"),
-                                    data: MontlyAvBalData.EndingBal,
-                                    borderColor: 'rgba(86,108,176)', // Transparent border color
-                                    borderWidth: 2,
-                                    backgroundColor: 'rgba(86,108,176)',
-                                    type: 'line',
-                                    tension: 0.4,
-                                    fill: false, /* No fill under the line */
-                                    order: 2 /*Draw this last (higher z-index) */
-                                },
-                            ],
-                        };
+                    // Prepare the data object for the chart
+                    const data = {
+                        labels: labels, // Dynamic labels
+                        datasets: [
+                            {
+                                label: VIS.Msg.getMsg("VAS_Payments"),
+                                data: MontlyAvBalData.APPayAmt,
+                                borderColor: 'rgba(0,0,0,0)', // Transparent border color
+                                borderWidth: 0, // No border
+                                backgroundColor: 'rgb(0, 132, 196)',
+                                order: 1
+                            },
+                            {
+                                label: VIS.Msg.getMsg("VAS_Receipts"),
+                                data: MontlyAvBalData.ARPayAmt,
+                                borderColor: 'rgba(0,0,0,0)', // Transparent border color
+                                borderWidth: 0, // No border
+                                backgroundColor: 'rgba(255,124,128)',
+                                order: 1
+                            },
+                            {
+                                label: VIS.Msg.getMsg("VAS_Balances"),
+                                data: MontlyAvBalData.EndingBal,
+                                borderColor: 'rgba(86,108,176)', // Transparent border color
+                                borderWidth: 2,
+                                backgroundColor: 'rgba(86,108,176)',
+                                type: 'line',
+                                tension: 0.4,
+                                fill: false, /* No fill under the line */
+                                order: 2 /*Draw this last (higher z-index) */
+                            },
+                        ],
+                    };
 
-                        // this is used to set the padding for legend
-                        const plugin = {
-                            beforeInit: function (chart) {
-                                const originalFit = chart.legend.fit;
-                                chart.legend.fit = function fit() {
-                                    originalFit.bind(chart.legend)();
-                                    this.height += -10;
-                                }
+                    // this is used to set the padding for legend
+                    const plugin = {
+                        beforeInit: function (chart) {
+                            const originalFit = chart.legend.fit;
+                            chart.legend.fit = function fit() {
+                                originalFit.bind(chart.legend)();
+                                this.height += -10;
                             }
-                        };
+                        }
+                    };
 
-                        // Define the chart configuration for BAR / Line chart
-                        const config = {
-                            type: 'bar',
-                            data: data,
-                            options: {
-                                responsive: true,
-                                layout: {
-                                    padding: 0
+                    // Define the chart configuration for BAR / Line chart
+                    const config = {
+                        type: 'bar',
+                        data: data,
+                        options: {
+                            responsive: true,
+                            layout: {
+                                padding: 0
+                            },
+                            scales: {
+                                x: {
+                                    grid: {
+                                        display: true // Hide the grid lines on the x-axis   
+                                    }
                                 },
-                                scales: {
-                                    x: {
-                                        grid: {
-                                            display: true // Hide the grid lines on the x-axis   
-                                        }
-                                    },
-                                    y: {
-                                        grid: {
-                                            display: false, // Hide the grid lines on the y-axis
-                                            //beginAtZero: true,
-                                        }
-                                    },
-                                    y1: {
-                                        /* type: 'linear',*/
-                                        display: false,
-                                        /*position: 'right',*/
-                                        beginAtZero: false,
-                                        /*grid: {
-                                            drawOnChartArea: false, // only want the grid lines for one axis to show up
-                                        },*/
+                                y: {
+                                    grid: {
+                                        display: false, // Hide the grid lines on the y-axis
+                                        //beginAtZero: true,
+                                    }
+                                },
+                                y1: {
+                                    /* type: 'linear',*/
+                                    display: false,
+                                    /*position: 'right',*/
+                                    beginAtZero: false,
+                                    /*grid: {
+                                        drawOnChartArea: false, // only want the grid lines for one axis to show up
+                                    },*/
+                                },
+                            },
+                            plugins: {
+                                title: {
+                                    display: true,
+                                    text: " ",
+                                    align: 'start',
+                                    /*font: {
+                                      size: 18
+                                    },*/
+                                    padding: {
+                                        top: 0,
+                                        bottom: 0
+                                    }
+                                },
+                                legend: {
+                                    display: true,
+                                    position: 'bottom', // Positioning the legend on the right
+                                    padding: {
+                                        top: 0,
+                                        bottom: 0
                                     },
                                 },
-                                plugins: {
-                                    title: {
-                                        display: true,
-                                        text: " ",
-                                        align: 'start',
-                                        /*font: {
-                                          size: 18
-                                        },*/
-                                        padding: {
-                                            top: 0,
-                                            bottom: 0
-                                        }
-                                    },
-                                    legend: {
-                                        display: true,
-                                        position: 'bottom', // Positioning the legend on the right
-                                        padding: {
-                                            top: 0,
-                                            bottom: 0
-                                        },
-                                    },
-                                    tooltip: {
-                                        callbacks: {
-                                            label: function (tooltipItem) {
-                                                const dataIndex = tooltipItem.dataIndex;
-                                                const datasetIndex = tooltipItem.datasetIndex;
-                                                const dataset = tooltipItem.chart.data.datasets[datasetIndex];
-                                                const labels = tooltipItem.chart.data.labels;
-                                                const dsLabel = dataset.label;
-                                                const value = dataset.data[dataIndex];
-                                                return dsLabel + " - " + ISO_Code + ': ' + value.toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision });
-                                            }
-                                        }
-                                    },
-                                    datalabels: {
-                                        display: false,
-                                        color: '#000',
-                                        anchor: 'end',
-                                        align: 'end',
-                                        formatter: function (value) {
-                                            return value; // Return value for external use only
-                                        },
-                                        font: {
-                                            weight: 'bold'
+                                tooltip: {
+                                    callbacks: {
+                                        label: function (tooltipItem) {
+                                            const dataIndex = tooltipItem.dataIndex;
+                                            const datasetIndex = tooltipItem.datasetIndex;
+                                            const dataset = tooltipItem.chart.data.datasets[datasetIndex];
+                                            const labels = tooltipItem.chart.data.labels;
+                                            const dsLabel = dataset.label;
+                                            const value = dataset.data[dataIndex];
+                                            return dsLabel + " - " + ISO_Code + ': ' + value.toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision });
                                         }
                                     }
+                                },
+                                datalabels: {
+                                    display: false,
+                                    color: '#000',
+                                    anchor: 'end',
+                                    align: 'end',
+                                    formatter: function (value) {
+                                        return value; // Return value for external use only
+                                    },
+                                    font: {
+                                        weight: 'bold'
+                                    }
                                 }
-                            },
-                            plugins: [plugin]
-                        };
+                            }
+                        },
+                        plugins: [plugin]
+                    };
 
-                        // Create a new canvas element and append it to the root
-                        const canvas = $('<canvas class="vas-barline-monAvBbal-canvas"></canvas>');
-                        var polarChart = $root.find('#VAS-BarLine-MABB_' + widgetID);
-                        polarChart.append(canvas);
+                    // Create a new canvas element and append it to the root
+                    const canvas = $('<canvas class="vas-barline-monAvBbal-canvas"></canvas>');
+                    var polarChart = $root.find('#VAS-BarLine-MABB_' + widgetID);
+                    polarChart.append(canvas);
 
-                        // Initialize the chart with the new data
-                        const ctx = canvas[0].getContext('2d');
-                        new Chart(ctx, config);
+                    // Initialize the chart with the new data
+                    const ctx = canvas[0].getContext('2d');
+                    new Chart(ctx, config);
 
-                    }
+                }
 
-                    // Hide busy indicator
-                    $bsyDiv[0].style.visibility = "hidden";
-                });
+                // Hide busy indicator
+                $bsyDiv[0].style.visibility = "hidden";
+            });
         };
 
         /** Add busy Indicator in Root */

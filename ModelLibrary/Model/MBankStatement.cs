@@ -884,6 +884,8 @@ namespace VAdvantage.Model
 
             //	Set lines to 0
             Decimal transactionAmt = 0; //To update transaction amount in unMatched Balance in case of void 
+            string sql = "";
+            int count = 0;
             MBankStatementLine[] lines = GetLines(true);
             for (int i = 0; i < lines.Length; i++)
             {
@@ -927,6 +929,16 @@ namespace VAdvantage.Model
                         MPayment payment = new MPayment(GetCtx(), line.GetC_Payment_ID(), Get_TrxName());
                         payment.SetIsReconciled(false);
                         payment.Save(Get_TrxName());
+                    }
+
+                    if (Env.IsModuleInstalled("VA012_") && line.GetC_CashLine_ID() != 0)
+                    {
+                        sql = @"UPDATE C_CashLine SET VA012_IsReconciled='N' WHERE C_CashLine_ID=" + line.GetC_CashLine_ID();
+                        count = DB.ExecuteQuery(sql, null, Get_Trx());
+                        if (count <= 0)
+                        {
+                            log.Info("Reconcile is not reset on CashLine ID = " + line.GetC_CashLine_ID());
+                        }
                     }
                 }
             }

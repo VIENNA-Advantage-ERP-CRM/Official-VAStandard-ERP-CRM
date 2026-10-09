@@ -1,0 +1,646 @@
+/************************************************************
+ * Module Name    : VAS
+ * Purpose        : Styles for the Journal details right panel
+ *                  (VAS.VAS_291_GLJournalRightPanel). Every class is panel
+ *                  prefixed (vas_291-) and scoped under .vas_291-root so it can
+ *                  neither collide with another panel nor repaint a base-theme
+ *                  selector.
+ *
+ *                  Panel Foundation (windows-and-panels.md > Panel Foundation):
+ *                    1. root     - solid white working surface. In THIS host the
+ *                                  root IS the panel body: it owns height:100% +
+ *                                  overflow-y:auto (the scroller), the
+ *                                  container-type and the canonical anchor
+ *                                  --panel-anchor: clamp(16px, 1vw, 18px).
+ *                                  Putting the scroller on an inner element does
+ *                                  not work here - the host's container has no
+ *                                  definite height for a percentage child to
+ *                                  resolve against. Same arrangement as
+ *                                  VAS_189 / VAS_191.
+ *                    2. header   - owned by the VIS tab-panel host (title, close,
+ *                                  collapse strip), not styled here
+ *                    3. body     - a plain flow child: padding + column gap only,
+ *                                  no height and no overflow of its own
+ *                    4. reset    - nested form controls inherit the anchor, so a
+ *                                  chip inside a button is the same size as one
+ *                                  outside it
+ *                    5. units    - px for borders, dividers, radii, dots and
+ *                                  shadow offsets; em for every text size,
+ *                                  padding, margin, gap and scalable height
+ *
+ *                  COMPOSITION comes from the approved reference
+ *                  (gl-journal-panel-shell.html), minus its section intro;
+ *                  SIZES come from design.md (Right Panel Body > Typography
+ *                  Quick Reference):
+ *                    section title 1em/700,
+ *                    section summary 0.75em/400, section action 0.8125em/400,
+ *                    hero title 1.125em/700, hero subtitle 0.75em, hero value
+ *                    1.5em/700, metric label 0.6875em, metric value 0.8125em/700,
+ *                    action pill 0.8125em/400, data grid head 0.6875em/500,
+ *                    data grid cell 0.75em, step title 0.8125em/700, step meta
+ *                    0.6875em, chip 0.6875em/700.
+ *                  Nothing below 0.6875em; weights are 400 / 500 / 700 only.
+ * Chronological development:
+ *   VAI145   2026-09-18  Created.
+ *   VAI145   2026-09-18  Section intro dropped; busy-indicator slot added to
+ *                        the lines grid for server-side paging; footer pager
+ *                        restyled to the canonical VAS_020 shape; approval
+ *                        routing redrawn as the VAS_191 rail with state-toned
+ *                        nodes instead of tinted step cards.
+ ***********************************************************/
+
+/* ----------------------------------------------------------- */
+/*  1. Panel wrapper                                            */
+/* ----------------------------------------------------------- */
+.vas_291-root {
+    /* Canonical palette (foundations.md) */
+    --p291-text:        #102C3F;
+    --p291-secondary:   #41576A;
+    --p291-muted:       #5F7283;
+    --p291-divider:     #E2EAF1;
+    --p291-head-bd:     #C5D2DD;
+    --p291-card-bd:     #D9E2EB;
+    --p291-trail:       #D9E6F2;
+    --p291-action:      #0083DA;
+    --p291-action-deep: #005FA3;
+    --p291-action-bg:   #EEF8FF;
+    --p291-disabled:    #9AB0C0;
+
+    /* Hero tones */
+    --p291-info-bg:   linear-gradient(180deg, #EEF8FF 0%, #F7FBFF 100%);
+    --p291-info-bd:   #CFE0ED;  --p291-info-tx: #0083DA;
+    --p291-ok-bg:     linear-gradient(180deg, #EFF9F3 0%, #F7FBF8 100%);
+    --p291-ok-bd:     #CFEAD9;  --p291-ok-tx:   #0B6B45;
+    --p291-warn-bg:   linear-gradient(180deg, #FFF8E8 0%, #FBFAF3 100%);
+    --p291-warn-bd:   #EBD7A6;  --p291-warn-tx: #9A6500;
+    --p291-crit-bg:   linear-gradient(180deg, #FCEFEF 0%, #FBF7F7 100%);
+    --p291-crit-bd:   #EDC8C8;  --p291-crit-tx: #A33F3F;
+
+    /* Routing rail node tones */
+    --p291-step-done-dot:    #20A464;
+    --p291-step-active-dot:  #0083DA;
+    --p291-step-pending-dot: #9AB0C0;
+    --p291-step-blocked-dot: #D14545;
+
+    /* THE ROOT IS THE SCROLLER (see header comment). */
+    position: relative;
+    height: 100%;
+    width: 100%;
+    /* min-width:0 lets the fr-based grid shrink to the host instead of forcing
+       a horizontal scrollbar on the whole window. */
+    min-width: 0;
+    max-width: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: auto;
+    box-sizing: border-box;
+
+    /* The canonical panel anchor + container context live here for the same
+       reason: this element IS the panel body in this host. */
+    container-type: inline-size;
+    --panel-anchor: clamp(16px, 1vw, 18px);
+    font-size: var(--panel-anchor);
+
+    background: #FFFFFF;
+    font-family: Roboto, "Segoe UI", Arial, sans-serif;
+    color: var(--p291-text);
+}
+.vas_291-root * { box-sizing: border-box; }
+
+/* ----------------------------------------------------------- */
+/*  3. Panel body - sections stack, the root scrolls them        */
+/* ----------------------------------------------------------- */
+.vas_291-body {
+    min-width: 0;
+    padding: 1.125em 0.875em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875em;
+    background: #FFFFFF;
+}
+
+/* ----------------------------------------------------------- */
+/*  4. Body reset - nested controls inherit the anchor          */
+/* ----------------------------------------------------------- */
+/* Scoped to the panel, never to '*': without it every em inside a button
+   resolves against the user agent's ~13.33px default instead of the anchor. */
+.vas_291-root button,
+.vas_291-root input,
+.vas_291-root select,
+.vas_291-root textarea,
+.vas_291-root optgroup {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    color: inherit;
+}
+.vas_291-root button:focus-visible {
+    outline: 2px solid var(--p291-action);
+    outline-offset: 2px;
+}
+
+/* Empty selection */
+.vas_291-empty {
+    padding: 2em 1em;
+    text-align: center;
+    font-size: 0.875em;
+    color: var(--p291-muted);
+}
+
+/* ----------------------------------------------------------- */
+/*  Icons - inline SVG only                                     */
+/* ----------------------------------------------------------- */
+.vas_291-ic { display: inline-flex; align-items: center; justify-content: center; line-height: 1; flex-shrink: 0; }
+.vas_291-ic svg { width: 1em; height: 1em; display: block; }
+
+/* ----------------------------------------------------------- */
+/*  Primitive 2 - Section header                                */
+/* ----------------------------------------------------------- */
+.vas_291-sec { min-width: 0; }
+
+.vas_291-secHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    margin: 0.5em 0;
+    padding-bottom: 0.375em;
+    border-bottom: 1px solid var(--p291-divider);
+}
+/* A section that opens the body sits flush with its top. */
+.vas_291-body > .vas_291-sec:first-child .vas_291-secHead { margin-top: 0; }
+
+.vas_291-secTitle {
+    font-size: 1em;
+    font-weight: 700;
+    color: var(--p291-text);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_291-secRight {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    min-width: 0;
+    flex-shrink: 0;
+}
+.vas_291-secSum {
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--p291-muted);
+    white-space: nowrap;
+}
+/* Action variant: a single inline link with a leading icon. */
+.vas_291-secAction {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25em;
+    font-size: 0.8125em;
+    font-weight: 400;
+    color: var(--p291-action);
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    white-space: nowrap;
+    border-radius: 4px;
+}
+.vas_291-secAction:hover { color: var(--p291-action-deep); }
+.vas_291-secAction .vas_291-ic svg { width: 1em; height: 1em; }
+
+/* Section empty state - a data section is never left blank. */
+.vas_291-secEmpty {
+    padding: 0.75em 0;
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--p291-muted);
+}
+
+/* ----------------------------------------------------------- */
+/*  Chip - one tier, no bespoke sizes                           */
+/* ----------------------------------------------------------- */
+.vas_291-chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.3125em 0.625em;
+    font-size: 0.6875em;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+/* Inside the tinted hero the chip takes a white ground and the card's tone. */
+.vas_291-chip.vas_291-onTint { background: #FFFFFF; }
+.vas_291-tone-info .vas_291-chip { color: var(--p291-info-tx); }
+.vas_291-tone-ok   .vas_291-chip { color: var(--p291-ok-tx); }
+.vas_291-tone-warn .vas_291-chip { color: var(--p291-warn-tx); }
+.vas_291-tone-crit .vas_291-chip { color: var(--p291-crit-tx); }
+
+/* ----------------------------------------------------------- */
+/*  Primitive 3 - Hero status card (+ 4 nested metric grid)     */
+/* ----------------------------------------------------------- */
+.vas_291-hero {
+    border-radius: 14px;
+    padding: 0.75em 0.875em;
+    border: 1px solid var(--p291-card-bd);
+    min-width: 0;
+}
+.vas_291-hero.vas_291-tone-info { background: var(--p291-info-bg); border-color: var(--p291-info-bd); }
+.vas_291-hero.vas_291-tone-ok   { background: var(--p291-ok-bg);   border-color: var(--p291-ok-bd); }
+.vas_291-hero.vas_291-tone-warn { background: var(--p291-warn-bg); border-color: var(--p291-warn-bd); }
+.vas_291-hero.vas_291-tone-crit { background: var(--p291-crit-bg); border-color: var(--p291-crit-bd); }
+
+.vas_291-heroTop {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.625em;
+}
+.vas_291-heroId { min-width: 0; }
+.vas_291-heroTitle {
+    font-size: 1.125em;
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--p291-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_291-heroSub {
+    font-size: 0.75em;
+    font-weight: 400;
+    line-height: 1.4;
+    margin-top: 0.125em;
+    color: var(--p291-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_291-heroEmph {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.5em;
+    margin-top: 0.5em;
+    min-width: 0;
+}
+.vas_291-heroValue {
+    font-size: 1.5em;
+    font-weight: 700;
+    line-height: 1.1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_291-tone-info .vas_291-heroValue { color: var(--p291-info-tx); }
+.vas_291-tone-ok   .vas_291-heroValue { color: var(--p291-ok-tx); }
+.vas_291-tone-warn .vas_291-heroValue { color: var(--p291-warn-tx); }
+.vas_291-tone-crit .vas_291-heroValue { color: var(--p291-crit-tx); }
+.vas_291-heroQual {
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--p291-secondary);
+}
+
+/* Nested 2-col metric grid */
+.vas_291-metrics {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 0.875em;
+    row-gap: 0.375em;
+    margin-top: 0.75em;
+}
+.vas_291-metric { min-width: 0; }
+.vas_291-metricLabel {
+    font-size: 0.6875em;
+    font-weight: 400;
+    line-height: 1.4;
+    color: var(--p291-muted);
+}
+.vas_291-metricValue {
+    font-size: 0.8125em;
+    font-weight: 700;
+    line-height: 1.35;
+    color: var(--p291-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ----------------------------------------------------------- */
+/*  Primitive 8 - Action pill row                               */
+/* ----------------------------------------------------------- */
+.vas_291-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.625em;
+}
+.vas_291-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375em;
+    border-radius: 999px;
+    border: 1px solid var(--p291-action);
+    background: #FFFFFF;
+    padding: 0.2em 0.875em;
+    font-size: 0.8125em;
+    font-weight: 400;
+    line-height: 1;
+    color: var(--p291-action);
+    cursor: pointer;
+    white-space: nowrap;
+}
+.vas_291-pill:hover:not(:disabled) { background: var(--p291-action-bg); }
+/* Disabled is visible, not hidden: the action exists, it is just unavailable. */
+.vas_291-pill:disabled {
+    border-color: var(--p291-disabled);
+    color: var(--p291-disabled);
+    cursor: not-allowed;
+    opacity: 0.8;
+}
+.vas_291-pill .vas_291-ic svg { width: 1em; height: 1em; }
+
+/* ----------------------------------------------------------- */
+/*  Primitive 11 - Data grid (journal lines)                    */
+/* ----------------------------------------------------------- */
+/* Single shared template across header, every body row and the total row:
+   the fixed 1.75em leading-affordance column, then minmax(0,Nfr) only. */
+.vas_291-dg {
+    --dg-cols: 1.75em minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr);
+    min-width: 0;
+}
+.vas_291-dgHead,
+.vas_291-dgRow,
+.vas_291-dgTotal {
+    display: grid;
+    grid-template-columns: var(--dg-cols);
+    gap: 0.5em;
+    align-items: center;
+    min-width: 0;
+}
+.vas_291-dgHead {
+    padding-bottom: 0.5em;
+    border-bottom: 1px solid var(--p291-head-bd);
+}
+.vas_291-dgH {
+    font-size: 0.6875em;
+    font-weight: 500;
+    color: var(--p291-secondary);
+    text-transform: capitalize;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_291-right { text-align: right; }
+
+.vas_291-dgRow {
+    padding: 0.625em 0;
+    border-bottom: 1px solid var(--p291-divider);
+    align-items: start;
+}
+.vas_291-dgRow.vas_291-last { border-bottom: 0; }
+
+/* Leading affordance: a 1em glyph, no tile, row-specific tone. */
+.vas_291-dgIcon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 1.4em;
+}
+.vas_291-dgIcon .vas_291-ic svg { width: 1em; height: 1em; }
+.vas_291-dgIcon.vas_291-isDebit  { color: var(--p291-action); }
+.vas_291-dgIcon.vas_291-isCredit { color: var(--p291-ok-tx); }
+
+.vas_291-dgCell { min-width: 0; }
+/* Composite cell - each line truncates on its own. */
+.vas_291-dgPrimary,
+.vas_291-dgMeta {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_291-dgPrimary {
+    font-size: 0.75em;
+    font-weight: 700;
+    line-height: 1.4;
+    color: var(--p291-text);
+}
+.vas_291-dgMeta {
+    font-size: 0.6875em;
+    font-weight: 400;
+    line-height: 1.4;
+    margin-top: 0.125em;
+    color: var(--p291-muted);
+}
+.vas_291-dgAmount {
+    font-size: 0.75em;
+    font-weight: 700;
+    line-height: 1.4;
+    color: var(--p291-text);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_291-dgAmount.vas_291-isEmpty { font-weight: 400; color: var(--p291-muted); }
+
+/* A page still on the wire: the framework busy indicator (vis_widgetloader)
+   takes the rows' place between the grid head and the total row, so the
+   section keeps its shape and does not jump while it waits. Tall enough that
+   the spinner is not clipped by the grid's dividers. */
+.vas_291-dgBusy {
+    min-height: 4em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+/* Total band - slightly darker than the inter-row divider. */
+.vas_291-dgTotal {
+    padding: 0.625em 0;
+    border-top: 1px solid var(--p291-card-bd);
+}
+.vas_291-dgTotalLabel {
+    grid-column: 1 / 3;
+    font-size: 0.8125em;
+    font-weight: 700;
+    color: var(--p291-text);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_291-dgTotalValue {
+    font-size: 0.8125em;
+    font-weight: 700;
+    color: var(--p291-action);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ----------------------------------------------------------- */
+/*  Section pager                                               */
+/* ----------------------------------------------------------- */
+/* Canonical footer pager (dashboard-widgets.md > widget footer pager, as the
+   VAS_020 widget draws it): "Showing a–b of N" on the left, compact
+   < n of m > on the right, beneath the grid's total band. Never an inner
+   scrollbar: the panel body owns scrolling, and a section that paginates
+   does not grow its own. */
+.vas_291-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    margin-top: 0.5em;
+    padding-top: 0.5em;
+    border-top: 1px solid var(--p291-divider);
+}
+.vas_291-pgInfo {
+    font-size: 0.6875em;
+    font-weight: 400;
+    line-height: 1;
+    color: var(--p291-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+.vas_291-pgNav {
+    display: flex;
+    align-items: center;
+    gap: 0.375em;
+    flex-shrink: 0;
+}
+.vas_291-pgLabel {
+    font-size: 0.75em;
+    font-weight: 500;
+    line-height: 1;
+    color: var(--p291-text);
+    white-space: nowrap;
+}
+/* 24px-class square buttons with a hairline border and a 14px-class chevron. */
+.vas_291-pgBtn {
+    width: 1.5em;
+    height: 1.5em;
+    padding: 0;
+    border: 1px solid var(--p291-card-bd);
+    border-radius: 6px;
+    background: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--p291-action);
+    cursor: pointer;
+}
+.vas_291-pgBtn:hover:not(:disabled) { background: var(--p291-action-bg); border-color: #C6D6E4; }
+.vas_291-pgBtn:disabled { color: var(--p291-disabled); cursor: default; background: #FFFFFF; }
+.vas_291-pgBtn .vas_291-ic svg { width: 0.875em; height: 0.875em; }
+
+/* ----------------------------------------------------------- */
+/*  Approval routing rail                                       */
+/* ----------------------------------------------------------- */
+/* Same rail as the payment panel (VAS_191): a marker node per step, a
+   hairline connector down to the next one, title + meta in plain text - no
+   tinted card. The node carries the step state (see the tones below). */
+.vas_291-vsteps { padding: 0.25em 0.25em 0; }
+
+.vas_291-vstep { display: flex; gap: 0.75em; min-width: 0; }
+
+.vas_291-rail {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+/* 22px physical marker - it does not scale with the anchor. */
+.vas_291-node {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--p291-step-pending-dot);
+    background: #FFFFFF;
+    color: #FFFFFF;
+    flex-shrink: 0;
+}
+.vas_291-node .vas_291-ic svg { width: 0.75em; height: 0.75em; }
+/* Node tones per step state - never custom colours. */
+.vas_291-is-done    .vas_291-node { border-color: var(--p291-step-done-dot);    background: var(--p291-step-done-dot); }
+.vas_291-is-active  .vas_291-node { border-color: var(--p291-step-active-dot);  background: #FFFFFF; }
+.vas_291-is-pending .vas_291-node { border-color: var(--p291-step-pending-dot); background: #FFFFFF; }
+.vas_291-is-blocked .vas_291-node { border-color: var(--p291-step-blocked-dot); background: var(--p291-step-blocked-dot); }
+/* Active reads radio-style: a ring with a dot inside. */
+.vas_291-nodeDot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--p291-step-active-dot);
+}
+/* The connector fills the gap down to the next node. */
+.vas_291-line {
+    flex: 1;
+    width: 2px;
+    min-height: 0.625em;
+    margin: 0.1875em 0;
+    background: var(--p291-card-bd);
+}
+
+.vas_291-vc { min-width: 0; padding-bottom: 0.875em; }
+.vas_291-vstep:last-child .vas_291-vc { padding-bottom: 0; }
+/* Step title / meta tokens. */
+.vas_291-st {
+    font-size: 0.8125em;
+    font-weight: 700;
+    color: var(--p291-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_291-mt {
+    font-size: 0.6875em;
+    font-weight: 400;
+    margin-top: 0.1875em;
+    color: var(--p291-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ----------------------------------------------------------- */
+/*  Motion                                                      */
+/* ----------------------------------------------------------- */
+@media (prefers-reduced-motion: no-preference) {
+    .vas_291-pill, .vas_291-pgBtn, .vas_291-secAction {
+        transition: background-color 120ms ease, color 120ms ease;
+    }
+}
+
+/* ----------------------------------------------------------- */
+/*  Narrow panel                                                */
+/* ----------------------------------------------------------- */
+/* Two metric columns are too cramped below this - a single stack keeps the
+   values readable instead of ellipsising every one of them. */
+@container (max-width: 320px) {
+    .vas_291-metrics { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ----------------------------------------------------------- */
+/*  RTL                                                         */
+/* ----------------------------------------------------------- */
+[dir="rtl"] .vas_291-right,
+[dir="rtl"] .vas_291-dgAmount,
+[dir="rtl"] .vas_291-dgTotalValue { text-align: left; }
+[dir="rtl"] .vas_291-pgBtn .vas_291-ic svg,
+[dir="rtl"] .vas_291-secAction .vas_291-ic svg { transform: scaleX(-1); }

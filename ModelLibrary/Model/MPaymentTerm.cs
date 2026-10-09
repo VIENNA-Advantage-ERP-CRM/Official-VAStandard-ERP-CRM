@@ -1607,13 +1607,22 @@ namespace VAdvantage.Model
 
             schedule.SetC_BPartner_ID(Util.GetValueOfInt(_ds["C_Bpartner_ID"]));
 
-            schedule.SetVA009_PaymentMode(Util.GetValueOfString(_ds["va009_paymentmode"]));
-            if (!String.IsNullOrEmpty(Convert.ToString(_ds["va009_paymenttype"])))
+            if (!string.IsNullOrEmpty(Util.GetValueOfString(_ds["va009_paymentmode"])))
+            {
+                schedule.SetVA009_PaymentMode(Util.GetValueOfString(_ds["va009_paymentmode"]));
+            }
+            if (!string.IsNullOrEmpty(Util.GetValueOfString(_ds["va009_paymenttype"])))
             {
                 schedule.SetVA009_PaymentType(Util.GetValueOfString(_ds["va009_paymenttype"]));
             }
-            schedule.SetVA009_PaymentTrigger(Util.GetValueOfString(_ds["va009_paymenttrigger"]));
-            schedule.SetVA009_ExecutionStatus(Util.GetValueOfString(_ds["VA009_ExecutionStatus"]));
+            if (!string.IsNullOrEmpty(Util.GetValueOfString(_ds["va009_paymenttrigger"])))
+            {
+                schedule.SetVA009_PaymentTrigger(Util.GetValueOfString(_ds["va009_paymenttrigger"]));
+            }
+            if (!string.IsNullOrEmpty(Util.GetValueOfString(_ds["VA009_ExecutionStatus"])))
+            {
+                schedule.SetVA009_ExecutionStatus(Util.GetValueOfString(_ds["VA009_ExecutionStatus"]));
+            }
             //VA230:Copy Cash Line Id discussed with amit
             schedule.SetC_CashLine_ID(Util.GetValueOfInt(_ds["C_CashLine_ID"]));
             schedule.SetProcessed(true);

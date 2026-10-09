@@ -1,0 +1,277 @@
+/* ==========================================================
+   VAS Top Five Vendors Widget  —  vas-t5vwdg-* namespace
+   ========================================================== */
+
+.vas-t5vwdg-root {
+    position: relative;
+    overflow: hidden;
+    box-sizing: border-box;
+    /* Named query container so the card can step its base font down on narrow / zoomed
+       cells (see the @container rules at the bottom). Without this the card only had the
+       --dash-inline-size clamp, which floors at 16px and overflows a narrow cell —
+       mirrors VIS.OutstandingSalesOrderWidget. */
+    container: vas-t5vwdg / inline-size;
+    /* Canonical Onfinity glass surface (latest spec) — implemented explicitly on the
+       widget root so it never depends on the shared .vas-widget-bg being loaded. */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    border: none;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+}
+
+/* ---- Busy indicator overlay ---- */
+.vas-widget-busy-wrap {
+    position: absolute;
+    width: 98%;
+    height: 97%;
+    text-align: center;
+    z-index: 999;
+}
+
+.vas-t5vwdg-container {
+    /* Widget root anchor: every internal value below is em against this clamp. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 0.875em;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+/* ---- Header ---- */
+.vas-t5vwdg-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    margin-bottom: 0.55em;
+    flex-shrink: 0;
+}
+
+.vas-t5vwdg-title {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    font-weight: 400;
+    color: #102C3F;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.vas-t5vwdg-title-icon {
+    width: 1em;
+    height: 1em;
+    flex-shrink: 0;
+    color: #41576A;
+}
+
+/* No-data message centered in the card body below the header (the container is a
+   flex column filling the card height), at the canonical sm no-data token. */
+.vas-t5vwdg-nodata {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: #5F7283;
+    font-size: 0.75em;
+}
+
+/* ---- Vendor list ---- */
+.vas-t5vwdg-list {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-bottom: 0.45em;
+}
+
+.vas-t5vwdg-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    padding: 0.325em 0.5em;
+    border-bottom: 1px solid #E2EAF1;
+}
+
+.vas-t5vwdg-row:last-child {
+    border-bottom: none;
+}
+
+.vas-t5vwdg-avatar {
+    flex-shrink: 0;
+    width: 1.9em;
+    height: 1.9em;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}
+
+.vas-t5vwdg-avatar--r1 { background: #EAF8FF; color: #0E5DA8; }
+.vas-t5vwdg-avatar--r2 { background: #EEEAFF; color: #4A3A9A; }
+.vas-t5vwdg-avatar--r3 { background: #FFF0D0; color: #7A4A00; }
+.vas-t5vwdg-avatar--r4 { background: #FAD7D7; color: #8F2D2D; }
+.vas-t5vwdg-avatar--r5 { background: #CCEFDD; color: #0C5D38; }
+
+.vas-t5vwdg-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.vas-t5vwdg-name {
+    font-size: 0.75em;
+    font-weight: 400;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-t5vwdg-cat {
+    font-size: 0.6875em;
+    color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-t5vwdg-metrics {
+    flex-shrink: 0;
+    text-align: right;
+}
+
+.vas-t5vwdg-amt {
+    font-size: 0.75em;
+    font-weight: 700;
+    color: #102C3F;
+    white-space: nowrap;
+}
+
+/* ---- Divider (section boundary: list -> chart) ---- */
+.vas-t5vwdg-divider {
+    height: 1px;
+    background: #D9E2EB;
+    flex-shrink: 0;
+    margin-bottom: 0.38em;
+}
+
+/* ---- Chart section header ---- */
+.vas-t5vwdg-chart-header {
+    display: flex;
+    align-items: center;
+    gap: 0.35em;
+    font-size: 0.6875em;
+    font-weight: 500;
+    color: #41576A;
+    flex-shrink: 0;
+    margin-bottom: 0.25em;
+}
+
+.vas-t5vwdg-chart-icon {
+    width: 0.95em;
+    height: 0.95em;
+    flex-shrink: 0;
+    color: #41576A;
+}
+
+/* ---- Chart area: donut (left) + custom HTML legend (right) ---- */
+.vas-t5vwdg-chart-wrap {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+}
+
+/* Donut auto-fits its box (square, capped) and centers — same rule as VAS_019.
+   Sized by the AVAILABLE HEIGHT (not width) so it can never overflow the chart
+   section vertically on zoom-out; the square width then follows via aspect-ratio. */
+.vas-t5vwdg-donut {
+    position: relative;
+    flex: 0 0 auto;
+    height: 100%;
+    max-height: 8.5em;
+    max-width: 100%;
+    aspect-ratio: 1 / 1;
+    align-self: center;
+}
+
+.vas-t5vwdg-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* ---- Custom legend (replaces the Chart.js right legend that used to clip) ---- */
+.vas-t5vwdg-legend {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.35em;
+    overflow: hidden;
+}
+
+.vas-t5vwdg-lg-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    min-width: 0;
+}
+
+.vas-t5vwdg-lg-dot {
+    flex-shrink: 0;
+    width: 0.7em;
+    height: 0.7em;
+    border-radius: 0.15em;
+}
+
+.vas-t5vwdg-lg-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.6875em;
+    font-weight: 400;
+    color: #41576A;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-t5vwdg-lg-val {
+    flex-shrink: 0;
+    font-size: 0.6875em;
+    font-weight: 500;
+    color: #102C3F;
+    white-space: nowrap;
+}
+
+/* ---- Responsive ----
+   The card base size follows the --dash-inline-size clamp, but that clamp floors at
+   16px; on a narrow / zoomed-in cell the content overflows at 16px. Step the base font
+   down on narrow cells (query the .vas-t5vwdg-root container), mirroring
+   VIS.OutstandingSalesOrderWidget so zoom-in/out stays clean. */
+@container vas-t5vwdg (max-width: 300px) {
+    .vas-t5vwdg-container {
+        font-size: 13px;
+    }
+}
+
+@container vas-t5vwdg (max-width: 220px) {
+    .vas-t5vwdg-container {
+        font-size: 11px;
+    }
+}

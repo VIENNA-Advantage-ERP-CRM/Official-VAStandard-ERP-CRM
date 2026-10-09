@@ -1,0 +1,2644 @@
+﻿/* ============================================================
+ * VAS_189_ARInvoiceDetailPanel — AR Invoice / AR Credit Note detail
+ *
+ * Class prefix follows the JS class (VAS_189_...): every selector is
+ * namespaced `vas_189_arinv-` so nothing leaks into the host page.
+ *
+ * Layout: bordered block cards with a head row, key/value lists, the
+ * per-table grids (line items, payment schedules, allocations, posted
+ * entry), the right-aligned totals card, the amber withholding card,
+ * the dashed recurring banner and the vertical approval rail.
+ *
+ * Units: per CLAUDE.md every length is `em`. Spec px values for the
+ * physical layer (borders, radii, dots) are translated at 1em = 16px.
+ *
+ * The recurring dialog is deliberately BORDERLESS: no card borders or
+ * shadows inside it, only hairline rules separating header / body /
+ * preview / footer.
+ * ============================================================ */
+
+.vas_189_arinv-root,
+.vas_189_arinv-scrim,
+.vas_189_arinv-rec-scrim {
+    /* Brand / action */
+    --arinv-primary: #0083DA;
+    --arinv-primary-hover: #0069AE;
+    --arinv-link-deep: #005FA3;
+    --arinv-action: #1F83FF;
+    /* Text */
+    --arinv-text: #102C3F;
+    --arinv-text-2: #41576A;
+    --arinv-muted: #5F7283;
+    --arinv-placeholder: #9F9F9F;
+    --arinv-disabled: #9AB0C0;
+    /* Surfaces */
+    --arinv-surface: #FFFFFF;
+    --arinv-surface-2: #FBFDFF;
+    --arinv-surface-faint: #EEF8FF;
+    /* Lines — three-tone hierarchy (table header > card border > row divider) */
+    --arinv-divider: #E2EAF1;
+    --arinv-divider-strong: #C5D2DD;
+    --arinv-border: #D9E2EB;
+    --arinv-field-border: #D7D7D7;
+    --arinv-trail: #D9E6F2;
+    --arinv-dashed-blue: #9ED1FF;
+    /* Semantic tones */
+    --arinv-info-text: #0083DA;
+    --arinv-info-bg: #EAF8FF;
+    --arinv-info-border: #CFE0ED;
+    --arinv-info-grad: linear-gradient(180deg, #EEF8FF 0%, #F7FBFF 100%);
+    --arinv-success-text: #0B6B45;
+    --arinv-success-dot: #20A464;
+    --arinv-success-bg: #E7F7EF;
+    --arinv-success-border: #CFEAD9;
+    --arinv-success-grad: linear-gradient(180deg, #EFF9F3 0%, #F7FBF8 100%);
+    --arinv-warning-text: #9A6500;
+    --arinv-warning-bg: #FFF6E2;
+    --arinv-warning-border: #EBD7A6;
+    --arinv-warning-grad: linear-gradient(180deg, #FFF8E8 0%, #FBFAF3 100%);
+    --arinv-risk-text: #A33F3F;
+    --arinv-risk-dot: #D14545;
+    --arinv-risk-bg: #FCEFEF;
+    --arinv-risk-border: #EDC8C8;
+    --arinv-risk-grad: linear-gradient(180deg, #FCEFEF 0%, #FBF7F7 100%);
+    --arinv-neutral-bg: #F1F4F8;
+    --arinv-pending-dot: #9AB0C0;
+    /* Physical layer — px spec values expressed at 1em = 16px */
+    --arinv-hair: 0.0625em;
+    --arinv-stroke: 0.125em;
+    --arinv-r-sm: 0.5em;
+    --arinv-r-md: 0.75em;
+    --arinv-r-hero: 0.875em;
+    --arinv-r-lg: 1em;
+    --arinv-r-pill: 999em;
+    --arinv-shadow-card: 0 0.625em 1.5em rgba(15, 61, 97, .06);
+    --arinv-font: Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* ------------------------------------------------------------
+ * Panel foundation. The tab host mounts this root directly, so the root
+ * IS the panel body: it carries the container-type and the canonical
+ * viewport-stable anchor, so every em resolves to the same physical size
+ * whatever baseline the framework host happens to set.
+ * ------------------------------------------------------------ */
+.vas_189_arinv-root {
+    position: relative;
+    height: 100%;
+    width: 100%;
+    /* min-width:0 lets the fr-based tables shrink to the host instead of
+       forcing a horizontal scrollbar on the whole window. */
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: auto;
+    box-sizing: border-box;
+    padding: 1em;
+    background: var(--arinv-surface);
+    font-family: var(--arinv-font);
+    container-type: inline-size;
+    --panel-anchor: clamp(16px, 1vw, 18px);
+    font-size: var(--panel-anchor);
+    color: var(--arinv-text);
+}
+
+    .vas_189_arinv-root * {
+        box-sizing: border-box;
+    }
+
+/* Force nested form controls to inherit the anchor. Without it every em
+   inside a <button>/<input>/<select> resolves against the UA default
+   (~13.33px in Chrome), so byte-identical chips render at two sizes.
+   :where() keeps specificity at zero so controls that set their own size win. */
+:where(.vas_189_arinv-root, .vas_189_arinv-scrim, .vas_189_arinv-rec-scrim) button,
+:where(.vas_189_arinv-root, .vas_189_arinv-scrim, .vas_189_arinv-rec-scrim) input,
+:where(.vas_189_arinv-root, .vas_189_arinv-scrim, .vas_189_arinv-rec-scrim) select,
+:where(.vas_189_arinv-root, .vas_189_arinv-scrim, .vas_189_arinv-rec-scrim) textarea,
+:where(.vas_189_arinv-root, .vas_189_arinv-scrim, .vas_189_arinv-rec-scrim) optgroup {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    color: inherit;
+}
+
+.vas_189_arinv-body,
+.vas_189_arinv-panel {
+    min-width: 0;
+}
+
+.vas_189_arinv-empty {
+    display: flex;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875em;
+    color: var(--arinv-muted);
+}
+
+.vas_189_arinv-panel {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    background: var(--arinv-surface);
+    border-radius: var(--arinv-r-lg);
+    padding: 0.5em 0.2em 1em;
+}
+
+/* ---------- header ---------- */
+.vas_189_arinv-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1em;
+    flex-wrap: wrap;
+    padding-bottom: 0.625em;
+    border-bottom: var(--arinv-hair) solid var(--arinv-border);
+}
+
+.vas_189_arinv-h1 {
+    font-size: 1em;
+    font-weight: 700;
+    color: var(--arinv-text);
+}
+
+.vas_189_arinv-sub {
+    font-size: 0.75em;
+    font-weight: 400;
+    margin-top: 0.25em;
+}
+
+.vas_189_arinv-ctx {
+    font-size: 0.75em;
+    font-weight: 400;
+    text-align: right;
+}
+
+    .vas_189_arinv-ctx b {
+        color: var(--arinv-text);
+        font-weight: 700;
+    }
+
+/* ---------- action pill row ---------- */
+.vas_189_arinv-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.625em;
+    margin-top: 1em;
+}
+
+.vas_189_arinv-btn {
+    font-family: inherit;
+    font-size: 0.8125em;
+    font-weight: 400;
+    line-height: 1.2;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.5em 0.875em;
+    border-radius: var(--arinv-r-pill);
+    border: var(--arinv-hair) solid var(--arinv-primary);
+    background: var(--arinv-surface);
+    color: var(--arinv-primary);
+    transition: background .15s, border-color .15s, color .15s;
+}
+
+    .vas_189_arinv-btn:hover:not(:disabled) {
+        background: var(--arinv-surface-faint);
+    }
+
+    /* The single filled treatment is reserved for the primary record action. */
+    .vas_189_arinv-btn.is-primary {
+        background: var(--arinv-primary);
+        border-color: var(--arinv-primary);
+        color: #FFFFFF;
+    }
+
+        .vas_189_arinv-btn.is-primary:hover:not(:disabled) {
+            background: var(--arinv-primary-hover);
+            border-color: var(--arinv-primary-hover);
+        }
+
+    .vas_189_arinv-btn:disabled {
+        border-color: var(--arinv-disabled);
+        color: var(--arinv-disabled);
+        background: var(--arinv-surface);
+        cursor: not-allowed;
+    }
+
+    .vas_189_arinv-btn.is-primary:disabled {
+        background: var(--arinv-surface);
+    }
+
+    /* Save in flight — the label stays, the control just reads as busy. */
+    .vas_189_arinv-btn.is-busy {
+        opacity: .75;
+        cursor: progress;
+    }
+
+/* ---------- chip / status pill ---------- */
+.vas_189_arinv-chip,
+.vas_189_arinv-spill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25em;
+    font-size: 0.6875em;
+    font-weight: 700;
+    line-height: 1.2;
+    padding: 0.3125em 0.625em;
+    border-radius: var(--arinv-r-pill);
+    white-space: nowrap;
+}
+
+    .vas_189_arinv-chip.ok,
+    .vas_189_arinv-spill.ok {
+        background: var(--arinv-success-bg);
+        color: var(--arinv-success-text);
+    }
+
+    .vas_189_arinv-chip.warn,
+    .vas_189_arinv-spill.warn {
+        background: var(--arinv-warning-bg);
+        color: var(--arinv-warning-text);
+    }
+
+    .vas_189_arinv-chip.risk,
+    .vas_189_arinv-spill.risk {
+        background: var(--arinv-risk-bg);
+        color: var(--arinv-risk-text);
+    }
+
+    .vas_189_arinv-chip.info,
+    .vas_189_arinv-spill.info {
+        background: var(--arinv-info-bg);
+        color: var(--arinv-info-text);
+    }
+
+    /* Neutral / category chips use Medium (500), not Bold. */
+    .vas_189_arinv-chip.neutral,
+    .vas_189_arinv-spill.neutral {
+        background: var(--arinv-neutral-bg);
+        color: var(--arinv-text-2);
+        font-weight: 500;
+    }
+
+.vas_189_arinv-dot {
+    width: 0.375em;
+    height: 0.375em;
+    border-radius: 50%;
+    background: currentColor;
+    flex: 0 0 auto;
+}
+
+/* A chip inside an already-tinted card drops to plain white so the two tints
+   don't read muddy. */
+.vas_189_arinv-hero .vas_189_arinv-chip {
+    background: #FFFFFF;
+}
+
+/* Row-inheritance trap: a parent that sets 0.75em would compound a nested
+   0.6875em chip down to ~0.52em (~8px). Dividing by the parent token lands the
+   chip back on 0.6875em of the panel anchor. */
+.vas_189_arinv-sec-r .vas_189_arinv-chip,
+.vas_189_arinv-t4-row .vas_189_arinv-spill,
+.vas_189_arinv-t4-row .vas_189_arinv-chip {
+    font-size: calc(0.6875em / 0.75);
+}
+
+/* ---------- section header (lifecycle) ---------- */
+.vas_189_arinv-sec {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    margin-top: 1em;
+}
+
+.vas_189_arinv-sec-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.625em;
+    flex-wrap: wrap;
+    margin-bottom: 0.5em;
+    padding-bottom: 0.375em;
+    border-bottom: var(--arinv-hair) solid var(--arinv-divider);
+}
+
+.vas_189_arinv-sec-h {
+    font-size: 1em;
+    font-weight: 700;
+    color: var(--arinv-text);
+}
+
+.vas_189_arinv-sec-r {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--arinv-muted);
+}
+
+/* ---------- hero status card ---------- */
+.vas_189_arinv-hero {
+    border-radius: var(--arinv-r-hero);
+    padding: 0.75em 0.875em;
+    margin-top: 1em;
+    border: var(--arinv-hair) solid var(--arinv-info-border);
+    background: var(--arinv-info-grad);
+}
+
+    .vas_189_arinv-hero.ok {
+        border-color: var(--arinv-success-border);
+        background: var(--arinv-success-grad);
+    }
+
+    .vas_189_arinv-hero.warn {
+        border-color: var(--arinv-warning-border);
+        background: var(--arinv-warning-grad);
+    }
+
+    .vas_189_arinv-hero.risk {
+        border-color: var(--arinv-risk-border);
+        background: var(--arinv-risk-grad);
+    }
+
+    .vas_189_arinv-hero .vas_189_arinv-mgrid {
+        margin-top: 0;
+    }
+
+.vas_189_arinv-mgrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 0.875em;
+    row-gap: 0.625em;
+    min-width: 0;
+}
+
+.vas_189_arinv-mcell {
+    min-width: 0;
+}
+
+    .vas_189_arinv-mcell .k {
+        font-size: 0.77em;
+        font-weight: 400;
+    }
+
+    .vas_189_arinv-mcell .v {
+        font-size: 0.8125em;
+        font-weight: 700;
+        color: var(--arinv-text);
+        margin-top: 0.125em;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+        .vas_189_arinv-mcell .v.warn {
+            color: var(--arinv-warning-text);
+        }
+
+        .vas_189_arinv-mcell .v.risk {
+            color: var(--arinv-risk-text);
+        }
+
+        .vas_189_arinv-mcell .v.ok {
+            color: var(--arinv-success-text);
+        }
+
+        /* Inline qualifier — stays muted and at the floor token regardless of the
+           value's semantic colour. De-compounded against the value's 0.8125em. */
+        .vas_189_arinv-mcell .v .mi {
+            font-size: calc(0.6875em / 0.8125);
+            font-weight: 400;
+            margin-left: 0.5em;
+        }
+
+        .vas_189_arinv-mcell .v .vas_189_arinv-chip {
+            font-size: calc(0.6875em / 0.8125);
+        }
+
+    .vas_189_arinv-mcell .m {
+        font-size: calc(0.6875em / 0.8125);
+        font-weight: 700;
+        color: var(--arinv-muted);
+        margin-top: 0.125em;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+/* ---------- stage pipeline (lifecycle) ---------- */
+.vas_189_arinv-pipe {
+    position: relative;
+    width: 100%;
+    padding: 0.75em 0 0.5em;
+}
+
+.vas_189_arinv-pipe-grid {
+    display: grid;
+    min-width: 0;
+}
+
+.vas_189_arinv-pipe-col {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 0;
+}
+
+.vas_189_arinv-pipe-seg {
+    position: absolute;
+    left: 50%;
+    right: -50%;
+    top: 1em;
+    height: var(--arinv-stroke);
+    transform: translateY(calc(var(--arinv-hair) * -1));
+    background: var(--arinv-divider);
+}
+
+    .vas_189_arinv-pipe-seg.done {
+        background: var(--arinv-primary);
+    }
+
+.vas_189_arinv-pipe-dot {
+    position: relative;
+    z-index: 1;
+    width: 2em;
+    height: 2em;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--arinv-surface);
+    border: var(--arinv-stroke) solid var(--arinv-border);
+    color: #FFFFFF;
+}
+
+    .vas_189_arinv-pipe-dot.done {
+        background: var(--arinv-primary);
+        border-color: var(--arinv-primary);
+    }
+
+    .vas_189_arinv-pipe-dot.active {
+        border-color: var(--arinv-primary);
+    }
+
+        .vas_189_arinv-pipe-dot.active i {
+            width: 0.5em;
+            height: 0.5em;
+            border-radius: 50%;
+            background: var(--arinv-primary);
+        }
+
+    .vas_189_arinv-pipe-dot .fa {
+        font-size: 0.75em;
+    }
+
+.vas_189_arinv-pipe-lbl {
+    margin-top: 0.5em;
+    width: 100%;
+    text-align: center;
+    font-size: 0.8725em;
+    font-weight: 400;
+    color: var(--arinv-pending-dot);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+    .vas_189_arinv-pipe-lbl.done {
+        font-weight: 500;
+        color: var(--arinv-primary);
+    }
+
+    .vas_189_arinv-pipe-lbl.active {
+        font-weight: 700;
+        color: var(--arinv-primary);
+    }
+
+/* One line per "·"-separated fact, so a stage never clips the parts after the
+   separator. */
+.vas_189_arinv-pipe-sub {
+    width: 100%;
+    text-align: center;
+    font-size: 0.7875em;
+    font-weight: 400;
+    line-height: 1.4;
+    color: var(--arinv-muted);
+    margin-top: 0.125em;
+    padding: 0 0.25em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+    .vas_189_arinv-pipe-sub + .vas_189_arinv-pipe-sub {
+        margin-top: 0;
+    }
+
+/* ---------- recurring banner ---------- */
+.vas_189_arinv-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    flex-wrap: wrap;
+    margin-top: 1.1em;
+    padding: 1em 1.1em;
+    border: var(--arinv-stroke) dashed var(--arinv-dashed-blue);
+    border-radius: var(--arinv-r-md);
+    background: linear-gradient(180deg, #F3F9FF, #FFFFFF);
+}
+
+    /* A live schedule is a settled fact, not an invitation - solid green frame. */
+    .vas_189_arinv-banner.is-active {
+        border-style: solid;
+        border-color: var(--arinv-success-border);
+        background: var(--arinv-success-grad);
+    }
+
+        .vas_189_arinv-banner.is-active .vas_189_arinv-well {
+            background: var(--arinv-success-dot);
+        }
+
+.vas_189_arinv-banner-l {
+    display: flex;
+    align-items: center;
+    gap: 0.85em;
+    min-width: 0;
+}
+
+.vas_189_arinv-well {
+    width: 2.5em;
+    height: 2.5em;
+    border-radius: 50%;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--arinv-primary);
+    color: #FFFFFF;
+}
+
+.vas_189_arinv-banner-a {
+    font-size: 0.875em;
+    font-weight: 700;
+    color: var(--arinv-text);
+}
+
+.vas_189_arinv-banner-b {
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--arinv-text-2);
+    margin-top: 0.2em;
+}
+
+/* ============================================================
+ * Block card — Invoice details, Line items, Payment schedules,
+ * Allocations, Delivery details, Approval and Posted entry.
+ * ============================================================ */
+.vas_189_arinv-block {
+    background: var(--arinv-surface);
+    border: var(--arinv-hair) solid var(--arinv-border);
+    border-radius: var(--arinv-r-md);
+    box-shadow: var(--arinv-shadow-card);
+    margin-top: 1.1em;
+    overflow: hidden;
+}
+
+.vas_189_arinv-block-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.8em;
+    flex-wrap: wrap;
+    padding: 0.8em 1.1em;
+}
+
+.vas_189_arinv-block-h {
+    font-size: 1em;
+    font-weight: 700;
+    color: var(--arinv-text);
+}
+
+.vas_189_arinv-block-r {
+    font-size: 0.75em;
+    font-weight: 400;
+}
+
+.vas_189_arinv-block-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.8em;
+    flex-wrap: wrap;
+    padding: 0.8em 1.1em;
+    background: var(--arinv-surface-2);
+    border-top: var(--arinv-hair) solid var(--arinv-border);
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--arinv-muted);
+}
+
+    .vas_189_arinv-block-foot b {
+        color: var(--arinv-primary);
+        font-weight: 700;
+        font-size: 1.2em;
+    }
+
+/* Text pager inside a footer band. */
+.vas_189_arinv-pager {
+    display: inline-flex;
+    gap: 0.4em;
+}
+
+.vas_189_arinv-pagebtn {
+    font-family: inherit;
+    font-size: 1em;
+    font-weight: 400;
+    cursor: pointer;
+    border: var(--arinv-hair) solid var(--arinv-border);
+    background: var(--arinv-surface);
+    border-radius: var(--arinv-r-sm);
+    padding: 0.3em 0.8em;
+    color: var(--arinv-text-2);
+}
+
+    .vas_189_arinv-pagebtn:hover:not(:disabled) {
+        border-color: var(--arinv-primary);
+        color: var(--arinv-primary);
+    }
+
+    .vas_189_arinv-pagebtn:disabled {
+        color: var(--arinv-disabled);
+        cursor: not-allowed;
+    }
+
+/* ---------- key / value list ---------- */
+.vas_189_arinv-kv {
+    padding: 0.3em 1.1em 1em;
+}
+
+    .vas_189_arinv-kv.cols2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        column-gap: 1.8em;
+    }
+
+.vas_189_arinv-kv-r {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1em;
+    padding: 0.6em 0;
+    border-bottom: var(--arinv-hair) solid var(--arinv-divider);
+}
+
+.vas_189_arinv-kv-k {
+    font-size: 0.8em;
+    font-weight: 400;
+}
+
+.vas_189_arinv-kv-v {
+    font-size: 0.8725em;
+    font-weight: 700;
+    color: var(--arinv-text);
+    text-align: right;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Rows a delivery comparison disagrees on: the row is tinted and the figure
+   takes the warning colour, so "Partially fulfilled" points at the number. */
+.vas_189_arinv-kv-r.variance {
+    background: var(--arinv-warning-bg);
+    box-shadow: inset 0.1875em 0 0 0 var(--arinv-warning-border);
+    padding-left: 0.5em;
+    padding-right: 0.5em;
+}
+
+.vas_189_arinv-kv-v.warn {
+    color: var(--arinv-warning-text);
+}
+
+/* Qualifier under the value (variance size, "No physical items detected").
+   De-compounded against the 0.8725em value so it lands on the floor. */
+.vas_189_arinv-kv-v .delta {
+    display: block;
+    font-size: calc(0.6875em / 0.8725);
+    font-weight: 500;
+    color: var(--arinv-muted);
+    margin-top: 0.15em;
+}
+
+.vas_189_arinv-kv-v.warn .delta {
+    color: var(--arinv-warning-text);
+}
+
+/* ---------- line items ---------- */
+.vas_189_arinv-li-head,
+.vas_189_arinv-lirow {
+    display: grid;
+    grid-template-columns: 2fr .7fr .6fr .8fr .7fr 1.2fr;
+    align-items: center;
+    gap: 0.8em;
+    padding: 0 1.1em;
+}
+
+.vas_189_arinv-li-head {
+    padding-bottom: 0.7em;
+    border-bottom: var(--arinv-hair) solid var(--arinv-divider-strong);
+}
+
+    .vas_189_arinv-li-head span {
+        font-size: 0.7875em;
+        font-weight: 500;
+        color: var(--arinv-text-2);
+        text-transform: capitalize;
+    }
+
+    .vas_189_arinv-li-head .right {
+        text-align: right;
+    }
+
+.vas_189_arinv-lirow {
+    padding: 0.9em 1.1em;
+    border-bottom: var(--arinv-hair) solid var(--arinv-divider);
+}
+
+    .vas_189_arinv-lirow:last-of-type {
+        border-bottom: none;
+    }
+
+    .vas_189_arinv-lirow > div {
+        min-width: 0;
+    }
+
+.vas_189_arinv-desc .vas_189_arinv-d {
+    font-size: 0.9375em;
+    font-weight: 700;
+    color: var(--arinv-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas_189_arinv-desc .vas_189_arinv-ds {
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--arinv-muted);
+    margin-top: 0.2em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas_189_arinv-qty,
+.vas_189_arinv-rate,
+.vas_189_arinv-tax {
+    font-size: 0.8em;
+    font-weight: 400;
+    color: var(--arinv-text-2);
+    text-align: right;
+}
+
+.vas_189_arinv-uom {
+    font-size: 0.8em;
+    font-weight: 400;
+    color: var(--arinv-text-2);
+}
+
+.vas_189_arinv-amt {
+    font-size: 0.8em;
+    font-weight: 400;
+    color: var(--arinv-text);
+    text-align: right;
+}
+
+.vas_189_arinv-block.no-tax .vas_189_arinv-li-head .right:nth-child(5),
+.vas_189_arinv-block.no-tax .vas_189_arinv-tax {
+    visibility: hidden;
+}
+
+/* ---------- totals card ---------- */
+.vas_189_arinv-totals-wrap {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1em;
+}
+
+.vas_189_arinv-totals {
+    width: min(30em, 100%);
+    background: var(--arinv-surface);
+    border: var(--arinv-hair) solid var(--arinv-border);
+    border-radius: var(--arinv-r-md);
+    box-shadow: var(--arinv-shadow-card);
+    padding: 0.4em 1.1em;
+}
+
+.vas_189_arinv-trow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    padding: 0.4em 0;
+}
+
+.vas_189_arinv-trow-k {
+    font-size: 0.75em;
+    font-weight: 400;
+}
+
+.vas_189_arinv-trow-v {
+    font-size: 0.8125em;
+    font-weight: 400;
+    color: var(--arinv-text);
+}
+
+.vas_189_arinv-trow.grand {
+    border-top: var(--arinv-hair) solid var(--arinv-border);
+    padding-top: 0.7em;
+}
+
+    .vas_189_arinv-trow.grand .vas_189_arinv-trow-k {
+        font-size: 0.8125em;
+        font-weight: 700;
+        color: var(--arinv-text);
+    }
+
+    .vas_189_arinv-trow.grand .vas_189_arinv-trow-v {
+        font-size: 1em;
+        font-weight: 700;
+        color: var(--arinv-primary);
+    }
+
+/* ---------- withholding card ---------- */
+.vas_189_arinv-withholding {
+    background: var(--arinv-surface);
+    border: var(--arinv-hair) solid var(--arinv-warning-border);
+    border-radius: var(--arinv-r-md);
+    box-shadow: var(--arinv-shadow-card);
+    margin-top: 1em;
+    overflow: hidden;
+}
+
+.vas_189_arinv-wh-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.8em;
+    flex-wrap: wrap;
+    padding: 1em 1.1em;
+    background: var(--arinv-warning-bg);
+}
+
+.vas_189_arinv-wh-h {
+    font-size: 1em;
+    font-weight: 700;
+    color: var(--arinv-warning-text);
+}
+
+.vas_189_arinv-wh-r {
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--arinv-warning-text);
+}
+
+.vas_189_arinv-wh-grid {
+    display: grid;
+    grid-template-columns: 1.2fr .9fr .9fr 1fr;
+    gap: 0.8em;
+    padding: 0.9em 1.1em;
+    align-items: center;
+}
+
+    .vas_189_arinv-wh-grid .k {
+        font-size: 0.7875em;
+        font-weight: 400;
+    }
+
+    .vas_189_arinv-wh-grid .v {
+        font-size: 0.8725em;
+        font-weight: 700;
+        color: var(--arinv-text);
+        margin-top: 0.4em;
+    }
+
+        .vas_189_arinv-wh-grid .v.warn {
+            color: var(--arinv-warning-text);
+        }
+
+/* ---------- two column pairing (Delivery + Approval) ---------- */
+.vas_189_arinv-two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.1em;
+    margin-top: 1.1em;
+}
+
+    .vas_189_arinv-two-col.single {
+        grid-template-columns: 1fr;
+    }
+
+    .vas_189_arinv-two-col .vas_189_arinv-block {
+        margin-top: 0;
+        height: 100%;
+    }
+
+/* ---------- 4-column table (schedules, allocations, modal credit list) ---------- */
+.vas_189_arinv-t4-head,
+.vas_189_arinv-t4-row {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr 1fr 1.7fr;
+    align-items: center;
+    gap: 0.7em;
+    padding: 0 1.1em;
+}
+
+.vas_189_arinv-t4-head {
+    padding-bottom: 0.7em;
+    border-bottom: var(--arinv-hair) solid var(--arinv-divider-strong);
+}
+
+    .vas_189_arinv-t4-head span {
+        font-size: 0.7875em;
+        font-weight: 500;
+        text-transform: capitalize;
+    }
+
+    .vas_189_arinv-t4-head .right {
+        text-align: right;
+    }
+
+.vas_189_arinv-t4-row {
+    padding: 0.9em 1.1em;
+    border-bottom: var(--arinv-hair) solid var(--arinv-divider);
+    font-size: 0.75em;
+}
+
+    .vas_189_arinv-t4-row:last-of-type {
+        border-bottom: none;
+    }
+
+    .vas_189_arinv-t4-row > div {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* Row tokens de-compounded against the row's own 0.75em context. */
+    .vas_189_arinv-t4-row .p {
+        font-size: calc(0.875em / 0.75);
+        font-weight: 400;
+        color: var(--arinv-text);
+    }
+
+    .vas_189_arinv-t4-row .c {
+        font-size: 1em;
+        font-weight: 400;
+    }
+
+    .vas_189_arinv-t4-row .amt {
+        font-size: 1em; /*calc(0.875em / 0.75);*/
+        font-weight: 400;
+        color: var(--arinv-text);
+    }
+
+    .vas_189_arinv-t4-row .col-d {
+        text-align: right;
+    }
+
+/* Document number that zooms to its record (allocation no. -> VAS_ViewAllocation).
+   Inherits the cell's size so it sits on the same baseline as a plain number. */
+.vas_189_arinv-doclink {
+    color: var(--arinv-link-deep);
+    font: inherit;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+    .vas_189_arinv-doclink:hover,
+    .vas_189_arinv-doclink:focus {
+        text-decoration: underline;
+    }
+
+/* Allocation rows carry a second line naming what the reference is. */
+.vas_189_arinv-alloc-row .col-a {
+    white-space: normal;
+}
+
+    .vas_189_arinv-alloc-row .col-a .p {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .vas_189_arinv-alloc-row .col-a .s {
+        font-size: calc(0.6875em / 0.75);
+        font-weight: 400;
+        color: var(--arinv-muted);
+        margin-top: 0.15em;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+/* Allocations carry one column more than the shared 4-column table: the
+   allocation document itself, between the reference and the date. Overriding
+   only the track list keeps every other t4 rule (padding, hairline, cell
+   truncation) intact for this table. */
+.vas_189_arinv-alloc-head,
+.vas_189_arinv-alloc-row {
+    grid-template-columns: 1.4fr 1fr 0.9fr 0.9fr 1.4fr;
+}
+
+/* ---------- approval rail ---------- */
+.vas_189_arinv-vsteps {
+    padding: 0.5em 1.1em 1em;
+}
+
+.vas_189_arinv-vstep {
+    display: flex;
+    gap: 0.8em;
+}
+
+    .vas_189_arinv-vstep .rail {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        flex: 0 0 auto;
+    }
+
+    .vas_189_arinv-vstep .node {
+        width: 1.5em;
+        height: 1.5em;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: var(--arinv-stroke) solid var(--arinv-border);
+        background: var(--arinv-surface);
+        color: var(--arinv-muted);
+        font-size: 0.8125em;
+    }
+
+    .vas_189_arinv-vstep.done .node {
+        background: var(--arinv-success-dot);
+        border-color: var(--arinv-success-dot);
+        color: #FFFFFF;
+    }
+
+    .vas_189_arinv-vstep .line {
+        flex: 1;
+        width: var(--arinv-hair);
+        background: var(--arinv-trail);
+        margin: 0.2em 0;
+        min-height: 0.7em;
+    }
+
+    .vas_189_arinv-vstep:last-child .line {
+        display: none;
+    }
+
+    .vas_189_arinv-vstep .c {
+        padding-bottom: 1em;
+        min-width: 0;
+    }
+
+    .vas_189_arinv-vstep:last-child .c {
+        padding-bottom: 0;
+    }
+
+        .vas_189_arinv-vstep .c .st {
+            font-size: 0.875em;
+            font-weight: 700;
+            color: var(--arinv-text);
+        }
+
+        .vas_189_arinv-vstep .c .mt {
+            font-size: 0.7875em;
+            font-weight: 400;
+            margin-top: 0.2em;
+        }
+
+        .vas_189_arinv-vstep .c .nt {
+            font-size: 0.75em;
+            font-weight: 400;
+            color: var(--arinv-text-2);
+            margin-top: 0.35em;
+            line-height: 1.4;
+        }
+
+/* ---------- posted journal (columns set inline per visible dimension) ---------- */
+.vas_189_arinv-je-head,
+.vas_189_arinv-je-row,
+.vas_189_arinv-je-total {
+    display: grid;
+    align-items: center;
+    gap: 0.8em;
+    padding: 0 1.1em;
+}
+
+.vas_189_arinv-je-head {
+    padding-bottom: 0.7em;
+    border-bottom: var(--arinv-hair) solid var(--arinv-divider-strong);
+}
+
+    .vas_189_arinv-je-head span {
+        font-size: 0.7875em;
+        font-weight: 500;
+        color: var(--arinv-text-2);
+        text-transform: capitalize;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .vas_189_arinv-je-head .right {
+        text-align: right;
+    }
+
+.vas_189_arinv-je-row {
+    padding: 0.8em 1.1em;
+    border-bottom: var(--arinv-hair) solid var(--arinv-divider);
+}
+
+    .vas_189_arinv-je-row:last-of-type {
+        border-bottom: none;
+    }
+
+    .vas_189_arinv-je-row > div {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .vas_189_arinv-je-row .acct .code {
+        font-size: 0.875em;
+        font-weight: 400;
+        color: var(--arinv-text);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .vas_189_arinv-je-row .dimc {
+        font-size: 0.75em;
+        font-weight: 400;
+        color: var(--arinv-text-2);
+    }
+
+    .vas_189_arinv-je-row .num {
+        font-size: 0.8125em;
+        font-weight: 400;
+        color: var(--arinv-text);
+        text-align: right;
+    }
+
+        .vas_189_arinv-je-row .num.zero {
+            font-weight: 400;
+            color: var(--arinv-placeholder);
+        }
+
+.vas_189_arinv-je-total {
+    padding: 0.9em 1.1em;
+    border-top: var(--arinv-hair) solid var(--arinv-border);
+    background: var(--arinv-surface-2);
+}
+
+    .vas_189_arinv-je-total .tlab {
+        font-size: 0.8125em;
+        font-weight: 700;
+        color: var(--arinv-text);
+    }
+
+    .vas_189_arinv-je-total .num {
+        font-size: 1em;
+        font-weight: 700;
+        color: var(--arinv-primary);
+        text-align: right;
+    }
+
+/* flash highlight (View ledger entry) */
+@keyframes vasArinvFlash {
+    0% {
+        box-shadow: var(--arinv-shadow-card);
+    }
+
+    28% {
+        box-shadow: 0 0 0 0.2em rgba(31, 131, 255, .45), var(--arinv-shadow-card);
+    }
+
+    100% {
+        box-shadow: var(--arinv-shadow-card);
+    }
+}
+
+.vas_189_arinv-block.flash {
+    animation: vasArinvFlash 1.25s ease;
+}
+
+/* ============================================================
+ * Receipt / allocation modal
+ * The scrim sets the same canonical anchor as the panel so the dialog
+ * reads at the panel's physical size.
+ * ============================================================ */
+.vas_189_arinv-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    background: rgba(16, 44, 63, .46);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 2.2em 1.1em;
+    overflow-y: auto;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity .2s ease, visibility .2s;
+    font-family: var(--arinv-font);
+    container-type: inline-size;
+    --panel-anchor: clamp(16px, 1vw, 18px);
+    font-size: var(--panel-anchor);
+    color: var(--arinv-text);
+}
+
+    .vas_189_arinv-scrim * {
+        box-sizing: border-box;
+    }
+
+    .vas_189_arinv-scrim.open {
+        opacity: 1;
+        visibility: visible;
+    }
+
+.vas_189_arinv-modal {
+    position: relative;
+    width: min(45em, 100%);
+    background: var(--arinv-surface);
+    border-radius: var(--arinv-r-lg);
+    box-shadow: 0 1.25em 2.8em rgba(15, 61, 97, .28);
+    overflow: hidden;
+    transform: translateY(0.7em) scale(.99);
+    transition: transform .24s cubic-bezier(.22, .61, .36, 1);
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 4.4em);
+}
+
+.vas_189_arinv-scrim.open .vas_189_arinv-modal {
+    transform: none;
+}
+
+.vas_189_arinv-scrim .js-form {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+    .vas_189_arinv-scrim .js-form .vas_189_arinv-m-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+    }
+
+.vas_189_arinv-success {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+    .vas_189_arinv-success .vas_189_arinv-m-success {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+    }
+
+.vas_189_arinv-m-head {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1em;
+    padding: 1em 1.125em;
+    border-bottom: var(--arinv-hair) solid var(--arinv-border);
+}
+
+    .vas_189_arinv-m-head h2 {
+        margin: 0;
+        font-size: 1em;
+        font-weight: 700;
+        color: var(--arinv-text);
+    }
+
+    .vas_189_arinv-m-head .ms {
+        font-size: 0.75em;
+        font-weight: 400;
+        color: var(--arinv-muted);
+        margin-top: 0.25em;
+    }
+
+.vas_189_arinv-m-x {
+    width: 2em;
+    height: 2em;
+    border-radius: var(--arinv-r-sm);
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: var(--arinv-text-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+
+    .vas_189_arinv-m-x:hover {
+        background: var(--arinv-surface-faint);
+        color: var(--arinv-primary);
+    }
+
+.vas_189_arinv-m-body {
+    padding: 1.1em 1.125em;
+}
+
+/* Stat tiles */
+.vas_189_arinv-m-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9em, 1fr));
+    gap: 0.625em;
+}
+
+.vas_189_arinv-m-stat {
+    border: var(--arinv-hair) solid var(--arinv-border);
+    border-radius: var(--arinv-r-md);
+    background: var(--arinv-surface-2);
+    padding: 0.75em;
+    min-width: 0;
+}
+
+    .vas_189_arinv-m-stat .l {
+        font-size: 0.6875em;
+        font-weight: 400;
+        color: var(--arinv-muted);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .vas_189_arinv-m-stat .v {
+        font-size: 0.9375em;
+        font-weight: 700;
+        color: var(--arinv-text);
+        margin-top: 0.125em;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .vas_189_arinv-m-stat.amber {
+        background: var(--arinv-warning-bg);
+        border-color: var(--arinv-warning-border);
+    }
+
+        .vas_189_arinv-m-stat.amber .l,
+        .vas_189_arinv-m-stat.amber .v {
+            color: var(--arinv-warning-text);
+        }
+
+    .vas_189_arinv-m-stat.green {
+        background: var(--arinv-success-bg);
+        border-color: var(--arinv-success-border);
+    }
+
+        .vas_189_arinv-m-stat.green .l,
+        .vas_189_arinv-m-stat.green .v {
+            color: var(--arinv-success-text);
+        }
+
+.vas_189_arinv-m-sec {
+    margin-top: 1.1em;
+}
+
+/* Boxed section — card look matching the Invoice details block. */
+.vas_189_arinv-m-sec-boxed {
+    background: var(--arinv-surface);
+    border: var(--arinv-hair) solid var(--arinv-border);
+    border-radius: var(--arinv-r-md);
+    box-shadow: var(--arinv-shadow-card);
+    padding: 1em 1.1em;
+}
+
+    .vas_189_arinv-m-sec-boxed .vas_189_arinv-t4-head,
+    .vas_189_arinv-m-sec-boxed .vas_189_arinv-t4-row {
+        padding-left: 0.7em;
+        padding-right: 0;
+    }
+
+.vas_189_arinv-m-sec-h {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6em;
+    flex-wrap: wrap;
+    margin-bottom: 0.6em;
+}
+
+    .vas_189_arinv-m-sec-h .t {
+        font-size: 1em;
+        font-weight: 700;
+        color: var(--arinv-text);
+    }
+
+    .vas_189_arinv-m-sec-h .hint {
+        font-size: 0.75em;
+        font-weight: 400;
+        color: var(--arinv-muted);
+    }
+
+/* On-account & credits list rendered as the 4-column table. */
+.vas_189_arinv-credit-t4row.selectable {
+    cursor: pointer;
+}
+
+    .vas_189_arinv-credit-t4row.selectable:hover {
+        background: var(--arinv-surface-faint);
+    }
+
+.vas_189_arinv-credit-t4row.on {
+    background: #F2F9FF;
+    box-shadow: inset 0.2em 0 0 var(--arinv-primary);
+}
+
+.vas_189_arinv-credit-t4row.locked {
+    cursor: default;
+    opacity: .84;
+}
+
+.vas_189_arinv-credit-t4row {
+    padding-top: 1.05em;
+    padding-bottom: 1.05em;
+}
+
+    .vas_189_arinv-credit-t4row .col-a.p {
+        font-weight: 400;
+    }
+
+    .vas_189_arinv-credit-t4row .col-d .conv {
+        display: block;
+        font-size: calc(0.6875em / 0.9375);
+        font-weight: 400;
+        color: var(--arinv-muted);
+        margin-top: 0.05em;
+    }
+
+.vas_189_arinv-credit-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6em;
+    flex-wrap: wrap;
+    margin-top: 0.6em;
+    padding-top: 0.6em;
+    border-top: var(--arinv-hair) solid var(--arinv-divider);
+}
+
+    .vas_189_arinv-credit-actions .summary {
+        font-size: 0.75em;
+        font-weight: 400;
+        color: var(--arinv-text-2);
+    }
+
+.vas_189_arinv-alloc-status {
+    display: none;
+    margin-top: 0.6em;
+    padding: 0.7em 0.8em;
+    border: var(--arinv-hair) solid var(--arinv-success-border);
+    background: var(--arinv-success-bg);
+    border-radius: var(--arinv-r-md);
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--arinv-success-text);
+    line-height: 1.5;
+}
+
+    .vas_189_arinv-alloc-status.show {
+        display: block;
+    }
+
+/* Every pay schedule paid: the New Receipt section is frozen (read-only) and
+   carries a success note instead of an editable balance. */
+.vas_189_arinv-paid-note {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    margin-bottom: 0.8em;
+    padding: 0.7em 0.8em;
+    border: var(--arinv-hair) solid var(--arinv-success-border);
+    background: var(--arinv-success-bg);
+    border-radius: var(--arinv-r-md);
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--arinv-success-text);
+    line-height: 1.5;
+}
+
+    .vas_189_arinv-paid-note .fa {
+        font-size: 1.05em;
+    }
+
+.vas_189_arinv-m-sec.is-readonly .vas_189_arinv-fgrid {
+    opacity: .6;
+    pointer-events: none;
+}
+
+/* A single field switched off — the Discount is disabled until the receipt
+   line has an amount to settle. */
+.vas_189_arinv-field.is-disabled {
+    opacity: .55;
+}
+
+    .vas_189_arinv-field.is-disabled .control,
+    .vas_189_arinv-field.is-disabled input {
+        cursor: not-allowed;
+    }
+
+    .vas_189_arinv-field.is-disabled .control:hover,
+    .vas_189_arinv-field.is-disabled .control:focus-within {
+        border-bottom-color: var(--arinv-field-border);
+    }
+
+.vas_189_arinv-m-sec.is-readonly .vas_189_arinv-field .control:hover,
+.vas_189_arinv-m-sec.is-readonly .vas_189_arinv-field .control:focus-within {
+    border-bottom-color: var(--arinv-field-border);
+}
+
+.vas_189_arinv-m-sec.is-readonly .vas_189_arinv-field input,
+.vas_189_arinv-m-sec.is-readonly .vas_189_arinv-field select {
+    color: var(--arinv-muted);
+    cursor: default;
+}
+
+/* Modal-scoped busy overlay. */
+.vas_189_arinv-m-busy {
+    position: absolute;
+    inset: 0;
+    z-index: 6;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, .68);
+    border-radius: var(--arinv-r-lg);
+}
+
+    .vas_189_arinv-m-busy.show {
+        display: flex;
+    }
+
+/* ---------- form fields ---------- */
+.vas_189_arinv-fgrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.8em 1em;
+}
+
+.vas_189_arinv-field {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+    .vas_189_arinv-field.span2 {
+        grid-column: 1 / -1;
+    }
+
+    .vas_189_arinv-field label {
+        font-size: 0.75em;
+        font-weight: 400;
+        color: var(--arinv-text-2);
+        margin-bottom: 0 !important;
+    }
+
+.vas_189_arinv-field-ic {
+    margin-right: 0.45em;
+    color: var(--arinv-muted);
+    font-size: 0.875em;
+}
+
+.vas_189_arinv-field .control {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    border: none;
+    border-bottom: var(--arinv-hair) solid var(--arinv-field-border);
+    border-radius: 0;
+    background: transparent;
+    padding: 0.5em 0.1em;
+    transition: border-color .15s;
+}
+
+    .vas_189_arinv-field .control:hover,
+    .vas_189_arinv-field .control:focus-within {
+        border-bottom-color: var(--arinv-primary);
+    }
+
+    .vas_189_arinv-field .control.invalid {
+        border-bottom-color: var(--arinv-risk-dot);
+    }
+
+    .vas_189_arinv-field .control .pfx {
+        font-size: 0.875em;
+        font-weight: 400;
+        color: var(--arinv-muted);
+    }
+
+.vas_189_arinv-field input,
+.vas_189_arinv-field select {
+    border: none;
+    outline: none;
+    background: none;
+    font-family: inherit;
+    font-size: 1em;
+    font-weight: 400;
+    color: var(--arinv-text);
+    width: 100%;
+    padding: 0;
+}
+
+.vas_189_arinv-field input[type="date"]::-webkit-calendar-picker-indicator,
+.vas_189_arinv-field input[type="date"]::-webkit-inner-spin-button {
+    display: none;
+}
+
+.vas_189_arinv-field input[type="date"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.vas_189_arinv-field select {
+    cursor: pointer;
+    padding-left: 0.35em;
+}
+
+/* ---------- settlement summary ---------- */
+.vas_189_arinv-settle {
+    margin-top: 1.1em;
+    border: var(--arinv-hair) solid var(--arinv-border);
+    border-radius: var(--arinv-r-md);
+    background: var(--arinv-surface-2);
+    padding: 0.9em;
+}
+
+    .vas_189_arinv-settle .srow {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75em;
+        padding: 0.3em 0;
+    }
+
+        .vas_189_arinv-settle .srow .k {
+            font-size: 0.75em;
+            font-weight: 400;
+            color: var(--arinv-text-2);
+        }
+
+        .vas_189_arinv-settle .srow .v {
+            font-size: 0.8125em;
+            font-weight: 700;
+            color: var(--arinv-text);
+        }
+
+            .vas_189_arinv-settle .srow .v.green {
+                color: var(--arinv-success-text);
+            }
+
+        .vas_189_arinv-settle .srow.tot {
+            border-top: var(--arinv-hair) solid var(--arinv-border);
+            margin-top: 0.3em;
+            padding-top: 0.6em;
+        }
+
+            .vas_189_arinv-settle .srow.tot .k {
+                font-size: 0.8125em;
+                font-weight: 700;
+                color: var(--arinv-text);
+            }
+
+            .vas_189_arinv-settle .srow.tot .v {
+                font-size: 1em;
+                color: var(--arinv-primary);
+            }
+
+    .vas_189_arinv-settle .bar {
+        height: 0.5em;
+        border-radius: var(--arinv-r-pill);
+        background: #E3EDF5;
+        overflow: hidden;
+        margin-top: 0.7em;
+    }
+
+        .vas_189_arinv-settle .bar > span {
+            display: block;
+            height: 100%;
+            border-radius: var(--arinv-r-pill);
+            background: var(--arinv-success-dot);
+            width: 0;
+            transition: width .3s ease;
+        }
+
+    .vas_189_arinv-settle .note {
+        display: none;
+        font-size: 0.6875em;
+        font-weight: 400;
+        color: var(--arinv-warning-text);
+        margin-top: 0.55em;
+    }
+
+        .vas_189_arinv-settle .note.show {
+            display: block;
+        }
+
+        .vas_189_arinv-settle .note.err {
+            color: var(--arinv-risk-text);
+            font-weight: 500;
+        }
+
+/* ---------- dialog footer / success ---------- */
+.vas_189_arinv-m-foot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.6em;
+    flex-wrap: wrap;
+    padding: 0.875em 1.125em;
+    border-top: var(--arinv-hair) solid var(--arinv-border);
+    background: var(--arinv-surface);
+    position: sticky;
+    bottom: 0;
+}
+
+    .vas_189_arinv-m-foot .spacer {
+        margin-right: auto;
+        font-size: 0.75em;
+        font-weight: 400;
+        color: var(--arinv-muted);
+    }
+
+.vas_189_arinv-m-success {
+    padding: 2em 1.125em 1.75em;
+    text-align: center;
+}
+
+    .vas_189_arinv-m-success .circle {
+        width: 3.5em;
+        height: 3.5em;
+        border-radius: 50%;
+        margin: 0 auto 0.875em;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--arinv-success-bg);
+        color: var(--arinv-success-text);
+    }
+
+    .vas_189_arinv-m-success h3 {
+        margin: 0 0 0.375em;
+        font-size: 1.125em;
+        font-weight: 700;
+        color: var(--arinv-text);
+    }
+
+    .vas_189_arinv-m-success p {
+        margin: 0 auto;
+        font-size: 0.8125em;
+        font-weight: 400;
+        color: var(--arinv-text-2);
+        max-width: 26em;
+        line-height: 1.5;
+    }
+
+    .vas_189_arinv-m-success .recap {
+        display: inline-flex;
+        flex-direction: column;
+        gap: 0.4em;
+        margin: 1em auto 0;
+        text-align: left;
+        background: var(--arinv-surface-2);
+        border: var(--arinv-hair) solid var(--arinv-border);
+        border-radius: var(--arinv-r-md);
+        padding: 0.8em 1em;
+    }
+
+        .vas_189_arinv-m-success .recap .rr {
+            display: flex;
+            justify-content: space-between;
+            gap: 1.5em;
+        }
+
+            .vas_189_arinv-m-success .recap .rr .k {
+                font-size: 0.75em;
+                font-weight: 400;
+                color: var(--arinv-text-2);
+            }
+
+            .vas_189_arinv-m-success .recap .rr .v {
+                font-size: 0.8125em;
+                font-weight: 700;
+                color: var(--arinv-text);
+            }
+
+/* ============================================================
+ * Set up recurring invoice
+ *
+ * Composition follows the supplied reference HTML element for element:
+ * brand-icon header, slim section dividers (icon well + title + rule +
+ * hint), segmented frequency type, a 12-column field-card grid with
+ * stepper controls, the 4-tile summary strip, the 6-column occurrence
+ * table and the legend + actions footer.
+ *
+ * TOKENS are ours, not the reference's (review-checklist.md §8.7 —
+ * reference sizes are prototypes and do not survive the audit):
+ *   - nothing below the 0.6875em floor (the reference's 0.625em eyebrows
+ *     round up)
+ *   - no uppercase eyebrow labels; sentence case throughout
+ *   - weights limited to 400 / 500 / 700 (no 600)
+ *   - section title 1em/700 + hint 0.75em/400; field label 0.6875em/400;
+ *     field value 0.875em/700; stat label 0.6875em + value 0.9375em/700;
+ *     table header 0.6875em/500, body row 0.75em
+ *   - status chips reuse the panel's own two-tier chip, not a third tier
+ *   - every length in em (px spec values translated at 1em = 16px)
+ * ============================================================ */
+.vas_189_arinv-rec-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 82;
+    background: rgba(16, 44, 63, .46);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 2.2em 1.1em;
+    overflow-y: auto;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity .2s ease, visibility .2s;
+    font-family: var(--arinv-font);
+    container-type: inline-size;
+    --panel-anchor: clamp(16px, 1vw, 18px);
+    font-size: var(--panel-anchor);
+    color: var(--arinv-text);
+}
+
+    .vas_189_arinv-rec-scrim * {
+        box-sizing: border-box;
+    }
+
+    .vas_189_arinv-rec-scrim.open {
+        opacity: 1;
+        visibility: visible;
+    }
+
+.vas_189_arinv-rec-modal {
+    position: relative;
+    width: min(64em, 100%);
+    background: var(--arinv-surface);
+    border: var(--arinv-stroke) solid #FFFFFF;
+    border-radius: var(--arinv-r-lg);
+    box-shadow: 0 1.125em 2.75em rgba(15, 61, 97, .16);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 4.4em);
+    transform: translateY(0.7em) scale(.99);
+    transition: transform .24s cubic-bezier(.22, .61, .36, 1);
+}
+
+.vas_189_arinv-rec-scrim.open .vas_189_arinv-rec-modal {
+    transform: none;
+}
+
+/* ---------- header ---------- */
+.vas_189_arinv-rec-head {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.875em;
+    padding: 1em 1.25em 0.875em;
+    border-bottom: var(--arinv-hair) solid var(--arinv-divider);
+}
+
+.vas_189_arinv-rec-brand {
+    width: 2.5em;
+    height: 2.5em;
+    flex: none;
+    border-radius: 0.6875em;
+    background: linear-gradient(160deg, var(--arinv-action), var(--arinv-primary));
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0.375em 0.875em rgba(31, 131, 255, .32);
+}
+
+    .vas_189_arinv-rec-brand svg {
+        width: 1.3125em;
+        height: 1.3125em;
+    }
+
+.vas_189_arinv-rec-titles {
+    flex: 1;
+    min-width: 0;
+}
+
+    .vas_189_arinv-rec-titles h2 {
+        margin: 0;
+        font-size: 1em;
+        font-weight: 700;
+        line-height: 1.2;
+        color: var(--arinv-text);
+    }
+
+.vas_189_arinv-rec-head-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+.vas_189_arinv-rec-x {
+    width: 2em;
+    height: 2em;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: var(--arinv-hair) solid var(--arinv-border);
+    border-radius: var(--arinv-r-sm);
+    background: var(--arinv-surface);
+    color: var(--arinv-text-2);
+    cursor: pointer;
+    transition: background .15s, border-color .15s, color .15s;
+}
+
+    .vas_189_arinv-rec-x svg {
+        width: 0.9375em;
+        height: 0.9375em;
+    }
+
+    .vas_189_arinv-rec-x:hover {
+        background: var(--arinv-surface-faint);
+        border-color: #BFE4FF;
+        color: var(--arinv-primary);
+    }
+
+/* ---------- body ---------- */
+.vas_189_arinv-rec-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0.875em 1.25em 0.375em;
+}
+
+/* Slim section divider — icon well + title + rule + hint. */
+.vas_189_arinv-rec-sec {
+    display: flex;
+    align-items: center;
+    gap: 0.5625em;
+    margin: 0.25em 0 0.625em;
+}
+
+    .vas_189_arinv-rec-sec h4 {
+        margin: 0;
+        font-size: 1em;
+        font-weight: 700;
+        color: var(--arinv-text);
+    }
+
+.vas_189_arinv-rec-rule {
+    flex: 1;
+    height: var(--arinv-hair);
+    background: var(--arinv-divider);
+}
+
+.vas_189_arinv-rec-hint {
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--arinv-muted);
+}
+
+/* Tinted icon well — section headers and field cards share it. */
+.vas_189_arinv-rec-well {
+    width: 1.375em;
+    height: 1.375em;
+    flex: none;
+    border-radius: 0.375em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    .vas_189_arinv-rec-well svg {
+        width: 0.8125em;
+        height: 0.8125em;
+    }
+
+    .vas_189_arinv-rec-well.iw {
+        width: 1.625em;
+        height: 1.625em;
+        border-radius: 0.4375em;
+        margin-top: 0.0625em;
+    }
+
+        .vas_189_arinv-rec-well.iw svg {
+            width: 0.875em;
+            height: 0.875em;
+        }
+
+    .vas_189_arinv-rec-well.b {
+        background: var(--arinv-info-bg);
+        color: var(--arinv-primary);
+    }
+
+    .vas_189_arinv-rec-well.t {
+        background: #E1F5EE;
+        color: #0F6E56;
+    }
+
+    .vas_189_arinv-rec-well.a {
+        background: #FBEFD6;
+        color: #BA7517;
+    }
+
+    .vas_189_arinv-rec-well.p {
+        background: #EDEBFA;
+        color: #534AB7;
+    }
+
+/* ---------- segmented frequency type ---------- */
+.vas_189_arinv-rec-segrow {
+    margin-bottom: 0.75em;
+}
+
+.vas_189_arinv-rec-seglab {
+    display: block;
+    margin-bottom: 0.375em;
+    font-size: 0.6875em;
+    font-weight: 500;
+    color: var(--arinv-text-2);
+}
+
+.vas_189_arinv-rec-req {
+    color: var(--arinv-risk-dot);
+    margin-left: 0.125em;
+}
+
+.vas_189_arinv-rec-seg {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375em;
+}
+
+.vas_189_arinv-rec-seg-btn {
+    font-family: inherit;
+    font-size: 0.8125em;
+    font-weight: 500;
+    line-height: 1.2;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4375em;
+    padding: 0.5em 0.875em;
+    border: var(--arinv-hair) solid var(--arinv-border);
+    border-radius: 0.5625em;
+    background: var(--arinv-surface);
+    color: var(--arinv-text-2);
+    transition: background .15s, border-color .15s, color .15s;
+}
+
+    .vas_189_arinv-rec-seg-btn svg {
+        width: 0.8125em;
+        height: 0.8125em;
+        opacity: .8;
+    }
+
+    .vas_189_arinv-rec-seg-btn:hover {
+        border-color: #BFE4FF;
+        background: var(--arinv-surface-faint);
+        color: var(--arinv-link-deep);
+    }
+
+    /* Selected: the canonical selected-row gradient + the inset marker rail. */
+    .vas_189_arinv-rec-seg-btn.on {
+        background: linear-gradient(109deg, #EAF8FF 0%, #CAEDFF 100%);
+        border-color: var(--arinv-primary);
+        color: #002640;
+        font-weight: 700;
+        box-shadow: inset 0.1875em 0 0 var(--arinv-primary), 0 0.25em 0.625em rgba(31, 131, 255, .10);
+    }
+
+    .vas_189_arinv-rec-seg-btn:focus-visible {
+        outline: var(--arinv-stroke) solid var(--arinv-action);
+        outline-offset: 0.125em;
+    }
+
+/* ---------- field-card grid ---------- */
+.vas_189_arinv-rec-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 0.5em;
+    margin-bottom: 0.75em;
+}
+
+.vas_189_arinv-rec-fc {
+    grid-column: span 3;
+    min-width: 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5625em;
+    padding: 0.5em 0.625em;
+    border: var(--arinv-hair) solid var(--arinv-border);
+    border-radius: 0.625em;
+    background: var(--arinv-surface);
+    transition: border-color .15s, box-shadow .15s;
+}
+
+    .vas_189_arinv-rec-fc:focus-within {
+        border-color: #BFE4FF;
+        box-shadow: 0 0 0 0.1875em rgba(31, 131, 255, .10);
+    }
+
+    /* Derived value — not an input, so it reads as a quieter surface. */
+    .vas_189_arinv-rec-fc.is-readonly {
+        background: var(--arinv-surface-2);
+    }
+
+    .vas_189_arinv-rec-fc.span-all {
+        grid-column: span 12;
+    }
+
+.vas_189_arinv-rec-fbody {
+    flex: 1;
+    min-width: 0;
+}
+
+    .vas_189_arinv-rec-fbody > label,
+    .vas_189_arinv-rec-lb {
+        display: block;
+        margin-bottom: 0.125em !important;
+        font-size: 0.6875em;
+        font-weight: 400;
+        color: var(--arinv-muted);
+    }
+
+.vas_189_arinv-rec-val {
+    font-size: 0.875em;
+    font-weight: 700;
+    line-height: 1.35;
+    color: var(--arinv-text);
+}
+
+    .vas_189_arinv-rec-val small {
+        font-size: calc(0.75em / 0.875);
+        font-weight: 400;
+        color: var(--arinv-text-2);
+    }
+
+/* Controls sit flush inside their card — the card is the field boundary, so
+   the control itself carries no second border. */
+.vas_189_arinv-rec-num,
+.vas_189_arinv-rec-date,
+.vas_189_arinv-rec-textarea {
+    font-family: inherit;
+    font-size: 0.875em;
+    font-weight: 700;
+    color: var(--arinv-text);
+    border: none !important;
+    background: transparent;
+    padding: 0;
+    width: 100%;
+    min-width: 0;
+    outline: none;
+    box-shadow: none;
+}
+
+.vas_189_arinv-rec-textarea {
+    font-size: 0.8125em;
+    font-weight: 400;
+    line-height: 1.45;
+    resize: none;
+}
+
+    .vas_189_arinv-rec-textarea::placeholder,
+    .vas_189_arinv-rec-num::placeholder {
+        color: var(--arinv-placeholder);
+        font-weight: 400;
+    }
+
+.vas_189_arinv-rec-num {
+    width: 2.75em;
+    flex: none;
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+    .vas_189_arinv-rec-num::-webkit-outer-spin-button,
+    .vas_189_arinv-rec-num::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+/* ---------- stepper ---------- */
+.vas_189_arinv-rec-stepper {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+.vas_189_arinv-rec-sbtns {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125em;
+    flex: none;
+}
+
+.vas_189_arinv-rec-sbtn {
+    width: 1.125em;
+    height: 0.8125em;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: var(--arinv-hair) solid var(--arinv-border);
+    border-radius: 0.25em;
+    background: var(--arinv-surface);
+    color: var(--arinv-text-2);
+    cursor: pointer;
+}
+
+    .vas_189_arinv-rec-sbtn svg {
+        width: 0.5625em;
+        height: 0.5625em;
+    }
+
+    .vas_189_arinv-rec-sbtn:hover {
+        background: var(--arinv-info-bg);
+        border-color: #BFE4FF;
+        color: var(--arinv-primary);
+    }
+
+    .vas_189_arinv-rec-sbtn:focus-visible {
+        outline: var(--arinv-stroke) solid var(--arinv-action);
+        outline-offset: 0.125em;
+    }
+
+.vas_189_arinv-rec-unit {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--arinv-text-2);
+    white-space: nowrap;
+}
+
+/* ---------- summary strip ---------- */
+.vas_189_arinv-rec-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5em;
+    margin-bottom: 0.625em;
+}
+
+.vas_189_arinv-rec-stat {
+    min-width: 0;
+    padding: 0.5em 0.6875em;
+    border: var(--arinv-hair) solid var(--arinv-border);
+    border-radius: 0.625em;
+    background: linear-gradient(180deg, #FBFDFF, #F4FAFF);
+}
+
+    .vas_189_arinv-rec-stat .k {
+        font-size: 0.6875em;
+        font-weight: 400;
+        color: var(--arinv-muted);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .vas_189_arinv-rec-stat .v {
+        margin-top: 0.125em;
+        font-size: 0.9375em;
+        font-weight: 700;
+        line-height: 1.25;
+        color: #002640;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+        .vas_189_arinv-rec-stat .v small {
+            font-size: calc(0.6875em / 0.9375);
+            font-weight: 400;
+            color: var(--arinv-text-2);
+        }
+
+/* ---------- occurrence table ---------- */
+.vas_189_arinv-rec-tblwrap {
+    border: var(--arinv-hair) solid var(--arinv-border);
+    border-radius: 0.625em;
+    overflow: hidden;
+    margin-bottom: 0.875em;
+}
+
+.vas_189_arinv-rec-tbl {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+    .vas_189_arinv-rec-tbl thead th {
+        font-size: 0.6875em;
+        font-weight: 500;
+        color: var(--arinv-text-2);
+        text-align: left;
+        padding: 0.5em 0.75em;
+        background: var(--arinv-surface-2);
+        border-bottom: var(--arinv-hair) solid var(--arinv-border);
+        white-space: nowrap;
+    }
+
+    .vas_189_arinv-rec-tbl tbody td {
+        font-size: 0.75em;
+        color: var(--arinv-text);
+        padding: 0.5em 0.75em;
+        border-bottom: var(--arinv-hair) solid var(--arinv-divider);
+        vertical-align: middle;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .vas_189_arinv-rec-tbl tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    .vas_189_arinv-rec-tbl tbody tr:hover td {
+        background: #F7FBFF;
+    }
+
+    /* The run that fires next — tinted with the same inset rail the selected
+       frequency button uses, so "next" reads the same way across the dialog. */
+    .vas_189_arinv-rec-tbl tbody tr.is-next td {
+        background: var(--arinv-surface-faint);
+    }
+
+        .vas_189_arinv-rec-tbl tbody tr.is-next td:first-child {
+            box-shadow: inset 0.1875em 0 0 var(--arinv-primary);
+        }
+
+    /* Row context is 0.75em — de-compound the chip back to the anchor floor. */
+    .vas_189_arinv-rec-tbl tbody .vas_189_arinv-chip {
+        font-size: calc(0.6875em / 0.75);
+    }
+
+    .vas_189_arinv-rec-tbl .right {
+        text-align: right;
+    }
+
+    .vas_189_arinv-rec-tbl .c-run {
+        width: 6%;
+        font-weight: 700;
+        color: #002640;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .vas_189_arinv-rec-tbl .c-date {
+        width: 11%;
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .vas_189_arinv-rec-tbl .c-status {
+        width: 11%;
+    }
+
+    .vas_189_arinv-rec-tbl .c-amt {
+        width: 17%;
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .vas_189_arinv-rec-tbl .c-cur {
+        width: 11%;
+    }
+
+.vas_189_arinv-rec-link {
+    color: var(--arinv-link-deep);
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+    .vas_189_arinv-rec-link:hover {
+        text-decoration: underline;
+    }
+
+/* A future occurrence is not a record yet — subdued italic. */
+.vas_189_arinv-rec-tbc {
+    color: var(--arinv-placeholder);
+    font-style: italic;
+}
+
+.vas_189_arinv-rec-pnote {
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--arinv-muted);
+    margin: -0.375em 0 0.875em;
+}
+
+    .vas_189_arinv-rec-pnote.err {
+        color: var(--arinv-risk-text);
+        font-weight: 500;
+    }
+
+/* Dialog-scoped busy overlay — covers the whole modal while the schedule is
+   saved, so the form cannot be edited or re-submitted mid-flight. */
+.vas_189_arinv-rec-busy {
+    position: absolute;
+    inset: 0;
+    z-index: 6;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, .68);
+    border-radius: var(--arinv-r-lg);
+}
+
+    .vas_189_arinv-rec-busy.show {
+        display: flex;
+    }
+
+/* ---------- footer ---------- */
+.vas_189_arinv-rec-foot {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.875em;
+    flex-wrap: wrap;
+    padding: 0.75em 1.25em;
+    border-top: var(--arinv-hair) solid var(--arinv-divider);
+    background: var(--arinv-surface-2);
+}
+
+.vas_189_arinv-rec-legend {
+    font-size: 0.6875em;
+    font-weight: 400;
+    color: var(--arinv-muted);
+}
+
+    .vas_189_arinv-rec-legend b {
+        color: var(--arinv-risk-dot);
+        font-weight: 700;
+    }
+
+.vas_189_arinv-rec-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-wrap: wrap;
+}
+
+.vas_189_arinv-rec-btn {
+    font-family: inherit;
+    font-size: 0.8125em;
+    font-weight: 500;
+    line-height: 1.2;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4375em;
+    padding: 0.5625em 1.125em;
+    border: var(--arinv-hair) solid var(--arinv-border);
+    border-radius: var(--arinv-r-sm);
+    background: var(--arinv-surface);
+    color: var(--arinv-text-2);
+    transition: background .15s, border-color .15s, color .15s;
+}
+
+    .vas_189_arinv-rec-btn svg {
+        width: 0.875em;
+        height: 0.875em;
+    }
+
+    .vas_189_arinv-rec-btn:hover:not(:disabled) {
+        background: var(--arinv-surface-faint);
+        border-color: #BFE4FF;
+        color: var(--arinv-link-deep);
+    }
+
+    /* Filled treatment is reserved for the form action bar's primary — which is
+       exactly what Save schedule is. */
+    .vas_189_arinv-rec-btn.is-primary {
+        background: var(--arinv-primary);
+        border-color: var(--arinv-primary);
+        color: #FFFFFF;
+        font-weight: 700;
+    }
+
+        .vas_189_arinv-rec-btn.is-primary:hover:not(:disabled) {
+            background: var(--arinv-primary-hover);
+            border-color: var(--arinv-primary-hover);
+            color: #FFFFFF;
+        }
+
+    .vas_189_arinv-rec-btn:disabled {
+        border-color: var(--arinv-disabled);
+        color: var(--arinv-disabled);
+        background: var(--arinv-surface);
+        cursor: not-allowed;
+    }
+
+    .vas_189_arinv-rec-btn.is-busy {
+        opacity: .75;
+        cursor: progress;
+    }
+
+    .vas_189_arinv-rec-btn:focus-visible {
+        outline: var(--arinv-stroke) solid var(--arinv-action);
+        outline-offset: 0.125em;
+    }
+
+/* ---------- recurring dialog responsive ---------- */
+@media (max-width: 56em) {
+    .vas_189_arinv-rec-fc {
+        grid-column: span 6;
+    }
+
+    .vas_189_arinv-rec-strip {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 37.5em) {
+    .vas_189_arinv-rec-fc,
+    .vas_189_arinv-rec-fc.span-all {
+        grid-column: span 12;
+    }
+
+    .vas_189_arinv-rec-strip {
+        grid-template-columns: 1fr;
+    }
+
+    .vas_189_arinv-rec-seg-btn {
+        flex: 1 1 auto;
+        justify-content: center;
+    }
+
+    .vas_189_arinv-rec-foot {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .vas_189_arinv-rec-actions .vas_189_arinv-rec-btn {
+        flex: 1;
+        justify-content: center;
+    }
+}
+
+/* ---------- responsive ---------- */
+@media (max-width: 47em) {
+    .vas_189_arinv-two-col {
+        grid-template-columns: 1fr;
+    }
+
+    .vas_189_arinv-kv.cols2 {
+        grid-template-columns: 1fr;
+    }
+
+    .vas_189_arinv-mgrid {
+        grid-template-columns: 1fr;
+    }
+
+    .vas_189_arinv-m-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .vas_189_arinv-fgrid {
+        grid-template-columns: 1fr;
+    }
+
+    .vas_189_arinv-ctx {
+        text-align: left;
+    }
+
+    .vas_189_arinv-wh-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using BaseLibrary.CloudService;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
@@ -772,6 +773,10 @@ namespace VIS.Models
             if (M_Product_ID > 0)
             {
                 MProduct prod = new MProduct(ctx, M_Product_ID, null);
+                if (prod.Get_ID() == 0)
+                {
+                    log.Severe($"MInvoiceModel -> GetTax -> M_Product object not created for product ID : {M_Product_ID}");
+                }
                 taxCategory = Util.GetValueOfInt(prod.GetC_TaxCategory_ID());
             }
             if (C_Charge_ID > 0)

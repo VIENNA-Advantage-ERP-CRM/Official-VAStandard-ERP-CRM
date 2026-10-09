@@ -211,11 +211,11 @@
             data: {
                 pageNo: pNo,
                 dates: date,
-                trxDatess: trxDates,
-                trxDatesUnions: trxDatesUnion,
-                cBPartnerIDs: cBPartnerID,
-                DocumentNos: DocumentNum,
-                DocumentNoUnions: DocumentNoUnion,
+                trxDatess: VIS.secureEngine.encrypt(trxDates),
+                trxDatesUnions: VIS.secureEngine.encrypt(trxDatesUnion),
+                cBPartnerIDs: VIS.secureEngine.encrypt(cBPartnerID),
+                DocumentNos: VIS.secureEngine.encrypt(DocumentNum),
+                DocumentNoUnions: VIS.secureEngine.encrypt(DocumentNoUnion),
                 DepositSlips: DepositSlip,
                 AuthCodes: AuthCode,
                 CheckNos: CheckNo,
@@ -618,7 +618,7 @@
                     return;
                 }
                 obj.$super.setBusy(false);
-                alert(returnValue);
+                VIS.ADialog.info('VAS_BankStatementNotSaved');
             },
             error: function (jqXHR, textStatus, errorThrown) {
                 debugger;

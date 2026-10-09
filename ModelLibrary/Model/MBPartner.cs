@@ -1245,11 +1245,11 @@ namespace VAdvantage.Model
                 if (wf_ID > 0 && Get_Value("VA061_NextStepBy") != null && (Is_ValueChanged("VA061_NextStepBy") || Is_ValueChanged("C_Followupdate")))
                 {
                     // Ensure that VA061_NextStep has value
-                    if (string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VA061_NextStep"))))
-                    {
-                        log.SaveWarning("VA061_NextStepMustHaveValue", "");
-                        return false;
-                    }
+                    //if (string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VA061_NextStep"))))
+                    //{
+                    //    log.SaveWarning("VA061_NextStepMustHaveValue", "");
+                    //    return false;
+                    //}
 
                     // Ensure that FollowUp On has value
                     if (string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("C_Followupdate"))))

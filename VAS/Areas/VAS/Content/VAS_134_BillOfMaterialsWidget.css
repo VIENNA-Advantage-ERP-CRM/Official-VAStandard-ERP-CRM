@@ -1,0 +1,427 @@
+/* Bill of Materials Widget (VAS_000) - 2x1 Product Master dual-stat KPI tile
+   with two drill-down modals. Widget size: 2 columns x 1 row (grid owns the
+   outer size). Tile internals in em on the dashboard-width lever; borders/
+   radii/shadows px. Both modals follow the Onfinity Panel Foundation
+   exactly as specified by this widget's own doc: fixed width min(600px,100%)
+   and their own compact vw-based font clamp (deliberately smaller/
+   independent of the dashboard-width lever - "dialogs are read briefly, not
+   for hours"). No fixed pixel width/height cap and no JS pixel measurement
+   decides row fit: row height and the list's max-height are both plain em
+   against the SAME fluid modal font-size, so "8 rows fit without a
+   scrollbar" holds by construction at every screen size. */
+
+.MPC-bom-root {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.MPC-bom-root,
+.MPC-bom-root *,
+.MPC-bom-overlay,
+.MPC-bom-overlay * {
+    box-sizing: border-box;
+}
+
+/* ---- Tile ---- */
+.MPC-bom-card {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    text-align: left;
+    padding: 0.875em;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    font-family: Roboto, sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .014), 24px);
+}
+
+.MPC-bom-title {
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.3;
+    font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * .011375), 16px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-bom-dual {
+    margin-top: auto;
+    display: flex;
+    align-items: stretch;
+    gap: 0.5em;
+}
+
+.MPC-bom-divider {
+    width: 1px;
+    align-self: stretch;
+    background: #E2EAF1;
+    flex: 0 0 auto;
+}
+
+.MPC-bom-stat {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: 0;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    padding: 0.375em 0.5em;
+    margin: -0.375em -0.25em;
+    border-radius: 10px;
+    transition: background 120ms ease;
+}
+
+.MPC-bom-stat:hover {
+    background: rgba(31, 131, 255, 0.08);
+}
+
+.MPC-bom-stat:focus-visible {
+    outline: 2px solid #0083DA;
+    outline-offset: 1px;
+}
+
+.MPC-bom-value {
+    font-size: 1.75em;
+    font-weight: 500;
+    line-height: 1.1;
+    color: #102C3F;
+}
+
+.MPC-bom-value.MPC-bom-warn {
+    color: #9A6500;
+}
+
+.MPC-bom-meta {
+    font-size: 0.6875em;
+    font-weight: 400;
+    color: #5F7283;
+    line-height: 1.3;
+    margin-top: 0.25em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ---- Modal (Onfinity Panel Foundation, shared shell for both dialogs) ---- */
+.MPC-bom-body-lock {
+    overflow: hidden !important;
+}
+
+.MPC-bom-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10050;
+    background: rgba(16, 44, 63, 0.45);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    font-family: Roboto, sans-serif;
+}
+
+.MPC-bom-overlay.MPC-bom-open {
+    display: flex;
+}
+
+.MPC-bom-panel {
+    container-type: inline-size;
+    background: #FFFFFF;
+    border: 1px solid #D9E2EB;
+    border-radius: 16px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    width: min(600px, 100%);
+    max-height: calc(100dvh - 48px);
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0117), 30px);
+}
+
+.MPC-bom-p-head {
+    height: 3em;
+    flex: none;
+    padding: 0 1em;
+    border-bottom: 1px solid #D9E2EB;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.MPC-bom-p-title {
+    font-size: 0.9375em;
+    font-weight: 500;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-bom-p-close {
+    width: 1.625em;
+    height: 1.625em;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    border: 1px solid #E4EDF4;
+    background: #FFFFFF;
+    color: #5F7283;
+    cursor: pointer;
+}
+
+.MPC-bom-p-close:hover {
+    background: #EEF8FF;
+    color: #0083DA;
+}
+
+.MPC-bom-p-close svg {
+    width: 0.8125em;
+    height: 0.8125em;
+}
+
+/* Same technique as VAS_134_TopCustomersWidget's modal: ONE font-size
+   source (the panel's fluid clamp above) cascades through every descendant
+   in em - no second, narrower override here, which is what previously made
+   this modal barely scale. */
+.MPC-bom-p-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0.875em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.625em;
+    container-type: inline-size;
+}
+
+.MPC-bom-p-body button,
+.MPC-bom-p-body input,
+.MPC-bom-p-body select,
+.MPC-bom-p-body textarea,
+.MPC-bom-p-body optgroup {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    color: inherit;
+}
+
+.MPC-bom-intro {
+    flex: none;
+    font-size: 0.75em;
+    font-weight: 400;
+    color: #5F7283;
+    line-height: 1.5;
+}
+
+.MPC-bom-section-head {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 0.375em;
+    border-bottom: 1px solid #E2EAF1;
+}
+
+.MPC-bom-section-title {
+    font-size: 0.9375em;
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.MPC-bom-section-summary {
+    font-size: 0.75em;
+    font-weight: 400;
+    color: #5F7283;
+}
+
+/* No JS pixel measurement decides how many rows fit: .MPC-bom-row's height
+   budget (~3.2em - padding + primary/meta line-heights) and .MPC-bom-list's
+   height are both plain em against the SAME fluid modal font-size, so
+   "8 rows fit without a scrollbar" holds by construction at every screen
+   size - the ratio between them never changes. overflow:hidden is the
+   safety net (clips rather than ever scrolling). min-height AND max-height
+   pinned to the same value (not a plain height - flex:1 sets flex-basis:0%,
+   which would make the flexbox algorithm ignore a plain height) so a
+   shorter/last page never shrinks the modal (widget-development-rules #15 -
+   stable line-area size): the list always reserves room for a full 8-row
+   page even when fewer rows are rendered. */
+.MPC-bom-list {
+    flex: 1;
+    min-height: calc(3.2em * 8);
+    max-height: calc(3.2em * 8);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.MPC-bom-row {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    padding: 0.5em;
+    border-bottom: 1px solid #E2EAF1;
+}
+
+.MPC-bom-row:last-child {
+    border-bottom: none;
+}
+
+.MPC-bom-row-left {
+    min-width: 0;
+}
+
+.MPC-bom-row-primary {
+    font-size: 0.75em;
+    font-weight: 700;
+    line-height: 1.3;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-bom-row-meta {
+    font-size: 0.6875em;
+    line-height: 1.3;
+    font-weight: 400;
+    color: #41576A;
+    margin-top: 0.125em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-bom-row-right {
+    flex: 0 0 auto;
+}
+
+.MPC-bom-row-value {
+    font-size: 0.75em;
+    font-weight: 700;
+    color: #102C3F;
+    white-space: nowrap;
+}
+
+.MPC-bom-pill {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 0.1875em 0.5em;
+    font-size: 0.6875em;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.MPC-bom-pill-warn {
+    background: #FFF6E2;
+    color: #9A6500;
+}
+
+.MPC-bom-pill-success {
+    background: #E9F6EE;
+    color: #0B6B45;
+}
+
+/* Loading / empty / error state inside the fixed list region. */
+.MPC-bom-state {
+    flex: 1;
+    padding: 1.5em 0.5em;
+    font-size: 0.8125em;
+    color: #748494;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75em;
+    text-align: center;
+}
+
+.MPC-bom-retry {
+    font-family: inherit;
+    font-size: 1em;
+    font-weight: 500;
+    color: #0083DA;
+    background: #FFFFFF;
+    border: 1px solid #E4EDF4;
+    border-radius: 8px;
+    padding: 0.35em 0.9em;
+    cursor: pointer;
+}
+
+.MPC-bom-retry:hover {
+    background: #EAF8FF;
+    border-color: #BFE4FF;
+}
+
+.MPC-bom-p-foot {
+    flex: none;
+    border-top: 1px solid #D9E2EB;
+    padding: 0.5em 1em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+}
+
+.MPC-bom-helper {
+    font-size: 0.75em;
+    font-weight: 400;
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-bom-pager {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    flex: 0 0 auto;
+}
+
+.MPC-bom-pgtext {
+    font-size: 0.8125em;
+    font-weight: 500;
+    color: #102C3F;
+    white-space: nowrap;
+}
+
+.MPC-bom-pgbtn {
+    width: 1.5em;
+    height: 1.5em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    border: 1px solid #E4EDF4;
+    background: #FFFFFF;
+    color: #0083DA;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.15s;
+}
+
+.MPC-bom-pgbtn:hover:not(:disabled) {
+    background: #EAF8FF;
+}
+
+.MPC-bom-pgbtn:disabled {
+    color: #B8C6D2;
+    cursor: default;
+    background: #FFFFFF;
+}
+
+.MPC-bom-pgbtn svg {
+    width: 0.875em;
+    height: 0.875em;
+}

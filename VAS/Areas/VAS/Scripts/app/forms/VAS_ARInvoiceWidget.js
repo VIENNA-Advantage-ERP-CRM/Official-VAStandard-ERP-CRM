@@ -13,7 +13,7 @@
         this.windowNo;
         var $bsyDiv;
         var $self = this;
-        var $root = $('<div class="h-100 w-100">');
+        var $root = $('<div class="h-100 w-100 vas-widget-bg">');
         var $maindiv = $('<div class="vas-arwidg-receivable-container">');
         var ctx = this.ctx;
         var TotalAmtArray = [];
@@ -40,18 +40,18 @@
                     $maindiv.append(
                         '  <div class="vas-arwidg-totalAmt-box" id="vas_arwidtotaamtContainer_' + widgetID + '">' +
                         '    <div class="vas-arwidg-totalRec-amount">' +
-                        '      <h1 class="vas-arwidg-rtl-amt">' + TotalAmtArray[0] +
+                        '      <div class="vas-arwidg-rtl-amt">' + TotalAmtArray[0] +
                         '<span class="vas-arwidg-cur-symbol">' + TotalAmtArray[1] + '<span>' +
-                        '<span class="vas-arwidg-Symbol">' + gridDataResult[4].Symbol + '</span></h1>' +
+                        '<span class="vas-arwidg-Symbol">' + gridDataResult[4].Symbol + '</span></div>' +
                         '      <div class="vas-arwidg-totalRecTxt">' + (VIS.Env.getCtx().isSOTrx($self.windowNo) == true ? VAS.translatedTexts.VAS_TotalRec : VAS.translatedTexts.VAS_TotalPurchase) + '</div>' +
                         '    </div>' +
                         '  </div>');
                     var listDesign = $('<div class="vas-arwidg-rec-listing" id="vas_listContainer_' + widgetID + '">');
                     for (var i = 0; i < gridDataResult.length - 1; i++) {
-                        var widgetDataDesign = '<div class="vas-arwidg-receiveTxt-box">' +
+                        var widgetDataDesign = '<div class="vas-arwidg-receiveTxt-box vas-separator-row">' +
                             '<div class="vas-arwidg-orderTxt">' + msgArray[i] + '</div>' +
                             '<div class="vas-arwidg-recBox-amt">' + '<span class="vas-vaswidg-Symbol">' + gridDataResult[i].Symbol + '</span>' + formatLargeNumber(gridDataResult[i].daysAmt, gridDataResult[i].stdPrecision) + unit
-                            '</div>' +
+                        '</div>' +
                             '</div>'
                         listDesign.append(widgetDataDesign);
                     }

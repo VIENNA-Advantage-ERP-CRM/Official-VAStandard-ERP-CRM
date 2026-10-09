@@ -1,0 +1,578 @@
+/**
+ * Warehouse Stock Widget
+ * Summary Message Table
+ *  # | Current Text                         | Message Key
+ * ---+--------------------------------------+-------------------------------
+ *  1 | Warehouse Stock                      | VAS_080_WarehouseStock
+ *  2 | Locator                              | VAS_080_Locator
+ *  3 | Qty                                  | VAS_Qty
+ *  4 | Value                                | VAS_Value
+ *  5 | locators                             | VAS_080_Locators
+ *  6 | Showing                              | VAS_Showing
+ *  7 | of                                   | VAS_Of
+ *  8 | Inventory Value by Age               | VAS_080_InventoryValueByAge
+ *  9 | 0-30 days                            | VAS_080_Age0To30Days
+ * 10 | 31-90 days                           | VAS_080_Age31To90Days
+ * 11 | 91-365 days                          | VAS_080_Age91To365Days
+ * 12 | >365 days                            | VAS_080_AgeOver365Days
+ * 13 | of value                             | VAS_080_OfValue
+ * 14 | total carrying value in this locator | VAS_080_TotalCarryingValueLocator
+ * 15 | units                                | VAS_080_Units
+ * 16 | No stock found for this warehouse.   | VAS_080_NoWarehouseStock
+ * 17 | Previous page                        | VAS_PreviousPage
+ * 18 | Next page                            | VAS_NextPage
+ * 19 | Close                                | Close
+ * 20 | Couldn't load                        | VAS_CouldntLoad
+ * 21 | Default                              | VAS_080_Default
+ * 22 | Use this warehouse as my default     | VAS_080_DefaultWarehouseHint
+ */
+; VAS = window.VAS || {};
+
+; (function (VAS, $) {
+
+    VAS.VAS_080_WarehouseStockWidget = function () {
+
+        this.frame;
+        this.windowNo;
+
+        var $self = this;
+        var $root = $('<div class="MPC-warehouse-stock-root">');
+        var $card;
+        var $warehouseSelect;
+        var $defaultCheck;
+        var $summary;
+        var $list;
+        var $footer;
+        var $modal;
+        var $modalBadge;
+        var $modalBody;
+        var rowResizeObserver = null;
+
+        var warehouseStockState = {
+            warehouseId: null,
+            defaultWarehouseId: null,
+            page: 1,
+            pageSize: 4,
+            rows: [],
+            warehouses: [],
+            currencySymbol: '',
+            currencyIso: '',
+            stdPrecision: 0
+        };
+
+        var ageBands = [
+            { key: 'value_0_30', messageKey: 'VAS_080_Age0To30Days', fallback: '0\u201330 days', className: 'MPC-ws-band-0' },
+            { key: 'value_31_90', messageKey: 'VAS_080_Age31To90Days', fallback: '31\u201390 days', className: 'MPC-ws-band-1' },
+            { key: 'value_91_365', messageKey: 'VAS_080_Age91To365Days', fallback: '91\u2013365 days', className: 'MPC-ws-band-2' },
+            { key: 'value_over_365', messageKey: 'VAS_080_AgeOver365Days', fallback: '>365 days', className: 'MPC-ws-band-3' }
+        ];
+
+        function label(key, fallback) {
+            return VIS.Msg.getMsg(key);
+        }
+
+        function parseResponse(response) {
+            var parsed = response;
+            if (typeof parsed === 'string' && parsed) { parsed = JSON.parse(parsed); }
+            if (typeof parsed === 'string' && parsed) { parsed = JSON.parse(parsed); }
+            return parsed || [];
+        }
+
+        function escapeHtml(value) {
+            return String(value == null ? '' : value).replace(/[&<>"']/g, function (character) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;'
+                }[character];
+            });
+        }
+
+        // Review #8 (common): currencies of Indian-numbering countries get Indian
+        // digit grouping; all others get international grouping. The symbol
+        // always comes from the DB.
+        var INDIAN_NUMBERING_CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
+
+        function usesIndianNumbering(isoCode) {
+            return INDIAN_NUMBERING_CURRENCIES.indexOf(String(isoCode || '').toUpperCase()) >= 0;
+        }
+
+        function currencyLocale(isoCode) {
+            return usesIndianNumbering(isoCode) ? 'en-IN' : 'en-US';
+        }
+
+        function formatQty(value) {
+            return Number(value || 0).toLocaleString(currencyLocale(warehouseStockState.currencyIso), { maximumFractionDigits: 2 });
+        }
+
+        function getPrecision(value) {
+            var precision = Number(value);
+            if (!isNaN(precision) && precision >= 0) { return precision; }
+            if (VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
+                precision = Number(VIS.Env.getCtx().getStdPrecision());
+            }
+            return !isNaN(precision) && precision >= 0 ? precision : 0;
+        }
+
+        function formatAmount(value) {
+            var number = Number(value || 0);
+            var precision = getPrecision(warehouseStockState.stdPrecision);
+            var currency = warehouseStockState.currencySymbol || warehouseStockState.currencyIso;
+            var formatted = number.toLocaleString(currencyLocale(warehouseStockState.currencyIso), {
+                minimumFractionDigits: precision,
+                maximumFractionDigits: precision
+            });
+            return currency ? currency + ' ' + formatted : formatted;
+        }
+
+        function trimTrailingZeros(text) {
+            return text.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+        }
+
+        // Compact currency for the narrow table Value column so a large amount
+        // stays under its header instead of overflowing sideways. Indian-family
+        // currencies use Cr/Lakh; others use K/M/B. Full value stays in the tooltip.
+        function formatCompactAmount(value) {
+            var iso = warehouseStockState.currencyIso;
+            var currency = warehouseStockState.currencySymbol || iso;
+            var number = Number(value || 0);
+            var abs = Math.abs(number);
+            var body;
+            if (usesIndianNumbering(iso)) {
+                if (abs >= 10000000) { body = trimTrailingZeros((number / 10000000).toFixed(2)) + ' Cr'; }
+                else if (abs >= 100000) { body = trimTrailingZeros((number / 100000).toFixed(2)) + ' Lakh'; }
+                else if (abs >= 1000) { body = trimTrailingZeros((number / 1000).toFixed(1)) + 'K'; }
+                else { body = number.toLocaleString(currencyLocale(iso), { maximumFractionDigits: 2 }); }
+            } else {
+                if (abs >= 1000000000) { body = trimTrailingZeros((number / 1000000000).toFixed(1)) + 'B'; }
+                else if (abs >= 1000000) { body = trimTrailingZeros((number / 1000000).toFixed(1)) + 'M'; }
+                else if (abs >= 1000) { body = trimTrailingZeros((number / 1000).toFixed(1)) + 'K'; }
+                else { body = number.toLocaleString(currencyLocale(iso), { maximumFractionDigits: 2 }); }
+            }
+            return currency ? currency + ' ' + body : body;
+        }
+
+        function getSelectedWarehouseRows() {
+            return warehouseStockState.rows.filter(function (row) {
+                return Number(row.warehouse_id) === Number(warehouseStockState.warehouseId);
+            });
+        }
+
+        function getSummary(rows) {
+            var summary = { locators: rows.length, quantity: 0, value: 0 };
+            rows.forEach(function (row) {
+                summary.quantity += Number(row.total_qty || 0);
+                summary.value += Number(row.total_value || 0);
+            });
+            return summary;
+        }
+
+        function getAgeShares(row) {
+            var values = ageBands.map(function (band) {
+                return Math.max(0, Number(row[band.key] || 0));
+            });
+            var total = values.reduce(function (sum, value) { return sum + value; }, 0);
+            return values.map(function (value) { return total > 0 ? value * 100 / total : 0; });
+        }
+
+        function renderStackedBar(shares, className) {
+            var offset = 0;
+            var rects = ageBands.map(function (band, index) {
+                var width = Math.max(0, shares[index]);
+                var rect = '<rect class="' + band.className + '" x="' + offset.toFixed(2) + '" y="0" width="' + width.toFixed(2) + '" height="1"></rect>';
+                offset += width;
+                return rect;
+            }).join('');
+            return '<svg class="' + className + '" viewBox="0 0 100 1" preserveAspectRatio="none" aria-hidden="true">' + rects + '</svg>';
+        }
+
+        function renderBandBar(share, band) {
+            return '<svg viewBox="0 0 100 1" preserveAspectRatio="none" aria-hidden="true"><rect class="' + band.className + '" x="0" y="0" width="' + Math.max(0, share).toFixed(2) + '" height="1"></rect></svg>';
+        }
+
+        function warehouseIcon() {
+            return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21V9l9-5 9 5v12"></path><path d="M3 9h18M7 13h3v3H7zM14 13h3v3h-3zM8 21v-3h8v3"></path></svg>';
+        }
+
+        function chevronIcon(direction) {
+            var path = direction === 'left' ? 'm15 18-6-6 6-6' : 'm9 18 6-6-6-6';
+            return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + path + '"></path></svg>';
+        }
+
+        function renderWarehouseOptions() {
+            $warehouseSelect.empty();
+            warehouseStockState.warehouses.forEach(function (warehouse) {
+                $('<option>')
+                    .val(warehouse.warehouse_id)
+                    .text(warehouse.warehouse_name)
+                    .appendTo($warehouseSelect);
+            });
+
+            if (warehouseStockState.warehouseId != null) {
+                $warehouseSelect.val(String(warehouseStockState.warehouseId));
+            }
+        }
+
+        function renderWarehouseStockWidget() {
+            renderWarehouseOptions();
+            renderWarehouseStockRows();
+        }
+
+        // Review #15: the checkbox reads checked only while the selected warehouse
+        // is this user's saved default.
+        function syncDefaultCheckbox() {
+            if (!$defaultCheck) { return; }
+            var current = warehouseStockState.warehouseId;
+            $defaultCheck.prop('checked', current != null && Number(current) === Number(warehouseStockState.defaultWarehouseId));
+            $defaultCheck.prop('disabled', current == null);
+        }
+
+        function saveDefaultWarehouse(makeDefault) {
+            var warehouseId = warehouseStockState.warehouseId;
+            if (warehouseId == null) { syncDefaultCheckbox(); return; }
+
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_080_WarehouseStockWidget/SetDefaultWarehouse',
+                type: 'POST',
+                cache: false,
+                data: { warehouseId: warehouseId, isDefault: makeDefault },
+                success: function (response) {
+                    var result = parseResponse(response);
+                    if (hasErrorProp(result)) {
+                        console.error('[VAS_080] SetDefaultWarehouse error:', result.error, '|', result.detail || '');
+                        syncDefaultCheckbox();
+                        return;
+                    }
+                    warehouseStockState.defaultWarehouseId = makeDefault ? Number(warehouseId) : null;
+                    syncDefaultCheckbox();
+                },
+                error: function (xhr) {
+                    console.error('[VAS_080] SetDefaultWarehouse HTTP error:', xhr.status, xhr.responseText);
+                    syncDefaultCheckbox();
+                }
+            });
+        }
+
+        function updatePageSize() {
+            var listHeight = $list.innerHeight();
+            var rowHeight = $list.find('.MPC-ws-row').first().outerHeight(true);
+            if (!listHeight || !rowHeight) { return false; }
+
+            var measuredPageSize = Math.max(1, Math.floor(listHeight / rowHeight));
+            if (measuredPageSize === warehouseStockState.pageSize) { return false; }
+
+            warehouseStockState.pageSize = measuredPageSize;
+            warehouseStockState.page = 1;
+            return true;
+        }
+
+        /* Zoom / window resizes don't fire widgetSizeChange, so the list is
+           observed directly and re-renders with as many rows as fit. */
+        function syncPageSize() {
+            if (!$list || !$list.length) { return; }
+            if (updatePageSize()) { renderWarehouseStockRows(); }
+        }
+
+        function bindResizeObserver() {
+            if (!$list || !$list.length || typeof ResizeObserver === 'undefined') { return; }
+            if (rowResizeObserver) { rowResizeObserver.disconnect(); }
+
+            rowResizeObserver = new ResizeObserver(syncPageSize);
+            rowResizeObserver.observe($list[0]);
+        }
+
+        function renderWarehouseStockRows() {
+            var rows = getSelectedWarehouseRows();
+            var summary = getSummary(rows);
+            var totalPages = Math.max(1, Math.ceil(rows.length / warehouseStockState.pageSize));
+            if (warehouseStockState.page > totalPages) { warehouseStockState.page = totalPages; }
+
+            var start = (warehouseStockState.page - 1) * warehouseStockState.pageSize;
+            var pageRows = rows.slice(start, start + warehouseStockState.pageSize);
+
+            $summary.html(
+                '<span><strong>' + formatQty(summary.locators) + '</strong> ' + escapeHtml(label('VAS_080_Locators', 'locators')) + '</span>' +
+                '<i></i>' +
+                '<span><strong>' + formatQty(summary.quantity) + '</strong> ' + escapeHtml(label('VAS_Qty', 'qty')) + '</span>' +
+                '<i></i>' +
+                '<span><strong class="MPC-ws-accent" title="' + escapeHtml(formatAmount(summary.value)) + '">' + escapeHtml(formatCompactAmount(summary.value)) + '</strong> ' + escapeHtml(label('VAS_Value', 'value')) + '</span>'
+            );
+
+            if (!pageRows.length) {
+                $list.html('<div class="MPC-ws-empty">' + escapeHtml(label('VAS_080_NoWarehouseStock', 'No stock found for this warehouse.')) + '</div>');
+            } else {
+                var html = '';
+                pageRows.forEach(function (row) {
+                    var shares = getAgeShares(row);
+                    var spark = renderStackedBar(shares, 'MPC-ws-spark-svg');
+                    var quantity = formatQty(row.total_qty);
+                    var amount = formatAmount(row.total_value);
+                    var amountCompact = formatCompactAmount(row.total_value);
+
+                    html +=
+                        '<button type="button" class="MPC-ws-row" data-locator-id="' + Number(row.locator_id) + '">' +
+                            '<span class="MPC-ws-locator">' +
+                                '<span class="MPC-ws-locator-line"><strong>' + escapeHtml(row.locator_code) + '</strong> <small>' + escapeHtml(row.locator_name) + '</small></span>' +
+                                '<span class="MPC-ws-spark">' + spark + '</span>' +
+                            '</span>' +
+                            '<span class="MPC-ws-qty" title="' + escapeHtml(quantity) + '">' + escapeHtml(quantity) + '</span>' +
+                            '<span class="MPC-ws-value" title="' + escapeHtml(amount) + '">' + escapeHtml(amountCompact) + '</span>' +
+                            '<span class="MPC-ws-chevron">' + chevronIcon('right') + '</span>' +
+                        '</button>';
+                });
+                $list.html(html);
+
+                if (updatePageSize()) {
+                    renderWarehouseStockRows();
+                    return;
+                }
+            }
+
+            var first = rows.length ? start + 1 : 0;
+            var last = rows.length ? start + pageRows.length : 0;
+            $footer.html(
+                '<span>' + escapeHtml(label('VAS_Showing', 'Showing')) + ' ' + first + '\u2013' + last + ' ' + escapeHtml(label('VAS_Of', 'of')) + ' ' + rows.length + '</span>' +
+                '<span class="MPC-ws-pager">' +
+                    '<button type="button" data-page="previous" aria-label="' + escapeHtml(label('VAS_PreviousPage', 'Previous page')) + '"' + (warehouseStockState.page === 1 ? ' disabled' : '') + '>' + chevronIcon('left') + '</button>' +
+                    '<strong>' + warehouseStockState.page + ' ' + escapeHtml(label('VAS_Of', 'of')) + ' ' + totalPages + '</strong>' +
+                    '<button type="button" data-page="next" aria-label="' + escapeHtml(label('VAS_NextPage', 'Next page')) + '"' + (warehouseStockState.page === totalPages ? ' disabled' : '') + '>' + chevronIcon('right') + '</button>' +
+                '</span>'
+            );
+        }
+
+        function openAgeModal(row) {
+            var shares = getAgeShares(row);
+            var totalValue = ageBands.reduce(function (sum, band) {
+                return sum + Number(row[band.key] || 0);
+            }, 0);
+
+            var stack = renderStackedBar(shares, 'MPC-ws-age-stack-svg');
+
+            var rows = ageBands.map(function (band, index) {
+                var value = Number(row[band.key] || 0);
+                var amount = formatAmount(value);
+                return '<div class="MPC-ws-age-row">' +
+                    '<span class="MPC-ws-age-label"><i class="' + band.className + '"></i>' + escapeHtml(label(band.messageKey, band.fallback)) + '</span>' +
+                    '<span class="MPC-ws-age-track">' + renderBandBar(shares[index], band) + '</span>' +
+                    '<span class="MPC-ws-age-value"><strong title="' + escapeHtml(amount) + '">' + escapeHtml(amount) + '</strong><small>' + Math.round(shares[index]) + '% ' + escapeHtml(label('VAS_080_OfValue', 'of value')) + '</small></span>' +
+                '</div>';
+            }).join('');
+
+            $modalBadge.text(formatQty(row.total_qty) + ' ' + label('VAS_080_Units', 'units'));
+            $modalBody.html(
+                '<div class="MPC-ws-age-total"><strong title="' + escapeHtml(formatAmount(totalValue)) + '">' + escapeHtml(formatAmount(totalValue)) + '</strong><span>' + escapeHtml(label('VAS_080_TotalCarryingValueLocator', 'total carrying value in this locator')) + '</span></div>' +
+                '<div class="MPC-ws-age-stack">' + stack + '</div>' +
+                '<div class="MPC-ws-age-rows">' + rows + '</div>'
+            );
+
+            $modal.addClass('MPC-ws-modal-open').attr('aria-hidden', 'false');
+            $('body').addClass('MPC-ws-body-lock');
+            $modal.find('.MPC-ws-modal-close').trigger('focus');
+        }
+
+        function closeAgeModal() {
+            if (!$modal) { return; }
+            $modal.removeClass('MPC-ws-modal-open').attr('aria-hidden', 'true');
+            $('body').removeClass('MPC-ws-body-lock');
+        }
+
+        /* Review #36 (follow-up): show the database's own message (e.g. a
+           missing-column error naming the field) instead of a bare generic
+           text, so a data-side fault is diagnosable from the widget itself. */
+        function showError(detail) {
+            $summary.empty();
+            var text = label('VAS_CouldntLoad', "Couldn't load");
+            if (detail) { text += ' - ' + String(detail); }
+            $list.html('<div class="MPC-ws-empty">' + escapeHtml(text) + '</div>');
+            $footer.empty();
+        }
+
+        function hasErrorProp(obj) {
+            return obj !== null && typeof obj === 'object' && 'error' in obj;
+        }
+
+        function loadData() {
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_080_WarehouseStockWidget/GetWarehouses',
+                type: 'GET',
+                cache: false,
+                success: function (response) {
+                    var result = parseResponse(response);
+                    if (hasErrorProp(result)) {
+                        console.error('[VAS_080] GetWarehouses error:', result.error, '|', result.detail || '');
+                        showError(result.detail || result.error); return;
+                    }
+
+                    // Review #15: the endpoint returns { warehouses, default_warehouse_id };
+                    // a bare array (older payload) still renders with no default.
+                    var warehouses = Array.isArray(result) ? result : (result.warehouses || []);
+                    var defaultWarehouseId = !Array.isArray(result) && result.default_warehouse_id ? Number(result.default_warehouse_id) : null;
+                    var hasDefault = defaultWarehouseId != null && warehouses.some(function (warehouse) {
+                        return Number(warehouse.warehouse_id) === defaultWarehouseId;
+                    });
+
+                    warehouseStockState.warehouses = warehouses;
+                    warehouseStockState.defaultWarehouseId = hasDefault ? defaultWarehouseId : null;
+                    warehouseStockState.warehouseId = hasDefault
+                        ? defaultWarehouseId
+                        : (warehouses.length ? warehouses[0].warehouse_id : null);
+                    renderWarehouseOptions();
+                    syncDefaultCheckbox();
+
+                    $.ajax({
+                        url: VIS.Application.contextUrl + 'VAS_080_WarehouseStockWidget/GetStockRows',
+                        type: 'GET',
+                        cache: false,
+                        success: function (stockResponse) {
+                            var stockResult = parseResponse(stockResponse);
+                            if (hasErrorProp(stockResult)) {
+                                console.error('[VAS_080] GetStockRows error:', stockResult.error, '|', stockResult.detail || '');
+                                showError(stockResult.detail || stockResult.error); return;
+                            }
+                            warehouseStockState.rows = stockResult.rows || [];
+                            warehouseStockState.currencySymbol = stockResult.currency_symbol || '';
+                            warehouseStockState.currencyIso = stockResult.currency_iso || '';
+                            warehouseStockState.stdPrecision = stockResult.std_precision;
+                            renderWarehouseStockWidget();
+                        },
+                        error: function (xhr) {
+                            console.error('[VAS_080] GetStockRows HTTP error:', xhr.status, xhr.responseText);
+                            showError('HTTP ' + (xhr && xhr.status ? xhr.status : 0));
+                        }
+                    });
+                },
+                error: function (xhr) {
+                    console.error('[VAS_080] GetWarehouses HTTP error:', xhr.status, xhr.responseText);
+                    showError('HTTP ' + (xhr && xhr.status ? xhr.status : 0));
+                }
+            });
+        }
+
+        function createWidget() {
+            $card = $(
+                '<div class="MPC-ws-card">' +
+                    '<div class="MPC-ws-header">' +
+                        '<span class="MPC-ws-icon">' + warehouseIcon() + '</span>' +
+                        '<span class="MPC-ws-title">' + escapeHtml(label('VAS_080_WarehouseStock', 'Warehouse Stock')) + '</span>' +
+                        '<span class="MPC-ws-select-wrap"><select class="MPC-ws-select" aria-label="' + escapeHtml(label('Warehouse', 'Warehouse')) + '"></select></span>' +
+                        '<label class="MPC-ws-default" title="' + escapeHtml(label('VAS_080_DefaultWarehouseHint', 'Use this warehouse as my default')) + '">' +
+                            '<input type="checkbox" class="MPC-ws-default-check">' +
+                            '<span>' + escapeHtml(label('VAS_080_Default', 'Default')) + '</span>' +
+                        '</label>' +
+                    '</div>' +
+                    '<div class="MPC-ws-summary"></div>' +
+                    '<div class="MPC-ws-table-head"><span>' + escapeHtml(label('VAS_080_Locator', 'Locator')) + '</span><span>' + escapeHtml(label('VAS_Qty', 'Qty')) + '</span><span>' + escapeHtml(label('VAS_Value', 'Value')) + '</span><span></span></div>' +
+                    '<div class="MPC-ws-list"></div>' +
+                    '<div class="MPC-ws-footer"></div>' +
+                '</div>'
+            );
+
+            $warehouseSelect = $card.find('.MPC-ws-select');
+            $defaultCheck = $card.find('.MPC-ws-default-check');
+            $summary = $card.find('.MPC-ws-summary');
+            $list = $card.find('.MPC-ws-list');
+            $footer = $card.find('.MPC-ws-footer');
+            $root.append($card);
+
+            $modal = $(
+                '<div class="MPC-ws-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="MPC-ws-modal-title-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '">' +
+                    '<div class="MPC-ws-modal-scrim"></div>' +
+                    '<div class="MPC-ws-modal-dialog">' +
+                        '<div class="MPC-ws-modal-header">' +
+                            '<span id="MPC-ws-modal-title-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '">' + escapeHtml(label('VAS_080_InventoryValueByAge', 'Inventory Value by Age')) + '</span>' +
+                            '<span class="MPC-ws-modal-badge"></span>' +
+                            '<button type="button" class="MPC-ws-modal-close" aria-label="' + escapeHtml(label('Close', 'Close')) + '">\u00d7</button>' +
+                        '</div>' +
+                        '<div class="MPC-ws-modal-body"></div>' +
+                    '</div>' +
+                '</div>'
+            );
+
+            $modalBadge = $modal.find('.MPC-ws-modal-badge');
+            $modalBody = $modal.find('.MPC-ws-modal-body');
+            $('body').append($modal);
+
+            $warehouseSelect.on('change', function () {
+                warehouseStockState.warehouseId = Number($(this).val());
+                warehouseStockState.page = 1;
+                renderWarehouseStockRows();
+                syncDefaultCheckbox();
+            });
+
+            $defaultCheck.on('change', function () {
+                saveDefaultWarehouse($(this).prop('checked'));
+            });
+
+            $root.on('click', '[data-page]', function () {
+                var direction = $(this).attr('data-page');
+                warehouseStockState.page += direction === 'next' ? 1 : -1;
+                renderWarehouseStockRows();
+            });
+
+            $root.on('click', '.MPC-ws-row', function () {
+                var locatorId = Number($(this).attr('data-locator-id'));
+                var row = warehouseStockState.rows.find(function (stockRow) {
+                    return Number(stockRow.locator_id) === locatorId;
+                });
+                if (row) { openAgeModal(row); }
+            });
+
+            $modal.on('click', '.MPC-ws-modal-close', closeAgeModal);
+        }
+
+        this.Initalize = function () {
+            createWidget();
+            bindResizeObserver();
+            loadData();
+        };
+
+        this.refreshWidget = function () {
+            warehouseStockState.page = 1;
+            loadData();
+        };
+
+        this.widgetSizeChange = function () {
+            if ($list) { renderWarehouseStockRows(); }
+        };
+
+        this.getRoot = function () {
+            return $root;
+        };
+
+        this.disposeComponent = function () {
+            closeAgeModal();
+            if (rowResizeObserver) {
+                rowResizeObserver.disconnect();
+                rowResizeObserver = null;
+            }
+            $(document).off('keydown.MPCWarehouseStock-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget'));
+            if ($modal) { $modal.remove(); $modal = null; }
+            $root.remove();
+        };
+    };
+
+    VAS.VAS_080_WarehouseStockWidget.prototype.init = function (windowNo, frame) {
+        this.frame = frame;
+        this.windowNo = windowNo;
+        this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
+        this.Initalize();
+        this.frame.getContentGrid().append(this.getRoot());
+    };
+
+    VAS.VAS_080_WarehouseStockWidget.prototype.widgetSizeChange = function () {
+        this.widgetSizeChange();
+    };
+
+    VAS.VAS_080_WarehouseStockWidget.prototype.refreshWidget = function () {
+        this.refreshWidget();
+    };
+
+    VAS.VAS_080_WarehouseStockWidget.prototype.dispose = function () {
+        this.disposeComponent();
+        if (this.frame) { this.frame.dispose(); }
+        this.frame = null;
+    };
+
+})(VAS, jQuery);

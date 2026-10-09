@@ -406,7 +406,7 @@ namespace VAdvantage.Model
                 // VIS0060: Set Next Step, Next Step By and Follow update
                 if (Env.IsModuleInstalled("VA061_"))
                 {
-                    _bp.Set_Value("VA061_NextStep", Get_Value("VA061_NextStep"));
+                    //_bp.Set_Value("VA061_NextStep", Get_Value("VA061_NextStep"));
                     if (Get_Value("C_Followupdate") != null)
                     {
                         _bp.Set_Value("C_Followupdate", Util.GetValueOfDateTime(Get_Value("C_Followupdate")));
@@ -790,6 +790,11 @@ namespace VAdvantage.Model
          */
         protected override bool BeforeSave(bool newRecord)
         {
+            if (!newRecord && Is_ValueChanged("EMail"))
+            {
+                SetAD_User_ID(0);
+                SetC_BPartner_ID(0);
+            }
             //	EMail Address specified
             if (GetEMail() != null && GetAD_User_ID() == 0)
                 SetAD_User_ID();
@@ -878,6 +883,11 @@ namespace VAdvantage.Model
                 }
             }
 
+            if (Get_ColumnIndex("VAS_LeadNextStep_ID") >= 0 && Util.GetValueOfInt(Get_Value("VAS_LeadNextStep_ID"))<=0)
+            {
+                log.SaveWarning("VA061_NextStepMustHaveValue", "");
+                return false;
+            }
             // If NextStepBy value not provided or neither NextStepBy nor C_Followupdate has changed, no task will be created.
             if (Env.IsModuleInstalled("VA061_"))
             {
@@ -887,11 +897,11 @@ namespace VAdvantage.Model
                 if (wf_ID > 0 && Get_Value("VA061_NextStepBy") != null && (Is_ValueChanged("VA061_NextStepBy") || Is_ValueChanged("C_Followupdate")))
                 {
                     // Ensure that VA061_NextStep has value
-                    if (string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VA061_NextStep"))))
-                    {
-                        log.SaveWarning("VA061_NextStepMustHaveValue", "");
-                        return false;
-                    }
+                    //if (string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VA061_NextStep"))))
+                    //{
+                    //    log.SaveWarning("VA061_NextStepMustHaveValue", "");
+                    //    return false;
+                    //}
 
                     // Ensure that FollowUp On has value
                     if (string.IsNullOrEmpty(Util.GetValueOfString(GetC_Followupdate())))

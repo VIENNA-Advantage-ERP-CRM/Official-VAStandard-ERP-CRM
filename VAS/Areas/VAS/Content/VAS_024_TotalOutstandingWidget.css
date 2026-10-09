@@ -1,0 +1,498 @@
+/* ==========================================================
+   VAS Total Outstanding Widget  —  vas-towdg-* namespace
+   ========================================================== */
+
+.vas-towdg-root {
+    /* Positioning context + query container (mirrors VIS.OutstandingSalesOrderWidget's
+       root); the glass surface lives on the card (.vas-towdg-container) below. No
+       overflow:hidden here so the card's drop-shadow is not clipped. */
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    position: relative;
+    /* Named query container so the card can step its base font down on narrow /
+       zoomed cells (see the @container rules at the bottom). Without this the card
+       only had the --dash-inline-size clamp, which floors at 16px and overflows a
+       narrow cell — the reason zoom-in/out misbehaved vs. OutstandingSalesOrderWidget. */
+    container: vas-towdg / inline-size;
+    font-family: Roboto, sans-serif;
+}
+
+/* ---- Busy indicator overlay ---- */
+.vas-widget-busy-wrap {
+    position: absolute;
+    width: 98%;
+    height: 97%;
+    text-align: center;
+    z-index: 999;
+}
+
+/* The card: glass surface + layout + base font-size anchor for all em sizing
+   (mirrors VIS.OutstandingSalesOrderWidget's .vas-oso-card). */
+.vas-towdg-container {
+    /* Widget root anchor: every internal value below is em against this clamp. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 0.5em;                      /* spec stack gap between header / value / why */
+    padding: 0.875em;                /* Widget Edge Spacing */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    position: relative;
+    overflow: hidden;
+}
+
+.vas-towdg-label {
+    /* Widget title (shared Widget Header clamp), Roboto Regular. Sits in the header
+       stack above the subtitle, so no bottom margin here. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    color: #102C3F;
+    font-weight: 400;
+    margin-bottom: 0;
+    line-height: 1.2;
+}
+
+.vas-towdg-value {
+    font-size: 1.75em;
+    font-weight: 700; /* Roboto Bold (spec weight palette: 400/500/700) */
+    color: #D14545;
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+    margin-bottom: 0.5em;   /* mirror VAS_025 value: sit in the space-between stack */
+    padding-left: 0.3125em;
+}
+
+/* Currency symbol sits ahead of the amount, same size/weight (CurrencyFormat util). */
+.vas-towdg-cur {
+    font-size: 1em;
+    font-weight: inherit;
+    margin-right: 0.08em;
+    vertical-align: baseline;
+}
+
+/* ---- Header: tinted icon well + title / subtitle (mirrors VIS.OutstandingSalesOrderWidget) ---- */
+.vas-towdg-header {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+}
+
+.vas-towdg-icon {
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    flex-shrink: 0;
+    border-radius: 0.5625em;
+    /* Self-contained SVG tile (its own red-tinted well + bars, ported from
+       VIS.OutstandingSalesOrderWidget) fills the well; overflow clips the tile's
+       corners to the family radius. No competing gradient/currentColor here. */
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vas-towdg-icon svg {
+    width: 100%;
+    height: 100%;
+}
+
+.vas-towdg-head-text {
+    min-width: 0;
+}
+
+.vas-towdg-subtitle {
+    font-size: 0.75em;
+    color: #5F7283;
+    line-height: 1.3;
+    margin-top: 0.0625em;
+}
+
+/* ---- WHY explanatory line (mirrors VIS.OutstandingSalesOrderWidget's why-wrap) ---- */
+.vas-towdg-why-wrap {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.375em;
+    /* Was margin-top:auto (pinned the value to the top); mirror VAS_025 so the value
+       distributes via the container's justify-content:space-between (centers on zoom-out). */
+    margin-top: 0.125em;
+}
+
+.vas-towdg-why-text {
+    font-size: 0.6875em;
+    color: #717182;
+    line-height: 1.3;
+}
+
+
+.vas-towdg-open {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    cursor: pointer;
+    z-index: 2;
+}
+
+.vas-towdg-open:focus-visible {
+    outline: 2px solid #D14545;
+    outline-offset: -4px;
+}
+
+.vis-editModeWidget .vas-towdg-open {
+    pointer-events: none;
+}
+
+.vas-towdg-dialog-shell {
+    background: #FFFFFF;
+    border: 1px solid #ECEFF3 !important;
+    border-radius: 14px !important;
+    box-shadow: 0 20px 60px rgba(10, 28, 45, 0.25) !important;
+    overflow: hidden !important;
+}
+
+.vas-towdg-dialog-shell .ui-dialog-titlebar {
+    background: #FFFFFF !important;
+    border: 0;
+    border-bottom: 1px solid #F0DEDE;
+    color: #102C3F;
+    font-family: Roboto, sans-serif;
+    letter-spacing: 0;
+    padding: 1.125em 1.25em 0.875em;
+    position: relative;
+    overflow: visible;
+}
+
+.vas-towdg-dialog-shell .ui-dialog-title {
+    color: #102C3F !important;
+    font-family: Roboto, sans-serif;
+    font-size: 0.9375em;
+    font-weight: 700;
+    letter-spacing: 0;
+    line-height: 1.2;
+}
+
+.vas-towdg-dialog-shell .vas-towdg-dialog-close {
+    -webkit-appearance: none;
+    appearance: none;
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: 8px;
+    box-shadow: none;
+    box-sizing: border-box;
+    color: #6B7280;
+    cursor: pointer;
+    display: flex;
+    height: 1.875em;
+    justify-content: center;
+    line-height: 0;
+    margin: 0;
+    outline: 0;
+    padding: 0;
+    position: absolute;
+    right: 0.875em;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1.875em;
+}
+
+.vas-towdg-dialog-shell .vas-towdg-dialog-close:hover,
+.vas-towdg-dialog-shell .vas-towdg-dialog-close:focus-visible {
+    background: rgba(0, 0, 0, 0.07);
+    color: #111827;
+}
+
+.vas-towdg-dialog-shell .vas-towdg-dialog-close svg {
+    display: block;
+    fill: currentColor;
+    height: 0.875em;
+    pointer-events: none;
+    width: 0.875em;
+}
+
+.vas-towdg-dialog-shell .ui-dialog-content {
+    padding: 1.125em 1.25em;
+}
+
+.vas-towdg-dialog-shell .ui-dialog-buttonpane {
+    background: #FFFFFF;
+    border-top: 1px solid #F0DEDE;
+    margin: 0;
+    padding: 0.75em 1.25em;
+}
+
+.vas-towdg-dialog-shell .ui-dialog-buttonset button {
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid #E4EDF4;
+    border-radius: 999px;
+    color: #41576A;
+    font-family: Roboto, sans-serif;
+    font-size: 0.75em;
+    font-weight: 700;
+    letter-spacing: 0;
+    line-height: 1.2;
+    padding: 0.5em 0.875em;
+}
+
+.vas-towdg-dialog-shell .ui-dialog-buttonset button:hover,
+.vas-towdg-dialog-shell .ui-dialog-buttonset button:focus {
+    background: rgba(255, 255, 255, 0.95);
+    color: #102C3F;
+    outline: 0;
+}
+
+.vas-towdg-dialog {
+    color: #102C3F;
+    font-family: Roboto, sans-serif;
+    /* Panel-body anchor: all modal-body typography + spacing scale in em off this
+       (foundations.md §Responsive Unit Rules — panel body anchor). */
+    font-size: clamp(16px, 1vw, 18px);
+    min-height: 13.75em;
+}
+
+.vas-towdg-drill-state {
+    align-items: center;
+    color: #5F7283;
+    display: flex;
+    font-size: 0.875em;
+    justify-content: center;
+    min-height: 11.25em;
+    text-align: center;
+}
+
+/* Busy spinner shown while the drill-down data loads (core vis_widgetloader). */
+.vas-towdg-drill-busy {
+    align-items: center;
+    display: flex;
+    justify-content: center;
+    min-height: 11.25em;
+    position: relative;
+}
+
+.vas-towdg-drill-error {
+    color: #D14545;
+}
+
+.vas-towdg-drill {
+    align-items: flex-start;
+    display: flex;
+    gap: 1em;
+}
+
+.vas-towdg-drill-card {
+    background: rgba(209, 69, 69, 0.094);
+    border-radius: 10px;
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0.875em 1em;
+}
+
+.vas-towdg-drill-card-label {
+    color: #41576A;
+    display: block;
+    font-size: 0.6875em;
+    line-height: 1.25;
+    margin-bottom: 0.25em;
+}
+
+.vas-towdg-drill-card-value {
+    color: #D14545;
+    display: block;
+    font-size: 2.125em;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1;
+}
+
+
+
+.vas-towdg-drill-copy {
+    flex: 2 1 0;
+    min-width: 0;
+}
+
+.vas-towdg-drill-desc {
+    color: #41576A;
+    font-size: 0.75em;
+    line-height: 1.6;
+    margin: 0 0 0.75em;
+}
+
+.vas-towdg-drill-row {
+    margin-bottom: 0.4375em;
+}
+
+.vas-towdg-drill-row:last-child {
+    margin-bottom: 0;
+}
+
+/* Invisible filler row — keeps the popup body a stable height on short pages. */
+.vas-towdg-drill-row--ph {
+    visibility: hidden;
+}
+
+.vas-towdg-drill-row-head {
+    display: flex;
+    font-size: 0.6875em;
+    gap: 0.625em;
+    justify-content: space-between;
+    margin-bottom: 0.1875em;
+}
+
+.vas-towdg-drill-row-name {
+    color: #102C3F;
+    font-weight: 400;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-towdg-drill-row-val {
+    color: #D14545;
+    flex-shrink: 0;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.vas-towdg-drill-track {
+    background: rgba(0, 0, 0, 0.07);
+    border-radius: 3px;
+    height: 0.375em;
+    overflow: hidden;
+    width: 100%;
+}
+
+.vas-towdg-drill-fill {
+    background: #D14545;
+    border-radius: 3px;
+    height: 100%;
+}
+
+/* ---- Drill-down pager (rule 18) ---- */
+.vas-towdg-drill-pager {
+    align-items: center;
+    display: flex;
+    gap: 0.75em;
+    justify-content: space-between;
+    margin-top: 0.85em;
+}
+
+.vas-towdg-drill-pager-info {
+    color: #5A6B78;
+    font-size: 0.85em;
+}
+
+.vas-towdg-drill-pager-nav {
+    align-items: center;
+    display: flex;
+    gap: 0.5em;
+}
+
+.vas-towdg-drill-pager-btn {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(16, 44, 63, 0.18);
+    border-radius: 6px;
+    color: #102C3F;
+    cursor: pointer;
+    display: flex;
+    height: 1.5em;
+    justify-content: center;
+    padding: 0;
+    transition: background 0.15s ease, border-color 0.15s ease;
+    width: 1.5em;
+}
+
+.vas-towdg-drill-pager-btn:hover:not([disabled]) {
+    background: #FFFFFF;
+    border-color: rgba(16, 44, 63, 0.35);
+}
+
+.vas-towdg-drill-pager-btn[disabled] {
+    cursor: default;
+    opacity: 0.4;
+}
+
+.vas-towdg-drill-pager-label {
+    color: #5A6B78;
+    font-size: 0.85em;
+    min-width: 4.5em;
+    text-align: center;
+}
+
+/* ---- Responsive ----
+   The card base size follows the --dash-inline-size clamp, but that clamp floors
+   at 16px; on a narrow / zoomed-in cell the KPI value + icon overflow at 16px.
+   Step the base font down on narrow cells (query the .vas-towdg-root container),
+   mirroring VIS.OutstandingSalesOrderWidget so zoom-in/out stays clean. */
+@container vas-towdg (max-width: 300px) {
+    .vas-towdg-container {
+        font-size: 13px;
+    }
+}
+
+@container vas-towdg (max-width: 220px) {
+    .vas-towdg-container {
+        font-size: 11px;
+    }
+}
+
+/* Only the drill-down dialog (a document-baseline surface) reflows at narrow widths. */
+@media (max-width: 680px) {
+    .vas-towdg-dialog-shell .ui-dialog-content {
+        padding: 0.875em;
+    }
+
+    .vas-towdg-drill {
+        flex-direction: column;
+    }
+
+    .vas-towdg-drill-card,
+    .vas-towdg-drill-copy {
+        width: 100%;
+    }
+}
+
+/* ==========================================================
+   RTL — drill-down modal (dir="rtl" on <html>; the body-appended
+   jQuery UI dialog inherits it). Physical offsets/anchors that
+   don't auto-flip get mirrored here.
+   ========================================================== */
+
+/* Close button was pinned to the physical right, colliding with the right-aligned
+   RTL title — move it to the (mirrored) left. */
+[dir="rtl"] .vas-towdg-dialog-shell .vas-towdg-dialog-close {
+    right: auto;
+    left: 0.875em;
+}
+
+/* Keep amounts as an isolated LTR run (sign · symbol · digits) so a negative like
+   -$1.153K doesn't reorder to $1.153K- inside the RTL modal. Placement stays at the
+   row's inline-end via the flex row; only the glyph order is forced LTR. */
+[dir="rtl"] .vas-towdg-drill-row-val {
+    direction: ltr;
+    unicode-bidi: isolate;
+}
+
+/* Progress bar fills from the inline-start (right) edge in RTL. */
+[dir="rtl"] .vas-towdg-drill-fill {
+    margin-left: auto;
+}
+
+/* The prev/next chevrons are fixed glyphs; mirror them so they point the right way
+   once the flex nav reverses. */
+[dir="rtl"] .vas-towdg-drill-pager-btn svg {
+    transform: scaleX(-1);
+}

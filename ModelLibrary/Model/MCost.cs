@@ -91,7 +91,7 @@ namespace VAdvantage.Model
                             AND CST.C_ACCTSCHEMA_ID = (SELECT c_acctschema1_id FROM ad_clientinfo WHERE ad_client_id = " + client_Id + " )";
                 cost = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, trxName));
             }
-            catch (Exception ex)
+            catch(Exception ex)
             {
                 _log.Info("GetproductCosts : " + sql);
                 throw new ArgumentException("Error in getting cost from GetProductCosts" + ex);
@@ -301,7 +301,7 @@ namespace VAdvantage.Model
                 }
                 if (M_Product_ID > 0)
                 {
-                    sql += " AND M_CostQueue.M_Product_ID = " + M_Product_ID +
+                    sql += " AND M_CostQueue.M_Product_ID = " + M_Product_ID + 
                            " AND M_CostQueueTransaction.M_Product_ID = " + M_Product_ID;
                 }
                 if (WindowName == (int)windowName.M_InventoryLine_ID)

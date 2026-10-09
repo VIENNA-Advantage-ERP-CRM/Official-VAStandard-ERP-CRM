@@ -1,0 +1,946 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_241 Contract search — full-width glass search band (Service Contracts
+ * dashboard). Design: Design Specs/dashboard-widgets.md "Full-Width Dashboard
+ * Search Widget", the same chrome as the sibling search widgets VAS_120/140/144.
+ * service-contracts-dashboard.html (the build spec's pixel-level reference) was
+ * not available when this was written - re-verify against it when available.
+ * Onfinity glass tokens; internal type / spacing in em against the widget-root
+ * font-size; borders / radii / shadows in px (physical edges). Dropdown is
+ * bounded to seven rows — no inner scrollbar. All classes carry the module
+ * prefix vas241-* per Prompt_Instructions' CSS Class Prefix rule.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas241-root {
+    /* Transparent cell — the dashboard gradient shows through the glass pill;
+       no card/box around it (shared search-widget rule). */
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.125em 0;
+    overflow: visible;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 20px);
+    color: #102C3F;
+    font-family: Roboto, sans-serif;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+    .vas241-root,
+    .vas241-root * {
+        box-sizing: border-box;
+    }
+
+/* Single glass search pill — 80% of the widget, horizontally centered, never
+   resizes the band on typing (the dropdown floats over the grid instead). */
+.vas241-searchbar {
+    width: 80%;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    padding: 1em 1.125em;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    backdrop-filter: blur(10px);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+    .vas241-searchbar:focus-within {
+        border-color: #B6DEFB;
+        box-shadow: 0 6px 18px rgba(0, 131, 218, 0.16);
+    }
+
+    .vas241-root:hover,
+    .vas241-searchbar:hover {
+        transform: none !important;
+    }
+
+.vas241-search-icon {
+    width: 1.125em;
+    height: 1.125em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    color: #0083DA;
+}
+
+    .vas241-search-icon svg {
+        width: 100%;
+        height: 100%;
+    }
+
+.vas241-searchbar .vas241-input,
+.vas241-searchbar .vas241-input:focus,
+.vas241-searchbar .vas241-input:hover {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 none !important;
+    border-radius: 0 !important;
+    outline: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    background-image: none !important;
+    font-family: inherit;
+    font-size: 0.875em !important;
+    line-height: 1.4 !important;
+    color: #102C3F;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+    .vas241-searchbar .vas241-input::placeholder {
+        color: #748494;
+        opacity: 1;
+    }
+
+.vas241-clear {
+    width: 1.25em;
+    height: 1.25em;
+    flex: 0 0 auto;
+    display: none;
+    place-items: center;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    color: #748494;
+    cursor: pointer;
+    transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+    .vas241-clear:hover {
+        color: #102C3F;
+        background-color: rgba(16, 44, 63, 0.08);
+    }
+
+    .vas241-clear svg {
+        width: 0.9em;
+        height: 0.9em;
+    }
+
+@container (max-width: 50em) {
+    .vas241-searchbar {
+        width: 92%;
+    }
+}
+
+/* ── Suggest popover (fixed, on <body> so the cell cannot clip it) ─────── */
+
+.vas241-suggest {
+    position: fixed;
+    z-index: 10050;
+    display: none;
+    background: #FFFFFF;
+    border: 1px solid #E4EDF4;
+    border-radius: 14px;
+    box-shadow: 0 18px 40px rgba(15, 61, 97, 0.18);
+    padding: 0.43em;
+    font-family: Roboto, sans-serif;
+    font-size: clamp(14px, calc(var(--dash-inline-size, 100vw) * .0105), 18px);
+    color: #102C3F;
+}
+
+    .vas241-suggest.is-open {
+        display: block;
+    }
+
+    .vas241-suggest *,
+    .vas241-suggest {
+        box-sizing: border-box;
+    }
+
+.vas241-option {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    padding: 0.55em 0.65em;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 120ms ease;
+}
+
+    .vas241-option:hover,
+    .vas241-option.is-active {
+        background: #EEF6FF;
+    }
+
+.vas241-option-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas241-option-name {
+    font-weight: 700;
+    font-size: 0.875em;
+    color: #102C3F;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas241-option-meta {
+    font-weight: 400;
+    font-size: 0.72em;
+    color: #748494;
+    line-height: 1.3;
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas241-option mark,
+.vas241-suggest mark {
+    background: #FFF1B8;
+    color: inherit;
+    border-radius: 3px;
+    padding: 0 1px;
+}
+
+/* Days-to-end pill: cold (ended) / red (≤30d) / amber (31-90d) / green (>90d). */
+.vas241-days {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-weight: 700;
+    font-size: 0.6875em;
+    padding: 0.3em 0.55em;
+    border-radius: 999px;
+    line-height: 1.1;
+    white-space: nowrap;
+}
+
+.vas241-days-green { background: #E4F6EC; color: #0B6B45; }
+.vas241-days-amber { background: #FCEBD3; color: #9A6500; }
+.vas241-days-red   { background: #FCE4E4; color: #B3241C; }
+.vas241-days-cold  { background: #EEF2F6; color: #5F7283; }
+
+/* Status band chip — colour family only; the label text is always the
+   tenant's own decoded AD_Ref_List(_Trl) name, never invented here. */
+.vas241-band {
+    display: inline-flex;
+    align-items: center;
+    font-weight: 500;
+    font-size: 0.6875em;
+    padding: 0.16em 0.66em;
+    border-radius: 999px;
+    line-height: 1.2;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.vas241-band-ok     { background: #E4F6EC; color: #0B6B45; }
+.vas241-band-warn   { background: #FCEBD3; color: #9A6500; }
+.vas241-band-danger { background: #FCE4E4; color: #B3241C; }
+.vas241-band-info   { background: #DFF1FF; color: #0E5DA8; }
+.vas241-band-cold   { background: #EEF2F6; color: #5F7283; }
+
+.vas241-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.375em;
+    flex-shrink: 0;
+}
+
+.vas241-action {
+    width: 1.875em;
+    height: 1.875em;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    background: rgba(0, 131, 218, 0.10);
+    border: none;
+    color: #0083DA;
+    cursor: pointer;
+}
+
+    .vas241-action:hover {
+        background: #E7F4FF;
+    }
+
+    .vas241-action svg {
+        width: 0.875em;
+        height: 0.875em;
+    }
+
+.vas241-option-chev {
+    display: inline-grid;
+    place-items: center;
+    color: #748494;
+    flex-shrink: 0;
+}
+
+    .vas241-option-chev svg {
+        width: 0.875em;
+        height: 0.875em;
+    }
+
+.vas241-state {
+    padding: 1em;
+    font-size: 0.8125em;
+    color: #748494;
+    text-align: center;
+}
+
+.vas241-more {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3125em;
+    padding: 0.6em 0.65em;
+    margin-top: 4px;
+    border-top: 1px solid #EDF2F6;
+    font-size: 0.78em;
+    font-weight: 600;
+    color: #0083DA;
+    cursor: pointer;
+}
+
+    .vas241-more:hover {
+        color: #1F83FF;
+    }
+
+    .vas241-more svg {
+        width: 0.75em;
+        height: 0.75em;
+    }
+
+/* ── Shared modal / dialog chrome (detail modal + "See all" list) ─────────
+ * Fixed scrim + white panel, sitting on <body> outside .vas241-root, so both
+ * carry their own font anchor (px chrome, not widget-relative). z-index clears
+ * the suggest popover's 10050.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas241-modal,
+.vas241-dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 10060;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    font-family: Roboto, sans-serif;
+    font-size: 14px;
+    color: #102C3F;
+}
+
+    .vas241-modal.is-open,
+    .vas241-dialog.is-open {
+        display: flex;
+    }
+
+    .vas241-modal *,
+    .vas241-modal,
+    .vas241-dialog *,
+    .vas241-dialog {
+        box-sizing: border-box;
+    }
+
+.vas241-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(16, 44, 63, 0.45);
+}
+
+.vas241-panel {
+    position: relative;
+    width: 100%;
+    max-width: 30em;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    background: #FFFFFF;
+    border-radius: 18px;
+    box-shadow: 0 24px 60px rgba(15, 61, 97, 0.28);
+    overflow: hidden;
+}
+
+.vas241-dialog .vas241-panel {
+    max-width: 34em;
+}
+
+/* Detail modal header. */
+.vas241-mhead {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    padding: 1em 1.25em;
+    border-bottom: 1px solid #EDF2F6;
+}
+
+.vas241-iconwell {
+    width: 2em;
+    height: 2em;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    background: rgba(0, 131, 218, 0.10);
+    color: #0083DA;
+}
+
+    .vas241-iconwell svg {
+        width: 1.05em;
+        height: 1.05em;
+    }
+
+.vas241-mtitle,
+.vas241-ptitle {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: 1.05em;
+    font-weight: 700;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas241-mclose,
+.vas241-close {
+    width: 2em;
+    height: 2em;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    color: #748494;
+    cursor: pointer;
+}
+
+    .vas241-mclose:hover,
+    .vas241-close:hover {
+        color: #102C3F;
+        background: rgba(16, 44, 63, 0.08);
+    }
+
+    .vas241-mclose svg,
+    .vas241-close svg {
+        width: 1em;
+        height: 1em;
+    }
+
+.vas241-mbody,
+.vas241-pbody {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 1.25em;
+}
+
+/* Detail modal is content-heavy (header + stat grid + attention cards + a
+   scrollable billing schedule) so it gets more room than the generic panel -
+   the same fixed 900px "wide" panel VAS_244/245/246 already use for this
+   identical modal (mirrors the mock's own openModal(html, true) -> wide chrome). */
+.vas241-modal .vas241-panel {
+    max-width: 900px;
+    max-height: 88vh;
+}
+
+/* Header meta ("SC-24000 · Expiring") to the right of the "Service contract" title. */
+.vas241-mhead-meta {
+    flex-shrink: 0;
+    font-size: 0.8em;
+    color: #748494;
+    white-space: nowrap;
+}
+
+/* Customer identity row: avatar + name/subtitle + status band & cadence. */
+.vas241-dtop2 {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85em;
+    padding-bottom: 1em;
+    margin-bottom: 1em;
+    border-bottom: 1px solid #EDF2F6;
+}
+
+.vas241-davatar {
+    width: 2.75em;
+    height: 2.75em;
+    flex-shrink: 0;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    font-size: 0.9em;
+    font-weight: 700;
+    color: #FFFFFF;
+}
+
+.vas241-dhead-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15em;
+}
+
+.vas241-dname {
+    font-size: 1.15em;
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas241-dsub {
+    font-size: 0.8em;
+    color: #748494;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas241-dhead-right {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.35em;
+}
+
+.vas241-dcycles {
+    font-size: 0.75em;
+    color: #748494;
+    white-space: nowrap;
+}
+
+/* Value / Status / Type / Renewal / Ends / Notice days / Billed / Unbilled. */
+.vas241-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1em 1.25em;
+    padding-bottom: 1.1em;
+    margin-bottom: 1.1em;
+    border-bottom: 1px solid #EDF2F6;
+}
+
+.vas241-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25em;
+    min-width: 0;
+}
+
+.vas241-slabel {
+    font-size: 0.68em;
+    font-weight: 600;
+    color: #94A4B4;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.vas241-sval {
+    font-size: 0.9em;
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@container (max-width: 40em) {
+    .vas241-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* "What needs attention" cards. */
+.vas241-attn {
+    margin-bottom: 1.1em;
+}
+
+.vas241-attn-title {
+    font-size: 0.85em;
+    font-weight: 700;
+    color: #102C3F;
+    margin-bottom: 0.6em;
+}
+
+.vas241-attn-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.7em;
+    padding: 0.7em 0;
+    border-top: 1px solid #F1F5F8;
+}
+
+    .vas241-attn-card:first-of-type {
+        border-top: none;
+    }
+
+.vas241-attn-ic {
+    width: 2em;
+    height: 2em;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    background: rgba(0, 131, 218, 0.10);
+    color: #0083DA;
+}
+
+/* Renewal-notice card - genuine act-now urgency, the one place a danger tint
+   is warranted on an icon well. */
+.vas241-attn-ic-danger {
+    background: rgba(216, 67, 74, 0.12);
+    color: #D8434A;
+}
+
+    .vas241-attn-ic svg {
+        width: 1em;
+        height: 1em;
+    }
+
+.vas241-attn-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15em;
+}
+
+.vas241-attn-title2 {
+    font-size: 0.875em;
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas241-attn-desc {
+    font-size: 0.78em;
+    color: #748494;
+}
+
+.vas241-attn-empty {
+    font-size: 0.8em;
+    color: #94A4B4;
+}
+
+/* Billing schedule (C_ContractSchedule). */
+.vas241-sched-title {
+    font-size: 0.85em;
+    font-weight: 700;
+    color: #102C3F;
+    margin-bottom: 0.6em;
+}
+
+.vas241-sched-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.vas241-sched-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    padding: 0.65em 0;
+    border-top: 1px solid #F1F5F8;
+    font-size: 0.85em;
+}
+
+    .vas241-sched-row:first-child {
+        border-top: none;
+    }
+
+.vas241-sched-left {
+    color: #102C3F;
+    font-weight: 500;
+}
+
+.vas241-sched-right {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+}
+
+.vas241-sched-amt {
+    font-weight: 700;
+    color: #102C3F;
+}
+
+/* Inline feedback for the mutating Renew / Generate invoice actions. */
+.vas241-mmsg {
+    display: none;
+    padding: 0.6em 1.25em;
+    font-size: 0.8em;
+    color: #0B6B45;
+    background: #E4F6EC;
+    border-top: 1px solid #EDF2F6;
+}
+
+    .vas241-mmsg.is-open {
+        display: block;
+    }
+
+    .vas241-mmsg.is-error {
+        color: #B3241C;
+        background: #FCE4E4;
+    }
+
+.vas241-mfoot {
+    padding: 1em 1.25em;
+    border-top: 1px solid #EDF2F6;
+    background: #FBFDFF;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6em;
+}
+
+.vas241-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.6em 1.1em;
+    border-radius: 10px;
+    font-size: 0.875em;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+}
+
+    .vas241-btn svg {
+        width: 0.9em;
+        height: 0.9em;
+    }
+
+    .vas241-btn:disabled {
+        opacity: 0.55;
+        cursor: default;
+    }
+
+.vas241-btn-ghost {
+    background: #FFFFFF;
+    color: #0083DA;
+    border: 1px solid #B6DEFB;
+}
+
+    .vas241-btn-ghost:hover:not(:disabled) {
+        background: #EEF6FF;
+    }
+
+.vas241-btn-primary {
+    background: #0083DA;
+    color: #FFFFFF;
+}
+
+    .vas241-btn-primary:hover:not(:disabled) {
+        background: #1F83FF;
+    }
+
+/* ── Confirm dialog (app-styled - replaces the native window.confirm(), which
+ * renders as an unstyled "<host> says" browser chrome popup). Small centered
+ * box on <body>, above the detail modal (z-index 10070 > 10060). ───────── */
+
+.vas241-confirm-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10070;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    font-family: Roboto, sans-serif;
+}
+
+    .vas241-confirm-overlay.is-open { display: flex; }
+
+    .vas241-confirm-overlay *,
+    .vas241-confirm-overlay {
+        box-sizing: border-box;
+    }
+
+.vas241-confirm-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(16, 44, 63, 0.45);
+}
+
+.vas241-confirm-box {
+    position: relative;
+    width: 100%;
+    max-width: 380px;
+    background: #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 24px 60px rgba(15, 61, 97, 0.28);
+    padding: 20px;
+}
+
+.vas241-confirm-msg {
+    margin: 0 0 16px;
+    font-size: 14px;
+    line-height: 1.4;
+    color: #102C3F;
+}
+
+.vas241-confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6em;
+}
+
+/* List dialog header / footer. */
+.vas241-phead {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    padding: 1em 1.25em;
+    border-bottom: 1px solid #EDF2F6;
+}
+
+.vas241-pfoot {
+    padding: 0.75em 1.25em;
+    border-top: 1px solid #EDF2F6;
+    background: #FBFDFF;
+}
+
+.vas241-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    font-size: 0.8em;
+    color: #748494;
+}
+
+.vas241-pgctl {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+.vas241-pgbtn {
+    width: 1.9em;
+    height: 1.9em;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    border: 1px solid #E4EDF4;
+    background: #FFFFFF;
+    color: #102C3F;
+    cursor: pointer;
+}
+
+    .vas241-pgbtn:hover:not(:disabled) {
+        background: #EEF6FF;
+    }
+
+    .vas241-pgbtn:disabled {
+        opacity: 0.4;
+        cursor: default;
+    }
+
+    .vas241-pgbtn svg {
+        width: 0.8em;
+        height: 0.8em;
+    }
+
+.vas241-pgtext {
+    min-width: 4.5em;
+    text-align: center;
+}
+
+/* List rows. */
+.vas241-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4em;
+}
+
+.vas241-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    padding: 0.7em 0.75em;
+    border-radius: 10px;
+    background: #F8FBFD;
+    cursor: pointer;
+    transition: background 120ms ease;
+}
+
+    .vas241-row:hover {
+        background: #EEF6FF;
+    }
+
+.vas241-row-ic {
+    width: 2em;
+    height: 2em;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    background: rgba(0, 131, 218, 0.10);
+    color: #0083DA;
+}
+
+    .vas241-row-ic svg {
+        width: 1em;
+        height: 1em;
+    }
+
+.vas241-row-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas241-row-title {
+    font-weight: 700;
+    font-size: 0.9em;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas241-row-meta {
+    font-size: 0.75em;
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas241-row-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.3em;
+    flex-shrink: 0;
+}
+
+.vas241-row-val {
+    font-weight: 700;
+    font-size: 0.875em;
+    color: #102C3F;
+}
+
+/* Body class set while any vas241 modal/dialog is open (parity with the
+   sibling widgets - available for a host page that wants to suppress its own
+   scroll while a dashboard modal is open). */
+body.vas241-modal-open {
+    overflow: hidden;
+}
