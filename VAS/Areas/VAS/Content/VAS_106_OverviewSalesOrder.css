@@ -392,8 +392,12 @@
     display: flex; flex-wrap: wrap; gap: 0.375em 1.125em;
     font-size: 0.75em; color: var(--vaso-text); margin-top: 0.4375em;
 }
-.vas_106-contactBit { display: inline-flex; align-items: center; gap: 0.4375em; }
-.vas_106-contactBit .vas_106-ic { color: var(--vaso-primary); }
+/* A bit never grows past the column: a long e-mail address wraps inside it
+   (breaking anywhere, since an address has no spaces) instead of running past
+   the divider into the order fields on the right. */
+.vas_106-contactBit { display: inline-flex; align-items: flex-start; gap: 0.4375em; min-width: 0; max-width: 100%; }
+.vas_106-contactBit > span { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
+.vas_106-contactBit .vas_106-ic { color: var(--vaso-primary); flex: none; margin-top: 0.15em; }
 
 @container (max-width: 460px) {
     .vas_106-hdrCard { grid-template-columns: minmax(0, 1fr); }

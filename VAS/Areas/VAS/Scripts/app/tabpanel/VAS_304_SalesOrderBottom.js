@@ -90,6 +90,13 @@
  *                        - CSS: "..." white (explicit fill) when empty, light blue with
  *                          values; no grey field wrappers; captions black in the
  *                          view-only modal.
+ *   VAI163   2026-10-08  Picking a different product / charge clears the line's UOM
+ *                        (commitCatalogItem) so the callout applies the new item's own
+ *                        default unit (Sales UOM, else primary) instead of keeping the
+ *                        previous product's.
+ *   VAI163   2026-10-09  Price is locked on a saved product line of a release against a
+ *                        price-controlled blanket order (IsBlanketPriceFixed), which the
+ *                        framework would refuse to save ("PriceCantChange").
  ************************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -1500,7 +1507,14 @@
                 setTimeout(function () { $inp.focus(); if (opts.amount) $inp.select(); }, 0);
             } else {
                 var disp = opts.amount ? (value ? fmtMoney(value) : "") : (value || "");
-                wrap.append(dispInput(line, field, disp, { align: opts.align, placeholder: placeholder }));
+                // Price fixed by the blanket order: shown locked, with the reason on hover.
+                var priceLocked = field === "price" && blanketPriceFixed(line);
+                var $disp = dispInput(line, field, disp, { align: opts.align, placeholder: placeholder, readOnly: priceLocked });
+                if (priceLocked) {
+                    $disp.attr("title", lbl("VAS_107_BlanketPriceLocked", "Price is fixed by the blanket order"));
+                    cell.attr("title", $disp.attr("title"));   // a disabled input shows no tooltip of its own
+                }
+                wrap.append($disp);
             }
             return cell;
         }
@@ -2234,6 +2248,16 @@
 
         function commitCatalogItem(line, item) {
             var v = line.values, d = line.display;
+            // A DIFFERENT product / charge brings its own default unit (08-Oct-2026): the
+            // server callout keeps any C_UOM_ID it is sent, so switching a Litre product
+            // for an Each one used to leave the line in Litre. Clear the unit (and the old
+            // product's base quantity) so the callout picks the new item's Sales UOM, else
+            // its primary unit. Re-picking the same item keeps a unit the user chose.
+            var prevId = item.Kind === "C" ? v.C_Charge_ID : v.M_Product_ID;
+            if (!sameVal(prevId, item.RecordId)) {
+                v.C_UOM_ID = 0; d.uomName = "";
+                v.QtyOrdered = v.QtyEntered;
+            }
             if (item.Kind === "C") {
                 v.C_Charge_ID = item.RecordId; v.M_Product_ID = 0; v.M_AttributeSetInstance_ID = 0;
                 d.chargeName = item.DisplayName; d.productName = ""; d.hasAttributeSet = false; d.attrName = "";
@@ -2685,6 +2709,10 @@
             // the DB ReadOnlyLogic (e.g. @Processed@=Y) is guarded at the header level
             // by panelEditable() in startEdit, so we skip column-level locking here.
             if (col === "QtyEntered" || col === "QtyOrdered") return false;
+            // A saved product line of a release against a price-controlled blanket order
+            // (VAS_ControlType PRC / PAQ) keeps its price: MOrderLine.BeforeSave refuses the
+            // update with "PriceCantChange" otherwise (09-Oct-2026).
+            if (col === "PriceEntered" && blanketPriceFixed(line)) return true;
             var m = columnMeta[col];
             if (!m) return false;
             if (m.IsReadOnly) return true;
@@ -2695,6 +2723,13 @@
             return !!(m.ReadOnlyLogic && evalLogic(line, m.ReadOnlyLogic));
         }
         var FIELD_COL = { product: "M_Product_ID", charge: "C_Charge_ID", uom: "C_UOM_ID", tax: "C_Tax_ID", quantity: "QtyEntered", price: "PriceEntered", description: "Description" };
+        /* The server's IsBlanketPriceFixed (release document, blanket order PRC / PAQ),
+           for a SAVED PRODUCT line - the framework forces a new line's price from the
+           blanket itself and does not check charge lines. */
+        function blanketPriceFixed(line) {
+            return !!(parent && parent.IsBlanketPriceFixed) && !!(line && line.values)
+                && (+line.values.C_OrderLine_ID || 0) > 0 && (+line.values.M_Product_ID || 0) > 0;
+        }
         function fieldReadOnly(line, field) {
             var col = FIELD_COL[field];
             return col ? isColumnReadOnly(line, col) : false;

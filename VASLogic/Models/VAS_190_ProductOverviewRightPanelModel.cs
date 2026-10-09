@@ -478,6 +478,14 @@
 ///                        - TRANSCRIPT. A meeting collapsed from several attendee rows
 ///                          takes its link and transcript from whichever row has them
 ///                          (TranscriptSourceId), so the Download button is offered.
+///   VAI163   2026-10-09  - ACCOUNTING. Right-hand value is the combination again (a
+///                          local edit had put FRPT_AcctDefault.Name there); an
+///                          accounting-default field this database cannot select (a
+///                          virtual column, or one it lacks) no longer empties the
+///                          section - the accounts are re-read without those fields.
+///                        - ACTIVITY. The 60-entry cap no longer lets field updates /
+///                          workflow steps push correspondence (mails, appointments,
+///                          tasks, notes, calls) out of the feed (CapActivity).
 /// </summary>
 
 using System;
@@ -4101,12 +4109,12 @@ namespace VASLogic.Models
             // FRPT_Product_Acct_ID the rewriter could reach for — see LoadAcctRow.
             // The combination's natural account (C_ElementValue) gives the account
             // NAME printed after the code (07-Oct-2026).
-            string sql = @"SELECT ad." + labelColumn + @" AS AccountRole,
+            string sqlHead = @"SELECT ad." + labelColumn + @" AS AccountRole,
                                   " + keyExpr + @" AS AccountKey,
                                   vc.Combination,
                                   vc.Description,
-                                  ev.Name AS AccountName"
-                                  + detailSelect + @"
+                                  ev.Name AS AccountName";
+            string sqlBody = @"
                            FROM FRPT_Product_Acct pa
                            INNER JOIN FRPT_AcctDefault ad
                                    ON (ad.FRPT_AcctDefault_ID=pa.FRPT_AcctDefault_ID)
@@ -4121,7 +4129,16 @@ namespace VASLogic.Models
                              AND COALESCE(pa.C_ValidCombination_ID, 0) > 0"
                            + orderBy;
 
-            DataSet ds = Query(sql, ProductParam(M_Product_ID), "LoadFrptAccounts");
+            DataSet ds = Query(sqlHead + detailSelect + sqlBody, ProductParam(M_Product_ID), "LoadFrptAccounts");
+            // The accounting-default fields are DISCOVERED, and one this database cannot
+            // select failed the whole statement - the product then read as having no
+            // accounts at all, though its Accounting tab is full (09-Oct-2026). The
+            // accounts themselves are the answer; the fields under them are extra.
+            if (ds == null && detailFields.Count > 0)
+            {
+                detailFields = new List<AcctDefaultField>();
+                ds = Query(sqlHead + sqlBody, ProductParam(M_Product_ID), "LoadFrptAccounts(no details)");
+            }
             if (ds == null || ds.Tables.Count == 0) return rows;
 
             foreach (DataRow r in ds.Tables[0].Rows)
@@ -4216,6 +4233,7 @@ namespace VASLogic.Models
                                    + trlJoin + @"
                                    WHERE UPPER(t.TableName)='FRPT_ACCTDEFAULT'
                                      AND c.IsActive='Y'
+                                     AND COALESCE(LENGTH(TRIM(c.ColumnSQL)), 0) = 0
                                      AND UPPER(c.ColumnName) LIKE @Pattern
                                    ORDER BY c.ColumnName";
 
@@ -4543,8 +4561,39 @@ namespace VASLogic.Models
             });
 
             events = DeduplicateActivity(events);
-            if (events.Count > MAX_ACTIVITY) events = events.GetRange(0, MAX_ACTIVITY);
-            return events;
+            return CapActivity(events);
+        }
+
+        /// <summary>
+        /// Caps the feed at MAX_ACTIVITY without letting the record's own CHANGE trail
+        /// crowd out its correspondence (09-Oct-2026). The cap used to cut the sorted
+        /// list as a whole, so on a product edited often the newest 60 entries were all
+        /// field updates and a mail received a few weeks back - linked to the product,
+        /// and shown by the history panel - never reached the feed. Mails, letters,
+        /// appointments, tasks, calls, notes and chats are all kept; field updates and
+        /// workflow steps fill whatever room is left, newest first. Order is preserved.
+        /// </summary>
+        /// <param name="events">deduplicated events, newest first</param>
+        /// <returns>the events the feed shows</returns>
+        private static List<ActivityData> CapActivity(List<ActivityData> events)
+        {
+            if (events.Count <= MAX_ACTIVITY) return events;
+            int kept = 0;
+            foreach (ActivityData e in events) if (!IsTrailEvent(e)) kept++;
+            int room = Math.Max(0, MAX_ACTIVITY - kept);
+            List<ActivityData> result = new List<ActivityData>();
+            foreach (ActivityData e in events)
+            {
+                if (!IsTrailEvent(e)) result.Add(e);
+                else if (room > 0) { result.Add(e); room--; }
+            }
+            return result;
+        }
+
+        /// <summary>A change-trail entry (field update / workflow step), not correspondence.</summary>
+        private static bool IsTrailEvent(ActivityData e)
+        {
+            return e.Type == "fieldupdate" || e.Type == "workflow";
         }
 
         /// <summary>

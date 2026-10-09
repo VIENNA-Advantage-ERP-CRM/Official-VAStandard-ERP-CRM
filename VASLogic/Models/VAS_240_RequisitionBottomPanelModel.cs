@@ -24,6 +24,11 @@
  *                    so the panel can put it on the line as the product is picked.
  *                  - SaveLines defaults a line's DateRequired from the header
  *                    where the line reaches it without one.
+ *   VAI163         08-Oct-2026  Default unit of a picked / scanned product is its
+ *                  default PURCHASE unit, as calloutrequisition.js: M_Product_PO.C_UOM_ID
+ *                  for the header partner, then M_Product.VAS_PurchaseUOM_ID, then the
+ *                  base C_UOM_ID - in the catalog rows, the product-change callout and
+ *                  the save fallback. Qty is converted to base from that unit.
  ******************************************************/
 
 using System;
@@ -1201,7 +1206,98 @@ namespace VASLogic.Models
                 it.UomName = Util.GetValueOfString(r["UomName"]);
                 items.Add(it);
             }
+            // The unit a picked product lands on the line in is its default PURCHASE unit,
+            // not its base unit (08-Oct-2026) - resolved in its own statement, outside
+            // AddAccessSQL, which mis-parses a subquery on M_Product_PO (no key column).
+            ApplyDefaultPurchaseUoms(ctx, M_Requisition_ID, items);
             return items;
+        }
+
+        private int? _headerBPartner;
+
+        /// <summary>
+        /// M_Requisition.C_BPartner_ID, read once per instance under the same column guard
+        /// as the line context. The platform's requisition callout looks the vendor's
+        /// purchasing unit up against this partner, so the panel does too.
+        /// </summary>
+        /// <param name="M_Requisition_ID">parent requisition</param>
+        /// <returns>C_BPartner_ID, or 0</returns>
+        private int GetHeaderBPartnerId(int M_Requisition_ID)
+        {
+            if (_headerBPartner.HasValue) return _headerBPartner.Value;
+            int bp = (M_Requisition_ID > 0 && ColumnExists("M_Requisition", "C_BPartner_ID"))
+                ? Util.GetValueOfInt(DB.ExecuteScalar(
+                    "SELECT r.C_BPartner_ID FROM M_Requisition r WHERE r.M_Requisition_ID = @M_Requisition_ID",
+                    new SqlParameter[] { new SqlParameter("@M_Requisition_ID", M_Requisition_ID) }, null))
+                : 0;
+            _headerBPartner = bp;
+            return bp;
+        }
+
+        /// <summary>
+        /// SQL expression for the unit a NEW line takes when this product is picked
+        /// (08-Oct-2026), in the order the requisition window's own callout applies
+        /// (calloutrequisition.js via MProduct/GetProductUOMs): the purchasing unit on the
+        /// product's Purchasing tab for the header partner (M_Product_PO.C_UOM_ID), then the
+        /// product's Default Purchase UOM (M_Product.VAS_PurchaseUOM_ID), then its base unit.
+        /// It used to be the base unit alone. The partner id is inlined as an integer, never
+        /// bound (Oracle binds positionally).
+        /// </summary>
+        /// <param name="M_Requisition_ID">parent requisition (supplies the partner)</param>
+        /// <param name="p">M_Product alias</param>
+        /// <returns>SQL expression yielding a C_UOM_ID (0 when none)</returns>
+        private string DefaultUomExpr(int M_Requisition_ID, string p)
+        {
+            int bp = GetHeaderBPartnerId(M_Requisition_ID);
+            string vendorUom = bp > 0
+                ? "(SELECT MAX(NULLIF(po.C_UOM_ID, 0)) FROM M_Product_PO po WHERE po.M_Product_ID = " + p
+                    + ".M_Product_ID AND po.C_BPartner_ID = " + bp + " AND po.IsActive = 'Y'), "
+                : "";
+            return "COALESCE(" + vendorUom + "NULLIF(" + p + ".VAS_PurchaseUOM_ID, 0), " + p + ".C_UOM_ID, 0)";
+        }
+
+        /// <summary>The unit DefaultUomExpr resolves, for one product.</summary>
+        /// <param name="M_Requisition_ID">parent requisition</param>
+        /// <param name="M_Product_ID">picked product</param>
+        /// <returns>C_UOM_ID, or 0</returns>
+        private int GetDefaultPurchaseUomId(int M_Requisition_ID, int M_Product_ID)
+        {
+            if (M_Product_ID <= 0) return 0;
+            return Util.GetValueOfInt(DB.ExecuteScalar(
+                "SELECT " + DefaultUomExpr(M_Requisition_ID, "p") + " FROM M_Product p WHERE p.M_Product_ID = @M_Product_ID",
+                new SqlParameter[] { new SqlParameter("@M_Product_ID", M_Product_ID) }, null));
+        }
+
+        /// <summary>
+        /// Replaces each product row's base unit (and its label) with the unit
+        /// DefaultUomExpr resolves for it, in one statement for the whole page. Charge rows
+        /// are left alone.
+        /// </summary>
+        /// <param name="ctx">session context</param>
+        /// <param name="M_Requisition_ID">parent requisition (supplies the partner)</param>
+        /// <param name="items">catalog rows, updated in place</param>
+        private void ApplyDefaultPurchaseUoms(Ctx ctx, int M_Requisition_ID, List<RequisitionCatalogItem> items)
+        {
+            List<int> ids = new List<int>();
+            foreach (RequisitionCatalogItem it in items)
+                if (it.Kind == "P" && it.RecordId > 0 && !ids.Contains(it.RecordId)) ids.Add(it.RecordId);
+            if (ids.Count == 0) return;
+            DataSet ds = DB.ExecuteDataset(
+                "SELECT p.M_Product_ID, " + DefaultUomExpr(M_Requisition_ID, "p") + " AS UomId FROM M_Product p"
+                + " WHERE p.M_Product_ID IN (" + string.Join(",", ids) + ")");
+            if (ds == null || ds.Tables.Count == 0) return;
+            Dictionary<int, int> map = new Dictionary<int, int>();
+            foreach (DataRow r in ds.Tables[0].Rows)
+                map[Util.GetValueOfInt(r["M_Product_ID"])] = Util.GetValueOfInt(r["UomId"]);
+            Dictionary<int, string> labels = new Dictionary<int, string>();
+            foreach (RequisitionCatalogItem it in items)
+            {
+                int uom;
+                if (it.Kind != "P" || !map.TryGetValue(it.RecordId, out uom) || uom <= 0 || uom == it.C_UOM_ID) continue;
+                it.C_UOM_ID = uom;
+                if (!labels.ContainsKey(uom)) labels[uom] = GetUomLabel(ctx, uom);
+                it.UomName = labels[uom];
+            }
         }
 
         /// <summary>Looks up a single product / charge by a scanned barcode.</summary>
@@ -1455,10 +1551,12 @@ namespace VASLogic.Models
                 line.SetM_Product_ID(req.M_Product_ID);
                 if (req.M_AttributeSetInstance_ID > 0)
                     line.SetM_AttributeSetInstance_ID(req.M_AttributeSetInstance_ID);
-                // The product's own stocking unit, unless the client sent one (below).
+                // The product's default PURCHASE unit (08-Oct-2026; it was the base unit),
+                // unless the client sent one (below).
                 if (req.C_UOM_ID <= 0)
                 {
-                    int uom = GetProductUomId(ctx, req.M_Product_ID);
+                    int uom = GetDefaultPurchaseUomId(req.M_Requisition_ID, req.M_Product_ID);
+                    if (uom <= 0) uom = GetProductUomId(ctx, req.M_Product_ID);
                     if (uom > 0) SetLineUom(line, uom);
                 }
             }
@@ -1609,6 +1707,15 @@ namespace VASLogic.Models
             string column = MapTriggerToColumn(req.TriggerColumn);
             res.Column = column;
             res.Callout = ReadColumnCallout(ctx, "M_RequisitionLine", column);
+
+            // A product pick puts the product's DEFAULT PURCHASE unit on the line
+            // (08-Oct-2026), whatever unit the previous product left there - the rule the
+            // requisition window's own callout applies. Price and Qty below follow it.
+            if (column == "M_Product_ID" && req.M_Product_ID > 0)
+            {
+                int purchaseUom = GetDefaultPurchaseUomId(req.M_Requisition_ID, req.M_Product_ID);
+                if (purchaseUom > 0) req.C_UOM_ID = purchaseUom;
+            }
 
             MRequisition parent;
             MRequisitionLine line = BuildCalcLine(ctx, req, out parent);
@@ -2107,7 +2214,11 @@ namespace VASLogic.Models
                     if (input.C_UOM_ID > 0)
                         SetLineUom(line, input.C_UOM_ID);
                     else if (input.M_Product_ID > 0 && LineUomId(line) <= 0)
-                        SetLineUom(line, GetProductUomId(ctx, input.M_Product_ID));
+                    {
+                        // Default purchase unit first (08-Oct-2026), base unit as the fallback.
+                        int saveUom = GetDefaultPurchaseUomId(M_Requisition_ID, input.M_Product_ID);
+                        SetLineUom(line, saveUom > 0 ? saveUom : GetProductUomId(ctx, input.M_Product_ID));
+                    }
 
                     // A charge line has no product to take a unit from; the framework does
                     // not set one either, and a line without a unit fails to save.
