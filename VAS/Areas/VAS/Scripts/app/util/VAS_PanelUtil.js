@@ -7,6 +7,8 @@
  *                  new panel can delegate instead of re-implementing.
  * Chronological development:
  *   VAI154   31-Jul-2026  Created
+ *            08-Oct-2026  Section 8: full value on hover for truncated text in the
+ *                         Overview tab panels and line bottom panels.
  ************************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -618,5 +620,108 @@
             setTimeout(function () { $t.remove(); }, 300);
         }, 2600);
     };
+
+    /* ================================================================
+       SECTION 8 - FULL VALUE ON HOVER FOR TRUNCATED TEXT
+       ================================================================ */
+
+    /*
+     * The panels clip long values with `text-overflow: ellipsis` (grid cells, chips,
+     * metric values) and long field values scroll out of their <input>, so the user
+     * cannot read "Steel Pipe 40mm Galvanised Cl..." in full. One delegated mouseover
+     * handler measures the hovered element at hover time - values change after render
+     * (callouts, edits, resize, zoom) - and sets a native `title` only when the text
+     * really is cut off. Text that fits gets no tooltip.
+     *
+     * Scope: elements inside the panels matched by TT_PANEL_CLASS (their CSS class
+     * prefix, so body-mounted popovers and dialogs of those panels are covered too).
+     * A `title` the panel set itself is never touched; only titles added here
+     * (marked data-vas-tt) are refreshed or removed.
+     */
+
+    /* Overview panels VAS_092, 098-104, 106, 167, 190 (vas_NNN-*) and bottom panels
+       VAS_107 (obl), 240 (rbl), 247 (mtl), 248 (dol), 249 (grn), 303 (po303), 304 (so304). */
+    var TT_PANEL_CLASS = /(^|\s)(vas_(092|098|099|100|101|102|103|104|106|167|190)-|vas-(obl|rbl|mtl|dol|grn|po303|so304)-)/;
+    var TT_MARK = "data-vas-tt";
+    var TT_MAX_UP = 4;       // hovered node -> clipping ancestor (e.g. <span> inside an ellipsis cell)
+    var TT_MAX_SCOPE = 25;   // depth searched for the owning panel
+    var ttCanvas = null;
+
+    function ttInPanel(el) {
+        for (var i = 0; el && el.nodeType === 1 && i < TT_MAX_SCOPE; i++, el = el.parentElement) {
+            var cls = typeof el.className === "string" ? el.className : el.getAttribute("class");
+            if (cls && TT_PANEL_CLASS.test(cls)) { return true; }
+        }
+        return false;
+    }
+
+    function ttTextWidth(text, style) {
+        ttCanvas = ttCanvas || document.createElement("canvas");
+        var ctx = ttCanvas.getContext("2d");
+        ctx.font = style.font || (style.fontWeight + " " + style.fontSize + " " + style.fontFamily);
+        return ctx.measureText(text).width;
+    }
+
+    /* The full value an element shows, or "" when it shows nothing worth a tip. */
+    function ttFullText(el) {
+        var tag = el.tagName;
+        if (tag === "INPUT") {
+            var type = (el.type || "text").toLowerCase();
+            if (type === "checkbox" || type === "radio" || type === "hidden" || type === "button" || type === "submit") { return ""; }
+            return el.value || "";
+        }
+        if (tag === "SELECT") {
+            var opt = el.options && el.selectedIndex >= 0 ? el.options[el.selectedIndex] : null;
+            return opt ? (opt.text || "") : "";
+        }
+        return (el.innerText || el.textContent || "").replace(/\s+/g, " ").trim();
+    }
+
+    /* True when the element's own content is cut off; null when the element is not
+       something that truncates (so the walk carries on to its parent). */
+    function ttIsTruncated(el) {
+        var tag = el.tagName;
+        if (tag === "TEXTAREA") { return null; }   // scrolls; the user can read it
+        if (tag === "INPUT") { return el.scrollWidth > el.clientWidth + 1; }
+        if (tag === "SELECT") {
+            var st = window.getComputedStyle(el);
+            var pad = (parseFloat(st.paddingLeft) || 0) + (parseFloat(st.paddingRight) || 0);
+            // Leave room for the dropdown arrow, which sits inside clientWidth.
+            return ttTextWidth(ttFullText(el), st) > el.clientWidth - pad - 16;
+        }
+        var cs = window.getComputedStyle(el);
+        var clamp = cs.webkitLineClamp || cs.getPropertyValue("-webkit-line-clamp");
+        if (clamp && clamp !== "none") { return el.scrollHeight > el.clientHeight + 1; }
+        if (cs.textOverflow === "ellipsis") { return el.scrollWidth > el.clientWidth + 1; }
+        return null;
+    }
+
+    function ttOnOver(e) {
+        var el = e.target;
+        if (!el || el.nodeType !== 1 || !ttInPanel(el)) { return; }
+        for (var i = 0; el && el.nodeType === 1 && i < TT_MAX_UP; i++, el = el.parentElement) {
+            var own = el.getAttribute("title");
+            // A tooltip the panel set itself wins; the browser shows the nearest title anyway.
+            if (own && !el.hasAttribute(TT_MARK)) { return; }
+            var cut = ttIsTruncated(el);
+            if (cut === null) { continue; }
+            var text = cut ? ttFullText(el) : "";
+            if (text) {
+                if (own !== text) { el.setAttribute("title", text); }
+                el.setAttribute(TT_MARK, "1");
+            } else if (el.hasAttribute(TT_MARK)) {
+                // Fits now (widened, value shortened) - drop the stale tip.
+                el.removeAttribute("title");
+                el.removeAttribute(TT_MARK);
+            }
+            return;
+        }
+    }
+
+    /* Installed once for the page, however many times this file is evaluated. */
+    if (!PU._truncateTipOn) {
+        PU._truncateTipOn = true;
+        document.addEventListener("mouseover", ttOnOver, true);
+    }
 
 })(VAS, jQuery);

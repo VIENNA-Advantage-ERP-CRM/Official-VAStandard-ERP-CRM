@@ -72,6 +72,14 @@
  *                          (vas-dol-root--new) until the header is saved.
  *                        - Additional Info "Order Line": the caption floats above the
  *                          chosen value instead of overlapping it.
+ *   VAI163   2026-10-08  - White by default: the root starts as vas-dol-root--new, and
+ *                          the framework's blue title strip stays white until a saved
+ *                          header is loaded (CSS).
+ *                        - lbl() honours its English fallback (VAS_303 resolver), so a
+ *                          save without a product / charge no longer reads "[VAS_248_...]".
+ *                        - Order Line is read-only on a saved line that holds one, and the
+ *                          field's IsReadOnly / ReadOnlyLogic apply to a saved line as on
+ *                          the window; a quantity edit no longer re-matches it.
  ************************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -232,10 +240,38 @@
 
         /* ---------- short helpers ---------- */
 
-        /* Resolves an AD_Message, falling back to English. VIS.Msg.getMsg returns
-           "[key]" for a missing row, which must never reach the screen. */
+        /* Resolves an AD_Message, falling back to English. A message the dictionary does
+           not hold comes back from the framework either as "[Key]" or as the bare key
+           itself - both are a miss, and neither may reach the screen. A miss tries the
+           element (AD_Element) translation of the same name, then the English fallback.
+           (08-Oct-2026: lbl ignored its fallback, so a save without a product read
+           "[VAS_248_...]". Ported from VAS_303.) */
+        function isMsgMiss(t, key) {
+            if (!t) return true;
+            t = String(t);
+            return t.charAt(0) === "[" || t === key;
+        }
+        /* Element captions resolved once per panel (the framework may go to the server
+           for one). Panel keys (VAS_248_*) are messages, never elements, so only a
+           dictionary name such as "GuaranteeDate" is ever looked up here. */
+        var elementCache = {};
+        function elementCaption(key) {
+            if (/^VAS_\d+_/.test(key)) return "";
+            if (elementCache.hasOwnProperty(key)) return elementCache[key];
+            var el = "";
+            try {
+                if (VIS.Msg && typeof VIS.Msg.getElement === "function")
+                    el = VIS.Msg.getElement(VIS.Env.getCtx(), key);
+            } catch (e) { el = ""; }
+            return (elementCache[key] = isMsgMiss(el, key) ? "" : String(el));
+        }
         function lbl(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            var t = "";
+            try { t = VIS.Msg.getMsg(key); } catch (e) { t = ""; }
+            if (!isMsgMiss(t, key)) return t;
+            var el = elementCaption(key);
+            if (el) return el;
+            return (fallback !== undefined) ? fallback : key;
         }
 
         /* Quantities are stated to two decimals, as the framework's own shipment grid
@@ -265,7 +301,9 @@
                 $(window).off("resize.vasdol");
                 $root.remove();
             }
-            $root = $('<div class="vas-dol-root"></div>');
+            // Born in the "no saved header" state, so the host strip is white from the
+            // first paint; render() drops the class once a saved delivery is loaded.
+            $root = $('<div class="vas-dol-root vas-dol-root--new"></div>');
             $body = $('<div class="vas-dol-body"></div>');
             $emptyState = $('<div class="vas-dol-empty" style="display:none;"></div>');
             $emptyState.text(lbl("VAS_248_NoShipment", "Select a record to add lines"));
@@ -1944,6 +1982,9 @@
         function matchOrderLine(line, fillQty, done) {
             var finish = function () { if (done) done(); };
             if (!(deliveryOrderId() > 0) || !parent || !parent.M_InOut_ID) { finish(); return; }
+            // A saved line's Order Line is read-only (orderLineReadOnly): a quantity edit
+            // must not re-match it behind the user's back.
+            if (orderLineReadOnly(line)) { finish(); return; }
             var v = line.values;
             if (!(v.M_Product_ID > 0 || v.C_Charge_ID > 0)) { finish(); return; }
             var seq = line._olSeq = (line._olSeq || 0) + 1;
@@ -2408,7 +2449,31 @@
            writes it even where AD_Column is not updateable (ALWAYS_EDITABLE_COLUMNS). */
         var FORCED_EDITABLE_COLS = { C_OrderLine_ID: 1 };
 
+        /* The Order Line a SAVED line was stored with (0 when it was saved without one).
+           Read from the pristine snapshot, so a value matched or picked since the save
+           does not count. */
+        function savedOrderLineId(line) {
+            if (!line || line.status !== "saved" || !line._saved) return 0;
+            return +VAS.PanelUtil.lineVal(line._saved.values, "C_OrderLine_ID") || 0;
+        }
+
+        /* Order Line follows the window's own field once the line is saved (08-Oct-2026):
+           the dictionary does not let a stored shipment line's order line be changed
+           (AD_Column not updateable - see ALWAYS_EDITABLE_COLUMNS in the model), so a saved
+           line that holds one shows it read-only, and the field's ReadOnlyLogic /
+           IsReadOnly applies to a saved line as it does on the screen. A line not saved yet
+           keeps the free pick (25-Sep-2026), restricted to the header's order. */
+        function orderLineReadOnly(line) {
+            if (!line || line.status !== "saved") return false;
+            if (savedOrderLineId(line) > 0) return true;
+            var m = columnMeta.C_OrderLine_ID;
+            if (!m) return false;
+            if (m.IsReadOnly) return true;
+            return !!(m.ReadOnlyLogic && evalLogic(line, m.ReadOnlyLogic));
+        }
+
         function isColumnReadOnly(line, col) {
+            if (col === "C_OrderLine_ID") return orderLineReadOnly(line);
             if (FORCED_EDITABLE_COLS[col]) return false;
             if (FORCED_READONLY_COLS[col]) return true;
             // Product / Charge stays SELECTABLE (27-Sep-2026, VAS_107 / VAS_249 rule): on a

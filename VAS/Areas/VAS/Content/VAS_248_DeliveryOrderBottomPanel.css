@@ -38,6 +38,9 @@
  *                        UOM / locator <select> side padding; the "..." is live on
  *                        a locked delivery (the modal opens read-only); the product
  *                        list is a fixed layer on <body>; no grey fields in the modal.
+ *   VAI163   2026-10-08  The framework's blue tab-panel title strip
+ *                        (.vis-ad-w-p-ap-tp-o-b-head) is white until a saved header
+ *                        is loaded (vas-dol-root--new); blue returns after the save.
  * ============================================================ */
 
 .vas-dol-root,
@@ -185,6 +188,20 @@
 .vis-ad-w-p-ap-tp-outerwrap:has(.vas-dol-root) > .vis-ad-w-p-ap-tp-o-body,
 .vis-ad-w-p-ap-tp-outerwrap:has(.vas-dol-root) .vis-ad-w-p-ap-tp-o-b-content {
     background: #ffffff !important;
+}
+
+/* The framework's tab-panel title strip (_Template.cshtml: .vis-ad-w-p-ap-tp-o-body >
+   .vis-ad-w-p-ap-tp-o-b-head, the sibling of the content box our root lives in) is filled
+   with the primary blue. 08-Oct-2026: it stays white, with dark text, until a SAVED header
+   is loaded (vas-dol-root--new - New Record and the panel's first paint); once the header
+   has been saved the framework's blue strip returns. The body-head rule below never
+   matched it - the framework has no such class. */
+.vis-ad-w-p-ap-tp-o-body:has(.vas-dol-root--new) > .vis-ad-w-p-ap-tp-o-b-head {
+    background: #ffffff !important;
+    /* Literal colours: the --dol-* tokens are scoped to the root, and the strip sits
+       outside it. Same values as --dol-text / --dol-divider. */
+    color: #102c3f !important;
+    border-bottom: 1px solid #e2eaf1;
 }
 
 /* Hide the framework-rendered tab title bar and its coloured header. The framework places

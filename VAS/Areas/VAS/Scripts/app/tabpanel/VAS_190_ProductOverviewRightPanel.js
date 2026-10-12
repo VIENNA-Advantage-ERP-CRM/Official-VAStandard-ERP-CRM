@@ -515,6 +515,11 @@
  *  - The composer's full-recipients line sits under the field ROW, outside the
  *    floating-label wrapper that clipped it.
  *  No new message keys.
+ *
+ * ── 2026-10-09 (VAI163) ─────────────────────────────────────────────────
+ *  - Accounting row: the bold name is FRPT_AcctDefault.Name alone, beside its
+ *    search key; the G/L account name moved under the combination (right).
+ *  No new message keys.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -2676,17 +2681,19 @@
                 // of a similar name apart. The combination's DESCRIPTION is no
                 // longer printed as a third line: it repeated the combination the
                 // row already states on the right.
-                // The account's name follows its code, "-" separated (07-Oct-2026):
-                // "51100 - Cost of Goods Sold". Left off when it would only repeat
-                // the label.
+                // The bold name is the accounting default's own Name (FRPT_AcctDefault.Name)
+                // and nothing else, its search key beside it (09-Oct-2026). The G/L
+                // account's name (07-Oct-2026) was appended to it, so the bold text
+                // no longer read as the account the Accounting tab lists; it now sits
+                // under the combination on the right, left off when it only repeats.
                 var primary = role ? msg(role.key, role.text) : a.AccountRole;
-                if (a.AccountName && a.AccountName !== primary)
-                    primary = (primary ? primary + " - " : "") + a.AccountName;
+                var glName = (a.AccountName && a.AccountName !== primary) ? a.AccountName : "";
                 return listRow({
                     primary: primary,
                     primarySoft: a.AccountKey || "",
                     meta: accountDetailText(a),
-                    value: a.Combination || "—"
+                    value: a.Combination || "—",
+                    valueSub: a.Combination ? glName : ""
                 });
             }, $list);
         }

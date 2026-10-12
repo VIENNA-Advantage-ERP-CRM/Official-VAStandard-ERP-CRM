@@ -48,6 +48,9 @@
  *                    Order Line lookup lists that order's lines only. C_OrderLine_ID is
  *                    written even where the dictionary marks it not updateable, but
  *                    only when the user (or that match) actually set it.
+ *   VAI163         08-Oct-2026  A saved line keeps the Order Line it was stored with:
+ *                  ApplyExtraColumns no longer overwrites a non-zero C_OrderLine_ID on
+ *                  an existing line (the panel shows it read-only, as the window does).
  ******************************************************/
 
 using System;
@@ -2224,6 +2227,10 @@ namespace VASLogic.Models
                 if (ALWAYS_EDITABLE_COLUMNS.Contains(col) && !updateable.Contains(col))
                 {
                     if (!isTouched) continue;
+                    // 08-Oct-2026: a saved line keeps the Order Line it was stored with - the
+                    // panel shows it read-only then, as the window does - so only a new line,
+                    // or a saved one that has none yet, may take one here.
+                    if (line.Get_ID() > 0 && Util.GetValueOfInt(line.Get_Value(col)) > 0) continue;
                     try
                     {
                         int id = Util.GetValueOfInt(CoerceJsonValue(kv.Value));
