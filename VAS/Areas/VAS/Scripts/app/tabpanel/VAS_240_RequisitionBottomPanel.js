@@ -57,6 +57,13 @@
  *                        - Ctrl+Alt+Z: uncommitted editor text counts as an undo, the
  *                          removed editor cannot re-commit its value, and a second answer
  *                          to one press stays silent.
+ *   VAI163   2026-10-08  - White by default, as VAS_248: the root starts as
+ *                          vas-rbl-root--new and keeps it until a saved requisition is
+ *                          loaded; the CSS keeps the panel's white height and paints the
+ *                          framework title strip white, so no blue on Add Record.
+ *                        - A picked / scanned product lands on the line in its default
+ *                          PURCHASE unit (vendor's purchasing unit, then the product's
+ *                          Default Purchase UOM, then base) - resolved by the model.
  ************************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -270,7 +277,8 @@
                 $(window).off("resize.vasrbl240");
                 $root.remove();
             }
-            $root = $('<div class="vas-rbl-root"></div>');
+            // Starts as --new (as VAS_248) so the first paint, before any data, is white.
+            $root = $('<div class="vas-rbl-root vas-rbl-root--new"></div>');
             $body = $('<div class="vas-rbl-body"></div>');
             $emptyState = $('<div class="vas-rbl-empty" style="display:none;"></div>');
             $emptyState.text(lbl("VAS_240_NoRequisition", "Select a record to add lines"));
@@ -426,6 +434,7 @@
                 // since 25-Sep-2026 it says nothing at all: no highlighted hint.
                 if ($body)       $body.hide();
                 if ($emptyState) $emptyState.hide();
+                markNewRecordHost();
             } else {
                 if ($emptyState) $emptyState.text(lbl("VAS_240_NoRequisition", "Select a record to add lines"));
                 // parent is already null here, so this reverts the heading to the neutral
@@ -434,6 +443,17 @@
                 render();
             }
         };
+
+        /* With a new, unsaved header the grid and the message are both hidden, so the root
+           collapses to nothing and the bottom panel shrinks to its tab strip: the window
+           canvas (.vis-ad-w-p-center, painted the theme's blue) then fills the place the
+           panel stands in (08-Oct-2026). This class gives the root its normal white height
+           (CSS) until the header has been saved and real data renders. */
+        function markNewRecordHost() {
+            // White by DEFAULT, as VAS_248: whenever no saved header is loaded - a New
+            // Record, or no record yet - not only while newRecordMode is flagged.
+            if ($root) $root.toggleClass("vas-rbl-root--new", !(parent && parent.M_Requisition_ID));
+        }
 
         function fromServerRow(r) {
             // Start from the full column bag (every M_RequisitionLine column) so the
@@ -670,6 +690,7 @@
             // The catalog dropdown lives on <body> (see positionCatalog); it must not
             // outlive the primary cell that opened it.
             if (!(editing && (editing.field === "product" || editing.field === "charge"))) closeCatalog();
+            markNewRecordHost();
             if (!parent || !parent.M_Requisition_ID) {
                 lastLockState = null; $body.hide();
                 // A new, unsaved header shows a plain white panel - no message (clear).

@@ -135,6 +135,11 @@
 ///                        value as already-zoned and skip its own conversion,
 ///                        printing the stored clock. Same JSON on either engine
 ///                        now. No-op on Oracle.
+///   VAI163   2026-10-08  Each line carries CurrentCostPrice
+///                        (M_InventoryLine.CurrentCostPrice, dictionary-guarded,
+///                        0 when NULL or absent) and the lines table's Value
+///                        column now shows that price. LineValue / TotalValue /
+///                        VarianceValue keep their direction-aware rate.
 /// </summary>
 
 using System;
@@ -1411,6 +1416,11 @@ namespace VASLogic.Models
         {
             List<InventoryCountLineData> lines = new List<InventoryCountLineData>();
 
+            // The line's own CurrentCostPrice, which the Value column shows (08-Oct-2026).
+            // Dictionary-guarded like the rate columns: a schema without it reads 0.
+            string curCostExpr = ColumnExists("M_InventoryLine", "CurrentCostPrice")
+                ? "COALESCE(l.CurrentCostPrice, 0)" : "0";
+
             string sql = @"SELECT
                               l.M_InventoryLine_ID,
                               l.Line,
@@ -1434,6 +1444,7 @@ namespace VASLogic.Models
                               bu.Name           AS BaseUOMName,
                               COALESCE(bu.StdPrecision, 0) AS BaseUOMPrecision,
                               " + rateExpr + @"                       AS UnitRate,
+                              " + curCostExpr + @"                    AS CurCostPrice,
                               COALESCE(l.QtyCount, 0) * " + rateExpr + @"   AS LineValue
                            FROM M_InventoryLine l
                            LEFT OUTER JOIN M_Product p   ON (p.M_Product_ID   = l.M_Product_ID)
@@ -1480,6 +1491,7 @@ namespace VASLogic.Models
                 ln.BaseUOMName        = Util.GetValueOfString(r["BaseUOMName"]);
                 ln.BaseUOMPrecision   = Util.GetValueOfInt(r["BaseUOMPrecision"]);
                 ln.UnitRate           = Util.GetValueOfDecimal(r["UnitRate"]);
+                ln.CurrentCostPrice   = Util.GetValueOfDecimal(r["CurCostPrice"]);
                 ln.LineValue          = Util.GetValueOfDecimal(r["LineValue"]);
 
                 lines.Add(ln);
@@ -1598,6 +1610,9 @@ namespace VASLogic.Models
             public decimal  CountedQty         { get; set; }   // QtyCount
             public decimal  VarianceQty        { get; set; }   // counted - system
             public decimal  UnitRate           { get; set; }
+            /// <summary>M_InventoryLine.CurrentCostPrice as stored (0 when NULL or
+            /// the column is absent) - what the lines table's Value column shows.</summary>
+            public decimal  CurrentCostPrice   { get; set; }
             public decimal  LineValue          { get; set; }
         }
 

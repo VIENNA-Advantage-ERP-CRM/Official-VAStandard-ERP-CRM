@@ -15,6 +15,13 @@
  *   VAI163         25-Sep-2026 C_DocTypeTarget_ID carried on the panel data, so the
  *                  panel re-fetches when a saved header changes the document type
  *                  (IsReleaseDocument drives the blanket catalog / line match).
+ *   VAI163         08-Oct-2026 BuildCalcLine converts QtyOrdered to the product's base
+ *                  unit when the line is on another unit (ConvertQtyOrderedToBase), so a
+ *                  product defaulting to its Sales UOM is priced per that unit.
+ *   VAI163         09-Oct-2026 Release against a price-controlled blanket (VAS_ControlType
+ *                  PRC / PAQ): header flag IsBlanketPriceFixed locks a saved line's
+ *                  price on the client, and a refused save reads "The price can't be
+ *                  changed..." instead of the bare "[PriceCantChange]".
  ******************************************************/
 
 using System;
@@ -972,6 +979,65 @@ namespace VASLogic.Models.VAS_304
                 && data.DocStatus != "VO" && data.DocStatus != "RE";
             if (data.LogicContext.ContainsKey("C_Order_Blanket"))
                 data.C_Order_Blanket = Util.GetValueOfInt(data.LogicContext["C_Order_Blanket"]);
+            data.IsBlanketPriceFixed = IsBlanketPriceControlled(data);
+        }
+
+        /// <summary>Set once C_Order.VAS_ControlType proved unreadable on this database.</summary>
+        private static bool _controlTypeFailed;
+
+        /// <summary>
+        /// True when a SAVED product line of this release order cannot change its price
+        /// (09-Oct-2026): the rule MOrderLine.BeforeSave applies - target document type is
+        /// a release (IsReleaseDocument, base SOO / POO) and the blanket order the HEADER
+        /// names (C_Order_Blanket) has VAS_ControlType PRC (price) or PAQ (price and qty).
+        /// The framework then refuses any update that changes PriceEntered / PriceActual /
+        /// PriceList with "PriceCantChange", so the panel locks the Price cell instead.
+        /// </summary>
+        /// <param name="data">the loaded header context</param>
+        /// <returns>true when the blanket fixes the price</returns>
+        private bool IsBlanketPriceControlled(CreateOrderPanelData data)
+        {
+            if (!data.IsReleaseDoc || data.C_Order_Blanket <= 0 || _controlTypeFailed) return false;
+            if (data.DocBaseType != "SOO" && data.DocBaseType != "POO") return false;
+            try
+            {
+                string ct = Util.GetValueOfString(DB.ExecuteScalar(
+                    "SELECT VAS_ControlType FROM C_Order WHERE C_Order_ID = @id",
+                    new SqlParameter[] { new SqlParameter("@id", data.C_Order_Blanket) }, null));
+                return ct == "PRC" || ct == "PAQ";
+            }
+            catch (Exception e)
+            {
+                _controlTypeFailed = true;
+                log.Warning("VAS_304 VAS_ControlType unreadable: " + e.Message);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// The row message for a line save the framework refused. MOrderLine.BeforeSave
+        /// logs Msg.GetMsg("PriceCantChange") as the TEXT, so on a database without that
+        /// AD_Message the row showed the bare "[PriceCantChange]" (09-Oct-2026). A seeded
+        /// message is kept as is.
+        /// </summary>
+        /// <param name="ctx">session context</param>
+        /// <param name="err">the error text the framework logged</param>
+        /// <param name="C_Order_Blanket">blanket order the release is raised against</param>
+        /// <returns>the message to show on the row</returns>
+        private static string FriendlySaveError(Ctx ctx, string err, int C_Order_Blanket)
+        {
+            if (string.IsNullOrEmpty(err) || err.Trim('[', ']', ' ') != "PriceCantChange") return err;
+            string blanketNo = C_Order_Blanket > 0
+                ? Util.GetValueOfString(DB.ExecuteScalar("SELECT DocumentNo FROM C_Order WHERE C_Order_ID = " + C_Order_Blanket))
+                : "";
+            string msg = Msg.GetMsg(ctx, "VAS_107_BlanketPriceFixed");
+            if (string.IsNullOrEmpty(msg) || msg.StartsWith("[") || msg == "VAS_107_BlanketPriceFixed")
+                msg = "The price can't be changed - it is fixed by blanket order {0}.";
+            if (msg.Contains("{0}"))
+                msg = string.IsNullOrEmpty(blanketNo)
+                    ? msg.Replace(" {0}", "").Replace("{0}", "")
+                    : msg.Replace("{0}", blanketNo);
+            return msg;
         }
 
         /// <summary>The three screens this one panel serves.</summary>
@@ -1924,6 +1990,14 @@ namespace VASLogic.Models.VAS_304
             if (req.C_Charge_ID > 0 && line.GetC_UOM_ID() <= 0)
                 line.SetC_UOM_ID(GetDefaultUomId(ctx));
 
+            // SetQty puts QtyOrdered = QtyEntered, which is only true on the product's base
+            // unit. On any other unit (the Sales UOM a new product now defaults to, 08-Oct-2026,
+            // or one the user picked) convert it, so SetLinePriceWithAttribute scales
+            // PriceEntered to the line's unit instead of quoting the base-unit price per box.
+            // ED011 prices per unit itself (pp.SetC_UOM_ID), so it is left as it was.
+            if (req.M_Product_ID > 0 && !Env.IsModuleInstalled("ED011_"))
+                ConvertQtyOrderedToBase(ctx, line, req.M_Product_ID);
+
             if (req.PriceOverride)
             {
                 line.SetPriceEntered(req.PriceEntered);
@@ -1951,6 +2025,22 @@ namespace VASLogic.Models.VAS_304
                 line.SetTaxAmt();
 
             return line;
+        }
+
+        /// <summary>
+        /// Sets QtyOrdered to QtyEntered expressed in the product's base unit when the line
+        /// is on another unit. Leaves it untouched when the units match or no conversion
+        /// is defined (the framework's own fallback, see MInOutModel).
+        /// </summary>
+        private static void ConvertQtyOrderedToBase(Ctx ctx, MOrderLine line, int productId)
+        {
+            int lineUom = line.GetC_UOM_ID();
+            if (lineUom <= 0) return;
+            int baseUom = MProduct.Get(ctx, productId).GetC_UOM_ID();
+            if (baseUom <= 0 || baseUom == lineUom) return;
+            Decimal? baseQty = MUOMConversion.ConvertProductFrom(ctx, productId, lineUom, line.GetQtyEntered());
+            if (baseQty != null)
+                line.SetQtyOrdered(baseQty.Value);
         }
 
         /// <summary>
@@ -2597,7 +2687,7 @@ namespace VASLogic.Models.VAS_304
                             string val = pp.GetName();
                             if (String.IsNullOrEmpty(val))
                                 val = Msg.GetMsg(ctx, pp.GetValue());
-                            err = val;
+                            err = FriendlySaveError(ctx, val, ctxData.C_Order_Blanket);
                         }
                         log.Warning("VAS_304 SaveLines: line save failed (Line " + input.Line + ") - " + err);
                         res.LineErrors.Add(new OrderLineSaveError
@@ -2822,6 +2912,11 @@ namespace VASLogic.Models.VAS_304
         public string PanelContext { get; set; }
         /// <summary>C_Order.C_Order_Blanket - the blanket order a release is raised against.</summary>
         public int C_Order_Blanket { get; set; }
+        /// <summary>
+        /// The blanket order (C_Order_Blanket) is price-controlled (VAS_ControlType PRC /
+        /// PAQ): a saved product line of this release cannot change its price.
+        /// </summary>
+        public bool IsBlanketPriceFixed { get; set; }
         public bool IsTaxIncluded { get; set; }
         public string DocStatus { get; set; }
         public bool Processed { get; set; }

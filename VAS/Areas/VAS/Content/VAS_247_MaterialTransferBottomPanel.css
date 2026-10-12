@@ -177,6 +177,27 @@
 .vis-ad-w-p-ap-tp-outerwrap:has(.vas-mtl-root) .vis-ad-w-p-ap-tp-o-b-content {
     background: #ffffff !important;
 }
+/* New, unsaved header (08-Oct-2026): white host alone was not enough. With the grid and
+   the message hidden the root has no content, and the framework's inline height:100% on
+   the host resolves against an auto-height parent, so the whole bottom panel shrank to its
+   35px tab strip - and the WINDOW canvas below the form (.vis-ad-w-p-center, the theme's
+   blue at 50%) filled the place the panel stands in. The root keeps the panel's normal
+   white height instead: the framework's own bottom-panel height (250px) less that strip. */
+.vas-mtl-root.vas-mtl-root--new {
+    min-height: 13.4375em;
+}
+/* The framework's tab-panel title strip (_Template.cshtml: .vis-ad-w-p-ap-tp-o-body >
+   .vis-ad-w-p-ap-tp-o-b-head, the sibling of the content box our root lives in) is filled
+   with the primary blue. 08-Oct-2026, as VAS_248: it stays white, with dark text, until a
+   SAVED header is loaded (vas-mtl-root--new); once the header is saved the framework's
+   strip returns. */
+.vis-ad-w-p-ap-tp-o-body:has(.vas-mtl-root--new) > .vis-ad-w-p-ap-tp-o-b-head {
+    background: #ffffff !important;
+    /* Literal colours: the --mtl-* tokens are scoped to the root, and the strip sits
+       outside it. Same values as --mtl-text / --mtl-divider. */
+    color: #102c3f !important;
+    border-bottom: 1px solid #e2eaf1;
+}
 
 /* Hide the framework-rendered tab title bar and its coloured header. The framework places
    .vis-ad-w-p-ap-tp-body-head immediately before our root, so this adjacency :has()
