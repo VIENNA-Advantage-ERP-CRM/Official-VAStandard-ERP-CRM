@@ -16,10 +16,7 @@ namespace VAdvantage.Process
         StringBuilder qry = new StringBuilder("");
         StringBuilder sql = new StringBuilder("");
         StringBuilder insert = new StringBuilder();
-        DateTime? stDate, eDate;
         Decimal ProfitBeforeTax = 0.0M;
-        DataSet ds = null;
-        DataSet ds1 = null;
         MProfitLoss prof = null;
         int C_ProfitLossLines_ID = 0;
         static readonly object lockRecord = new object();
@@ -30,27 +27,23 @@ namespace VAdvantage.Process
             MProfitLoss PL = new MProfitLoss(GetCtx(), GetRecord_ID(), null);
             prof = new MProfitLoss(GetCtx(), GetRecord_ID(), Get_Trx());
 
-            stDate = Util.GetValueOfDateTime(DB.ExecuteScalar("select p.startdate from c_period p  inner join c_year y on p.c_year_id=y.c_year_id where p.periodno='1' and p.c_year_id= " + prof.GetC_Year_ID() + " and y.ad_client_id= " + GetAD_Client_ID(), null, null));
-            eDate = Util.GetValueOfDateTime(DB.ExecuteScalar("select p.enddate from c_period p  inner join c_year y on p.c_year_id=y.c_year_id where p.periodno='12' and p.c_year_id= " + prof.GetC_Year_ID() + " and y.ad_client_id= " + GetAD_Client_ID(), null, null));
-
-            // lock record 
+            // lock record
             lock (lockRecord)
             {
+                // Duplicate check: is there a completed/closed P&L whose period overlaps this one?
+                // Reads C_ProfitLoss only - joining Fact_Acct here multiplied every header by the whole ledger.
                 sql.Clear();
-                sql.Append("SELECT DISTINCT CP.* FROM C_ProfitLoss CP INNER JOIN Fact_Acct ft ON ft.C_AcctSchema_ID = Cp.C_AcctSchema_ID                             "
-                            + " INNER JOIN C_ElementValue ev ON ft.Account_ID=ev.C_ElementValue_ID                                                           "
-                            + " WHERE CP.AD_Client_ID=" + GetAD_Client_ID());
+                sql.Append("SELECT COUNT(CP.C_ProfitLoss_ID) FROM C_ProfitLoss CP WHERE CP.AD_Client_ID=" + GetAD_Client_ID()
+                         + " AND CP.C_ProfitLoss_ID <> " + GetRecord_ID());
 
                 if (prof.Get_Value("PostingType") != null)
                 {
                     sql.Append(" AND CP.PostingType = '" + prof.Get_Value("PostingType") + "'");
                 }
-                sql.Append(" AND (( " + GlobalVariable.TO_DATE(prof.GetDateFrom(), true) + " >= CP.DateFrom "
-                         + " AND " + GlobalVariable.TO_DATE(prof.GetDateFrom(), true) + " <= CP.DateTo "
-                         + " OR " + GlobalVariable.TO_DATE(prof.GetDateTo(), true) + " <= CP.DateFrom "
-                         + " AND " + GlobalVariable.TO_DATE(prof.GetDateTo(), true) + " <= CP.DateTo ))  "
-                         + " AND (ev.AccountType='E' OR ev.AccountType='R')"
-                         + " AND ev.IsIntermediateCode='N' AND CP.DocStatus IN ('CO', 'CL') AND CP.AD_Org_ID IN (SELECT Ad_Org_ID FROM AD_Org WHERE IsActive='Y'");
+                // Two ranges overlap when each one starts on or before the other ends
+                sql.Append(" AND " + GlobalVariable.TO_DATE(prof.GetDateFrom(), true) + " <= CP.DateTo "
+                         + " AND " + GlobalVariable.TO_DATE(prof.GetDateTo(), true) + " >= CP.DateFrom "
+                         + " AND CP.DocStatus IN ('CO', 'CL') AND CP.AD_Org_ID IN (SELECT Ad_Org_ID FROM AD_Org WHERE IsActive='Y'");
 
                 // VIS0060: Handle Organization filter based on Profit & Loss closing settings on Tenant
                 if (client.Get_ColumnIndex("PLClosing") >= 0 && !string.IsNullOrEmpty(client.GetPLClosing()) && !client.GetPLClosing().Equals("LOW"))
@@ -66,8 +59,7 @@ namespace VAdvantage.Process
                 {
                     sql.Append(" AND Cp.C_AcctSchema_ID=" + Util.GetValueOfInt(PL.Get_Value("C_AcctSchema_ID")));
                 }
-                ds1 = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
-                if (ds1 != null && ds1.Tables[0].Rows.Count > 0)
+                if (Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx())) > 0)
                 {
                     return Msg.GetMsg(GetCtx(), "VIS_RecordsAlreadyGenerated");
                 }
@@ -77,7 +69,7 @@ namespace VAdvantage.Process
                 C_ProfitLossLines_ID -= 1;
 
                 // Delete All Record from line
-                DB.ExecuteQuery("DELETE FROM C_ProfitLossLines WHERE C_ProfitLoss_ID=" + GetRecord_ID());
+                DB.ExecuteQuery("DELETE FROM C_ProfitLossLines WHERE C_ProfitLoss_ID=" + GetRecord_ID(), null, Get_Trx());
 
                 insert.Clear();
                 insert.Append(@"INSERT INTO C_ProfitLossLines (C_ProfitLossLines_ID , AD_Client_ID , AD_Org_ID , C_ProfitLoss_ID , C_ProfitAndLoss_ID , C_AcctSchema_ID , PostingType ,
@@ -146,7 +138,6 @@ namespace VAdvantage.Process
                     prof.SetProfitBeforeTax(ProfitBeforeTax);
                     if (!prof.Save(Get_Trx()))
                     {
-                        ds.Dispose();
                         Rollback();
                         // return GetReterivedError(prof, "ProfitNotSaved");
                         return Msg.GetMsg(GetCtx(), "ProfitNotSaved");

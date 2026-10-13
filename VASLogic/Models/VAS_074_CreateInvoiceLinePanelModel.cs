@@ -780,8 +780,8 @@ namespace VASLogic.Models
                         @"SELECT t.TableName, ck.ColumnName AS KeyColumn, cd.ColumnName AS DisplayColumn
                           FROM AD_Ref_Table rt
                           INNER JOIN AD_Table t ON (rt.AD_Table_ID = t.AD_Table_ID)
-                          INNER JOIN AD_Column ck ON (rt.AD_Key = ck.AD_Column_ID)
-                          LEFT JOIN AD_Column cd ON (rt.AD_Display = cd.AD_Column_ID)
+                          INNER JOIN AD_Column ck ON (rt.Column_Key_ID = ck.AD_Column_ID)
+                          LEFT JOIN AD_Column cd ON (rt.Column_Display_ID = cd.AD_Column_ID)
                           WHERE rt.AD_Reference_ID = @rv",
                         new SqlParameter[] { new SqlParameter("@rv", refValId) }, null);
                     if (ts != null && ts.Tables.Count > 0 && ts.Tables[0].Rows.Count > 0)
@@ -990,33 +990,55 @@ namespace VASLogic.Models
             // reach the SELECT (column names come from the dictionary, never user input,
             // so there is no injection surface). Falls back to every active column when
             // no tab is resolved.
-            StringBuilder cols = new StringBuilder();
-            foreach (string cn in GetLineProjectionColumns(AD_Tab_IDs))
-                cols.Append("il.").Append(cn).Append(", ");
-            if (cols.Length == 0)
-                cols.Append("il.C_InvoiceLine_ID, il.Line, il.M_Product_ID, il.C_Charge_ID, il.QtyEntered, il.C_UOM_ID, il.PriceEntered, il.C_Tax_ID, il.TaxAmt, il.LineNetAmt, il.LineTotalAmt, il.M_AttributeSetInstance_ID, il.Description, ");
+            List<string> lineCols = new List<string>(GetLineProjectionColumns(AD_Tab_IDs));
+            if (lineCols.Count == 0)
+                lineCols.AddRange(ESSENTIAL_LINE_COLUMNS);
+            // Updated drives the ORDER BY on the outer query, so the base select must carry it.
+            if (!lineCols.Exists(c => string.Equals(c, "Updated", StringComparison.OrdinalIgnoreCase)))
+                lineCols.Add("Updated");
 
-            string sql = "SELECT " + cols.ToString() +
-                @"COALESCE(p.Name, N'') AS VASCILDISP_ProductName,
-                  COALESCE(ch.Name, N'') AS VASCILDISP_ChargeName,
-                  COALESCE(uom.Name,uom.UOMSymbol, N'') AS VASCILDISP_UOMName,
-                  COALESCE(t.Name, N'') AS VASCILDISP_TaxName,
-                  COALESCE(asi.Description, N'') AS VASCILDISP_AttrName,
-                  COALESCE(p.M_AttributeSet_ID, 0) AS VASCILDISP_HasAttrSet,
-                  COALESCE(p.ProductType, '') AS VASCILDISP_ProductType
-               FROM C_InvoiceLine il
-               LEFT JOIN M_Product p ON (il.M_Product_ID = p.M_Product_ID)
-               LEFT JOIN C_Charge ch ON (il.C_Charge_ID = ch.C_Charge_ID)
-               LEFT JOIN C_UOM uom ON (il.C_UOM_ID = uom.C_UOM_ID)
-               LEFT JOIN C_Tax t ON (il.C_Tax_ID = t.C_Tax_ID)
-               LEFT JOIN M_AttributeSetInstance asi ON (il.M_AttributeSetInstance_ID = asi.M_AttributeSetInstance_ID)
-               WHERE il.C_Invoice_ID = @C_Invoice_ID
-                 AND il.IsActive = 'Y'";
+            StringBuilder baseCols = new StringBuilder();
+            StringBuilder outerCols = new StringBuilder();
+            foreach (string cn in lineCols)
+            {
+                if (baseCols.Length > 0) baseCols.Append(", ");
+                baseCols.Append("il.").Append(cn);
+                outerCols.Append("b.").Append(cn).Append(", ");
+            }
 
-            sql = MRole.GetDefault(ctx).AddAccessSQL(
-                sql, "il", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            // MRole goes on the main physical table only (C_InvoiceLine, alias il), and the
+            // base select is kept join-free so the access-SQL parser sees one table and one
+            // WHERE. With the lookup joins in the same FROM, the parser also applied record /
+            // dependent-column access to M_Product, C_Charge, C_UOM, C_Tax and
+            // M_AttributeSetInstance, which turned those LEFT joins into inner filters and
+            // dropped lines (e.g. a charge line has no product). The lookups below inherit
+            // the parent filter instead.
+            StringBuilder baseSql = new StringBuilder();
+            baseSql.Append("SELECT ").Append(baseCols)
+                   .Append(" FROM C_InvoiceLine il WHERE il.C_Invoice_ID=@C_Invoice_ID AND il.IsActive='Y'");
+            string accessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                baseSql.ToString(), "il", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+            StringBuilder sqlBuilder = new StringBuilder();
+            sqlBuilder.Append("SELECT ").Append(outerCols)
+                .Append("COALESCE(p.Name,N'') AS VASCILDISP_ProductName,")
+                .Append(" COALESCE(ch.Name,N'') AS VASCILDISP_ChargeName,")
+                .Append(" COALESCE(uom.Name,uom.UOMSymbol,N'') AS VASCILDISP_UOMName,")
+                .Append(" COALESCE(t.Name,N'') AS VASCILDISP_TaxName,")
+                .Append(" COALESCE(asi.Description,N'') AS VASCILDISP_AttrName,")
+                .Append(" COALESCE(p.M_AttributeSet_ID,0) AS VASCILDISP_HasAttrSet,")
+                .Append(" COALESCE(p.ProductType,N'') AS VASCILDISP_ProductType")
+                .Append(" FROM (").Append(accessSql).Append(") b")
+                .Append(" LEFT OUTER JOIN M_Product p ON (p.M_Product_ID=b.M_Product_ID)")
+                .Append(" LEFT OUTER JOIN C_Charge ch ON (ch.C_Charge_ID=b.C_Charge_ID)")
+                .Append(" LEFT OUTER JOIN C_UOM uom ON (uom.C_UOM_ID=b.C_UOM_ID)")
+                .Append(" LEFT OUTER JOIN C_Tax t ON (t.C_Tax_ID=b.C_Tax_ID)")
+                .Append(" LEFT OUTER JOIN M_AttributeSetInstance asi ON (asi.M_AttributeSetInstance_ID=b.M_AttributeSetInstance_ID)");
+
+            // ORDER BY and the paging suffix go after AddAccessSQL, on the outer query.
             if (page < 0) page = 0;
-            sql += " ORDER BY il.Updated DESC" + PagingSuffix(LINE_PAGE_SIZE, page * LINE_PAGE_SIZE);
+            sqlBuilder.Append(" ORDER BY b.Updated DESC").Append(PagingSuffix(LINE_PAGE_SIZE, page * LINE_PAGE_SIZE));
+            string sql = sqlBuilder.ToString();
 
             DataSet ds = DB.ExecuteDataset(sql,
                 new SqlParameter[] { new SqlParameter("@C_Invoice_ID", C_Invoice_ID) }, null);

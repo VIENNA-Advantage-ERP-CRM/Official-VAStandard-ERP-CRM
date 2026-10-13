@@ -863,8 +863,8 @@ namespace VASLogic.Models
                            COALESCE(dc.ColumnName,N'') AS Display_Column
                     FROM AD_Ref_Table rt
                     INNER JOIN AD_Table t ON (t.AD_Table_ID=rt.AD_Table_ID)
-                    LEFT OUTER JOIN AD_Column kc ON (kc.AD_Column_ID=rt.AD_Key)
-                    LEFT OUTER JOIN AD_Column dc ON (dc.AD_Column_ID=rt.AD_Display)
+                    LEFT OUTER JOIN AD_Column kc ON (kc.AD_Column_ID=rt.Column_Key_ID)
+                    LEFT OUTER JOIN AD_Column dc ON (dc.AD_Column_ID=rt.Column_Display_ID)
                     WHERE rt.AD_Reference_ID=@AD_Reference_ID
                       AND rt.IsActive='Y'
                       AND t.IsActive='Y'";

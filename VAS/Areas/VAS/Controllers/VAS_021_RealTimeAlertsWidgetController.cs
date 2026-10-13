@@ -250,6 +250,8 @@ namespace VAS.Areas.VAS.Controllers
 
             // Round-trip 5 — DPO: average days unpaid invoices have been outstanding this year.
             // Joins C_InvoicePaySchedule to filter VA009_IsPaid = 'N'. EXTRACT arithmetic in outer query.
+            // The current-year filter is a bound date range, not EXTRACT(YEAR FROM ...): the " FROM "
+            // inside EXTRACT is read by the AddAccessSQL parser as a FROM clause and breaks MRole.
             string baseDPO = @"SELECT i.C_Invoice_ID, i.DateInvoiced
                   FROM C_Invoice i
                  WHERE i.IsSOTrx = 'N'
@@ -257,8 +259,18 @@ namespace VAS.Areas.VAS.Controllers
                    AND i.DocStatus IN ('CO', 'CL')
                    AND i.IsActive = 'Y'
                    AND i.AD_Client_ID = @ClientID
-                   AND EXTRACT(YEAR FROM i.DateInvoiced) = " + now.Year;
+                   AND i.DateInvoiced >= @YearStart
+                   AND i.DateInvoiced < @NextYearStart";
             baseDPO = MRole.GetDefault(ctx).AddAccessSQL(baseDPO, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+            // Binds are positional - keep this order identical to the placeholders in the SQL text.
+            DateTime yearStart = new DateTime(now.Year, 1, 1);
+            SqlParameter[] dpoParams =
+            {
+                new SqlParameter("@ClientID", clientId),
+                new SqlParameter("@YearStart", yearStart),
+                new SqlParameter("@NextYearStart", yearStart.AddYears(1))
+            };
 
             strQuery = @"SELECT AVG(" + todayInt + @" - ((EXTRACT(YEAR FROM d.DateInvoiced) * 12 + EXTRACT(MONTH FROM d.DateInvoiced)) * 31 + EXTRACT(DAY FROM d.DateInvoiced))) AS AvgDPO,
                        COUNT(DISTINCT d.C_Invoice_ID) AS InvCount
@@ -268,7 +280,7 @@ namespace VAS.Areas.VAS.Controllers
                    AND ips.VA009_IsPaid = 'N'
                    AND ips.DueAmt > 0";
 
-            DataSet dsDPO = DB.ExecuteDataset(strQuery, dataParams, null);
+            DataSet dsDPO = DB.ExecuteDataset(strQuery, dpoParams, null);
             if (dsDPO != null && dsDPO.Tables.Count > 0 && dsDPO.Tables[0].Rows.Count > 0)
             {
                 int cnt        = Util.GetValueOfInt(dsDPO.Tables[0].Rows[0]["InvCount"]);
