@@ -236,34 +236,28 @@ namespace VAdvantage.Model
 
         private bool CheckForPreviousCompeletedRecords()
         {
-            MProfitLoss PL = new MProfitLoss(GetCtx(), GetC_ProfitLoss_ID(), null);
-            MProfitLoss prof = new MProfitLoss(GetCtx(), GetC_ProfitLoss_ID(), Get_TrxName());
+            // Duplicate check: is there a completed/closed P&L whose period overlaps this one?
+            // Reads C_ProfitLoss only - joining Fact_Acct here multiplied every header by the whole ledger.
             StringBuilder sql = new StringBuilder();
+            sql.Append("SELECT COUNT(CP.C_ProfitLoss_ID) FROM C_ProfitLoss CP WHERE CP.AD_Client_ID=" + GetAD_Client_ID()
+                     + " AND CP.C_ProfitLoss_ID <> " + GetC_ProfitLoss_ID());
 
-            sql.Append("SELECT distinct CP.* FROM C_ProfitLoss CP INNER JOIN Fact_Acct ft ON ft.C_AcctSchema_ID = Cp.C_AcctSchema_ID                             "
-                       + " INNER JOIN c_elementvalue ev ON ft.account_id         = ev.c_elementvalue_id                                                           "
-                       + " WHERE CP.ad_client_id    = " + +GetAD_Client_ID());
-
-            if (prof.Get_Value("PostingType") != null)
+            if (Get_Value("PostingType") != null)
             {
-                sql.Append(" and CP.PostingType = '" + prof.Get_Value("PostingType") + "' ");
+                sql.Append(" AND CP.PostingType = '" + Get_Value("PostingType") + "'");
             }
-            sql.Append(" AND (( " + GlobalVariable.TO_DATE(prof.GetDateFrom(), true) + " >= CP.DateFrom "
-                     + " AND " + GlobalVariable.TO_DATE(prof.GetDateFrom(), true) + " <= CP.DateTo "
-                     + " OR " + GlobalVariable.TO_DATE(prof.GetDateTo(), true) + " <= CP.DateFrom "
-                     + " AND " + GlobalVariable.TO_DATE(prof.GetDateTo(), true) + " <= CP.DateTo ))  "
-                     + " AND (ev.accounttype      ='E' OR ev.accounttype        ='R')     "
-                     + " AND ev.isintermediatecode='N' AND CP.AD_Org_ID        IN (    (SELECT Ad_Org_ID   FROM AD_Org   WHERE isactive      = 'Y'             "
-                     + " AND (" + DBFunctionCollection.TypecastColumnAsInt("legalentityorg") + " =" + PL.GetAD_Org_ID() + "  OR Ad_Org_ID = " + PL.GetAD_Org_ID() + ")  )) AND DOCstatus in ('CO', 'CL') ");
+            // Two ranges overlap when each one starts on or before the other ends
+            sql.Append(" AND " + GlobalVariable.TO_DATE(GetDateFrom(), true) + " <= CP.DateTo "
+                     + " AND " + GlobalVariable.TO_DATE(GetDateTo(), true) + " >= CP.DateFrom "
+                     + " AND CP.DocStatus IN ('CO', 'CL') AND CP.AD_Org_ID IN (SELECT AD_Org_ID FROM AD_Org WHERE IsActive='Y'"
+                     + " AND (" + DBFunctionCollection.TypecastColumnAsInt("LegalEntityOrg") + "=" + GetAD_Org_ID() + " OR AD_Org_ID=" + GetAD_Org_ID() + "))");
 
-            if (Util.GetValueOfInt(PL.Get_Value("C_AcctSchema_ID")) > 0)
+            if (Util.GetValueOfInt(Get_Value("C_AcctSchema_ID")) > 0)
             {
-                sql.Append(" AND Cp.C_AcctSchema_ID=" + Util.GetValueOfInt(PL.Get_Value("C_AcctSchema_ID")));
+                sql.Append(" AND CP.C_AcctSchema_ID=" + Util.GetValueOfInt(Get_Value("C_AcctSchema_ID")));
             }
 
-            DataSet ds1 = DB.ExecuteDataset(sql.ToString(), null, Get_TrxName());
-
-            if (ds1 != null && ds1.Tables[0].Rows.Count > 0)
+            if (Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_TrxName())) > 0)
             {
                 /// _processMsg =  "Record(s) for defined criteria has already been generated";
                 _processMsg = Msg.GetMsg(GetCtx(), "VIS_RecordsAlreadyGenerated", true);
