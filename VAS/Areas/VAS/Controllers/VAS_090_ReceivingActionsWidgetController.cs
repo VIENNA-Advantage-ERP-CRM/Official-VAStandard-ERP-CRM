@@ -59,7 +59,7 @@ namespace VIS.Controllers
         {
             if (Session["ctx"] == null)
             {
-                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+                return Fail(MsgOr(Env.GetCtx(), "SessionExpired", "Session Expired"));
             }
 
             Ctx ctx = Session["ctx"] as Ctx;
@@ -238,7 +238,7 @@ namespace VIS.Controllers
         {
             if (Session["ctx"] == null)
             {
-                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+                return Fail(MsgOr(Env.GetCtx(), "SessionExpired", "Session Expired"));
             }
 
             Ctx ctx = Session["ctx"] as Ctx;
@@ -537,7 +537,7 @@ namespace VIS.Controllers
         {
             if (Session["ctx"] == null)
             {
-                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+                return Fail(MsgOr(Env.GetCtx(), "SessionExpired", "Session Expired"));
             }
 
             Ctx ctx = Session["ctx"] as Ctx;
@@ -614,7 +614,7 @@ namespace VIS.Controllers
         {
             if (Session["ctx"] == null)
             {
-                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+                return Fail(MsgOr(Env.GetCtx(), "SessionExpired", "Session Expired"));
             }
 
             Ctx ctx = Session["ctx"] as Ctx;
@@ -858,7 +858,7 @@ namespace VIS.Controllers
                     grnNo = completedReceipt.GetDocumentNo(),
                     docStatus = docStatus,
                     docStatusName = DocStatusLabel(ctx, docStatus),
-                    message = Msg.GetMsg(ctx, "VAS_GRNSaved") ?? "GRN created."
+                    message = MsgOr(ctx, "VAS_GRNSaved", "GRN created.")
                 });
             }
             catch (Exception ex)
@@ -1025,11 +1025,11 @@ namespace VIS.Controllers
         {
             switch (docStatus)
             {
-                case "CO": return Msg.GetMsg(ctx, "Completed") ?? "Completed";
-                case "CL": return Msg.GetMsg(ctx, "Closed") ?? "Closed";
-                case "IP": return Msg.GetMsg(ctx, "InProgress") ?? "In Progress";
-                case "DR": return Msg.GetMsg(ctx, "Drafted") ?? "Drafted";
-                case "IN": return Msg.GetMsg(ctx, "Invalid") ?? "Invalid";
+                case "CO": return MsgOr(ctx, "Completed", "Completed");
+                case "CL": return MsgOr(ctx, "Closed", "Closed");
+                case "IP": return MsgOr(ctx, "InProgress", "In Progress");
+                case "DR": return MsgOr(ctx, "Drafted", "Drafted");
+                case "IN": return MsgOr(ctx, "Invalid", "Invalid");
                 default: return docStatus ?? "";
             }
         }
@@ -1056,6 +1056,38 @@ namespace VIS.Controllers
             }
 
             return string.IsNullOrEmpty(error) ? fallback : error;
+        }
+
+        /// <summary>
+        /// QA sheet #78 / #106: replaces raw "[VAS_Key]" tokens in a message by the message text;
+        /// a key that does not resolve is shown without brackets instead of the raw token.
+        /// </summary>
+        private string ResolveBracketedKeys(string message)
+        {
+            if (string.IsNullOrEmpty(message) || message.IndexOf('[') < 0) { return message; }
+            try
+            {
+                Ctx ctx = Env.GetCtx();
+                return System.Text.RegularExpressions.Regex.Replace(message, @"\[([A-Za-z][A-Za-z0-9_]*)\]", delegate (System.Text.RegularExpressions.Match m)
+                {
+                    string text = ResolveMessage(ctx, m.Groups[1].Value);
+                    return string.IsNullOrEmpty(text) ? m.Groups[1].Value : text;
+                });
+            }
+            catch
+            {
+                return message;
+            }
+        }
+
+        /// <summary>
+        /// Message text for a key, or the fallback when the key is not defined
+        /// (Msg.GetMsg returns "[Key]" for unknown keys, never null).
+        /// </summary>
+        private string MsgOr(Ctx ctx, string key, string fallback)
+        {
+            string text = ResolveMessage(ctx, key);
+            return string.IsNullOrEmpty(text) ? fallback : text;
         }
 
         /// <summary>Resolves an AD_Message key, returning "" when it does not resolve.</summary>
@@ -1109,7 +1141,7 @@ namespace VIS.Controllers
         {
             if (Session["ctx"] == null)
             {
-                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+                return Fail(MsgOr(Env.GetCtx(), "SessionExpired", "Session Expired"));
             }
 
             Ctx ctx = Session["ctx"] as Ctx;
@@ -1305,7 +1337,7 @@ namespace VIS.Controllers
         {
             if (Session["ctx"] == null)
             {
-                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+                return Fail(MsgOr(Env.GetCtx(), "SessionExpired", "Session Expired"));
             }
 
             if (grnId <= 0)
@@ -1360,7 +1392,7 @@ namespace VIS.Controllers
         {
             if (Session["ctx"] == null)
             {
-                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+                return Fail(MsgOr(Env.GetCtx(), "SessionExpired", "Session Expired"));
             }
 
             Ctx ctx = Session["ctx"] as Ctx;
@@ -1497,11 +1529,11 @@ namespace VIS.Controllers
         {
             if (Session["ctx"] == null)
             {
-                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+                return Fail(MsgOr(Env.GetCtx(), "SessionExpired", "Session Expired"));
             }
 
             Ctx ctx = Session["ctx"] as Ctx;
-            if (confirmId <= 0) { return Fail(Msg.GetMsg(ctx, "NotFound") ?? "Not found"); }
+            if (confirmId <= 0) { return Fail(MsgOr(ctx, "NotFound", "Not found")); }
 
             string headerSql = @"
                 SELECT Confirm.M_InOutConfirm_ID AS Confirm_ID,
@@ -1509,6 +1541,7 @@ namespace VIS.Controllers
                        Confirm.DocStatus AS Doc_Status,
                        COALESCE(CAST(Confirm.IsInDispute AS VARCHAR(1)),'N') AS In_Dispute,
                        InOut.DocumentNo AS GRN_No,
+                       InOut.M_InOut_ID AS GRN_ID,
                        BPartner.Name AS Supplier_Name,
                        Warehouse.Name AS Warehouse_Name,
                        COALESCE(InOut.M_Warehouse_ID, 0) AS Warehouse_ID,
@@ -1584,6 +1617,7 @@ namespace VIS.Controllers
                         confirmId = Util.GetValueOfInt(dr["Confirm_ID"]),
                         confirmNo = Util.GetValueOfString(dr["Confirm_No"]),
                         grnNo = Util.GetValueOfString(dr["GRN_No"]),
+                        grnId = Util.GetValueOfInt(dr["GRN_ID"]),
                         supplier = Util.GetValueOfString(dr["Supplier_Name"]),
                         warehouseName = Util.GetValueOfString(dr["Warehouse_Name"]),
                         // Scrap Locator options on the confirmation line come from this warehouse (#84).
@@ -1597,7 +1631,7 @@ namespace VIS.Controllers
                 dr.Dispose();
                 dr = null;
 
-                if (header == null) { return Fail(Msg.GetMsg(ctx, "NotFound") ?? "Not found"); }
+                if (header == null) { return Fail(MsgOr(ctx, "NotFound", "Not found")); }
 
                 List<object> lines = new List<object>();
                 dr = DB.ExecuteReader(linesSql, new SqlParameter[]
@@ -1653,11 +1687,11 @@ namespace VIS.Controllers
         {
             if (Session["ctx"] == null)
             {
-                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+                return Fail(MsgOr(Env.GetCtx(), "SessionExpired", "Session Expired"));
             }
 
             Ctx ctx = Session["ctx"] as Ctx;
-            if (lineConfirmId <= 0) { return Fail(Msg.GetMsg(ctx, "NotFound") ?? "Not found"); }
+            if (lineConfirmId <= 0) { return Fail(MsgOr(ctx, "NotFound", "Not found")); }
 
             decimal target, confirmed, scrapped;
             if (!decimal.TryParse(targetQty, System.Globalization.NumberStyles.Any, CultureInfo.InvariantCulture, out target)
@@ -1665,7 +1699,7 @@ namespace VIS.Controllers
                 || !decimal.TryParse(String.IsNullOrEmpty(scrappedQty) ? "0" : scrappedQty, System.Globalization.NumberStyles.Any, CultureInfo.InvariantCulture, out scrapped)
                 || target < 0 || confirmed < 0 || scrapped < 0)
             {
-                return Fail(Msg.GetMsg(ctx, "VAS_090_InvalidQuantity") ?? "Quantities must be zero or positive numbers.");
+                return Fail(MsgOr(ctx, "VAS_090_InvalidQuantity", "Quantities must be zero or positive numbers."));
             }
 
             if (confirmed > target)
@@ -1686,14 +1720,17 @@ namespace VIS.Controllers
                 MInOutLineConfirm line = new MInOutLineConfirm(ctx, lineConfirmId, null);
                 if (line.Get_ID() <= 0 || line.GetAD_Client_ID() != ctx.GetAD_Client_ID())
                 {
-                    return Fail(Msg.GetMsg(ctx, "NotFound") ?? "Not found");
+                    return Fail(MsgOr(ctx, "NotFound", "Not found"));
                 }
 
                 MInOutConfirm parent = new MInOutConfirm(ctx, line.GetM_InOutConfirm_ID(), null);
                 if (parent.IsProcessed() || parent.GetDocStatus() == "CO" || parent.GetDocStatus() == "CL")
                 {
-                    return Fail(Msg.GetMsg(ctx, "VAS_090_ConfirmationCompleted") ?? "This GRN confirmation is already completed.");
+                    return Fail(MsgOr(ctx, "VAS_090_ConfirmationCompleted", "This GRN confirmation is already completed."));
                 }
+
+                // QA sheet #87: the Target quantity is read-only - always the stored value, never the posted one.
+                target = line.GetTargetQty();
 
                 // QA sheet Complete GRN Confirmation #88 / #89 (2026-09-15): neither quantity may exceed
                 // the Target quantity, and the two together may not either - the model then derives
@@ -1743,13 +1780,16 @@ namespace VIS.Controllers
                 line.SetTargetQty(target);
                 line.SetConfirmedQty(confirmed);
                 line.SetScrappedQty(scrapped);
-                line.SetDescription(description ?? "");
+                // QA sheet #90: Description is limited to 255 characters.
+                description = description ?? "";
+                if (description.Length > 255) { description = description.Substring(0, 255); }
+                line.SetDescription(description);
                 // Blank option = no scrap locator (column is optional).
                 line.Set_Value("M_Locator_ID", scrapLocatorId > 0 ? (object)scrapLocatorId : null);
 
                 if (!line.Save())
                 {
-                    return Fail(Msg.GetMsg(ctx, "SaveError") ?? "Save failed.");
+                    return Fail(MsgOr(ctx, "SaveError", "Save failed."));
                 }
 
                 return Ok(new
@@ -1775,29 +1815,29 @@ namespace VIS.Controllers
         {
             if (Session["ctx"] == null)
             {
-                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+                return Fail(MsgOr(Env.GetCtx(), "SessionExpired", "Session Expired"));
             }
 
             Ctx ctx = Session["ctx"] as Ctx;
-            if (confirmId <= 0) { return Fail(Msg.GetMsg(ctx, "NotFound") ?? "Not found"); }
+            if (confirmId <= 0) { return Fail(MsgOr(ctx, "NotFound", "Not found")); }
 
             try
             {
                 MInOutConfirm confirm = new MInOutConfirm(ctx, confirmId, null);
                 if (confirm.Get_ID() <= 0 || confirm.GetAD_Client_ID() != ctx.GetAD_Client_ID())
                 {
-                    return Fail(Msg.GetMsg(ctx, "NotFound") ?? "Not found");
+                    return Fail(MsgOr(ctx, "NotFound", "Not found"));
                 }
 
                 if (confirm.GetDocStatus() == "CO" || confirm.GetDocStatus() == "CL")
                 {
-                    return Fail(Msg.GetMsg(ctx, "VAS_090_ConfirmationCompleted") ?? "This GRN confirmation is already completed.");
+                    return Fail(MsgOr(ctx, "VAS_090_ConfirmationCompleted", "This GRN confirmation is already completed."));
                 }
 
                 string productName = GetProductMissingQualityActualValue(ctx, confirmId);
                 if (!string.IsNullOrEmpty(productName))
                 {
-                    return Fail("Product name (" + productName + ") is not verified with all the Quality Parameters. Please fill actual value for the missing Quality Parameters in Quality Control.");
+                    return Fail(QualityNotVerifiedMessage(productName));
                 }
 
                 bool processed = confirm.ProcessIt(X_M_InOutConfirm.DOCACTION_Complete);
@@ -1806,16 +1846,73 @@ namespace VIS.Controllers
                 if (!processed || !(confirm.GetDocStatus() == "CO" || confirm.GetDocStatus() == "CL"))
                 {
                     string processMsg = confirm.GetProcessMsg();
+                    /* QA sheet #91: a missing Quality Parameter actual value surfaces from the
+                       completion as a raw NullReference text - show the quality message instead. */
+                    if (IsNullReferenceText(processMsg))
+                    {
+                        return Fail(QualityNotVerifiedMessage(GetAnyQualityProductName(ctx, confirmId)));
+                    }
                     return Fail(!String.IsNullOrEmpty(processMsg)
                         ? processMsg
-                        : (Msg.GetMsg(ctx, "VAS_090_CompleteFailed") ?? "GRN confirmation could not be completed."));
+                        : (MsgOr(ctx, "VAS_090_CompleteFailed", "GRN confirmation could not be completed.")));
                 }
 
                 return Ok(new { success = true, status = "completed" });
             }
+            catch (NullReferenceException)
+            {
+                /* QA sheet #91: never show "Object reference not set to an instance of an object." */
+                return Fail(QualityNotVerifiedMessage(GetAnyQualityProductName(ctx, confirmId)));
+            }
             catch (Exception ex)
             {
+                if (IsNullReferenceText(ex.Message))
+                {
+                    return Fail(QualityNotVerifiedMessage(GetAnyQualityProductName(ctx, confirmId)));
+                }
                 return Fail(ex.Message);
+            }
+        }
+
+        private static bool IsNullReferenceText(string text)
+        {
+            return !string.IsNullOrEmpty(text)
+                && text.IndexOf("Object reference not set", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        /// <summary>QA sheet #91: "Product name (X) is not verified with all the Quality Parameters..." text.</summary>
+        private string QualityNotVerifiedMessage(string productName)
+        {
+            return "Product name (" + (string.IsNullOrEmpty(productName) ? "-" : productName) + ") is not verified with all the Quality Parameters. Please fill actual value for the missing Quality Parameters in Quality Control.";
+        }
+
+        /// <summary>First product of the confirmation that carries Quality Parameters (message text only).</summary>
+        private string GetAnyQualityProductName(Ctx ctx, int confirmId)
+        {
+            try
+            {
+                string name = Util.GetValueOfString(DB.ExecuteScalar(@"
+                    SELECT COALESCE(QAProduct.Name, Product.Name)
+                    FROM M_InOutLineConfirm LineConfirm
+                    INNER JOIN VA010_ShipConfParameters QAParam
+                        ON (QAParam.M_InOutLineConfirm_ID=LineConfirm.M_InOutLineConfirm_ID AND QAParam.IsActive='Y')
+                    INNER JOIN M_InOutLine InOutLine ON (InOutLine.M_InOutLine_ID=LineConfirm.M_InOutLine_ID)
+                    LEFT OUTER JOIN M_Product QAProduct ON (QAProduct.M_Product_ID=QAParam.M_Product_ID)
+                    LEFT OUTER JOIN M_Product Product ON (Product.M_Product_ID=InOutLine.M_Product_ID)
+                    WHERE LineConfirm.IsActive='Y'
+                      AND LineConfirm.M_InOutConfirm_ID=@Confirm_ID
+                      AND LineConfirm.AD_Client_ID=@AD_Client_ID
+                    ORDER BY (CASE WHEN QAParam.VA010_ActualValue IS NULL OR QAParam.VA010_ActualValue='' OR QAParam.VA010_ActualValue='0' THEN 0 ELSE 1 END)",
+                    new SqlParameter[]
+                    {
+                        new SqlParameter("@Confirm_ID", confirmId),
+                        new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+                    }, null));
+                return name ?? "";
+            }
+            catch
+            {
+                return "";
             }
         }
 
@@ -1830,29 +1927,29 @@ namespace VIS.Controllers
         {
             if (Session["ctx"] == null)
             {
-                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+                return Fail(MsgOr(Env.GetCtx(), "SessionExpired", "Session Expired"));
             }
 
             Ctx ctx = Session["ctx"] as Ctx;
-            if (confirmId <= 0) { return Fail(Msg.GetMsg(ctx, "NotFound") ?? "Not found"); }
+            if (confirmId <= 0) { return Fail(MsgOr(ctx, "NotFound", "Not found")); }
 
             try
             {
                 MInOutConfirm confirm = new MInOutConfirm(ctx, confirmId, null);
                 if (confirm.Get_ID() <= 0 || confirm.GetAD_Client_ID() != ctx.GetAD_Client_ID())
                 {
-                    return Fail(Msg.GetMsg(ctx, "NotFound") ?? "Not found");
+                    return Fail(MsgOr(ctx, "NotFound", "Not found"));
                 }
 
                 if (confirm.GetDocStatus() == "CO" || confirm.GetDocStatus() == "CL")
                 {
-                    return Fail(Msg.GetMsg(ctx, "VAS_090_ConfirmationCompleted") ?? "This GRN confirmation is already completed.");
+                    return Fail(MsgOr(ctx, "VAS_090_ConfirmationCompleted", "This GRN confirmation is already completed."));
                 }
 
                 confirm.SetIsInDispute(true);
                 if (!confirm.Save())
                 {
-                    return Fail(Msg.GetMsg(ctx, "SaveError") ?? "Save failed.");
+                    return Fail(MsgOr(ctx, "SaveError", "Save failed."));
                 }
 
                 return Ok(new { success = true, status = "dispute" });
@@ -1966,17 +2063,19 @@ namespace VIS.Controllers
             try
             {
                 string sql = @"
-                    SELECT Product.Name
+                    SELECT COALESCE(Product.Name, LineProduct.Name, '-')
                     FROM M_InOutLineConfirm LineConfirm
                     INNER JOIN VA010_ShipConfParameters QAParam
                         ON (QAParam.M_InOutLineConfirm_ID=LineConfirm.M_InOutLineConfirm_ID AND QAParam.IsActive='Y')
+                    INNER JOIN M_InOutLine InOutLine ON (InOutLine.M_InOutLine_ID=LineConfirm.M_InOutLine_ID)
                     LEFT OUTER JOIN M_Product Product ON (Product.M_Product_ID=QAParam.M_Product_ID AND Product.IsActive='Y')
+                    LEFT OUTER JOIN M_Product LineProduct ON (LineProduct.M_Product_ID=InOutLine.M_Product_ID)
                     WHERE LineConfirm.IsActive='Y'
                       AND LineConfirm.M_InOutConfirm_ID=@Confirm_ID
                       AND LineConfirm.AD_Client_ID=@AD_Client_ID
                       AND QAParam.AD_Client_ID=@QA_AD_Client_ID
                       AND (QAParam.VA010_ActualValue IS NULL OR QAParam.VA010_ActualValue='' OR QAParam.VA010_ActualValue='0')
-                    ORDER BY Product.Name";
+                    ORDER BY Product.Name, LineProduct.Name";
 
                 return Util.GetValueOfString(DB.ExecuteScalar(sql, new SqlParameter[]
                 {
@@ -2080,6 +2179,7 @@ namespace VIS.Controllers
         /// <returns>JSON result with success:false.</returns>
         private JsonResult Fail(string message)
         {
+            message = ResolveBracketedKeys(message);
             return Json(JsonConvert.SerializeObject(new
             {
                 success = false,

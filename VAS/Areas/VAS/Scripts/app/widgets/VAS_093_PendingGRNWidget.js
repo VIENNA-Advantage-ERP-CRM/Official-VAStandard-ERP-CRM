@@ -94,8 +94,14 @@
         var currentOrder = null;
         var currentChildRecords = [];
 
+        /* Resolves an AD_Message key; when the key is missing (getMsg returns the bare key or "[key]")
+           the English fallback is shown instead of the raw key (QA sheet Pending GRN #105 / #100). */
         function lbl(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            var text = VIS.Msg.getMsg(key);
+            if (text == null || text === '' || text === key || text === '[' + key + ']') {
+                return fallback != null ? fallback : key;
+            }
+            return text;
         }
 
         function escapeHtml(value) {
@@ -162,6 +168,18 @@
                 return lbl("VAS_QtyWholeNumberOnly", "Enter a whole number as the received quantity for") + ' ' + name + '.';
             }
             return lbl("VAS_QtyDecimalPlacesAllowed", "Decimal places allowed in the received quantity for") + ' ' + name + ': ' + p + '.';
+        }
+
+        /* QA sheet Pending GRN #61: typing is restricted as it happens - digits and one decimal point
+           only, no more decimals than the UOM's standard precision (0 = whole numbers only). */
+        function sanitizeQty(raw, precision) {
+            var t = String(raw == null ? '' : raw).replace(/[^0-9.]/g, '');
+            var i = t.indexOf('.');
+            if (i >= 0) {
+                var p = Math.max(0, Number(precision || 0));
+                t = t.substring(0, i) + (p > 0 ? '.' + t.substring(i + 1).replace(/\./g, '').substring(0, p) : '');
+            }
+            return t;
         }
 
         /* Input step matching the UOM precision: 1, 0.1, 0.01, 0.001 ... */
@@ -250,7 +268,7 @@
                                 '<div class="vas-egrn-main">' +
                                 '<div class="vas-egrn-top">' +
                                 '<span class="vas-egrn-no" title="' + escapeHtml(VIS.Msg.getMsg("VAS_093_Document_No")) + '">' + escapeHtml(order.poNo) + '</span>' +
-                                '<span class="vas-egrn-qty" title="' + escapeHtml(VIS.Msg.getMsg("VAS_093_NoOfLines")) + '">' + escapeHtml(order.lineCount) + '</span>' +
+                                '<span class="vas-egrn-qty" title="' + escapeHtml(lbl("VAS_NoOfLinesAbbr", "No. of Lines")) + '">' + escapeHtml(order.lineCount) + '</span>' +
                                 '</div>' +
                                 '<div class="vas-egrn-mid">' +
                                 '<span class="vas-egrn-party" title="' + escapeHtml(VIS.Msg.getMsg("Vendor")) + '">' + escapeHtml(order.supplier) + '</span>' +
@@ -340,9 +358,6 @@
                 '<div class="vas-egrn-modal">' +
                 '<div class="vas-egrn-modal-head">' +
                 '<div class="vas-egrn-modal-title-wrap">' +
-                '<button type="button" class="vas-egrn-back" aria-label="' + escapeHtml(lbl("VAS_Back", "Back")) + '">' +
-                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>' +
-                '</button>' +
                 '<h3 class="vas-egrn-modal-title"></h3>' +
                 '<span class="vas-egrn-modal-badge vas-egrn-hidden"></span>' +
                 '</div>' +
@@ -362,7 +377,6 @@
             $dialogBusy = $dialog.find('.vas-egrn-modal-busy');
 
             $dialog.find('.vas-egrn-modal-close').on('click', closeDialog);
-            $dialog.find('.vas-egrn-back').on('click', closeDialog);
 
             $dialogBody.on('change', '.vas-pgrn-check', function () {
                 var orderlineID = Number($(this).data('orderlineid'));
@@ -375,7 +389,10 @@
             });
             $dialogBody.on('input', '.vas-pgrn-qty', function () {
                 var orderLineId = Number($(this).data('orderlineid') || 0);
-                if (orderLineId > 0) { lineQtyById[orderLineId] = String($(this).val() || ""); }
+                var qtyLine = childLineById(orderLineId);
+                var clean = sanitizeQty($(this).val(), qtyLine ? qtyLine.uomPrecision : 0);
+                if (clean !== $(this).val()) { $(this).val(clean); }
+                if (orderLineId > 0) { lineQtyById[orderLineId] = clean; }
                 updateGenerateState();
             });
             $dialogBody.on('click', '.vas-egrn-create-btn', function () {
@@ -509,7 +526,7 @@
             if (!text) {
                 return '<div class="vas-egrn-rcv-attr">-</div>';
             }
-            return '<div class="vas-egrn-rcv-attr" title="' + escapeHtml(text) + '"><span class="vas-egrn-attr-chip">' + escapeHtml(text) + '</span></div>';
+            return '<div class="vas-egrn-rcv-attr" title="' + escapeHtml(text) + '">' + escapeHtml(text) + '</div>';
         }
 
         /* Footer pager matching the widget's own pagination design: "Showing
@@ -544,7 +561,7 @@
             $dialogTitle.text(order.poNo || '');
             $dialogBadge
                 .removeClass('vas-egrn-hidden')
-                .html('<span class="vas-egrn-pill info">' + escapeHtml(lbl("VAS_093_NoOfLines", "No of Lines") + ' ' + order.lineCount) + '</span>');
+                .html('<span class="vas-egrn-pill info">' + escapeHtml(lbl("VAS_NoOfLinesAbbr", "No. of Lines") + ' ' + order.lineCount) + '</span>');
 
             $dialog.removeClass('vas-egrn-hidden');
             $('body').addClass('vas-egrn-body-lock');
@@ -563,7 +580,7 @@
                     for (var i = 0; i < currentChildRecords.length; i++) {
                         lineQtyById[currentChildRecords[i].poLineId] = toInputValue(currentChildRecords[i].openQty);
                     }
-                    $dialogBadge.html('<span class="vas-egrn-pill info">' + escapeHtml(lbl("VAS_093_NoOfLines", "No of Lines") + ' ' + currentChildRecords.length) + '</span>');
+                    $dialogBadge.html('<span class="vas-egrn-pill info">' + escapeHtml(lbl("VAS_NoOfLinesAbbr", "No. of Lines") + ' ' + currentChildRecords.length) + '</span>');
                     renderOrderLines();
                 },
                 error: function () {
@@ -591,10 +608,8 @@
                Order" (core message key), not "Pending GRN". */
             var fields =
                 '<div class="vas-egrn-form-grid">' +
-                fieldHtml(lbl("VAS_093_PurchaseOrder", "Purchase Order"), order.poNo, true) +
                 fieldHtml(lbl("Vendor", "Vendor"), order.supplier) +
                 fieldHtml(lbl("VAS_VendorLocation", "Vendor Location"), order.addressLine) +
-                fieldHtml(lbl("VAS_093_NoOfLines", "No of Lines"), String(childRecords.length)) +
                 '</div>';
 
             var totalPages = Math.max(1, Math.ceil(childRecords.length / linePageSize));
@@ -627,10 +642,11 @@
                     '<input type="checkbox" class="vas-pgrn-check" data-orderlineid="' + escapeHtml(line.poLineId) + '"' + checked + '/>' +
                     '<span>' + escapeHtml(line.itemName) + '</span>' +
                     '</label>' +
-                    (showAttr ? attrCellHtml(line.attributeName) : '') +
-                    /* Editable received quantity, defaulting to the remaining qty. */
-                    '<input class="vas-egrn-rcv-in vas-pgrn-qty" type="number" min="0" max="' + escapeHtml(line.openQty) + '" step="' + escapeHtml(uomStep(line.uomPrecision)) + '" value="' + escapeHtml(qtyValue) + '" data-orderlineid="' + escapeHtml(line.poLineId) + '" aria-label="' + escapeHtml(lbl("VAS_093_RemianingQty", "Remaining Qty")) + '"/>' +
+                    /* Editable received quantity, defaulting to the remaining qty. Text input restricted to the
+                       UOM's standard precision while typing (QA sheet Pending GRN #61). */
+                    '<input class="vas-egrn-rcv-in vas-pgrn-qty" type="text" inputmode="decimal" autocomplete="off" value="' + escapeHtml(qtyValue) + '" data-orderlineid="' + escapeHtml(line.poLineId) + '" aria-label="' + escapeHtml(lbl("VAS_093_RemainingQuantity", "Remaining Quantity")) + '"/>' +
                     '<div class="vas-egrn-rcv-uom" title="' + escapeHtml(line.uom) + '">' + escapeHtml(line.uom) + '</div>' +
+                    (showAttr ? attrCellHtml(line.attributeName) : '') +
                     '</div>';
             }
 
@@ -642,16 +658,16 @@
                 '</div>' +
                 '<div class="' + lineCls + ' vas-egrn-rcv-head">' +
                 '<div>' + escapeHtml(lbl("VAS_093_Item", "Item")) + '</div>' +
-                (showAttr ? '<div>' + escapeHtml(lbl("VAS_Attribute", "Attribute")) + '</div>' : '') +
-                '<div>' + escapeHtml(lbl("VAS_093_RemianingQty", "Remaining Qty")) + '</div>' +
+                '<div>' + escapeHtml(lbl("VAS_093_RemainingQuantity", "Remaining Quantity")) + '</div>' +
                 '<div>' + escapeHtml(lbl("VAS_Uom", "UOM")) + '</div>' +
+                (showAttr ? '<div>' + escapeHtml(lbl("VAS_Attribute", "Attribute")) + '</div>' : '') +
                 '</div>' +
                 '<div class="vas-egrn-rcv-viewport"><div class="vas-egrn-lines">' + rows + '</div></div>' +
                 linePagerHtml(linePageNo, totalPages, childRecords.length, linePageSize) +
                 '<div class="vas-egrn-error vas-egrn-hidden"></div>' +
                 '<div class="vas-egrn-action"><button type="button" class="vas-egrn-create-btn" disabled>' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' +
-                '<span>' + escapeHtml(lbl("VAS_093_GenerateGRN", "Generate GRN")) + '</span>' +
+                '<span>' + escapeHtml(lbl("VAS_097_CreateGRN", "Create GRN")) + '</span>' +
                 '</button></div>'
             );
 

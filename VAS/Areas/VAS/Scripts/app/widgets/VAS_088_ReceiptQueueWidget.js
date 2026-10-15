@@ -17,11 +17,15 @@
  * ----+--------------------+-----------------------
  *  1  | Receipt Queue      | VAS_088_ReceiptQueue
  *  2  | GRN #              | VAS_088_GRNNo
- *  3  | Supplier           | VAS_088_Supplier
- *  4  | PO                 | VAS_088_PO
+ *  3  | Vendor             | VAS_088_Supplier
+ *  4  | Purchase Order     | VAS_088_PO
  *  5  | Qty                | VAS_088_Qty
  *  6  | Status             | VAS_088_Status
- *  7  | Received Lines     | VAS_088_ReceivedLines
+ *  7  | Receipt Lines      | VAS_088_ReceivedLines
+ *     | Created By         | VAS_088_By
+ *     | Created On         | VAS_088_CreatedOn
+ *  (QA sheet GRN #34/#35/#37/#45/#46: the visible text of the keys above is the AD_Message value,
+ *   lbl() has no fallback - update AD_Message VAS_088_Supplier/PO/ReceivedLines/By/CreatedOn.)
  *  8  | Month              | Month
  *  9  | Year               | Year
  */
@@ -50,6 +54,7 @@
         this.frame;
         this.windowNo;
 
+        var $self = this;
         var $root = $('<div class="vas-rq-root">');
         var $body, $busy, $footer, $pageInfo, $pageText, $prevBtn, $nextBtn;
         var $dialog, $dialogBody, $dialogTitle, $dialogStatus, $dialogBusy;
@@ -61,8 +66,13 @@
         var totalPages = 0;
         var totalRecords = 0;
         var loading = false;
-        var filterYear = 0;
-        var filterMonth = 0;
+        /* QA sheet GRN #102: the filter starts on the current month and year. */
+        var filterYear = new Date().getFullYear();
+        var filterMonth = new Date().getMonth() + 1;
+        var LINES_PAGE_SIZE = 8;          /* QA sheet GRN #36 */
+        var detailHeader = null;
+        var detailLines = null;
+        var linesPage = 1;
         var $monthSelect, $yearSelect;
         var rowResizeObserver = null;
 
@@ -137,6 +147,20 @@
         }
 
         /* Display text comes straight from the system status name (controller-resolved). */
+        /* QA sheet GRN #107: on the Home page (no host window) the GRN number is a link that opens the
+           record in the Material Receipt window (new tab) through the shared VAS.ZoomUtil helper. */
+        function grnNoHtml(r) {
+            if ($self.windowNo >= 0 || !r.grnId || !window.VAS || !VAS.ZoomUtil) { return escapeHtml(r.grnNo); }
+            return '<span class="vas-rq-grnlink" role="link" tabindex="0" data-grnid="' + escapeHtml(r.grnId) + '">' + escapeHtml(r.grnNo) + '</span>';
+        }
+
+        function zoomToGrn(grnId) {
+            if (!grnId || !window.VAS || !VAS.ZoomUtil) { return; }
+            try {
+                VAS.ZoomUtil.zoomToRecord('M_InOut_ID', Number(grnId), 0, 'VAS_MaterialReceipt', 'Material Receipt');
+            } catch (e) { /* zoom is best-effort */ }
+        }
+
         function getStatusText(row) {
             if (row && row.statusText) { return row.statusText; }
             return row && row.statusCode ? row.statusCode : "";
@@ -238,6 +262,7 @@
             $monthSelect = $header.find('.vas-rq-month');
             $yearSelect = $header.find('.vas-rq-year');
             buildMonthFilter();
+            syncMonthFilter();
             $monthSelect.on('change', function () {
                 filterMonth = Number($(this).val());
                 if (!loading) { loadReceiptQueue(1); }
@@ -251,8 +276,8 @@
                 '<div class="vas-rq-body">' +
                 '<div class="vas-rq-grid vas-rq-cols vas-rq-headers">' +
                 '<div title="' + escapeHtml(lbl("VAS_088_GRNNo", "GRN #")) + '">' + escapeHtml(lbl("VAS_088_GRNNo", "GRN #")) + '</div>' +
-                '<div title="' + escapeHtml(lbl("VAS_088_Supplier", "Supplier")) + '">' + escapeHtml(lbl("VAS_088_Supplier", "Supplier")) + '</div>' +
-                '<div title="' + escapeHtml(lbl("VAS_088_PO", "PO")) + '">' + escapeHtml(lbl("VAS_088_PO", "PO")) + '</div>' +
+                '<div title="' + escapeHtml(lbl("VAS_088_Supplier", "Vendor")) + '">' + escapeHtml(lbl("VAS_088_Supplier", "Vendor")) + '</div>' +
+                '<div title="' + escapeHtml(lbl("VAS_088_PO", "Purchase Order")) + '">' + escapeHtml(lbl("VAS_088_PO", "Purchase Order")) + '</div>' +
                 '<div class="vas-rq-right" title="' + escapeHtml(lbl("VAS_088_Qty", "Qty")) + '">' + escapeHtml(lbl("VAS_088_Qty", "Qty")) + '</div>' +
                 '<div class="vas-rq-center" title="' + escapeHtml(lbl("VAS_088_Status", "Status")) + '">' + escapeHtml(lbl("VAS_088_Status", "Status")) + '</div>' +
                 '</div>' +
@@ -282,6 +307,12 @@
             $busy = $('<div class="vas-rq-busy vas-rq-hidden"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
             $root.append($busy);
 
+            $body.on('click keydown', '.vas-rq-grnlink', function (e) {
+                if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') { return; }
+                e.preventDefault();
+                e.stopPropagation();
+                zoomToGrn($(this).data('grnid'));
+            });
             $body.on('click', '.vas-rq-row', function () {
                 openReceiptDetail($(this).data('grnid'));
             });
@@ -356,7 +387,7 @@
 
                 $rows.append(
                     '<button type="button" class="vas-rq-row vas-rq-grid vas-rq-cols" data-grnid="' + escapeHtml(r.grnId) + '">' +
-                    '<div class="vas-rq-cell vas-rq-strong" title="' + escapeHtml(r.grnNo) + '">' + escapeHtml(r.grnNo) + '</div>' +
+                    '<div class="vas-rq-cell vas-rq-strong" title="' + escapeHtml(r.grnNo) + '">' + grnNoHtml(r) + '</div>' +
                     '<div class="vas-rq-cell" title="' + escapeHtml(r.supplier) + '">' + escapeHtml(r.supplier) + '</div>' +
                     '<div class="vas-rq-cell" title="' + escapeHtml(r.poNo) + '">' + escapeHtml(r.poNo || "-") + '</div>' +
                     '<div class="vas-rq-cell vas-rq-right vas-rq-emph" title="' + escapeHtml(formatQty(r.receivedQty)) + '">' + escapeHtml(formatQty(r.receivedQty)) + '</div>' +
@@ -412,6 +443,14 @@
             $dialogBusy = $dialog.find('.vas-rq-modal-busy');
 
             $dialog.find('.vas-rq-modal-close').on('click', function () { closeDetail(); });
+            /* The popup closes only through its Close button (QA sheet GRN #94) - the scrim has no click handler. */
+            $dialog.on('click', '.vas-rq-lines-pager .vas-rq-pgbtn', function () {
+                var delta = $(this).hasClass('vas-rq-lprev') ? -1 : 1;
+                if (!detailLines) { return; }
+                var pages = Math.max(1, Math.ceil(detailLines.length / LINES_PAGE_SIZE));
+                linesPage = Math.min(pages, Math.max(1, linesPage + delta));
+                renderReceiptDetail(detailHeader, detailLines);
+            });
 
             $('body').append($dialog);
         }
@@ -431,6 +470,9 @@
             var statusText = getStatusText(header);
             var statusClass = getStatusClass(header.statusCode);
 
+            detailHeader = header;
+            detailLines = null;
+            linesPage = 1;
             $dialogTitle.text((header.grnNo || "") + " - " + (header.supplier || ""));
             $dialogStatus.html('<span class="vas-rq-pill ' + statusClass + '">' + escapeHtml(statusText) + '</span>');
             renderReceiptDetail(header, null);
@@ -447,11 +489,13 @@
                 success: function (res) {
                     var data = parseResponse(res);
                     showDialogBusy(false);
-                    renderReceiptDetail(header, data && data.rows ? data.rows : []);
+                    detailLines = data && data.rows ? data.rows : [];
+                    renderReceiptDetail(header, detailLines);
                 },
                 error: function () {
                     showDialogBusy(false);
-                    renderReceiptDetail(header, []);
+                    detailLines = [];
+                    renderReceiptDetail(header, detailLines);
                 }
             });
         }
@@ -459,14 +503,12 @@
         function renderReceiptDetail(header, lines) {
             var html =
                 '<div class="vas-rq-form">' +
-                field(lbl("VAS_088_GRN", "GRN"), header.grnNo, true) +
-                field(lbl("VAS_088_Supplier", "Supplier"), header.supplier) +
                 field(lbl("VAS_088_LinkedPO", "Linked PO"), header.poNo) +
                 field(lbl("VAS_088_ReceivedQty", "Received Qty"), formatQty(header.receivedQty)) +
-                field(lbl("VAS_088_By", "By"), header.receivedBy) +
-                field(lbl("VAS_088_CreatedOn", "Created on"), formatCreatedOn(header)) +
+                field(lbl("VAS_088_By", "Created By"), header.receivedBy) +
+                field(lbl("VAS_088_CreatedOn", "Created On"), formatCreatedOn(header)) +
                 '</div>' +
-                '<div class="vas-rq-lines-title">' + escapeHtml(lbl("VAS_088_ReceivedLines", "Received Lines")) + '</div>' +
+                '<div class="vas-rq-lines-title">' + escapeHtml(lbl("VAS_088_ReceivedLines", "Receipt Lines")) + '</div>' +
                 '<div class="vas-rq-lines-wrap">';
 
             if (lines === null) {
@@ -490,8 +532,13 @@
                 if (hasAttributeText(lines[a].attributeName)) { showAttr = true; break; }
             }
 
+            var totalLinePages = Math.max(1, Math.ceil(lines.length / LINES_PAGE_SIZE));
+            if (linesPage > totalLinePages) { linesPage = totalLinePages; }
+            var lineFrom = (linesPage - 1) * LINES_PAGE_SIZE;
+            var lineTo = Math.min(lines.length, lineFrom + LINES_PAGE_SIZE);
+
             var body = '';
-            for (var i = 0; i < lines.length; i++) {
+            for (var i = lineFrom; i < lineTo; i++) {
                 var ln = lines[i];
                 var cumulative = ln.cumulativeReceivedQty != null ? ln.cumulativeReceivedQty : ln.receivedQty;
                 var lineStatus = getLineStatus(ln.orderedQty, cumulative);
@@ -516,7 +563,17 @@
                 '<th class="vas-rq-l-num">' + escapeHtml(lbl("VAS_088_Received", "Received")) + '</th>' +
                 '<th class="vas-rq-l-uom">' + escapeHtml(lbl("VAS_088_UOM", "UOM")) + '</th>' +
                 '<th class="vas-rq-l-status">' + escapeHtml(lbl("VAS_088_Status", "Status")) + '</th>' +
-                '</tr></thead><tbody>' + body + '</tbody></table></div>';
+                '</tr></thead><tbody>' + body + '</tbody></table>' +
+                (lines.length > LINES_PAGE_SIZE
+                    ? '<div class="vas-rq-lines-pager">' +
+                      '<span class="vas-rq-foot-info">' + escapeHtml(lbl("VAS_088_Showing", "Showing") + ' ' + (lineFrom + 1) + '-' + lineTo + ' ' + lbl("VAS_088_Of", "of") + ' ' + lines.length) + '</span>' +
+                      '<div class="vas-rq-pager">' +
+                      '<button type="button" class="vas-rq-pgbtn vas-rq-lprev"' + (linesPage <= 1 ? ' disabled' : '') + ' aria-label="' + escapeHtml(lbl("VAS_088_Previous", "Previous")) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>' +
+                      '<span class="vas-rq-pgtext">' + linesPage + ' ' + escapeHtml(lbl("VAS_088_Of", "of")) + ' ' + totalLinePages + '</span>' +
+                      '<button type="button" class="vas-rq-pgbtn vas-rq-lnext"' + (linesPage >= totalLinePages ? ' disabled' : '') + ' aria-label="' + escapeHtml(lbl("VAS_088_Next", "Next")) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>' +
+                      '</div></div>'
+                    : '') +
+                '</div>';
 
             $dialogBody.html(html);
 

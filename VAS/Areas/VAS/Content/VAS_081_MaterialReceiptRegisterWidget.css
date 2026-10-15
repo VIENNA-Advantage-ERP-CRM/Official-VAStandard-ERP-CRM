@@ -531,3 +531,13 @@
 @media (max-width: 40em) {
     .vas-mrr-form { grid-template-columns: 1fr; }
 }
+
+.vas-mrr-grn-link {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #1F83FF;
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+}

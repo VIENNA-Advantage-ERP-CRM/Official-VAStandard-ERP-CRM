@@ -449,7 +449,11 @@
     font-size: 0.98em;
     outline: none !important;
     box-shadow: none !important;
-    padding: 0 1.786em 0 0 !important;
+    padding: 0 1.786em 0 0.5em !important;     /* QA sheet GRN #30: text off the left border */
+}
+
+.vas-qah-actual option {
+    padding: 0.35em 0.6em;
 }
 
 .vas-qah-select-arr {
@@ -569,4 +573,11 @@
     .vas-qah-qc-grid {
         grid-template-columns: 1fr;
     }
+}
+
+/* GRN number link on the Home page (QA sheet GRN #107). */
+.vas-qah-grnlink {
+    color: #0083DA;
+    text-decoration: underline;
+    cursor: pointer;
 }

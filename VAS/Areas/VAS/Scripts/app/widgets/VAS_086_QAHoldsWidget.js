@@ -46,6 +46,8 @@
         this.frame;
         this.windowNo;
 
+        var $self = this;
+        var DESC_MAX_LENGTH = 275;     /* QA sheet GRN #31 */
         var $root = $('<div class="vas-qah-root">');
         var $listBody;
         var $busy;
@@ -160,6 +162,20 @@
             return Math.floor(diffHours / 24) + "d";
         }
 
+        /* QA sheet GRN #107: on the Home page (no host window) the GRN number is a link that opens the
+           record in the Material Receipt window (new tab) through the shared VAS.ZoomUtil helper. */
+        function grnNoHtml(r) {
+            if ($self.windowNo >= 0 || !r.grnId || !window.VAS || !VAS.ZoomUtil) { return escapeHtml(r.grnNo); }
+            return '<span class="vas-qah-grnlink" role="link" tabindex="0" data-grnid="' + escapeHtml(r.grnId) + '">' + escapeHtml(r.grnNo) + '</span>';
+        }
+
+        function zoomToGrn(grnId) {
+            if (!grnId || !window.VAS || !VAS.ZoomUtil) { return; }
+            try {
+                VAS.ZoomUtil.zoomToRecord('M_InOut_ID', Number(grnId), 0, 'VAS_MaterialReceipt', 'Material Receipt');
+            } catch (e) { /* zoom is best-effort */ }
+        }
+
         function lineReference(record) {
             if (record.confirmationNo) { return record.confirmationNo; }
             var line = record.lineNo ? record.lineNo + " - " : "";
@@ -227,6 +243,12 @@
             $busy = $('<div class="vas-qah-busy vas-qah-hidden"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
             $root.append($busy);
 
+            $listBody.on('click keydown', '.vas-qah-grnlink', function (e) {
+                if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') { return; }
+                e.preventDefault();
+                e.stopPropagation();
+                zoomToGrn($(this).data('grnid'));
+            });
             $listBody.on('click', '.vas-qah-row', function () {
                 openQADetail($(this).data('holdid'));
             });
@@ -303,7 +325,7 @@
 
             for (var i = 0; i < rows.length; i++) {
                 var r = rows[i];
-                var label = escapeHtml(r.grnNo) + ' &middot; ' + escapeHtml(r.supplier);
+                var label = grnNoHtml(r) + ' &middot; ' + escapeHtml(r.supplier);
                 var meta = escapeHtml(r.itemName) + ' &middot; ' + escapeHtml(lbl("VAS_086_Held", "held")) + ' ' + escapeHtml(holdAge(r.holdStartedOn, r.holdAgeHours));
                 $listBody.append(
                     '<button type="button" class="vas-qah-row" data-holdid="' + escapeHtml(r.grnConfirmationLineId) + '">' +
@@ -361,7 +383,14 @@
             $dialogBusy = $dialog.find('.vas-qah-modal-busy');
 
             $dialog.find('.vas-qah-modal-close').on('click', closeDetail);
+            /* The popup closes only through its Close button (QA sheet GRN #94) - the scrim has no click handler. */
             $dialog.on('change', '.vas-qah-actual', updateActualTone);
+            /* QA sheet GRN #29: the year of the QA/QC date is limited to 4 digits (browsers let a date
+               input take 5-6 year digits even with a max attribute). */
+            $dialog.on('input change', '.vas-qah-date', function () {
+                var v = $(this).val();
+                if (/^\d{5,}-/.test(v)) { $(this).val(v.replace(/^(\d{4})\d+-/, '$1-')); }
+            });
             $dialog.on('click', '.vas-qah-save', saveQAResult);
 
             $('body').append($dialog);
@@ -431,7 +460,7 @@
                 '<div class="vas-qah-qc-field active note">' +
                 '<div class="vas-qah-qc-main">' +
                 '<div class="vas-qah-qc-label">' + escapeHtml(lbl("VAS_086_Description", "Description")) + '</div>' +
-                '<textarea class="vas-qah-desc" rows="2" placeholder="' + escapeHtml(lbl("VAS_086_AddNoteOptional", "Add a note (optional)")) + '">' + escapeHtml(record.description || "") + '</textarea>' +
+                '<textarea class="vas-qah-desc" rows="2" maxlength="' + DESC_MAX_LENGTH + '" placeholder="' + escapeHtml(lbl("VAS_086_AddNoteOptional", "Add a note (optional)")) + '">' + escapeHtml(record.description || "") + '</textarea>' +
                 '</div>' +
                 '</div>';
 
@@ -525,6 +554,12 @@
         function saveQAResult() {
             if (!activeRecord || activeRecord.qaRecordId <= 0) { return; }
 
+            var qaDateText = $dialogBody.find('.vas-qah-date').val();
+            if (qaDateText && !/^\d{4}-\d{2}-\d{2}$/.test(qaDateText)) {
+                VIS.ADialog.info("", true, lbl("VAS_086_InvalidQAQCDate", "QA/QC date is not valid."), null);
+                return;
+            }
+
             var actualValue = $dialogBody.find('.vas-qah-actual').val();
             if (!actualValue) {
                 VIS.ADialog.info("", true, lbl("VAS_086_SelectQAActualValue", "Select an actual value before saving."), null);
@@ -542,7 +577,7 @@
                     qaRecordId: activeRecord.qaRecordId,
                     actualValue: actualValue,
                     qaQcDate: $dialogBody.find('.vas-qah-date').val(),
-                    description: $dialogBody.find('.vas-qah-desc').val()
+                    description: String($dialogBody.find('.vas-qah-desc').val() || '').substring(0, DESC_MAX_LENGTH)
                 },
                 success: function (res) {
                     var data = parseResponse(res);

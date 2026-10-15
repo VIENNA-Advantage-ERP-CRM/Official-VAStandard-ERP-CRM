@@ -411,8 +411,8 @@
 
 .vas-rq-form {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0 1.5em;
+    grid-template-columns: repeat(4, minmax(0, 1fr));   /* Linked PO, Received Qty, Created By, Created On on one line (QA sheet GRN #44) */
+    gap: 0 1em;
 }
 
 .vas-rq-field {
@@ -527,11 +527,27 @@
 
 @media (max-width: 40em) {
     .vas-rq-form {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .vas-rq-cols {
         grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 1.3fr);
         gap: 0.5em;
     }
+}
+
+/* GRN number link on the Home page (QA sheet GRN #107) and receipt-lines pager (GRN #36). */
+.vas-rq-grnlink {
+    color: #0083DA;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.vas-rq-lines-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    padding-top: 0.6em;
+    border-top: 1px solid #EDF2F6;
 }

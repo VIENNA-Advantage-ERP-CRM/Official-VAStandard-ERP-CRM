@@ -51,6 +51,7 @@
         this.frame;
         this.windowNo;
 
+        var $self = this;
         var $root = $('<div class="vas-rag-root">');
         var $summary, $listBody, $busy;
         var $footer, $pageInfo, $pageText, $prevBtn, $nextBtn;
@@ -65,9 +66,17 @@
         var oldestReceivedOn = "";
         var loading = false;
         var rowResizeObserver = null;
+        /* QA sheet GRN #12: the popup lists 5 lines per page. */
+        var LINES_PAGE_SIZE = 5;
+        var detailHeader = null;
+        var detailLines = null;
+        var detailPage = 1;
+        var grnZoomWindowId = 0;
 
+        /* Falls back to the English text when the message is not seeded (getMsg then echoes the key). */
         function lbl(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            var text = VIS.Msg.getMsg(key);
+            return (!text || text === key) && fallback ? fallback : text;
         }
 
         function escapeHtml(value) {
@@ -426,9 +435,40 @@
             $dialogStatus = $dialog.find('.vas-rag-modal-status');
             $dialogBusy = $dialog.find('.vas-rag-modal-busy');
 
+            /* Closes only through the Close button - a click on the scrim or outside the popup does nothing (QA sheet GRN #94). */
             $dialog.find('.vas-rag-modal-close').on('click', closeDetail);
+            $dialog.on('click', '.vas-rag-grn-link', function () {
+                openGrnRecord(Number($(this).attr('data-receiptid')));
+            });
+            $dialog.on('click', '.vas-rag-lines-prev', function () {
+                if (detailPage > 1) { detailPage--; renderReceiptDetail(detailHeader, detailLines); }
+            });
+            $dialog.on('click', '.vas-rag-lines-next', function () {
+                var pages = Math.ceil((detailLines ? detailLines.length : 0) / LINES_PAGE_SIZE);
+                if (detailPage < pages) { detailPage++; renderReceiptDetail(detailHeader, detailLines); }
+            });
 
             $('body').append($dialog);
+        }
+
+        /* QA sheet GRN #107: the GRN number opens that receipt in the Material Receipt window (new tab).
+           The popup closes first so the window does not open behind it. */
+        function openGrnRecord(receiptId) {
+            if (!receiptId || !VAS.ZoomUtil) { return; }
+            closeDetail();
+            VAS.ZoomUtil.zoomToRecord("M_InOut_ID", receiptId, grnZoomWindowId, "VAS_MaterialReceipt", "Material Receipt")
+                .done(function (id) {
+                    if (id > 0) { grnZoomWindowId = id; }
+                });
+        }
+
+        function grnField(label, value, receiptId) {
+            var shown = value == null || value === "" ? "-" : value;
+            return '<div class="vas-rag-field">' +
+                '<div class="vas-rag-field-lbl">' + escapeHtml(label) + '</div>' +
+                '<div class="vas-rag-field-val strong" title="' + escapeHtml(shown) + '">' +
+                '<button type="button" class="vas-rag-grn-link" data-receiptid="' + escapeHtml(receiptId) + '">' + escapeHtml(shown) + '</button>' +
+                '</div></div>';
         }
 
         function field(label, value, strong) {
@@ -448,6 +488,7 @@
 
             $dialogTitle.text((header.grnNo || "") + " - " + (header.supplier || ""));
             $dialogStatus.html('<span class="vas-rag-pill ' + severity + '">' + escapeHtml(lbl("VAS_087_Aging", "Aging") + " " + ageLabel(hours)) + '</span>');
+            detailPage = 1;
             renderReceiptDetail(header, null);
 
             $dialog.removeClass('vas-rag-hidden');
@@ -472,13 +513,15 @@
         }
 
         function renderReceiptDetail(header, lines) {
+            detailHeader = header;
+            detailLines = lines;
             var html =
                 '<div class="vas-rag-form">' +
-                field(lbl("VAS_087_GRN", "GRN"), header.grnNo, true) +
+                grnField(lbl("VAS_087_GRN", "GRN"), header.grnNo, header.receiptId) +
                 field(lbl("VAS_087_LinkedPO", "Linked PO"), header.linkedPoNo) +
-                field(lbl("VAS_087_Supplier", "Supplier"), header.supplier) +
+                field(lbl("VAS_087_Vendor", "Vendor"), header.supplier) +
                 field(lbl("VAS_087_Warehouse", "Warehouse"), header.warehouse) +
-                field(lbl("VAS_087_ReceivedOn", "Received on"), formatDateOnly(header.receivedOn)) +
+                field(lbl("VAS_087_MovementDate", "Movement Date"), formatDateOnly(header.receivedOn)) +
                 field(lbl("VAS_087_Status", "Status"), getStatusText(header)) +
                 '</div>' +
                 '<div class="vas-rag-lines-title">' + escapeHtml(lbl("VAS_087_ReceiptLines", "Receipt Lines")) + '</div>' +
@@ -504,8 +547,14 @@
                 if (hasAttributeText(lines[a].attributeName)) { showAttr = true; break; }
             }
 
+            var totalLines = lines.length;
+            var linePages = Math.max(1, Math.ceil(totalLines / LINES_PAGE_SIZE));
+            if (detailPage > linePages) { detailPage = linePages; }
+            var firstLine = (detailPage - 1) * LINES_PAGE_SIZE;
+            var lastLine = Math.min(totalLines, firstLine + LINES_PAGE_SIZE);
+
             var body = "";
-            for (var i = 0; i < lines.length; i++) {
+            for (var i = firstLine; i < lastLine; i++) {
                 var ln = lines[i];
                 var attrText = hasAttributeText(ln.attributeName) ? String(ln.attributeName) : "";
                 body +=
@@ -529,7 +578,19 @@
                 '<th class="vas-rag-l-uom">' + escapeHtml(lbl("VAS_087_UOM", "UOM")) + '</th>' +
                 '<th class="vas-rag-l-location">' + escapeHtml(lbl("VAS_087_Locator", "Locator")) + '</th>' +
                 '<th class="vas-rag-l-status">' + escapeHtml(lbl("VAS_087_Status", "Status")) + '</th>' +
-                '</tr></thead><tbody>' + body + '</tbody></table></div>';
+                '</tr></thead><tbody>' + body + '</tbody></table>';
+
+            if (linePages > 1) {
+                html +=
+                    '<div class="vas-rag-lines-pager">' +
+                    '<span>' + escapeHtml(lbl("VAS_087_Showing", "Showing") + ' ' + (firstLine + 1) + '-' + lastLine + ' ' + lbl("VAS_087_Of", "of") + ' ' + totalLines) + '</span>' +
+                    '<button type="button" class="vas-rag-pgbtn vas-rag-lines-prev" aria-label="' + escapeHtml(lbl("VAS_087_Previous", "Previous")) + '"' + (detailPage <= 1 ? ' disabled' : '') + '>' + icon("chevL") + '</button>' +
+                    '<span>' + detailPage + ' ' + escapeHtml(lbl("VAS_087_Of", "of")) + ' ' + linePages + '</span>' +
+                    '<button type="button" class="vas-rag-pgbtn vas-rag-lines-next" aria-label="' + escapeHtml(lbl("VAS_087_Next", "Next")) + '"' + (detailPage >= linePages ? ' disabled' : '') + '>' + icon("chevR") + '</button>' +
+                    '</div>';
+            }
+
+            html += '</div>';
 
             $dialogBody.html(html);
         }

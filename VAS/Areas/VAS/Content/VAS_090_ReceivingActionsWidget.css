@@ -1355,3 +1355,84 @@
     line-height: 1.1em;
     text-align: center;
 }
+
+/* ============================================================================
+   QA sheet 2026-10-15 (GRN widgets) - Receiving Actions
+   ============================================================================ */
+
+/* #69 / #70: breathing room between the dropdown text/options and the border. */
+.vas-ra-field-select {
+    padding: 0 0.5em;
+}
+
+.vas-ra-field-select option,
+.vas-ra-line-select option,
+.vas-ra-gc-inp option {
+    padding: 0.4em 0.75em;
+}
+
+.vas-ra-line-select {
+    padding: 0 0.5em;
+}
+
+/* #66 / #92: popup lists keep one height whatever the number of rows on the page
+   (5 rows per page), so searching or paging never resizes the popup. */
+.vas-ra-gc-list {
+    min-height: 17.6em;
+    align-content: flex-start;
+}
+
+.vas-ra-gc-list.vas-ra-gc-compact {
+    min-height: 14.6em;
+}
+
+.vas-ra-label-shell {
+    min-height: 22em;
+}
+
+/* #85: Source GRN, Vendor, Warehouse and Movement Date on a single line. */
+.vas-ra-form.vas-ra-form-inline {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0 1em;
+}
+
+/* #86: tighter spacing between confirmation lines. */
+.vas-ra-gc-list.vas-ra-gc-compact {
+    gap: 0.25em;
+}
+
+    .vas-ra-gc-list.vas-ra-gc-compact .vas-ra-gc-row {
+        min-height: 2.5em;
+        padding: 0.25em 0.75em;
+    }
+
+@media (max-width: 40em) {
+    .vas-ra-form.vas-ra-form-inline {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* #87: read-only Target Quantity. */
+.vas-ra-gc-inp[readonly] {
+    background: #F6F8FA;
+    color: #5F7283;
+    cursor: default;
+}
+
+/* #88 / #89: quantity above its limit. */
+.vas-ra-gc-inp.vas-ra-rcv-invalid,
+.vas-ra-gc-inp.vas-ra-rcv-invalid:focus {
+    border-bottom-color: #A33F3F;
+    background: #FCEFEF;
+}
+
+/* #107: GRN number link. */
+.vas-ra-grn-link {
+    color: #0083DA;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+    .vas-ra-grn-link:hover {
+        text-decoration: underline;
+    }
