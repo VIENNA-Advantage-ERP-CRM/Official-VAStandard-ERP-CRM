@@ -66,6 +66,7 @@
         this.windowNo;
 
         var $self = this;
+        var grnZoomWindowId = 0;
         var $root = $('<div class="vas-mrr-root">');
         var $listBody;
         var $busy;
@@ -378,7 +379,17 @@
             $dialogTitle = $dialog.find('.vas-mrr-modal-title');
             $dialogBusy = $dialog.find('.vas-mrr-modal-busy');
 
+            /* Closes only through the Close button - clicking outside the popup does nothing (QA sheet GRN #94). */
             $dialog.find('.vas-mrr-modal-close').on('click', function () { closeDetail(); });
+            $dialog.on('click', '.vas-mrr-grn-link', function () {
+                var receiptId = Number($(this).attr('data-receiptid'));
+                if (!receiptId || !VAS.ZoomUtil) { return; }
+                closeDetail();
+                VAS.ZoomUtil.zoomToRecord('M_InOut_ID', receiptId, grnZoomWindowId, 'VAS_MaterialReceipt', 'Material Receipt')
+                    .done(function (id) {
+                        if (id > 0) { grnZoomWindowId = id; }
+                    });
+            });
             // Review #22: pager for the modal line table.
             $dialog.on('click', '.vas-mrr-lprev', function () {
                 if (detailPage > 1) { detailPage--; renderLinesPage(); }
@@ -400,7 +411,10 @@
             var r = rowsById[receiptId];
             if (!r || !$dialog) { return; }
 
-            $dialogTitle.text((r.receiptNo || '') + ' - ' + (r.supplier || ''));
+            /* QA sheet GRN #107: the receipt number opens that GRN in the Material Receipt window (new tab). */
+            $dialogTitle.html(
+                '<button type="button" class="vas-mrr-grn-link" data-receiptid="' + escapeHtml(r.receiptId) + '">' + escapeHtml(r.receiptNo || '') + '</button>' +
+                escapeHtml(' - ' + (r.supplier || '')));
 
             // Review #23 (follow-up): Receipt, Supplier, Customer/Project and
             // Put-away on removed from the modal - the title bar already
