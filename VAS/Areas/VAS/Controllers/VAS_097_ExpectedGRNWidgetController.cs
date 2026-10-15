@@ -87,6 +87,8 @@ namespace VIS.Controllers
             bool allowNonItem = Util.GetValueOfString(ctx.GetContext("$AllowNonItem")).Equals("Y");
             bool pendingMode = "PG".Equals(type, StringComparison.OrdinalIgnoreCase);
 
+            // QA sheet GRN #98 / #99: PO_Value is the order's own total (TotalLines) in the PO price list currency,
+            // not converted to the base currency; on a tax-inclusive price list the line amounts already contain the tax.
             string rawSql = @"
                 SELECT o.C_Order_ID AS PO_ID,
                        o.DocumentNo AS PO_NO,
@@ -94,10 +96,6 @@ namespace VIS.Controllers
                        l.Name AS Address_Line,
                        w.Name AS Warehouse_Name,
                        o.DatePromised AS Promise_Date,
-                       /* QA sheet GRN #98 / #99: the PO value is the order's own total in the PO (price list)
-                          currency - no conversion to the base currency. With a tax-inclusive price list the line
-                          amounts already contain the tax, so TotalLines (= GrandTotal) is the PO value as booked;
-                          the former "TotalLines - tax" produced a smaller, wrong figure. */
                        COALESCE(o.TotalLines, 0) AS PO_Value,
                        cur.CurSymbol AS Cur_Symbol,
                        cur.ISO_Code AS Cur_ISO,
