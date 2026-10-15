@@ -1140,7 +1140,8 @@
                 resetCatalog($inp.val(), inner, line, $inp);
                 setTimeout(function () { $inp.focus(); }, 0);
             } else {
-                wrap.append(dispInput(line, pField, primaryValue(line), { placeholder: primaryPlaceholder() }));
+                wrap.append(dispInput(line, pField, primaryValue(line),
+                    { placeholder: primaryPlaceholder(), readOnly: orderLineLocked(line) }));
                 // No product code under the name (17-Sep-2026): the full "name (key)"
                 // stays in the catalog row's tooltip for telling look-alikes apart.
                 // For a product carrying (or able to carry) an attribute set, show the
@@ -2402,6 +2403,10 @@
         function isColumnReadOnly(line, col) {
             if (col === "C_OrderLine_ID") return orderLineLocked(line);
             if (FORCED_READONLY_COLS[col]) return true;
+            // Product / Charge locks with the Order Line (15-Oct-2026, as on the screen): a
+            // line saved against an order line is that line's product, so it is not
+            // re-picked here. Ahead of the Drafted / new-line override below.
+            if ((col === "M_Product_ID" || col === "C_Charge_ID") && orderLineLocked(line)) return true;
             // Product / Charge stays SELECTABLE (25-Sep-2026, VAS_107's rule): on a
             // Drafted receipt, and on any line not saved yet, whatever the dictionary's
             // IsReadOnly / ReadOnlyLogic says. Add line opens the product editor

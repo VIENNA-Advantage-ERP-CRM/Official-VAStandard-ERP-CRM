@@ -4882,12 +4882,19 @@
            single toast - so every failing record in a multi-row save is flagged in place.
            Falls back to the first row (then a toast) for a batch-level error with no per-line
            mapping. */
+        /* A save error the server sends as a message KEY (FriendlySaveError's
+           VAS_304_PriceCantbeChanged) is shown through VIS.Msg; any other text is as it came. */
+        function saveErrorText(msg) {
+            if (!msg) return lbl("VAS_107_SaveFailed", "Save failed");
+            if (msg === "VAS_304_PriceCantbeChanged") return lbl(msg, "Price Can't be Changed.");
+            return msg;
+        }
         function showServerSaveErrors(batch, res) {
             var errs = (res && res.LineErrors) || [];
             var mapped = 0;
             for (var i = 0; i < errs.length; i++) {
                 var l = findBatchLine(batch, errs[i]);
-                if (l) { l._error = errs[i].Message || lbl("VAS_107_SaveFailed", "Save failed"); mapped++; }
+                if (l) { l._error = saveErrorText(errs[i].Message); mapped++; }
             }
             if (!mapped) {
                 // No per-line info (e.g. a batch-level exception) - still show it in place on

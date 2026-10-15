@@ -1952,3 +1952,12 @@
         padding: 0.5em 0.625em;
     }
 }
+
+/* New Record (15-Oct-2026, as asked): white, never blue. The window canvas
+   (.vis-ad-w-p-center, the theme's blue / pale gradient) and the host chain show around a
+   panel that has no grid yet, so while this panel is in its new / unsaved state both are
+   painted white. A saved header releases it. */
+.vis-ad-w-p-center:has(.vas-dol-root--new),
+.vis-ad-w-p-actionpanel-b:has(.vas-dol-root--new) {
+    background: #ffffff !important;
+}

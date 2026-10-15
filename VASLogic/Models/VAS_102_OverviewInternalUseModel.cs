@@ -922,6 +922,12 @@ namespace VASLogic.Models
                 // KPI card and the totals footer agreeing.
                 if (perBase != 0 && perBase != 1) ln.UnitRate = ln.UnitRate / perBase;
                 ln.LineValue = ln.IssuedQty * ln.UnitRate;
+                // The Value column IS M_InventoryLine.CurrentCostPrice, as is - not
+                // multiplied by the issued quantity, and with no fallback: a line
+                // without one reads 0 (15-Oct-2026, as asked). The KPI card and footer
+                // sum these line values.
+                ln.LineValue = r["CurCostPrice"] == DBNull.Value
+                    ? 0m : Util.GetValueOfDecimal(r["CurCostPrice"]);
 
                 lines.Add(ln);
             }
