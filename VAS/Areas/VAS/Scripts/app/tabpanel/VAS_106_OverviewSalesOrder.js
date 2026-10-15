@@ -670,9 +670,35 @@
         var fetchToken = 0;
         var pendingFetch = null;    // timer handle of a scheduled fetch, if any
 
+        // Every displayed value is readable on hover: the first time the pointer
+        // lands on an element with no tooltip of its own (and none inherited from
+        // an ancestor), its text - or an input's value - becomes its title.
+        // Tooltips set elsewhere are never replaced.
+        function bindValueHover($r) {
+            $r.on("mouseover", function (e) {
+                var el = e.target;
+                if (!el || el === $r[0] || $(el).closest("[title]:not([data-vh])", $r[0]).length) return;
+                var $el = $(el);
+                var txt;
+                if ($el.is("input,textarea,select")) {
+                    txt = $el.is("select") ? $el.find("option:selected").text() : $el.val();
+                } else {
+                    // Only the element's own text nodes - never its children's -
+                    // so each field shows just its own value.
+                    txt = "";
+                    for (var n = el.firstChild; n; n = n.nextSibling) {
+                        if (n.nodeType === 3) txt += n.nodeValue;
+                    }
+                }
+                txt = $.trim(txt || "").replace(/\s+/g, " ");
+                if (txt && txt.length <= 300) $el.attr({ "title": txt, "data-vh": "1" });
+            });
+        }
+
         this.init = function () {
             $root = $('<div class="vas_106-root"></div>');
-            $body = $('<div class="vas_106-body"></div>');
+            bindValueHover($root);
+            $body =$('<div class="vas_106-body"></div>');
             $emptyState = $('<div class="vas_106-empty" style="display:none;"></div>');
             $emptyState.text(getMsg("VAS_106_NoData", "No sales order selected"));
             $root.append($body).append($emptyState);
@@ -1533,9 +1559,8 @@
                     delPending = getMsg("VAS_106_PartialDelivered", "Partial Delivered");
                     delActive = true;
                 } else {
+                    // The word alone: no date beside In Progress (15-Oct-2026, as asked).
                     delPending = inProcess;
-                    var ipDate = anyConfirm ? formatDate(dl.inProcessDate) : "";
-                    if (ipDate) delPending += " · " + ipDate;
                     delActive = true;
                 }
             }

@@ -1027,17 +1027,9 @@ namespace VASLogic.Models.VAS_304
         private static string FriendlySaveError(Ctx ctx, string err, int C_Order_Blanket)
         {
             if (string.IsNullOrEmpty(err) || err.Trim('[', ']', ' ') != "PriceCantChange") return err;
-            string blanketNo = C_Order_Blanket > 0
-                ? Util.GetValueOfString(DB.ExecuteScalar("SELECT DocumentNo FROM C_Order WHERE C_Order_ID = " + C_Order_Blanket))
-                : "";
-            string msg = Msg.GetMsg(ctx, "VAS_107_BlanketPriceFixed");
-            if (string.IsNullOrEmpty(msg) || msg.StartsWith("[") || msg == "VAS_107_BlanketPriceFixed")
-                msg = "The price can't be changed - it is fixed by blanket order {0}.";
-            if (msg.Contains("{0}"))
-                msg = string.IsNullOrEmpty(blanketNo)
-                    ? msg.Replace(" {0}", "").Replace("{0}", "")
-                    : msg.Replace("{0}", blanketNo);
-            return msg;
+            // The message KEY: the panel shows it through VIS.Msg (saveErrorText in the JS),
+            // as VAS_303 does with VAS_303_PriceCantbeChanged (15-Oct-2026, as asked).
+            return "VAS_304_PriceCantbeChanged";
         }
 
         /// <summary>The three screens this one panel serves.</summary>
