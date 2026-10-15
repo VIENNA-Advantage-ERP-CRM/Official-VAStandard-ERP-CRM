@@ -11,6 +11,7 @@ using VAdvantage.Utility;
 using System.IO;
 using System.Data;
 using VAdvantage.Print;
+using ViennaAdvantage.Model;
 
 namespace VAdvantage.Model
 {
@@ -71,264 +72,7 @@ namespace VAdvantage.Model
         /// </summary>
         /// <param name="bp">optional bp</param>
         /// <param name="clientName">optional client</param>
-        /// <returns>info</returns>
-        public bool CreateClient(String clientName, String orgName, String userClient, String userOrg)
-        {
-            log.Info(clientName);
-            m_trx.Start();
-
-            //  info header
-            m_info = new StringBuilder();
-            //  Standarc columns
-            String name = null;
-            String sql = null;
-            int no = 0;
-
-            /**
-             *  Create Client
-             */
-            name = clientName;
-            if (name == null || name.Length == 0)
-                name = "newClient";
-            m_clientName = name;
-            m_client = new MClient(m_ctx, 0, true, m_trx);
-            m_client.SetValue(m_clientName);
-            m_client.SetName(m_clientName);
-            if (!m_client.Save())
-            {
-                String err = "Client NOT created";
-                log.Log(Level.SEVERE, err);
-                m_info.Append(err);
-                m_trx.Rollback();
-                m_trx.Close();
-                m_ctx.SetContext("#AD_User_A_ID", 0);
-                m_ctx.SetContext("#AD_User_U_ID", 0);
-                return false;
-            }
-            int AD_Client_ID = m_client.GetAD_Client_ID();
-            m_ctx.SetContext(m_WindowNo, "AD_Client_ID", AD_Client_ID);
-            m_ctx.SetContext("#AD_Client_ID", AD_Client_ID);
-
-            //	Standard Values
-            m_stdValues = AD_Client_ID.ToString() + ",0,'Y',SysDate,0,SysDate,0";
-            //  Info - Client
-            m_info.Append(Msg.Translate(m_lang, "AD_Client_ID")).Append("=").Append(name).Append("\n");
-
-            //	Setup Sequences
-            if (!MSequence.CheckClientSequences(m_ctx, AD_Client_ID, m_trx))
-            {
-                String err = "Sequences NOT created";
-                log.Log(Level.SEVERE, err);
-                m_info.Append(err);
-                m_trx.Rollback();
-                m_trx.Close();
-                m_ctx.SetContext("#AD_User_A_ID", 0);
-                m_ctx.SetContext("#AD_User_U_ID", 0);
-                return false;
-            }
-
-            //  Trees and Client Info
-            if (!m_client.SetupClientInfo(m_lang))
-            {
-                String err = "Client Info NOT created";
-                log.Log(Level.SEVERE, err);
-                m_info.Append(err);
-                m_trx.Rollback();
-                m_trx.Close();
-                m_ctx.SetContext("#AD_User_A_ID", 0);
-                m_ctx.SetContext("#AD_User_U_ID", 0);
-                return false;
-            }
-            m_AD_Tree_Account_ID = m_client.GetSetup_AD_Tree_Account_ID();
-
-            /**
-             *  Create Org
-             */
-            name = orgName;
-            if (name == null || name.Length == 0)
-                name = "newOrg";
-            m_org = new MOrg(m_client, name);
-            if (!m_org.Save())
-            {
-                String err = "Organization NOT created";
-                log.Log(Level.SEVERE, err);
-                m_info.Append(err);
-                m_trx.Rollback();
-                m_trx.Close();
-                m_ctx.SetContext("#AD_User_A_ID", 0);
-                m_ctx.SetContext("#AD_User_U_ID", 0);
-                return false;
-            }
-            m_ctx.SetContext(m_WindowNo, "AD_Org_ID", GetAD_Org_ID());
-            m_ctx.SetAD_Org_ID(GetAD_Org_ID());
-            m_stdValuesOrg = AD_Client_ID + "," + GetAD_Org_ID() + ",'Y',SysDate,0,SysDate,0";
-            //  Info
-            m_info.Append(Msg.Translate(m_lang, "AD_Org_ID")).Append("=").Append(name).Append("\n");
-
-            /**
-             *  Create Roles
-             *  - Admin
-             *  - User
-             */
-            name = m_clientName + " Admin";
-            MRole admin = new MRole(m_ctx, 0, m_trx);
-            admin.SetClientOrg(m_client);
-            admin.SetName(name);
-            admin.SetUserLevel(MRole.USERLEVEL_ClientPlusOrganization);
-            admin.SetPreferenceType(MRole.PREFERENCETYPE_Client);
-            admin.SetIsShowAcct(true);
-            if (!admin.Save())
-            {
-                String err = "Admin Role A NOT inserted";
-                log.Log(Level.SEVERE, err);
-                m_info.Append(err);
-                m_trx.Rollback();
-                m_trx.Close();
-                m_ctx.SetContext("#AD_User_A_ID", 0);
-                m_ctx.SetContext("#AD_User_U_ID", 0);
-                return false;
-            }
-            m_ctx.SetContext("#Admin_Role_ID", admin.GetAD_Role_ID());
-            //	OrgAccess x, 0
-            MRoleOrgAccess adminClientAccess = new MRoleOrgAccess(admin, 0);
-            if (!adminClientAccess.Save())
-                log.Log(Level.SEVERE, "Admin Role_OrgAccess 0 NOT created");
-            //  OrgAccess x,y
-            MRoleOrgAccess adminOrgAccess = new MRoleOrgAccess(admin, m_org.GetAD_Org_ID());
-            if (!adminOrgAccess.Save())
-                log.Log(Level.SEVERE, "Admin Role_OrgAccess NOT created");
-
-            //  Info - Admin Role
-            m_info.Append(Msg.Translate(m_lang, "AD_Role_ID")).Append("=").Append(name).Append("\n");
-
-
-            MRole user = new MRole(m_ctx, 0, m_trx);
-            if (userOrg != null && userOrg.Length > 0)                  //////////////////stop UserOrgCreation
-            {
-                name = m_clientName + " User";
-
-                user.SetClientOrg(m_client);
-                user.SetName(name);
-                if (!user.Save())
-                {
-                    String err = "User Role A NOT inserted";
-                    log.Log(Level.SEVERE, err);
-                    m_info.Append(err);
-                    m_trx.Rollback();
-                    m_trx.Close();
-                    m_ctx.SetContext("#AD_User_A_ID", 0);
-                    m_ctx.SetContext("#AD_User_U_ID", 0);
-                    return false;
-                }
-                //  OrgAccess x,y
-                MRoleOrgAccess userOrgAccess = new MRoleOrgAccess(user, m_org.GetAD_Org_ID());
-                if (!userOrgAccess.Save())
-                    log.Log(Level.SEVERE, "User Role_OrgAccess NOT created");
-            }
-            //  Info - Client Role
-            m_info.Append(Msg.Translate(m_lang, "AD_Role_ID")).Append("=").Append(name).Append("\n");
-
-            /**
-             *  Create Users
-             *  - Client
-             *  - Org
-             */
-            name = userClient;
-            if (name == null || name.Length == 0)
-                name = m_clientName + "Client";
-            AD_User_ID = GetNextID(AD_Client_ID, "AD_User");
-            ///////////
-            m_ctx.SetContext("#AD_User_A_ID", AD_User_ID);
-            //////////////
-            AD_User_Name = name;
-            name = DataBase.DB.TO_STRING(name);
-            sql = "INSERT INTO AD_User(" + m_stdColumns + ",AD_User_ID,"
-                + " Value,Name,Description,Password)"
-                + " VALUES (" + m_stdValuesOrg + "," + AD_User_ID + ","
-                + name + "," + name + "," + name + "," + name + ")";
-            no = DataBase.DB.ExecuteQuery(sql, null, m_trx);
-            if (no != 1)
-            {
-                String err = "Admin User NOT inserted - " + AD_User_Name;
-                log.Log(Level.SEVERE, err);
-                m_info.Append(err);
-                m_trx.Rollback();
-                m_trx.Close();
-                m_ctx.SetContext("#AD_User_A_ID", 0);
-                return false;
-            }
-            //  Info
-            m_info.Append(Msg.Translate(m_lang, "AD_User_ID")).Append("=").Append(AD_User_Name).Append("/").Append(AD_User_Name).Append("\n");
-
-
-            if (userOrg != null && userOrg.Length > 0)                  //////////////////stop UserOrgCreation
-            {
-                name = userOrg;
-                if (name == null || name.Length == 0)
-                    name = m_clientName + "Org";
-                AD_User_U_ID = GetNextID(AD_Client_ID, "AD_User");
-
-                ////////////////////////////
-                m_ctx.SetContext("#AD_User_U_ID", AD_User_U_ID);
-                ////////////////////////////
-
-                AD_User_U_Name = name;
-                name = DataBase.DB.TO_STRING(name);
-                sql = "INSERT INTO AD_User(" + m_stdColumns + ",AD_User_ID,"
-                    + "Value,Name,Description,Password)"
-                    + " VALUES (" + m_stdValuesOrg + "," + AD_User_U_ID + ","
-                    + name + "," + name + "," + name + "," + name + ")";
-                no = DataBase.DB.ExecuteQuery(sql, null, m_trx);
-                if (no != 1)
-                {
-                    String err = "Org User NOT inserted - " + AD_User_U_Name;
-                    log.Log(Level.SEVERE, err);
-                    m_info.Append(err);
-                    m_trx.Rollback();
-                    m_trx.Close();
-                    return false;
-                }
-                //  Info
-                m_info.Append(Msg.Translate(m_lang, "AD_User_ID")).Append("=").Append(AD_User_U_Name).Append("/").Append(AD_User_U_Name).Append("\n");
-
-
-                sql = "INSERT INTO AD_User_Roles(" + m_stdColumns + ",AD_User_ID,AD_Role_ID)"
-                    + " VALUES (" + m_stdValues + "," + AD_User_ID + "," + user.GetAD_Role_ID() + ")";
-                no = DataBase.DB.ExecuteQuery(sql, null, m_trx);
-                if (no != 1)
-                    log.Log(Level.SEVERE, "UserRole ClientUser+User NOT inserted");
-                //  OrgUser             - User
-                sql = "INSERT INTO AD_User_Roles(" + m_stdColumns + ",AD_User_ID,AD_Role_ID)"
-                    + " VALUES (" + m_stdValues + "," + AD_User_U_ID + "," + user.GetAD_Role_ID() + ")";
-                no = DataBase.DB.ExecuteQuery(sql, null, m_trx);
-                if (no != 1)
-                    log.Log(Level.SEVERE, "UserRole OrgUser+Org NOT inserted");
-
-            }
-            else
-            {
-                m_ctx.SetContext("#AD_User_U_ID", 0);
-            }
-            /**
-             *  Create User-Role
-             */
-            //  ClientUser          - Admin & User
-            sql = "INSERT INTO AD_User_Roles(" + m_stdColumns + ",AD_User_ID,AD_Role_ID)"
-                + " VALUES (" + m_stdValues + "," + AD_User_ID + "," + admin.GetAD_Role_ID() + ")";
-            no = DataBase.DB.ExecuteQuery(sql, null, m_trx);
-            if (no != 1)
-                log.Log(Level.SEVERE, "UserRole ClientUser+Admin NOT inserted");
-
-            //	Processors
-            MAcctProcessor ap = new MAcctProcessor(m_client, AD_User_ID);
-            ap.Save();
-
-            MRequestProcessor rp = new MRequestProcessor(m_client, AD_User_ID);
-            rp.Save();
-
-            log.Info("fini");
-            return true;
-        }   //  createClient
+        /// <returns>info</returns>        
 
         public bool CreateClient(String clientName, String orgName, String userClient, String userOrg, string adminUserPwd)
         {
@@ -638,7 +382,7 @@ namespace VAdvantage.Model
         string tableName = string.Empty;
         private void CreateDefaultRoles(int adminUserID)
         {
-            string sql = @"select * from ad_role where ad_client_id=0 and ad_org_id=0 and name!='Sys Admin' and name!='System Administrator' AND IsForNewTenant='Y'";
+            string sql = @"SELECT * FROM AD_Role WHERE AD_Client_ID=0 AND AD_Org_ID=0 AND Name != 'Sys Admin' AND Name!='System Administrator' AND IsForNewTenant='Y' AND IsActive = 'Y'";
             DataSet ds = DB.ExecuteDataset(sql);
             if (ds != null)
             {
@@ -651,12 +395,13 @@ namespace VAdvantage.Model
                 X_AD_Form_Access formAcess = null;
                 X_AD_Workflow_Access workAccess = null;
                 X_AD_Task_Access taskAcess = null;
+                X_AD_Widget_Access widgetAcess = null;
                 for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                 {
                     role = new MRole(m_ctx, 0, m_trx);
                     role.SetAD_Client_ID(m_client.GetAD_Client_ID());
                     role.SetAD_Org_ID(0);
-                    role.SetName(ds.Tables[0].Rows[i]["Name"].ToString());
+                    role.SetName(ds.Tables[0].Rows[i]["Name"].ToString() + " (" + m_clientName + ")");
                     if (ds.Tables[0].Rows[i]["Description"] != null && ds.Tables[0].Rows[i]["Description"] != DBNull.Value)
                     {
                         role.SetDescription(ds.Tables[0].Rows[i]["Description"].ToString());
@@ -776,6 +521,24 @@ namespace VAdvantage.Model
                     }
                     else
                     {
+                        if (role.IsUseUserOrgAccess())
+                        {
+                            PO _userOrgAccess = MTable.GetPO(m_ctx, "AD_User_OrgAccess", 0, m_trx);
+                            _userOrgAccess.Set_ValueNoCheck("AD_Org_ID", m_org.GetAD_Org_ID());
+                            _userOrgAccess.Set_ValueNoCheck("AD_User_ID", adminUserID);
+                            if (!_userOrgAccess.Save())
+                            {
+                                log.Info(role.GetName() + " UserOrgAccessNotSaved");
+                            }
+
+                            _userOrgAccess = MTable.GetPO(m_ctx, "AD_User_OrgAccess", 0, m_trx);
+                            _userOrgAccess.Set_ValueNoCheck("AD_Org_ID", 0);
+                            _userOrgAccess.Set_ValueNoCheck("AD_User_ID", adminUserID);
+                            if (!_userOrgAccess.Save())
+                            {
+                                log.Info(role.GetName() + " UserOrgAccessNotSaved");
+                            }
+                        }
                         /////////Save OrgAccess
                         dsComm = DB.ExecuteDataset("Select * From AD_Role_OrgAccess WHERE AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
                         if (dsComm != null)
@@ -955,6 +718,85 @@ namespace VAdvantage.Model
                                 if (!taskAcess.Save(m_trx))
                                 {
                                     log.Info(" WindowAcessNotSaved");
+                                }
+                            }
+                        }
+
+                        /////////Save WidgetAcess
+                        dsComm = DB.ExecuteDataset("Select * From AD_Widget_Access WHERE AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
+                        if (dsComm != null)
+                        {
+                            for (int j = 0; j < dsComm.Tables[0].Rows.Count; j++)
+                            {
+                                widgetAcess = new X_AD_Widget_Access(m_ctx, 0, m_trx);
+                                widgetAcess.SetAD_Client_ID(m_client.GetAD_Client_ID());
+                                widgetAcess.SetIsActive(true);
+                                widgetAcess.SetAD_Org_ID(0);
+                                widgetAcess.SetAD_Role_ID(role.GetAD_Role_ID());
+                                if (dsComm.Tables[0].Rows[j]["AD_Widget_ID"] != null && dsComm.Tables[0].Rows[j]["AD_Widget_ID"] != DBNull.Value)
+                                {
+                                    widgetAcess.SetAD_Widget_ID(Util.GetValueOfInt(dsComm.Tables[0].Rows[j]["AD_Widget_ID"]));
+                                }
+                                if (!widgetAcess.Save(m_trx))
+                                {
+                                    log.Info(" WidgetAcessNotSaved");
+                                }
+                            }
+                        }
+
+                        ///////// Create Dashboard and Save Dashboard Access
+                        dsComm = DB.ExecuteDataset(@"SELECT d.AD_Dashboard_ID, d.Name, d.Description, da.AD_Role_ID, da.IsDefault, da.IsReadWrite, da.SeqNo FROM AD_Dashboard_Access da 
+                        INNER JOIN AD_Dashboard d ON (da.AD_Dashboard_ID = d.AD_Dashboard_ID) WHERE d.IsActive = 'Y' AND da.IsActive = 'Y' AND da.AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
+                        if (dsComm != null && dsComm.Tables.Count > 0)
+                        {
+                            StringBuilder sbSql = new StringBuilder("");
+                            PO _dashboard = null;
+                            PO _dashboardAccess = null;
+                            for (int j = 0; j < dsComm.Tables[0].Rows.Count; j++)
+                            {
+                                _dashboard = MTable.GetPO(m_ctx, "AD_Dashboard", 0, m_trx);
+                                _dashboard.SetAD_Client_ID(m_client.GetAD_Client_ID());
+                                _dashboard.SetAD_Org_ID(0);
+                                _dashboard.Set_Value("Name", Util.GetValueOfString(dsComm.Tables[0].Rows[j]["Name"]));
+                                _dashboard.Set_Value("Description", Util.GetValueOfString(dsComm.Tables[0].Rows[j]["Description"]));
+                                if (!_dashboard.Save())
+                                {
+                                    log.Info(" DashboardNotSaved");
+                                }
+                                else
+                                {
+                                    _dashboardAccess = MTable.GetPO(m_ctx, "AD_Dashboard_Access", 0, m_trx);
+                                    _dashboardAccess.SetAD_Client_ID(m_client.GetAD_Client_ID());
+                                    _dashboardAccess.SetAD_Org_ID(0);
+                                    _dashboardAccess.Set_ValueNoCheck("AD_Role_ID", role.GetAD_Role_ID());
+                                    _dashboardAccess.Set_ValueNoCheck("AD_Dashboard_ID", _dashboard.Get_ID());
+                                    _dashboardAccess.Set_Value("IsReadWrite", Util.GetValueOfString(dsComm.Tables[0].Rows[j]["IsReadWrite"]) == "Y");
+                                    _dashboardAccess.Set_Value("IsDefault", Util.GetValueOfString(dsComm.Tables[0].Rows[j]["IsDefault"]) == "Y");
+                                    _dashboardAccess.Set_Value("SeqNo", Util.GetValueOfInt(dsComm.Tables[0].Rows[j]["SeqNo"]));
+                                    if (!_dashboardAccess.Save())
+                                    {
+                                        log.Info(" DashboardAcessNotSaved");
+                                    }
+
+                                    sbSql.Clear().Append("SELECT * FROM AD_UserHomeWidget WHERE AD_Dashboard_ID = " + Util.GetValueOfInt(dsComm.Tables[0].Rows[j]["AD_Dashboard_ID"]));
+                                    DataSet dsDashboardComps = DB.ExecuteDataset(sbSql.ToString());
+                                    if (dsDashboardComps != null && dsDashboardComps.Tables != null && dsDashboardComps.Tables[0].Rows.Count > 0)
+                                    {
+                                        for (int d = 0; d < dsDashboardComps.Tables[0].Rows.Count; d++)
+                                        {
+                                            PO oldDBComp = MTable.GetPO(m_ctx, "AD_UserHomeWidget", Util.GetValueOfInt(dsDashboardComps.Tables[0].Rows[d]["AD_UserHomeWidget_ID"]), m_trx);
+                                            PO newDBComp = MTable.GetPO(m_ctx, "AD_UserHomeWidget", 0, m_trx);
+                                            oldDBComp.CopyTo(newDBComp);
+                                            newDBComp.SetAD_Client_ID(m_client.GetAD_Client_ID());
+                                            newDBComp.SetAD_Org_ID(0);
+                                            newDBComp.Set_ValueNoCheck("AD_Dashboard_ID", _dashboard.Get_ID());
+                                            newDBComp.Set_ValueNoCheck("AD_Role_ID", role.GetAD_Role_ID());
+                                            if (!newDBComp.Save())
+                                            {
+                                                log.Info(" DashboardComponentNotSaved");
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
