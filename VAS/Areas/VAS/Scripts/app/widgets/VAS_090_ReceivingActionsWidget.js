@@ -25,7 +25,7 @@
  *  5  | Review pending confirmations    | VAS_090_ReviewPendingConfirmations
  *  6  | Print GRN Label                 | VAS_090_PrintGRNLabel
  *  7  | Search a GRN to print           | VAS_090_SearchGRNToPrint
- *  8  | Make GRN                        | VAS_090_MakeGRN
+ *  8  | Create GRN (was Make GRN)       | VAS_090_CreateGRN
  *  9  | Pending GRN Confirmations       | VAS_090_PendingGRNConfirmations
  * 10  | Review Confirmation Line        | VAS_090_ReviewConfirmationLine
  * 11  | Print Label                     | VAS_090_PrintLabel
@@ -41,6 +41,11 @@
  * 21  | UOM (Receive Against PO column) | VAS_090_UOM
  * 22  | Enter a whole number as the received quantity for | VAS_QtyWholeNumberOnly
  * 23  | Decimal places allowed in the received quantity for | VAS_QtyDecimalPlacesAllowed
+ *
+ * QA sheet 2026-10-15 (GRN widgets): Supplier -> Vendor (VAS_090_Vendor), From PO -> Linked PO
+ * (VAS_090_LinkedPO), Received Lines -> Receipt Lines (VAS_090_ReceiptLines), Date -> Movement Date
+ * (VAS_090_MovementDate); renamed labels use NEW message keys so an old AD_Message text cannot
+ * override them. lbl() now uses the fallback text when a key is undefined, so no raw "[Key]" shows.
  *
  * QA sheet 2026-09-15 (batch 10): Print GRN Label quantity per GRN line UOM (#65); warehouses
  * follow the PO's IsDropShip (#68); Attribute column only when a line has an attribute (#71);
@@ -107,7 +112,9 @@
         var gcRows = [];
         var gcRowsById = {};
         var gcPageNo = 1;
-        var gcPageSize = 6;
+        var gcPageSize = 5;   /* fixed - never re-measured (QA #80 / #82 / #92) */
+        var gcLinePageNo = 1;
+        var GC_LINE_PAGE_SIZE = 5;
         var gcTotalPages = 0;
         var gcTotalRecords = 0;
         var gcPendingCount = 0;
@@ -126,8 +133,15 @@
         var labelTotalRecords = 0;
         var labelLoading = false;
 
+        /* VIS.Msg.getMsg returns the key itself or "[Key]" when the message is not defined; in that
+           case the fallback text is shown instead of the raw key (QA #78 / #106). */
         function lbl(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            var text = "";
+            try { text = VIS.Msg.getMsg(key); } catch (e) { text = ""; }
+            if (text == null || text === "" || text === key || text === "[" + key + "]" || /^\[[A-Za-z0-9_]+\]$/.test(String(text).trim())) {
+                return fallback != null ? fallback : String(key);
+            }
+            return text;
         }
 
         function escapeHtml(value) {
@@ -177,25 +191,12 @@
         }
 
         function syncLabelPageSize() {
-            if (labelLoading || !$dialogBody.find('.vas-ra-label-shell').length) { return; }
-
-            var nextPageSize = measureRowsInDialog('.vas-ra-label-table tbody tr', 40, 3);
-            if (!nextPageSize || nextPageSize === labelPageSize) { return; }
-
-            var firstRecord = ((labelPageNo - 1) * labelPageSize) + 1;
-            labelPageSize = nextPageSize;
-            searchGRNLabels(labelSearchText, Math.max(1, Math.ceil(firstRecord / labelPageSize)));
+            /* Fixed 5 rows per page: the Print GRN Label popup keeps one size (QA #66). */
         }
 
         function syncGCPageSize() {
-            if (gcLoading || gcDetail || !$dialogBody.find('.vas-ra-gc-list').length) { return; }
-
-            var nextPageSize = measureRowsInDialog('.vas-ra-gc-row', 54, 3);
-            if (!nextPageSize || nextPageSize === gcPageSize) { return; }
-
-            var firstRecord = ((gcPageNo - 1) * gcPageSize) + 1;
-            gcPageSize = nextPageSize;
-            loadGRNConfirmations(Math.max(1, Math.ceil(firstRecord / gcPageSize)));
+            /* Fixed 5 rows per page: the size no longer depends on the measured height, so going
+               back from page 2 shows the same records as before (QA #92). */
         }
 
         function syncOpenModalPageSize() {
@@ -354,6 +355,16 @@
             var month = d.getMonth() + 1;
             var day = d.getDate();
             return d.getFullYear() + '-' + (month < 10 ? '0' + month : month) + '-' + (day < 10 ? '0' + day : day);
+        }
+
+        /* QA #107: open the GRN in the Material Receipt window (new tab) - same helper the other
+           GRN widgets use; window ids differ per environment, so they are resolved by name. */
+        var grnZoomWindowId = 0;
+        function zoomToGRN(grnId) {
+            grnId = Number(grnId || 0);
+            if (!grnId || !VAS.ZoomUtil) { return; }
+            VAS.ZoomUtil.zoomToRecord("M_InOut_ID", grnId, grnZoomWindowId, "VAS_MaterialReceipt", "Material Receipt")
+                .done(function (id) { if (id > 0) { grnZoomWindowId = id; } });
         }
 
         function notify(message) {
@@ -515,7 +526,10 @@
             $dialog.on('click', '.vas-ra-rcv-prev', function () { if (rcvPageNo > 1) { rcvPageNo--; renderReceiveLines(); } });
             $dialog.on('click', '.vas-ra-rcv-next', function () { rcvPageNo++; renderReceiveLines(); });
             $dialog.on('click', '.vas-ra-make-grn', makeGRN);
-            $dialog.on('click', '.vas-ra-gc-row', function () { openGRNConfirmationDetail(Number($(this).data('gcid'))); });
+            $dialog.on('click', '.vas-ra-gc-row[data-gcid]', function () { gcLinePageNo = 1; openGRNConfirmationDetail(Number($(this).data('gcid'))); });
+            $dialog.on('click', '.vas-ra-gc-line-prev', function () { if (gcLinePageNo > 1) { gcLinePageNo--; renderGRNConfirmDetail(); } });
+            $dialog.on('click', '.vas-ra-gc-line-next', function () { gcLinePageNo++; renderGRNConfirmDetail(); });
+            $dialog.on('click', '.vas-ra-grn-link', function (e) { e.stopPropagation(); zoomToGRN($(this).data('grnid')); });
             $dialog.on('click', '.vas-ra-gc-prev', function () { if (gcPageNo > 1) { loadGRNConfirmations(gcPageNo - 1); } });
             $dialog.on('click', '.vas-ra-gc-next', function () { if (gcPageNo < gcTotalPages) { loadGRNConfirmations(gcPageNo + 1); } });
             $dialog.on('click', '.vas-ra-gc-back-list', function () { gcDetail = null; gcLineIndex = -1; renderGRNConfirmList(); });
@@ -526,7 +540,8 @@
             $dialog.on('click', '.vas-ra-gc-quality-save', saveQualityParametersAndComplete);
             $dialog.on('click', '.vas-ra-gc-dispute', disputeGRNConfirmation);
             $dialog.on('click', '.vas-ra-gc-save-line', saveGRNConfirmationLine);
-            $dialog.on('input', '.vas-ra-gc-qty', paintGRNConfirmDifference);
+            $dialog.on('input', '.vas-ra-gc-qty', function () { paintGRNConfirmDifference(); flagGRNConfirmQuantities(false); });
+            $dialog.on('change', '.vas-ra-gc-qty', function () { flagGRNConfirmQuantities(true); });
             $dialog.on('input', '.vas-ra-label-search', function () {
                 var searchText = $(this).val();
                 clearTimeout(labelSearchTimer);
@@ -609,7 +624,7 @@
             var html =
                 '<div class="vas-ra-search-pill">' +
                 '<span class="vas-ra-search-pill-ic">' + icon("search") + '</span>' +
-                '<input class="vas-ra-po-search" type="text" placeholder="' + escapeHtml(lbl("VAS_090_POSearchPlaceholder", "PO number or supplier name...")) + '"/>' +
+                '<input class="vas-ra-po-search" type="text" placeholder="' + escapeHtml(lbl("VAS_090_POVendorSearchPlaceholder", "PO number or vendor name...")) + '"/>' +
                 '</div>' +
                 '<div class="vas-ra-po-list">';
 
@@ -803,7 +818,7 @@
                 '</div>' +
                 '</div>' +
                 '</div>' +
-                '<div class="vas-ra-lines-title">' + escapeHtml(lbl("VAS_090_ReceivedLines", "Received Lines")) + '</div>' +
+                '<div class="vas-ra-lines-title">' + escapeHtml(lbl("VAS_090_ReceiptLines", "Receipt Lines")) + '</div>' +
                 '<div class="vas-ra-receive-table">' +
                 '<div class="' + rowCls + ' head">' +
                 '<span>' + escapeHtml(lbl("VAS_090_Item", "Item")) + '</span>' +
@@ -901,8 +916,8 @@
 
             html +=
                 '<div class="vas-ra-action-footer">' +
-                '<button type="button" class="vas-ra-secondary vas-ra-back-po">' + icon("chevL") + escapeHtml(lbl("VAS_090_Back", "Back")) + '</button>' +
-                '<button type="button" class="vas-ra-primary vas-ra-make-grn">' + icon("check") + escapeHtml(lbl("VAS_090_MakeGRN", "Make GRN")) + '</button>' +
+                '<button type="button" class="vas-ra-primary vas-ra-back-po">' + icon("chevL") + escapeHtml(lbl("VAS_090_Back", "Back")) + '</button>' +
+                '<button type="button" class="vas-ra-primary vas-ra-make-grn">' + icon("check") + escapeHtml(lbl("VAS_090_CreateGRN", "Create GRN")) + '</button>' +
                 '</div>';
 
             $dialogBody.html(html);
@@ -1111,8 +1126,8 @@
                     setModal(lbl("VAS_090_GRNCreatedFrom", "GRN created from") + " " + currentPO.poNo, statusText, "ok");
                     $dialogBody.html(
                         '<div class="vas-ra-form">' +
-                        fieldHtml(lbl("VAS_090_FromPO", "From PO"), currentPO.poNo, true) +
-                        fieldHtml(lbl("VAS_090_Supplier", "Supplier"), currentPO.supplier) +
+                        fieldHtml(lbl("VAS_090_LinkedPO", "Linked PO"), currentPO.poNo, true) +
+                        fieldHtml(lbl("VAS_090_Vendor", "Vendor"), currentPO.supplier) +
                         fieldHtml(lbl("VAS_090_Lines", "Lines"), String(lines.length)) +
                         fieldHtml(lbl("VAS_090_NewGRNNo", "New GRN #"), data.grnNo || data.shipmentId || "-") +
                         '</div>'
@@ -1270,6 +1285,16 @@
             });
         }
 
+        /* Field whose value is a link to the GRN record (QA #107). */
+        function grnLinkFieldHtml(label, grnNo, grnId) {
+            var shown = grnNo == null || grnNo === "" ? "-" : grnNo;
+            if (!Number(grnId || 0) || shown === "-") { return fieldHtml(label, grnNo, true); }
+            return '<div class="vas-ra-field">' +
+                '<div class="vas-ra-field-label">' + escapeHtml(label) + '</div>' +
+                '<div class="vas-ra-field-value strong"><a href="javascript:void(0)" class="vas-ra-grn-link" data-grnid="' + escapeHtml(grnId) + '" title="' + escapeHtml(shown) + '">' + escapeHtml(shown) + '</a></div>' +
+                '</div>';
+        }
+
         function renderGRNConfirmDetail() {
             if (!gcDetail || !gcDetail.header) { return; }
 
@@ -1279,20 +1304,26 @@
 
             var html =
                 '<div class="vas-ra-modal-back vas-ra-gc-back-list">' + icon("chevL") + '<span>' + escapeHtml(lbl("VAS_090_BackToConfirmations", "Back to pending confirmations")) + '</span></div>' +
-                '<div class="vas-ra-form">' +
-                fieldHtml(lbl("VAS_090_SourceGRN", "Source GRN"), header.grnNo, true) +
-                fieldHtml(lbl("VAS_090_Supplier", "Supplier"), header.supplier) +
+                '<div class="vas-ra-form vas-ra-form-inline">' +
+                grnLinkFieldHtml(lbl("VAS_090_SourceGRN", "Source GRN"), header.grnNo, header.grnId) +
+                fieldHtml(lbl("VAS_090_Vendor", "Vendor"), header.supplier) +
                 fieldHtml(lbl("VAS_090_Warehouse", "Warehouse"), header.warehouseName) +
-                fieldHtml(lbl("VAS_090_Date", "Date"), header.docDate) +
+                fieldHtml(lbl("VAS_090_MovementDate", "Movement Date"), header.docDate) +
                 '</div>' +
                 '<div class="vas-ra-lines-title">' + escapeHtml(lbl("VAS_090_ConfirmationLines", "Confirmation Lines")) + '</div>' +
-                '<div class="vas-ra-gc-list">';
+                '<div class="vas-ra-gc-list vas-ra-gc-compact">';
 
             var lines = gcDetail.lines || [];
+            /* QA #80 / #82: 5 lines per page with a pager instead of a scrollbar. */
+            var linePages = Math.max(1, Math.ceil(lines.length / GC_LINE_PAGE_SIZE));
+            if (gcLinePageNo > linePages) { gcLinePageNo = linePages; }
+            if (gcLinePageNo < 1) { gcLinePageNo = 1; }
+            var lineStart = (gcLinePageNo - 1) * GC_LINE_PAGE_SIZE;
+            var lineEnd = Math.min(lineStart + GC_LINE_PAGE_SIZE, lines.length);
             if (lines.length === 0) {
                 html += '<div class="vas-ra-empty">' + escapeHtml(lbl("VAS_090_NoConfirmationLines", "No confirmation lines available.")) + '</div>';
             } else {
-                for (var i = 0; i < lines.length; i++) {
+                for (var i = lineStart; i < lineEnd; i++) {
                     var line = lines[i];
                     var linePill = gcLineStatusPill(line);
                     var lineRef = lbl("VAS_090_Line", "line").charAt(0).toUpperCase() + lbl("VAS_090_Line", "line").slice(1) + ' ' + (line.lineNo || "-");
@@ -1314,6 +1345,14 @@
             }
 
             html += '</div>';
+
+            if (linePages > 1) {
+                html += '<div class="vas-ra-modal-pager">' +
+                    '<button type="button" class="vas-ra-pgbtn vas-ra-gc-line-prev"' + (gcLinePageNo <= 1 ? ' disabled' : '') + '>' + icon("chevL") + '</button>' +
+                    '<span class="vas-ra-pgtext">' + escapeHtml(gcLinePageNo + ' ' + lbl("VAS_090_Of", "of") + ' ' + linePages) + '</span>' +
+                    '<button type="button" class="vas-ra-pgbtn vas-ra-gc-line-next"' + (gcLinePageNo >= linePages ? ' disabled' : '') + '>' + icon("chevR") + '</button>' +
+                    '</div>';
+            }
 
             var isCompleted = header.status === "completed";
             if (isCompleted) {
@@ -1396,13 +1435,13 @@
 
             setModal(lbl("VAS_090_ReviewConfirmationLine", "Review Confirmation Line"), "", "");
 
-            function inputField(iconName, label, value, key, required) {
+            function inputField(iconName, label, value, key, required, readOnly) {
                 var iconCell = iconName ? '<div class="vas-ra-qc-ico">' + icon(iconName) + '</div>' : '';
                 return '<div class="vas-ra-qc-field active">' +
                     iconCell +
                     '<div class="vas-ra-qc-main">' +
                     '<div class="vas-ra-qc-label' + (required ? ' req' : '') + '">' + escapeHtml(label) + '</div>' +
-                    '<input class="vas-ra-gc-inp vas-ra-gc-qty" type="number" min="0" step="any" data-k="' + key + '" value="' + escapeHtml(toInputValue(value)) + '"/>' +
+                    '<input class="vas-ra-gc-inp vas-ra-gc-qty" type="number" min="0" step="any" data-k="' + key + '" value="' + escapeHtml(toInputValue(value)) + '"' + (readOnly ? ' readonly tabindex="-1"' : '') + '/>' +
                     '</div>' +
                     '</div>';
             }
@@ -1411,7 +1450,7 @@
             var left =
                 disabledQAField("file", lbl("VAS_090_GRNLine", "GRN Line"), lineRefText) +
                 disabledQAField("package", lbl("VAS_090_AttributeSetInstance", "Attribute Set Instance"), line.attributeSetInstance || "-") +
-                inputField("scale", lbl("VAS_090_TargetQuantity", "Target Quantity"), line.targetQty, "target", true) +
+                inputField("scale", lbl("VAS_090_TargetQuantity", "Target Quantity"), line.targetQty, "target", false, true) +
                 '<div class="vas-ra-qc-field disabled">' +
                 '<div class="vas-ra-qc-ico">' + icon("clipboard") + '</div>' +
                 '<div class="vas-ra-qc-main">' +
@@ -1428,7 +1467,7 @@
                 '<div class="vas-ra-qc-field active note">' +
                 '<div class="vas-ra-qc-main">' +
                 '<div class="vas-ra-qc-label">' + escapeHtml(lbl("VAS_090_Description", "Description")) + '</div>' +
-                '<textarea class="vas-ra-desc" rows="2" placeholder="' + escapeHtml(lbl("VAS_090_AddNoteOptional", "Add a note (optional)")) + '">' + escapeHtml(line.description || "") + '</textarea>' +
+                '<textarea class="vas-ra-desc" rows="2" maxlength="255" placeholder="' + escapeHtml(lbl("VAS_090_AddNoteOptional", "Add a note (optional)")) + '">' + escapeHtml(line.description || "") + '</textarea>' +
                 '</div>' +
                 '</div>';
 
@@ -1445,6 +1484,39 @@
             );
 
             paintGRNConfirmDifference();
+        }
+
+        /* QA #88 / #89: Confirmed and Scrapped may not exceed Target, nor together
+           (Confirmed + Difference + Scrapped = Target). Returns "" when valid. */
+        function gcQuantityError() {
+            var target = Number($dialogBody.find('.vas-ra-gc-qty[data-k="target"]').val()) || 0;
+            var confirmed = Number($dialogBody.find('.vas-ra-gc-qty[data-k="confirmed"]').val()) || 0;
+            var scrapped = Number($dialogBody.find('.vas-ra-gc-qty[data-k="scrapped"]').val()) || 0;
+            if (confirmed > target) { return lbl("VAS_090_ConfirmedAboveTarget", "Confirmed Quantity cannot be greater than Target Quantity."); }
+            if (scrapped > target) { return lbl("VAS_090_ScrappedAboveTarget", "Scrapped Quantity cannot be greater than Target Quantity."); }
+            if (confirmed + scrapped > target) { return lbl("VAS_090_ConfirmedScrappedAboveTarget", "Confirmed Quantity and Scrapped Quantity cannot exceed Target Quantity."); }
+            return "";
+        }
+
+        /* Marks the fields while typing; on change (leaving the field) the offending value is
+           reset to the largest allowed one and the user is told why. */
+        function flagGRNConfirmQuantities(onChange) {
+            var error = gcQuantityError();
+            var $fields = $dialogBody.find('.vas-ra-gc-qty[data-k="confirmed"], .vas-ra-gc-qty[data-k="scrapped"]');
+            $fields.toggleClass('vas-ra-rcv-invalid', !!error).attr('title', error);
+            if (!error || !onChange) { return; }
+
+            var target = Number($dialogBody.find('.vas-ra-gc-qty[data-k="target"]').val()) || 0;
+            var $confirmed = $dialogBody.find('.vas-ra-gc-qty[data-k="confirmed"]');
+            var $scrapped = $dialogBody.find('.vas-ra-gc-qty[data-k="scrapped"]');
+            var confirmed = Math.min(Number($confirmed.val()) || 0, target);
+            var scrapped = Math.min(Number($scrapped.val()) || 0, target);
+            if (confirmed + scrapped > target) { scrapped = Math.max(0, target - confirmed); }
+            $confirmed.val(String(confirmed));
+            $scrapped.val(String(scrapped));
+            $fields.removeClass('vas-ra-rcv-invalid').attr('title', '');
+            paintGRNConfirmDifference();
+            notify(error);
         }
 
         /* Computed field: Difference = Target - Confirmed - Scrapped (same rule
@@ -1471,16 +1543,9 @@
                 notify(lbl("VAS_090_InvalidQuantity", "Quantities must be zero or positive numbers."));
                 return;
             }
-            if (confirmed > target) {
-                notify("Confirmed Quantity cannot be greater than Target Quantity.");
-                return;
-            }
-            if (scrapped > target) {
-                notify("Scrapped Quantity cannot be greater than Target Quantity.");
-                return;
-            }
-            if (confirmed + scrapped > target) {
-                notify("Confirmed Quantity and Scrapped Quantity cannot exceed Target Quantity.");
+            var quantityError = gcQuantityError();
+            if (quantityError) {
+                notify(quantityError);
                 return;
             }
 
@@ -1498,7 +1563,7 @@
                     scrappedQty: String(scrapped),
                     /* QA sheet #84: 0 = no scrap locator (blank option). */
                     scrapLocatorId: Number($dialogBody.find('.vas-ra-gc-scrap-loc').val() || 0),
-                    description: $dialogBody.find('.vas-ra-desc').val() || ""
+                    description: String($dialogBody.find('.vas-ra-desc').val() || "").substring(0, 255)
                 },
                 success: function (res) {
                     var data = parseResponse(res);
@@ -1540,7 +1605,13 @@
                 data: { confirmId: gcDetail.header.confirmId },
                 success: function (res) {
                     var data = parseResponse(res);
-                    gcQualityRows = (data && !data.error && data.rows) ? data.rows : [];
+                    if (data && data.error) {
+                        gcQualityRows = [];
+                        showDialogBusy(false);
+                        notify(data.error);
+                        return;
+                    }
+                    gcQualityRows = (data && data.rows) ? data.rows : [];
                     if (!gcQualityRows.length) {
                         completeWithoutQuality = true;
                         return;
@@ -1776,10 +1847,10 @@
                     '<div class="vas-ra-label-shell">' +
                     '<div class="vas-ra-search-pill">' +
                     '<span class="vas-ra-search-pill-ic">' + icon("search") + '</span>' +
-                    '<input class="vas-ra-label-search" type="text" placeholder="' + escapeHtml(lbl("VAS_090_GRNSearchPlaceholder", "GRN number or supplier name...")) + '"/>' +
+                    '<input class="vas-ra-label-search" type="text" placeholder="' + escapeHtml(lbl("VAS_090_GRNVendorSearchPlaceholder", "GRN number or vendor name...")) + '"/>' +
                     '</div>' +
                     '<table class="vas-ra-label-table">' +
-                    '<thead><tr><th>' + escapeHtml(lbl("VAS_090_GRNNo", "GRN #")) + '</th><th>' + escapeHtml(lbl("VAS_090_CustomerSupplier", "Customer / Supplier")) + '</th><th class="r">' + escapeHtml(lbl("VAS_090_Qty", "Qty")) + '</th><th class="r">' + escapeHtml(lbl("VAS_090_Label", "Label")) + '</th></tr></thead>' +
+                    '<thead><tr><th>' + escapeHtml(lbl("VAS_090_GRNNo", "GRN #")) + '</th><th>' + escapeHtml(lbl("VAS_090_Vendor", "Vendor")) + '</th><th class="r">' + escapeHtml(lbl("VAS_090_Qty", "Qty")) + '</th><th class="r">' + escapeHtml(lbl("VAS_090_Label", "Label")) + '</th></tr></thead>' +
                     '<tbody class="vas-ra-label-rows"></tbody>' +
                     '</table>' +
                     '<div class="vas-ra-label-pager"></div>' +
@@ -1798,7 +1869,7 @@
                     var r = rows[i];
                     body +=
                         '<tr class="vas-ra-label-row" data-grnid="' + escapeHtml(r.grnId) + '">' +
-                        '<td class="s" title="' + escapeHtml(r.grnNo || "-") + '">' + escapeHtml(r.grnNo || "-") + '</td>' +
+                        '<td class="s" title="' + escapeHtml(r.grnNo || "-") + '"><a href="javascript:void(0)" class="vas-ra-grn-link" data-grnid="' + escapeHtml(r.grnId) + '">' + escapeHtml(r.grnNo || "-") + '</a></td>' +
                         '<td title="' + escapeHtml(r.partyName || "-") + '">' + escapeHtml(r.partyName || "-") + '</td>' +
                         '<td class="r" title="' + escapeHtml(formatLabelQuantities(r)) + '">' + escapeHtml(formatLabelQuantities(r)) + '</td>' +
                         '<td class="r"><span class="vas-ra-pill info">' + escapeHtml(lbl("VAS_090_Print", "Print")) + '</span></td>' +

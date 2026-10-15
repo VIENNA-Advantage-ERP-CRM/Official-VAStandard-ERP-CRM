@@ -76,8 +76,8 @@ namespace VIS.Controllers
                +03), so the server sends how many hours ago it was created - measured on that same clock -
                and the browser subtracts it from its own now. */
             string createdAgeExpr = DB.IsPostgreSQL()
-                ? "(EXTRACT(EPOCH FROM (LOCALTIMESTAMP - InOut.Created)) / 3600)"
-                : "((SYSDATE - InOut.Created) * 24)";
+                ? "ROUND(CAST(EXTRACT(EPOCH FROM (LOCALTIMESTAMP - InOut.Created)) / 3600 AS NUMERIC), 4)"
+                : "ROUND((SYSDATE - InOut.Created) * 24, 4)";
 
             string headerSql = @"
                 SELECT InOut.M_InOut_ID AS GRN_ID,
