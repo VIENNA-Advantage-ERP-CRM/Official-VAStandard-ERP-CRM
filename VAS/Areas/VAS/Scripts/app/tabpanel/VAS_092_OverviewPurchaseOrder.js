@@ -689,9 +689,35 @@
             return MSG_DEFAULTS.hasOwnProperty(key) ? MSG_DEFAULTS[key] : key;
         }
 
+        // Every displayed value is readable on hover: the first time the pointer
+        // lands on an element with no tooltip of its own (and none inherited from
+        // an ancestor), its text - or an input's value - becomes its title.
+        // Tooltips set elsewhere are never replaced.
+        function bindValueHover($r) {
+            $r.on("mouseover", function (e) {
+                var el = e.target;
+                if (!el || el === $r[0] || $(el).closest("[title]:not([data-vh])", $r[0]).length) return;
+                var $el = $(el);
+                var txt;
+                if ($el.is("input,textarea,select")) {
+                    txt = $el.is("select") ? $el.find("option:selected").text() : $el.val();
+                } else {
+                    // Only the element's own text nodes - never its children's -
+                    // so each field shows just its own value.
+                    txt = "";
+                    for (var n = el.firstChild; n; n = n.nextSibling) {
+                        if (n.nodeType === 3) txt += n.nodeValue;
+                    }
+                }
+                txt = $.trim(txt || "").replace(/\s+/g, " ");
+                if (txt && txt.length <= 300) $el.attr({ "title": txt, "data-vh": "1" });
+            });
+        }
+
         this.init = function () {
             $root = $('<div class="vas_092-root"></div>');
-            $body = $('<div class="vas_092-body"></div>');
+            bindValueHover($root);
+            $body =$('<div class="vas_092-body"></div>');
             $emptyState = $('<div class="vas_092-empty" style="display:none;"></div>');
             $emptyState.text(getMsg("VAS_092_NoData"));
             $root.append($body).append($emptyState);
