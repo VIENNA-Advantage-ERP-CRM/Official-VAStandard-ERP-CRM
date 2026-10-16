@@ -20,7 +20,9 @@ namespace VIS.Controllers
     /// </summary>
     public class VAS_169_UnderConfirmationWidgetController : Controller
     {
-        private const string UnderConfirmationStatusInList = "'DP', 'UC'";
+        // Transfers that are in progress / waiting for confirmation AND have a drafted or in-progress
+        // confirmation (M_MovementConfirm). DP / UC are kept for compatibility with older flows.
+        private const string UnderConfirmationStatusInList = "'IP', 'WC', 'DP', 'UC'";
 
 // ===== NEW CODE START — currency format (agent C03, 2026-08-19) =====
         /// <summary>
@@ -46,7 +48,10 @@ namespace VIS.Controllers
                 SELECT COUNT(DISTINCT MMovement.M_Movement_ID) AS Under_Confirmation_Count
                 FROM M_Movement MMovement
                 WHERE MMovement.IsActive = 'Y'
-                  AND MMovement.DocStatus IN (" + UnderConfirmationStatusInList + @")";
+                  AND MMovement.DocStatus IN (" + UnderConfirmationStatusInList + @")
+                  AND EXISTS (SELECT 1 FROM M_MovementConfirm MConfirm
+                              WHERE MConfirm.M_Movement_ID = MMovement.M_Movement_ID AND MConfirm.IsActive = 'Y'
+                                AND MConfirm.DocStatus IN ('DR', 'IP'))";
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(
                 sql,
@@ -149,7 +154,10 @@ namespace VIS.Controllers
 //                SELECT COUNT(DISTINCT MMovement.M_Movement_ID) AS Under_Confirmation_Count
 //                FROM M_Movement MMovement
 //                WHERE MMovement.IsActive = 'Y'
-//                  AND MMovement.DocStatus IN (" + UnderConfirmationStatusInList + @")";
+//                  AND MMovement.DocStatus IN (" + UnderConfirmationStatusInList + @")
+                  AND EXISTS (SELECT 1 FROM M_MovementConfirm MConfirm
+                              WHERE MConfirm.M_Movement_ID = MMovement.M_Movement_ID AND MConfirm.IsActive = 'Y'
+                                AND MConfirm.DocStatus IN ('DR', 'IP'))";
 //
 //            sql = MRole.GetDefault(ctx).AddAccessSQL(
 //                sql,

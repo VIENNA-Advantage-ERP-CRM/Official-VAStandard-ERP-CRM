@@ -36,11 +36,18 @@
 
     var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-    function formatDate(iso) {
-        if (!iso) { return '—'; }
+    /* Dates arrive as "YYYY-MM-DDT00:00:00" without a time zone: read the calendar date as written
+       (UTC getters would show the previous day in time zones ahead of UTC). */
+    function ymd(iso) {
+        var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+        if (m) { return { y: +m[1], m: +m[2], d: +m[3] }; }
         var d = new Date(iso);
-        if (isNaN(d)) { return iso; }
-        return d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()] + ' ' + d.getUTCFullYear();
+        return isNaN(d) ? null : { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate() };
+    }
+
+    function formatDate(iso) {
+        var p = ymd(iso);
+        return p ? (p.d + ' ' + MONTHS[p.m - 1] + ' ' + p.y) : '—';
     }
 
     function formatQty(v) {
@@ -61,18 +68,20 @@
 
         var allRecords = [];
         var filtered = [];
-        var rowsPerPage = 2;
-        var MIN_ROWS = 2;
+        var rowsPerPage = 1;
+        var MIN_ROWS = 1;
         var page = 1;
-        var selMonth = 0;
-        var selYear = 0;
+        var HAS_FILTERS = false;
+        var now = new Date();
+        /* The running month and year are selected by default. */
+        var selMonth = HAS_FILTERS ? now.getMonth() + 1 : 0;
+        var selYear = HAS_FILTERS ? now.getFullYear() : 0;
         var loaded = false;
         var openMenu = '';
-        var HAS_FILTERS = false;
         var DATE_FIELD = 'InspectionDate';
 
         /* Single column template shared by the header row and every body row. */
-        var COLS = [{"label": "Transfer", "fr": 1.1}, {"label": "Product", "fr": 1.5}, {"label": "Parameter", "fr": 1.3}, {"label": "Actual", "fr": 0.8, "right": true}, {"label": "Result", "fr": 1.0}];
+        var COLS = [{"label": "Transfer", "fr": 1.0}, {"label": "Product", "fr": 1.3}, {"label": "Parameter", "fr": 1.2}, {"label": "Actual", "fr": 0.7, "right": true}, {"label": "Result", "fr": 1.5}];
         var GRID = COLS.map(function (c) { return 'minmax(0,' + c.fr + 'fr)'; }).join(' ');
 
         function rowCells(r) {
@@ -108,8 +117,8 @@
                     '<span class="vas-175-pills"></span>' +
                     (HAS_FILTERS ?
                     '<div class="vas-175-filters">' +
-                        '<div class="vas-175-dropdown" data-dd="m"><button type="button" class="vas-175-dropdown-btn"><span class="vas-175-dd-lbl">' + escapeHtml(lbl('VAS_175_Month', 'Month')) + '</span></button></div>' +
-                        '<div class="vas-175-dropdown" data-dd="y"><button type="button" class="vas-175-dropdown-btn"><span class="vas-175-dd-lbl">' + escapeHtml(lbl('VAS_175_Year', 'Year')) + '</span></button></div>' +
+                        '<div class="vas-175-dropdown" data-dd="m"><button type="button" class="vas-175-dropdown-btn"><span class="vas-175-dd-lbl">' + escapeHtml(MONTHS[selMonth - 1] || lbl('VAS_175_AllMonths', 'All Months')) + '</span></button></div>' +
+                        '<div class="vas-175-dropdown" data-dd="y"><button type="button" class="vas-175-dropdown-btn"><span class="vas-175-dd-lbl">' + escapeHtml(selYear ? String(selYear) : lbl('VAS_175_AllYears', 'All Years')) + '</span></button></div>' +
                     '</div>' : '') +
                 '</div>' +
                 '<div class="vas-175-table-wrap">' +
@@ -137,7 +146,7 @@
                 var key = $(this).closest('.vas-175-dropdown').attr('data-dd');
                 var val = parseInt($(this).attr('data-v'), 10);
                 if (key === 'm') { selMonth = val; } else { selYear = val; }
-                $(this).closest('.vas-175-dropdown').find('.vas-175-dd-lbl').text(val === 0 ? (key === 'm' ? lbl('VAS_175_Month', 'Month') : lbl('VAS_175_Year', 'Year')) : $(this).text());
+                $(this).closest('.vas-175-dropdown').find('.vas-175-dd-lbl').text(val === 0 ? (key === 'm' ? lbl('VAS_175_AllMonths', 'All Months') : lbl('VAS_175_AllYears', 'All Years')) : $(this).text());
                 closeMenus();
                 page = 1;
                 applyFilter();
@@ -182,7 +191,7 @@
         function years() {
             var set = {};
             set[new Date().getFullYear()] = 1;
-            allRecords.forEach(function (r) { var d = new Date(r[DATE_FIELD]); if (!isNaN(d)) { set[d.getUTCFullYear()] = 1; } });
+            allRecords.forEach(function (r) { var d = ymd(r[DATE_FIELD]); if (d) { set[d.y] = 1; } });
             return Object.keys(set).map(Number).sort(function (a, b) { return b - a; });
         }
 
@@ -192,6 +201,8 @@
                 for (var i = 0; i < entries.length; i++) {
                     var width = entries[i].contentRect.width;
                     if (width > 0) { $root[0].style.setProperty('--widget-inline-size', width + 'px'); }
+                    var height = entries[i].contentRect.height;
+                    if (height > 0) { $root[0].style.setProperty('--widget-block-size', height + 'px'); }
                 }
             });
             widgetObserver.observe($wrapper[0]);
@@ -213,10 +224,10 @@
         function applyFilter() {
             filtered = allRecords.filter(function (r) {
                 if (!selYear && !selMonth) { return true; }
-                var d = new Date(r[DATE_FIELD]);
-                if (isNaN(d)) { return false; }
-                if (selYear && d.getUTCFullYear() !== selYear) { return false; }
-                if (selMonth && (d.getUTCMonth() + 1) !== selMonth) { return false; }
+                var d = ymd(r[DATE_FIELD]);
+                if (!d) { return false; }
+                if (selYear && d.y !== selYear) { return false; }
+                if (selMonth && d.m !== selMonth) { return false; }
                 return true;
             });
             render();

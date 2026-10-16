@@ -60,7 +60,7 @@
         var selYear = now.getFullYear();
         var loaded = false;
         var cells = [];
-        var maxRows = 2;
+        var maxRows = 1;
         var maxCols = 3;
         var page = 1;
         var MAX_COLS_CAP = 10;
@@ -139,6 +139,8 @@
                 for (var i = 0; i < entries.length; i++) {
                     var width = entries[i].contentRect.width;
                     if (width > 0) { $root[0].style.setProperty('--widget-inline-size', width + 'px'); }
+                    var height = entries[i].contentRect.height;
+                    if (height > 0) { $root[0].style.setProperty('--widget-block-size', height + 'px'); }
                 }
             });
             widgetObserver.observe($wrapper[0]);
@@ -154,7 +156,7 @@
             var fs = parseFloat(window.getComputedStyle($root[0]).fontSize) || 16;
             var rowH = fs * (0.75 * 1.5 + 1.25) + 1;
             var headH = fs * (0.6875 * 1.5 + 1) + 1;
-            var rows = Math.max(2, Math.floor((body.clientHeight - headH) / rowH));
+            var rows = Math.max(1, Math.floor((body.clientHeight - headH) / rowH));
             var cols = Math.min(MAX_COLS_CAP, Math.max(2, Math.floor((body.clientWidth - fs * 5) / (fs * 4.5))));
             if (rows !== maxRows || cols !== maxCols) { maxRows = rows; maxCols = cols; render(); }
         }

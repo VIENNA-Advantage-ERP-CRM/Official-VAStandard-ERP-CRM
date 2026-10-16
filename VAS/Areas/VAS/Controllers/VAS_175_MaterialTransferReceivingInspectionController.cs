@@ -17,7 +17,7 @@ namespace VIS.Controllers
     /// Purpose     : Returns the quality inspection parameters captured on Material Transfer
     ///               confirmation lines (VA010_MoveConfParameters): parameter, acceptable
     ///               range, actual value, quantity to verify, date and remarks. A failed
-    ///               result is flagged but never blocks the confirmation.
+    ///               numeric result is flagged but never blocks the confirmation.
     /// ID Prefix   : VAS_175_
     /// </summary>
     public class VAS_175_MaterialTransferReceivingInspectionController : Controller
@@ -49,7 +49,8 @@ namespace VIS.Controllers
                        cp.VA010_QAQCDate       AS InspectionDate,
                        cp.Remark               AS Remark
                 FROM VA010_MoveConfParameters cp
-                INNER JOIN M_MovementConfirm mc ON mc.M_MovementConfirm_ID = cp.M_MovementConfirm_ID
+                INNER JOIN M_MovementLineConfirm lc ON lc.M_MovementLineConfirm_ID = cp.M_MovementLineConfirm_ID
+                INNER JOIN M_MovementConfirm mc ON mc.M_MovementConfirm_ID = lc.M_MovementConfirm_ID
                 LEFT JOIN M_Movement mm ON mm.M_Movement_ID = mc.M_Movement_ID
                 LEFT JOIN M_Product p ON p.M_Product_ID = cp.M_Product_ID
                 LEFT JOIN VA010_QualityParameters qp ON qp.VA010_QualityParameters_ID = cp.VA010_QualityParameters_ID
@@ -71,23 +72,22 @@ namespace VIS.Controllers
                     decimal max = Util.GetValueOfDecimal(dr["MaxValue"]);
                     string listValue = Util.GetValueOfString(dr["ListValue"]);
 
-                    // Pending (no actual value yet), Pass / Fail (numeric range or list value), NA
+                    // Actual = typed actual value, else the list value picked for the parameter.
+                    // Numeric range (Min/Max set + numeric actual) -> Pass / Fail.
+                    // Any other recorded value -> Recorded. Nothing recorded yet -> Pending.
+                    string shown = !string.IsNullOrEmpty(actual) ? actual : listValue;
                     string result = "Pending";
-                    if (!string.IsNullOrEmpty(actual))
+                    if (!string.IsNullOrEmpty(shown))
                     {
                         decimal a;
                         if ((min != 0 || max != 0) &&
-                            decimal.TryParse(actual, NumberStyles.Any, CultureInfo.InvariantCulture, out a))
+                            decimal.TryParse(shown, NumberStyles.Any, CultureInfo.InvariantCulture, out a))
                         {
                             result = (a >= min && (max == 0 || a <= max)) ? "Pass" : "Fail";
                         }
-                        else if (!string.IsNullOrEmpty(listValue))
-                        {
-                            result = string.Equals(actual.Trim(), listValue.Trim(), StringComparison.OrdinalIgnoreCase) ? "Pass" : "Fail";
-                        }
                         else
                         {
-                            result = "NA";
+                            result = "Recorded";
                         }
                     }
 
@@ -101,7 +101,7 @@ namespace VIS.Controllers
                         ParameterName = Util.GetValueOfString(dr["ParameterName"]),
                         MinValue = min,
                         MaxValue = max,
-                        ActualValue = actual,
+                        ActualValue = shown,
                         QtyToVerify = Util.GetValueOfDecimal(dr["QtyToVerify"]),
                         InspectionDate = dt.HasValue ? dt.Value.ToString("o") : "",
                         Remark = Util.GetValueOfString(dr["Remark"]),
