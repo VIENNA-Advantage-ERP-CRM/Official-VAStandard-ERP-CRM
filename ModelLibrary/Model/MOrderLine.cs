@@ -49,6 +49,8 @@ namespace VAdvantage.Model
         private int I_Order_ID = 0;
 
         private bool _fromProcess = false;
+        // set when the price limit was enforced on this line, so the user can be warned after save
+        private bool _priceLimitApplied = false;
 
         /** is Closed Document*/
         private bool isClosed = false;
@@ -1538,6 +1540,7 @@ namespace VAdvantage.Model
                                                      && Util.GetValueOfDecimal(GetLineNetAmt()).CompareTo(Decimal.Round(Decimal.Multiply(GetPriceLimit(), GetQtyEntered()), precision)) < 0)
                                                 {
                                                     SetPriceActual(GetPriceLimit());
+                                                    _priceLimitApplied = true;
                                                     SetPriceEntered(GetPriceLimit());
 
                                                     if (GetPriceList() != 0)
@@ -1613,6 +1616,7 @@ namespace VAdvantage.Model
                                                      && Util.GetValueOfDecimal(GetLineNetAmt()).CompareTo(Decimal.Round(Decimal.Multiply(GetPriceLimit(), GetQtyEntered()), precision)) < 0)
                                                 {
                                                     SetPriceActual(GetPriceLimit());
+                                                    _priceLimitApplied = true;
                                                     SetPriceEntered(GetPriceLimit());
 
                                                     if (GetPriceList() != 0)
@@ -1688,6 +1692,7 @@ namespace VAdvantage.Model
                                                      && Util.GetValueOfDecimal(GetLineNetAmt()).CompareTo(Decimal.Round(Decimal.Multiply(GetPriceLimit(), GetQtyEntered()), precision)) < 0)
                                                 {
                                                     SetPriceActual(GetPriceLimit());
+                                                    _priceLimitApplied = true;
                                                     SetPriceEntered(GetPriceLimit());
                                                     if (GetPriceList() != 0)
                                                     {
@@ -1762,6 +1767,7 @@ namespace VAdvantage.Model
                                                     && Util.GetValueOfDecimal(GetLineNetAmt()).CompareTo(Decimal.Round(Decimal.Multiply(GetPriceLimit(), GetQtyEntered()), precision)) < 0)
                                                 {
                                                     SetPriceActual(GetPriceLimit());
+                                                    _priceLimitApplied = true;
                                                     SetPriceEntered(GetPriceLimit());
 
                                                     if (GetPriceList() != 0)
@@ -1838,6 +1844,7 @@ namespace VAdvantage.Model
                                                  && Util.GetValueOfDecimal(GetLineNetAmt()).CompareTo(Decimal.Round(Decimal.Multiply(GetPriceLimit(), GetQtyEntered()), precision)) < 0)
                                                 {
                                                     SetPriceActual(GetPriceLimit());
+                                                    _priceLimitApplied = true;
                                                     SetPriceEntered(GetPriceLimit());
 
                                                     if (GetPriceList() != 0)
@@ -1914,6 +1921,7 @@ namespace VAdvantage.Model
                                                  && Util.GetValueOfDecimal(GetLineNetAmt()).CompareTo(Decimal.Round(Decimal.Multiply(GetPriceLimit(), GetQtyEntered()), precision)) < 0)
                                                 {
                                                     SetPriceActual(GetPriceLimit());
+                                                    _priceLimitApplied = true;
                                                     SetPriceEntered(GetPriceLimit());
                                                     if (GetPriceList() != 0)
                                                     {
@@ -1989,6 +1997,7 @@ namespace VAdvantage.Model
                                               && Util.GetValueOfDecimal(GetLineNetAmt()).CompareTo(Decimal.Round(Decimal.Multiply(GetPriceLimit(), GetQtyEntered()), precision)) < 0)
                                                 {
                                                     SetPriceActual(GetPriceLimit());
+                                                    _priceLimitApplied = true;
                                                     SetPriceEntered(GetPriceLimit());
 
                                                     if (GetPriceList() != 0)
@@ -2051,6 +2060,7 @@ namespace VAdvantage.Model
                                         && Util.GetValueOfDecimal(GetLineNetAmt()).CompareTo(Decimal.Round(Decimal.Multiply(GetPriceLimit(), GetQtyEntered()), precision)) < 0)
                                 {
                                     SetPriceActual(GetPriceLimit());
+                                    _priceLimitApplied = true;
                                     SetPriceEntered(GetPriceLimit());
 
                                     if (GetPriceList() != 0)
@@ -2106,6 +2116,7 @@ namespace VAdvantage.Model
                                     && Util.GetValueOfDecimal(GetLineNetAmt()).CompareTo(Decimal.Round(Decimal.Multiply(GetPriceLimit(), GetQtyEntered()), precision)) < 0)
                             {
                                 SetPriceActual(GetPriceLimit());
+                                _priceLimitApplied = true;
                                 SetPriceEntered(GetPriceLimit());
 
                                 if (GetPriceList() != 0)
@@ -2215,6 +2226,7 @@ namespace VAdvantage.Model
                                   && Util.GetValueOfDecimal(GetLineNetAmt()).CompareTo(Decimal.Round(Decimal.Multiply(GetPriceLimit(), GetQtyEntered()), precision)) < 0)
                         {
                             SetPriceActual(GetPriceLimit());
+                            _priceLimitApplied = true;
                             SetPriceEntered(GetPriceLimit());
 
                             if (GetPriceList() != 0)
@@ -3728,9 +3740,12 @@ namespace VAdvantage.Model
         public void SetDiscount()
         {
             Decimal list = GetPriceList();
-            //	No List Price
+            //	No List Price - nothing to derive a discount from, so clear any stale one
             if (Env.ZERO.CompareTo(list) == 0)
+            {
+                SetDiscount(Env.ZERO);
                 return;
+            }
             //BigDecimal discount = list.subtract(getPriceActual()).multiply(new BigDecimal(100)).divide(list, getPrecision(), BigDecimal.ROUND_HALF_UP);
             Decimal discount = Decimal.Round(Decimal.Divide(Decimal.Multiply(Decimal.Subtract(list, GetPriceEntered()), new Decimal(100)), list), GetPrecision(), MidpointRounding.AwayFromZero);
 
@@ -4441,6 +4456,7 @@ namespace VAdvantage.Model
             }
 
             //Calculations & Rounding            	    
+            _priceLimitApplied = false;
             SetLineNetAmt(); //extended Amount with or without tax
 
             // if change the Quantity then recalculate tax and surcharge amount.
@@ -5012,7 +5028,14 @@ namespace VAdvantage.Model
                     }
                 }
 
-                // Warning message needs to display in case Entered Price is less than Cost of the Product on Sales Order                
+                // Tell the user when the entered price was replaced by the product's price limit
+                if (_priceLimitApplied)
+                {
+                    _priceLimitApplied = false;
+                    log.SaveWarning("", Msg.GetMsg(GetCtx(), "VIS_PriceLimitApplied"));
+                }
+
+                // Warning message needs to display in case Entered Price is less than Cost of the Product on Sales Order
                 if (Ord.IsSOTrx() && !Ord.IsReturnTrx() && GetM_Product_ID() > 0)
                 {
                     if (GetProduct().GetProductType().Equals("I") && GetPriceEntered() < GetCurrentCostPrice())
