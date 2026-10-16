@@ -39,6 +39,9 @@ namespace VIS.Controllers
                 FROM M_Movement mm
                 WHERE mm.IsActive = 'Y'
                   AND mm.DocStatus IN (" + PendingStatusInList + @")
+                  AND EXISTS (SELECT 1 FROM M_MovementConfirm mc
+                              WHERE mc.M_Movement_ID = mm.M_Movement_ID AND mc.IsActive = 'Y'
+                                AND mc.DocStatus IN ('DR', 'IP'))
                 ORDER BY mm.MovementDate ASC";
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "mm", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
@@ -148,8 +151,8 @@ namespace VIS.Controllers
                     ml.Line                     AS LineNo,
                     p.Name                      AS ItemName,
                     COALESCE(u.UOMSymbol, u.Name) AS UOM,
-                    COALESCE(asi.Description, '') AS AttributeSetInstance,
-                    COALESCE(lDst.Value, lDst.LocatorCombination, '') AS ScrapLocator,
+                    COALESCE(asi.Description, N'') AS AttributeSetInstance,
+                    COALESCE(lDst.Value, lDst.LocatorCombination, N'') AS ScrapLocator,
                     COALESCE(ml.MovementQty, 0) AS TargetQty,
                     ml.ConfirmedQty             AS ConfirmedQty,
                     COALESCE(ml.ScrappedQty, 0) AS ScrappedQty,
