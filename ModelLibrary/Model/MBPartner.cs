@@ -1003,20 +1003,16 @@ namespace VAdvantage.Model
             if (_group == null)
                 return;
             SetC_BP_Group_ID(_group.GetC_BP_Group_ID());
-            if (_group.GetC_Dunning_ID() != 0)
+            // Category defaults only fill values the partner does not already have
+            if (GetC_Dunning_ID() == 0 && _group.GetC_Dunning_ID() != 0)
                 SetC_Dunning_ID(_group.GetC_Dunning_ID());
-            // if pricelist already selected from UI then skip..
-            if (base.GetM_PriceList_ID() > 0) { }
-            else
-            {
-                if (_group.GetM_PriceList_ID() != 0)
-                    SetM_PriceList_ID(_group.GetM_PriceList_ID());
-            }
-            if (_group.GetPO_PriceList_ID() != 0)
+            if (base.GetM_PriceList_ID() == 0 && _group.GetM_PriceList_ID() != 0)
+                SetM_PriceList_ID(_group.GetM_PriceList_ID());
+            if (GetPO_PriceList_ID() == 0 && _group.GetPO_PriceList_ID() != 0)
                 SetPO_PriceList_ID(_group.GetPO_PriceList_ID());
-            if (_group.GetM_DiscountSchema_ID() != 0)
+            if (GetM_DiscountSchema_ID() == 0 && _group.GetM_DiscountSchema_ID() != 0)
                 SetM_DiscountSchema_ID(_group.GetM_DiscountSchema_ID());
-            if (_group.GetPO_DiscountSchema_ID() != 0)
+            if (GetPO_DiscountSchema_ID() == 0 && _group.GetPO_DiscountSchema_ID() != 0)
                 SetPO_DiscountSchema_ID(_group.GetPO_DiscountSchema_ID());
         }
 

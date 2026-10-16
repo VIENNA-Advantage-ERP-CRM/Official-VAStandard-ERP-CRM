@@ -771,8 +771,13 @@ namespace VAdvantage.Model
                 if (!prjph.IsOpportunity())
                 {
                     //Used transaction because total was not updating on header
-                    decimal plnAmt = Util.GetValueOfDecimal(DB.ExecuteScalar("SELECT COALESCE(SUM(PlannedAmt),0) FROM C_ProjectPhase WHERE IsActive= 'Y' AND C_Project_ID= " + GetC_Project_ID(), null, Get_TrxName()));
-                    DB.ExecuteQuery("UPDATE C_Project SET PlannedAmt=" + plnAmt + " WHERE C_Project_ID=" + GetC_Project_ID(), null, Get_TrxName());
+                    // Only derive the total from phases when there are any; otherwise keep the entered amount
+                    int phaseCount = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(C_ProjectPhase_ID) FROM C_ProjectPhase WHERE IsActive= 'Y' AND C_Project_ID= " + GetC_Project_ID(), null, Get_TrxName()));
+                    if (phaseCount > 0)
+                    {
+                        decimal plnAmt = Util.GetValueOfDecimal(DB.ExecuteScalar("SELECT COALESCE(SUM(PlannedAmt),0) FROM C_ProjectPhase WHERE IsActive= 'Y' AND C_Project_ID= " + GetC_Project_ID(), null, Get_TrxName()));
+                        DB.ExecuteQuery("UPDATE C_Project SET PlannedAmt=" + plnAmt + " WHERE C_Project_ID=" + GetC_Project_ID(), null, Get_TrxName());
+                    }
                 }
             }
             return success;
