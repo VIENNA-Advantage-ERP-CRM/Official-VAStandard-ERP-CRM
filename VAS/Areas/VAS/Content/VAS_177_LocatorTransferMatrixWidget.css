@@ -1,0 +1,79 @@
+/* Locator Transfer Matrix Widget (VAS_177) - all selectors prefixed .vas-177- */
+.vas-177-container { width: 100%; height: 100%; container-type: inline-size; box-sizing: border-box; }
+
+.vas-177-root {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    font-family: 'Roboto', sans-serif;
+    font-size: clamp(14px, calc(var(--widget-inline-size, 380px) * 0.04), 18px);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    backdrop-filter: blur(10px);
+    padding: 0.85em;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.vas-177-root, .vas-177-root * { box-sizing: border-box; }
+
+.vas-177-header-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.5em;
+    flex-shrink: 0; padding: 0.4em 0.4em; border-bottom: 1px solid #C5D2DD;
+}
+.vas-177-left-cluster { display: flex; align-items: center; gap: 0.6em; min-width: 0; flex: 1; }
+.vas-177-icon-well {
+    width: 34px; height: 34px; border-radius: 12px; flex-shrink: 0;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(232, 244, 255, 0.96));
+    box-shadow: inset 0 0 0 1px rgba(31, 131, 255, 0.12);
+    display: flex; align-items: center; justify-content: center; color: #0083DA;
+}
+.vas-177-icon-well svg { width: 18px; height: 18px; display: block; stroke: #0083DA; }
+.vas-177-title-block { display: flex; flex-direction: column; min-width: 0; }
+.vas-177-title { font-size: 1.05em; color: #102C3F; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vas-177-subtitle { font-size: 0.8em; color: #717182; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vas-177-count-pill {
+    font-size: 0.75em; font-weight: 700; color: #106AB0; background-color: #DFF1FF;
+    border-radius: 999px; padding: 0.2em 0.65em; white-space: nowrap; flex-shrink: 0;
+}
+.vas-177-filters { display: flex; gap: 0.35em; flex-shrink: 0; }
+
+.vas-177-toolbar { display: flex; gap: 0.4em; padding: 0.5em 0.2em 0.3em; flex-shrink: 0; }
+.vas-177-search {
+    flex: 1; min-width: 0; font-size: 0.8em; padding: 0.35em 0.6em; color: #102C3F;
+    border: 1px solid #C5D2DD; border-radius: 8px; background: rgba(255, 255, 255, 0.8); outline: none;
+}
+.vas-177-sel {
+    font-size: 0.8em; padding: 0.3em 0.4em; color: #102C3F; border: 1px solid #C5D2DD;
+    border-radius: 8px; background: rgba(255, 255, 255, 0.8); outline: none; max-width: 40%;
+}
+
+.vas-177-table-wrap { flex: 1; min-height: 0; overflow: auto; }
+.vas-177-body { width: 100%; }
+.vas-177-table { width: 100%; border-collapse: collapse; font-size: 0.8em; color: #102C3F; }
+.vas-177-table th {
+    text-align: left; font-weight: 500; color: #717182; padding: 0.4em 0.5em;
+    border-bottom: 1px solid #C5D2DD; white-space: nowrap; max-width: 9em; overflow: hidden; text-overflow: ellipsis;
+}
+.vas-177-table td { padding: 0.45em 0.5em; border-bottom: 1px solid rgba(197, 210, 221, 0.5); max-width: 12em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vas-177-empty { padding: 1.5em 0.5em; text-align: center; color: #717182; font-size: 0.85em; }
+
+.vas-177-pager { display: flex; align-items: center; justify-content: flex-end; gap: 0.5em; padding-top: 0.4em; flex-shrink: 0; font-size: 0.8em; color: #717182; }
+.vas-177-pg {
+    border: 1px solid #C5D2DD; background: rgba(255, 255, 255, 0.8); color: #106AB0; border-radius: 8px;
+    width: 1.8em; height: 1.8em; cursor: pointer; line-height: 1;
+}
+.vas-177-pg:disabled { opacity: 0.4; cursor: default; }
+
+.vas-177-pill { display: inline-block; font-size: 0.85em; padding: 0.1em 0.6em; border-radius: 999px; font-weight: 500; }
+.vas-177-pill--pass { background: #DDF5E7; color: #20A464; }
+.vas-177-pill--fail { background: #FDE3E3; color: #D23C3C; }
+.vas-177-pill--pending, .vas-177-pill--na { background: #EEF1F4; color: #717182; }
+
+/* matrix (VAS_177) */
+.vas-177-table th { text-align: center; }
+.vas-177-corner, .vas-177-rowhead { text-align: left !important; }
+.vas-177-cell { text-align: center; font-weight: 500; }
+.vas-177-cell--none { color: #B0BAC4; background: transparent; }

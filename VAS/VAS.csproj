@@ -471,6 +471,9 @@
     <Compile Include="Areas\VAS\Controllers\VAS_172_PendingTransferConfirmationWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_173_TransfersByWarehouseWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_174_TransferQueueWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_175_MaterialTransferReceivingInspectionController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_176_MaterialTransferHistoryWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_177_LocatorTransferMatrixWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_LeadController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_PaymentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_RequestController.cs" />
@@ -573,6 +576,9 @@
     <Content Include="Areas\VAS\Content\VAS_172_PendingTransferConfirmationWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_173_TransfersByWarehouseWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_174_TransferQueueWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_175_MaterialTransferReceivingInspectionModal.css" />
+    <Content Include="Areas\VAS\Content\VAS_176_MaterialTransferHistoryWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_177_LocatorTransferMatrixWidget.css" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_123_QuotationRightPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\BankingJournal\VAS_236_ReceiptvsPaymentWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\BankingJournal\VAS_238_UnreconciledBankLineWidget.js" />
@@ -586,6 +592,9 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_172_PendingTransferConfirmationWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_173_TransfersByWarehouseWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_174_TransferQueueWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_175_MaterialTransferReceivingInspectionModal.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_176_MaterialTransferHistoryWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_177_LocatorTransferMatrixWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_092_OverviewPurchaseOrder.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_167_PurchaseOrderLandedCost.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_098_PurchaseRequisition.js" />
