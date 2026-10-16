@@ -74,6 +74,7 @@ namespace VAS.Controllers
     /// Chronological development:
     ///   VAI052      2026-09-14 Created
     /// </summary>
+    [System.Web.Mvc.SessionState(System.Web.SessionState.SessionStateBehavior.ReadOnly)]
     public class VAS_276_QuotationConversionWidgetController : Controller
     {
         private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_276_QuotationConversionWidgetController).FullName);
@@ -177,7 +178,7 @@ namespace VAS.Controllers
                    AND q.IsActive = 'Y'
                    AND q.IsSOTrx = 'Y'
                    AND COALESCE(q.IsReturnTrx, 'N') = 'N'
-                   AND q.IsSalesQuotation = 'Y'
+                   AND (q.IsSalesQuotation = 'Y' OR EXISTS (SELECT 1 FROM C_DocType dtq WHERE dtq.C_DocType_ID = q.C_DocTypeTarget_ID AND dtq.DocSubTypeSO IN ('ON', 'OB')))
                    AND q.DocStatus = 'CO'
                    AND q.DateOrdered >= @Period_Start
                    AND q.DateOrdered < @Period_End";
@@ -214,7 +215,7 @@ namespace VAS.Controllers
                                              AND so.IsActive = 'Y'
                                              AND so.IsSOTrx = 'Y'
                                              AND COALESCE(so.IsReturnTrx, 'N') = 'N'
-                                             AND COALESCE(so.IsSalesQuotation, 'N') = 'N'
+                                             AND EXISTS (SELECT 1 FROM C_DocType dt WHERE dt.C_DocType_ID = so.C_DocTypeTarget_ID AND dt.DocSubTypeSO IN ('SO', 'WR', 'BO'))
                                              AND so.DocStatus IN ('CO', 'CL') )
                      WHERE ql.IsActive = 'Y'
                      GROUP BY ql.C_Order_ID

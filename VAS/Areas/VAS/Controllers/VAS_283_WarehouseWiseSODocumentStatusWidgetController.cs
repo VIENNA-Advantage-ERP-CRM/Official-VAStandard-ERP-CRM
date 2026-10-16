@@ -70,6 +70,7 @@ namespace VAS.Controllers
     /// Chronological development:
     ///   VAI052      2026-09-14 Created
     /// </summary>
+    [System.Web.Mvc.SessionState(System.Web.SessionState.SessionStateBehavior.ReadOnly)]
     public class VAS_283_WarehouseWiseSODocumentStatusWidgetController : Controller
     {
         private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_283_WarehouseWiseSODocumentStatusWidgetController).FullName);
@@ -212,7 +213,7 @@ namespace VAS.Controllers
                  WHERE o.AD_Client_ID = @AD_Client_ID
                    AND o.IsActive = 'Y'
                    AND o.IsSOTrx = 'Y'
-                   AND COALESCE(o.IsSalesQuotation, 'N') = 'N'
+                   AND EXISTS (SELECT 1 FROM C_DocType dt WHERE dt.C_DocType_ID = o.C_DocTypeTarget_ID AND dt.DocSubTypeSO IN ('SO', 'WR', 'BO'))
                    AND COALESCE(o.IsReturnTrx, 'N') = 'N'
                    AND o.DocStatus IN ('DR', 'IP', 'CO')
                    AND o.DateOrdered >= @Period_Start

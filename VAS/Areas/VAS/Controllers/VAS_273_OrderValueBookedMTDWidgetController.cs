@@ -68,6 +68,7 @@ namespace VAS.Controllers
     /// Chronological development:
     ///   VAI052      2026-09-14 Created
     /// </summary>
+    [System.Web.Mvc.SessionState(System.Web.SessionState.SessionStateBehavior.ReadOnly)]
     public class VAS_273_OrderValueBookedMTDWidgetController : Controller
     {
         private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_273_OrderValueBookedMTDWidgetController).FullName);
@@ -194,7 +195,7 @@ namespace VAS.Controllers
                    AND o.IsActive = 'Y'
                    AND o.IsSOTrx = 'Y'
                    AND COALESCE(o.IsReturnTrx, 'N') = 'N'
-                   AND COALESCE(o.IsSalesQuotation, 'N') = 'N'
+                   AND EXISTS (SELECT 1 FROM C_DocType dt WHERE dt.C_DocType_ID = o.C_DocTypeTarget_ID AND dt.DocSubTypeSO IN ('SO', 'WR', 'BO'))
                    AND o.DocStatus IN ('CO', 'CL')
                    AND o.DateOrdered >= @Period_Start
                    AND o.DateOrdered < @Period_End";
@@ -309,7 +310,7 @@ namespace VAS.Controllers
                    AND o.IsActive = 'Y'
                    AND o.IsSOTrx = 'Y'
                    AND COALESCE(o.IsReturnTrx, 'N') = 'N'
-                   AND COALESCE(o.IsSalesQuotation, 'N') = 'N'
+                   AND EXISTS (SELECT 1 FROM C_DocType dt WHERE dt.C_DocType_ID = o.C_DocTypeTarget_ID AND dt.DocSubTypeSO IN ('SO', 'WR', 'BO'))
                    AND o.DocStatus IN ('CO', 'CL')
                    AND o.DateOrdered >= @Prev_Period_Start
                    AND o.DateOrdered < @Prev_Period_End";
