@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Category Mix Widget
  * Widget number 113 - reassign on hand-off.
  * Ranked share of active items per product category (name, share bar, %,
@@ -26,7 +26,7 @@
  * 16 | On Hand                               | VAS_113_OnHand
  * 17 | Stock Value                           | VAS_113_StockValue
  * 18 | Previous page / Next page             | VAS_PreviousPage / VAS_NextPage
- * 19 | Close                                 | Close
+ * 19 | Close                                 | VAS_ClosePopup
  * 20 | Render error:                         | VAS_113_RenderError
  */
 ; VAS = window.VAS || {};
@@ -45,6 +45,7 @@
         var $empty;
         var $footHelper;
         var $pageText;
+        var $pager;
         var $prevButton;
         var $nextButton;
         var $footer;
@@ -170,6 +171,9 @@
             $pageText.text((state.page + 1) + ' ' + label('VAS_Of', 'of') + ' ' + pages);
             $prevButton.prop('disabled', state.page === 0);
             $nextButton.prop('disabled', state.page >= pages - 1);
+            // Pager only when the categories span more than one page (Widget_Bug_Fix Sr 42). Hidden
+            // with visibility (not display) so the footer keeps its height and rows don't shift.
+            $pager.css('visibility', pages > 1 ? '' : 'hidden');
         }
 
         function showError() {
@@ -245,7 +249,7 @@
             $modalBadge = $modal.find('.MPC-cm-modal-badge');
             $modalBody = $modal.find('.MPC-cm-modal-body');
 
-            var closeText = label('Close', 'Close');
+            var closeText = label('VAS_ClosePopup', 'Close');
             $modal.find('.MPC-cm-modal-close').attr({ 'aria-label': closeText, title: closeText });
             $('body').append($modal);
 
@@ -453,6 +457,7 @@
             $empty = $card.find('.MPC-cm-empty');
             $footHelper = $card.find('.MPC-cm-foot-helper');
             $pageText = $card.find('.MPC-cm-pgtext');
+            $pager = $card.find('.MPC-cm-pager');
             $footer = $card.find('.MPC-cm-foot');
             $busy = $card.find('.vis-busyindicatorouterwrap');
 

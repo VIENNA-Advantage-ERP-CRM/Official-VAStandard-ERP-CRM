@@ -73,6 +73,17 @@ namespace VAdvantage.Model
             //	Set Currency
             if (Is_ValueChanged("M_PriceList_Version_ID") && GetM_PriceList_Version_ID() != 0)
             {
+                int linesCount = Util.GetValueOfInt(DB.ExecuteScalar($@"SELECT
+	count(vo.vas_opplines_id)
+FROM
+	vas_opplines vo
+WHERE
+	vo.vas_opportunity_id = {GetVAS_Opportunity_ID()}"));
+                if (linesCount > 0)
+                {
+                    log.SaveWarning("Warning", Msg.GetMsg(GetCtx(), "VAS_DeleteLinesFirst"));
+                    return false;
+                }
                 MPriceList pl = MPriceList.Get(GetCtx(), GetM_PriceList_ID(), null);
                 if (pl != null && pl.Get_ID() != 0)
                     SetC_Currency_ID(pl.GetC_Currency_ID());

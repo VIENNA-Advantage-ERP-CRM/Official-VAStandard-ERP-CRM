@@ -23,7 +23,7 @@
  *  7 | products (count prepended in code)    | VAS_129_PBT_ModalSub
  *  8 | Active / Inactive                     | VAS_129_PBT_Active / VAS_129_PBT_Inactive
  *  9 | Showing / of                          | VAS_Showing / VAS_Of
- * 10 | No products of this type.             | VAS_129_PBT_EmptyState
+ * 10 | No products are available for the selected product type. | VAS_129_PBT_EmptyState
  * 11 | Couldn't load / Retry                 | VAS_CouldntLoad / VAS_129_PBT_Retry
  * 12 | Close                                 | Close
  */
@@ -531,7 +531,7 @@
             if (!state.modalItems.length) {
                 els.mBody.innerHTML = '';
                 els.mBody.appendChild(buildModalHeadRow());
-                els.mBody.appendChild(el('div', 'MPC-pt-state', lbl('VAS_129_PBT_EmptyState', 'No products of this type.')));
+                els.mBody.appendChild(el('div', 'MPC-pt-state', lbl('VAS_129_PBT_EmptyState', 'No products are available for the selected product type.')));
                 els.mHelper.textContent = '';
                 els.mPageText.textContent = '1 ' + lbl('VAS_Of', 'of') + ' 1';
                 els.mPrev.disabled = true;

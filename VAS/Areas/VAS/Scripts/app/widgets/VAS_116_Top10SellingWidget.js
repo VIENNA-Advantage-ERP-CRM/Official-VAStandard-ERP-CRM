@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Top 10 Selling Widget (Highest / Lowest)
  * Widget number 116 - reassign on hand-off.
  * Ranked bar list of the ten best (or worst) selling products by current
@@ -24,11 +24,18 @@
  *  8 | Couldn't load                         | VAS_CouldntLoad
  *  9 | Rank                                  | VAS_116_Rank
  * 10 | Previous page / Next page             | VAS_PreviousPage / VAS_NextPage
- * 11 | Close                                 | Close
+ * 11 | Close                                 | VAS_ClosePopup
  * 12 | Product Performance modal texts       | VAS_116_* keys (own copies of
  *    |                                       | the VAS_094 widget's message
  *    |                                       | set, incl. VAS_116_LastYear) +
  *    |                                       | VAS_CurrentYear
+ *
+ * Widget_Bug_Fix 2026-10-15 (popup): the "Strong performer" badge and the "Consider raising stock
+ * levels..." note (VAS_116_TopSellerNote) are no longer shown; the hero shows the product picture
+ * or a product-type placeholder; revenue is net of tax for tax-inclusive Price Lists and
+ * negative-stock warehouses are left out (flags passed to VAS_094 GetProductPerformance). The
+ * popup keys VAS_116_TopSeller, VAS_116_UoM, VAS_116_Location, VAS_116_Locations and
+ * VAS_116_NonStockNoInventory must exist on the message server (they rendered as [KEY]).
  */
 ; VAS = window.VAS || {};
 
@@ -255,6 +262,32 @@
             return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (paths[name] || '') + '</svg>';
         }
 
+        /* No-image placeholder by product type, same glyphs as the Product tab panel
+           (VAS_190_ProductOverviewRightPanel): Item box, Service wrench, Resource person,
+           Expense receipt; anything else is drawn as an item. */
+        var PRODUCT_PLACEHOLDER_SVG = {
+            I: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.3 7 12 12 20.7 7"/><line x1="12" y1="22" x2="12" y2="12"/></svg>',
+            S: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
+            R: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="7.5" r="3.5"/><path d="M5 20.5c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="M16.5 3.5l1 1.5M19.5 7.5h-1.8"/></svg>',
+            E: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3h14v18l-2.33-1.5L14.33 21 12 19.5 9.67 21l-2.34-1.5L5 21z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>'
+        };
+
+        function productPlaceholderIcon(code) {
+            return PRODUCT_PLACEHOLDER_SVG[String(code || '').toUpperCase()] || PRODUCT_PLACEHOLDER_SVG.I;
+        }
+
+        // The server returns an absolute URL, a data: URI, or a path relative to the application
+        // root ("Images/..."); only the last needs the context prefix.
+        function resolveImageSrc(stored) {
+            var url = String(stored || '').trim();
+            if (!url) { return ''; }
+            if (/^(https?:)?\/\//i.test(url) || /^data:/i.test(url)) { return url; }
+            var base = '';
+            try { base = VIS.Application.contextUrl || ''; } catch (e) { base = ''; }
+            if (base && base.charAt(base.length - 1) !== '/') { base += '/'; }
+            return base + url.replace(/^\//, '');
+        }
+
         function createModal() {
             if ($modal) { return; }
 
@@ -280,7 +313,7 @@
             $modalBody = $modal.find('.MPC-hsp-modal-body');
             $modalBusy = $modal.find('.MPC-hsp-modal-busy');
 
-            var closeText = label('Close', 'Close');
+            var closeText = label('VAS_ClosePopup', 'Close');
             $modal.find('.MPC-hsp-modal-close').attr({ 'aria-label': closeText, title: closeText });
             $('body').append($modal);
 
@@ -320,7 +353,9 @@
                 url: VIS.Application.contextUrl + 'VAS_094_HighestSellingProductsWidget/GetProductPerformance',
                 type: 'GET',
                 cache: false,
-                data: { productId: productId },
+                // excludeTax / positiveStockOnly: Widget_Bug_Fix Sr 56 / 58 - revenue net of tax on tax-inclusive
+                // Price Lists, and no negative-stock warehouses in "Stock On Hand".
+                data: { productId: productId, excludeTax: true, positiveStockOnly: true },
                 success: function (response) {
                     var result = response;
                     if (typeof result === 'string' && result) { result = JSON.parse(result); }
@@ -401,8 +436,8 @@
             var growth = performanceGrowth(data);
             var averagePrice = Number(data.current_year_units || 0) !== 0 ? formatFullAmount(data.avg_selling_price) : '-';
 
+            // The "Strong performer" badge was removed from both popups (Widget_Bug_Fix Sr 57).
             var chips =
-                '<span class="MPC-hsp-chip">' + escapeHtml(label('VAS_116_StrongPerformer', 'Strong performer')) + '</span>' +
                 '<span class="MPC-hsp-chip">' + escapeHtml(label('VAS_116_UoM', 'UoM') + ' · ' + uomName) + '</span>' +
                 '<span class="MPC-hsp-chip">' + escapeHtml(performanceSourcingChip(data)) + '</span>';
 
@@ -412,9 +447,15 @@
                 '<div class="MPC-hsp-pstat"><span class="MPC-hsp-pstat-label">' + escapeHtml(label('VAS_116_AvgSellingPrice', 'Avg Selling Price')) + '</span><span class="MPC-hsp-pstat-value">' + escapeHtml(averagePrice) + '</span></div>' +
                 '<div class="MPC-hsp-pstat"><span class="MPC-hsp-pstat-label">' + escapeHtml(label('VAS_116_YoYGrowth', 'YoY Growth')) + '</span><span class="MPC-hsp-pstat-value MPC-hsp-tone-' + growth.tone + '">' + escapeHtml(growth.text) + '</span></div>';
 
+            // Product picture, or the product-type placeholder when it has none (Widget_Bug_Fix Sr 55).
+            var heroImageSrc = resolveImageSrc(data.image_url);
+            var heroVisual = heroImageSrc
+                ? '<span class="MPC-hsp-phero-ico MPC-hsp-has-image"><img class="MPC-hsp-phero-img" src="' + escapeHtml(heroImageSrc) + '" alt=""></span>'
+                : '<span class="MPC-hsp-phero-ico">' + productPlaceholderIcon(data.product_type) + '</span>';
+
             var hero =
                 '<div class="MPC-hsp-phero">' +
-                    '<span class="MPC-hsp-phero-ico">' + modalIcon('trend') + '</span>' +
+                    heroVisual +
                     '<span class="MPC-hsp-phero-main">' +
                         '<span class="MPC-hsp-phero-name" title="' + escapeHtml(data.product_name || '') + '">' + escapeHtml(data.product_name || '') + '</span>' +
                         '<span class="MPC-hsp-phero-chips">' + chips + '</span>' +
@@ -500,19 +541,20 @@
                     '</div>';
             }
 
-            var note =
-                '<div class="MPC-hsp-mnote">' + modalIcon('clock') +
-                    '<span>' + escapeHtml(label('VAS_116_TopSellerNote', 'Consider raising stock levels to avoid missed sales during peak demand.')) + '</span>' +
-                '</div>';
-
+            // The "Consider raising stock levels ..." note (VAS_116_TopSellerNote) was removed from the
+            // popup (Widget_Bug_Fix Sr 59).
             $modalBody.html(
                 hero +
                 '<div class="MPC-hsp-mcols">' +
                     '<div class="MPC-hsp-mcol">' + attributesBlock + yoyBlock + '</div>' +
                     '<div class="MPC-hsp-mcol">' + stockBlock + '</div>' +
-                '</div>' +
-                note
+                '</div>'
             );
+
+            // A picture that fails to load degrades to the product-type placeholder.
+            $modalBody.find('.MPC-hsp-phero-img').on('error', function () {
+                $(this).closest('.MPC-hsp-phero-ico').removeClass('MPC-hsp-has-image').html(productPlaceholderIcon(data.product_type));
+            });
 
             if (isStockedProduct && modalStockRows.length) {
                 renderPerformanceStockPage(uomName);

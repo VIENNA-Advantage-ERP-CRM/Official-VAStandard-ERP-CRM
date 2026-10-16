@@ -40,13 +40,36 @@ namespace VAS.Controllers
     /// - COALESCE used for NULL coalescing (Oracle & PostgreSQL portable)
     /// - Parameterized SQL statements with MRole tenant/org access enforcement
     /// - Zero provider-specific SQL functions (no DECODE, NVL, TRUNC, etc.)
+    ///
+    /// Chronological development:
+    ///   Claude 2026-10-16 Widget_Bug_Fix Sr 148-154, GetPurchaseOrderDetail (PO detail pop-up):
+    ///     UOM shown by full name ("Each", not the "Ea" symbol); a charge line shows the selected
+    ///     charge name instead of "Standard Product"; ordered / received / pending are scaled to the
+    ///     line's selected UOM (QtyEntered, as VAS_206 does); pending counts Item-type products only
+    ///     (charges and other product types are excluded).
+    ///   Claude 2026-10-16 Widget_Bug_Fix Sr 154 (re-done): tax-inclusive is judged by the order's PRICE LIST
+    ///     (M_PriceList.IsTaxIncluded), as the Purchase Order window does (VAS_092 / VAS_303), not by
+    ///     C_Order.IsTaxIncluded, which is a copy taken when the list was assigned and can be stale. On a
+    ///     tax-inclusive list each line shows LineNetAmt less its tax (TaxAmt + SurchargeAmt, or derived from
+    ///     the tax rate when the line's TaxAmt is 0), and subTotal = SUM(LineNetAmt) - SUM(C_OrderTax.TaxAmt).
+    ///   Claude 2026-10-16 Sr 154 (final, user rule: "if the price list IsTaxIncluded = Y reduce that tax amount
+    ///     and then show the value; if N show it directly; also applies to the total amount"): the pop-up shows
+    ///     amounts WITHOUT tax. Inclusive list: line = LineNetAmt less its tax, totalAmount = SUM(LineNetAmt) -
+    ///     SUM(C_OrderTax.TaxAmt). Exclusive list: LineNetAmt as stored. This supersedes the with-tax variant above.
+    ///   Claude 2026-10-16 Search results paging: the search no longer stops at the first 8 matches.
+    ///     SearchPurchaseOrders / Search take maxRows (default 25) and offset and return hasMore; the
+    ///     widget requests the next page as the results list is scrolled, until every match is shown.
+    ///   Claude 2026-10-16 Widget_Bug_Fix Sr 154 (re-done again, user: "it didnt show amount with tax"): the
+    ///     pop-up now shows amounts WITH tax. Line amount = LineNetAmt on a tax-inclusive price list (already
+    ///     gross), LineNetAmt + line tax on a tax-exclusive one; totalAmount (replaces subTotal) = the window's
+    ///     Grand Total (inclusive: SUM(LineNetAmt); exclusive: lines + SUM(C_OrderTax.TaxAmt)).
     /// </summary>
     [AjaxAuthorize]
     [AjaxSessionFilter]
     public class VAS_203_POGlobalSearchWidgetController : Controller
     {
         private static readonly VLogger _log = VLogger.GetVLogger(typeof(VAS_203_POGlobalSearchWidgetController));
-        private const int MAX_SEARCH_RESULTS = 8;
+        private const int SEARCH_PAGE_SIZE = 25;   // default rows per page; the widget loads further pages as the list is scrolled
         private const int MAX_RECENT_RESULTS = 6;
 
         public ActionResult Index()
@@ -60,7 +83,7 @@ namespace VAS.Controllers
         /// <param name="query">Search text</param>
         /// <param name="q">Alternative parameter name for search text</param>
         [HttpGet]
-        public JsonResult SearchPurchaseOrders(string query = null, string q = null)
+        public JsonResult SearchPurchaseOrders(string query = null, string q = null, int maxRows = SEARCH_PAGE_SIZE, int offset = 0)
         {
             Ctx ctx = Session["ctx"] as Ctx;
             if (ctx == null)
@@ -76,16 +99,21 @@ namespace VAS.Controllers
                 return GetRecentPurchaseOrders(ctx);
             }
 
-            return ExecuteSearch(ctx, searchTerm);
+            if (maxRows < 1) { maxRows = 1; }
+            if (maxRows > 50) { maxRows = 50; }
+            if (offset < 0) { offset = 0; }
+            if (offset > 100000) { offset = 100000; }
+
+            return ExecuteSearch(ctx, searchTerm, maxRows, offset);
         }
 
         /// <summary>
         /// Generic search endpoint alias matching Onfinity convention.
         /// </summary>
         [HttpGet]
-        public JsonResult Search(string query = null, string q = null)
+        public JsonResult Search(string query = null, string q = null, int maxRows = SEARCH_PAGE_SIZE, int offset = 0)
         {
-            return SearchPurchaseOrders(query, q);
+            return SearchPurchaseOrders(query, q, maxRows, offset);
         }
 
         /// <summary>
@@ -191,7 +219,7 @@ namespace VAS.Controllers
         /// <summary>
         /// Executes full multi-entity search and ranks / deduplicates results server-side.
         /// </summary>
-        private JsonResult ExecuteSearch(Ctx ctx, string searchTerm)
+        private JsonResult ExecuteSearch(Ctx ctx, string searchTerm, int maxRows, int offset)
         {
             string likePattern = "%" + searchTerm.ToLowerInvariant() + "%";
             List<SearchResultCandidate> candidates = new List<SearchResultCandidate>();
@@ -521,7 +549,10 @@ namespace VAS.Controllers
                     .ToList();
 
                 int totalCount = sorted.Count;
-                var topResults = sorted.Take(MAX_SEARCH_RESULTS).Select(c => new
+                // One page of the ranked list: rows [offset, offset + maxRows). The search is stateless, so each
+                // page re-runs it; hasMore says whether rows remain beyond this page.
+                bool hasMore = totalCount > offset + maxRows;
+                var topResults = sorted.Skip(offset).Take(maxRows).Select(c => new
                 {
                     orderId = c.OrderId,
                     orderLineId = c.OrderLineId,
@@ -543,6 +574,7 @@ namespace VAS.Controllers
                 return Ok(new
                 {
                     totalCount = totalCount,
+                    hasMore = hasMore,
                     results = topResults
                 });
             }
@@ -596,12 +628,14 @@ namespace VAS.Controllers
                         rep.Name AS SalesRepName,
                         curr.CurSymbol,
                         curr.ISO_Code,
-                        COALESCE(curr.StdPrecision, 2) AS StdPrecision
+                        COALESCE(curr.StdPrecision, 2) AS StdPrecision,
+                        COALESCE(pl.IsTaxIncluded, 'N') AS PriceListTaxIncluded
                     FROM C_Order o
                     INNER JOIN C_BPartner bp ON bp.C_BPartner_ID = o.C_BPartner_ID
                     LEFT JOIN M_Warehouse wh ON wh.M_Warehouse_ID = o.M_Warehouse_ID
                     LEFT JOIN AD_User rep ON rep.AD_User_ID = o.SalesRep_ID
                     LEFT JOIN C_Currency curr ON curr.C_Currency_ID = o.C_Currency_ID
+                    LEFT JOIN M_PriceList pl ON pl.M_PriceList_ID = o.M_PriceList_ID
                     WHERE o.C_Order_ID = @OrderID
                       AND o.AD_Client_ID = @ClientID
                       AND o.IsActive = 'Y'
@@ -616,12 +650,17 @@ namespace VAS.Controllers
                 };
 
                 object header = null;
+                // Whether the order's PRICE LIST includes tax - the flag the Purchase Order window judges by.
+                bool plTaxIncluded = false;
+                int stdPrecision = 2;
                 IDataReader dr = null;
                 try
                 {
                     dr = DB.ExecuteReader(headerSql, headParams, null);
                     if (dr != null && dr.Read())
                     {
+                        plTaxIncluded = Util.GetValueOfString(dr["PriceListTaxIncluded"]) == "Y";
+                        stdPrecision = Util.GetValueOfInt(dr["StdPrecision"]);
                         DateTime? dateOrdered = Util.GetValueOfDateTime(dr["DateOrdered"]);
                         DateTime? datePromised = Util.GetValueOfDateTime(dr["DatePromised"]);
                         header = new
@@ -659,21 +698,36 @@ namespace VAS.Controllers
                 // Product') raises ORA-12704 (character set mismatch) on Oracle - selected raw here
                 // (or COALESCE'd only against another column, never a literal) and defaulted in C#
                 // instead. Same bug fixed the same way in VAS_161/163/165/164/215/209.
+                // ProductType is a CHAR column, so it is selected raw and compared in C# (never
+                // COALESCE'd against a literal in SQL). The charge name is likewise selected raw.
+                // LineNetAmt is selected as stored; it is restated net of tax in C# when the price list
+                // includes tax (see below). Surcharge and the tax rate are read for that restatement.
+                string surchargeExpr = HasColumn("C_OrderLine", "SurchargeAmt") ? "COALESCE(ol.SurchargeAmt, 0)" : "0";
                 string linesSql = @"
                     SELECT
                         ol.C_OrderLine_ID,
                         ol.Line,
+                        ol.M_Product_ID,
+                        ol.C_Charge_ID,
                         p.Name AS ProductNameRaw,
+                        ch.Name AS ChargeNameRaw,
                         ol.Description AS OrderLineDescRaw,
                         p.Value AS ProductCode,
+                        p.ProductType AS ProductType,
                         asi.Description AS AttributeDesc,
-                        COALESCE(uom.UOMSymbol, uom.Name) AS UomName,
+                        COALESCE(uom.Name, uom.UOMSymbol) AS UomName,
                         COALESCE(ol.QtyOrdered, 0) AS QtyOrdered,
+                        COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) AS QtyEntered,
                         COALESCE(ol.QtyDelivered, 0) AS QtyDelivered,
                         COALESCE(ol.PriceActual, 0) AS PriceActual,
-                        COALESCE(ol.LineNetAmt, 0) AS LineNetAmt
+                        COALESCE(ol.LineNetAmt, 0) AS LineNetAmt,
+                        COALESCE(ol.TaxAmt, 0) AS LineTaxAmt,
+                        " + surchargeExpr + @" AS LineSurchargeAmt,
+                        COALESCE(tx.Rate, 0) AS TaxRate
                     FROM C_OrderLine ol
+                    LEFT JOIN C_Tax tx ON tx.C_Tax_ID = ol.C_Tax_ID
                     LEFT JOIN M_Product p ON p.M_Product_ID = ol.M_Product_ID
+                    LEFT JOIN C_Charge ch ON ch.C_Charge_ID = ol.C_Charge_ID
                     LEFT JOIN C_UOM uom ON uom.C_UOM_ID = ol.C_UOM_ID
                     LEFT JOIN M_AttributeSetInstance asi ON asi.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID
                     WHERE ol.C_Order_ID = @OrderID
@@ -690,15 +744,52 @@ namespace VAS.Controllers
                 };
 
                 var lines = new List<object>();
+                decimal linesNet = 0m;       // line amounts as shown (without tax)
+                decimal linesGross = 0m;     // SUM(LineNetAmt) as stored
                 dr = null;
                 try
                 {
                     dr = DB.ExecuteReader(linesSql, lineParams, null);
                     while (dr != null && dr.Read())
                     {
-                        decimal qtyOrdered = Util.GetValueOfDecimal(dr["QtyOrdered"]);
-                        decimal qtyDelivered = Util.GetValueOfDecimal(dr["QtyDelivered"]);
+                        // The price list decides (M_PriceList.IsTaxIncluded). Tax-INCLUSIVE ('Y'): LineNetAmt is the
+                        // gross (it contains the line tax and surcharge), so that tax is taken off and the amount
+                        // shown is without tax; where the line's TaxAmt is 0 / not maintained the tax is derived from
+                        // the line's tax rate, so the gross is never left in. Tax-exclusive ('N'): LineNetAmt is
+                        // shown directly.
+                        decimal lineAmt = Util.GetValueOfDecimal(dr["LineNetAmt"]);
+                        decimal lineNet = lineAmt;
+                        if (plTaxIncluded)
+                        {
+                            decimal lineTax = Util.GetValueOfDecimal(dr["LineTaxAmt"]) + Util.GetValueOfDecimal(dr["LineSurchargeAmt"]);
+                            decimal taxRate = Util.GetValueOfDecimal(dr["TaxRate"]);
+                            if (lineTax == 0m && taxRate > 0m)
+                            {
+                                lineTax = Math.Round(lineAmt * taxRate / (100m + taxRate), stdPrecision, MidpointRounding.AwayFromZero);
+                            }
+                            lineNet = lineAmt - lineTax;
+                        }
+                        linesGross += lineAmt;
+                        linesNet += lineNet;
+
+                        // QtyEntered is in the line's own C_UOM_ID (the UOM the buyer picked);
+                        // QtyOrdered / QtyDelivered are in the product's base UOM. The dialog shows
+                        // the selected UOM beside the figures, so ordered is QtyEntered and received
+                        // is scaled by this line's own entered/ordered ratio (same as VAS_206).
+                        decimal qtyOrderedBase = Util.GetValueOfDecimal(dr["QtyOrdered"]);
+                        decimal qtyEntered = Util.GetValueOfDecimal(dr["QtyEntered"]);
+                        decimal uomRatio = (qtyOrderedBase != 0m) ? (qtyEntered / qtyOrderedBase) : 1m;
+                        decimal qtyOrdered = qtyEntered;
+                        decimal qtyDelivered = Util.GetValueOfDecimal(dr["QtyDelivered"]) * uomRatio;
+
+                        // Pending is a stock figure: only Item-type products carry one. A charge line,
+                        // a line without a product and every other product type are excluded.
+                        bool isItem = Util.GetValueOfInt(dr["M_Product_ID"]) > 0
+                            && string.Equals((Util.GetValueOfString(dr["ProductType"]) ?? "").Trim(), "I", StringComparison.OrdinalIgnoreCase);
+
+                        // A charge line shows the selected charge's name, not "Standard Product".
                         string productName = Util.GetValueOfString(dr["ProductNameRaw"]);
+                        if (string.IsNullOrEmpty(productName)) { productName = Util.GetValueOfString(dr["ChargeNameRaw"]); }
                         if (string.IsNullOrEmpty(productName)) { productName = Util.GetValueOfString(dr["OrderLineDescRaw"]); }
                         if (string.IsNullOrEmpty(productName)) { productName = "Standard Product"; }
                         lines.Add(new
@@ -709,11 +800,12 @@ namespace VAS.Controllers
                             productCode = Util.GetValueOfString(dr["ProductCode"]),
                             attribute = Util.GetValueOfString(dr["AttributeDesc"]),
                             uom = Util.GetValueOfString(dr["UomName"]),
+                            isItem = isItem,
                             qtyOrdered = qtyOrdered,
                             qtyDelivered = qtyDelivered,
-                            qtyPending = Math.Max(0m, qtyOrdered - qtyDelivered),
+                            qtyPending = isItem ? Math.Max(0m, qtyOrdered - qtyDelivered) : 0m,
                             priceActual = Util.GetValueOfDecimal(dr["PriceActual"]),
-                            lineNetAmt = Util.GetValueOfDecimal(dr["LineNetAmt"])
+                            lineNetAmt = lineNet
                         });
                     }
                 }
@@ -722,13 +814,65 @@ namespace VAS.Controllers
                     if (dr != null) { dr.Close(); dr.Dispose(); }
                 }
 
-                return Ok(new { header = header, lines = lines });
+                // Total amount, without tax, stated the way the Purchase Order window states its Sub Total
+                // (VAS_092 / VAS_303): on a tax-inclusive price list SUM(LineNetAmt) is the gross, and the total is
+                // that gross less the order's extracted tax SUM(C_OrderTax.TaxAmt); on a tax-exclusive one it is
+                // SUM(LineNetAmt) directly. When an inclusive order carries no C_OrderTax rows the line-by-line
+                // net above is used.
+                decimal totalAmount = linesNet;
+                if (plTaxIncluded)
+                {
+                    decimal orderTax = GetOrderTaxAmt(orderId);
+                    if (orderTax > 0m) { totalAmount = linesGross - orderTax; }
+                }
+
+                return Ok(new { header = header, lines = lines, totalAmount = totalAmount });
             }
             catch (Exception ex)
             {
                 _log.Log(Level.SEVERE, "VAS_203_POGlobalSearchWidget.GetPurchaseOrderDetail", ex);
                 return Fail(Msg.GetMsg(ctx, "Error") ?? "Error");
             }
+        }
+
+        /// <summary>
+        /// The order's total tax = SUM(C_OrderTax.TaxAmt) - the extracted tax the platform stores for both
+        /// tax-exclusive and tax-inclusive price lists (same query as VAS_092_OverviewPurchaseOrderModel).
+        /// </summary>
+        private static decimal GetOrderTaxAmt(int orderId)
+        {
+            string sql = @"SELECT COALESCE(SUM(ot.TaxAmt), 0) AS TaxAmt
+                             FROM C_OrderTax ot
+                            WHERE ot.C_Order_ID = @OrderID
+                              AND ot.IsActive = 'Y'";
+            return Util.GetValueOfDecimal(DB.ExecuteScalar(sql, new SqlParameter[] { new SqlParameter("@OrderID", orderId) }, null));
+        }
+
+        private static bool HasColumn(string tableName, string columnName)
+        {
+            string sql;
+            if (DB.IsPostgreSQL())
+            {
+                sql = @"
+                    SELECT COUNT(1)
+                    FROM information_schema.columns
+                    WHERE UPPER(table_name)=UPPER(@TableName)
+                      AND UPPER(column_name)=UPPER(@ColumnName)";
+            }
+            else
+            {
+                sql = @"
+                    SELECT COUNT(1)
+                    FROM USER_TAB_COLUMNS
+                    WHERE TABLE_NAME=UPPER(@TableName)
+                      AND COLUMN_NAME=UPPER(@ColumnName)";
+            }
+
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql, new SqlParameter[]
+            {
+                new SqlParameter("@TableName", tableName),
+                new SqlParameter("@ColumnName", columnName)
+            }, null)) > 0;
         }
 
         private static void AddCandidate(List<SearchResultCandidate> list, HashSet<string> seen, SearchResultCandidate candidate)

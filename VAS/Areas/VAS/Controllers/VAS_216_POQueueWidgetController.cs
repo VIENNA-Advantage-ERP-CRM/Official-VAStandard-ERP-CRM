@@ -6,6 +6,9 @@
  *                  Excludes completed, closed, voided, and reversed POs (CO, CL, VO, RE).
  * Author         : Builder Agent 14
  * Date           : 17 August 2026
+ * Chronological Development:
+ *   Claude 2026-10-16 Blanket Purchase Order documents (C_DocType.IsBlanketTrx / DocSubTypeSO 'BO') are
+ *                     no longer queued; the order-level IsBlanketTrx flag alone did not catch them.
  ***********************************************************/
 
 using Newtonsoft.Json;
@@ -126,11 +129,21 @@ namespace VIS.Controllers
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
                       AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
+                      -- Blanket Purchase Orders are not queued: also excluded by document type (C_DocType.IsBlanketTrx / Blanket Order sub-type)
+                      AND NOT EXISTS (SELECT 1 FROM C_DocType dt WHERE dt.C_DocType_ID = o.C_DocTypeTarget_ID
+                                    AND (COALESCE(dt.IsBlanketTrx, 'N') = 'Y' OR COALESCE(dt.DocSubTypeSO, ' ') = 'BO'))
                       AND o.DocStatus IN ('DR', 'IP', 'CO', 'CL') -- queue includes Completed and Closed per specification; only Voided/Reversed stay out
+                      AND o.C_Order_ID IN (@P_ORDER_ACCESS@)
                       AND o.DatePromised >= @MonthStart
                       AND o.DatePromised < @MonthEndExclusive";
 
-                countSql = MRole.GetDefault(ctx).AddAccessSQL(countSql, "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                // MRole.AddAccessSQL cannot parse a statement holding a sub-select (the blanket doc-type
+                // exclusion), so the role access is applied through a simple sub-query on C_Order instead,
+                // exactly as the paged query below does.
+                string orderAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                    "SELECT accessOrd.C_Order_ID FROM C_Order accessOrd WHERE accessOrd.AD_Client_ID = " + clientId,
+                    "accessOrd", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                countSql = countSql.Replace("@P_ORDER_ACCESS@", orderAccessSql);
 
                 SqlParameter[] countParams = {
                     new SqlParameter("@AD_Client_ID", clientId),
@@ -197,6 +210,9 @@ namespace VIS.Controllers
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
                       AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
+                      -- Blanket Purchase Orders are not queued: also excluded by document type (C_DocType.IsBlanketTrx / Blanket Order sub-type)
+                      AND NOT EXISTS (SELECT 1 FROM C_DocType dt WHERE dt.C_DocType_ID = o.C_DocTypeTarget_ID
+                                    AND (COALESCE(dt.IsBlanketTrx, 'N') = 'Y' OR COALESCE(dt.DocSubTypeSO, ' ') = 'BO'))
                       AND o.DocStatus IN ('DR', 'IP', 'CO', 'CL') -- queue includes Completed and Closed per specification; only Voided/Reversed stay out
                       AND o.C_Order_ID IN (@P_ORDER_ACCESS@)
                       AND o.DatePromised >= @MonthStart
@@ -209,9 +225,6 @@ namespace VIS.Controllers
                 // appends the access predicates after GROUP BY / HAVING / ORDER BY, producing
                 // ORA-00933 / ORA-00979 / ORA-00904. Apply the same role access through a simple,
                 // parseable sub-query on C_Order instead.
-                string orderAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
-                    "SELECT accessOrd.C_Order_ID FROM C_Order accessOrd WHERE accessOrd.AD_Client_ID = " + clientId,
-                    "accessOrd", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
                 mainSql = mainSql.Replace("@P_ORDER_ACCESS@", orderAccessSql);
 
                 SqlParameter[] mainParams = {

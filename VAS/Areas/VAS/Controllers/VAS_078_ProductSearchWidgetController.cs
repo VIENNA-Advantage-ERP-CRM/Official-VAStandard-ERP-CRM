@@ -39,6 +39,11 @@ namespace VAS.Controllers
     ///                          reorder point, preferred supplier) per explicit instruction -
     ///                          MRole.AddAccessSQL, already applied to each of these tables,
     ///                          is the correct (and only needed) org-access check.
+    ///   Claude      2026-10-15 Widget_Bug_Fix Sr 60 / 61: SearchProducts now returns each suggestion's
+    ///                          product image (ImageUrl, same resolution as the detail overview) and
+    ///                          accepts a "types" list of product-type codes the browser derived from the
+    ///                          typed text, so a search such as "Item" or "Service" matches by product type
+    ///                          (the column holds one-letter codes and never matched the typed name).
     /// </summary>
     public class VAS_078_ProductSearchWidgetController : Controller
     {
@@ -72,7 +77,7 @@ namespace VAS.Controllers
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
         [ValidateInput(false)]
-        public JsonResult SearchProducts(string q, int max = 7)
+        public JsonResult SearchProducts(string q, int max = 7, string types = null)
         {
             if (Session["ctx"] == null)
             {
@@ -83,7 +88,7 @@ namespace VAS.Controllers
 
             try
             {
-                string json = JsonConvert.SerializeObject(SearchProductsData(ctx, q, max));
+                string json = JsonConvert.SerializeObject(SearchProductsData(ctx, q, max, types));
                 return Json(json, JsonRequestBehavior.AllowGet);
             }
             catch (Exception ex)
@@ -122,7 +127,31 @@ namespace VAS.Controllers
             }
         }
 
-        private ProductSearchResult SearchProductsData(Ctx ctx, string searchText, int maxRows)
+        /// <summary>
+        /// Builds the extra "product type" search predicate from the codes the browser derived by
+        /// matching the typed text against the product-type names it displays (M_Product.ProductType
+        /// stores a one-letter code - I, S, R, E, O - so typing "Item" can never match the column
+        /// directly). Only whitelisted single letters are accepted, so the values can be inlined.
+        /// Returns an empty string when there is nothing to add.
+        /// </summary>
+        private static string BuildProductTypePredicate(string types)
+        {
+            if (string.IsNullOrWhiteSpace(types)) { return ""; }
+
+            List<string> codes = new List<string>();
+            foreach (string part in types.Split(','))
+            {
+                string code = part.Trim().ToUpperInvariant();
+                if (code.Length == 1 && "ISREO".IndexOf(code[0]) >= 0 && !codes.Contains(code))
+                {
+                    codes.Add("'" + code + "'");
+                }
+            }
+
+            return codes.Count == 0 ? "" : "OR Product.ProductType IN (" + string.Join(",", codes) + ")";
+        }
+
+        private ProductSearchResult SearchProductsData(Ctx ctx, string searchText, int maxRows, string types)
         {
             ProductSearchResult result = new ProductSearchResult
             {
@@ -151,9 +180,13 @@ namespace VAS.Controllers
                        Product.SKU,
                        Product.UPC,
                        Product.ProductType AS Product_Type,
-                       ProductCategory.Name AS Category_Name
+                       ProductCategory.Name AS Category_Name,
+                       Product.AD_Image_ID,
+                       ProductImage.ImageExtension,
+                       ProductImage.ImageURL AS Image_URL
                 FROM M_Product Product
                 LEFT OUTER JOIN M_Product_Category ProductCategory ON (ProductCategory.M_Product_Category_ID=Product.M_Product_Category_ID AND ProductCategory.IsActive=N'Y')
+                LEFT OUTER JOIN AD_Image ProductImage ON (ProductImage.AD_Image_ID=Product.AD_Image_ID AND ProductImage.IsActive=N'Y')
                 WHERE Product.AD_Client_ID=@Product_Client_ID
                   AND (
                       UPPER(COALESCE(Product.Name,N'')) LIKE @Product_Name
@@ -162,6 +195,7 @@ namespace VAS.Controllers
                       OR UPPER(COALESCE(Product.UPC,N'')) LIKE @Product_UPC
                       OR UPPER(COALESCE(Product.ProductType,'')) LIKE @Product_Type
                       OR UPPER(COALESCE(ProductCategory.Name,N'')) LIKE @Product_Category
+                      " + BuildProductTypePredicate(types) + @"
                   )";
 
             searchProductsSql = AddAccessSql(ctx, searchProductsSql, "Product");
@@ -221,6 +255,9 @@ namespace VAS.Controllers
                        SearchProducts.UPC,
                        SearchProducts.Product_Type,
                        SearchProducts.Category_Name,
+                       SearchProducts.AD_Image_ID,
+                       SearchProducts.ImageExtension,
+                       SearchProducts.Image_URL,
                        COALESCE(StockValues.On_Hand_Qty,0) AS On_Hand_Qty,
                        COALESCE(StockValues.Stock_Value,0) AS Stock_Value
                 FROM SearchProducts
@@ -260,7 +297,14 @@ namespace VAS.Controllers
                         ProductType = Util.GetValueOfString(dr["Product_Type"]),
                         CategoryName = Util.GetValueOfString(dr["Category_Name"]),
                         OnHandQty = Util.GetValueOfDecimal(dr["On_Hand_Qty"]),
-                        StockValue = Util.GetValueOfDecimal(dr["Stock_Value"])
+                        StockValue = Util.GetValueOfDecimal(dr["Stock_Value"]),
+                        // Product picture for the suggestion row (Widget_Bug_Fix Sr 60); null when the product
+                        // has none, and the client then draws the product-type placeholder.
+                        ImageUrl = GetProductImageUrl(
+                            ctx,
+                            Util.GetValueOfInt(dr["AD_Image_ID"]),
+                            Util.GetValueOfString(dr["ImageExtension"]),
+                            Util.GetValueOfString(dr["Image_URL"]))
                     });
                 }
             }
@@ -548,7 +592,7 @@ namespace VAS.Controllers
                        Warehouse.Name AS Warehouse_Name,
                        COALESCE(Locator.LocatorCombination, Locator.Value) AS Locator_Value,
                        COALESCE(Storage.M_AttributeSetInstance_ID,0) AS M_AttributeSetInstance_ID,
-                       COALESCE(AttributeInstance.Description,N'') AS Attribute_Description,
+                       CASE WHEN COALESCE(Storage.M_AttributeSetInstance_ID,0)>0 THEN COALESCE(AttributeInstance.Description,N'') ELSE N'' END AS Attribute_Description,
                        SUM(COALESCE(Storage.QtyOnHand,0)) AS Qty_On_Hand
                 FROM M_Storage Storage
                 INNER JOIN M_Locator Locator ON (Locator.M_Locator_ID=Storage.M_Locator_ID AND Locator.IsActive=N'Y')
@@ -564,7 +608,7 @@ namespace VAS.Controllers
                          Warehouse.Name,
                          COALESCE(Locator.LocatorCombination, Locator.Value),
                          COALESCE(Storage.M_AttributeSetInstance_ID,0),
-                         COALESCE(AttributeInstance.Description,N'')";
+                         CASE WHEN COALESCE(Storage.M_AttributeSetInstance_ID,0)>0 THEN COALESCE(AttributeInstance.Description,N'') ELSE N'' END";
 
             string sql = @"
                 WITH CostRows AS (
@@ -715,7 +759,7 @@ namespace VAS.Controllers
                        OrderLine.QtyDelivered,
                        OrderLine.LineNetAmt,
                        OrderHeader.DocStatus,
-                       COALESCE(AttributeInstance.Description,N'') AS Attribute_Description,
+                       CASE WHEN COALESCE(OrderLine.M_AttributeSetInstance_ID,0)>0 THEN COALESCE(AttributeInstance.Description,N'') ELSE N'' END AS Attribute_Description,
                        CASE
                            WHEN OrderCurrency.CurSymbol IS NOT NULL THEN OrderCurrency.CurSymbol
                            ELSE OrderCurrency.ISO_Code
@@ -791,7 +835,7 @@ namespace VAS.Controllers
                        Movement.MovementQty,
                        Warehouse.Name AS Warehouse_Name,
                        COALESCE(Locator.LocatorCombination, Locator.Value) AS Locator_Value,
-                       COALESCE(AttributeInstance.Description,N'') AS Attribute_Description
+                       CASE WHEN COALESCE(Movement.M_AttributeSetInstance_ID,0)>0 THEN COALESCE(AttributeInstance.Description,N'') ELSE N'' END AS Attribute_Description
                 FROM M_Transaction Movement
                 INNER JOIN M_Locator Locator ON (Locator.M_Locator_ID=Movement.M_Locator_ID AND Locator.IsActive=N'Y')
                 INNER JOIN M_Warehouse Warehouse ON (Warehouse.M_Warehouse_ID=Locator.M_Warehouse_ID AND Warehouse.IsActive=N'Y')
@@ -857,7 +901,7 @@ namespace VAS.Controllers
                        RequisitionLine.Qty,
                        COALESCE(NULLIF(RequisitionLine.QtyOrdered, 0), (SELECT SUM(ol.QtyOrdered) FROM C_OrderLine ol WHERE ol.M_RequisitionLine_ID=RequisitionLine.M_RequisitionLine_ID AND ol.IsActive=N'Y'), 0) AS QtyOrdered,
                        Requisition.DocStatus,
-                       COALESCE(AttributeInstance.Description,N'') AS Attribute_Description
+                       CASE WHEN COALESCE(RequisitionLine.M_AttributeSetInstance_ID,0)>0 THEN COALESCE(AttributeInstance.Description,N'') ELSE N'' END AS Attribute_Description
                 FROM M_RequisitionLine RequisitionLine
                 INNER JOIN M_Requisition Requisition ON (Requisition.M_Requisition_ID=RequisitionLine.M_Requisition_ID AND Requisition.IsActive=N'Y')
                 LEFT OUTER JOIN M_AttributeSetInstance AttributeInstance ON (AttributeInstance.M_AttributeSetInstance_ID=RequisitionLine.M_AttributeSetInstance_ID)
@@ -1030,6 +1074,7 @@ namespace VAS.Controllers
             public string CategoryName { get; set; }
             public decimal OnHandQty { get; set; }
             public decimal StockValue { get; set; }
+            public string ImageUrl { get; set; }
         }
 
         private class ProductDetail

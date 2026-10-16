@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -216,7 +216,10 @@ namespace VIS.Controllers
                                 f.LineNo ASC,
                                 f.M_InventoryLine_ID ASC
                         ) AS RowNo,
-                        COUNT(*) OVER () AS TotalRows
+                        COUNT(*) OVER () AS TotalRows,
+                        -- 1 when ANY line of the whole result carries an attribute (not just this page), so
+                        -- the dialog decides once whether the Attribute column is shown.
+                        MAX(CASE WHEN f.AttributeValue IS NULL OR f.AttributeValue = '' THEN 0 ELSE 1 END) OVER () AS HasAttribute
                     FROM filtered f
                 )
                 SELECT
@@ -230,7 +233,8 @@ namespace VIS.Controllers
                     Locator,
                     QtyCount,
                     DifferenceQty,
-                    TotalRows
+                    TotalRows,
+                    HasAttribute
                 FROM numbered
                 WHERE RowNo BETWEEN @StartRow AND @EndRow
                 ORDER BY RowNo";
@@ -246,6 +250,7 @@ namespace VIS.Controllers
             IDataReader dr = null;
             List<object> rows = new List<object>();
             int totalRows = 0;
+            bool hasAttribute = false;
 
             try
             {
@@ -253,6 +258,8 @@ namespace VIS.Controllers
                 while (dr != null && dr.Read())
                 {
                     totalRows = Util.GetValueOfInt(dr["TotalRows"]);
+                    // Window MAX can come back as a boxed decimal on Oracle; Convert accepts any numeric.
+                    hasAttribute = Convert.ToInt32(Convert.ToDecimal(dr["HasAttribute"])) > 0;
                     rows.Add(new
                     {
                         mInventoryId = Util.GetValueOfInt(dr["M_Inventory_ID"]),
@@ -272,6 +279,7 @@ namespace VIS.Controllers
                 {
                     rows = rows,
                     totalRows = totalRows,
+                    hasAttribute = hasAttribute,
                     page = page,
                     pageSize = pageSize
                 };

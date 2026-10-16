@@ -24,6 +24,8 @@ namespace VAS.Controllers
     ///               number 000 - reassign on hand-off.
     /// Chronological development:
     ///   116         2026-07-16 Created
+    ///   Claude      2026-10-15 Widget_Bug_Fix Sr 56: revenue on invoices whose Price List is tax-inclusive
+    ///                          (M_PriceList.IsTaxIncluded='Y') is now net of line tax.
     /// </summary>
     public class VAS_116_Top10SellingWidgetController : Controller
     {
@@ -79,6 +81,7 @@ namespace VAS.Controllers
                        InvoiceLine.C_OrderLine_ID,
                        InvoiceLine.M_Product_ID,
                        InvoiceLine.LineNetAmt,
+                       InvoiceLine.TaxAmt,
                        InvoiceLine.QtyInvoiced,
                        InvoiceLine.QtyEntered
                 FROM C_InvoiceLine InvoiceLine
@@ -90,6 +93,7 @@ namespace VAS.Controllers
                 SELECT Invoice.C_Invoice_ID,
                        Invoice.C_Currency_ID,
                        Invoice.C_ConversionType_ID,
+                       Invoice.M_PriceList_ID,
                        Invoice.AD_Client_ID,
                        Invoice.AD_Org_ID,
                        Invoice.DateInvoiced
@@ -134,6 +138,16 @@ namespace VAS.Controllers
             orderSql = AddAccessSql(ctx, orderSql, "SalesOrder");
             productSql = AddAccessSql(ctx, productSql, "Product");
 
+            // Widget_Bug_Fix Sr 56: a line on an invoice whose Price List has IsTaxIncluded='Y' is valued
+            // net of its tax (LineNetAmt then already contains the tax - same rule as
+            // MInvoiceLine.IsTaxIncluded(), which reads the invoice's Price List). This block is
+            // parameter-free (role filter only), so the positional parameter array below is unchanged.
+            string priceListSql = AddAccessSql(ctx, @"
+                SELECT PriceList.M_PriceList_ID,
+                       PriceList.IsTaxIncluded
+                FROM M_PriceList PriceList
+                WHERE PriceList.IsActive='Y'", "PriceList");
+
             string sql = string.Format(@"
                 WITH InvoiceLines AS (
                     {0}
@@ -150,17 +164,21 @@ namespace VAS.Controllers
                 Products AS (
                     {4}
                 ),
+                PriceLists AS (
+                    {5}
+                ),
                 Sales AS (
                     SELECT Products.M_Product_ID,
                            Products.Name AS Product_Name,
                            Products.Product_Code,
-                           SUM(COALESCE(CURRENCYCONVERT(InvoiceLines.LineNetAmt,Invoices.C_Currency_ID,@Schema_Currency_ID,Invoices.DateInvoiced,Invoices.C_ConversionType_ID,Invoices.AD_Client_ID,Invoices.AD_Org_ID),0)) AS Revenue,
+                           SUM(COALESCE(CURRENCYCONVERT(CASE WHEN PriceLists.IsTaxIncluded='Y' THEN InvoiceLines.LineNetAmt-COALESCE(InvoiceLines.TaxAmt,0) ELSE InvoiceLines.LineNetAmt END,Invoices.C_Currency_ID,@Schema_Currency_ID,Invoices.DateInvoiced,Invoices.C_ConversionType_ID,Invoices.AD_Client_ID,Invoices.AD_Org_ID),0)) AS Revenue,
                            SUM(COALESCE(InvoiceLines.QtyInvoiced,InvoiceLines.QtyEntered,0)) AS Units
                     FROM InvoiceLines
                     INNER JOIN Invoices ON (Invoices.C_Invoice_ID=InvoiceLines.C_Invoice_ID)
                     INNER JOIN OrderLines ON (OrderLines.C_OrderLine_ID=InvoiceLines.C_OrderLine_ID)
                     INNER JOIN SalesOrders ON (SalesOrders.C_Order_ID=OrderLines.C_Order_ID)
                     INNER JOIN Products ON (Products.M_Product_ID=InvoiceLines.M_Product_ID)
+                    LEFT OUTER JOIN PriceLists ON (PriceLists.M_PriceList_ID=Invoices.M_PriceList_ID)
                     GROUP BY Products.M_Product_ID,
                              Products.Name,
                              Products.Product_Code
@@ -177,7 +195,8 @@ namespace VAS.Controllers
                 invoiceSql,
                 orderLineSql,
                 orderSql,
-                productSql
+                productSql,
+                priceListSql
             );
 
             SqlParameter[] parameters = new SqlParameter[]

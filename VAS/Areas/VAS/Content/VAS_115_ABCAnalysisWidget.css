@@ -97,21 +97,30 @@
 }
 
 /* Warehouse dropdown - compact, truncates long names, never pushes the title out */
+/* Warehouse filter button (Widget_Bug_Fix Sr 62: larger - was .6875em type, .4em .6em padding,
+   9em max width). The list below it is a custom, height-limited, scrollable popover (Sr 64). */
 .MPC-abc-select {
     flex: 0 1 auto;
-    max-width: 9em;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    max-width: 18em;
     min-width: 0;
     font-family: inherit;
-    font-size: 0.6875em;
+    font-size: 0.8125em;
     font-weight: 500;
     color: #102c3f;
-    padding: 0.4em 0.6em;
+    padding: 0.55em 0.8em;
     border: 1px solid #e4edf4;
     border-radius: 8px;
     background: rgba(255, 255, 255, 0.8);
     cursor: pointer;
-    text-overflow: ellipsis;
+    text-align: left;
 }
+
+    .MPC-abc-select:hover:not(:disabled) {
+        background: #eaf8ff;
+    }
 
     .MPC-abc-select:focus-visible {
         outline: 2px solid #1f83ff;
@@ -121,6 +130,61 @@
     .MPC-abc-select:disabled {
         color: #b8c6d2;
         cursor: default;
+    }
+
+.MPC-abc-select-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-abc-select-chev {
+    flex: 0 0 auto;
+    width: 1em;
+    height: 1em;
+    color: #0083da;
+}
+
+/* Dropdown list: fixed popover on <body>; the height cap is set from JS (room on screen, max 300px)
+   and the list scrolls inside it. */
+.MPC-abc-dd-list {
+    position: fixed;
+    z-index: 10060;
+    display: none;
+    box-sizing: border-box;
+    overflow-y: auto;
+    padding: 4px;
+    background: #fff;
+    border: 1px solid #e4edf4;
+    border-radius: 10px;
+    box-shadow: 0 12px 28px rgba(15, 61, 97, 0.18);
+    font-family: Roboto, sans-serif;
+    font-size: 13px;
+    color: #102c3f;
+}
+
+    .MPC-abc-dd-list.is-open {
+        display: block;
+    }
+
+.MPC-abc-dd-opt {
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+    .MPC-abc-dd-opt.is-active {
+        background: #eef6ff;
+    }
+
+    .MPC-abc-dd-opt.is-selected {
+        color: #0083da;
+        font-weight: 600;
     }
 
 /* Body */
@@ -144,6 +208,8 @@
     color: #748494;
     font-size: 0.75em;
     padding: 1em;
+    /* Full message, wrapped - never clipped to an ellipsis (Widget_Bug_Fix Sr 63). */
+    overflow-wrap: anywhere;
 }
 
 .MPC-abc-retry {
@@ -447,7 +513,7 @@
 
 .MPC-abc-th-r,
 .MPC-abc-td-r {
-    text-align: right;
+    text-align: left;
 }
 
 .MPC-abc-td-s {

@@ -34,6 +34,13 @@ namespace VAS.Controllers
     ///                          AddAccessSql (MRole's real, possibly multi-org access)
     ///                          instead, matching how the Product window itself
     ///                          authorizes rows.
+    ///   Claude      2026-10-15 Widget_Bug_Fix Sr 35: the category list itself was still
+    ///                          restricted to "Category.AD_Org_ID IN (0, session's currently
+    ///                          selected org)", so a category owned by another org (even one the
+    ///                          role can access) vanished along with its active-product count
+    ///                          ("No categories found."). The explicit org predicate is dropped;
+    ///                          AddAccessSql(Category) already scopes categories to the role's
+    ///                          real org access, same as the product scope above.
     /// </summary>
     public class VAS_113_CategoryMixWidgetController : Controller
     {
@@ -132,8 +139,7 @@ namespace VAS.Controllers
                 FROM M_Product_Category Category
                 LEFT OUTER JOIN (" + productScopeSql + @") Prod ON (Prod.M_Product_Category_ID=Category.M_Product_Category_ID)
                 WHERE Category.IsActive='Y'
-                  AND Category.AD_Client_ID=@Cat_Client_ID
-                  AND Category.AD_Org_ID IN (0,COALESCE(NULLIF(@Cat_Org_ID,0),Category.AD_Org_ID))";
+                  AND Category.AD_Client_ID=@Cat_Client_ID";
 
             sql = AddAccessSql(ctx, sql, "Category");
             sql += @"
@@ -144,8 +150,7 @@ namespace VAS.Controllers
             SqlParameter[] parameters = new SqlParameter[]
             {
                 new SqlParameter("@Prod_Client_ID", ctx.GetAD_Client_ID()),
-                new SqlParameter("@Cat_Client_ID", ctx.GetAD_Client_ID()),
-                new SqlParameter("@Cat_Org_ID", ctx.GetAD_Org_ID())
+                new SqlParameter("@Cat_Client_ID", ctx.GetAD_Client_ID())
             };
 
             int total = 0;

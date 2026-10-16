@@ -43,6 +43,14 @@ namespace VAS.Controllers
     /// Widget number 131.
     /// Chronological development:
     ///   &lt;EmpCode&gt;   2026-07-20 Created
+    ///   Claude       2026-10-15 Widget_Bug_Fix Sr 43: customers are now ranked by the Grand Total
+    ///                           (converted to the accounting-schema currency) of their completed /
+    ///                           closed, fully delivered sales orders - last delivery falling in the
+    ///                           selected fiscal year - instead of by distinct products shipped. This
+    ///                           supersedes the "completed deliveries only, sales orders NOT used"
+    ///                           rule above for the ranking; the drill-in product list is still
+    ///                           built from completed shipments.
+    ///   Claude       2026-10-15 Widget_Bug_Fix Sr 41: drill-in shows the full UOM name (Each) not the symbol (Ea).
     /// </summary>
     public class VAS_131_TopCustomersWidgetController : Controller
     {
@@ -81,11 +89,11 @@ namespace VAS.Controllers
         }
 
         /// <summary>
-        /// Returns customers ranked by distinct products delivered in one
-        /// fiscal year, most products first.
+        /// Returns customers ranked by the Grand Total of their fully delivered
+        /// sales orders in one fiscal year, highest total first.
         /// </summary>
         /// <param name="yearId">C_Year_ID selected by the user.</param>
-        /// <returns>JSON { yearId, label, partners[] }.</returns>
+        /// <returns>JSON { yearId, label, currencySymbol, currencyIso, stdPrecision, partners[] }.</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
         public JsonResult GetRankedPartners(int yearId)
@@ -106,42 +114,80 @@ namespace VAS.Controllers
             try
             {
                 DateTime endExclusive = year.EndDate.Date.AddDays(1);
+                BaseCurrency currency = LoadBaseCurrency(ctx);
+
+                // Widget_Bug_Fix Sr 43: customers are ranked by the Grand Total of their
+                // fully delivered, completed sales orders (not by distinct products shipped).
+                // The role-filtered order set is its own block (AddAccessSQL appends its
+                // predicate to the END of the text it is given), and the delivery-date /
+                // delivered-quantity aggregates live in separate unfiltered CTEs, so no
+                // GROUP BY ever sits inside the statement handed to AddAccessSQL. Each
+                // order's GrandTotal is converted to the accounting-schema currency.
+                string orderSql = @"
+                    SELECT o.C_Order_ID, o.C_BPartner_ID, o.GrandTotal, o.C_Currency_ID,
+                           o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID, o.DateOrdered
+                    FROM C_Order o
+                    WHERE o.AD_Client_ID = @AD_Client_ID1
+                      AND o.IsActive = 'Y'
+                      AND o.IsSOTrx = 'Y'
+                      AND COALESCE(o.IsReturnTrx, 'N') = 'N'
+                      AND COALESCE(o.IsSalesQuotation, 'N') = 'N'
+                      AND o.DocStatus IN ('CO', 'CL')";
+                orderSql = MRole.GetDefault(ctx).AddAccessSQL(orderSql, "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
                 string sql = @"
+                    WITH Ord AS (
+                        " + orderSql + @"
+                    ),
+                    OrdQty AS (
+                        SELECT ol.C_Order_ID,
+                               SUM(COALESCE(ol.QtyDelivered, 0)) AS QtyDelivered,
+                               SUM(COALESCE(ol.QtyOrdered, 0)) AS QtyOrdered
+                        FROM C_OrderLine ol
+                        WHERE ol.AD_Client_ID = @AD_Client_ID2
+                        GROUP BY ol.C_Order_ID
+                    ),
+                    Dlv AS (
+                        SELECT io.C_Order_ID, MAX(io.MovementDate) AS LastMove
+                        FROM M_InOut io
+                        WHERE io.AD_Client_ID = @AD_Client_ID3
+                          AND io.IsActive = 'Y'
+                          AND io.MovementType = 'C-'
+                          AND io.IsSOTrx = 'Y'
+                          AND COALESCE(io.IsReturnTrx, 'N') = 'N'
+                          AND io.DocStatus IN ('CO', 'CL')
+                          AND io.C_Order_ID IS NOT NULL
+                        GROUP BY io.C_Order_ID
+                    )
                     SELECT bp.C_BPartner_ID AS PartnerId,
                            bp.Name AS PartnerName,
-                           COUNT(DISTINCT il.M_Product_ID) AS ProductCount,
-                           MAX(io.MovementDate) AS LastDate
-                    FROM M_InOut io
-                    JOIN M_InOutLine il ON (il.M_InOut_ID = io.M_InOut_ID AND il.AD_Client_ID = io.AD_Client_ID)
-                    JOIN C_BPartner bp ON (bp.C_BPartner_ID = io.C_BPartner_ID AND bp.AD_Client_ID = io.AD_Client_ID)
-                    WHERE io.AD_Client_ID = @AD_Client_ID
-                      AND io.IsActive = 'Y'
-                      AND il.IsActive = 'Y'
-                      AND io.MovementType = 'C-'
-                      AND io.IsSOTrx = 'Y'
-                      AND COALESCE(io.IsReturnTrx, 'N') = 'N'
-                      AND io.DocStatus IN ('CO', 'CL')
-                      AND bp.IsCustomer = 'Y'
-                      AND il.M_Product_ID IS NOT NULL
-                      AND COALESCE(il.MovementQty, 0) <> 0
-                      AND io.MovementDate >= @StartDate
-                      AND io.MovementDate < @EndDateExclusive";
-
-                // AddAccessSQL appends its predicate to the END, so GROUP BY /
-                // ORDER BY are appended after the call (widget rule #1).
-                sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "io", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-                sql += @"
+                           SUM(COALESCE(CurrencyConvert(Ord.GrandTotal, Ord.C_Currency_ID, @BaseCurrency_ID,
+                                   Ord.DateOrdered, Ord.C_ConversionType_ID, Ord.AD_Client_ID, Ord.AD_Org_ID), 0)) AS TotalAmount,
+                           MAX(Dlv.LastMove) AS LastDate
+                    FROM Ord
+                    JOIN OrdQty ON (OrdQty.C_Order_ID = Ord.C_Order_ID)
+                    JOIN Dlv ON (Dlv.C_Order_ID = Ord.C_Order_ID)
+                    JOIN C_BPartner bp ON (bp.C_BPartner_ID = Ord.C_BPartner_ID AND bp.AD_Client_ID = Ord.AD_Client_ID)
+                    WHERE bp.IsCustomer = 'Y'
+                      AND OrdQty.QtyDelivered > 0
+                      AND OrdQty.QtyDelivered >= OrdQty.QtyOrdered
+                      AND Dlv.LastMove >= @StartDate
+                      AND Dlv.LastMove < @EndDateExclusive
                     GROUP BY bp.C_BPartner_ID, bp.Name
-                    ORDER BY ProductCount DESC, LastDate DESC, bp.Name";
+                    ORDER BY TotalAmount DESC, LastDate DESC, bp.Name";
 
                 List<object> partners = new List<object>();
                 IDataReader dr = null;
                 try
                 {
+                    // DB.ExecuteReader binds POSITIONALLY (left-to-right placeholder order in the final
+                    // text), so the client id needed in three blocks has three distinct placeholders.
                     dr = DB.ExecuteReader(sql, new SqlParameter[]
                     {
-                        new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
+                        new SqlParameter("@AD_Client_ID1", ctx.GetAD_Client_ID()),
+                        new SqlParameter("@AD_Client_ID2", ctx.GetAD_Client_ID()),
+                        new SqlParameter("@AD_Client_ID3", ctx.GetAD_Client_ID()),
+                        new SqlParameter("@BaseCurrency_ID", currency.CurrencyId),
                         new SqlParameter("@StartDate", SqlDbType.DateTime) { Value = year.StartDate },
                         new SqlParameter("@EndDateExclusive", SqlDbType.DateTime) { Value = endExclusive }
                     });
@@ -153,7 +199,7 @@ namespace VAS.Controllers
                         {
                             partnerId = Util.GetValueOfInt(dr["PartnerId"]),
                             name = Util.GetValueOfString(dr["PartnerName"]),
-                            productCount = Util.GetValueOfInt(dr["ProductCount"]),
+                            totalAmount = Util.GetValueOfDecimal(dr["TotalAmount"]),
                             lastDate = lastDate.HasValue ? lastDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : ""
                         });
                     }
@@ -163,7 +209,15 @@ namespace VAS.Controllers
                     if (dr != null) { dr.Close(); dr.Dispose(); }
                 }
 
-                return Ok(new { yearId = year.YearId, label = year.Label, partners = partners });
+                return Ok(new
+                {
+                    yearId = year.YearId,
+                    label = year.Label,
+                    currencySymbol = currency.Symbol,
+                    currencyIso = currency.IsoCode,
+                    stdPrecision = currency.StdPrecision,
+                    partners = partners
+                });
             }
             catch (Exception ex)
             {
@@ -280,7 +334,8 @@ namespace VAS.Controllers
                                 name = Util.GetValueOfString(dr["ProductName"]),
                                 code = Util.GetValueOfString(dr["ProductCode"]),
                                 qty = Util.GetValueOfDecimal(dr["Qty"]),
-                                uom = !string.IsNullOrEmpty(uomSymbol) ? uomSymbol : uomName,
+                                // Full UOM name ("Each"), not the symbol ("Ea") - Widget_Bug_Fix Sr 41.
+                                uom = !string.IsNullOrEmpty(uomName) ? uomName : uomSymbol,
                                 attributes = new List<Attr>(),
                                 seenChips = new HashSet<string>()
                             };
@@ -427,6 +482,61 @@ namespace VAS.Controllers
                 new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
                 new SqlParameter("@PartnerId", partnerId)
             }, null));
+        }
+
+        /// <summary>
+        /// Accounting-schema currency (id, symbol, ISO code, standard precision) that the
+        /// ranked Grand Totals are converted to. Same source as the other Product Master widgets.
+        /// </summary>
+        private BaseCurrency LoadBaseCurrency(Ctx ctx)
+        {
+            BaseCurrency currency = new BaseCurrency();
+
+            string sql = @"
+                SELECT asch.C_Currency_ID AS CurrencyId,
+                       cur.StdPrecision AS StdPrecision,
+                       cur.ISO_Code AS IsoCode,
+                       cur.CurSymbol AS CurSymbol
+                FROM AD_ClientInfo ci
+                JOIN C_AcctSchema asch ON (asch.C_AcctSchema_ID = ci.C_AcctSchema1_ID AND asch.IsActive = 'Y')
+                JOIN C_Currency cur ON (cur.C_Currency_ID = asch.C_Currency_ID AND cur.IsActive = 'Y')
+                WHERE ci.IsActive = 'Y'
+                  AND ci.AD_Client_ID = @AD_Client_ID";
+
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+            IDataReader dr = null;
+            try
+            {
+                dr = DB.ExecuteReader(sql, new SqlParameter[]
+                {
+                    new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+                });
+
+                if (dr != null && dr.Read())
+                {
+                    currency.CurrencyId = Util.GetValueOfInt(dr["CurrencyId"]);
+                    currency.StdPrecision = Util.GetValueOfInt(dr["StdPrecision"]);
+                    currency.IsoCode = Util.GetValueOfString(dr["IsoCode"]);
+                    string symbol = Util.GetValueOfString(dr["CurSymbol"]);
+                    currency.Symbol = !string.IsNullOrEmpty(symbol) ? symbol : currency.IsoCode;
+                }
+            }
+            finally
+            {
+                if (dr != null) { dr.Close(); dr.Dispose(); }
+            }
+
+            return currency;
+        }
+
+        /// <summary>Accounting-schema currency used to total Grand Totals.</summary>
+        private class BaseCurrency
+        {
+            public int CurrencyId;
+            public int StdPrecision = 2;
+            public string IsoCode = "";
+            public string Symbol = "";
         }
 
         /// <summary>One resolved fiscal year with date bounds.</summary>
