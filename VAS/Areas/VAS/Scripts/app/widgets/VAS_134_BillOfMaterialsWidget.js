@@ -116,13 +116,19 @@
             return date.toLocaleDateString(window.navigator.language, { day: 'numeric', month: 'long', year: 'numeric' });
         }
 
-        function formatRelativeTime(value) {
-            if (!value) { return ''; }
-            var iso = String(value).replace(' ', 'T');
-            var date = new Date(iso);
-            if (isNaN(date.getTime())) { return String(value); }
-            var diffMs = Date.now() - date.getTime();
-            var diffMin = Math.max(0, Math.floor(diffMs / 60000));
+        // ageMinutes (preferred) is measured on the database clock by the server, so it is correct whatever
+        // time zones the database, web server and browser are in; the Date.now() comparison is only a fallback.
+        function formatRelativeTime(value, ageMinutes) {
+            var diffMin;
+            if (typeof ageMinutes === 'number' && isFinite(ageMinutes)) {
+                diffMin = Math.max(0, Math.floor(ageMinutes));
+            } else {
+                if (!value) { return ''; }
+                var iso = String(value).replace(' ', 'T');
+                var date = new Date(iso);
+                if (isNaN(date.getTime())) { return String(value); }
+                diffMin = Math.max(0, Math.floor((Date.now() - date.getTime()) / 60000));
+            }
             if (diffMin < 1) { return lbl('VAS_134_BOM_JustNow', 'Just now'); }
             if (diffMin < 60) { return diffMin + lbl('VAS_134_BOM_MinsAgo', 'm ago'); }
             var diffHour = Math.floor(diffMin / 60);
@@ -361,7 +367,7 @@
             var metaText = lbl('VAS_134_BOM_VerifyMetaRev', 'Rev') + ' ' + revision +
                 ' · ' + (row.componentCount || 0) + ' ' + lbl('VAS_134_BOM_VerifyMetaComponents', 'components') +
                 ' · ' + lbl('VAS_134_BOM_VerifyMetaUpdatedBy', 'updated by') + ' ' + updatedByName +
-                ' · ' + lbl('VAS_134_BOM_VerifyMetaUpdated', 'updated') + ' ' + formatRelativeTime(row.updatedAt);
+                ' · ' + lbl('VAS_134_BOM_VerifyMetaUpdated', 'updated') + ' ' + formatRelativeTime(row.updatedAt, row.updatedAgeMinutes);
             left.appendChild(el('div', 'MPC-bom-row-meta', metaText));
             rowEl.appendChild(left);
 

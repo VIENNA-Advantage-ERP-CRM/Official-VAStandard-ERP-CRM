@@ -132,12 +132,18 @@
             return date.toLocaleDateString(window.navigator.language, { day: 'numeric', month: 'long', year: 'numeric' });
         }
 
-        function formatRelativeTime(value) {
-            if (!value) { return ''; }
-            var date = parseLocalDate(value);
-            if (!date || isNaN(date.getTime())) { return String(value); }
-            var diffMs = Date.now() - date.getTime();
-            var diffMin = Math.floor(diffMs / 60000);
+        // ageMinutes (preferred) is measured on the database clock by the server, so it is correct whatever
+        // time zones the database, web server and browser are in; the Date.now() comparison is only a fallback.
+        function formatRelativeTime(value, ageMinutes) {
+            var diffMin;
+            if (typeof ageMinutes === 'number' && isFinite(ageMinutes)) {
+                diffMin = Math.max(0, Math.floor(ageMinutes));
+            } else {
+                if (!value) { return ''; }
+                var date = parseLocalDate(value);
+                if (!date || isNaN(date.getTime())) { return String(value); }
+                diffMin = Math.floor((Date.now() - date.getTime()) / 60000);
+            }
             if (diffMin < 1) { return lbl('VAS_133_UTM_JustNow', 'Just now'); }
             if (diffMin < 60) { return diffMin + lbl('VAS_133_UTM_MinsAgo', 'm ago'); }
             var diffHour = Math.floor(diffMin / 60);
@@ -398,7 +404,7 @@
             var updatedByName = row.updatedByName && String(row.updatedByName).trim()
                 ? row.updatedByName
                 : lbl('VAS_133_UTM_UnknownUser', 'Unknown user');
-            var metaText = (row.description || '') + ' · ' + updatedByName + ' · ' + formatRelativeTime(row.updatedAt);
+            var metaText = (row.description || '') + ' · ' + updatedByName + ' · ' + formatRelativeTime(row.updatedAt, row.updatedAgeMinutes);
             left.appendChild(el('div', 'MPC-utm-row-meta', metaText));
             rowEl.appendChild(left);
 

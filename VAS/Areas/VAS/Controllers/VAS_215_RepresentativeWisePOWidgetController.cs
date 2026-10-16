@@ -7,6 +7,11 @@
  *                  and PO lines inspection.
  * Created Date   : 17 Aug 2026
  * ID Prefix      : VAS_215_
+ * Chronological Development:
+ *   Claude 2026-10-16 Widget_Bug_Fix Sr 145: the "Share of month" card of the representative popup
+ *                     now divides the representative's COMPLETED PO value by the month's COMPLETED
+ *                     PO value (DocStatus CO only - Closed POs are not counted). Drafted and in-process POs no
+ *                     longer inflate it. PO value / POs raised cards are unchanged.
  ***********************************************************/
 
 using Newtonsoft.Json;
@@ -98,6 +103,8 @@ namespace VIS.Controllers
 
                 Dictionary<int, RepresentativeAggregate> repMap = new Dictionary<int, RepresentativeAggregate>();
                 decimal totalMonthConvertedValue = 0m;
+                // Completed / Closed POs only - the denominator of the popup's "Share of month" card.
+                decimal totalMonthCompletedValue = 0m;
                 int totalMonthPOCount = 0;
                 HashSet<int> distinctMonthPOs = new HashSet<int>();
 
@@ -114,11 +121,14 @@ namespace VIS.Controllers
                         int convTypeId = Util.GetValueOfInt(dr["C_ConversionType_ID"]);
                         int orgId = Util.GetValueOfInt(dr["AD_Org_ID"]);
                         decimal docValue = Util.GetValueOfDecimal(dr["po_value_doc"]);
+                        string rowDocStatus = Util.GetValueOfString(dr["DocStatus"]);
+                        bool isCompletedPO = rowDocStatus == "CO";
 
                         // Convert currency server-side to functional accounting currency
                         decimal convertedValue = ConvertAmount(ctx, docValue, curId, curInfo.CurrencyId, orderDate, convTypeId, clientId, orgId);
 
                         totalMonthConvertedValue += convertedValue;
+                        if (isCompletedPO) { totalMonthCompletedValue += convertedValue; }
                         if (!distinctMonthPOs.Contains(orderId))
                         {
                             distinctMonthPOs.Add(orderId);
@@ -139,6 +149,7 @@ namespace VIS.Controllers
 
                         RepresentativeAggregate rAgg = repMap[repId];
                         rAgg.TotalConvertedValue += convertedValue;
+                        if (isCompletedPO) { rAgg.CompletedConvertedValue += convertedValue; }
                         rAgg.DistinctOrders.Add(orderId);
 
                         // Cycle time calculation: whole days from DateOrdered to OrderCompletionDatetime
@@ -171,6 +182,7 @@ namespace VIS.Controllers
                 {
                     RepresentativeAggregate r = allReps[i];
                     decimal share = totalMonthConvertedValue > 0 ? (r.TotalConvertedValue / totalMonthConvertedValue) : 0m;
+                    decimal completedShare = totalMonthCompletedValue > 0 ? (r.CompletedConvertedValue / totalMonthCompletedValue) : 0m;
                     int pct = topRepValue > 0 ? (int)Math.Round((r.TotalConvertedValue / topRepValue) * 100m, MidpointRounding.AwayFromZero) : 0;
 
                     int? avgCycleDays = null;
@@ -193,6 +205,7 @@ namespace VIS.Controllers
                         value = r.TotalConvertedValue,
                         pos = r.DistinctOrders.Count,
                         share = Math.Round(share, 4),
+                        completedShare = Math.Round(completedShare, 4),
                         pct = Math.Max(0, Math.Min(100, pct)),
                         avgCycle = avgCycleDays,
                         avgCycleText = avgCycleText
@@ -206,6 +219,7 @@ namespace VIS.Controllers
                     curIso = curInfo.CurIso,
                     stdPrecision = curInfo.StdPrecision,
                     totalMonthValue = totalMonthConvertedValue,
+                    totalMonthCompletedValue = totalMonthCompletedValue,
                     totalMonthPOs = totalMonthPOCount,
                     representatives = repList
                 };
@@ -289,6 +303,8 @@ namespace VIS.Controllers
 
                 List<object> poList = new List<object>();
                 decimal repTotalValue = 0m;
+                // Completed / Closed POs only - the numerator of the popup's "Share of month" card.
+                decimal repCompletedValue = 0m;
                 List<int> cycleDaysList = new List<int>();
 
                 using (IDataReader dr = DB.ExecuteReader(sql, parameters, null))
@@ -314,6 +330,7 @@ namespace VIS.Controllers
 
                         decimal convertedValue = ConvertAmount(ctx, docValue, curId, curInfo.CurrencyId, dateOrdered, convTypeId, clientId, orgId);
                         repTotalValue += convertedValue;
+                        if (docStatus == "CO") { repCompletedValue += convertedValue; }
 
                         if (dateOrdered.HasValue && completionDate.HasValue)
                         {
@@ -474,6 +491,7 @@ namespace VIS.Controllers
                     curIso = curInfo.CurIso,
                     stdPrecision = curInfo.StdPrecision,
                     repTotalValue = repTotalValue,
+                    repCompletedValue = repCompletedValue,
                     posRaised = poList.Count,
                     avgCycleText = avgCycleText,
                     orders = poList
@@ -736,6 +754,7 @@ namespace VIS.Controllers
             public int RepresentativeId { get; set; }
             public string RepresentativeName { get; set; }
             public decimal TotalConvertedValue { get; set; }
+            public decimal CompletedConvertedValue { get; set; }
             public HashSet<int> DistinctOrders { get; set; }
             public List<int> CycleDaysList { get; set; }
         }

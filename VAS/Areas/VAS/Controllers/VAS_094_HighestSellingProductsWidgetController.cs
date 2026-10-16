@@ -17,6 +17,9 @@ namespace VAS.Controllers
     /// Purpose     : Supplies accounting-year sales rankings for the Overall Inventory dashboard.
     /// Chronological development:
     ///   VAI154      2026-06-22 Created
+    ///   Claude      2026-10-15 Widget_Bug_Fix Sr 56 / 58: GetProductPerformance gained two optional flags
+    ///                          (excludeTax, positiveStockOnly), both default false so this widget is
+    ///                          unchanged; the VAS_116 Top 10 popup passes true for both.
     /// </summary>
     public class VAS_094_HighestSellingProductsWidgetController : Controller
     {
@@ -50,10 +53,15 @@ namespace VAS.Controllers
         /// attribute chips, and stock on hand per warehouse.
         /// </summary>
         /// <param name="productId">Selected product.</param>
+        /// <param name="excludeTax">When true, revenue of invoices whose Price List is tax-inclusive
+        /// (M_PriceList.IsTaxIncluded='Y') is reported net of line tax. Default false keeps this widget's
+        /// own behaviour; the VAS_116 Top 10 popup passes true.</param>
+        /// <param name="positiveStockOnly">When true, warehouses with a negative on-hand total are left out
+        /// of the stock list. Default false keeps this widget's own behaviour; the VAS_116 Top 10 popup passes true.</param>
         /// <returns>Serialized product performance payload.</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetProductPerformance(int productId)
+        public JsonResult GetProductPerformance(int productId, bool excludeTax = false, bool positiveStockOnly = false)
         {
             Ctx ctx = Session["ctx"] as Ctx;
             if (ctx == null)
@@ -68,7 +76,7 @@ namespace VAS.Controllers
                     return Json(JsonConvert.SerializeObject(new { error = Msg.GetMsg(ctx, "Error") ?? "Error" }), JsonRequestBehavior.AllowGet);
                 }
 
-                ProductPerformanceResult result = GetProductPerformanceData(ctx, productId);
+                ProductPerformanceResult result = GetProductPerformanceData(ctx, productId, excludeTax, positiveStockOnly);
                 if (result == null)
                 {
                     return Json(JsonConvert.SerializeObject(new { error = Msg.GetMsg(ctx, "NotFound") ?? "Not found" }), JsonRequestBehavior.AllowGet);
@@ -322,7 +330,7 @@ namespace VAS.Controllers
         /// <param name="ctx">Current application context.</param>
         /// <param name="productId">Selected product.</param>
         /// <returns>Modal payload, or null when the product is not accessible.</returns>
-        private ProductPerformanceResult GetProductPerformanceData(Ctx ctx, int productId)
+        private ProductPerformanceResult GetProductPerformanceData(Ctx ctx, int productId, bool excludeTax, bool positiveStockOnly)
         {
             // Review #35 (follow-up): no COALESCE/CASE mixing a column with an
             // N'' literal - CHAR columns (ProductType, IsStocked, ...) raise
@@ -341,9 +349,13 @@ namespace VAS.Controllers
                        Product.IsStocked AS Is_Stocked,
                        Product.IsPurchased AS Is_Purchased,
                        Product.IsBOM AS Is_BOM,
-                       UnitOfMeasure.Name AS UOM_Name
+                       UnitOfMeasure.Name AS UOM_Name,
+                       Product.AD_Image_ID,
+                       ProductImage.ImageExtension,
+                       ProductImage.ImageURL AS Image_URL
                 FROM M_Product Product
                 LEFT OUTER JOIN C_UOM UnitOfMeasure ON (UnitOfMeasure.C_UOM_ID=Product.C_UOM_ID AND UnitOfMeasure.IsActive=N'Y')
+                LEFT OUTER JOIN AD_Image ProductImage ON (ProductImage.AD_Image_ID=Product.AD_Image_ID AND ProductImage.IsActive=N'Y')
                 WHERE Product.IsActive=N'Y'
                   AND Product.M_Product_ID=@Product_ID
                   AND Product.AD_Client_ID=@Product_Client_ID";
@@ -374,6 +386,14 @@ namespace VAS.Controllers
                         is_purchased = DefaultIfEmpty(Util.GetValueOfString(reader["Is_Purchased"]), "N"),
                         is_bom = DefaultIfEmpty(Util.GetValueOfString(reader["Is_BOM"]), "N"),
                         uom_name = DefaultIfEmpty(Util.GetValueOfString(reader["UOM_Name"]), "Unit"),
+                        // Product picture for the popup hero (null when the product has none; the VAS_116
+                        // popup then draws a product-type placeholder). Extra field - VAS_094's own popup ignores it.
+                        image_url = GetProductImageUrl(
+                            ctx,
+                            Util.GetValueOfInt(reader["AD_Image_ID"]),
+                            Util.GetValueOfString(reader["ImageExtension"]),
+                            Util.GetValueOfString(reader["Image_URL"])
+                        ),
                         attributes = new List<ProductPerformanceAttribute>(),
                         stock = new List<ProductPerformanceStock>()
                     };
@@ -398,7 +418,7 @@ namespace VAS.Controllers
             FinancialYearRange financialYears = GetFinancialYearRange(ctx);
             if (currency.CurrencyId > 0 && financialYears.HasCurrentYear)
             {
-                LoadProductPerformanceSales(ctx, productId, currency, financialYears, result);
+                LoadProductPerformanceSales(ctx, productId, currency, financialYears, result, excludeTax);
             }
 
             LoadProductPerformanceAttributes(ctx, productId, result);
@@ -407,7 +427,7 @@ namespace VAS.Controllers
             // so the warehouse query only runs for stocked physical items.
             if (result.is_stocked == "Y" && result.product_type != "S")
             {
-                LoadProductPerformanceStock(ctx, productId, result);
+                LoadProductPerformanceStock(ctx, productId, result, positiveStockOnly);
             }
 
             return result;
@@ -418,13 +438,14 @@ namespace VAS.Controllers
         /// product with the same joins, currency conversion, and role security
         /// as the widget ranking query, so the modal matches the tile figures.
         /// </summary>
-        private void LoadProductPerformanceSales(Ctx ctx, int productId, SchemaCurrency currency, FinancialYearRange financialYears, ProductPerformanceResult result)
+        private void LoadProductPerformanceSales(Ctx ctx, int productId, SchemaCurrency currency, FinancialYearRange financialYears, ProductPerformanceResult result, bool excludeTax)
         {
             string invoiceLineSql = @"
                 SELECT InvoiceLine.C_InvoiceLine_ID,
                        InvoiceLine.C_Invoice_ID,
                        InvoiceLine.C_OrderLine_ID,
                        InvoiceLine.LineNetAmt,
+                       InvoiceLine.TaxAmt,
                        InvoiceLine.QtyInvoiced,
                        InvoiceLine.QtyEntered
                 FROM C_InvoiceLine InvoiceLine
@@ -437,6 +458,7 @@ namespace VAS.Controllers
                 SELECT Invoice.C_Invoice_ID,
                        Invoice.C_Currency_ID,
                        Invoice.C_ConversionType_ID,
+                       Invoice.M_PriceList_ID,
                        Invoice.AD_Client_ID,
                        Invoice.AD_Org_ID,
                        Invoice.DateInvoiced
@@ -470,6 +492,19 @@ namespace VAS.Controllers
             orderLineSql = AddAccessSql(ctx, orderLineSql, "OrderLine");
             orderSql = AddAccessSql(ctx, orderSql, "SalesOrder");
 
+            // Widget_Bug_Fix Sr 56: when asked (excludeTax), a line on an invoice whose Price List has
+            // IsTaxIncluded='Y' is valued net of its tax - LineNetAmt then already contains the tax
+            // (same rule as MInvoiceLine.IsTaxIncluded(), which reads the invoice's Price List). The Price
+            // List block is parameter-free (role filter only), so the positional parameter array below is unchanged.
+            string priceListSql = AddAccessSql(ctx, @"
+                SELECT PriceList.M_PriceList_ID,
+                       PriceList.IsTaxIncluded
+                FROM M_PriceList PriceList
+                WHERE PriceList.IsActive=N'Y'", "PriceList");
+            string netLineAmt = excludeTax
+                ? "CASE WHEN PriceLists.IsTaxIncluded=N'Y' THEN InvoiceLines.LineNetAmt-COALESCE(InvoiceLines.TaxAmt,0) ELSE InvoiceLines.LineNetAmt END"
+                : "InvoiceLines.LineNetAmt";
+
             string sql = string.Format(@"
                 WITH InvoiceLines AS (
                     {0}
@@ -482,11 +517,14 @@ namespace VAS.Controllers
                 ),
                 SalesOrders AS (
                     {3}
+                ),
+                PriceLists AS (
+                    {4}
                 )
                 SELECT SUM(
                            CASE
                                WHEN Invoices.DateInvoiced>=@Current_Year_Start1 AND Invoices.DateInvoiced<@Current_Year_End2
-                               THEN COALESCE(CURRENCYCONVERT(InvoiceLines.LineNetAmt,Invoices.C_Currency_ID,@Schema_Currency_ID1,Invoices.DateInvoiced,Invoices.C_ConversionType_ID,Invoices.AD_Client_ID,Invoices.AD_Org_ID),0)
+                               THEN COALESCE(CURRENCYCONVERT({5},Invoices.C_Currency_ID,@Schema_Currency_ID1,Invoices.DateInvoiced,Invoices.C_ConversionType_ID,Invoices.AD_Client_ID,Invoices.AD_Org_ID),0)
                                ELSE 0
                            END
                        ) AS Current_Year_Value,
@@ -500,7 +538,7 @@ namespace VAS.Controllers
                        SUM(
                            CASE
                                WHEN Invoices.DateInvoiced>=@Previous_Year_Start2 AND Invoices.DateInvoiced<@Previous_Year_End1
-                               THEN COALESCE(CURRENCYCONVERT(InvoiceLines.LineNetAmt,Invoices.C_Currency_ID,@Schema_Currency_ID2,Invoices.DateInvoiced,Invoices.C_ConversionType_ID,Invoices.AD_Client_ID,Invoices.AD_Org_ID),0)
+                               THEN COALESCE(CURRENCYCONVERT({5},Invoices.C_Currency_ID,@Schema_Currency_ID2,Invoices.DateInvoiced,Invoices.C_ConversionType_ID,Invoices.AD_Client_ID,Invoices.AD_Org_ID),0)
                                ELSE 0
                            END
                        ) AS Previous_Year_Value,
@@ -514,11 +552,14 @@ namespace VAS.Controllers
                 FROM InvoiceLines
                 INNER JOIN Invoices ON (Invoices.C_Invoice_ID=InvoiceLines.C_Invoice_ID)
                 INNER JOIN OrderLines ON (OrderLines.C_OrderLine_ID=InvoiceLines.C_OrderLine_ID)
-                INNER JOIN SalesOrders ON (SalesOrders.C_Order_ID=OrderLines.C_Order_ID)",
+                INNER JOIN SalesOrders ON (SalesOrders.C_Order_ID=OrderLines.C_Order_ID)
+                LEFT OUTER JOIN PriceLists ON (PriceLists.M_PriceList_ID=Invoices.M_PriceList_ID)",
                 invoiceLineSql,
                 invoiceSql,
                 orderLineSql,
-                orderSql
+                orderSql,
+                priceListSql,
+                netLineAmt
             );
 
             SqlParameter[] parameters = new SqlParameter[]
@@ -631,7 +672,7 @@ namespace VAS.Controllers
         /// Loads on-hand quantity per warehouse for a stocked product; zero-sum
         /// warehouses are dropped so only locations actually holding stock show.
         /// </summary>
-        private void LoadProductPerformanceStock(Ctx ctx, int productId, ProductPerformanceResult result)
+        private void LoadProductPerformanceStock(Ctx ctx, int productId, ProductPerformanceResult result, bool positiveStockOnly)
         {
             string sql = @"
                 SELECT Warehouse.M_Warehouse_ID,
@@ -646,11 +687,13 @@ namespace VAS.Controllers
                   AND Storage.AD_Client_ID=@Stock_Client_ID";
 
             sql = AddAccessSql(ctx, sql, "Storage");
+            // Widget_Bug_Fix Sr 58: positiveStockOnly drops warehouses whose total is below zero
+            // (the default keeps every non-zero warehouse, negatives included).
             sql += @"
                 GROUP BY Warehouse.M_Warehouse_ID,
                          Warehouse.Value,
                          Warehouse.Name
-                HAVING SUM(COALESCE(Storage.QtyOnHand,0))<>0
+                HAVING SUM(COALESCE(Storage.QtyOnHand,0))" + (positiveStockOnly ? ">0" : "<>0") + @"
                 ORDER BY Warehouse.Name";
 
             IDataReader reader = null;
@@ -1169,6 +1212,7 @@ namespace VAS.Controllers
             public string is_bom { get; set; }
             public string has_bom { get; set; }
             public string uom_name { get; set; }
+            public string image_url { get; set; }
             public decimal current_year_revenue { get; set; }
             public decimal current_year_units { get; set; }
             public decimal last_year_revenue { get; set; }

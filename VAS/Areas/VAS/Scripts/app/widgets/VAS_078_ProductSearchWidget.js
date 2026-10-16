@@ -6,6 +6,9 @@
  * - VAS_078_ProductSearchWidget/SearchProducts
  * - VAS_078_ProductSearchWidget/GetProductDetail
  *
+ * Widget_Bug_Fix 2026-10-15: suggestion rows show the product picture (or a product-type placeholder),
+ * the search also matches product-type names, and the dropdown closes when the dashboard scrolls.
+ *
  * Summary Message Table
  *  # | Current Text                                  | Message Key
  * ---+-----------------------------------------------+-----------------------------
@@ -72,6 +75,7 @@
         var $dashboardScroll;
 
         var searchTimer = null;
+        var scrollCaptureHandler = null;
         var requestSequence = 0;
         var suggestions = [];
         var suggestionIndex = -1;
@@ -129,6 +133,52 @@
                 return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>';
             }
             return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 8-9 5-9-5"></path><path d="m3 8 9-5 9 5v8l-9 5-9-5Z"></path><path d="M12 13v8"></path></svg>';
+        }
+
+        /* No-image placeholder by product type, same glyphs as the Product tab panel
+           (VAS_190_ProductOverviewRightPanel): Item box, Service wrench, Resource person,
+           Expense receipt; anything else is drawn as an item. */
+        var TYPE_PLACEHOLDER_SVG = {
+            I: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.3 7 12 12 20.7 7"/><line x1="12" y1="22" x2="12" y2="12"/></svg>',
+            S: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
+            R: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="7.5" r="3.5"/><path d="M5 20.5c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="M16.5 3.5l1 1.5M19.5 7.5h-1.8"/></svg>',
+            E: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3h14v18l-2.33-1.5L14.33 21 12 19.5 9.67 21l-2.34-1.5L5 21z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>'
+        };
+
+        function typePlaceholderIcon(code) {
+            return TYPE_PLACEHOLDER_SVG[String(code || '').toUpperCase()] || TYPE_PLACEHOLDER_SVG.I;
+        }
+
+        // The server returns an absolute URL, a data: URI, or a path relative to the application
+        // root ("Images/..."); only the last needs the context prefix.
+        function resolveImageSrc(stored) {
+            var url = String(stored || '').trim();
+            if (!url) { return ''; }
+            if (/^(https?:)?\/\//i.test(url) || /^data:/i.test(url)) { return url; }
+            var base = '';
+            try { base = VIS.Application.contextUrl || ''; } catch (e) { base = ''; }
+            if (base && base.charAt(base.length - 1) !== '/') { base += '/'; }
+            return base + url.replace(/^\//, '');
+        }
+
+        // Suggestion-row visual: the product picture when it has one, otherwise the
+        // product-type placeholder (Widget_Bug_Fix Sr 60).
+        function optionVisualHtml(product) {
+            var src = resolveImageSrc(product.ImageUrl);
+            if (src) {
+                return '<span class="MPC-product-search-option-icon has-image"><img class="MPC-product-search-option-img" src="' + escapeHtml(src) + '" alt=""></span>';
+            }
+            return '<span class="MPC-product-search-option-icon">' + typePlaceholderIcon(product.ProductType) + '</span>';
+        }
+
+        // Codes of the product types whose displayed name contains the typed text, so a search
+        // for "Item" / "Service" finds products by type (the column stores one-letter codes).
+        function matchingProductTypeCodes(searchText) {
+            var needle = String(searchText || '').trim().toUpperCase();
+            if (!needle) { return ''; }
+            return ['I', 'S', 'R', 'E', 'O'].filter(function (code) {
+                return String(productTypeLabel(code) || '').toUpperCase().indexOf(needle) >= 0;
+            }).join(',');
         }
 
         function parseResponse(response) {
@@ -450,6 +500,16 @@
             });
 
             $(window).on('scroll' + eventNamespace, closeSuggestions);
+            // The dropdown is a fixed popover on <body>, so when the dashboard scrolls it would stay
+            // behind at its old screen position while the search pill moves away (Widget_Bug_Fix Sr 48).
+            // Scroll events do not bubble, so a capture-phase listener on the document catches the scroll
+            // of whichever container holds the dashboard; scrolling inside the dropdown itself is ignored.
+            scrollCaptureHandler = function (event) {
+                if (!$suggest || !$suggest.hasClass('is-open')) { return; }
+                if (event.target && $suggest[0] && $suggest[0].contains(event.target)) { return; }
+                closeSuggestions();
+            };
+            document.addEventListener('scroll', scrollCaptureHandler, true);
             $(window).on('resize' + eventNamespace, function () {
                 if ($suggest && $suggest.hasClass('is-open')) { positionSuggest(); }
             });
@@ -486,7 +546,8 @@
                 dataType: 'json',
                 data: {
                     q: searchText,
-                    max: 7
+                    max: 7,
+                    types: matchingProductTypeCodes(searchText)
                 },
                 success: function (response) {
                     if (sequence !== requestSequence) { return; }
@@ -531,7 +592,7 @@
                 ].filter(function (value) { return value; }).join(' \u00b7 ');
 
                 return '<div class="MPC-product-search-option' + (index === suggestionIndex ? ' is-active' : '') + '" role="option" aria-selected="' + (index === suggestionIndex ? 'true' : 'false') + '" data-index="' + index + '">' +
-                    '<span class="MPC-product-search-option-icon">' + icon('product') + '</span>' +
+                    optionVisualHtml(product) +
                     '<span class="MPC-product-search-option-main">' +
                         '<span class="MPC-product-search-option-name" title="' + escapeHtml(product.ProductName) + '">' + escapeHtml(product.ProductName) + '</span>' +
                         '<span class="MPC-product-search-option-meta" title="' + escapeHtml(metadata) + '">' + escapeHtml(metadata) + '</span>' +
@@ -541,6 +602,13 @@
             }).join('');
 
             $suggest.html(html).addClass('is-open');
+            // A picture that fails to load (file removed, dead URL) degrades to the product-type
+            // placeholder instead of a broken-image glyph.
+            $suggest.find('.MPC-product-search-option-img').on('error', function () {
+                var $option = $(this).closest('.MPC-product-search-option');
+                var failed = suggestions[Number($option.attr('data-index'))];
+                $(this).closest('.MPC-product-search-option-icon').removeClass('has-image').html(typePlaceholderIcon(failed && failed.ProductType));
+            });
             positionSuggest();
             $input.attr('aria-expanded', 'true');
         }
@@ -673,7 +741,7 @@
 
             var heroIconContent = imageUrl
                 ? '<img class="MPC-product-search-hero-img" src="' + escapeHtml(imageUrl) + '" alt="">'
-                : icon('product');
+                : typePlaceholderIcon(overview.ProductType);
 
             /* Open-record action. Emitted LAST so it sits to the right of the Status tile, against
                the hero section's trailing edge - the row is justify-content: flex-end, so the final
@@ -735,9 +803,9 @@
             $dialogBody.html(hero + '<nav class="MPC-product-search-tabs">' + tabs + '</nav><div class="MPC-product-search-tab-body"></div>');
 
             // A hero image that fails to load (file removed from the server, dead URL)
-            // degrades to the product icon instead of a broken-image glyph.
+            // degrades to the product-type icon instead of a broken-image glyph.
             $dialogBody.find('.MPC-product-search-hero-img').on('error', function () {
-                $(this).closest('.MPC-product-search-hero-icon').removeClass('has-image').html(icon('product'));
+                $(this).closest('.MPC-product-search-hero-icon').removeClass('has-image').html(typePlaceholderIcon(overview.ProductType));
             });
 
             renderTab();
@@ -825,7 +893,8 @@
                 [label('Warehouse', 'Warehouse'), label('Locator', 'Locator'), label('VAS_Attribute', 'Attribute'), label('VAS_078_OnHandQty', 'On Hand Qty'), label('Amount', 'Amount')],
                 rows,
                 [3, 4],
-                'stock'
+                'stock',
+                2
             );
         }
 
@@ -854,7 +923,7 @@
                 ];
             });
 
-            return latestRecordsNote(orders.length) + renderTable(headers, rows, [4, 5, 6], isSales ? 'salesOrders' : 'purchaseOrders');
+            return latestRecordsNote(orders.length) + renderTable(headers, rows, [4, 5, 6], isSales ? 'salesOrders' : 'purchaseOrders', 3);
         }
 
         function renderMovements() {
@@ -873,7 +942,8 @@
                 [label('VAS_078_MovementDate', 'Date'), label('VAS_078_MovementType', 'Type'), label('VAS_Attribute', 'Attribute'), label('Qty', 'Qty'), label('Warehouse', 'Warehouse'), label('Locator', 'Locator')],
                 rows,
                 [3],
-                'movements'
+                'movements',
+                2
             );
         }
 
@@ -894,7 +964,8 @@
                 [label('Requisition', 'Requisition #'), label('VAS_078_DocumentDate', 'Document Date'), label('VAS_078_RequiredDate', 'Required Date'), label('VAS_Attribute', 'Attribute'), label('Qty', 'Qty'), label('VAS_078_OrderedQty', 'Ordered Qty'), label('Status', 'Status')],
                 rows,
                 [4, 5],
-                'requisitions'
+                'requisitions',
+                3
             );
         }
 
@@ -906,7 +977,25 @@
             return '<div class="MPC-product-search-note">' + icon('clock') + '<span>' + escapeHtml(label('VAS_Showing', 'Showing') + ' ' + TABLE_FETCH_SIZE + ' ' + label('VAS_078_LatestRecords', 'latest records')) + '</span></div>';
         }
 
-        function renderTable(headers, rows, rightAlignedColumns, pageKey) {
+        /* attributeColumn (optional): index of the Attribute column. It is shown only when at least one
+           row of the tab has an attribute value; otherwise the column is removed from the header and every
+           row (right-alignment indexes after it shift left). Judged over ALL rows of the tab, not just the
+           current page, so paging never makes the column appear or disappear. */
+        function renderTable(headers, rows, rightAlignedColumns, pageKey, attributeColumn) {
+            var blankCellColumn = -1; // an empty Attribute cell stays empty (no dash) when the column is shown
+            if (rows.length && attributeColumn !== undefined && attributeColumn >= 0) {
+                var hasAttribute = rows.some(function (row) {
+                    var cell = row[attributeColumn];
+                    return cell != null && !/^[\s\-\u2013\u2014]*$/.test(String(cell)); // blank or dash-only = no attribute
+                });
+                if (hasAttribute) {
+                    blankCellColumn = attributeColumn;
+                } else {
+                    headers = headers.filter(function (h, i) { return i !== attributeColumn; });
+                    rows = rows.map(function (row) { return row.filter(function (c, i) { return i !== attributeColumn; }); });
+                    rightAlignedColumns = rightAlignedColumns.map(function (i) { return i > attributeColumn ? i - 1 : i; });
+                }
+            }
             if (!rows.length) {
                 return '<div class="MPC-product-search-empty">' + escapeHtml(label('VAS_078_NoProductRecords', 'No records found for this product.')) + '</div>';
             }
@@ -923,7 +1012,7 @@
 
             var body = pageRows.map(function (row) {
                 return '<tr>' + row.map(function (cell, index) {
-                    var value = cell == null || cell === '' ? '-' : cell;
+                    var isBlankCell = cell == null || cell === '' || (index === blankCellColumn && /^[\s\-\u2013\u2014]*$/.test(String(cell)));                    var value = isBlankCell ? (index === blankCellColumn ? '' : '-') : cell;
                     return '<td class="' + (index === 0 ? 'is-primary ' : '') + (rightAlignedColumns.indexOf(index) >= 0 ? 'is-right' : '') + '" title="' + escapeHtml(value) + '">' + escapeHtml(value) + '</td>';
                 }).join('') + '</tr>';
             }).join('');
@@ -1007,6 +1096,10 @@
             var eventNamespace = '.MPCProductSearch-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget');
 
             if (searchTimer) { clearTimeout(searchTimer); }
+            if (scrollCaptureHandler) {
+                document.removeEventListener('scroll', scrollCaptureHandler, true);
+                scrollCaptureHandler = null;
+            }
             $(document).off(eventNamespace);
             $(window).off(eventNamespace);
             if ($dashboardScroll && $dashboardScroll.length) { $dashboardScroll.off(eventNamespace); }

@@ -286,6 +286,20 @@
             return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (paths[name] || '') + '</svg>';
         }
 
+        /* No-image placeholder by product type, same glyphs as the Product tab panel
+           (VAS_190_ProductOverviewRightPanel): Item box, Service wrench, Resource person,
+           Expense receipt; anything else is drawn as an item. */
+        var PRODUCT_PLACEHOLDER_SVG = {
+            I: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.3 7 12 12 20.7 7"/><line x1="12" y1="22" x2="12" y2="12"/></svg>',
+            S: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
+            R: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="7.5" r="3.5"/><path d="M5 20.5c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="M16.5 3.5l1 1.5M19.5 7.5h-1.8"/></svg>',
+            E: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3h14v18l-2.33-1.5L14.33 21 12 19.5 9.67 21l-2.34-1.5L5 21z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>'
+        };
+
+        function productPlaceholderIcon(code) {
+            return PRODUCT_PLACEHOLDER_SVG[String(code || '').toUpperCase()] || PRODUCT_PLACEHOLDER_SVG.I;
+        }
+
         function createPerformanceModal() {
             if ($modal) { return; }
 
@@ -439,9 +453,15 @@
                 '<div class="MPC-hsp-pstat"><span class="MPC-hsp-pstat-label">' + escapeHtml(label('VAS_094_AvgSellingPrice', 'Avg Selling Price')) + '</span><span class="MPC-hsp-pstat-value">' + escapeHtml(averagePrice) + '</span></div>' +
                 '<div class="MPC-hsp-pstat"><span class="MPC-hsp-pstat-label">' + escapeHtml(label('VAS_094_YoYGrowth', 'YoY Growth')) + '</span><span class="MPC-hsp-pstat-value MPC-hsp-tone-' + growth.tone + '">' + escapeHtml(growth.text) + '</span></div>';
 
+            // Hero box: the product's picture when it has one, else the product-type icon.
+            var heroImageSrc = resolveImageUrl(data.image_url);
+            var heroIcon = heroImageSrc
+                ? '<span class="MPC-hsp-phero-ico MPC-hsp-has-image"><img class="MPC-hsp-phero-img" src="' + escapeHtml(heroImageSrc) + '" alt=""></span>'
+                : '<span class="MPC-hsp-phero-ico">' + productPlaceholderIcon(data.product_type) + '</span>';
+
             var hero =
                 '<div class="MPC-hsp-phero">' +
-                    '<span class="MPC-hsp-phero-ico">' + modalIcon('trend') + '</span>' +
+                    heroIcon +
                     '<span class="MPC-hsp-phero-main">' +
                         '<span class="MPC-hsp-phero-name" title="' + escapeHtml(data.product_name || '') + '">' + escapeHtml(data.product_name || '') + '</span>' +
                         '<span class="MPC-hsp-phero-chips">' + chips + '</span>' +
@@ -540,6 +560,11 @@
                 '</div>' +
                 note
             );
+
+            // A picture that fails to load falls back to the product-type icon.
+            $modalBody.find('.MPC-hsp-phero-img').on('error', function () {
+                $(this).closest('.MPC-hsp-phero-ico').removeClass('MPC-hsp-has-image').html(productPlaceholderIcon(data.product_type));
+            });
 
             if (isStockedProduct && modalStockRows.length) {
                 renderPerformanceStockPage(uomName);

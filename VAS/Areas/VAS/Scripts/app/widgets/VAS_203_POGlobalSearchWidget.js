@@ -11,6 +11,15 @@
  *                  and behaves exactly like VAS_067 / VAS_068 / VAS_069 /
  *                  VAS_070 / VAS_091.
  * chronological  : Development
+ *   Claude 2026-10-16 Widget_Bug_Fix Sr 147-154, PO detail pop-up: Status card removed; Attribute
+ *                     column only when a line has a value; lines paged 10 at a time; qty / UOM /
+ *                     charge name / net-of-tax amount come from the server (see the controller header).
+ *                     Sr 146 ("[VAS_TotalAmount]") is a missing message on the transport server -
+ *                     no code fallback by design; key and text are listed in the status report.
+ *
+ *   Claude 2026-10-16 Search results paging: results load 25 at a time and the next page is fetched
+ *                     as the list is scrolled (server maxRows / offset / hasMore), so every match is reachable
+ *                     instead of only the first 8.
  *
  * AD_Message keys used:
  *   VAS_203_Placeholder        => "Search product, vendor, location, representative, PO reference, description, warehouse..."
@@ -50,6 +59,11 @@
         var requestSeq = 0;
         var currentItems = [];
         var activeItemIndex = -1;
+        // Results come back a page at a time; the next page is fetched as the list is scrolled to its end.
+        var PAGE_SIZE = 25;
+        var currentTerm = '';
+        var hasMore = false;
+        var isLoadingMore = false;
 
         /* Group -> chip tone. The shared stylesheet ships chip-order / -invoice /
            -payment / -receipt / -cash / -gljournal; the purchase-specific groups map
@@ -135,6 +149,8 @@
             $panel = $('<div class="vas-dssrch-panel" id="vas_dssrch_panel_' + widgetID + '">');
             $('body').append($panel);
 
+            $panel.on('scroll', onPanelScroll);
+
             wireEvents($clear);
         }
 
@@ -172,6 +188,9 @@
 
             $clear.on('click', function () {
                 $input.val('');
+                currentTerm = '';
+                hasMore = false;
+                isLoadingMore = false;
                 $bar.removeClass('vas-dssrch-has-text');
                 setBusy(false);
                 closePanel();
@@ -212,10 +231,13 @@
 
         function runSearch(term) {
             var mySeq = ++requestSeq;
+            currentTerm = term;
+            hasMore = false;
+            isLoadingMore = false;
             $.ajax({
                 url: VIS.Application.contextUrl + ENDPOINT,
                 type: 'GET',
-                data: { query: term },
+                data: { query: term, maxRows: PAGE_SIZE, offset: 0 },
                 dataType: 'json',
                 cache: false,
                 success: function (raw) {
@@ -224,11 +246,12 @@
                     var res = parseResponse(raw);
                     var payload = res.data || res;
                     if (payload && payload.results) {
-                        renderResults(payload.results, payload.totalCount || payload.results.length);
+                        hasMore = !!payload.hasMore;
+                        renderResults(payload.results);
                     } else if (res.error || res.success === false) {
                         renderError();
                     } else {
-                        renderResults([], 0);
+                        renderResults([]);
                     }
                 },
                 error: function () {
@@ -239,8 +262,71 @@
             });
         }
 
+        /* ---- Infinite scroll: fetch the next page and append ---- */
+        function onPanelScroll() {
+            if (!hasMore || isLoadingMore) { return; }
+            if (!$panel.hasClass('vas-dssrch-open')) { return; }
+            var el = $panel[0];
+            if (el.scrollTop + el.clientHeight >= el.scrollHeight - 56) { loadMore(); }
+        }
+
+        function loadMore() {
+            if (isLoadingMore || !hasMore) { return; }
+            isLoadingMore = true;
+            var mySeq = requestSeq;
+            var term = currentTerm;
+            var offset = currentItems.length;
+            showMoreSpinner(true);
+            $.ajax({
+                url: VIS.Application.contextUrl + ENDPOINT,
+                type: 'GET',
+                data: { query: term, maxRows: PAGE_SIZE, offset: offset },
+                dataType: 'json',
+                cache: false,
+                success: function (raw) {
+                    if (mySeq !== requestSeq) { isLoadingMore = false; return; }
+                    var res = parseResponse(raw);
+                    var payload = res.data || res;
+                    var items = (payload && payload.results) ? payload.results : [];
+                    appendResults(items);
+                    hasMore = !!(payload && payload.hasMore) && items.length > 0;
+                    isLoadingMore = false;
+                    showMoreSpinner(false);
+                    updateCount();
+                },
+                error: function () {
+                    if (mySeq !== requestSeq) { isLoadingMore = false; return; }
+                    isLoadingMore = false;
+                    showMoreSpinner(false);
+                }
+            });
+        }
+
+        function appendResults(items) {
+            if (!items || items.length === 0) { return; }
+            var startIndex = currentItems.length;
+            var html = '';
+            for (var i = 0; i < items.length; i++) {
+                html += buildRow(items[i], startIndex + i);
+            }
+            currentItems = currentItems.concat(items);
+            var $rows = $(html).filter('.vas-dssrch-row');
+            $panel.find('.vas-dssrch-list').append($rows);
+            bindRowClicks($rows);
+        }
+
+        function updateCount() {
+            var text = currentItems.length + (hasMore ? '+' : '') + ' ' + msg('VAS_DocSearch_Results', 'results');
+            $panel.find('.vas-dssrch-count').text(text);
+        }
+
+        function showMoreSpinner(on) {
+            $panel.find('.vas-dssrch-more').toggleClass('vas-dssrch-more-active', !!on);
+        }
+
         /* ---- Rendering (shared vas-dssrch-* markup) ---- */
         function renderHint() {
+            hasMore = false;
             currentItems = [];
             activeItemIndex = -1;
             $panel.html(stateHtml(searchSvg(), msg('VAS_DocSearch_TypeToSearch', 'Type at least 2 characters to search'), false));
@@ -248,13 +334,14 @@
         }
 
         function renderError() {
+            hasMore = false;
             currentItems = [];
             activeItemIndex = -1;
             $panel.html(stateHtml(alertSvg(), msg('VAS_DocSearch_Error', 'Search failed. Please try again.'), true));
             openPanel();
         }
 
-        function renderResults(items, totalCount) {
+        function renderResults(items) {
             currentItems = items || [];
             activeItemIndex = -1;
 
@@ -268,11 +355,10 @@
             for (var i = 0; i < items.length; i++) {
                 html += buildRow(items[i], i);
             }
-            html += '</div>';
+            html += '</div><div class="vas-dssrch-more"><span class="vas-dssrch-more-spin"></span></div>';
             $panel.html(html);
 
-            var text = items.length + ((totalCount > items.length) ? '+' : '') + ' ' + msg('VAS_DocSearch_Results', 'results');
-            $panel.find('.vas-dssrch-count').text(text);
+            updateCount();
 
             bindRowClicks($panel.find('.vas-dssrch-list .vas-dssrch-row'));
             $panel.scrollTop(0);
@@ -436,7 +522,7 @@
                             '<div class="vas-203-dtl-msg">' + escapeHtml(lbl('VAS_CouldntLoad', "Couldn't load")) + '</div>');
                         return;
                     }
-                    renderPurchaseOrderDetail(payload.header, payload.lines || []);
+                    renderPurchaseOrderDetail(payload.header, payload.lines || [], payload.totalAmount);
                 },
                 error: function () {
                     if ($detailModal) {
@@ -448,7 +534,78 @@
         }
 
 
-        function renderPurchaseOrderDetail(header, lines) {
+        /* Lines are shown LINES_PER_PAGE at a time (Widget_Bug_Fix Sr 153). All lines arrive in one
+           response, so paging is done here. The Attribute column is drawn only when at least one
+           line of the order carries an attribute value (Sr 152) - decided over ALL lines, so it
+           does not appear and disappear while paging. Pending is a dash for lines that are not an
+           Item-type product (Sr 150). */
+        var LINES_PER_PAGE = 10;
+
+        // An attribute set instance with no values can still carry a description made of blanks or
+        // separators only (e.g. "-"), which is not an attribute value (Sr 152, reopened).
+        function hasAttributeValue(text) {
+            return !!text && /[^\s\-‐-―_.,:;()\[\]\/\\|]/.test(String(text));
+        }
+
+        function renderLinesPage(header, lines, page) {
+            var $host = $detailModal.find('.vas-203-dtl-lines');
+            var totalPages = Math.max(1, Math.ceil(lines.length / LINES_PER_PAGE));
+            page = Math.max(1, Math.min(page, totalPages));
+            var start = (page - 1) * LINES_PER_PAGE;
+            var end = Math.min(start + LINES_PER_PAGE, lines.length);
+
+            var showAttribute = false;
+            for (var a = 0; a < lines.length; a++) {
+                if (hasAttributeValue(lines[a].attribute)) { showAttribute = true; break; }
+            }
+
+            var html = '<div class="vas-203-dtl-tblwrap"><table class="vas-203-dtl-table"><thead><tr>' +
+                '<th>#</th>' +
+                '<th>' + escapeHtml(lbl('VAS_Product', 'Product')) + '</th>' +
+                (showAttribute ? '<th>' + escapeHtml(lbl('VAS_Attribute', 'Attribute')) + '</th>' : '') +
+                '<th>' + escapeHtml(lbl('VAS_UoM', 'UoM')) + '</th>' +
+                '<th class="r">' + escapeHtml(lbl('VAS_Ordered', 'Ordered')) + '</th>' +
+                '<th class="r">' + escapeHtml(lbl('VAS_Received', 'Received')) + '</th>' +
+                '<th class="r">' + escapeHtml(lbl('VAS_Pending', 'Pending')) + '</th>' +
+                '<th class="r">' + escapeHtml(lbl('VAS_Amount', 'Amount')) + '</th>' +
+                '</tr></thead><tbody>';
+            for (var k = start; k < end; k++) {
+                var ln = lines[k];
+                var amount = fmtMoney(ln.lineNetAmt, header.currencySymbol, header.currencyIso, header.stdPrecision);
+                html += '<tr>' +
+                    '<td>' + escapeHtml(String(ln.lineNo || (k + 1))) + '</td>' +
+                    '<td title="' + escapeHtml(ln.productName || '') + '">' + escapeHtml(ln.productName || '—') + '</td>' +
+                    (showAttribute ? '<td title="' + escapeHtml(hasAttributeValue(ln.attribute) ? ln.attribute : '') + '">' + escapeHtml(hasAttributeValue(ln.attribute) ? ln.attribute : '—') + '</td>' : '') +
+                    '<td>' + escapeHtml(ln.uom || '—') + '</td>' +
+                    '<td class="r">' + escapeHtml(fmtQty(ln.qtyOrdered)) + '</td>' +
+                    '<td class="r">' + escapeHtml(fmtQty(ln.qtyDelivered)) + '</td>' +
+                    '<td class="r">' + escapeHtml(ln.isItem ? fmtQty(ln.qtyPending) : '—') + '</td>' +
+                    '<td class="r" title="' + escapeHtml(amount) + '">' + escapeHtml(amount) + '</td>' +
+                    '</tr>';
+            }
+            html += '</tbody></table></div>';
+
+            if (lines.length > LINES_PER_PAGE) {
+                html += '<div class="vas-203-dtl-pgfoot">' +
+                    '<span class="vas-203-dtl-pghelper">' + escapeHtml(lbl('VAS_Showing', 'Showing') + ' ' + (start + 1) + '–' + end + ' ' + lbl('VAS_Of', 'of') + ' ' + lines.length) + '</span>' +
+                    '<span class="vas-203-dtl-pager">' +
+                        '<button type="button" class="vas-203-dtl-pgbtn vas-203-dtl-prev" aria-label="' + escapeHtml(lbl('VAS_PreviousPage', 'Previous page')) + '"' + (page <= 1 ? ' disabled' : '') + '>' +
+                            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>' +
+                        '</button>' +
+                        '<span class="vas-203-dtl-pgtext">' + escapeHtml(page + ' ' + lbl('VAS_Of', 'of') + ' ' + totalPages) + '</span>' +
+                        '<button type="button" class="vas-203-dtl-pgbtn vas-203-dtl-next" aria-label="' + escapeHtml(lbl('VAS_NextPage', 'Next page')) + '"' + (page >= totalPages ? ' disabled' : '') + '>' +
+                            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>' +
+                        '</button>' +
+                    '</span>' +
+                '</div>';
+            }
+
+            $host.html(html);
+            $host.find('.vas-203-dtl-prev').on('click', function () { renderLinesPage(header, lines, page - 1); });
+            $host.find('.vas-203-dtl-next').on('click', function () { renderLinesPage(header, lines, page + 1); });
+        }
+
+        function renderPurchaseOrderDetail(header, lines, orderTotal) {
             var title = header.documentNo || (lbl('VAS_PONo', 'PO No') + ' #' + header.orderId);
             $detailModal.find('.vas-203-dtl-title').text(title);
             $detailModal.find('.vas-203-dtl-title').attr('title', title);
@@ -464,12 +621,14 @@
                 totalAmount += Number(ln.lineNetAmt || 0);
             }
 
+            // The amount is the order's total WITHOUT tax as the server states it (the Purchase Order window's
+            // Sub Total, tax taken off when the price list includes tax); the sum of the lines is only a fallback.
+            if (typeof orderTotal === 'number') { totalAmount = orderTotal; }
             var amtFmt = fmtMoney(totalAmount, header.currencySymbol, header.currencyIso, header.stdPrecision);
 
             var html = '<div class="vas-203-dtl-summary">' +
                 '<div class="vas-203-dtl-cell"><span class="vas-203-dtl-lbl">' + escapeHtml(lbl('VAS_Vendor', 'Vendor')) + '</span><span class="vas-203-dtl-val">' + escapeHtml(header.vendorName || '—') + '</span></div>' +
                 '<div class="vas-203-dtl-cell"><span class="vas-203-dtl-lbl">' + escapeHtml(lbl('VAS_Warehouse', 'Warehouse')) + '</span><span class="vas-203-dtl-val">' + escapeHtml(header.warehouseName || '—') + '</span></div>' +
-                '<div class="vas-203-dtl-cell"><span class="vas-203-dtl-lbl">' + escapeHtml(lbl('VAS_Status', 'Status')) + '</span><span class="vas-203-dtl-val">' + escapeHtml(header.docStatusLabel || '—') + '</span></div>' +
                 '<div class="vas-203-dtl-cell"><span class="vas-203-dtl-lbl">' + escapeHtml(lbl('VAS_TotalAmount', 'Amount')) + '</span><span class="vas-203-dtl-val">' + escapeHtml(amtFmt) + '</span></div>' +
                 '<div class="vas-203-dtl-cell"><span class="vas-203-dtl-lbl">' + escapeHtml(lbl('VAS_QtyOrdered', 'Qty ordered')) + '</span><span class="vas-203-dtl-val">' + escapeHtml(fmtQty(totalOrdered)) + '</span></div>' +
                 '<div class="vas-203-dtl-cell"><span class="vas-203-dtl-lbl">' + escapeHtml(lbl('VAS_QtyPending', 'Qty pending')) + '</span><span class="vas-203-dtl-val">' + escapeHtml(fmtQty(totalPending)) + '</span></div>' +
@@ -480,30 +639,8 @@
             if (lines.length === 0) {
                 html += '<div class="vas-203-dtl-msg">' + escapeHtml(lbl('VAS_203_NoLines', 'No order lines.')) + '</div>';
             } else {
-                html += '<div class="vas-203-dtl-tblwrap"><table class="vas-203-dtl-table"><thead><tr>' +
-                    '<th>#</th>' +
-                    '<th>' + escapeHtml(lbl('VAS_Product', 'Product')) + '</th>' +
-                    '<th>' + escapeHtml(lbl('VAS_Attribute', 'Attribute')) + '</th>' +
-                    '<th>' + escapeHtml(lbl('VAS_UoM', 'UoM')) + '</th>' +
-                    '<th class="r">' + escapeHtml(lbl('VAS_Ordered', 'Ordered')) + '</th>' +
-                    '<th class="r">' + escapeHtml(lbl('VAS_Received', 'Received')) + '</th>' +
-                    '<th class="r">' + escapeHtml(lbl('VAS_Pending', 'Pending')) + '</th>' +
-                    '<th class="r">' + escapeHtml(lbl('VAS_Amount', 'Amount')) + '</th>' +
-                    '</tr></thead><tbody>';
-                for (k = 0; k < lines.length; k++) {
-                    ln = lines[k];
-                    html += '<tr>' +
-                        '<td>' + escapeHtml(String(ln.lineNo || (k + 1))) + '</td>' +
-                        '<td title="' + escapeHtml(ln.productName || '') + '">' + escapeHtml(ln.productName || '—') + '</td>' +
-                        '<td>' + escapeHtml(ln.attribute || '—') + '</td>' +
-                        '<td>' + escapeHtml(ln.uom || '—') + '</td>' +
-                        '<td class="r">' + escapeHtml(fmtQty(ln.qtyOrdered)) + '</td>' +
-                        '<td class="r">' + escapeHtml(fmtQty(ln.qtyDelivered)) + '</td>' +
-                        '<td class="r">' + escapeHtml(fmtQty(ln.qtyPending)) + '</td>' +
-                        '<td class="r" title="' + escapeHtml(fmtMoney(ln.lineNetAmt, header.currencySymbol, header.currencyIso, header.stdPrecision)) + '">' + escapeHtml(fmtMoney(ln.lineNetAmt, header.currencySymbol, header.currencyIso, header.stdPrecision)) + '</td>' +
-                        '</tr>';
-                }
-                html += '</tbody></table></div>';
+                // Lines table + pager are drawn by renderLinesPage() once the body is in the DOM.
+                html += '<div class="vas-203-dtl-lines"></div>';
             }
 
             html += '<div class="vas-203-dtl-foot">' +
@@ -512,6 +649,7 @@
                 '</div>';
 
             $detailModal.find('.vas-203-dtl-body').html(html);
+            if (lines.length > 0) { renderLinesPage(header, lines, 1); }
             $detailModal.find('.vas-203-dtl-openbtn').on('click', function () {
                 closePurchaseOrderDetail();
                 openRecordInWindow(header.orderId || orderId);

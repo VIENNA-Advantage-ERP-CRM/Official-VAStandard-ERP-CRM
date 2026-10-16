@@ -2,11 +2,12 @@
  * Top Vendors Widget (Product Master dashboard)
  * Widget number 130.
  * Widget size: 2 columns x 3 rows.
- * Ranks vendors by distinct products received through completed material
- * receipts (M_InOut MovementType 'V+') in a selected fiscal year, as a bar
- * list; clicking a vendor opens a drill-down modal listing every product
- * received from that vendor (code, attribute chips, received qty + base
- * UOM). Fit-to-height widget pagination and dynamic no-scroll modal
+ * Ranks vendors by the Grand Total of their completed, fully received purchase
+ * orders (last receipt in the selected fiscal year, amounts in the accounting
+ * schema currency), as a bar list; clicking a vendor opens a drill-down modal
+ * listing every product received from that vendor (code, attribute chips -
+ * column shown only when a value exists, received qty + full base UOM name).
+ * Pagers (widget and modal) are visible only when there is more than one page. Fit-to-height widget pagination and dynamic no-scroll modal
  * pagination (both clamp 1-8). Self-contained file - no code shared with any
  * other widget file. Read-only. Plain DOM internals (no jQuery in the widget
  * logic); jQuery is used only at the framework boundary.
@@ -19,7 +20,7 @@
  *  2 | Fiscal year                                | VAS_130_TV_FyAria
  *  3 | Last receipt                              | VAS_130_TV_DateMeta
  *  4 | No material receipts in this fiscal year. | VAS_130_TV_EmptyState
- *  5 | product / code / attributes / qty (UoM)    | VAS_130_TV_ColProduct / VAS_130_TV_ColCode / VAS_130_TV_ColAttributes / VAS_130_TV_ColQty
+ *  5 | product / code / attributes / Qty (UOM)    | VAS_130_TV_ColProduct / VAS_130_TV_ColCode / VAS_130_TV_ColAttributes / VAS_130_TV_ColQty
  *  6 | products (count/year/date assembled in code) | VAS_130_TV_ModalSub
  *  7 | Retry                                      | VAS_130_TV_Retry
  *  8 | Showing / of                               | VAS_Showing / VAS_Of (shared global keys)
@@ -64,6 +65,8 @@
             years: [],
             yearId: 0,
             partners: [],
+            currencySymbol: '',
+            stdPrecision: 2,
             page: 1,
             perPage: MAX_PER_PAGE,
             firstIndex: 0,
@@ -159,6 +162,7 @@
             pager.appendChild(next);
             foot.appendChild(pager); // right-aligned pager only, no helper text
             els.rows = rowsClip;
+            els.pager = pager;
             els.pageText = pageText;
             els.prev = prev;
             els.next = next;
@@ -241,6 +245,7 @@
             els.mBody = mBody;
             els.mClose = mClose;
             els.mHelper = mHelper;
+            els.mPager = pager;
             els.mPageText = pageText;
             els.mPrev = prev;
             els.mNext = next;
@@ -302,6 +307,8 @@
                 var data = parseResponse(text);
                 if (!data || data.error) { showRowsError(); return; }
                 state.partners = data.partners || [];
+                state.currencySymbol = data.currencySymbol || '';
+                state.stdPrecision = (typeof data.stdPrecision === 'number') ? data.stdPrecision : 2;
                 state.loaded = true;
                 state.page = 1;
                 state.firstIndex = 0;
@@ -328,7 +335,7 @@
 
         function maxCount() {
             var max = 0;
-            state.partners.forEach(function (p) { if (p.productCount > max) { max = p.productCount; } });
+            state.partners.forEach(function (p) { if (p.totalAmount > max) { max = p.totalAmount; } });
             return max || 1;
         }
 
@@ -375,6 +382,24 @@
             els.pageText.textContent = state.page + ' ' + lbl('VAS_Of', 'of') + ' ' + pages;
             els.prev.disabled = state.page <= 1;
             els.next.disabled = state.page >= pages;
+            setPagerVisible(els.pager, pages > 1);
+        }
+
+        // Pager only when the records span more than one page (Widget_Bug_Fix Sr 42). Hidden with
+        // visibility (not display) so the footer keeps its height and the fit-to-height row
+        // measurement stays stable.
+        function setPagerVisible(pagerEl, visible) {
+            if (pagerEl) { pagerEl.style.visibility = visible ? '' : 'hidden'; }
+        }
+
+        // Grand Total in the accounting-schema currency (Widget_Bug_Fix Sr 49).
+        function formatAmount(value) {
+            var precision = (typeof state.stdPrecision === 'number') ? state.stdPrecision : 2;
+            var text = Number(value || 0).toLocaleString(window.navigator.language, {
+                minimumFractionDigits: precision,
+                maximumFractionDigits: precision
+            });
+            return (state.currencySymbol ? state.currencySymbol + ' ' : '') + text;
         }
 
         function buildRow(partner, absoluteIndex, max) {
@@ -385,7 +410,7 @@
             var line1 = el('span', 'MPC-vnd-line1');
             var rank = el('span', 'MPC-vnd-rank', String(absoluteIndex + 1).padStart(2, '0'));
             var name = el('span', 'MPC-vnd-name', partner.name || '');
-            var count = el('span', 'MPC-vnd-count', String(partner.productCount || 0));
+            var count = el('span', 'MPC-vnd-count', formatAmount(partner.totalAmount));
             line1.appendChild(rank);
             line1.appendChild(name);
             line1.appendChild(count);
@@ -394,7 +419,7 @@
             var barWrap = el('span', 'MPC-vnd-barwrap');
             var barTrack = el('span', 'MPC-vnd-bartrack');
             var barFill = el('span', 'MPC-vnd-barfill');
-            var pct = Math.max(6, Math.round((partner.productCount / max) * 100));
+            var pct = Math.max(6, Math.round(((partner.totalAmount || 0) / max) * 100));
             barFill.style.width = pct + '%';
             barFill.style.background = BAR_COLORS[absoluteIndex % BAR_COLORS.length];
             barTrack.appendChild(barFill);
@@ -416,6 +441,7 @@
             els.pageText.textContent = '1 ' + lbl('VAS_Of', 'of') + ' 1';
             els.prev.disabled = true;
             els.next.disabled = true;
+            setPagerVisible(els.pager, false);
         }
 
         function showEmptyState() {
@@ -424,6 +450,7 @@
             els.pageText.textContent = '1 ' + lbl('VAS_Of', 'of') + ' 1';
             els.prev.disabled = true;
             els.next.disabled = true;
+            setPagerVisible(els.pager, false);
         }
 
         function showRowsError() {
@@ -440,6 +467,7 @@
             els.pageText.textContent = '1 ' + lbl('VAS_Of', 'of') + ' 1';
             els.prev.disabled = true;
             els.next.disabled = true;
+            setPagerVisible(els.pager, false);
         }
 
         /* ---- Modal ---- */
@@ -512,6 +540,7 @@
             els.mPageText.textContent = '1 ' + lbl('VAS_Of', 'of') + ' 1';
             els.mPrev.disabled = true;
             els.mNext.disabled = true;
+            setPagerVisible(els.mPager, false);
         }
 
         function showModalError(partnerId) {
@@ -527,33 +556,44 @@
             els.mPageText.textContent = '1 ' + lbl('VAS_Of', 'of') + ' 1';
             els.mPrev.disabled = true;
             els.mNext.disabled = true;
+            setPagerVisible(els.mPager, false);
+        }
+
+        // The Attributes column is shown only when at least one listed product has an attribute
+        // value defined (Widget_Bug_Fix Sr 50); otherwise the row falls back to 3 columns.
+        function modalHasAttributes() {
+            return state.modalItems.some(function (item) { return item.attributes && item.attributes.length; });
         }
 
         function buildModalHeadRow() {
-            var head = el('div', 'MPC-vnd-m-row MPC-vnd-m-ghead');
+            var showAttrs = modalHasAttributes();
+            var head = el('div', 'MPC-vnd-m-row MPC-vnd-m-ghead' + (showAttrs ? '' : ' MPC-vnd-m-noattrs'));
             head.appendChild(el('span', null, lbl('VAS_130_TV_ColProduct', 'product')));
             head.appendChild(el('span', null, lbl('VAS_130_TV_ColCode', 'code')));
-            head.appendChild(el('span', null, lbl('VAS_130_TV_ColAttributes', 'attributes')));
-            head.appendChild(el('span', null, lbl('VAS_130_TV_ColQty', 'qty (UoM)')));
+            if (showAttrs) { head.appendChild(el('span', null, lbl('VAS_130_TV_ColAttributes', 'attributes'))); }
+            head.appendChild(el('span', null, lbl('VAS_130_TV_ColQty', 'Qty (UOM)')));
             return head;
         }
 
         function buildModalDataRow(item) {
-            var row = el('div', 'MPC-vnd-m-row MPC-vnd-m-datarow');
+            var showAttrs = modalHasAttributes();
+            var row = el('div', 'MPC-vnd-m-row MPC-vnd-m-datarow' + (showAttrs ? '' : ' MPC-vnd-m-noattrs'));
 
             row.appendChild(el('span', 'MPC-vnd-m-primary', item.name || ''));
             row.appendChild(el('span', 'MPC-vnd-m-cell', item.code || ''));
 
-            var attrsCell = el('span', 'MPC-vnd-m-attrs');
-            var attrs = item.attributes || [];
-            if (attrs.length) {
-                attrs.forEach(function (a) {
-                    attrsCell.appendChild(el('span', 'MPC-vnd-chip', a.label + ': ' + a.value));
-                });
-            } else {
-                attrsCell.appendChild(el('span', 'MPC-vnd-em-dash', '—'));
+            if (showAttrs) {
+                var attrsCell = el('span', 'MPC-vnd-m-attrs');
+                var attrs = item.attributes || [];
+                if (attrs.length) {
+                    attrs.forEach(function (a) {
+                        attrsCell.appendChild(el('span', 'MPC-vnd-chip', a.label + ': ' + a.value));
+                    });
+                } else {
+                    attrsCell.appendChild(el('span', 'MPC-vnd-em-dash', '—'));
+                }
+                row.appendChild(attrsCell);
             }
-            row.appendChild(attrsCell);
 
             var qty = (item.qty != null) ? item.qty : 0;
             row.appendChild(el('span', 'MPC-vnd-m-qty', qty + ' ' + (item.uom || '')));
@@ -613,6 +653,7 @@
                 els.mPageText.textContent = '1 ' + lbl('VAS_Of', 'of') + ' 1';
                 els.mPrev.disabled = true;
                 els.mNext.disabled = true;
+                setPagerVisible(els.mPager, false);
                 return;
             }
 
@@ -641,6 +682,7 @@
             els.mPageText.textContent = state.modalPage + ' ' + lbl('VAS_Of', 'of') + ' ' + pages;
             els.mPrev.disabled = state.modalPage <= 1;
             els.mNext.disabled = state.modalPage >= pages;
+            setPagerVisible(els.mPager, pages > 1);
         }
 
         /* The modal never scrolls: whenever its size changes (window resize,
