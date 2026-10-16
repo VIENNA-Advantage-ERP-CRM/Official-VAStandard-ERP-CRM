@@ -1,7 +1,8 @@
 /**
  * Locator Transfer Matrix Widget (Material Transfer Dashboard)
  * Purpose - Heat-map matrix of stock moved between locators (from-locator rows x to-locator
- *           columns) for the selected month/year. Shows the busiest locators; cell = quantity.
+ *           columns) for the selected month/year. The number of rows/columns adapts to the
+ *           widget size (no inner scrollbar); the footer says how many locators are shown.
  * Prefix  - VAS_177_
  */
 ; VAS = window.VAS || {};
@@ -34,7 +35,7 @@
     }
 
     var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    var MAX_AXIS = 5;
+    var KEY_SEP = '\u0001';
 
     function formatQty(v) {
         var n = Number(v || 0);
@@ -50,23 +51,18 @@
         var $wrapper = $('<div class="vas-177-container">');
         var $root = $('<div class="vas-177-root">');
         var widgetObserver = null;
+        var bodyObserver = null;
 
         var now = new Date();
         var selMonth = now.getMonth() + 1;
         var selYear = now.getFullYear();
         var loaded = false;
         var cells = [];
+        var maxRows = 3;
+        var maxCols = 3;
+        var openMenu = '';
 
         function build() {
-            var monthOpts = '';
-            for (var m = 0; m < 12; m++) {
-                monthOpts += '<option value="' + (m + 1) + '"' + (m + 1 === selMonth ? ' selected' : '') + '>' + MONTHS[m] + '</option>';
-            }
-            var yearOpts = '';
-            for (var y = selYear; y >= selYear - 4; y--) {
-                yearOpts += '<option value="' + y + '"' + (y === selYear ? ' selected' : '') + '>' + y + '</option>';
-            }
-
             $root.html(
                 '<div class="vas-177-header-row">' +
                     '<div class="vas-177-left-cluster">' +
@@ -77,23 +73,59 @@
                         '</div>' +
                     '</div>' +
                     '<div class="vas-177-filters">' +
-                        '<select class="vas-177-sel vas-177-msel">' + monthOpts + '</select>' +
-                        '<select class="vas-177-sel vas-177-ysel">' + yearOpts + '</select>' +
+                        '<div class="vas-177-dropdown" data-dd="m"><button type="button" class="vas-177-dropdown-btn"><span class="vas-177-dd-lbl">' + MONTHS[selMonth - 1] + '</span></button></div>' +
+                        '<div class="vas-177-dropdown" data-dd="y"><button type="button" class="vas-177-dropdown-btn"><span class="vas-177-dd-lbl">' + selYear + '</span></button></div>' +
                     '</div>' +
                 '</div>' +
-                '<div class="vas-177-table-wrap"><div class="vas-177-body"></div></div>'
+                '<div class="vas-177-table-wrap"><div class="vas-177-table-body"></div></div>' +
+                '<div class="vas-177-footer"></div>'
             );
             $wrapper.empty().append($root);
 
-            $root.on('change', '.vas-177-sel', function () {
-                selMonth = parseInt($root.find('.vas-177-msel').val(), 10);
-                selYear = parseInt($root.find('.vas-177-ysel').val(), 10);
+            $root.on('click', '.vas-177-dropdown-btn', function (e) {
+                e.stopPropagation();
+                toggleMenu($(this).closest('.vas-177-dropdown').attr('data-dd'));
+            });
+            $root.on('click', '.vas-177-dd-option', function (e) {
+                e.stopPropagation();
+                var key = $(this).closest('.vas-177-dropdown').attr('data-dd');
+                var val = parseInt($(this).attr('data-v'), 10);
+                if (key === 'm') { selMonth = val; } else { selYear = val; }
+                $(this).closest('.vas-177-dropdown').find('.vas-177-dd-lbl').text($(this).text());
+                closeMenus();
                 load();
             });
-            setupWidgetSizeObserver();
+            $(document).on('click.vas177', closeMenus);
+
+            setupObservers();
         }
 
-        function setupWidgetSizeObserver() {
+        function closeMenus() {
+            openMenu = '';
+            $root.find('.vas-177-dropdown-menu').remove();
+        }
+
+        function toggleMenu(key) {
+            var wasOpen = (openMenu === key);
+            closeMenus();
+            if (wasOpen) { return; }
+            openMenu = key;
+            var html = '<div class="vas-177-dropdown-menu">';
+            if (key === 'm') {
+                html += '<div class="vas-177-dd-option' + (selMonth === 0 ? ' vas-177-dd-option--sel' : '') + '" data-v="0">' + escapeHtml(lbl('VAS_177_AllMonths', 'All Months')) + '</div>';
+                MONTHS.forEach(function (m, i) {
+                    html += '<div class="vas-177-dd-option' + (selMonth === i + 1 ? ' vas-177-dd-option--sel' : '') + '" data-v="' + (i + 1) + '">' + m + '</div>';
+                });
+            } else {
+                for (var y = now.getFullYear(); y >= now.getFullYear() - 4; y--) {
+                    html += '<div class="vas-177-dd-option' + (selYear === y ? ' vas-177-dd-option--sel' : '') + '" data-v="' + y + '">' + y + '</div>';
+                }
+            }
+            html += '</div>';
+            $root.find('.vas-177-dropdown[data-dd="' + key + '"]').append(html);
+        }
+
+        function setupObservers() {
             if (typeof ResizeObserver === 'undefined') { return; }
             widgetObserver = new ResizeObserver(function (entries) {
                 for (var i = 0; i < entries.length; i++) {
@@ -102,55 +134,80 @@
                 }
             });
             widgetObserver.observe($wrapper[0]);
+
+            /* Adaptive size: how many locator rows / columns fit the body. */
+            bodyObserver = new ResizeObserver(function () { recalc(); });
+            bodyObserver.observe($root.find('.vas-177-table-body')[0]);
         }
 
-        function topKeys(field) {
+        function recalc() {
+            var body = $root.find('.vas-177-table-body')[0];
+            if (!body) { return; }
+            var fs = parseFloat(window.getComputedStyle($root[0]).fontSize) || 16;
+            var rowH = fs * (0.75 * 1.5 + 1.25) + 1;
+            var headH = fs * (0.6875 * 1.5 + 1) + 1;
+            var rows = Math.max(2, Math.floor((body.clientHeight - headH) / rowH));
+            var cols = Math.max(2, Math.floor((body.clientWidth - fs * 5) / (fs * 4.5)));
+            if (rows !== maxRows || cols !== maxCols) { maxRows = rows; maxCols = cols; render(); }
+        }
+
+        function topKeys(field, limit) {
             var tot = {};
             cells.forEach(function (c) { tot[c[field]] = (tot[c[field]] || 0) + Number(c.Qty || 0); });
-            return Object.keys(tot).sort(function (a, b) { return tot[b] - tot[a]; }).slice(0, MAX_AXIS);
+            var all = Object.keys(tot).sort(function (a, b) { return tot[b] - tot[a]; });
+            return { shown: all.slice(0, limit), total: all.length };
         }
 
         function render() {
-            var $body = $root.find('.vas-177-body');
-            if (!loaded) {
-                $body.html('<div class="vas-177-empty">' + escapeHtml(lbl('VAS_177_Loading', 'Loading…')) + '</div>');
-                return;
-            }
-            if (!cells.length) {
-                $body.html('<div class="vas-177-empty">' + escapeHtml(lbl('VAS_177_Empty', 'No locator transfers for the selected period')) + '</div>');
+            var $body = $root.find('.vas-177-table-body');
+            var $footer = $root.find('.vas-177-footer');
+
+            if (!loaded || !cells.length) {
+                var title = !loaded ? lbl('VAS_177_Loading', 'Loading…') : lbl('VAS_177_Empty', 'No locator transfers for this period');
+                var sub = !loaded ? '' : '<div class="vas-177-empty-sub">' + escapeHtml(lbl('VAS_177_EmptySub', 'Try a different month or year.')) + '</div>';
+                $body.html('<div class="vas-177-empty"><div class="vas-177-empty-title">' + escapeHtml(title) + '</div>' + sub + '</div>');
+                $footer.empty();
                 return;
             }
 
-            var rows = topKeys('FromLocator');
-            var cols = topKeys('ToLocator');
+            var rowSet = topKeys('FromLocator', maxRows);
+            var colSet = topKeys('ToLocator', maxCols);
+            var rows = rowSet.shown;
+            var cols = colSet.shown;
             var map = {};
             var max = 0;
             cells.forEach(function (c) {
-                map[c.FromLocator + '\u0001' + c.ToLocator] = c;
+                map[c.FromLocator + KEY_SEP + c.ToLocator] = c;
                 if (rows.indexOf(c.FromLocator) !== -1 && cols.indexOf(c.ToLocator) !== -1) {
                     max = Math.max(max, Number(c.Qty || 0));
                 }
             });
 
-            var html = '<table class="vas-177-table"><thead><tr><th class="vas-177-corner">' +
-                escapeHtml(lbl('VAS_177_FromTo', 'From \\ To')) + '</th>';
-            cols.forEach(function (c) { html += '<th title="' + escapeHtml(c) + '">' + escapeHtml(c) + '</th>'; });
-            html += '</tr></thead><tbody>';
+            var tpl = 'minmax(0,1.3fr) repeat(' + cols.length + ',minmax(0,1fr))';
+            var html = '<div class="vas-177-table-header" style="grid-template-columns:' + tpl + '">' +
+                '<span class="vas-177-th" title="' + escapeHtml(lbl('VAS_177_FromTo', 'From / To')) + '">' + escapeHtml(lbl('VAS_177_FromTo', 'From / To')) + '</span>';
+            cols.forEach(function (c) { html += '<span class="vas-177-th vas-177-right" title="' + escapeHtml(c) + '">' + escapeHtml(c) + '</span>'; });
+            html += '</div>';
+
             rows.forEach(function (r) {
-                html += '<tr><th class="vas-177-rowhead" title="' + escapeHtml(r) + '">' + escapeHtml(r) + '</th>';
+                html += '<div class="vas-177-row" style="grid-template-columns:' + tpl + '">' +
+                    '<span class="vas-177-cell vas-177-cell--primary" title="' + escapeHtml(r) + '">' + escapeHtml(r) + '</span>';
                 cols.forEach(function (c) {
-                    var cell = map[r + '\u0001' + c];
-                    if (!cell) { html += '<td class="vas-177-cell vas-177-cell--none">–</td>'; return; }
+                    var cell = map[r + KEY_SEP + c];
+                    if (!cell) { html += '<span class="vas-177-cell vas-177-right vas-177-cell--none" title="">–</span>'; return; }
                     var q = Number(cell.Qty || 0);
-                    var alpha = max > 0 ? (0.12 + 0.6 * (q / max)) : 0.12;
-                    html += '<td class="vas-177-cell" style="background-color: rgba(0,131,218,' + alpha.toFixed(2) + ')" title="' +
-                        escapeHtml(r + ' → ' + c + ': ' + formatQty(q) + ' (' + cell.Docs + ' ' + lbl('VAS_177_Docs', 'documents') + ')') + '">' +
-                        escapeHtml(formatQty(q)) + '</td>';
+                    var alpha = max > 0 ? (0.08 + 0.34 * (q / max)) : 0.08;
+                    var tip = r + ' → ' + c + ': ' + formatQty(q) + ' (' + cell.Docs + ' ' + lbl('VAS_177_Docs', 'documents') + ')';
+                    html += '<span class="vas-177-cell vas-177-right vas-177-cell--heat" style="background-color:rgba(0,131,218,' + alpha.toFixed(2) + ')" title="' + escapeHtml(tip) + '">' + escapeHtml(formatQty(q)) + '</span>';
                 });
-                html += '</tr>';
+                html += '</div>';
             });
-            html += '</tbody></table>';
             $body.html(html);
+
+            $footer.html('<span class="vas-177-footer-helper">' +
+                escapeHtml(lbl('VAS_177_Showing', 'Showing') + ' ' + rows.length + ' ' + lbl('VAS_177_Of', 'of') + ' ' + rowSet.total + ' ' +
+                    lbl('VAS_177_FromLocators', 'from-locators') + ' · ' + cols.length + ' ' + lbl('VAS_177_Of', 'of') + ' ' + colSet.total + ' ' +
+                    lbl('VAS_177_ToLocators', 'to-locators')) + '</span>');
         }
 
         function load() {
@@ -165,18 +222,15 @@
                     var data = typeof res === 'string' ? JSON.parse(res) : res;
                     if (data && typeof data === 'string') { data = JSON.parse(data); }
                     loaded = true;
-                    if (!data || data.error) {
-                        cells = [];
-                        $root.find('.vas-177-body').html('<div class="vas-177-empty">' + escapeHtml(lbl('VAS_177_LoadError', 'Unable to load data')) + '</div>');
-                        return;
-                    }
-                    cells = data.cells || [];
+                    cells = (data && !data.error) ? (data.cells || []) : [];
                     render();
+                    recalc();
                 },
                 error: function () {
                     loaded = true;
                     cells = [];
-                    $root.find('.vas-177-body').html('<div class="vas-177-empty">' + escapeHtml(lbl('VAS_177_LoadError', 'Unable to load data')) + '</div>');
+                    render();
+                    $root.find('.vas-177-empty-title').text(lbl('VAS_177_LoadError', 'Unable to load data'));
                 }
             });
         }
@@ -191,10 +245,12 @@
         this.getRoot = function () { return $wrapper; };
 
         this.disposeComponent = function () {
+            $(document).off('click.vas177');
             if (widgetObserver && $wrapper[0]) {
                 widgetObserver.unobserve($wrapper[0]);
                 widgetObserver = null;
             }
+            if (bodyObserver) { bodyObserver.disconnect(); bodyObserver = null; }
             $root.off();
             $root.remove();
             $wrapper.remove();

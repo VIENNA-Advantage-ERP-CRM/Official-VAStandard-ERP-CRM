@@ -1,6 +1,8 @@
 /**
  * Transfer Receiving Inspection Widget (Material Transfer Dashboard)
- * Purpose - Quality results on received transfers. Table with search and paging.
+ * Purpose - Quality results on received transfers. Grid data widget: shared-template CSS grid table, adaptive row count,
+ *           footer pager (no inner scrollbar). Follows the Onfinity dashboard-widgets spec
+ *           and the sibling Material Transfer widgets (VAS_172-174).
  * Prefix  - VAS_175_
  */
 ; VAS = window.VAS || {};
@@ -55,25 +57,42 @@
         var $wrapper = $('<div class="vas-175-container">');
         var $root = $('<div class="vas-175-root">');
         var widgetObserver = null;
+        var bodyObserver = null;
 
         var allRecords = [];
         var filtered = [];
-        var PAGE_SIZE = 3;
+        var rowsPerPage = 2;
+        var MIN_ROWS = 2;
         var page = 1;
-        var searchText = '';
         var selMonth = 0;
         var selYear = 0;
         var loaded = false;
-
-        var COLS = ["Transfer", "Product", "Parameter", "Range", "Actual", "Result"];
-        var SEARCH_FIELDS = ["TransferNo", "ConfirmNo", "ProductName", "ParameterName"];
+        var openMenu = '';
+        var HAS_FILTERS = false;
         var DATE_FIELD = 'InspectionDate';
+
+        /* Single column template shared by the header row and every body row. */
+        var COLS = [{"label": "Transfer", "fr": 1.1}, {"label": "Product", "fr": 1.5}, {"label": "Parameter", "fr": 1.3}, {"label": "Actual", "fr": 0.8, "right": true}, {"label": "Result", "fr": 1.0}];
+        var GRID = COLS.map(function (c) { return 'minmax(0,' + c.fr + 'fr)'; }).join(' ');
 
         function rowCells(r) {
             var range = (Number(r.MinValue) || Number(r.MaxValue)) ? (r.MinValue + ' – ' + r.MaxValue) : '—';
             var res = r.Result || 'Pending';
-            var pill = '<span class="vas-175-pill vas-175-pill--' + res.toLowerCase() + '">' + escapeHtml(lbl('VAS_175_Result' + res, res)) + '</span>';
-            return [escapeHtml(r.TransferNo || r.ConfirmNo), escapeHtml(r.ProductName), escapeHtml(r.ParameterName), escapeHtml(range), escapeHtml(r.ActualValue || '—'), pill];
+            var resTxt = lbl('VAS_175_Result' + res, res);
+            return [
+                { t: r.TransferNo || r.ConfirmNo || '—', primary: true },
+                { t: r.ProductName || '—' },
+                { t: r.ParameterName || '—' },
+                { t: r.ActualValue || '—', title: (lbl('VAS_175_Range', 'Range') + ': ' + range) },
+                { t: resTxt, html: '<span class="vas-175-pill vas-175-pill--' + res.toLowerCase() + '">' + escapeHtml(resTxt) + '</span>' }
+            ];
+        }
+
+        function headerPills() {
+            var failed = filtered.filter(function (r) { return r.Result === 'Fail'; }).length;
+            var html = '';
+            if (failed) { html += '<span class="vas-175-stat vas-175-stat--danger">' + failed + ' ' + escapeHtml(lbl('VAS_175_Failed', 'failed')) + '</span>'; }
+            return html;
         }
 
         function build() {
@@ -82,37 +101,92 @@
                     '<div class="vas-175-left-cluster">' +
                         '<div class="vas-175-icon-well"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg></div>' +
                         '<div class="vas-175-title-block">' +
-                            '<div class="vas-175-title">' + escapeHtml(lbl('VAS_175_Title', 'Transfer Receiving Inspection')) + '</div>' +
+                            '<div class="vas-175-title" title="' + escapeHtml(lbl('VAS_175_Title', 'Transfer Receiving Inspection')) + '">' + escapeHtml(lbl('VAS_175_Title', 'Transfer Receiving Inspection')) + '</div>' +
                             '<div class="vas-175-subtitle">' + escapeHtml(lbl('VAS_175_Subtitle', 'Quality results on received transfers')) + '</div>' +
                         '</div>' +
                     '</div>' +
-                    '<span class="vas-175-count-pill" id="vas175-cnt">0</span>' +
+                    '<span class="vas-175-pills"></span>' +
+                    (HAS_FILTERS ?
+                    '<div class="vas-175-filters">' +
+                        '<div class="vas-175-dropdown" data-dd="m"><button type="button" class="vas-175-dropdown-btn"><span class="vas-175-dd-lbl">' + escapeHtml(lbl('VAS_175_Month', 'Month')) + '</span></button></div>' +
+                        '<div class="vas-175-dropdown" data-dd="y"><button type="button" class="vas-175-dropdown-btn"><span class="vas-175-dd-lbl">' + escapeHtml(lbl('VAS_175_Year', 'Year')) + '</span></button></div>' +
+                    '</div>' : '') +
                 '</div>' +
-                '<div class="vas-175-toolbar">' +
-                    '<input type="search" class="vas-175-search" placeholder="' + escapeHtml(lbl('VAS_175_Search', 'Search')) + '" />' +
-                    ''+
+                '<div class="vas-175-table-wrap">' +
+                    '<div class="vas-175-table-header"></div>' +
+                    '<div class="vas-175-table-body"></div>' +
                 '</div>' +
-                '<div class="vas-175-table-wrap"><div class="vas-175-body"></div></div>' +
-                '<div class="vas-175-pager"></div>'
+                '<div class="vas-175-footer"></div>'
             );
             $wrapper.empty().append($root);
 
-            $root.on('input', '.vas-175-search', function () { searchText = $(this).val().toLowerCase(); page = 1; applyFilter(); });
-            $root.on('change', '.vas-175-sel', function () {
-                selMonth = parseInt($root.find('.vas-175-msel').val(), 10) || 0;
-                selYear = parseInt($root.find('.vas-175-ysel').val(), 10) || 0;
-                page = 1; applyFilter();
+            var hdr = '';
+            COLS.forEach(function (c) {
+                var t = lbl('VAS_175_Col' + c.label.replace(/[^A-Za-z]/g, ''), c.label);
+                hdr += '<span class="vas-175-th' + (c.right ? ' vas-175-right' : '') + '" title="' + escapeHtml(t) + '">' + escapeHtml(t) + '</span>';
             });
-            $root.on('click', '.vas-175-pg', function () {
+            $root.find('.vas-175-table-header').css('grid-template-columns', GRID).html(hdr);
+
+            $root.on('click', '.vas-175-dropdown-btn', function (e) {
+                e.stopPropagation();
+                var key = $(this).closest('.vas-175-dropdown').attr('data-dd');
+                toggleMenu(key);
+            });
+            $root.on('click', '.vas-175-dd-option', function (e) {
+                e.stopPropagation();
+                var key = $(this).closest('.vas-175-dropdown').attr('data-dd');
+                var val = parseInt($(this).attr('data-v'), 10);
+                if (key === 'm') { selMonth = val; } else { selYear = val; }
+                $(this).closest('.vas-175-dropdown').find('.vas-175-dd-lbl').text(val === 0 ? (key === 'm' ? lbl('VAS_175_Month', 'Month') : lbl('VAS_175_Year', 'Year')) : $(this).text());
+                closeMenus();
+                page = 1;
+                applyFilter();
+            });
+            $(document).on('click.vas175', closeMenus);
+            $root.on('click', '.vas-175-pager-btn', function () {
                 var dir = parseInt($(this).attr('data-dir'), 10);
-                var total = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+                var total = Math.max(1, Math.ceil(filtered.length / rowsPerPage));
                 page = Math.min(total, Math.max(1, page + dir));
                 render();
             });
-            setupWidgetSizeObserver();
+
+            setupObservers();
         }
 
-        function setupWidgetSizeObserver() {
+        function closeMenus() {
+            openMenu = '';
+            $root.find('.vas-175-dropdown-menu').remove();
+        }
+
+        function toggleMenu(key) {
+            var wasOpen = (openMenu === key);
+            closeMenus();
+            if (wasOpen) { return; }
+            openMenu = key;
+            var html = '<div class="vas-175-dropdown-menu">';
+            if (key === 'm') {
+                html += '<div class="vas-175-dd-option' + (selMonth === 0 ? ' vas-175-dd-option--sel' : '') + '" data-v="0">' + escapeHtml(lbl('VAS_175_AllMonths', 'All Months')) + '</div>';
+                MONTHS.forEach(function (m, i) {
+                    html += '<div class="vas-175-dd-option' + (selMonth === i + 1 ? ' vas-175-dd-option--sel' : '') + '" data-v="' + (i + 1) + '">' + m + '</div>';
+                });
+            } else {
+                html += '<div class="vas-175-dd-option' + (selYear === 0 ? ' vas-175-dd-option--sel' : '') + '" data-v="0">' + escapeHtml(lbl('VAS_175_AllYears', 'All Years')) + '</div>';
+                years().forEach(function (y) {
+                    html += '<div class="vas-175-dd-option' + (selYear === y ? ' vas-175-dd-option--sel' : '') + '" data-v="' + y + '">' + y + '</div>';
+                });
+            }
+            html += '</div>';
+            $root.find('.vas-175-dropdown[data-dd="' + key + '"]').append(html);
+        }
+
+        function years() {
+            var set = {};
+            set[new Date().getFullYear()] = 1;
+            allRecords.forEach(function (r) { var d = new Date(r[DATE_FIELD]); if (!isNaN(d)) { set[d.getUTCFullYear()] = 1; } });
+            return Object.keys(set).map(Number).sort(function (a, b) { return b - a; });
+        }
+
+        function setupObservers() {
             if (typeof ResizeObserver === 'undefined') { return; }
             widgetObserver = new ResizeObserver(function (entries) {
                 for (var i = 0; i < entries.length; i++) {
@@ -121,83 +195,88 @@
                 }
             });
             widgetObserver.observe($wrapper[0]);
+
+            /* Adaptive row count: rows that fit the body = floor(height / row height). */
+            bodyObserver = new ResizeObserver(function () { recalcRows(); });
+            bodyObserver.observe($root.find('.vas-175-table-body')[0]);
+        }
+
+        function recalcRows() {
+            var body = $root.find('.vas-175-table-body')[0];
+            if (!body) { return; }
+            var fs = parseFloat(window.getComputedStyle($root[0]).fontSize) || 16;
+            var rowH = fs * (0.75 * 1.5 + 1.25) + 1;
+            var n = Math.max(MIN_ROWS, Math.floor(body.clientHeight / rowH));
+            if (n !== rowsPerPage) { rowsPerPage = n; render(); }
         }
 
         function applyFilter() {
             filtered = allRecords.filter(function (r) {
-                if (searchText) {
-                    var hit = false;
-                    for (var i = 0; i < SEARCH_FIELDS.length; i++) {
-                        if (String(r[SEARCH_FIELDS[i]] || '').toLowerCase().indexOf(searchText) !== -1) { hit = true; break; }
-                    }
-                    if (!hit) { return false; }
-                }
-                if (selYear || selMonth) {
-                    var d = new Date(r[DATE_FIELD]);
-                    if (isNaN(d)) { return false; }
-                    if (selYear && d.getUTCFullYear() !== selYear) { return false; }
-                    if (selMonth && (d.getUTCMonth() + 1) !== selMonth) { return false; }
-                }
+                if (!selYear && !selMonth) { return true; }
+                var d = new Date(r[DATE_FIELD]);
+                if (isNaN(d)) { return false; }
+                if (selYear && d.getUTCFullYear() !== selYear) { return false; }
+                if (selMonth && (d.getUTCMonth() + 1) !== selMonth) { return false; }
                 return true;
             });
             render();
         }
 
         function render() {
-            var $body = $root.find('.vas-175-body');
-            $root.find('#vas175-cnt').text(filtered.length + ' ' + lbl('VAS_175_CountWord', 'results'));
+            var $body = $root.find('.vas-175-table-body');
+            var $footer = $root.find('.vas-175-footer');
+            $root.find('.vas-175-pills').html(loaded ? headerPills() : '');
 
             if (!loaded) {
-                $body.html('<div class="vas-175-empty">' + escapeHtml(lbl('VAS_175_Loading', 'Loading…')) + '</div>');
-                $root.find('.vas-175-pager').empty();
+                $body.html('<div class="vas-175-empty"><div class="vas-175-empty-title">' + escapeHtml(lbl('VAS_175_Loading', 'Loading…')) + '</div></div>');
+                $footer.empty();
                 return;
             }
             if (!filtered.length) {
-                $body.html('<div class="vas-175-empty">' + escapeHtml(lbl('VAS_175_Empty', 'No inspection results to show')) + '</div>');
-                $root.find('.vas-175-pager').empty();
+                $body.html('<div class="vas-175-empty"><div class="vas-175-empty-title">' + escapeHtml(lbl('VAS_175_Empty', 'No inspection results yet')) + '</div>' +
+                    '<div class="vas-175-empty-sub">' + escapeHtml(lbl('VAS_175_EmptySub', 'Results appear once a transfer confirmation is inspected.')) + '</div></div>');
+                $footer.empty();
                 return;
             }
 
-            var total = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+            var total = Math.max(1, Math.ceil(filtered.length / rowsPerPage));
             if (page > total) { page = total; }
-            var start = (page - 1) * PAGE_SIZE;
-            var slice = filtered.slice(start, start + PAGE_SIZE);
+            var start = (page - 1) * rowsPerPage;
+            var end = Math.min(start + rowsPerPage, filtered.length);
 
-            var html = '<table class="vas-175-table"><thead><tr>';
-            for (var c = 0; c < COLS.length; c++) {
-                html += '<th>' + escapeHtml(lbl('VAS_175_Col' + COLS[c].replace(/[^A-Za-z]/g, ''), COLS[c])) + '</th>';
+            var html = '';
+            for (var i = start; i < end; i++) {
+                var cells = rowCells(filtered[i]);
+                html += '<div class="vas-175-row" style="grid-template-columns:' + GRID + '">';
+                for (var j = 0; j < cells.length; j++) {
+                    var c = cells[j];
+                    var cls = 'vas-175-cell' + (c.primary ? ' vas-175-cell--primary' : '') + (COLS[j].right ? ' vas-175-right' : '');
+                    html += '<span class="' + cls + '" title="' + escapeHtml(c.title || c.t) + '">' + (c.html || escapeHtml(c.t)) + '</span>';
+                }
+                html += '</div>';
             }
-            html += '</tr></thead><tbody>';
-            for (var i = 0; i < slice.length; i++) {
-                var cells = rowCells(slice[i]);
-                html += '<tr>';
-                for (var j = 0; j < cells.length; j++) { html += '<td>' + cells[j] + '</td>'; }
-                html += '</tr>';
-            }
-            html += '</tbody></table>';
             $body.html(html);
 
-            $root.find('.vas-175-pager').html(
-                '<button type="button" class="vas-175-pg" data-dir="-1"' + (page <= 1 ? ' disabled' : '') + '>‹</button>' +
-                '<span class="vas-175-pager-label">' + page + ' ' + escapeHtml(lbl('VAS_175_Of', 'of')) + ' ' + total + '</span>' +
-                '<button type="button" class="vas-175-pg" data-dir="1"' + (page >= total ? ' disabled' : '') + '>›</button>'
-            );
-        }
-
-        function fillYears() {
-            if (!$root.find('.vas-175-ysel').length) { return; }
-            var years = {};
-            allRecords.forEach(function (r) { var d = new Date(r[DATE_FIELD]); if (!isNaN(d)) { years[d.getUTCFullYear()] = 1; } });
-            var list = Object.keys(years).sort().reverse();
-            var html = '<option value="0">' + escapeHtml(lbl('VAS_175_AllYears', 'All Years')) + '</option>';
-            list.forEach(function (y) { html += '<option value="' + y + '">' + y + '</option>'; });
-            $root.find('.vas-175-ysel').html(html);
+            if (filtered.length > rowsPerPage) {
+                $footer.html(
+                    '<span class="vas-175-footer-helper">' + escapeHtml(lbl('VAS_175_Showing', 'Showing') + ' ' + (start + 1) + '–' + end + ' ' + lbl('VAS_175_Of', 'of') + ' ' + filtered.length) + '</span>' +
+                    '<span class="vas-175-pager">' +
+                        '<button type="button" class="vas-175-pager-btn" data-dir="-1"' + (page <= 1 ? ' disabled' : '') + '><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg></button>' +
+                        '<span class="vas-175-pager-label">' + page + ' ' + escapeHtml(lbl('VAS_175_Of', 'of')) + ' ' + total + '</span>' +
+                        '<button type="button" class="vas-175-pager-btn" data-dir="1"' + (page >= total ? ' disabled' : '') + '><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></button>' +
+                    '</span>'
+                );
+            } else {
+                $footer.html('<span class="vas-175-footer-helper">' + escapeHtml(lbl('VAS_175_Showing', 'Showing') + ' 1–' + filtered.length + ' ' + lbl('VAS_175_Of', 'of') + ' ' + filtered.length) + '</span>');
+            }
         }
 
         function showLoadError() {
             loaded = true;
-            $root.find('.vas-175-body').html('<div class="vas-175-empty">' + escapeHtml(lbl('VAS_175_LoadError', 'Unable to load data')) + '</div>');
-            $root.find('.vas-175-pager').empty();
+            allRecords = [];
+            filtered = [];
+            render();
+            $root.find('.vas-175-empty-title').text(lbl('VAS_175_LoadError', 'Unable to load data'));
         }
 
         function load() {
@@ -211,8 +290,8 @@
                     if (!data || data.error) { showLoadError(); return; }
                     loaded = true;
                     allRecords = data.rows || [];
-                    fillYears();
                     applyFilter();
+                    recalcRows();
                 },
                 error: function () { showLoadError(); }
             });
@@ -229,10 +308,12 @@
         this.getRoot = function () { return $wrapper; };
 
         this.disposeComponent = function () {
+            $(document).off('click.vas175');
             if (widgetObserver && $wrapper[0]) {
                 widgetObserver.unobserve($wrapper[0]);
                 widgetObserver = null;
             }
+            if (bodyObserver) { bodyObserver.disconnect(); bodyObserver = null; }
             $root.off();
             $root.remove();
             $wrapper.remove();

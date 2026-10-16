@@ -1,6 +1,8 @@
 /**
  * Material Transfer History Widget (Material Transfer Dashboard)
- * Purpose - Completed and closed transfers. Table with search and month/year filter and paging.
+ * Purpose - Completed and closed transfers. Grid data widget: shared-template CSS grid table, adaptive row count,
+ *           footer pager (no inner scrollbar). Follows the Onfinity dashboard-widgets spec
+ *           and the sibling Material Transfer widgets (VAS_172-174).
  * Prefix  - VAS_176_
  */
 ; VAS = window.VAS || {};
@@ -55,22 +57,36 @@
         var $wrapper = $('<div class="vas-176-container">');
         var $root = $('<div class="vas-176-root">');
         var widgetObserver = null;
+        var bodyObserver = null;
 
         var allRecords = [];
         var filtered = [];
-        var PAGE_SIZE = 3;
+        var rowsPerPage = 2;
+        var MIN_ROWS = 2;
         var page = 1;
-        var searchText = '';
         var selMonth = 0;
         var selYear = 0;
         var loaded = false;
-
-        var COLS = ["Document", "Date", "From / To", "Lines", "Qty"];
-        var SEARCH_FIELDS = ["DocumentNo", "FromWarehouse", "ToWarehouse"];
+        var openMenu = '';
+        var HAS_FILTERS = true;
         var DATE_FIELD = 'MovementDate';
 
+        /* Single column template shared by the header row and every body row. */
+        var COLS = [{"label": "Document", "fr": 1.0}, {"label": "Date", "fr": 1.4}, {"label": "From / To", "fr": 2.2}, {"label": "Qty", "fr": 0.7, "right": true}];
+        var GRID = COLS.map(function (c) { return 'minmax(0,' + c.fr + 'fr)'; }).join(' ');
+
         function rowCells(r) {
-            return [escapeHtml(r.DocumentNo), escapeHtml(formatDate(r.MovementDate)), escapeHtml((r.FromWarehouse || '—') + ' → ' + (r.ToWarehouse || '—')), escapeHtml(r.LineCount), escapeHtml(formatQty(r.TotalQty))];
+            var route = (r.FromWarehouse || '—') + ' → ' + (r.ToWarehouse || '—');
+            return [
+                { t: r.DocumentNo || '—', primary: true },
+                { t: formatDate(r.MovementDate) },
+                { t: route },
+                { t: formatQty(r.TotalQty), title: formatQty(r.TotalQty) + ' (' + (r.LineCount || 0) + ' ' + lbl('VAS_176_Lines', 'lines') + ')' }
+            ];
+        }
+
+        function headerPills() {
+            return '';
         }
 
         function build() {
@@ -79,38 +95,92 @@
                     '<div class="vas-176-left-cluster">' +
                         '<div class="vas-176-icon-well"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg></div>' +
                         '<div class="vas-176-title-block">' +
-                            '<div class="vas-176-title">' + escapeHtml(lbl('VAS_176_Title', 'Material Transfer History')) + '</div>' +
+                            '<div class="vas-176-title" title="' + escapeHtml(lbl('VAS_176_Title', 'Material Transfer History')) + '">' + escapeHtml(lbl('VAS_176_Title', 'Material Transfer History')) + '</div>' +
                             '<div class="vas-176-subtitle">' + escapeHtml(lbl('VAS_176_Subtitle', 'Completed and closed transfers')) + '</div>' +
                         '</div>' +
                     '</div>' +
-                    '<span class="vas-176-count-pill" id="vas176-cnt">0</span>' +
+                    '<span class="vas-176-pills"></span>' +
+                    (HAS_FILTERS ?
+                    '<div class="vas-176-filters">' +
+                        '<div class="vas-176-dropdown" data-dd="m"><button type="button" class="vas-176-dropdown-btn"><span class="vas-176-dd-lbl">' + escapeHtml(lbl('VAS_176_Month', 'Month')) + '</span></button></div>' +
+                        '<div class="vas-176-dropdown" data-dd="y"><button type="button" class="vas-176-dropdown-btn"><span class="vas-176-dd-lbl">' + escapeHtml(lbl('VAS_176_Year', 'Year')) + '</span></button></div>' +
+                    '</div>' : '') +
                 '</div>' +
-                '<div class="vas-176-toolbar">' +
-                    '<input type="search" class="vas-176-search" placeholder="' + escapeHtml(lbl('VAS_176_Search', 'Search')) + '" />' +
-                    '<select class="vas-176-sel vas-176-msel"><option value="0">' + escapeHtml(lbl('VAS_176_AllMonths', 'All Months')) + '</option>' + MONTHS.map(function (m, i) { return '<option value="' + (i + 1) + '">' + m + '</option>'; }).join('') + '</select>' +
-                    '<select class="vas-176-sel vas-176-ysel"></select>' +
+                '<div class="vas-176-table-wrap">' +
+                    '<div class="vas-176-table-header"></div>' +
+                    '<div class="vas-176-table-body"></div>' +
                 '</div>' +
-                '<div class="vas-176-table-wrap"><div class="vas-176-body"></div></div>' +
-                '<div class="vas-176-pager"></div>'
+                '<div class="vas-176-footer"></div>'
             );
             $wrapper.empty().append($root);
 
-            $root.on('input', '.vas-176-search', function () { searchText = $(this).val().toLowerCase(); page = 1; applyFilter(); });
-            $root.on('change', '.vas-176-sel', function () {
-                selMonth = parseInt($root.find('.vas-176-msel').val(), 10) || 0;
-                selYear = parseInt($root.find('.vas-176-ysel').val(), 10) || 0;
-                page = 1; applyFilter();
+            var hdr = '';
+            COLS.forEach(function (c) {
+                var t = lbl('VAS_176_Col' + c.label.replace(/[^A-Za-z]/g, ''), c.label);
+                hdr += '<span class="vas-176-th' + (c.right ? ' vas-176-right' : '') + '" title="' + escapeHtml(t) + '">' + escapeHtml(t) + '</span>';
             });
-            $root.on('click', '.vas-176-pg', function () {
+            $root.find('.vas-176-table-header').css('grid-template-columns', GRID).html(hdr);
+
+            $root.on('click', '.vas-176-dropdown-btn', function (e) {
+                e.stopPropagation();
+                var key = $(this).closest('.vas-176-dropdown').attr('data-dd');
+                toggleMenu(key);
+            });
+            $root.on('click', '.vas-176-dd-option', function (e) {
+                e.stopPropagation();
+                var key = $(this).closest('.vas-176-dropdown').attr('data-dd');
+                var val = parseInt($(this).attr('data-v'), 10);
+                if (key === 'm') { selMonth = val; } else { selYear = val; }
+                $(this).closest('.vas-176-dropdown').find('.vas-176-dd-lbl').text(val === 0 ? (key === 'm' ? lbl('VAS_176_Month', 'Month') : lbl('VAS_176_Year', 'Year')) : $(this).text());
+                closeMenus();
+                page = 1;
+                applyFilter();
+            });
+            $(document).on('click.vas176', closeMenus);
+            $root.on('click', '.vas-176-pager-btn', function () {
                 var dir = parseInt($(this).attr('data-dir'), 10);
-                var total = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+                var total = Math.max(1, Math.ceil(filtered.length / rowsPerPage));
                 page = Math.min(total, Math.max(1, page + dir));
                 render();
             });
-            setupWidgetSizeObserver();
+
+            setupObservers();
         }
 
-        function setupWidgetSizeObserver() {
+        function closeMenus() {
+            openMenu = '';
+            $root.find('.vas-176-dropdown-menu').remove();
+        }
+
+        function toggleMenu(key) {
+            var wasOpen = (openMenu === key);
+            closeMenus();
+            if (wasOpen) { return; }
+            openMenu = key;
+            var html = '<div class="vas-176-dropdown-menu">';
+            if (key === 'm') {
+                html += '<div class="vas-176-dd-option' + (selMonth === 0 ? ' vas-176-dd-option--sel' : '') + '" data-v="0">' + escapeHtml(lbl('VAS_176_AllMonths', 'All Months')) + '</div>';
+                MONTHS.forEach(function (m, i) {
+                    html += '<div class="vas-176-dd-option' + (selMonth === i + 1 ? ' vas-176-dd-option--sel' : '') + '" data-v="' + (i + 1) + '">' + m + '</div>';
+                });
+            } else {
+                html += '<div class="vas-176-dd-option' + (selYear === 0 ? ' vas-176-dd-option--sel' : '') + '" data-v="0">' + escapeHtml(lbl('VAS_176_AllYears', 'All Years')) + '</div>';
+                years().forEach(function (y) {
+                    html += '<div class="vas-176-dd-option' + (selYear === y ? ' vas-176-dd-option--sel' : '') + '" data-v="' + y + '">' + y + '</div>';
+                });
+            }
+            html += '</div>';
+            $root.find('.vas-176-dropdown[data-dd="' + key + '"]').append(html);
+        }
+
+        function years() {
+            var set = {};
+            set[new Date().getFullYear()] = 1;
+            allRecords.forEach(function (r) { var d = new Date(r[DATE_FIELD]); if (!isNaN(d)) { set[d.getUTCFullYear()] = 1; } });
+            return Object.keys(set).map(Number).sort(function (a, b) { return b - a; });
+        }
+
+        function setupObservers() {
             if (typeof ResizeObserver === 'undefined') { return; }
             widgetObserver = new ResizeObserver(function (entries) {
                 for (var i = 0; i < entries.length; i++) {
@@ -119,83 +189,88 @@
                 }
             });
             widgetObserver.observe($wrapper[0]);
+
+            /* Adaptive row count: rows that fit the body = floor(height / row height). */
+            bodyObserver = new ResizeObserver(function () { recalcRows(); });
+            bodyObserver.observe($root.find('.vas-176-table-body')[0]);
+        }
+
+        function recalcRows() {
+            var body = $root.find('.vas-176-table-body')[0];
+            if (!body) { return; }
+            var fs = parseFloat(window.getComputedStyle($root[0]).fontSize) || 16;
+            var rowH = fs * (0.75 * 1.5 + 1.25) + 1;
+            var n = Math.max(MIN_ROWS, Math.floor(body.clientHeight / rowH));
+            if (n !== rowsPerPage) { rowsPerPage = n; render(); }
         }
 
         function applyFilter() {
             filtered = allRecords.filter(function (r) {
-                if (searchText) {
-                    var hit = false;
-                    for (var i = 0; i < SEARCH_FIELDS.length; i++) {
-                        if (String(r[SEARCH_FIELDS[i]] || '').toLowerCase().indexOf(searchText) !== -1) { hit = true; break; }
-                    }
-                    if (!hit) { return false; }
-                }
-                if (selYear || selMonth) {
-                    var d = new Date(r[DATE_FIELD]);
-                    if (isNaN(d)) { return false; }
-                    if (selYear && d.getUTCFullYear() !== selYear) { return false; }
-                    if (selMonth && (d.getUTCMonth() + 1) !== selMonth) { return false; }
-                }
+                if (!selYear && !selMonth) { return true; }
+                var d = new Date(r[DATE_FIELD]);
+                if (isNaN(d)) { return false; }
+                if (selYear && d.getUTCFullYear() !== selYear) { return false; }
+                if (selMonth && (d.getUTCMonth() + 1) !== selMonth) { return false; }
                 return true;
             });
             render();
         }
 
         function render() {
-            var $body = $root.find('.vas-176-body');
-            $root.find('#vas176-cnt').text(filtered.length + ' ' + lbl('VAS_176_CountWord', 'transfers'));
+            var $body = $root.find('.vas-176-table-body');
+            var $footer = $root.find('.vas-176-footer');
+            $root.find('.vas-176-pills').html(loaded ? headerPills() : '');
 
             if (!loaded) {
-                $body.html('<div class="vas-176-empty">' + escapeHtml(lbl('VAS_176_Loading', 'Loading…')) + '</div>');
-                $root.find('.vas-176-pager').empty();
+                $body.html('<div class="vas-176-empty"><div class="vas-176-empty-title">' + escapeHtml(lbl('VAS_176_Loading', 'Loading…')) + '</div></div>');
+                $footer.empty();
                 return;
             }
             if (!filtered.length) {
-                $body.html('<div class="vas-176-empty">' + escapeHtml(lbl('VAS_176_Empty', 'No completed transfers found')) + '</div>');
-                $root.find('.vas-176-pager').empty();
+                $body.html('<div class="vas-176-empty"><div class="vas-176-empty-title">' + escapeHtml(lbl('VAS_176_Empty', 'No completed transfers for this period')) + '</div>' +
+                    '<div class="vas-176-empty-sub">' + escapeHtml(lbl('VAS_176_EmptySub', 'Try a different month or year.')) + '</div></div>');
+                $footer.empty();
                 return;
             }
 
-            var total = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+            var total = Math.max(1, Math.ceil(filtered.length / rowsPerPage));
             if (page > total) { page = total; }
-            var start = (page - 1) * PAGE_SIZE;
-            var slice = filtered.slice(start, start + PAGE_SIZE);
+            var start = (page - 1) * rowsPerPage;
+            var end = Math.min(start + rowsPerPage, filtered.length);
 
-            var html = '<table class="vas-176-table"><thead><tr>';
-            for (var c = 0; c < COLS.length; c++) {
-                html += '<th>' + escapeHtml(lbl('VAS_176_Col' + COLS[c].replace(/[^A-Za-z]/g, ''), COLS[c])) + '</th>';
+            var html = '';
+            for (var i = start; i < end; i++) {
+                var cells = rowCells(filtered[i]);
+                html += '<div class="vas-176-row" style="grid-template-columns:' + GRID + '">';
+                for (var j = 0; j < cells.length; j++) {
+                    var c = cells[j];
+                    var cls = 'vas-176-cell' + (c.primary ? ' vas-176-cell--primary' : '') + (COLS[j].right ? ' vas-176-right' : '');
+                    html += '<span class="' + cls + '" title="' + escapeHtml(c.title || c.t) + '">' + (c.html || escapeHtml(c.t)) + '</span>';
+                }
+                html += '</div>';
             }
-            html += '</tr></thead><tbody>';
-            for (var i = 0; i < slice.length; i++) {
-                var cells = rowCells(slice[i]);
-                html += '<tr>';
-                for (var j = 0; j < cells.length; j++) { html += '<td>' + cells[j] + '</td>'; }
-                html += '</tr>';
-            }
-            html += '</tbody></table>';
             $body.html(html);
 
-            $root.find('.vas-176-pager').html(
-                '<button type="button" class="vas-176-pg" data-dir="-1"' + (page <= 1 ? ' disabled' : '') + '>‹</button>' +
-                '<span class="vas-176-pager-label">' + page + ' ' + escapeHtml(lbl('VAS_176_Of', 'of')) + ' ' + total + '</span>' +
-                '<button type="button" class="vas-176-pg" data-dir="1"' + (page >= total ? ' disabled' : '') + '>›</button>'
-            );
-        }
-
-        function fillYears() {
-            if (!$root.find('.vas-176-ysel').length) { return; }
-            var years = {};
-            allRecords.forEach(function (r) { var d = new Date(r[DATE_FIELD]); if (!isNaN(d)) { years[d.getUTCFullYear()] = 1; } });
-            var list = Object.keys(years).sort().reverse();
-            var html = '<option value="0">' + escapeHtml(lbl('VAS_176_AllYears', 'All Years')) + '</option>';
-            list.forEach(function (y) { html += '<option value="' + y + '">' + y + '</option>'; });
-            $root.find('.vas-176-ysel').html(html);
+            if (filtered.length > rowsPerPage) {
+                $footer.html(
+                    '<span class="vas-176-footer-helper">' + escapeHtml(lbl('VAS_176_Showing', 'Showing') + ' ' + (start + 1) + '–' + end + ' ' + lbl('VAS_176_Of', 'of') + ' ' + filtered.length) + '</span>' +
+                    '<span class="vas-176-pager">' +
+                        '<button type="button" class="vas-176-pager-btn" data-dir="-1"' + (page <= 1 ? ' disabled' : '') + '><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg></button>' +
+                        '<span class="vas-176-pager-label">' + page + ' ' + escapeHtml(lbl('VAS_176_Of', 'of')) + ' ' + total + '</span>' +
+                        '<button type="button" class="vas-176-pager-btn" data-dir="1"' + (page >= total ? ' disabled' : '') + '><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></button>' +
+                    '</span>'
+                );
+            } else {
+                $footer.html('<span class="vas-176-footer-helper">' + escapeHtml(lbl('VAS_176_Showing', 'Showing') + ' 1–' + filtered.length + ' ' + lbl('VAS_176_Of', 'of') + ' ' + filtered.length) + '</span>');
+            }
         }
 
         function showLoadError() {
             loaded = true;
-            $root.find('.vas-176-body').html('<div class="vas-176-empty">' + escapeHtml(lbl('VAS_176_LoadError', 'Unable to load data')) + '</div>');
-            $root.find('.vas-176-pager').empty();
+            allRecords = [];
+            filtered = [];
+            render();
+            $root.find('.vas-176-empty-title').text(lbl('VAS_176_LoadError', 'Unable to load data'));
         }
 
         function load() {
@@ -209,8 +284,8 @@
                     if (!data || data.error) { showLoadError(); return; }
                     loaded = true;
                     allRecords = data.records || [];
-                    fillYears();
                     applyFilter();
+                    recalcRows();
                 },
                 error: function () { showLoadError(); }
             });
@@ -227,10 +302,12 @@
         this.getRoot = function () { return $wrapper; };
 
         this.disposeComponent = function () {
+            $(document).off('click.vas176');
             if (widgetObserver && $wrapper[0]) {
                 widgetObserver.unobserve($wrapper[0]);
                 widgetObserver = null;
             }
+            if (bodyObserver) { bodyObserver.disconnect(); bodyObserver = null; }
             $root.off();
             $root.remove();
             $wrapper.remove();
