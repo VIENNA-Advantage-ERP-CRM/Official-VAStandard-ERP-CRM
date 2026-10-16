@@ -155,7 +155,16 @@
                 '</button>'
             );
 
-            $card.on('click', function () { openNewSalesOrder(); });
+            // The Sales Order window takes a few seconds to open a new record. Show a busy state at once and
+            // ignore repeat clicks so users do not open duplicate windows / draft documents.
+            var busy = false;
+            $card.on('click', function () {
+                if (busy) { return; }
+                busy = true;
+                $card.addClass('is-busy').attr('aria-busy', 'true');
+                setTimeout(function () { busy = false; $card.removeClass('is-busy').removeAttr('aria-busy'); }, 8000);
+                openNewSalesOrder();
+            });
             $root.append($card);
         }
 

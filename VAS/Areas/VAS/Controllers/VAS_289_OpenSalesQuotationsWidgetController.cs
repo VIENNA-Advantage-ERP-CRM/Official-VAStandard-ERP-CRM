@@ -83,6 +83,7 @@ namespace VAS.Controllers
     /// Chronological development:
     ///   VAI052      2026-09-15 Created
     /// </summary>
+    [System.Web.Mvc.SessionState(System.Web.SessionState.SessionStateBehavior.ReadOnly)]
     public class VAS_289_OpenSalesQuotationsWidgetController : Controller
     {
         private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_289_OpenSalesQuotationsWidgetController).FullName);
@@ -134,7 +135,7 @@ namespace VAS.Controllers
                    AND q.IsActive = 'Y'
                    AND q.IsSOTrx = 'Y'
                    AND COALESCE(q.IsReturnTrx, 'N') = 'N'
-                   AND q.IsSalesQuotation = 'Y'
+                   AND (q.IsSalesQuotation = 'Y' OR EXISTS (SELECT 1 FROM C_DocType dtq WHERE dtq.C_DocType_ID = q.C_DocTypeTarget_ID AND dtq.DocSubTypeSO IN ('ON', 'OB')))
                    AND q.DocStatus IN ('CO', 'IP')
                    AND (q.ValidTillDate IS NULL OR q.ValidTillDate >= @Today)";
         }
@@ -149,7 +150,7 @@ namespace VAS.Controllers
                                          AND so.IsActive = 'Y'
                                          AND so.IsSOTrx = 'Y'
                                          AND COALESCE(so.IsReturnTrx, 'N') = 'N'
-                                         AND COALESCE(so.IsSalesQuotation, 'N') = 'N'
+                                         AND EXISTS (SELECT 1 FROM C_DocType dt WHERE dt.C_DocType_ID = so.C_DocTypeTarget_ID AND dt.DocSubTypeSO IN ('SO', 'WR', 'BO'))
                                          AND so.DocStatus NOT IN ('VO', 'RE') )
                  WHERE sol.IsActive = 'Y'
                    AND sol.C_Quotation_Line_ID IS NOT NULL
@@ -316,7 +317,7 @@ namespace VAS.Controllers
                  WHERE q.C_Order_ID = @Quotation_Id
                    AND q.AD_Client_ID = @AD_Client_ID
                    AND q.IsActive = 'Y'
-                   AND q.IsSalesQuotation = 'Y'";
+                   AND (q.IsSalesQuotation = 'Y' OR EXISTS (SELECT 1 FROM C_DocType dtq WHERE dtq.C_DocType_ID = q.C_DocTypeTarget_ID AND dtq.DocSubTypeSO IN ('ON', 'OB')))";
 
             headerSql = MRole.GetDefault(ctx).AddAccessSQL(headerSql, "q", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
@@ -552,7 +553,7 @@ namespace VAS.Controllers
                  WHERE q.C_Order_ID = @Quotation_Id
                    AND q.AD_Client_ID = @AD_Client_ID
                    AND q.IsActive = 'Y'
-                   AND q.IsSalesQuotation = 'Y'";
+                   AND (q.IsSalesQuotation = 'Y' OR EXISTS (SELECT 1 FROM C_DocType dtq WHERE dtq.C_DocType_ID = q.C_DocTypeTarget_ID AND dtq.DocSubTypeSO IN ('ON', 'OB')))";
 
             headerSql = MRole.GetDefault(ctx).AddAccessSQL(headerSql, "q", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
@@ -878,7 +879,7 @@ namespace VAS.Controllers
                      WHERE q.C_Order_ID = @Quotation_Id
                        AND q.AD_Client_ID = @AD_Client_ID
                        AND q.IsActive = 'Y'
-                       AND q.IsSalesQuotation = 'Y'";
+                       AND (q.IsSalesQuotation = 'Y' OR EXISTS (SELECT 1 FROM C_DocType dtq WHERE dtq.C_DocType_ID = q.C_DocTypeTarget_ID AND dtq.DocSubTypeSO IN ('ON', 'OB')))";
                 DataSet qds = DB.ExecuteDataset(qSql, new[]
                 {
                     new SqlParameter("@Quotation_Id", request.QuotationId),
@@ -922,7 +923,7 @@ namespace VAS.Controllers
                                    INNER JOIN C_Order so ON ( so.C_Order_ID = sol.C_Order_ID
                                                           AND so.IsActive = 'Y' AND so.IsSOTrx = 'Y'
                                                           AND COALESCE(so.IsReturnTrx, 'N') = 'N'
-                                                          AND COALESCE(so.IsSalesQuotation, 'N') = 'N'
+                                                          AND EXISTS (SELECT 1 FROM C_DocType dt WHERE dt.C_DocType_ID = so.C_DocTypeTarget_ID AND dt.DocSubTypeSO IN ('SO', 'WR', 'BO'))
                                                           AND so.DocStatus NOT IN ('VO', 'RE') )
                                   WHERE sol.C_Quotation_Line_ID = ql.C_OrderLine_ID
                                     AND sol.IsActive = 'Y'
