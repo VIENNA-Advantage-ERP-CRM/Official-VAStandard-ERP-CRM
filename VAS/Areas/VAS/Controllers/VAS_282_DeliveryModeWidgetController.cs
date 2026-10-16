@@ -72,6 +72,7 @@ namespace VAS.Controllers
     ///                          does not exist in this environment) - dispatch value is
     ///                          now computed from M_InOutLine/C_OrderLine/C_Tax instead.
     /// </summary>
+    [System.Web.Mvc.SessionState(System.Web.SessionState.SessionStateBehavior.ReadOnly)]
     public class VAS_282_DeliveryModeWidgetController : Controller
     {
         private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_282_DeliveryModeWidgetController).FullName);

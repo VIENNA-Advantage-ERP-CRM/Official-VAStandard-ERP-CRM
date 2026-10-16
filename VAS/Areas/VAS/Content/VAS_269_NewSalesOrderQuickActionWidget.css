@@ -94,3 +94,8 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
+
+/* Busy state while the new Sales Order window opens. */
+.vas269-card.is-busy { cursor: progress; opacity: .7; pointer-events: none; }
+.vas269-card.is-busy .vas269-well { animation: vas269-pulse 1s ease-in-out infinite; }
+@keyframes vas269-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(.88); } }

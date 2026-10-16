@@ -68,6 +68,7 @@ namespace VAS.Controllers
     /// Chronological development:
     ///   VAI052      2026-09-15 Created
     /// </summary>
+    [System.Web.Mvc.SessionState(System.Web.SessionState.SessionStateBehavior.ReadOnly)]
     public class VAS_285_TopProductsWidgetController : Controller
     {
         private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_285_TopProductsWidgetController).FullName);
@@ -223,7 +224,7 @@ namespace VAS.Controllers
                  WHERE o.AD_Client_ID = @AD_Client_ID
                    AND o.IsActive = 'Y'
                    AND o.IsSOTrx = 'Y'
-                   AND COALESCE(o.IsSalesQuotation, 'N') = 'N'
+                   AND EXISTS (SELECT 1 FROM C_DocType dt WHERE dt.C_DocType_ID = o.C_DocTypeTarget_ID AND dt.DocSubTypeSO IN ('SO', 'WR', 'BO'))
                    AND COALESCE(o.IsReturnTrx, 'N') = 'N'
                    AND o.DocStatus IN ('CO', 'CL')
                    AND o.DateOrdered >= @Period_Start
@@ -335,7 +336,7 @@ namespace VAS.Controllers
                  WHERE o.AD_Client_ID = @AD_Client_ID
                    AND o.IsActive = 'Y'
                    AND o.IsSOTrx = 'Y'
-                   AND COALESCE(o.IsSalesQuotation, 'N') = 'N'
+                   AND EXISTS (SELECT 1 FROM C_DocType dt WHERE dt.C_DocType_ID = o.C_DocTypeTarget_ID AND dt.DocSubTypeSO IN ('SO', 'WR', 'BO'))
                    AND COALESCE(o.IsReturnTrx, 'N') = 'N'
                    AND o.DocStatus IN ('CO', 'CL')
                    AND o.DateOrdered >= @Period_Start
@@ -366,7 +367,7 @@ namespace VAS.Controllers
                  WHERE o.AD_Client_ID = @AD_Client_ID
                    AND o.IsActive = 'Y'
                    AND o.IsSOTrx = 'Y'
-                   AND COALESCE(o.IsSalesQuotation, 'N') = 'N'
+                   AND EXISTS (SELECT 1 FROM C_DocType dt WHERE dt.C_DocType_ID = o.C_DocTypeTarget_ID AND dt.DocSubTypeSO IN ('SO', 'WR', 'BO'))
                    AND COALESCE(o.IsReturnTrx, 'N') = 'N'
                    AND o.DocStatus = 'CO'";
 
