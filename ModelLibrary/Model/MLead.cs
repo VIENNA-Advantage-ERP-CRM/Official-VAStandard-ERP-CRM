@@ -783,6 +783,19 @@ namespace VAdvantage.Model
             return null;
         }
 
+        /// <summary>
+        /// Parameters for a duplicate-lead lookup, scoped to this lead's tenant
+        /// </summary>
+        private System.Data.SqlClient.SqlParameter[] GetDuplicateParams(string name, string value)
+        {
+            return new System.Data.SqlClient.SqlParameter[]
+            {
+                new System.Data.SqlClient.SqlParameter("@clientId", GetAD_Client_ID()),
+                new System.Data.SqlClient.SqlParameter(name, value),
+                new System.Data.SqlClient.SqlParameter("@leadId", GetC_Lead_ID())
+            };
+        }
+
         /**
          * 	Before Save
          *	@param newRecord new
@@ -824,8 +837,8 @@ namespace VAdvantage.Model
                 bool phone = false;
                 if (!string.IsNullOrEmpty(GetEMail()))
                 {
-                    sql.Append("SELECT COUNT(C_Lead_ID) FROM C_LEAD WHERE IsActive = 'Y' AND LOWER(Email) ='" + GetEMail().ToLower() + "'AND C_Lead_ID !='" + GetC_Lead_ID() + "' AND IsArchive != 'Y'");
-                    count = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
+                    sql.Append("SELECT COUNT(C_Lead_ID) FROM C_LEAD WHERE IsActive = 'Y' AND AD_Client_ID = @clientId AND LOWER(Email) = @email AND C_Lead_ID != @leadId AND IsArchive != 'Y'");
+                    count = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), GetDuplicateParams("@email", GetEMail().ToLower()), Get_Trx()));
                     if (count > 0)
                     {
                         email = true;
@@ -834,8 +847,8 @@ namespace VAdvantage.Model
                 }
                 if (!string.IsNullOrEmpty(GetMobile()))
                 {
-                    sql.Append("SELECT COUNT(C_Lead_ID) FROM C_LEAD WHERE IsActive = 'Y' AND Mobile = '" + GetMobile() + "'AND C_Lead_ID !='" + GetC_Lead_ID() + "' AND IsArchive != 'Y'");
-                    count = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
+                    sql.Append("SELECT COUNT(C_Lead_ID) FROM C_LEAD WHERE IsActive = 'Y' AND AD_Client_ID = @clientId AND Mobile = @mobile AND C_Lead_ID != @leadId AND IsArchive != 'Y'");
+                    count = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), GetDuplicateParams("@mobile", GetMobile()), Get_Trx()));
                     if (count > 0)
                     {
                         mobile = true;
@@ -845,8 +858,8 @@ namespace VAdvantage.Model
                 }
                 if (!string.IsNullOrEmpty(GetPhone()))
                 {
-                    sql.Append("SELECT COUNT(C_Lead_ID) FROM C_LEAD WHERE IsActive = 'Y' AND Phone = '" + GetPhone() + "'AND C_Lead_ID !='" + GetC_Lead_ID() + "' AND IsArchive != 'Y'");
-                    count = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
+                    sql.Append("SELECT COUNT(C_Lead_ID) FROM C_LEAD WHERE IsActive = 'Y' AND AD_Client_ID = @clientId AND Phone = @phone AND C_Lead_ID != @leadId AND IsArchive != 'Y'");
+                    count = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), GetDuplicateParams("@phone", GetPhone()), Get_Trx()));
                     if (count > 0)
                     {
                         phone = true;
