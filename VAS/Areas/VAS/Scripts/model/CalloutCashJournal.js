@@ -1372,7 +1372,7 @@
                 var paramString = BusinessPartner_ID.toString() + "," + ctx.getAD_Client_ID().toString();
                 var data = VIS.dataContext.getJSONRecord("MCashJournal/GetBPLocation", paramString);
                 if (data != null) {
-                    var CreditStatus = Util.getValueOfInt(data["CreditStatusSettingOn"]);
+                    var CreditStatus = Util.getValueOfString(data["CreditStatusSettingOn"]);
                     var Location_ID = Util.getValueOfInt(data["C_BPartner_Location_ID"]);
                     if (CreditStatus == "CL" && Location_ID == 0) {
                         this.setCalloutActive(false);
