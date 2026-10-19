@@ -121,8 +121,9 @@ namespace VAdvantage.Model
             }
             if (_schedule.Length == 1)
             {
+                // a single instalment is refused; say why and what to do instead of reporting a bare count
                 SetIsValid(false);
-                return "@Invalid@ @Count@ # = 1 (@C_PaySchedule_ID@)";
+                return Msg.GetMsg(GetCtx(), "VAS_PaymentTermSingleSchedule");
             }
 
             //	Add up
