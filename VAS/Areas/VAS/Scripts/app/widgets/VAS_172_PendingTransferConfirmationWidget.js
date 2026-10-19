@@ -21,8 +21,10 @@
         write();
     }
 
+    /* Falls back to the English text when the AD_Message key is not defined. */
     function lbl(key, fallback) {
-        return VIS.Msg.getMsg(key);
+        var t = VIS.Msg.getMsg(key);
+        return (t && t.charAt(0) !== '[') ? t : (fallback !== undefined ? fallback : t);
     }
 
     function escapeHtml(v) {

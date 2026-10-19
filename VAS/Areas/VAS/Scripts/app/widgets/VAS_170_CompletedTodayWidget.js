@@ -57,6 +57,7 @@
                     var width = entries[i].contentRect.width;
                     if (width > 0) {
                         $root[0].style.setProperty('--widget-inline-size', width + 'px');
+                        $root[0].style.setProperty('--widget-block-size', entries[i].contentRect.height + 'px');
                     }
                 }
             });
@@ -73,21 +74,6 @@
             return d.getFullYear() + '-' +
                    String(d.getMonth() + 1).padStart(2, '0') + '-' +
                    String(d.getDate()).padStart(2, '0');
-        }
-
-        function openTransferList() {
-            var today = todayIso();
-            var where =
-                "MMovement.IsActive = 'Y'" +
-                " AND MMovement.DocStatus IN (" + COMPLETED_STATUS_LIST + ")" +
-                " AND TRUNC(MMovement.Updated) = TO_DATE('" + today + "','YYYY-MM-DD')";
-
-            var windowParam = {
-                "TabWhereClause": where,
-                "TabLayout": "N",
-                "TabIndex": "0"
-            };
-            $self.widgetFirevalueChanged(windowParam);
         }
 
         this.Initalize = function () {
@@ -242,15 +228,14 @@
             var metaText = lbl("VAS_170_FullyReceived", "Fully received");
 
             var $card = $(
-                '<button type="button" class="vas-completed-today-card" aria-label="' + escapeHtml(title) + '">' +
+                '<div class="vas-completed-today-card" aria-label="' + escapeHtml(title) + '">' +
                 '<div class="vas-completed-today-label">' + escapeHtml(title) + '</div>' +
                 '<div class="vas-completed-today-value">—</div>' +
                 '<div class="vas-completed-today-meta">' + escapeHtml(metaText) + '</div>' +
-                '</button>'
+                '</div>'
             );
 
-            $card.on('click', function () { openTransferList(); });
-
+            
             $valueEl = $card.find('.vas-completed-today-value');
             $metaEl = $card.find('.vas-completed-today-meta');
 
