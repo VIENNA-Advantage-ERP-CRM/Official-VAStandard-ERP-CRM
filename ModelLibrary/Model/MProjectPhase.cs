@@ -466,10 +466,9 @@ namespace VAdvantage.Model
             }
 
             //Used transaction object because total was not updating on header
-            string isCam = Util.GetValueOfString(DB.ExecuteScalar("SELECT IsCampaign FROM C_Project WHERE C_Project_ID = " + GetC_Project_ID(), null, Get_TrxName()));
-            string isOpp = Util.GetValueOfString(DB.ExecuteScalar("SELECT IsOpportunity FROM C_Project WHERE C_Project_ID = " + GetC_Project_ID(), null, Get_TrxName()));
+            MProject project = new MProject(GetCtx(), GetC_Project_ID(), Get_TrxName());
 
-            if (isOpp.Equals("N") && isCam.Equals("N"))
+            if (project.IsPlannedAmtFromPhases())
             {
                 // set sum of total amount of phase tab to project tab, similalary Commitment amount                
                 //project.SetPlannedAmt(Util.GetValueOfDecimal(DB.ExecuteScalar("SELECT COALESCE(SUM(pl.PlannedAmt),0) FROM C_Projectphase pl WHERE pl.IsActive = 'Y' AND pl.C_Project_ID = " + GetC_Project_ID(), null, Get_TrxName())));
@@ -480,7 +479,6 @@ namespace VAdvantage.Model
                 //}
 
                 // DevOps ID: 2786 - Planned Quantity not updated in Quantity field on header of Project screen from Phase line tab.
-                MProject project = new MProject(GetCtx(), GetC_Project_ID(), Get_TrxName());
                 StringBuilder Sql = new StringBuilder();
                 if (project.GetProjectLineLevel().Equals("T") || project.GetProjectLineLevel().Equals("Y"))
                 {
