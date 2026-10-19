@@ -155,9 +155,6 @@ namespace VIS.Controllers
 //                FROM M_Movement MMovement
 //                WHERE MMovement.IsActive = 'Y'
 //                  AND MMovement.DocStatus IN (" + UnderConfirmationStatusInList + @")
-                  AND EXISTS (SELECT 1 FROM M_MovementConfirm MConfirm
-                              WHERE MConfirm.M_Movement_ID = MMovement.M_Movement_ID AND MConfirm.IsActive = 'Y'
-                                AND MConfirm.DocStatus IN ('DR', 'IP'))";
 //
 //            sql = MRole.GetDefault(ctx).AddAccessSQL(
 //                sql,

@@ -34,6 +34,8 @@ namespace VAdvantage.Model
         private static VLogger _log = VLogger.GetVLogger(typeof(MTax).FullName);
         //	100				
         private const Decimal ONEHUNDRED = 100M;
+        // Decimals kept on line tax/surcharge when the tenant does not round line tax (rounded at document level)
+        private const int UNROUNDED_LINE_TAX_SCALE = 7;
         //	Child Taxes		
         private MTax[] _childTaxes = null;
         // Postal Codes		
@@ -281,6 +283,21 @@ namespace VAdvantage.Model
         }
 
         /// <summary>
+        /// Scale used for line tax and surcharge amounts: when the tenant does not round line tax
+        /// (IsRoundLineTaxAmt off), keep line-level precision and round at document level
+        /// </summary>
+        /// <param name="scale">currency precision requested by the caller</param>
+        /// <returns>scale to round line tax and surcharge to</returns>
+        private int GetLineTaxScale(int scale)
+        {
+            // VIS0060: Round off Tax Amount based on setting taken on Tenant.
+            MClient client = MClient.Get(GetCtx());
+            if (client.Get_ColumnIndex("IsRoundLineTaxAmt") >= 0 && !client.IsRoundLineTaxAmt())
+                return UNROUNDED_LINE_TAX_SCALE;
+            return scale;
+        }
+
+        /// <summary>
         /// Calculate Tax - no rounding
         /// </summary>
         /// <param name="amount"></param>
@@ -293,12 +310,7 @@ namespace VAdvantage.Model
             if (IsZeroTax())
                 return Env.ZERO;
 
-            // VIS0060: Work done to Round off Tax Amount based on setting taken on Tenant.
-            MClient client = MClient.Get(GetCtx());
-            if (client.Get_ColumnIndex("IsRoundLineTaxAmt") >= 0 && !client.IsRoundLineTaxAmt())
-            {
-                scale = 7;      //SET 7 By VIS0228 As discussed with Mukesh Sir
-            }
+            scale = GetLineTaxScale(scale);
             Decimal multiplier = Decimal.Round(Decimal.Divide(GetRate(), ONEHUNDRED), 12, MidpointRounding.AwayFromZero);
             //BigDecimal multiplier = getRate().divide(ONEHUNDRED, 12, BigDecimal.ROUND_HALF_UP);		
             Decimal? tax = null;
@@ -341,6 +353,9 @@ namespace VAdvantage.Model
             {
                 return Env.ZERO;
             }
+
+            // same rounding decision as CalculateTax, whichever surcharge type applies
+            scale = GetLineTaxScale(scale);
 
             Decimal multiplier = Env.ZERO;
             Decimal taxBase = amount;
