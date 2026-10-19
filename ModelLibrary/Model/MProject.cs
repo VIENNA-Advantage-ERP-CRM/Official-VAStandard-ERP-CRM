@@ -768,7 +768,7 @@ namespace VAdvantage.Model
             {
                 //Used transaction because total was not updating on header
                 prjph = new MProject(GetCtx(), GetC_Project_ID(), Get_TrxName());
-                if (!prjph.IsOpportunity())
+                if (prjph.IsPlannedAmtFromPhases())
                 {
                     //Used transaction because total was not updating on header
                     // Only derive the total from phases when there are any; otherwise keep the entered amount
@@ -781,6 +781,16 @@ namespace VAdvantage.Model
                 }
             }
             return success;
+        }
+
+        /// <summary>
+        /// Whether the project's PlannedAmt is derived from its phases.
+        /// Single rule shared by project and phase save: not for opportunities or campaign projects.
+        /// </summary>
+        /// <returns>true if PlannedAmt is rolled up from phases</returns>
+        public bool IsPlannedAmtFromPhases()
+        {
+            return !IsOpportunity() && !"Y".Equals(Util.GetValueOfString(Get_Value("IsCampaign")));
         }
 
         /**
