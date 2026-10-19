@@ -36,6 +36,7 @@
         this.windowNo;
 
         var $self = this;
+        var widgetObserver = null;
         var $root = $('<div class="vas-new-transfer-quick-action-root">');
 
         function lbl(key, fallback) {
@@ -137,6 +138,16 @@
 
             $card.on('click', function () { openNewTransfer(); });
             $root.append($card);
+
+            /* Publish the widget size so the card can scale down when the cell is small (browser zoom). */
+            if (typeof ResizeObserver !== 'undefined' && $root[0]) {
+                widgetObserver = new ResizeObserver(function (entries) {
+                    var r = entries[0].contentRect;
+                    if (r.width > 0) { $root[0].style.setProperty('--widget-inline-size', r.width + 'px'); }
+                    if (r.height > 0) { $root[0].style.setProperty('--widget-block-size', r.height + 'px'); }
+                });
+                widgetObserver.observe($root[0]);
+            }
         }
 
         this.Initalize = function () {
@@ -148,6 +159,7 @@
         this.getRoot = function () { return $root; };
 
         this.disposeComponent = function () {
+            if (widgetObserver) { widgetObserver.disconnect(); widgetObserver = null; }
             $root.off();
             $root.remove();
         };

@@ -20,6 +20,7 @@
  * 11 | Consumed                               | VAS_183_Consumed
  * 12 | UoM                                    | VAS_183_UoM
  * 13 | Attributes                             | VAS_183_Attributes
+ *    | Value (unit cost, modal)               | VAS_183_Value
  * 14 | Each                                   | VAS_183_Each
  * 15 | Loading...                             | VAS_183_Loading
  * 16 | No items found                         | VAS_183_NoItemsFound
@@ -304,13 +305,19 @@
         function positionMenu($menu, $btn) {
             if (!$btn || !$btn[0]) { return; }
             var rect = $btn[0].getBoundingClientRect();
-            // Right-aligned to the button, as in the source design.
+            // Font size and width are applied BEFORE measuring: measuring first used the unscaled
+            // width, so the menu was placed with the wrong left edge and stuck out past the button.
+            // The menu is as wide as its longest entry (never narrower than the button) and is
+            // right-aligned to the button, as in the source design.
             $menu.css({
-                top: Math.round(rect.bottom + 4) + 'px',
-                left: Math.round(rect.right - $menu.outerWidth()) + 'px',
-                // Inherit the card's fluid font size so menu text scales with the widget.
-                'font-size': $card.length ? window.getComputedStyle($card[0]).fontSize : ''
+                'font-size': $card.length ? window.getComputedStyle($card[0]).fontSize : '',
+                'min-width': Math.round(rect.width) + 'px',
+                left: '0px',
+                top: Math.round(rect.bottom + 4) + 'px'
             });
+            var left = Math.round(rect.right - $menu.outerWidth());
+            if (left < 4) { left = 4; }
+            $menu.css('left', left + 'px');
         }
 
         function toggleMenu($menu, $btn) {
@@ -526,9 +533,9 @@
                 '<table class="vas-mcw-mini-table">' +
                 '<thead><tr>' +
                 '<th>' + escapeHtml(label("VAS_183_Item", "Item")) + '</th>' +
-                '<th>' + escapeHtml(label("VAS_183_Consumed", "Consumed")) + '</th>' +
+                '<th class="vas-mcw-qty-col">' + escapeHtml(label("VAS_183_Consumed", "Consumed")) + '</th>' +
                 '<th>' + escapeHtml(label("VAS_183_UoM", "UoM")) + '</th>' +
-                '<th>' + escapeHtml(label("VAS_183_Attributes", "Attributes")) + '</th>' +
+                '<th class="vas-mcw-val-col">' + escapeHtml(label("VAS_183_Value", "Value")) + '</th>' +
                 '</tr></thead>' +
                 '<tbody class="vas-mcw-m-tbody"><tr><td colspan="4" class="vas-mcw-m-msgcell">' + escapeHtml(label("VAS_183_Loading", "Loading...")) + '</td></tr></tbody>' +
                 '</table>' +
@@ -550,6 +557,15 @@
             var modalPageSize = 5;
 
             function renderModalTable() {
+                /* Attributes column sits second and is shown only when at least one item has a value. */
+                var hasAttr = modalItemData.some(function (it) { return it.attributes && String(it.attributes).trim() !== ""; });
+                var colCount = hasAttr ? 5 : 4;
+                $modal.find('thead tr').html(
+                    '<th>' + escapeHtml(label("VAS_183_Item", "Item")) + '</th>' +
+                    (hasAttr ? '<th>' + escapeHtml(label("VAS_183_Attributes", "Attributes")) + '</th>' : '') +
+                    '<th class="vas-mcw-qty-col">' + escapeHtml(label("VAS_183_Consumed", "Consumed")) + '</th>' +
+                    '<th>' + escapeHtml(label("VAS_183_UoM", "UoM")) + '</th>' +
+                    '<th class="vas-mcw-val-col">' + escapeHtml(label("VAS_183_Value", "Value")) + '</th>');
                 var mTotalPages = Math.max(1, Math.ceil(modalItemData.length / modalPageSize));
                 if (modalPageNo > mTotalPages) { modalPageNo = mTotalPages; }
 
@@ -571,13 +587,13 @@
                 function fillerRows(count) {
                     var html = '';
                     for (var f = 0; f < count; f++) {
-                        html += '<tr class="vas-mcw-m-filler" aria-hidden="true"><td colspan="4">&nbsp;</td></tr>';
+                        html += '<tr class="vas-mcw-m-filler" aria-hidden="true"><td colspan="' + colCount + '">&nbsp;</td></tr>';
                     }
                     return html;
                 }
 
                 if (modalItemData.length === 0) {
-                    $tbody.html('<tr><td colspan="4" class="vas-mcw-m-msgcell">' +
+                    $tbody.html('<tr><td colspan="' + colCount + '" class="vas-mcw-m-msgcell">' +
                         escapeHtml(label("VAS_183_NoItemsFound", "No items found")) + '</td></tr>' +
                         fillerRows(modalPageSize - 1));
                     $mHelper.text('0 ' + ofTxt + ' 0 ' + linesTxt);
@@ -596,9 +612,10 @@
                     tbodyHtml +=
                         '<tr>' +
                         '<td class="vas-mcw-item-col" title="' + escapeHtml(item.productName) + '">' + escapeHtml(item.productName) + '</td>' +
-                        '<td>' + escapeHtml(formatQty(item.consumedQty)) + '</td>' +
+                        (hasAttr ? '<td class="vas-mcw-attr-col" title="' + escapeHtml(item.attributes || "") + '">' + escapeHtml(item.attributes || "") + '</td>' : '') +
+                        '<td class="vas-mcw-qty-col">' + escapeHtml(formatQty(item.consumedQty)) + '</td>' +
                         '<td>' + escapeHtml(item.uomName || label("VAS_183_Each", "Each")) + '</td>' +
-                        '<td class="vas-mcw-attr-col" title="' + escapeHtml(item.attributes || "-") + '">' + escapeHtml(item.attributes || "-") + '</td>' +
+                        '<td class="vas-mcw-val-col" title="' + escapeHtml(formatCurrency(item.costPrice).exact) + '">' + escapeHtml(formatCurrency(item.costPrice).exact) + '</td>' +
                         '</tr>';
                 }
 

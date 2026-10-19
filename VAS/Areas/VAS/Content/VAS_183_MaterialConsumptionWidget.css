@@ -161,7 +161,8 @@
     border: 1px solid #E4EDF4;
     border-radius: 10px;
     box-shadow: 0 12px 30px rgba(15, 61, 97, .16);
-    min-width: 10em;
+    width: max-content;
+    min-width: 0;
     max-height: 15.7em;
     overflow-y: auto;
     overflow-x: hidden;
@@ -221,7 +222,10 @@
        overflow:hidden on .vas-mcw-body - the widget claimed 4 rows but only showed 3.
        min-height: 0 is the part that actually permits shrinking; without it a flex item will not
        shrink below its content size and the overflow comes straight back. */
-    flex: 1 1 0;
+    /* FIXED row slot: one quarter of the body (4 rows per page, 3 gaps of .375em), so 1-3 records
+       keep the same row height as a full page and sit at the top instead of stretching. */
+    flex: 0 1 calc((100% - 3 * .375em) / 4);
+    max-height: calc((100% - 3 * .375em) / 4);
     min-height: 0;
     padding: .45em .625em;
     border-radius: 8px;
@@ -535,7 +539,7 @@
         white-space: nowrap;
     }
 
-        .vas-mcw-mini-table th:nth-child(2) {
+        .vas-mcw-mini-table th.vas-mcw-qty-col {
             text-align: right;
         }
 
@@ -552,7 +556,7 @@
         vertical-align: middle;
     }
 
-        .vas-mcw-mini-table td:nth-child(2) {
+        .vas-mcw-mini-table td.vas-mcw-qty-col {
             text-align: right;
             font-weight: 700;
         }
@@ -582,6 +586,11 @@
     .vas-mcw-mini-table tbody tr.vas-mcw-m-filler td {
         border-bottom-color: #F5F8FA;
     }
+
+.vas-mcw-mini-table th.vas-mcw-val-col,
+.vas-mcw-mini-table td.vas-mcw-val-col {
+    text-align: right;
+}
 
 .vas-mcw-item-col {
     font-weight: 700;

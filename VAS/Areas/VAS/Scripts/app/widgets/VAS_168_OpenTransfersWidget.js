@@ -103,6 +103,7 @@
                     var width = entries[i].contentRect.width;
                     if (width > 0) {
                         $root[0].style.setProperty('--widget-inline-size', width + 'px');
+                        $root[0].style.setProperty('--widget-block-size', entries[i].contentRect.height + 'px');
                     }
                 }
             });
@@ -111,19 +112,6 @@
 
         /* DocStatus list matching backend predicate exactly ('IP', 'WC', 'IN') — excludes 'DR' (Drafts) per spec §4 */
         var OPEN_STATUS_LIST = "'IP', 'WC', 'IN'";
-
-        function openTransferList() {
-            var where =
-                "MMovement.IsActive = 'Y'" +
-                " AND MMovement.DocStatus IN (" + OPEN_STATUS_LIST + ")";
-
-            var windowParam = {
-                "TabWhereClause": where,
-                "TabLayout": "N",
-                "TabIndex": "0"
-            };
-            $self.widgetFirevalueChanged(windowParam);
-        }
 
         this.Initalize = function () {
             createWidget();
@@ -183,15 +171,14 @@
             var metaText = lbl("VAS_168_AwaitingDispatch", "Awaiting dispatch");
 
             var $card = $(
-                '<button type="button" class="vas-open-transfers-card" aria-label="' + escapeHtml(title) + '">' +
+                '<div class="vas-open-transfers-card" aria-label="' + escapeHtml(title) + '">' +
                 '<div class="vas-open-transfers-label">' + escapeHtml(title) + '</div>' +
                 '<div class="vas-open-transfers-value">—</div>' +
                 '<div class="vas-open-transfers-meta">' + escapeHtml(metaText) + '</div>' +
-                '</button>'
+                '</div>'
             );
 
-            $card.on('click', function () { openTransferList(); });
-
+            
             $valueEl = $card.find('.vas-open-transfers-value');
             $metaEl = $card.find('.vas-open-transfers-meta');
 

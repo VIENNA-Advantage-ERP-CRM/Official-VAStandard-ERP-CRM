@@ -17,6 +17,22 @@
     box-sizing: border-box;
 }
 
+/* Product picture in the Product Performance popup hero (Widget_Bug_Fix Sr 55); the popup's own
+   .MPC-hsp-phero-ico box comes from the shared MPC-hsp styles. The whole image fits its box. */
+.MPC-hsp-phero-ico.MPC-hsp-has-image {
+    padding: 0;
+    overflow: hidden;
+}
+
+.MPC-hsp-phero-img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #fff;
+    border-radius: 11px;
+}
+
 .MPC-t10-hidden {
     display: none !important;
 }
@@ -121,8 +137,12 @@
 .MPC-t10-list {
     flex: 1;
     min-height: 0;
-    display: flex;
-    flex-direction: column;
+    /* Five equal, fixed row slots (PER_PAGE = 5) laid out top to bottom, so 1-2 records sit at the
+       top of the widget at the same height as on a full page instead of stretching / centering
+       (Widget_Bug_Fix Sr 53). Unused slots stay empty at the bottom. */
+    display: grid;
+    grid-template-rows: repeat(5, minmax(0, 1fr));
+    align-content: start;
     overflow: hidden;
 }
 
@@ -138,7 +158,6 @@
 }
 
 .MPC-t10-row {
-    flex: 1 1 0;
     min-height: 0;
     display: flex;
     align-items: center;

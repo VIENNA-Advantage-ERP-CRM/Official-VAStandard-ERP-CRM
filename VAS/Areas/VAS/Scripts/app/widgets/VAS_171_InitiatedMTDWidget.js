@@ -170,6 +170,7 @@
                     var width = entries[i].contentRect.width;
                     if (width > 0) {
                         $root[0].style.setProperty('--widget-inline-size', width + 'px');
+                        $root[0].style.setProperty('--widget-block-size', entries[i].contentRect.height + 'px');
                     }
                 }
             });
@@ -195,23 +196,6 @@
         /* Drill-through to Material Transfer list filtered to transfers created this month.
            Excludes cancelled (DocStatus NOT IN ('VO','RE')) to match the backend count.
            Uses TabWhereClause so the list row count equals the KPI number. */
-        function openTransferList() {
-            var startDate = monthStartIso();
-            var endDate = tomorrowIso();
-            var where =
-                "MMovement.IsActive = 'Y'" +
-                " AND MMovement.DocStatus NOT IN ('VO', 'RE')" +
-                " AND TRUNC(MMovement.Created) >= TO_DATE('" + startDate + "','YYYY-MM-DD')" +
-                " AND TRUNC(MMovement.Created) < TO_DATE('" + endDate + "','YYYY-MM-DD')";
-
-            var windowParam = {
-                "TabWhereClause": where,
-                "TabLayout": "N",
-                "TabIndex": "0"
-            };
-            $self.widgetFirevalueChanged(windowParam);
-        }
-
         this.Initalize = function () {
             createWidget();
             loadKpi();
@@ -254,15 +238,14 @@
             var metaText = lbl('VAS_171_ThisMonthToDate', 'This month to date');
 
             var $card = $(
-                '<button type="button" class="vas-initiated-mtd-card" aria-label="' + escapeHtml(title) + '">' +
+                '<div class="vas-initiated-mtd-card" aria-label="' + escapeHtml(title) + '">' +
                 '<div class="vas-initiated-mtd-label">' + escapeHtml(title) + '</div>' +
                 '<div class="vas-initiated-mtd-value">—</div>' +
                 '<div class="vas-initiated-mtd-meta">' + escapeHtml(metaText) + '</div>' +
-                '</button>'
+                '</div>'
             );
 
-            $card.on('click', function () { openTransferList(); });
-
+            
             $valueEl = $card.find('.vas-initiated-mtd-value');
             $metaEl = $card.find('.vas-initiated-mtd-meta');
 

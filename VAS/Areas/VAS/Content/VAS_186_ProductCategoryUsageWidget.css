@@ -215,8 +215,13 @@
        min-height is the design row height and doubles as the floor used by recalcPageSize():
        the row count is computed from VAS_PCU_ROW_MIN_EM in the JS, NOT from the rendered row
        height, because a stretched row would feed its own height back into the calculation. */
-    flex: 1 1 0;
-    min-height: 2em;
+    /* FIXED row height (was flex: 1 1 0, which stretched 2 rows to fill the whole body). Rows now
+       stack from the top, each one quarter of the body (page size is fixed at 4 in the JS), and
+       leftover space stays empty below the last row. */
+    flex: 0 1 calc((100% - 3 * .25em) / 4);
+    max-height: calc((100% - 3 * .25em) / 4);
+    box-sizing: border-box;
+    min-height: 0;
     padding: .375em 0;
     border-bottom: 1px solid #E2EAF1;
     border-top: 0;
@@ -501,7 +506,8 @@
     }
 
         .vas-pcu-lines-table th:nth-child(5),
-        .vas-pcu-lines-table th:nth-child(6) {
+        .vas-pcu-lines-table th:nth-child(7),
+        .vas-pcu-lines-table th:nth-child(8) {
             text-align: right;
         }
 
@@ -526,6 +532,12 @@
         }
 
         .vas-pcu-lines-table td:nth-child(6) {
+            font-weight: 700;
+            color: #102C3F;
+        }
+
+        .vas-pcu-lines-table td:nth-child(7),
+        .vas-pcu-lines-table td:nth-child(8) {
             text-align: right;
         }
 

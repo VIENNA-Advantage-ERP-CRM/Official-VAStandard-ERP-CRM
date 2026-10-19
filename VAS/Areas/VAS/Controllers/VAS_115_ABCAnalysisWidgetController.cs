@@ -25,6 +25,11 @@ namespace VAS.Controllers
     ///               hand-off.
     /// Chronological development:
     ///   115         2026-07-16 Created
+    ///   Claude      2026-10-16 Cost lookup aligned with VAS_075 / VAS_080 / VAS_113: the product
+    ///               category's costing method (else the schema's) picks the cost element and the
+    ///               elements are summed. The old lookup matched the schema's single cost element
+    ///               with IsThisLevel / A_Asset filters, so stock priced to 0 and the widget showed
+    ///               "Current cost is not available" although the other widgets showed a value.
     /// </summary>
     public class VAS_115_ABCAnalysisWidgetController : Controller
     {
@@ -120,61 +125,92 @@ namespace VAS.Controllers
             result.currency_iso = currency.IsoCode;
             result.std_precision = currency.StdPrecision;
 
-            // storage_cost's physical driver is M_Storage (alias s): MRole is
-            // applied to the SELECT ... WHERE and the GROUP BY is appended after,
-            // so the access predicate never lands past GROUP BY (ORA-00907). The
-            // remaining CTEs read only CTE aliases, so they carry no MRole.
+            // Current cost, same rule as VAS_075 / VAS_080 / VAS_113: the product category's
+            // costing method (else the schema's) selects the cost element(s), whose
+            // CurrentCostPrice are summed. MRole is applied on the physical table (alias Cost)
+            // before the GROUP BY is appended, so the access predicate never lands past
+            // GROUP BY (ORA-00907).
+            string costSql = @"
+                SELECT Cost.AD_Org_ID,
+                       Cost.M_Product_ID,
+                       COALESCE(Cost.M_Warehouse_ID,0) AS M_Warehouse_ID,
+                       COALESCE(Cost.M_AttributeSetInstance_ID,0) AS M_AttributeSetInstance_ID,
+                       SUM(COALESCE(Cost.CurrentCostPrice,0)) AS Unit_Cost
+                FROM M_Cost Cost
+                INNER JOIN M_Product CostProduct ON (CostProduct.M_Product_ID=Cost.M_Product_ID AND CostProduct.IsActive='Y')
+                LEFT OUTER JOIN M_Product_Category CostCategory ON (CostCategory.M_Product_Category_ID=CostProduct.M_Product_Category_ID AND CostCategory.IsActive='Y')
+                INNER JOIN M_CostElement CostElement ON (
+                    CostElement.M_CostElement_ID=Cost.M_CostElement_ID
+                    AND CostElement.IsActive='Y'
+                    AND CostElement.CostingMethod=COALESCE(NULLIF(CostCategory.CostingMethod,''),@Costing_Method)
+                )
+                WHERE Cost.IsActive='Y'
+                  AND Cost.C_AcctSchema_ID=@C_AcctSchema_ID
+                  AND Cost.M_CostType_ID=@M_CostType_ID
+                  AND Cost.AD_Client_ID=@Cost_Client_ID
+                  AND (
+                      COALESCE(NULLIF(CostCategory.CostingMethod,''),@Costing_Method2)<>'C'
+                      OR Cost.M_CostElement_ID=COALESCE(NULLIF(CostCategory.M_CostElement_ID,0),@M_CostElement_ID)
+                  )";
+
+            costSql = AddAccessSql(ctx, costSql, "Cost");
+            costSql += @"
+                GROUP BY Cost.AD_Org_ID,
+                         Cost.M_Product_ID,
+                         COALESCE(Cost.M_Warehouse_ID,0),
+                         COALESCE(Cost.M_AttributeSetInstance_ID,0)";
+
+            // storage_cost's physical driver is M_Storage (alias s); MRole applies to it.
+            // The remaining CTEs read only CTE aliases, so they carry no MRole.
             string storageCost = @"
-                SELECT s.M_Storage_ID AS storage_id,
+                SELECT s.AD_Org_ID AS org_id,
                        l.M_Warehouse_ID AS warehouse_id,
                        p.M_Product_ID AS product_id,
                        COALESCE(p.SKU, p.Value) AS sku,
                        p.Name AS product_name,
-                       s.M_AttributeSetInstance_ID AS attribute_set_instance_id,
-                       s.QtyOnHand AS qty_on_hand,
-                       COALESCE(
-                           MAX(CASE WHEN COALESCE(c.M_Warehouse_ID,0)=l.M_Warehouse_ID AND COALESCE(c.M_AttributeSetInstance_ID,0)=COALESCE(s.M_AttributeSetInstance_ID,0) THEN c.CurrentCostPrice END),
-                           MAX(CASE WHEN COALESCE(c.M_Warehouse_ID,0)=l.M_Warehouse_ID AND COALESCE(c.M_AttributeSetInstance_ID,0)=0 THEN c.CurrentCostPrice END),
-                           MAX(CASE WHEN COALESCE(c.M_Warehouse_ID,0)=0 AND COALESCE(c.M_AttributeSetInstance_ID,0)=COALESCE(s.M_AttributeSetInstance_ID,0) THEN c.CurrentCostPrice END),
-                           MAX(CASE WHEN COALESCE(c.M_Warehouse_ID,0)=0 AND COALESCE(c.M_AttributeSetInstance_ID,0)=0 THEN c.CurrentCostPrice END),
-                           0
-                       ) AS current_cost_price
+                       COALESCE(s.M_AttributeSetInstance_ID,0) AS attribute_set_instance_id,
+                       s.QtyOnHand AS qty_on_hand
                 FROM M_Storage s
                 INNER JOIN M_Locator l ON l.M_Locator_ID=s.M_Locator_ID AND l.IsActive='Y'
                 INNER JOIN M_Warehouse w ON w.M_Warehouse_ID=l.M_Warehouse_ID AND w.IsActive='Y'
                 INNER JOIN M_Product p ON p.M_Product_ID=s.M_Product_ID AND p.IsActive='Y' AND p.ProductType='I' AND p.IsStocked='Y'
-                INNER JOIN AD_ClientInfo ci ON ci.AD_Client_ID=s.AD_Client_ID AND ci.IsActive='Y'
-                INNER JOIN C_AcctSchema a ON a.C_AcctSchema_ID=ci.C_AcctSchema1_ID AND a.IsActive='Y'
-                LEFT JOIN M_Cost c
-                    ON c.AD_Client_ID=s.AD_Client_ID
-                   AND c.M_Product_ID=s.M_Product_ID
-                   AND c.C_AcctSchema_ID=a.C_AcctSchema_ID
-                   AND c.M_CostType_ID=a.M_CostType_ID
-                   AND c.M_CostElement_ID=a.M_CostElement_ID
-                   AND c.IsActive='Y'
-                   AND COALESCE(c.IsThisLevel,'Y')='Y'
-                   AND COALESCE(c.A_Asset_ID,0)=0
-                   AND COALESCE(c.M_Warehouse_ID,0) IN (0,l.M_Warehouse_ID)
-                   AND COALESCE(c.M_AttributeSetInstance_ID,0) IN (0,COALESCE(s.M_AttributeSetInstance_ID,0))
                 WHERE s.IsActive='Y'
                   AND s.AD_Client_ID=@AD_Client_ID
                   AND l.M_Warehouse_ID=@M_Warehouse_ID";
 
             storageCost = AddAccessSql(ctx, storageCost, "s");
-            storageCost += @"
-                GROUP BY s.M_Storage_ID, l.M_Warehouse_ID, p.M_Product_ID, p.SKU, p.Value, p.Name, s.M_AttributeSetInstance_ID, s.QtyOnHand";
 
             string sql = @"
-                WITH storage_cost AS (
+                WITH cost_values AS (
+                    " + costSql + @"
+                ),
+                storage_cost AS (
                     " + storageCost + @"
                 ),
                 product_stock AS (
-                    SELECT product_id, sku, product_name,
-                           SUM(qty_on_hand) AS qty_on_hand,
-                           SUM(qty_on_hand * current_cost_price) AS stock_value
-                    FROM storage_cost
-                    GROUP BY product_id, sku, product_name
-                    HAVING SUM(qty_on_hand) > 0
+                    SELECT sc.product_id, sc.sku, sc.product_name,
+                           SUM(sc.qty_on_hand) AS qty_on_hand,
+                           SUM(sc.qty_on_hand * COALESCE(
+                               OrgExact.Unit_Cost,
+                               OrgWarehouse.Unit_Cost,
+                               OrgAttribute.Unit_Cost,
+                               OrgProduct.Unit_Cost,
+                               ClientExact.Unit_Cost,
+                               ClientWarehouse.Unit_Cost,
+                               ClientAttribute.Unit_Cost,
+                               ClientProduct.Unit_Cost,
+                               0)) AS stock_value
+                    FROM storage_cost sc
+                    LEFT OUTER JOIN cost_values OrgExact ON (OrgExact.AD_Org_ID=sc.org_id AND OrgExact.M_Product_ID=sc.product_id AND OrgExact.M_Warehouse_ID=sc.warehouse_id AND OrgExact.M_AttributeSetInstance_ID=sc.attribute_set_instance_id)
+                    LEFT OUTER JOIN cost_values OrgWarehouse ON (OrgWarehouse.AD_Org_ID=sc.org_id AND OrgWarehouse.M_Product_ID=sc.product_id AND OrgWarehouse.M_Warehouse_ID=sc.warehouse_id AND OrgWarehouse.M_AttributeSetInstance_ID=0)
+                    LEFT OUTER JOIN cost_values OrgAttribute ON (OrgAttribute.AD_Org_ID=sc.org_id AND OrgAttribute.M_Product_ID=sc.product_id AND OrgAttribute.M_Warehouse_ID=0 AND OrgAttribute.M_AttributeSetInstance_ID=sc.attribute_set_instance_id)
+                    LEFT OUTER JOIN cost_values OrgProduct ON (OrgProduct.AD_Org_ID=sc.org_id AND OrgProduct.M_Product_ID=sc.product_id AND OrgProduct.M_Warehouse_ID=0 AND OrgProduct.M_AttributeSetInstance_ID=0)
+                    LEFT OUTER JOIN cost_values ClientExact ON (ClientExact.AD_Org_ID=0 AND ClientExact.M_Product_ID=sc.product_id AND ClientExact.M_Warehouse_ID=sc.warehouse_id AND ClientExact.M_AttributeSetInstance_ID=sc.attribute_set_instance_id)
+                    LEFT OUTER JOIN cost_values ClientWarehouse ON (ClientWarehouse.AD_Org_ID=0 AND ClientWarehouse.M_Product_ID=sc.product_id AND ClientWarehouse.M_Warehouse_ID=sc.warehouse_id AND ClientWarehouse.M_AttributeSetInstance_ID=0)
+                    LEFT OUTER JOIN cost_values ClientAttribute ON (ClientAttribute.AD_Org_ID=0 AND ClientAttribute.M_Product_ID=sc.product_id AND ClientAttribute.M_Warehouse_ID=0 AND ClientAttribute.M_AttributeSetInstance_ID=sc.attribute_set_instance_id)
+                    LEFT OUTER JOIN cost_values ClientProduct ON (ClientProduct.AD_Org_ID=0 AND ClientProduct.M_Product_ID=sc.product_id AND ClientProduct.M_Warehouse_ID=0 AND ClientProduct.M_AttributeSetInstance_ID=0)
+                    GROUP BY sc.product_id, sc.sku, sc.product_name
+                    HAVING SUM(sc.qty_on_hand) > 0
                 ),
                 ranked_products AS (
                     SELECT ps.product_id, ps.sku, ps.product_name, ps.qty_on_hand, ps.stock_value,
@@ -214,8 +250,16 @@ namespace VAS.Controllers
                     cp.stock_value DESC,
                     cp.product_id";
 
+            /* The database layer binds positionally: one parameter per placeholder occurrence, in the
+               order they appear in the statement (cost_values first, then storage_cost). */
             SqlParameter[] parameters = new SqlParameter[]
             {
+                new SqlParameter("@Costing_Method", SqlDbType.VarChar) { Value = currency.CostingMethod },
+                new SqlParameter("@C_AcctSchema_ID", currency.AcctSchemaId),
+                new SqlParameter("@M_CostType_ID", currency.CostTypeId),
+                new SqlParameter("@Cost_Client_ID", ctx.GetAD_Client_ID()),
+                new SqlParameter("@Costing_Method2", SqlDbType.VarChar) { Value = currency.CostingMethod },
+                new SqlParameter("@M_CostElement_ID", currency.CostElementId),
                 new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
                 new SqlParameter("@M_Warehouse_ID", warehouseId)
             };
@@ -280,7 +324,11 @@ namespace VAS.Controllers
         {
             SchemaCurrency currency = new SchemaCurrency();
             string sql = @"
-                SELECT AcctSchema.C_Currency_ID,
+                SELECT ClientInfo.C_AcctSchema1_ID AS C_AcctSchema_ID,
+                       AcctSchema.C_Currency_ID,
+                       AcctSchema.M_CostType_ID,
+                       AcctSchema.M_CostElement_ID,
+                       COALESCE(NULLIF(AcctSchema.CostingMethod,''),'S') AS Costing_Method,
                        Currency.StdPrecision,
                        CASE WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol ELSE Currency.ISO_Code END AS Currency_Symbol,
                        Currency.ISO_Code AS Currency_ISO
@@ -297,6 +345,10 @@ namespace VAS.Controllers
                 reader = DB.ExecuteReader(sql, new SqlParameter[] { new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()) });
                 if (reader == null || !reader.Read()) { return currency; }
 
+                currency.AcctSchemaId = SafeInt(reader["C_AcctSchema_ID"]);
+                currency.CostTypeId = SafeInt(reader["M_CostType_ID"]);
+                currency.CostElementId = SafeInt(reader["M_CostElement_ID"]);
+                currency.CostingMethod = Util.GetValueOfString(reader["Costing_Method"]);
                 currency.CurrencyId = SafeInt(reader["C_Currency_ID"]);
                 currency.Symbol = Util.GetValueOfString(reader["Currency_Symbol"]);
                 currency.IsoCode = Util.GetValueOfString(reader["Currency_ISO"]);
@@ -351,6 +403,10 @@ namespace VAS.Controllers
 
         private class SchemaCurrency
         {
+            public int AcctSchemaId { get; set; }
+            public int CostTypeId { get; set; }
+            public int CostElementId { get; set; }
+            public string CostingMethod { get; set; }
             public int CurrencyId { get; set; }
             public string Symbol { get; set; }
             public string IsoCode { get; set; }

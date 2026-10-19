@@ -119,6 +119,8 @@
 
         var representativesData = [];
         var totalMonthValue = 0;
+        // Completed POs only (Closed excluded) - the denominator of the popup's "Share of month" card.
+        var totalMonthCompletedValue = 0;
         var totalMonthPOs = 0;
         var curSymbol = "₹";
         var curIso = "INR";
@@ -361,6 +363,7 @@
                         curIso = data.curIso || "INR";
                         stdPrecision = data.stdPrecision || 2;
                         totalMonthValue = data.totalMonthValue || 0;
+                totalMonthCompletedValue = data.totalMonthCompletedValue || 0;
                         totalMonthPOs = data.totalMonthPOs || 0;
                         representativesData = data.representatives || [];
                     } else {
@@ -610,7 +613,8 @@
 
             var rSpend = rObj ? rObj.value : 0;
             var rPOs = rObj ? rObj.pos : 0;
-            var rShare = rObj ? (rObj.share * 100).toFixed(1) + '%' : '0.0%';
+            // Share of month counts completed POs only (Widget_Bug_Fix Sr 145).
+            var rShare = rObj ? ((rObj.completedShare || 0) * 100).toFixed(1) + '%' : '0.0%';
             var rAvgCycle = rObj ? formatCycleText(rObj.avgCycle, rObj.avgCycleText) : '—';
 
             var statStripHtml = '<div class="vas-rwpo-mstats">' +
@@ -658,7 +662,10 @@
                     }
                     if (data.repTotalValue != null) {
                         $host.find('#vas_rwpo_stat_val').text(fmtMoney(data.repTotalValue)).attr('title', fmtMoney(data.repTotalValue));
-                        var sharePct = totalMonthValue > 0 ? ((data.repTotalValue / totalMonthValue) * 100).toFixed(1) + '%' : '0.0%';
+                    }
+                    if (data.repCompletedValue != null) {
+                        // Completed POs only, over the month's completed POs.
+                        var sharePct = totalMonthCompletedValue > 0 ? ((data.repCompletedValue / totalMonthCompletedValue) * 100).toFixed(1) + '%' : '0.0%';
                         $host.find('#vas_rwpo_stat_share').text(sharePct);
                     }
                     if (data.avgCycleText != null) {

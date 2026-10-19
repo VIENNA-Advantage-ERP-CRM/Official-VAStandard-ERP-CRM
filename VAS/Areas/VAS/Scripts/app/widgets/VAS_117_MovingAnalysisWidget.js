@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Moving Analysis Widget (Top Moving / Slow Moving)
  * Widget number 117 - reassign on hand-off.
  * Summary Message Table
@@ -25,7 +25,12 @@
  * 19 | On hand                                        | VAS_117_OnHand
  * 20 | Window                                         | VAS_117_Window
  * 21 | Last {0} days                                  | VAS_117_LastNDays
- * 22 | Close                                          | Close
+ * 22 | Close                                          | VAS_ClosePopup
+ * 23 | Showing only {0} fast moving and {0} slow      | VAS_117_TopNNote
+ *    | moving product details.                        |
+ *
+ * Widget_Bug_Fix 2026-10-15: #16 SKU -> "Product Code" and #20 Window -> "Velocity Period"
+ * are message-text changes on the server (keys unchanged); #23 is a new key.
  */
 ; VAS = window.VAS || {};
 
@@ -52,7 +57,7 @@
         var $modalBody;
         var modalEventNamespace = '.MPCMvModal';
         var eventNamespace = 'MPCMovingAnalysis';
-        var state = { mode: 'fast', fast: [], slow: [], fastWindow: 30, slowWindow: 90 };
+        var state = { mode: 'fast', fast: [], slow: [], fastWindow: 30, slowWindow: 90, maxRows: 5 };
 
         function label(key, fallback) {
             return VIS.Msg.getMsg(key);
@@ -60,6 +65,13 @@
 
         function format(key, fallback, token) {
             return label(key, fallback).replace('{0}', token);
+        }
+
+        // Footer note stating how many fast / slow movers are listed (Widget_Bug_Fix Sr 47).
+        // The message carries a {0} token for the count (it appears twice).
+        function footNote() {
+            return label('VAS_117_TopNNote', 'Showing only {0} fast moving and {0} slow moving product details.')
+                .replace(/\{0\}/g, state.maxRows);
         }
 
         function formatQty(value) {
@@ -137,9 +149,9 @@
             });
             $rows.html(html);
 
-            $footHelper.text(slow
-                ? label('VAS_117_SlowHelper', 'No / low issue activity - slow movers')
-                : label('VAS_117_FastHelper', 'Highest issue activity - fast movers'));
+            // With data on screen the footer states the list cap instead of the mover helper
+            // (Widget_Bug_Fix Sr 47); the helper text still shows when there is no data.
+            $footHelper.text(footNote());
         }
 
         function showError() {
@@ -175,6 +187,7 @@
                     state.slow = result.slow || [];
                     state.fastWindow = Number(result.fast_window_days) || 30;
                     state.slowWindow = Number(result.slow_window_days) || 90;
+                    state.maxRows = Number(result.max_rows_per_list) || 5;
                     render();
                 },
                 error: function (xhr, status) {
@@ -216,7 +229,7 @@
             $modalBadge = $modal.find('.MPC-mv-modal-badge');
             $modalBody = $modal.find('.MPC-mv-modal-body');
 
-            var closeText = label('Close', 'Close');
+            var closeText = label('VAS_ClosePopup', 'Close');
             $modal.find('.MPC-mv-modal-close').attr({ 'aria-label': closeText, title: closeText });
             $('body').append($modal);
 

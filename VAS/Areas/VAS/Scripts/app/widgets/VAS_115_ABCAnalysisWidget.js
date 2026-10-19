@@ -1,9 +1,11 @@
-/**
+﻿/**
  * ABC Analysis Widget (warehouse-level Pareto by current stock value)
  * Widget number 115 - reassign on hand-off.
  * Warehouse filter + three class rows (A/B/C) with value-contribution bars and a
  * class-detail modal. Classification (abc_class) comes from SQL; JS never
  * re-classifies. Backend - VAS_115_ABCAnalysisWidget/GetWarehouses, GetABCAnalysis
+ * Widget_Bug_Fix 2026-10-15: the warehouse filter is a larger custom dropdown whose list is
+ * height-limited and scrolls (was a native <select>); messages are shown in full with a tooltip.
  * Summary Message Table
  *  # | Current Text                                        | Message Key
  * ---+-----------------------------------------------------+-----------------------------
@@ -27,13 +29,13 @@
  * 18 | Stock Value                                         | VAS_115_StockValue
  * 19 | No active warehouse is available.                   | VAS_115_NoWarehouse
  * 20 | No on-hand stock is available for this warehouse.   | VAS_115_NoStock
- * 21 | Current cost is not available for the selected ...  | VAS_115_NoCost
+ * 21 | Current cost is not available for the selected ...  | VAS_115_NoCost (shown) / VAS_115_NoCostFull (hover: ...selected warehouse stock.)
  * 22 | Couldn't load                                       | VAS_CouldntLoad
  * 23 | Retry                                               | VAS_115_Retry
  * 24 | No items.                                           | VAS_115_NoItems
  * 25 | Showing / of                                        | VAS_Showing / VAS_Of
  * 26 | Previous page / Next page                           | VAS_PreviousPage / VAS_NextPage
- * 27 | Close                                               | Close
+ * 27 | Close                                               | VAS_ClosePopup
  */
 ; VAS = window.VAS || {};
 
@@ -48,6 +50,11 @@
         var $root = $('<div class="MPC-abc-root">');
         var $card;
         var $select;
+        var $ddText;
+        var $ddList;
+        var ddOpen = false;
+        var ddIndex = 0;
+        var ddScrollHandler = null;
         var $body;
         var $busy;
         var warehouseRequest;
@@ -136,18 +143,128 @@
             if ($busy) { $busy.toggleClass('MPC-abc-busy-hidden', !visible); }
         }
 
-        function messageHtml(text) {
-            return '<div class="MPC-abc-msg">' + escapeHtml(text) + '</div>';
+        // The message is shown in full (wrapped, never ellipsised) and also carried as a tooltip, so a
+        // long text can always be read on hover (Widget_Bug_Fix Sr 63).
+        // tip (optional) is the full text shown on hover when the displayed text is the short form.
+        function messageHtml(text, tip) {
+            return '<div class="MPC-abc-msg" title="' + escapeHtml(tip || text) + '">' + escapeHtml(text) + '</div>';
         }
 
         function retryHtml(text) {
-            return '<div class="MPC-abc-msg">' + escapeHtml(text) +
+            return '<div class="MPC-abc-msg" title="' + escapeHtml(text) + '">' + escapeHtml(text) +
                 '<button type="button" class="MPC-abc-retry">' + escapeHtml(label('VAS_115_Retry', 'Retry')) + '</button></div>';
         }
 
         // ---- warehouse dropdown ----
+        /* Custom dropdown (Widget_Bug_Fix Sr 62 / 64): a native <select> list cannot be height-limited,
+           so with many warehouses it ran off the screen unscrollable. The list is a fixed popover on
+           <body> (the card clips overflow) whose height is capped to the available room and scrolls. */
+        function selectedWarehouseName() {
+            for (var index = 0; index < state.warehouses.length; index++) {
+                if (Number(state.warehouses[index].warehouse_id) === state.warehouseId) {
+                    return String(state.warehouses[index].warehouse_name || '');
+                }
+            }
+            return '';
+        }
+
+        function updateDropdownText() {
+            var name = selectedWarehouseName();
+            $ddText.text(name);
+            $select.attr('title', name);
+        }
+
+        function renderDropdownOptions() {
+            var html = '';
+            state.warehouses.forEach(function (warehouse, index) {
+                var id = Number(warehouse.warehouse_id);
+                var name = String(warehouse.warehouse_name || '');
+                html += '<div class="MPC-abc-dd-opt' + (id === state.warehouseId ? ' is-selected' : '') + '" role="option" aria-selected="' + (id === state.warehouseId ? 'true' : 'false') + '" data-index="' + index + '" title="' + escapeHtml(name) + '">' + escapeHtml(name) + '</div>';
+            });
+            $ddList.html(html);
+        }
+
+        function positionDropdown() {
+            if (!$ddList || !$select) { return; }
+            var rect = $select[0].getBoundingClientRect();
+            var gap = 4;
+            // The list must stay inside the widget: its height is capped by the room between the button and the
+            // widget's own bottom (or top, when flipped above), and never exceeds the widget height itself.
+            var cardRect = $card[0].getBoundingClientRect();
+            var spaceBelow = Math.min(window.innerHeight, cardRect.bottom) - rect.bottom - gap - 8;
+            var spaceAbove = rect.top - Math.max(0, cardRect.top) - gap - 8;
+            var natural = $ddList[0].scrollHeight;
+            var openAbove = natural > spaceBelow && spaceAbove > spaceBelow;
+            var room = Math.max(openAbove ? spaceAbove : spaceBelow, 96);
+            // Width: at least the button's, grown to fit the longest warehouse name (so names are not cut
+            // off), but never wider than the widget; right-aligned to the button and kept inside the widget.
+            var minWidth = Math.max(Math.round(rect.width), 160);
+            var maxWidth = Math.max(minWidth, Math.round(cardRect.width) - 16);
+            $ddList.css({ width: 'max-content', minWidth: minWidth + 'px', maxWidth: maxWidth + 'px' });
+            var width = Math.min(Math.max(Math.round($ddList[0].getBoundingClientRect().width), minWidth), maxWidth);
+            var left = Math.round(rect.right) - width;
+            left = Math.max(left, Math.round(cardRect.left) + 8);
+            left = Math.min(left, window.innerWidth - width - 8);
+
+            $ddList.css({
+                left: Math.max(8, left) + 'px',
+                maxHeight: Math.min(room, Math.round(cardRect.height), 300) + 'px'
+            });
+            if (openAbove) {
+                $ddList.css({ top: 'auto', bottom: Math.round(window.innerHeight - rect.top + gap) + 'px' });
+            } else {
+                $ddList.css({ bottom: 'auto', top: Math.round(rect.bottom + gap) + 'px' });
+            }
+        }
+
+        function highlightOption(index, scrollIntoView) {
+            ddIndex = index;
+            var $options = $ddList.children('.MPC-abc-dd-opt');
+            $options.removeClass('is-active');
+            var $active = $options.eq(index).addClass('is-active');
+            if (scrollIntoView && $active.length) {
+                var list = $ddList[0];
+                var option = $active[0];
+                if (option.offsetTop < list.scrollTop) { list.scrollTop = option.offsetTop; }
+                else if (option.offsetTop + option.offsetHeight > list.scrollTop + list.clientHeight) {
+                    list.scrollTop = option.offsetTop + option.offsetHeight - list.clientHeight;
+                }
+            }
+        }
+
+        function openDropdown() {
+            if (ddOpen || $select.prop('disabled') || !state.warehouses.length) { return; }
+            ddOpen = true;
+            renderDropdownOptions();
+            $ddList.addClass('is-open');
+            $select.attr('aria-expanded', 'true');
+            positionDropdown();
+            var selectedIndex = 0;
+            state.warehouses.forEach(function (w, i) { if (Number(w.warehouse_id) === state.warehouseId) { selectedIndex = i; } });
+            highlightOption(selectedIndex, true);
+        }
+
+        function closeDropdown() {
+            if (!ddOpen) { return; }
+            ddOpen = false;
+            if ($ddList) { $ddList.removeClass('is-open'); }
+            if ($select) { $select.attr('aria-expanded', 'false'); }
+        }
+
+        function chooseWarehouse(index) {
+            var warehouse = state.warehouses[index];
+            closeDropdown();
+            if (!warehouse) { return; }
+            var id = Number(warehouse.warehouse_id);
+            if (!id || id === state.warehouseId) { return; }
+            state.warehouseId = id;
+            updateDropdownText();
+            loadABC();
+        }
+
         function loadWarehouses() {
             $select.prop('disabled', true);
+            closeDropdown();
             setBusy(true);
             if (warehouseRequest && warehouseRequest.readyState !== 4) { warehouseRequest.abort(); }
 
@@ -164,22 +281,19 @@
 
                     state.warehouses = result.rows || [];
                     if (!state.warehouses.length) {
-                        $select.empty().prop('disabled', true);
+                        $ddText.text('');
+                        $select.removeAttr('title').prop('disabled', true);
                         $body.html(messageHtml(label('VAS_115_NoWarehouse', 'No active warehouse is available.')));
                         setBusy(false);
                         return;
                     }
 
-                    var options = '';
-                    state.warehouses.forEach(function (warehouse) {
-                        options += '<option value="' + escapeHtml(warehouse.warehouse_id) + '">' + escapeHtml(warehouse.warehouse_name) + '</option>';
-                    });
-                    $select.html(options).prop('disabled', false);
+                    $select.prop('disabled', false);
 
                     // Prefer a context warehouse when one is available, else first.
                     var contextWarehouse = resolveContextWarehouse();
                     state.warehouseId = contextWarehouse || Number(state.warehouses[0].warehouse_id);
-                    $select.val(String(state.warehouseId));
+                    updateDropdownText();
                     loadABC();
                 },
                 error: function (xhr, status) {
@@ -255,7 +369,8 @@
             }
             // Stock exists but no cost, so this is not a valid Pareto distribution.
             if (totalValue <= 0) {
-                $body.html(messageHtml(label('VAS_115_NoCost', 'Current cost is not available for the selected warehouse stock.')));
+                // Short text is shown; the full sentence appears on hover (key VAS_115_NoCostFull).
+                $body.html(messageHtml(label('VAS_115_NoCost', 'Current cost is not available for the selected ...'), label('VAS_115_NoCostFull', 'Current cost is not available for the selected warehouse stock.')));
                 return;
             }
             $body.html(renderRows());
@@ -324,7 +439,7 @@
             $modalBadge = $modal.find('.MPC-abc-modal-badge');
             $modalBody = $modal.find('.MPC-abc-modal-body');
 
-            var closeText = label('Close', 'Close');
+            var closeText = label('VAS_ClosePopup', 'Close');
             $modal.find('.MPC-abc-modal-close').attr({ 'aria-label': closeText, title: closeText });
             $('body').append($modal);
 
@@ -453,7 +568,10 @@
                             '<span class="MPC-abc-sub"></span>' +
                         '</span>' +
                         '<span class="MPC-abc-spacer"></span>' +
-                        '<select class="MPC-abc-select"></select>' +
+                        '<button type="button" class="MPC-abc-select" aria-haspopup="listbox" aria-expanded="false" disabled>' +
+                            '<span class="MPC-abc-select-text"></span>' +
+                            '<svg class="MPC-abc-select-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>' +
+                        '</button>' +
                     '</div>' +
                     '<div class="MPC-abc-body"></div>' +
                     '<div class="vis-busyindicatorouterwrap"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>' +
@@ -463,17 +581,54 @@
             $card.find('.MPC-abc-title').text(label('VAS_115_ABCAnalysis', 'ABC Analysis'));
             $card.find('.MPC-abc-sub').text(label('VAS_115_ABCSub', 'Value contribution by class'));
             $select = $card.find('.MPC-abc-select').attr('aria-label', label('VAS_115_Warehouse', 'Warehouse'));
+            $ddText = $card.find('.MPC-abc-select-text');
+            $ddList = $('<div class="MPC-abc-dd-list" role="listbox"></div>').attr('aria-label', label('VAS_115_Warehouse', 'Warehouse'));
+            $('body').append($ddList);
             $body = $card.find('.MPC-abc-body');
             $busy = $card.find('.vis-busyindicatorouterwrap');
 
             modalEventNamespace += '-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget');
+            var ddNamespace = '.MPCAbcDd-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget');
 
-            $select.on('change.' + eventNamespace, function () {
-                var id = Number($(this).val());
-                if (!id || id === state.warehouseId) { return; }
-                state.warehouseId = id;
-                loadABC();
+            $select.on('click.' + eventNamespace, function () {
+                if (ddOpen) { closeDropdown(); } else { openDropdown(); }
             });
+            $select.on('keydown.' + eventNamespace, function (event) {
+                var last = state.warehouses.length - 1;
+                if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    if (!ddOpen) { openDropdown(); return; }
+                    var next = ddIndex + (event.key === 'ArrowDown' ? 1 : -1);
+                    highlightOption(Math.min(Math.max(next, 0), last), true);
+                } else if ((event.key === 'Enter' || event.key === ' ') && ddOpen) {
+                    event.preventDefault();
+                    chooseWarehouse(ddIndex);
+                } else if (event.key === 'Escape' && ddOpen) {
+                    event.preventDefault();
+                    closeDropdown();
+                }
+            });
+            $ddList.on('mousedown', '.MPC-abc-dd-opt', function (event) {
+                event.preventDefault();
+                chooseWarehouse(Number($(this).attr('data-index')));
+            });
+            $ddList.on('mousemove', '.MPC-abc-dd-opt', function () {
+                var index = Number($(this).attr('data-index'));
+                if (index !== ddIndex) { highlightOption(index, false); }
+            });
+            $(document).on('mousedown' + ddNamespace, function (event) {
+                if (!ddOpen) { return; }
+                if (!$(event.target).closest('.MPC-abc-select, .MPC-abc-dd-list').length) { closeDropdown(); }
+            });
+            $(window).on('resize' + ddNamespace, closeDropdown);
+            // Fixed popover: close it when anything but the list itself scrolls, so it never hangs
+            // at its old screen position after the dashboard moves.
+            ddScrollHandler = function (event) {
+                if (!ddOpen) { return; }
+                if (event.target && $ddList[0] && $ddList[0].contains(event.target)) { return; }
+                closeDropdown();
+            };
+            document.addEventListener('scroll', ddScrollHandler, true);
 
             $root.on('click.' + eventNamespace, '.MPC-abc-row', function () {
                 openModal($(this).attr('data-cls'), $(this));
@@ -499,6 +654,14 @@
             if (abcRequest && abcRequest.readyState !== 4) { abcRequest.abort(); }
             $root.off('.' + eventNamespace);
             if ($select) { $select.off('.' + eventNamespace); }
+            var ddNamespace = '.MPCAbcDd-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget');
+            if (ddScrollHandler) {
+                document.removeEventListener('scroll', ddScrollHandler, true);
+                ddScrollHandler = null;
+            }
+            $(document).off('mousedown' + ddNamespace);
+            $(window).off('resize' + ddNamespace);
+            if ($ddList) { $ddList.remove(); $ddList = null; }
             $(document).off('keydown' + modalEventNamespace);
             if ($modal) { $modal.remove(); $modal = null; }
             $root.remove();

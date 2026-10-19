@@ -415,6 +415,11 @@
     align-items: center;
 }
 
+/* No product in the list has an attribute value -> Attributes column omitted. */
+.MPC-cst-m-row.MPC-cst-m-noattrs {
+    grid-template-columns: 1.8fr 0.9fr 0.9fr;
+}
+
 .MPC-cst-m-ghead {
     font-size: 0.8125em;
     color: #748494;

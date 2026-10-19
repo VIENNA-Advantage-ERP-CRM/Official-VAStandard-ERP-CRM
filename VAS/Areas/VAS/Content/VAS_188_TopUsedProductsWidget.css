@@ -170,7 +170,10 @@
        overflow:hidden on .vas-tup-body - the pager said 4, the 4th was cut in half.
        min-height: 0 is what actually permits the shrink; without it a flex item refuses to go below
        its content height and the clipping returns. Same fix as .vas-mcw-row / .vas-riu-row. */
-    flex: 1 1 0;
+    /* FIXED row slot: one quarter of the body (4 rows per page, no gap), so 1-3 records keep the
+       same row height as a full page and sit at the top instead of stretching. */
+    flex: 0 1 25%;
+    max-height: 25%;
     min-height: 0;
     padding: .4em 0;
     border-bottom: 1px solid #E2EAF1;

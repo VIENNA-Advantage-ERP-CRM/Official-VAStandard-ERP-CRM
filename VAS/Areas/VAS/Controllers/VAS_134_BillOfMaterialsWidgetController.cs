@@ -47,6 +47,12 @@ namespace VAS.Controllers
     /// Widget number 134.
     /// Chronological development:
     ///   &lt;EmpCode&gt;   2026-07-21 Created
+    ///   Claude       2026-10-15 Widget_Bug_Fix Sr 36: "updated Nh ago" was wrong by the DB/browser
+    ///                           timezone gap (Updated is stamped by the database clock, which can run in
+    ///                           UTC) - each row now carries updatedAgeMinutes, measured on the database
+    ///                           clock, and the widget shows that instead of comparing with the browser's
+    ///                           clock. Sr 37: "Products in BOM" list ordering - most
+    ///                           recently added BOM component first (see GetProductsInBom).
     /// </summary>
     public class VAS_134_BillOfMaterialsWidgetController : Controller
     {
@@ -140,7 +146,8 @@ namespace VAS.Controllers
 
         /// <summary>
         /// Returns one page (2-8 rows) of distinct products used as active
-        /// BOM components, ranked by distinct-BOM usage count descending.
+        /// BOM components, the most recently added component first (MAX of its
+        /// M_BOMProduct.Created), then distinct-BOM usage count descending.
         /// </summary>
         /// <param name="offset">Zero-based result offset.</param>
         /// <param name="pageSize">Requested page size; clamped to 2-8.</param>
@@ -164,7 +171,8 @@ namespace VAS.Controllers
             {
                 string productUsage = @"
                     SELECT cp.M_Product_ID AS product_id, cp.Name AS product_name, cp.Value AS product_code,
-                           pc.Name AS product_category, COUNT(DISTINCT b.M_BOM_ID) AS bom_count
+                           pc.Name AS product_category, COUNT(DISTINCT b.M_BOM_ID) AS bom_count,
+                           MAX(bp.Created) AS last_used
                     FROM M_BOMProduct bp
                     JOIN M_BOM b ON (b.M_BOM_ID = bp.M_BOM_ID AND b.AD_Client_ID = bp.AD_Client_ID AND b.IsActive = 'Y')
                     JOIN M_Product assembly ON (assembly.M_Product_ID = b.M_Product_ID AND assembly.AD_Client_ID = b.AD_Client_ID AND assembly.IsActive = 'Y' AND assembly.IsBOM = 'Y')
@@ -184,7 +192,7 @@ namespace VAS.Controllers
                         SELECT pu.product_id, pu.product_name, pu.product_code, pu.product_category, pu.bom_count,
                             COUNT(*) OVER () AS total_count,
                             ROW_NUMBER() OVER (
-                                ORDER BY pu.bom_count DESC, pu.product_name ASC, pu.product_id ASC
+                                ORDER BY pu.last_used DESC, pu.bom_count DESC, pu.product_name ASC, pu.product_id ASC
                             ) AS row_num
                         FROM product_usage pu
                     )
@@ -318,6 +326,8 @@ namespace VAS.Controllers
 
                 List<object> rows = new List<object>();
                 int total = 0, notVerifiedCount = 0;
+                // "x ago" is measured on the DATABASE clock (see GetDbNow), not the web server's or the browser's.
+                DateTime? dbNow = GetDbNow();
 
                 IDataReader dr = null;
                 try
@@ -328,6 +338,9 @@ namespace VAS.Controllers
                         total = Util.GetValueOfInt(dr["total_count"]);
                         notVerifiedCount = Util.GetValueOfInt(dr["not_verified_count"]);
                         DateTime? updatedAt = Util.GetValueOfDateTime(dr["updated_at"]);
+                        int? ageMinutes = (updatedAt.HasValue && dbNow.HasValue)
+                            ? (int?)Math.Max(0, (int)Math.Floor((dbNow.Value - updatedAt.Value).TotalMinutes))
+                            : null;
                         rows.Add(new
                         {
                             bomId = Util.GetValueOfInt(dr["bom_id"]),
@@ -339,7 +352,8 @@ namespace VAS.Controllers
                             isVerified = "Y".Equals(Util.GetValueOfString(dr["is_verified"]), StringComparison.OrdinalIgnoreCase),
                             updatedById = Util.GetValueOfInt(dr["updated_by_id"]),
                             updatedByName = Util.GetValueOfString(dr["updated_by_name"]),
-                            updatedAt = updatedAt.HasValue ? updatedAt.Value.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) : ""
+                            updatedAt = updatedAt.HasValue ? updatedAt.Value.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) : "",
+                            updatedAgeMinutes = ageMinutes
                         });
                     }
                 }
@@ -354,6 +368,20 @@ namespace VAS.Controllers
             {
                 return Fail(Msg.GetMsg(ctx, "Error") ?? "Error");
             }
+        }
+
+        /// <summary>
+        /// Current time on the DATABASE clock, the clock that stamps Created / Updated (the Receipt Queue
+        /// widget already documents it: the DB can run in UTC while the web server and the users sit in
+        /// other zones). Comparing a stored timestamp with the web server's or the browser's "now" is off by
+        /// the zone gap - a record saved moments ago read "5h ago". Age = this value - stored timestamp.
+        /// </summary>
+        private static DateTime? GetDbNow()
+        {
+            string sql = DB.IsPostgreSQL() ? "SELECT LOCALTIMESTAMP"
+                       : DB.IsOracle() ? "SELECT SYSDATE FROM DUAL"
+                       : "SELECT NOW()";
+            return Util.GetValueOfDateTime(DB.ExecuteScalar(sql, new SqlParameter[0], null));
         }
 
         /// <summary>Wraps a success payload as a serialized JSON result.</summary>

@@ -271,7 +271,10 @@
     display: flex;
     align-items: center;
     gap: .4em;
-    font-size: .8125em;
+    /* Matched to VAS_183_MaterialConsumptionWidget's .vas-mcw-pager (user request: "paging icon
+       design should match with other widgets") - was .8125em, which made the "1 of N" label
+       visibly larger than the sibling Consumption widget's pager. */
+    font-size: .75em;
     color: #102C3F;
     font-weight: 500;
 }
@@ -284,9 +287,9 @@
 .vas-hvu-pager-btn {
     width: 24px;
     height: 24px;
-    border: 1px solid #D9E2EB;
+    border: 1px solid #E4EDF4;
     border-radius: 6px;
-    background: #fff;
+    background: rgba(255, 255, 255, 0.9);
     color: #0083DA;
     display: inline-flex;
     align-items: center;
@@ -304,11 +307,16 @@
         outline: none;
     }
 
-/* Pager text sits inside .vas-hvu-pager, which carries the .8125em scale. */
+/* Pager text sits inside .vas-hvu-pager, which carries the .75em scale. No min-width here so the
+   "1 of N" label hugs the buttons exactly like the Consumption widget; the popup pager keeps its
+   own min-width (.vas-hvu-m-pager-txt rules) so "Page 10 of 10" doesn't shift its buttons. */
 .vas-hvu-pager-txt {
-    min-width: 6.5em;
     text-align: center;
     white-space: nowrap;
+}
+
+.vas-hvu-m-pager-txt {
+    min-width: 6.5em;
 }
 
     .vas-hvu-pager-btn:disabled {

@@ -73,6 +73,7 @@
                     var width = entries[i].contentRect.width;
                     if (width > 0) {
                         $root[0].style.setProperty('--widget-inline-size', width + 'px');
+                        $root[0].style.setProperty('--widget-block-size', entries[i].contentRect.height + 'px');
                     }
                 }
             });
@@ -81,19 +82,6 @@
 
         /* DocStatus list matching backend predicate exactly ('DP', 'UC') */
         var UNDER_CONFIRMATION_STATUS_LIST = "'DP', 'UC'";
-
-        function openTransferList() {
-            var where =
-                "MMovement.IsActive = 'Y'" +
-                " AND MMovement.DocStatus IN (" + UNDER_CONFIRMATION_STATUS_LIST + ")";
-
-            var windowParam = {
-                "TabWhereClause": where,
-                "TabLayout": "N",
-                "TabIndex": "0"
-            };
-            $self.widgetFirevalueChanged(windowParam);
-        }
 
         this.Initalize = function () {
             createWidget();
@@ -243,15 +231,14 @@
             var metaText = lbl("VAS_169_AwaitingConfirmation", "Awaiting confirmation");
 
             var $card = $(
-                '<button type="button" class="vas-under-confirmation-card" aria-label="' + escapeHtml(title) + '">' +
+                '<div class="vas-under-confirmation-card" aria-label="' + escapeHtml(title) + '">' +
                 '<div class="vas-under-confirmation-label">' + escapeHtml(title) + '</div>' +
                 '<div class="vas-under-confirmation-value">—</div>' +
                 '<div class="vas-under-confirmation-meta">' + escapeHtml(metaText) + '</div>' +
-                '</button>'
+                '</div>'
             );
 
-            $card.on('click', function () { openTransferList(); });
-
+            
             $valueEl = $card.find('.vas-under-confirmation-value');
             $metaEl = $card.find('.vas-under-confirmation-meta');
 

@@ -111,6 +111,8 @@ namespace VIS.Models
             ProductID = Util.GetValueOfInt(paramValue[1].ToString());
             Attribute_ID = Util.GetValueOfInt(paramValue[2].ToString());
             UOM_ID = Util.GetValueOfInt(paramValue[3].ToString());
+            // optional 5th parameter "Y" - use the selected UOM instead of the Sales UOM of product
+            bool useSelectedUOM = paramValue.Length > 4 && paramValue[4] == "Y" && UOM_ID > 0;
             Dictionary<string, object> result = null;
             string Sql = $@"SELECT
 	PriceList,
@@ -130,13 +132,18 @@ WHERE
 	AND M_Product_ID = {ProductID}
 	AND NVL(M_AttributeSetInstance_ID, 0)= {Attribute_ID}";
 
-          
+
             //VAI050-Give priority to Sales UOM  On Product
 
             string query = "SELECT C_UOM_ID,VAS_SalesUOM_ID FROM M_Product WHERE M_Product_ID= " + ProductID;
             DataSet ds1 = DB.ExecuteDataset(query, null, null);
 
-            if (ds1 != null && ds1.Tables.Count > 0 && ds1.Tables[0].Rows.Count > 0)
+            string priceSqlWithoutUOM = Sql;
+            if (useSelectedUOM)
+            {
+                Sql += " AND C_UOM_ID=" + UOM_ID;
+            }
+            else if (ds1 != null && ds1.Tables.Count > 0 && ds1.Tables[0].Rows.Count > 0)
             {
                 if (Util.GetValueOfInt(ds1.Tables[0].Rows[0]["VAS_SalesUOM_ID"]) > 0)
                 {
@@ -171,6 +178,33 @@ WHERE
                 result["PriceStd"] = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["PriceStd"]);
                 result["PriceLimit"] = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["PriceLimit"]);
                 result["C_UOM_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_UOM_ID"]);
+            }
+            else if (useSelectedUOM && ds1 != null && ds1.Tables.Count > 0 && ds1.Tables[0].Rows.Count > 0)
+            {
+                // No price for the selected UOM on M_ProductPrice - take the price of the product's
+                // base UOM and convert it to the selected UOM using C_UOM_Conversion
+                int baseUOM_ID = Util.GetValueOfInt(ds1.Tables[0].Rows[0]["C_UOM_ID"]);
+                if (baseUOM_ID > 0 && baseUOM_ID != UOM_ID)
+                {
+                    DataSet dsBase = DB.ExecuteDataset(priceSqlWithoutUOM + " AND C_UOM_ID=" + baseUOM_ID, null, null);
+                    if (dsBase != null && dsBase.Tables.Count > 0 && dsBase.Tables[0].Rows.Count > 0)
+                    {
+                        DataRow dr = dsBase.Tables[0].Rows[0];
+                        // price is per product UOM, so it is converted with ConvertProductFrom (price of 1 selected UOM)
+                        Decimal? priceList = MUOMConversion.ConvertProductFrom(ctx, ProductID, UOM_ID, Util.GetValueOfDecimal(dr["PriceList"]));
+                        Decimal? priceStd = MUOMConversion.ConvertProductFrom(ctx, ProductID, UOM_ID, Util.GetValueOfDecimal(dr["PriceStd"]));
+                        Decimal? priceLimit = MUOMConversion.ConvertProductFrom(ctx, ProductID, UOM_ID, Util.GetValueOfDecimal(dr["PriceLimit"]));
+                        // null means no conversion is defined between the two UOMs
+                        if (priceList != null && priceStd != null && priceLimit != null)
+                        {
+                            result = new Dictionary<string, object>();
+                            result["PriceList"] = priceList.Value;
+                            result["PriceStd"] = priceStd.Value;
+                            result["PriceLimit"] = priceLimit.Value;
+                            result["C_UOM_ID"] = UOM_ID;
+                        }
+                    }
+                }
             }
 
             return result;
