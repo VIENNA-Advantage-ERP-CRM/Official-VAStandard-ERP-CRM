@@ -972,7 +972,7 @@ namespace ModelLibrary.Classes
                               INNER JOIN VADMS_MetaData meta ON(meta.VADMS_Document_ID = dlink.VADMS_Document_ID)
                                WHERE dlink.AD_Table_ID =" + FromTableID + " AND dlink.record_ID =" + FromRecordID;
             DataSet ds = DB.ExecuteDataset(query);
-            if (ds == null && ds.Tables.Count == 0 && ds.Tables[0].Rows.Count == 0)
+            if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
             {
                 return;
             }

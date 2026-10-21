@@ -73,6 +73,23 @@ namespace VAdvantage.Model
         }
 
         /// <summary>
+        /// Organization level numbering needs the column that holds the record's organisation
+        /// </summary>
+        /// <param name="newRecord">new record</param>
+        /// <returns>false if organization level numbering is ticked without an Org Column</returns>
+        protected override bool BeforeSave(bool newRecord)
+        {
+            if (Get_ColumnIndex("IsOrgLevelSequence") >= 0 && Get_ColumnIndex("OrgColumn") >= 0
+                && Util.GetValueOfBool(Get_Value("IsOrgLevelSequence"))
+                && string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("OrgColumn")).Trim()))
+            {
+                log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_SerNoOrgColumnRequired"));
+                return false;
+            }
+            return true;
+        }
+
+        /// <summary>
         /// Create Organization level Sequence No from Serial No Control
         /// </summary>
         /// <param name="po"></param>
@@ -119,6 +136,11 @@ namespace VAdvantage.Model
                 {
                     docOrg_ID = Util.GetValueOfInt(po.Get_Value(orgColumn));
                 }
+                else if (isUseOrgLevel && po != null)
+                {
+                    // no Org Column defined: number per the organisation of the record itself instead of one shared counter
+                    docOrg_ID = po.GetAD_Org_ID();
+                }
 
                 if (isUseOrgLevel)
                 {
@@ -132,11 +154,11 @@ namespace VAdvantage.Model
                         string _suffix = Convert.ToString(rs.Tables[0].Rows[0]["suffix"]);
 
                         // if any of these fields contains data, then override parent tab's data....
-                        if (!string.IsNullOrEmpty(_prefix) || !string.IsNullOrEmpty(_suffix))
-                        {
+                        // each one overrides independently, so filling in only one does not blank the other
+                        if (!string.IsNullOrEmpty(_prefix))
                             prefix = _prefix;
+                        if (!string.IsNullOrEmpty(_suffix))
                             suffix = _suffix;
-                        }
                     }
                 }
                 else
@@ -177,6 +199,8 @@ namespace VAdvantage.Model
                     else    // standard
                     {
                         log.Warning("(Serial No)- no record found - " + GetName());
+                        // tell the user instead of silently returning no serial number (control missing or inactive)
+                        log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_SerNoControlNotFound"));
                         next = -2;
                     }
                 }

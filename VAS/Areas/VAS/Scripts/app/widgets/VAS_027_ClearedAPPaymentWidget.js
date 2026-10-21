@@ -1484,7 +1484,7 @@
                     if (!started) {
                         showActionError(
                             lbl(
-                                'VAS_027_ReconciliationWindowNotConfigured',
+                                'VAS_027_ReconWindowNotConfigure',
                                 'Payment reconciliation window is not configured'
                             )
                         );
