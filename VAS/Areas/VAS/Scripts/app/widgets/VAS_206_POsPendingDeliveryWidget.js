@@ -700,9 +700,12 @@
                     var totalOrderValue = 0;
 
                     lines.forEach(function (l) {
+                        totalOrderValue += Number(l.LineNetAmt || 0);
+                        // Same rule as the widget total: Item-type products only, so charge /
+                        // non-Item lines (shown as dashes) add nothing to ordered or pending.
+                        if (l.IsNonStock || l.isNonStock) { return; }
                         totalOrderedQty += Number(l.OrderedQty || 0);
                         totalPendingQty += Number(l.PendingQty || 0);
-                        totalOrderValue += Number(l.LineNetAmt || 0);
                     });
 
                     var curSym = (lines.length > 0 && lines[0].CurrencySymbol) ? lines[0].CurrencySymbol : '';
@@ -836,6 +839,7 @@
                             var totalOrderedQty = 0;
                             var totalPendingQty = 0;
                             lines.forEach(function (l) {
+                                if (l.IsNonStock || l.isNonStock) { return; }
                                 totalOrderedQty += Number(l.OrderedQty || 0);
                                 totalPendingQty += Number(l.PendingQty || 0);
                             });

@@ -557,6 +557,11 @@
     color: #9A6500;
 }
 
+.vas-207-chip-orange {
+    background: #FFE8D1;
+    color: #B45309;
+}
+
 /* Table Footer / Pager */
 .vas-207-mtfoot {
     display: flex;

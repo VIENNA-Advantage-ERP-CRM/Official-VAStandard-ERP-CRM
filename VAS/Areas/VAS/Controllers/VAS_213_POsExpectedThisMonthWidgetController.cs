@@ -104,6 +104,13 @@ namespace VIS.Controllers
                 DateTime monthStart = new DateTime(targetYear, targetMonth, 1, 0, 0, 0);
                 DateTime monthEndExclusive = monthStart.AddMonths(1);
 
+                // Only POs still expected: the expected (promised) date is today or later, so
+                // earlier days of the month (already overdue) are not listed.
+                if (monthStart < today)
+                {
+                    monthStart = today;
+                }
+
                 DateTime todayPlus7 = today.AddDays(7);
 
                 // Step 3: Query Open POs Expected in the target month window
@@ -149,7 +156,7 @@ namespace VIS.Controllers
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
                       AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
-                      AND o.DocStatus NOT IN ('DR', 'IP', 'VO', 'RE')
+                      AND o.DocStatus = 'CO'
                       AND o.DatePromised >= @P_MONTH_START
                       AND o.DatePromised < @P_MONTH_END_EXCLUSIVE
                       AND q.ordered_qty > q.delivered_qty
@@ -255,6 +262,8 @@ namespace VIS.Controllers
                         // Document status display label
                         string docStatusText = docStatus == "DR" ? (Msg.GetMsg(ctx, "Drafted") ?? "Drafted")
                             : docStatus == "IP" ? (Msg.GetMsg(ctx, "InProcess") ?? "In process")
+                            : docStatus == "CO" ? (Msg.GetMsg(ctx, "Completed") ?? "Completed")
+                            : docStatus == "CL" ? (Msg.GetMsg(ctx, "Closed") ?? "Closed")
                             : (Msg.GetMsg(ctx, "DocStatus_" + docStatus) ?? docStatus);
                         string docStatusChip = docStatus == "IP" ? "chip-prop" : "chip-neutral";
 

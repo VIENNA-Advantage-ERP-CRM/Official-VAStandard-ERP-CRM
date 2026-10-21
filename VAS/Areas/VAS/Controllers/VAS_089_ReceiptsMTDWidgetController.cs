@@ -15,8 +15,8 @@ namespace VIS.Controllers
     /// Module Name : Receipts MTD (Material Receipt / GRN dashboard KPI)
     /// Purpose     : KPI = COUNT of vendor material receipts (M_InOut, IsSOTrx 'N',
     ///               MovementType 'V+') for the current calendar month-to-date, with the
-    ///               previous calendar month's count for comparison. Reversed/Voided (RE, VO)
-    ///               documents are excluded. Read-only, header-level count (never
+    ///               previous calendar month's count for comparison. Only Completed/Closed (CO, CL)
+    ///               documents are counted (drafts, in-progress, reversed and voided are excluded). Read-only, header-level count (never
     ///               joins M_InOutLine). Tenant/organization scope comes from
     ///               MRole, applied to the single physical table M_InOut.
     /// Chronological development:
@@ -67,7 +67,7 @@ namespace VIS.Controllers
                 WHERE MInOut.IsActive = 'Y'
                   AND MInOut.IsSOTrx = 'N'
                   AND MInOut.MovementType = 'V+'
-                  AND MInOut.DocStatus NOT IN ('RE', 'VO')
+                  AND MInOut.DocStatus IN ('CO', 'CL')
                   AND MInOut.MovementDate >= @RangeStart
                   AND MInOut.MovementDate < @RangeEndNext";
 

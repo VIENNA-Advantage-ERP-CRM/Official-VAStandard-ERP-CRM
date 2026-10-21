@@ -7,7 +7,7 @@
  *  #  | Fallback Text                                    | Message Key
  * ----+--------------------------------------------------+-----------------------------------
  *  1  | Adjustment Wise Count                            | VAS_162_AdjustmentWiseCount
- *  2  | As-on-Date Count                                 | VAS_162_AsOnDateCount
+ *  2  | As On Date Count                                 | VAS_162_AsOnDateCount
  *  3  | Quantity Difference                              | VAS_162_QuantityDifference
  *  4  | Total Count Sessions                             | VAS_162_TotalCountSessions
  *  5  | Net Difference Qty                               | VAS_162_NetDifferenceQty
@@ -20,7 +20,7 @@
  * 12  | No adjustment records available                  | VAS_162_NoAdjustmentRecords
  * 13  | Unable to load adjustment summary                | VAS_162_UnableToLoadAdjSummary
  * 14  | As on Date Count Tile                            | VAS_162_AsOnDateCountTileAria
- * 15  | As on Date Count                                 | VAS_162_AsOnDateCountLabel
+ * 15  | As On Date Count                                 | VAS_162_AsOnDateCountLabel
  * 16  | Loading...                                       | VAS_162_Loading
  * 17  | Quantity Difference Tile                         | VAS_162_QuantityDifferenceTileAria
  * 18  | No adjustments this period                       | VAS_162_NoAdjustmentsThisPeriod
