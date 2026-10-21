@@ -1943,6 +1943,81 @@ namespace VASLogic.Models
             return d;
         }
 
+        /// <summary>
+        /// The purchase-order line a product / charge is received against (21-Oct-2026).
+        /// The line's current Order Line is kept when it is for the same product / charge;
+        /// otherwise the first line (in line order) whose open quantity covers the quantity,
+        /// else the first with anything open. When the receipt names a purchase order only
+        /// its lines are considered; without one, the open lines of the receipt's vendor's
+        /// completed orders. Empty (C_OrderLine_ID = 0) when nothing matches - the panel
+        /// then leaves the Order Line blank.
+        /// </summary>
+        /// <param name="ctx">session context</param>
+        /// <param name="M_InOut_ID">receipt</param>
+        /// <param name="M_Product_ID">product on the line, or 0</param>
+        /// <param name="C_Charge_ID">charge on the line, or 0</param>
+        /// <param name="qty">quantity entered on the line</param>
+        /// <param name="currentOrderLineId">Order Line the line carries now, or 0</param>
+        /// <returns>the matching line, or an empty item</returns>
+        public ReceiptOrderLineData FindOrderLine(Ctx ctx, int M_InOut_ID, int M_Product_ID, int C_Charge_ID,
+            decimal qty, int currentOrderLineId)
+        {
+            ReceiptOrderLineData none = new ReceiptOrderLineData();
+            if (M_InOut_ID <= 0 || (M_Product_ID <= 0 && C_Charge_ID <= 0)) return none;
+
+            if (currentOrderLineId > 0)
+            {
+                ReceiptOrderLineData cur = GetOrderLine(ctx, M_InOut_ID, currentOrderLineId);
+                if (cur.C_OrderLine_ID > 0
+                    && ((M_Product_ID > 0 && cur.M_Product_ID == M_Product_ID)
+                        || (M_Product_ID <= 0 && C_Charge_ID > 0 && cur.C_Charge_ID == C_Charge_ID)))
+                    return cur;
+            }
+
+            Dictionary<string, string> io = GetInOutVars(ctx, M_InOut_ID);
+            int headerOrder = 0, bpartner = 0;
+            if (io.ContainsKey("C_Order_ID")) int.TryParse(io["C_Order_ID"], out headerOrder);
+            if (io.ContainsKey("C_BPartner_ID")) int.TryParse(io["C_BPartner_ID"], out bpartner);
+            // No order on the receipt and no vendor to narrow by: nothing to pick from.
+            if (headerOrder <= 0 && bpartner <= 0) return none;
+
+            string sql = @"SELECT ol.C_OrderLine_ID, COALESCE(ol.QtyOrdered, 0) AS QtyOrdered,
+                                  COALESCE(ol.QtyDelivered, 0) AS QtyDelivered,
+                                  COALESCE(ol.QtyEntered, 0) AS QtyEntered
+                           FROM C_OrderLine ol
+                           INNER JOIN C_Order o ON (o.C_Order_ID = ol.C_Order_ID)
+                           WHERE ol.IsActive = 'Y'
+                             AND o.IsSOTrx = 'N'";
+            sql += M_Product_ID > 0
+                ? " AND ol.M_Product_ID = " + M_Product_ID
+                : " AND ol.C_Charge_ID = " + C_Charge_ID;
+            sql += headerOrder > 0
+                ? " AND o.C_Order_ID = " + headerOrder
+                : " AND o.C_BPartner_ID = " + bpartner + " AND o.DocStatus IN ('CO', 'CL')";
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "ol", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            sql += " ORDER BY ol.Line, ol.C_OrderLine_ID";
+
+            DataSet ds = DB.ExecuteDataset(sql, null, null);
+            if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return none;
+
+            int firstCovering = 0, firstOpen = 0, first = 0;
+            foreach (DataRow r in ds.Tables[0].Rows)
+            {
+                int id = Util.GetValueOfInt(r["C_OrderLine_ID"]);
+                decimal ordered = Util.GetValueOfDecimal(r["QtyOrdered"]);
+                decimal received = Util.GetValueOfDecimal(r["QtyDelivered"]);
+                decimal entered = Util.GetValueOfDecimal(r["QtyEntered"]);
+                decimal openBase = ordered - received;
+                if (openBase < 0) openBase = 0;
+                decimal open = (ordered != 0 && entered != 0) ? Math.Round(openBase * entered / ordered, 6) : openBase;
+                if (first == 0) first = id;
+                if (open > 0 && firstOpen == 0) firstOpen = id;
+                if (open > 0 && open >= qty && firstCovering == 0) { firstCovering = id; break; }
+            }
+            int pick = firstCovering > 0 ? firstCovering : (firstOpen > 0 ? firstOpen : first);
+            return GetOrderLine(ctx, M_InOut_ID, pick);
+        }
+
         #endregion
 
         #region Product attributes (M_AttributeSetInstance)

@@ -68,9 +68,9 @@
  *                        - The unit reads the same before and after saving: symbol,
  *                          else name (model side, blank-safe).
  *                        - Order Line is editable in Additional Info whatever the
- *                          dictionary's read-only flag says - until the line is SAVED
- *                          with one; then it is locked, as on the screen (orderLineLocked,
- *                          30-Sep-2026). Picking one fills the line from that PO line -
+ *                          dictionary's read-only flag says, saved or not, and so is
+ *                          Product / Charge on a line carrying one (19-Oct-2026; the
+ *                          30-Sep lock is gone). Picking one fills the line from that PO line -
  *                          product / charge, unit, open quantity, attribute - never the
  *                          locator (applyOrderLine, 30-Sep-2026).
  *                        - Product list: a fixed-size list on <body>, opening below the
@@ -1140,8 +1140,7 @@
                 resetCatalog($inp.val(), inner, line, $inp);
                 setTimeout(function () { $inp.focus(); }, 0);
             } else {
-                wrap.append(dispInput(line, pField, primaryValue(line),
-                    { placeholder: primaryPlaceholder(), readOnly: orderLineLocked(line) }));
+                wrap.append(dispInput(line, pField, primaryValue(line), { placeholder: primaryPlaceholder() }));
                 // No product code under the name (17-Sep-2026): the full "name (key)"
                 // stays in the catalog row's tooltip for telling look-alikes apart.
                 // For a product carrying (or able to carry) an attribute set, show the
@@ -2011,8 +2010,46 @@
             runCallout(line, item.Kind === "C" ? "C_Charge_ID" : "M_Product_ID", function () {
                 // Warm the per-row UOM / locator lists for the new product context.
                 ensureRowLookups(line);
-                if (d.hasAttributeSet) openAttrDialog(line);
-                else { editing = { rowId: line.rowId, field: "description" }; render(); }
+                // The Order Line follows the product (21-Oct-2026): a line of the order for
+                // this product is picked when none is set; one for another product is blanked.
+                matchOrderLine(line, function () {
+                    if (d.hasAttributeSet) openAttrDialog(line);
+                    else { editing = { rowId: line.rowId, field: "description" }; render(); }
+                });
+            });
+        }
+
+        /* Product / charge just picked -> the order line it is received against, written
+           to the line's C_OrderLine_ID (Additional Info > Order Line). The line's current
+           Order Line is kept when it is for the same product; when the order has none for
+           it, a leftover Order Line is blanked. Only the link changes - quantity and unit
+           stay as the user has them. `done` always runs. */
+        function matchOrderLine(line, done) {
+            var finish = function () { if (done) done(); };
+            var v = line.values;
+            if (!parent || !parent.M_InOut_ID || !(v.M_Product_ID > 0 || v.C_Charge_ID > 0)) { finish(); return; }
+            var seq = line._olSeq = (line._olSeq || 0) + 1;
+            $.ajax({
+                url: VIS.Application.contextUrl + "VAS_249_GRNBottomPanel/FindOrderLine",
+                type: "GET", dataType: "json",
+                data: { M_InOut_ID: parent.M_InOut_ID, M_Product_ID: v.M_Product_ID || 0, C_Charge_ID: v.C_Charge_ID || 0, QtyEntered: +v.QtyEntered || 0,
+                        CurrentOrderLine_ID: +lineVal(line, "C_OrderLine_ID") || 0 },
+                success: function (raw) {
+                    if (seq !== line._olSeq || lines.indexOf(line) < 0) { finish(); return; }   // superseded / gone
+                    var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
+                    var id = +(res && res.C_OrderLine_ID) || 0;
+                    if (id > 0) {
+                        if (!sameVal(lineVal(line, "C_OrderLine_ID"), id)) setOrderLineValue(line, id, res.Name);
+                    } else if ((+lineVal(line, "C_OrderLine_ID") || 0) > 0) {
+                        clearDynValue(line, "C_OrderLine_ID");
+                    }
+                    // No full render: the only thing on the grid this changes is the
+                    // Additional Info button's highlight.
+                    $linesBody.find('[data-rowid="' + line.rowId + '"] .vas-grn-more-btn')
+                        .toggleClass("has-values", hasAdditionalValues(line, additionalInfoColumns(line)));
+                    finish();
+                },
+                error: function (err) { console.log(err); finish(); }
             });
         }
 
@@ -2384,29 +2421,15 @@
             ProcessedOn: 1, Processed: 1
         };
 
-        /* The purchase ORDER LINE follows the receipt window's own rule (30-Sep-2026): it
-           is keyed in by hand on a receipt raised without Create From, so it stays editable
-           whatever AD_Field.IsReadOnly or the ReadOnlyLogic say - until the line has been
-           SAVED with one. From then on it is locked, as the Order Line field on the screen
-           is: the receipt line now hangs off that order line (matching, invoicing), so the
-           link is not re-pointed by editing. The pristine snapshot (line._saved) says what
-           was saved; an unsaved edit of the field does not lock it. The document lock still
+        /* The purchase ORDER LINE stays editable (19-Oct-2026, replacing the 30-Sep lock on
+           a line saved with one): it is keyed in by hand on a receipt raised without Create
+           From, and a wrong pick is corrected here rather than by delete-and-re-enter -
+           whatever AD_Field.IsReadOnly or the ReadOnlyLogic say. The document lock still
            applies on top - that is buildDynField's additionalInfoEditable() test. The model
            writes it even where AD_Column is not updateable (ALWAYS_EDITABLE_COLUMNS). */
-        function orderLineLocked(line) {
-            if (!line || !line.values || !((line.values.M_InOutLine_ID || 0) > 0)) return false;
-            var saved = line._saved && line._saved.values;
-            if (!saved) return false;
-            return (parseInt(VAS.PanelUtil.lineVal(saved, "C_OrderLine_ID"), 10) || 0) > 0;
-        }
-
         function isColumnReadOnly(line, col) {
-            if (col === "C_OrderLine_ID") return orderLineLocked(line);
+            if (col === "C_OrderLine_ID") return false;
             if (FORCED_READONLY_COLS[col]) return true;
-            // Product / Charge locks with the Order Line (15-Oct-2026, as on the screen): a
-            // line saved against an order line is that line's product, so it is not
-            // re-picked here. Ahead of the Drafted / new-line override below.
-            if ((col === "M_Product_ID" || col === "C_Charge_ID") && orderLineLocked(line)) return true;
             // Product / Charge stays SELECTABLE (25-Sep-2026, VAS_107's rule): on a
             // Drafted receipt, and on any line not saved yet, whatever the dictionary's
             // IsReadOnly / ReadOnlyLogic says. Add line opens the product editor
@@ -2415,9 +2438,12 @@
             // and a ReadOnlyLogic such as @C_OrderLine_ID@!0 - true on a new line whose
             // columns are all still empty - refused it: the product could no longer be
             // selected. The cell kept looking clickable because the resting display
-            // does not ask this test.
+            // does not ask this test. Also on a line that carries an Order Line
+            // (19-Oct-2026): the product stays editable with it, whatever the
+            // dictionary's "@C_OrderLine_ID@!0" style logic says.
             if ((col === "M_Product_ID" || col === "C_Charge_ID")
-                && ((line && line.status === "new") || (panelEditable() && liveDocStatus() === "DR"))) return false;
+                && ((line && line.status === "new")
+                    || (panelEditable() && (liveDocStatus() === "DR" || (line && (+lineVal(line, "C_OrderLine_ID") || 0) > 0))))) return false;
             // C_UOM_ID: always read-only for a charge line (the unit is auto-assigned).
             // For a product line: editable until saved, then locked — changing the unit of a
             // stored receipt line would restate a quantity the warehouse has already acted

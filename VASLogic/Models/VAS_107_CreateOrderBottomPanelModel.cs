@@ -910,7 +910,7 @@ namespace VASLogic.Models
                               o.DateOrdered,
                               o.DateAcct,
                               o.IsSOTrx,
-                              COALESCE(pl.IsTaxIncluded, 'N') AS IsTaxIncluded,
+                              COALESCE(o.IsTaxIncluded, 'N') AS IsTaxIncluded,
                               o.DocStatus,
                               COALESCE(o.Processed, 'N') AS Processed,
                               cur.StdPrecision  AS StdPrecision,
@@ -1220,7 +1220,7 @@ namespace VASLogic.Models
             // already read 300.00. Tax-inclusive: LineNetAmt - TaxAmt - SurchargeAmt;
             // tax-exclusive: LineNetAmt.
             string sql = @"SELECT t.Name AS TaxName, ot.TaxAmt, ot.TaxBaseAmt,
-                                  (SELECT COALESCE(SUM(CASE WHEN COALESCE(pl.IsTaxIncluded, 'N') = 'Y'
+                                  (SELECT COALESCE(SUM(CASE WHEN COALESCE(co.IsTaxIncluded, 'N') = 'Y'
                                                             THEN ol2.LineNetAmt - COALESCE(ol2.TaxAmt, 0) - COALESCE(ol2.SurchargeAmt, 0)
                                                             ELSE ol2.LineNetAmt END), 0)
                                    FROM C_OrderLine ol2
@@ -1882,17 +1882,8 @@ namespace VASLogic.Models
                 line.SetM_Product_ID(req.M_Product_ID, true);
                 if (req.M_AttributeSetInstance_ID > 0)
                     line.SetM_AttributeSetInstance_ID(req.M_AttributeSetInstance_ID);
-
-                // On a sales order, when the client has not yet supplied a UOM (fresh product
-                // selection), prefer the product's Sales UOM (VAS_SalesUOM_Id) over the primary
-                // unit set by SetM_Product_ID. A UOM already on the line (req.C_UOM_ID > 0)
-                // means the user changed it deliberately — that is preserved below.
-                if (req.C_UOM_ID <= 0 && order.IsSOTrx())
-                {
-                    int salesUomId = GetProductSalesUomId(ctx, req.M_Product_ID);
-                    if (salesUomId > 0)
-                        line.SetC_UOM_ID(salesUomId);
-                }
+                // (The product's Sales UOM is applied below, with the quantity, so it is
+                // priced in that unit - 19-Oct-2026.)
             }
             else if (req.C_Charge_ID > 0)
             {
@@ -1908,7 +1899,22 @@ namespace VASLogic.Models
             decimal qty = req.QtyEntered > 0 ? req.QtyEntered : (req.QtyOrdered > 0 ? req.QtyOrdered : 1);
             line.SetQty(qty);
 
-            if (req.C_UOM_ID > 0)
+            // A product PICK takes that product's own unit (19-Oct-2026, as VAS_303). The
+            // client sends the row's current C_UOM_ID, which on a product change is the
+            // PREVIOUS product's unit - re-applying it kept that unit (and priced the new
+            // product in it). SetM_Product_ID has already put the new product's base unit on
+            // the line; a sales document then opens it in the product's Sales UOM
+            // (VAS_SalesUOM_Id), as before when no unit was sent. A unit the user picked
+            // afterwards (a UOM change, not a product pick) is kept.
+            int salesUom = 0;
+            if (req.M_Product_ID > 0 && (IsProductTrigger(req.TriggerColumn) || req.C_UOM_ID <= 0))
+            {
+                int baseUom = line.GetC_UOM_ID();
+                salesUom = order.IsSOTrx() ? GetProductSalesUomId(ctx, req.M_Product_ID) : 0;
+                if (salesUom <= 0 || salesUom == baseUom) salesUom = 0;
+                else line.SetC_UOM_ID(salesUom);
+            }
+            else if (req.C_UOM_ID > 0)
                 line.SetC_UOM_ID(req.C_UOM_ID);
 
             // MOrderLine.SetC_Charge_ID does not auto-set a UOM (unlike MInvoiceLine).
@@ -1916,7 +1922,16 @@ namespace VASLogic.Models
             if (req.C_Charge_ID > 0 && line.GetC_UOM_ID() <= 0)
                 line.SetC_UOM_ID(GetDefaultUomId(ctx));
 
-            if (req.PriceOverride)
+            if (salesUom > 0 && !req.PriceOverride)
+            {
+                // Priced and converted as the window's product callout does for a unit other
+                // than the base one (MOrderLine/GetPricesOnProductChange): the price list's
+                // price for that unit, or the base price x the conversion rate, and
+                // QtyOrdered restated in the base unit. The base-unit pricing below priced
+                // a Sales-UOM line as if it were the base unit.
+                ApplyUomPrices(ctx, line, order, qty, salesUom);
+            }
+            else if (req.PriceOverride)
             {
                 line.SetPriceEntered(req.PriceEntered);
                 line.SetPriceActual(req.PriceEntered);
@@ -2003,6 +2018,39 @@ namespace VASLogic.Models
                 line.SetC_UOM_ID(pp.GetC_UOM_ID());
         }
 
+        /// <summary>True when the recalculation was triggered by picking a product.</summary>
+        private static bool IsProductTrigger(string trigger)
+        {
+            return trigger == "M_Product_ID" || trigger == "product";
+        }
+
+        /// <summary>
+        /// Prices a product line opened in a unit other than its base unit through the
+        /// platform's own MOrderLineModel.GetPricesOnProductChange - the call the window's
+        /// product callout makes for the same case - so the panel and the window agree on
+        /// price, list price, limit and the base-unit QtyOrdered (19-Oct-2026, as VAS_303).
+        /// </summary>
+        private void ApplyUomPrices(Ctx ctx, MOrderLine line, MOrder order, decimal qty, int uomId)
+        {
+            int productId = line.GetM_Product_ID();
+            Dictionary<string, object> prices = new MOrderLineModel().GetPricesOnProductChange(ctx,
+                productId + "," + ctx.GetAD_Client_ID() + "," + order.GetC_Order_ID() + ","
+                + order.GetC_BPartner_ID() + "," + qty.ToString(CultureInfo.InvariantCulture) + "," + uomId);
+
+            decimal priceEntered = Util.GetValueOfDecimal(prices["PriceEntered"]);
+            line.SetPriceEntered(priceEntered);
+            line.SetPriceActual(priceEntered);
+            line.SetPriceList(Util.GetValueOfDecimal(prices["PriceList"]));
+            line.SetPriceLimit(Util.GetValueOfDecimal(prices["PriceLimit"]));
+
+            // GetPricesOnProductChange reads the quantity as a whole number, so a fractional
+            // (or sub-1) quantity comes back short; convert it here in that case.
+            decimal qtyOrdered = Util.GetValueOfDecimal(prices["QtyOrdered"]);
+            if (qtyOrdered <= 0 || decimal.Truncate(qty) != qty)
+                qtyOrdered = MUOMConversion.ConvertProductFrom(ctx, productId, uomId, qty) ?? qty;
+            line.SetQtyOrdered(qtyOrdered);
+        }
+
         /// <summary>
         /// Reads the AD_Column.Callout for the changed column and executes the equivalent
         /// server-side callout logic, returning the changed columns as a patch object.
@@ -2025,6 +2073,12 @@ namespace VASLogic.Models
             decimal taxAmt = line.GetTaxAmt();
 
             res.Values["C_UOM_ID"] = line.GetC_UOM_ID();
+            // The base-unit quantity, restated when a product pick opened the line in its
+            // Sales UOM - the client callouts read it back (CalloutOrder.Qty / Amt). Product
+            // picks only: on any other trigger SetQty restated it from QtyEntered without the
+            // unit conversion, so the client's own QtyOrdered stays.
+            if (req.M_Product_ID > 0 && IsProductTrigger(req.TriggerColumn))
+                res.Values["QtyOrdered"] = line.GetQtyOrdered();
             res.Values["PriceEntered"] = line.GetPriceEntered();
             res.Values["PriceActual"] = line.GetPriceActual();
             res.Values["PriceList"] = line.GetPriceList();
