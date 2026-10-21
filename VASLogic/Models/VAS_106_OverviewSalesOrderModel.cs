@@ -3088,8 +3088,8 @@ namespace VASLogic.Models
 
         /// <summary>
         /// The order's taxable base = SUM over its lines of the net amount, judged
-        /// by the PRICE LIST's IsTaxIncluded (the flag MOrderLine and MOrderTax
-        /// wrote the line amounts under): tax-inclusive net = LineNetAmt - TaxAmt -
+        /// by the ORDER's IsTaxIncluded (C_Order.IsTaxIncluded, changed from the price
+        /// list's flag 21-Oct-2026): tax-inclusive net = LineNetAmt - TaxAmt -
         /// SurchargeAmt, tax-exclusive net = LineNetAmt. Falls back to
         /// C_Order.TotalLines when the lines cannot be read. Standalone query for
         /// the reason GetOrderTaxAmt gives; one bind name, once. Mirrors VAS_092.
@@ -3102,12 +3102,11 @@ namespace VASLogic.Models
             {
                 string surchargeExpr = ColumnExists("C_OrderLine", "SurchargeAmt")
                     ? "COALESCE(ol.SurchargeAmt, 0)" : "0";
-                string sql = @"SELECT COALESCE(SUM(CASE WHEN COALESCE(pl.IsTaxIncluded, 'N') = 'Y'
+                string sql = @"SELECT COALESCE(SUM(CASE WHEN COALESCE(o.IsTaxIncluded, 'N') = 'Y'
                                                         THEN COALESCE(ol.LineNetAmt, 0) - COALESCE(ol.TaxAmt, 0) - " + surchargeExpr + @"
                                                         ELSE COALESCE(ol.LineNetAmt, 0) END), 0) AS Net
                                  FROM C_OrderLine ol
                                 INNER JOIN C_Order o ON (o.C_Order_ID = ol.C_Order_ID)
-                                 LEFT OUTER JOIN M_PriceList pl ON (pl.M_PriceList_ID = o.M_PriceList_ID)
                                 WHERE ol.C_Order_ID = @C_Order_ID
                                   AND ol.IsActive   = 'Y'";
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);

@@ -1524,11 +1524,15 @@ namespace VASLogic.Models
         /// <param name="C_Charge_ID">charge on the line, or 0</param>
         /// <param name="qty">quantity entered on the line</param>
         /// <returns>the matching line, or an empty item</returns>
-        public DeliveryOrderLineData FindOrderLine(Ctx ctx, int M_InOut_ID, int M_Product_ID, int C_Charge_ID, decimal qty)
+        /// <param name="currentOrderLineId">Order Line the line carries now, or 0 - kept when it is
+        /// one of the matching lines (21-Oct-2026)</param>
+        public DeliveryOrderLineData FindOrderLine(Ctx ctx, int M_InOut_ID, int M_Product_ID, int C_Charge_ID, decimal qty, int currentOrderLineId)
         {
             if (M_Product_ID <= 0 && C_Charge_ID <= 0) return new DeliveryOrderLineData();
             List<DeliveryOrderLineData> l = LoadOrderLines(ctx, HeaderOrderId(ctx, M_InOut_ID), 0, M_Product_ID, C_Charge_ID);
             if (l.Count == 0) return new DeliveryOrderLineData();
+            if (currentOrderLineId > 0)
+                foreach (DeliveryOrderLineData d in l) if (d.C_OrderLine_ID == currentOrderLineId) return d;
             foreach (DeliveryOrderLineData d in l) if (d.QtyOpen > 0 && d.QtyOpen >= qty) return d;
             foreach (DeliveryOrderLineData d in l) if (d.QtyOpen > 0) return d;
             return l[0];
@@ -2227,10 +2231,8 @@ namespace VASLogic.Models
                 if (ALWAYS_EDITABLE_COLUMNS.Contains(col) && !updateable.Contains(col))
                 {
                     if (!isTouched) continue;
-                    // 08-Oct-2026: a saved line keeps the Order Line it was stored with - the
-                    // panel shows it read-only then, as the window does - so only a new line,
-                    // or a saved one that has none yet, may take one here.
-                    if (line.Get_ID() > 0 && Util.GetValueOfInt(line.Get_Value(col)) > 0) continue;
+                    // 19-Oct-2026: a saved line's Order Line may be re-pointed too (the
+                    // 08-Oct "keep the stored one" guard is gone - the panel edits it).
                     try
                     {
                         int id = Util.GetValueOfInt(CoerceJsonValue(kv.Value));

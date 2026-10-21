@@ -767,6 +767,14 @@
     -webkit-text-fill-color: var(--cil-text) !important;
     opacity: 1 !important;
 }
+/* ...but its PLACEHOLDER ("Add product / charge…") is grey like every other cell's
+   (19-Oct-2026): Chromium paints the placeholder with the input's
+   -webkit-text-fill-color, so the rule above turned it dark. */
+.vas-obl-cell-edit input.vas-obl-cell-disp--primary::placeholder {
+    color: var(--cil-text-disabled) !important;
+    -webkit-text-fill-color: var(--cil-text-disabled) !important;
+    opacity: 1;
+}
 .vas-obl-cell-edit input.vas-obl-cell-disp--sub {
     font-size: 0.85em;
     font-weight: 500;

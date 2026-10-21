@@ -60,6 +60,11 @@
  *                        than being shared out — that cell carries the document
  *                        TYPE in front of the number on every row now, so it is
  *                        the one that wanted the room.
+ *   VAI163   2026-10-19  - .vas_190-clPName: the accounting row's G/L account name
+ *                          on the top-left line, in front of the search key.
+ *                        - Activity: .vas_190-actTitle takes a 12em basis instead
+ *                          of auto, and .vas_190-actSub / .vas_190-mailV break
+ *                          anywhere, so a long To list fits its section.
  ***********************************************************/
 
 .vas_190-root {
@@ -547,6 +552,10 @@
     white-space: nowrap;
 }
 .vas_190-clP .vas_190-soft { font-weight: 400; color: var(--p190-muted); }
+/* A second name on the top line, ahead of the soft key (19-Oct-2026): the
+   accounting row's G/L account name. Regular weight in the text colour, so the
+   bold run is still the row's own name; the line's ellipsis covers all three. */
+.vas_190-clP .vas_190-clPName { font-weight: 400; color: var(--p190-text); }
 .vas_190-clM {
     font-weight: 400;
     font-size: 0.75em;
@@ -882,8 +891,12 @@
 .vas_190-actTag.vas_190-tone-purple  { background: var(--p190-purple-bg);  color: var(--p190-purple-tx); }
 .vas_190-actTag.vas_190-tone-neutral { background: var(--p190-neutral-bg); color: var(--p190-neutral-tx); }
 
+/* A 12em basis rather than auto (19-Oct-2026): auto sized the headline to its
+   longest line, so a mail whose To list ran long pushed it onto a line of its
+   own under the tag. It now keeps the tag's line and wraps inside whatever is
+   left; only the timestamp drops when less than 12em remains. */
 .vas_190-actTitle {
-    flex: 1 1 auto;
+    flex: 1 1 12em;
     min-width: 0;
     font-size: 0.8125em;
     color: var(--p190-text);
@@ -908,6 +921,7 @@
     margin-top: 0.125em;
     white-space: normal;
     overflow-wrap: break-word;
+    overflow-wrap: anywhere;    /* also lowers its min-content width (19-Oct-2026) */
     word-break: break-word;
     line-height: 1.45;
 }
@@ -970,7 +984,16 @@
 .vas_190-mailMeta { margin-top: 0.5em; display: flex; flex-direction: column; gap: 0.1875em; }
 .vas_190-mailRow { display: flex; gap: 0.5em; font-size: 0.6875em; }
 .vas_190-mailK { flex-shrink: 0; width: 2.6em; font-weight: 500; color: var(--p190-muted); }
-.vas_190-mailV { font-weight: 400; color: var(--p190-secondary); word-break: break-word; min-width: 0; }
+/* The value takes the rest of the row and breaks anywhere (19-Oct-2026), so a
+   long To list stays inside the drawer instead of running past its edge. */
+.vas_190-mailV {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-weight: 400;
+    color: var(--p190-secondary);
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
 
 /* Under the platform composer's To / Cc / Bcc box (25-Sep-2026): the whole list,
    wrapping, so a recipient list longer than the single-line box is readable in

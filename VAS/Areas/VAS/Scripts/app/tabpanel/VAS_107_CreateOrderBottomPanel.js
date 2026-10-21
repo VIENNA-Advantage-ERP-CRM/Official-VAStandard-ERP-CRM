@@ -68,6 +68,12 @@
  *                          quotation too (the always-show override is gone).
  *                        - Quotation: no column is dropped at any width, newest line
  *                          first, tax list left-aligned, product list viewport-fixed.
+ *   VAI163   2026-10-19  - Changing the product takes the NEW product's unit (Sales UOM,
+ *                          else base) and tax, not the previous product's (as VAS_303;
+ *                          model BuildCalcLine, runCalloutServer).
+ *                        - Taxable Amount is qty x price (no Discount factor) and follows
+ *                          the Price / Quantity as it is typed (previewLineAmount).
+ *                        - The "Add product / charge…" placeholder is grey (CSS).
  ************************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -291,12 +297,16 @@
 
         /* ---------- per-line calculation (mirrors the prototype formulas) ---------- */
         function taxRate(id) { return taxRateById[id] || 0; }
-        /* Entered line amount (qty x price less discount). On a tax-inclusive order this
-           is the GROSS (price already contains tax); otherwise it is the net. */
+        /* Entered line amount (qty x price). On a tax-inclusive order this is the GROSS
+           (price already contains tax); otherwise it is the net. */
         function lineGross(line) {
             var v = line.values;
-            var disc = (+v.Discount || 0) / 100;
-            return (+v.QtyEntered || 0) * (+v.PriceEntered || 0) * (1 - disc);
+            // No Discount factor (19-Oct-2026, as VAS_303 / 304): C_OrderLine.Discount is how
+            // far the price sits from the list price, and the price callout restates it from
+            // the typed PriceEntered - typing 600 over a list price of 100 sets it to -500,
+            // so the old (1 - Discount) factor multiplied the line by 6. PriceEntered
+            // already carries any discount; the framework's LineNetAmt is plain qty x price.
+            return (+v.QtyEntered || 0) * (+v.PriceEntered || 0);
         }
         /* Line tax. Tax-inclusive: EXTRACT it from the gross (gross*r/(100+r)) - mirrors
            the framework MTax.CalculateTax(amount, taxIncluded=true). Tax-exclusive: add
@@ -346,7 +356,7 @@
            the framework on save). A clean SAVED line reads TaxableAmt directly
            (authoritative). A new / edited line has no stored value yet, so it falls back
            to lineTaxBaseSaved() which mirrors the framework's taxable-base formula:
-           tax-exclusive = QtyOrdered × PriceEntered × (1 − Discount);
+           tax-exclusive = QtyEntered × PriceEntered (Discount is already in the price);
            tax-inclusive = gross minus extracted tax. */
         function lineAmount(line) {
             // Tax-INCLUSIVE price list: the stored TaxableAmt is the entered (gross) line
@@ -365,6 +375,22 @@
             // Every screen since 23-Sep-2026 - quotations too: the calculation is shared,
             // and the stored TaxableAmt is never read for this column any more.
             return lineTaxBaseSaved(line);
+        }
+        /* Live Taxable Amount while a Price / Quantity cell is being typed in (19-Oct-2026,
+           as VAS_303). The cell only commits on blur, so the row used to keep the old amount
+           until the user left the cell. The typed figure is applied to a scratch copy of the
+           line, run through lineAmount() - the very formula the committed row uses - and
+           written into the row's amount span. Nothing is committed, dirtied or sent to a
+           callout until blur, exactly as before. */
+        function previewLineAmount(line, field, raw) {
+            var col = field === "price" ? "PriceEntered" : (field === "quantity" ? "QtyEntered" : null);
+            if (!col) return;
+            var v = line.values, keep = v[col], keepDirty = line.dirty, amt;
+            v[col] = parseNum(raw);
+            line.dirty = true;   // a typed value is never the stored one
+            try { amt = lineAmount(line); }
+            finally { v[col] = keep; line.dirty = keepDirty; }
+            $linesBody.find('[data-rowid="' + line.rowId + '"] .vas-obl-amt').text(amt ? fmtMoney(amt) : "");
         }
 
         /* ---------- lifecycle ---------- */
@@ -1355,6 +1381,7 @@
                 if (opts.maxLength > 0) $inp.attr("maxlength", opts.maxLength);   // AD_Column.FieldLength cap
                 if (opts.align === "right") $inp.css("text-align", "right");
                 if (opts.amount) bindAmountInput($inp);
+                if (field === "price") $inp.on("input", function () { previewLineAmount(line, field, $inp.val()); });
                 $inp.on("blur", function () { commitField(line, field, opts.amount ? parseNum($inp.val()) : $inp.val()); editing = null; render(); });
                 $inp.on("keydown", function (e) {
                     e.stopPropagation();
@@ -1392,6 +1419,7 @@
                 var $q = $('<input type="text" class="vas-obl-cell-edit__input" inputmode="decimal" />').val(fmtAmtInput(v.QtyEntered, 2)).css("text-align", "right");
                 var qLen = colFieldLength("QtyEntered"); if (qLen > 0) $q.attr("maxlength", qLen);   // AD_Column.FieldLength cap
                 bindAmountInput($q);
+                $q.on("input", function () { previewLineAmount(line, "quantity", $q.val()); });
                 $q.on("blur", function () { commitField(line, "quantity", parseNum($q.val())); editing = null; render(); });
                 $q.on("keydown", function (e) {
                     e.stopPropagation();
@@ -2451,6 +2479,12 @@
            the framework callout isn't loaded on the page. */
         function runCalloutServer(line, trigger, done) {
             var v = line.values;
+            // A new product / charge takes its OWN tax and unit (19-Oct-2026, as VAS_303):
+            // BuildCalcLine keeps any C_Tax_ID it is sent, so changing the product of a line
+            // re-priced it but left the previous product's tax. Send none so the server
+            // re-determines it (the unit is re-determined server side on a product pick).
+            // Nor the previous line's Discount, which would be applied to the new price.
+            var newItem = trigger === "M_Product_ID" || trigger === "C_Charge_ID";
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_107_CreateOrderBottomPanel/RunCallout",
                 type: "GET", dataType: "json",
@@ -2460,7 +2494,7 @@
                     M_AttributeSetInstance_ID: v.M_AttributeSetInstance_ID || 0,
                     QtyEntered: v.QtyEntered || 0, QtyOrdered: v.QtyOrdered || 0, C_UOM_ID: v.C_UOM_ID || 0,
                     PriceEntered: v.PriceEntered || 0, PriceOverride: !!line._priceOverride,
-                    C_Tax_ID: v.C_Tax_ID || 0, Discount: v.Discount || 0
+                    C_Tax_ID: newItem ? 0 : (v.C_Tax_ID || 0), Discount: newItem ? 0 : (v.Discount || 0)
                 },
                 success: function (raw) {
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;

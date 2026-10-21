@@ -156,14 +156,14 @@ namespace VAS.Controllers
         /// <returns>serialized DeliveryOrderLineData (C_OrderLine_ID 0 when none)</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult FindOrderLine(int M_InOut_ID, int M_Product_ID, int C_Charge_ID, decimal QtyEntered)
+        public JsonResult FindOrderLine(int M_InOut_ID, int M_Product_ID, int C_Charge_ID, decimal QtyEntered, int CurrentOrderLine_ID = 0)
         {
             string retJSON = "";
             if (Session["ctx"] != null)
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 VAS_248_DeliveryOrderBottomPanelModel model = new VAS_248_DeliveryOrderBottomPanelModel();
-                retJSON = JsonConvert.SerializeObject(model.FindOrderLine(ctx, M_InOut_ID, M_Product_ID, C_Charge_ID, QtyEntered));
+                retJSON = JsonConvert.SerializeObject(model.FindOrderLine(ctx, M_InOut_ID, M_Product_ID, C_Charge_ID, QtyEntered, CurrentOrderLine_ID));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }

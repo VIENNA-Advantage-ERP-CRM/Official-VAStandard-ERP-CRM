@@ -1779,7 +1779,13 @@ namespace VASLogic.Models
             bool hasPriceUom = ColumnExists("M_ProductPrice", "C_UOM_ID");
             bool hasPriceAsi = ColumnExists("M_ProductPrice", "M_AttributeSetInstance_ID");
 
-            string priceUomExpr  = hasPriceUom ? "COALESCE(ppu.Name, '')" : "''";
+            // The unit name is read bare and a missing one becomes "" in managed
+            // code (19-Oct-2026). COALESCE(ppu.Name, '') failed the whole
+            // statement on Oracle: C_UOM.Name is NVARCHAR2 and '' a VARCHAR2
+            // literal, so COALESCE raised ORA-12704 (character set mismatch),
+            // Query() logged and swallowed it, and the Pricing section came back
+            // empty. PostgreSQL has no national character set and ran it.
+            string priceUomExpr  = hasPriceUom ? "ppu.Name" : "CAST(NULL AS VARCHAR(60))";
             string priceUomJoin  = hasPriceUom
                 ? " LEFT OUTER JOIN C_UOM ppu ON (ppu.C_UOM_ID=pp.C_UOM_ID)" : "";
             string priceAsiExprs = hasPriceAsi
@@ -5522,7 +5528,8 @@ namespace VASLogic.Models
             foreach (DataRow r in ds.Tables[0].Rows)
             {
                 bool isTask = Util.GetValueOfString(r["IsTask"]) == "Y";
-                DateTime? start = Stamp(r["StartDate"]);
+                // StartDate / EndDate are wall-clock, not UTC - see WallClock.
+                DateTime? start = VAS_ActivitySourcesModel.WallClock(r["StartDate"]);
                 int apptId = Util.GetValueOfInt(r["AppointmentsInfo_ID"]);
                 string subject = PlainText(Util.GetValueOfString(r["Subject"]));
                 string assignee = Util.GetValueOfString(r["AssigneeName"]);
@@ -5575,7 +5582,7 @@ namespace VASLogic.Models
                     IsClosed    = Util.GetValueOfString(r["IsClosed"]) == "Y",
                     IsCancelled = Util.GetValueOfString(r["IsCancelled"]) == "Y",
                     StartDate   = start,
-                    EndDate     = Stamp(r["EndDate"]),
+                    EndDate     = VAS_ActivitySourcesModel.WallClock(r["EndDate"]),
                     // WHO RAISED IT and WHEN. The meeting's own start date and the
                     // attendee on the surviving row answered neither.
                     Actor       = Util.GetValueOfString(r["ActorName"]),

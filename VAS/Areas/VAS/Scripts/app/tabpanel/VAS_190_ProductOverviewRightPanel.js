@@ -520,6 +520,17 @@
  *  - Accounting row: the bold name is FRPT_AcctDefault.Name alone, beside its
  *    search key; the G/L account name moved under the combination (right).
  *  No new message keys.
+ *
+ * ── 2026-10-19 (VAI163) ─────────────────────────────────────────────────
+ *  - Accounting row: the G/L account name is back on the top-left line, in
+ *    front of the search key (not bold, so the bold text is still the
+ *    accounting default's name); the right side is the combination alone.
+ *  - Activity: a mail's To / Cc / Bcc lists are spaced after each separator,
+ *    so a stored "a@x.com;b@y.com" breaks between addresses, and the headline
+ *    keeps its place beside the tag instead of dropping under it.
+ *  - Pricing came back empty on Oracle (server: COALESCE across character
+ *    sets); see VAS_190_ProductOverviewRightPanelModel.LoadPricing.
+ *  No new message keys.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -1297,10 +1308,17 @@
             var $lhs = $('<div class="vas_190-clLhs"></div>');
             var $p = $('<div class="vas_190-clP"></div>');
             $p.append($('<span></span>').text(opts.primary));
+            // A second name on the same line, in front of the soft key and not
+            // bold (19-Oct-2026) - the accounting row's G/L account name.
+            if (opts.primaryName) {
+                $p.append($('<span class="vas_190-clPName"></span>').text(" · " + opts.primaryName));
+            }
             if (opts.primarySoft) {
                 $p.append($('<span class="vas_190-soft"></span>').text(" · " + opts.primarySoft));
             }
-            $p.attr("title", opts.primary + (opts.primarySoft ? " · " + opts.primarySoft : ""));
+            $p.attr("title", opts.primary
+                + (opts.primaryName ? " · " + opts.primaryName : "")
+                + (opts.primarySoft ? " · " + opts.primarySoft : ""));
             $lhs.append($p);
             if (opts.meta) {
                 $lhs.append($('<div class="vas_190-clM"></div>').text(opts.meta).attr("title", opts.meta));
@@ -2686,14 +2704,18 @@
                 // account's name (07-Oct-2026) was appended to it, so the bold text
                 // no longer read as the account the Accounting tab lists; it now sits
                 // under the combination on the right, left off when it only repeats.
+                // The G/L account name is back at the TOP LEFT, in front of the
+                // search key (19-Oct-2026): under the combination it read as part
+                // of the code. Regular weight, so the bold text is still the
+                // accounting default alone; the right side is the combination.
                 var primary = role ? msg(role.key, role.text) : a.AccountRole;
                 var glName = (a.AccountName && a.AccountName !== primary) ? a.AccountName : "";
                 return listRow({
                     primary: primary,
+                    primaryName: glName,
                     primarySoft: a.AccountKey || "",
                     meta: accountDetailText(a),
-                    value: a.Combination || "—",
-                    valueSub: a.Combination ? glName : ""
+                    value: a.Combination || "—"
                 });
             }, $list);
         }
@@ -3243,10 +3265,10 @@
                           a.IsReceived ? msg("VAS_190_MailReceived", "Received")
                                        : msg("VAS_190_MailSent", "Sent"));
                 pushField(fields, msg("VAS_190_DetailWhen", "When"), formatDateTime(a.EventDate));
-                pushField(fields, msg("VAS_190_From", "From"), a.MailFrom);
-                pushField(fields, msg("VAS_190_To", "To"), a.MailTo);
-                pushField(fields, msg("VAS_190_Cc", "Cc"), a.MailCc);
-                pushField(fields, msg("VAS_190_Bcc", "Bcc"), a.MailBcc);
+                pushField(fields, msg("VAS_190_From", "From"), addressList(a.MailFrom));
+                pushField(fields, msg("VAS_190_To", "To"), addressList(a.MailTo));
+                pushField(fields, msg("VAS_190_Cc", "Cc"), addressList(a.MailCc));
+                pushField(fields, msg("VAS_190_Bcc", "Bcc"), addressList(a.MailBcc));
                 // The USERS whose addresses are on To and Cc, by name (server-
                 // resolved, 18-Sep-2026). It used to print the sender's user,
                 // which is not who the mail was between.
@@ -3290,12 +3312,10 @@
             };
         }
 
-        // "12 Aug 2026 09:00 – 10:30", or just the start where there is no end.
+        // When the appointment / task was CREATED, in the browser's zone (21-Oct-2026) -
+        // not the meeting's scheduled time.
         function meetingWhen(a) {
-            var from = formatDateTime(a.StartDate);
-            var to   = formatDateTime(a.EndDate);
-            if (from && to) return from + " – " + to;
-            return from || to || formatDateTime(a.EventDate) || "";
+            return formatDateTime(a.EventDate) || formatDateTime(a.StartDate) || "";
         }
 
         // The address a reply goes to: whoever sent an inbound mail, else whoever
@@ -3688,9 +3708,22 @@
         }
 
         function appendAddressBit(bits, label, value) {
-            var text = (value === null || value === undefined) ? "" : String(value).trim();
+            var text = addressList(value);
             if (!text) return;
             bits.push(label + " " + text);
+        }
+
+        // An address list as it is stored - "a@x.com;b@y.com" - with a space
+        // after every separator (19-Oct-2026). Unspaced, the whole list was ONE
+        // word: it could only break mid-address, and it widened the row until
+        // the headline dropped under its tag. Nothing is split or dropped, so a
+        // display name holding a comma reads exactly as it was written.
+        function addressList(value) {
+            var text = (value === null || value === undefined) ? "" : String(value).trim();
+            if (!text) return "";
+            return text.replace(/\s*;\s*/g, "; ")
+                       .replace(/,(?=\S)/g, ", ")
+                       .replace(/[;,]\s*$/, "");
         }
 
         function activityTitle(a) {
@@ -3810,7 +3843,7 @@
                     .text((m.Subject || "").trim() || msg("VAS_190_NoSubject", "(no subject)")));
 
                 var $meta = $('<div class="vas_190-mailMeta"></div>');
-                appendMailRow($meta, msg("VAS_190_To", "To"), m.MailTo);
+                appendMailRow($meta, msg("VAS_190_To", "To"), addressList(m.MailTo));
                 appendMailRow($meta, msg("VAS_190_Date", "Date"), formatDateTime(m.SentOn));
                 appendMailRow($meta, msg("VAS_190_SentBy", "Sent by"), m.SentBy);
                 $one.append($meta);
