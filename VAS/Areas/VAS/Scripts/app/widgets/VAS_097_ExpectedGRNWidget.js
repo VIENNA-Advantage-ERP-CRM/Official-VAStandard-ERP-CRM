@@ -607,7 +607,8 @@
             /* QA sheet GRN #21/#22 (2026-09-15): the Attribute column is shown only when at least one
                line of the PO has a real attribute (dash-only instance descriptions do not count), and
                PO Qty / Received sit right after the item so the UOM column has room for full unit
-               names. Order: Item | PO Qty | Received | UOM | Attribute. The layout classes are
+               names. Order: Item | Attribute | PO Qty | Received | UOM (QA sheet GRN #180: attribute beside the
+               product). The layout classes are
                Expected-GRN-only - Pending GRN shares the base .vas-egrn-rcv-line grid. */
             /* QA sheet GRN #21: the column is hidden as soon as any line has no attribute value. */
             var showAttr = currentLines.length > 0;
@@ -625,10 +626,10 @@
                     '<label class="vas-egrn-rcv-name vas-egrn-rcv-sel" title="' + escapeHtml(line.itemName) + '">' +
                     '<input type="checkbox" class="vas-egrn-rcv-chk"' + (selectedLines[line.poLineId] ? ' checked' : '') + '/>' +
                     '<span>' + escapeHtml(line.itemName) + '</span></label>' +
+                    (showAttr ? attrCellHtml(line.attributeName) : '') +
                     '<div class="vas-egrn-rcv-po">' + escapeHtml(Number(line.poQty || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: Math.max(0, Number(line.uomPrecision || 0)) })) + '</div>' +
                     '<input class="vas-egrn-rcv-in" type="text" inputmode="decimal" autocomplete="off" data-precision="' + escapeHtml(line.uomPrecision) + '" value="' + escapeHtml(qtyValue) + '" aria-label="' + escapeHtml(lbl("VAS_Received", "Received")) + '"/>' +
                     '<div class="vas-egrn-rcv-uom" title="' + escapeHtml(line.uom) + '">' + escapeHtml(line.uom) + '</div>' +
-                    (showAttr ? attrCellHtml(line.attributeName) : '') +
                     '</div>';
             }
 
@@ -637,10 +638,10 @@
                 '<div class="vas-egrn-note">' + fileIcon() + '<span>' + escapeHtml(lbl("VAS_093_SelectLinesThenGRN", "Select the order lines to receive, then create the GRN.")) + '</span></div>' +
                 '<div class="vas-egrn-rcv-line' + layoutCls + ' vas-egrn-rcv-head">' +
                 '<div>' + escapeHtml(lbl("VAS_097_Item", "Item")) + '</div>' +
+                (showAttr ? '<div>' + escapeHtml(lbl("VAS_Attribute", "Attribute")) + '</div>' : '') +
                 '<div>' + escapeHtml(lbl("VAS_097_POQty", "PO Qty")) + '</div>' +
                 '<div>' + escapeHtml(lbl("VAS_Received", "Received")) + '</div>' +
                 '<div>' + escapeHtml(lbl("VAS_Uom", "UOM")) + '</div>' +
-                (showAttr ? '<div>' + escapeHtml(lbl("VAS_Attribute", "Attribute")) + '</div>' : '') +
                 '</div>' +
                 '<div class="vas-egrn-rcv-viewport"><div class="vas-egrn-lines">' + rows + '</div></div>' +
                 linePagerHtml(rcvPageNo, totalPages, currentLines.length, rcvPageSize) +

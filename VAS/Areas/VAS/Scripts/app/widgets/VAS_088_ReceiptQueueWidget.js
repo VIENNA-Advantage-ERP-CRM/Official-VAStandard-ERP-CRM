@@ -76,8 +76,10 @@
         var $monthSelect, $yearSelect;
         var rowResizeObserver = null;
 
+        /* Falls back to the English text when the message is not seeded (getMsg then echoes the key, or [key]). */
         function lbl(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            var text = VIS.Msg.getMsg(key);
+            return (!text || text === key || text === "[" + key + "]") && fallback ? fallback : text;
         }
 
         function escapeHtml(value) {
@@ -504,7 +506,8 @@
             var html =
                 '<div class="vas-rq-form">' +
                 field(lbl("VAS_088_LinkedPO", "Linked PO"), header.poNo) +
-                field(lbl("VAS_088_ReceivedQty", "Received Qty"), formatQty(header.receivedQty)) +
+                /* QA sheet GRN #183: the header total is the sum of the lines' product-UOM quantity. */
+                field(lbl("VAS_088_ReceivedQty", "Received Qty") + " (" + lbl("VAS_088_InBaseUOM", "In Base UOM") + ")", formatQty(header.receivedQty)) +
                 field(lbl("VAS_088_By", "Created By"), header.receivedBy) +
                 field(lbl("VAS_088_CreatedOn", "Created On"), formatCreatedOn(header)) +
                 '</div>' +

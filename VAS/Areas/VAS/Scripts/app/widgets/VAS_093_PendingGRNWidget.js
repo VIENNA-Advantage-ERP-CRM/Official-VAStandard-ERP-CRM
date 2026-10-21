@@ -642,11 +642,11 @@
                     '<input type="checkbox" class="vas-pgrn-check" data-orderlineid="' + escapeHtml(line.poLineId) + '"' + checked + '/>' +
                     '<span>' + escapeHtml(line.itemName) + '</span>' +
                     '</label>' +
+                    (showAttr ? attrCellHtml(line.attributeName) : '') +
                     /* Editable received quantity, defaulting to the remaining qty. Text input restricted to the
                        UOM's standard precision while typing (QA sheet Pending GRN #61). */
                     '<input class="vas-egrn-rcv-in vas-pgrn-qty" type="text" inputmode="decimal" autocomplete="off" value="' + escapeHtml(qtyValue) + '" data-orderlineid="' + escapeHtml(line.poLineId) + '" aria-label="' + escapeHtml(lbl("VAS_093_RemainingQuantity", "Remaining Quantity")) + '"/>' +
                     '<div class="vas-egrn-rcv-uom" title="' + escapeHtml(line.uom) + '">' + escapeHtml(line.uom) + '</div>' +
-                    (showAttr ? attrCellHtml(line.attributeName) : '') +
                     '</div>';
             }
 
@@ -658,9 +658,9 @@
                 '</div>' +
                 '<div class="' + lineCls + ' vas-egrn-rcv-head">' +
                 '<div>' + escapeHtml(lbl("VAS_093_Item", "Item")) + '</div>' +
+                (showAttr ? '<div>' + escapeHtml(lbl("VAS_Attribute", "Attribute")) + '</div>' : '') +
                 '<div>' + escapeHtml(lbl("VAS_093_RemainingQuantity", "Remaining Quantity")) + '</div>' +
                 '<div>' + escapeHtml(lbl("VAS_Uom", "UOM")) + '</div>' +
-                (showAttr ? '<div>' + escapeHtml(lbl("VAS_Attribute", "Attribute")) + '</div>' : '') +
                 '</div>' +
                 '<div class="vas-egrn-rcv-viewport"><div class="vas-egrn-lines">' + rows + '</div></div>' +
                 linePagerHtml(linePageNo, totalPages, childRecords.length, linePageSize) +
