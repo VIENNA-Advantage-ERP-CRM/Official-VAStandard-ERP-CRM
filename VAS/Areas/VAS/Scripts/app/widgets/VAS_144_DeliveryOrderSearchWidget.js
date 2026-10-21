@@ -4,8 +4,8 @@
  * Widget size: 9 columns x 1 row (transparent cell, centered 80% glass pill).
  * Type-ahead search over outbound customer delivery orders (DR/IP/WC/CO only)
  * across eight facets in fixed priority (DO number, customer, contact,
- * contact phone, location, sales order, rep, line item), capped at 7
- * suggestions. Selecting a result opens the detail modal with Overview and
+ * contact phone, location, sales order, rep, line item), 20 suggestions
+ * per page, more loaded on scroll. Selecting a result opens the detail modal with Overview and
  * Line Items tabs (4 lines per page, product thumbnails with package
  * fallback, subtotal/tax/total honouring the order's tax-included rule).
  * Backend - VAS_144_DeliveryOrderSearchWidget/SearchDeliveryOrders
@@ -27,12 +27,12 @@
  * 12 | Overview / Line Items                            | VAS_144_Overview / VAS_144_LineItems
  * 13 | Matched                                          | VAS_144_Matched
  * 14 | DO Number / Customer / Contact / Location /      | VAS_144_FacetDONumber / VAS_144_FacetCustomer /
- *    | Sales Order / Rep / Line Item (facet labels)     | VAS_144_FacetContact / VAS_144_FacetLocation /
- *    |                                                  | VAS_144_FacetSalesOrder / VAS_144_FacetRep / VAS_144_FacetLineItem
+ *    | Sales Order / Representative / Line Item (facet) | VAS_144_FacetContact / VAS_144_FacetLocation /
+ *    |                                                  | VAS_144_FacetSalesOrder / VAS_144_Representative / VAS_144_FacetLineItem
  * 15 | Total Value / Lines / Delivery Date              | VAS_144_TotalValue / VAS_144_Lines / VAS_144_DeliveryDate
  * 16 | Contact Person / Contact Phone / Delivery        | VAS_144_ContactPerson / VAS_144_ContactPhone /
- *    | Location / Representative / Ship From / Notes    | VAS_144_DeliveryLocation / VAS_144_Representative /
- *    |                                                  | VAS_144_ShipFrom / VAS_144_DeliveryNotes
+ *    | Location / Representative / Warehouse / Notes    | VAS_144_DeliveryLocation / VAS_144_Representative /
+ *    |                                                  | VAS_144_Warehouse / VAS_144_DeliveryNotes
  * 17 | Item / Qty / Price / Total                       | VAS_144_Item / VAS_144_Qty / VAS_144_Price / VAS_144_Total
  * 18 | Subtotal / Tax                                   | VAS_144_Subtotal / VAS_144_Tax
  * 19 | Delivery / Pickup / Shipper (via-rule labels)    | VAS_144_ViaDelivery / VAS_144_ViaPickup / VAS_144_ViaShipper
@@ -81,6 +81,10 @@
         var detailRequest;
         var detailLoading = false;
         var suggestions = [];
+        var searchText = '';
+        var searchPage = 0;
+        var searchHasMore = false;
+        var loadingMore = false;
         var currentOrder = null;
         var activeTab = 'overview';
         var linePage = 0;
@@ -101,7 +105,7 @@
             CONTACT: { msgKey: 'VAS_144_FacetContact', fallback: 'Contact' },
             LOC: { msgKey: 'VAS_144_FacetLocation', fallback: 'Location' },
             SO: { msgKey: 'VAS_144_FacetSalesOrder', fallback: 'Sales Order' },
-            REP: { msgKey: 'VAS_144_FacetRep', fallback: 'Rep' },
+            REP: { msgKey: 'VAS_144_Representative', fallback: 'Representative' },
             LINE: { msgKey: 'VAS_144_FacetLineItem', fallback: 'Line Item' }
         };
         var VIA_MAP = {
@@ -263,28 +267,43 @@
             searchTimer = setTimeout(function () { runSearch(text); }, 250);
         }
 
-        function runSearch(text) {
+        function runSearch(text, page) {
             var sequence = ++requestSequence;
-            openDropdown('<div class="MPC-dos-dd-state">' + escapeHtml(label('VAS_144_Searching', 'Searching...')) + '</div>');
+            page = page || 0;
+            if (!page) {
+                searchText = text;
+                searchPage = 0;
+                searchHasMore = false;
+                loadingMore = false;
+                openDropdown('<div class="MPC-dos-dd-state">' + escapeHtml(label('VAS_144_Searching', 'Searching...')) + '</div>');
+            }
 
             if (searchRequest && searchRequest.readyState !== 4) { searchRequest.abort(); }
             searchRequest = $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_144_DeliveryOrderSearchWidget/SearchDeliveryOrders',
                 type: 'GET',
                 cache: false,
-                data: { q: text },
+                data: { q: text, page: page },
                 success: function (response) {
                     if (sequence !== requestSequence) { return; }
                     var result = parseResponse(response);
                     if (!result || result.error) {
-                        openDropdown('<div class="MPC-dos-dd-state">' + escapeHtml(label('VAS_144_SearchError', 'Unable to search delivery orders. Please try again.')) + '</div>');
+                        loadingMore = false;
+                        if (!page) {
+                            openDropdown('<div class="MPC-dos-dd-state">' + escapeHtml(label('VAS_144_SearchError', 'Unable to search delivery orders. Please try again.')) + '</div>');
+                        }
                         return;
                     }
-                    suggestions = result.rows || [];
+                    searchPage = page;
+                    searchHasMore = !!result.hasMore;
+                    suggestions = page ? suggestions.concat(result.rows || []) : (result.rows || []);
                     renderSuggestions(text);
+                    loadingMore = false;
                 },
                 error: function (xhr, status) {
                     if (status === 'abort' || sequence !== requestSequence) { return; }
+                    loadingMore = false;
+                    if (page) { return; }
                     openDropdown('<div class="MPC-dos-dd-state">' + escapeHtml(label('VAS_144_SearchError', 'Unable to search delivery orders. Please try again.')) + '</div>');
                 }
             });
@@ -309,7 +328,7 @@
             var html = '';
             for (var index = 0; index < suggestions.length; index++) {
                 var row = suggestions[index];
-                var secondLine = label('VAS_144_Matched', 'Matched') + ' ' + facetLabel(row.matchedFacet) + ': ' + (row.matchedValue || '-');
+                var secondLine = row.matchedValue || '-';
                 if (row.salesOrder) { secondLine += ' · ' + row.salesOrder; }
                 if (row.location) { secondLine += ' · ' + row.location; }
                 html +=
@@ -326,14 +345,26 @@
                         '<span class="MPC-dos-dd-facet">' + escapeHtml(facetLabel(row.matchedFacet)) + '</span>' +
                     '</button>';
             }
+            var scrollTop = $dropdown.scrollTop();
             openDropdown(html);
+            $dropdown.scrollTop(scrollTop);
+        }
+
+        /* Lazy-load the next page when the list is scrolled near its end. */
+        function loadMoreOnScroll() {
+            if (!searchHasMore || loadingMore || !dropdownIsOpen()) { return; }
+            var el = $dropdown[0];
+            if (el.scrollTop + el.clientHeight >= el.scrollHeight - 40) {
+                loadingMore = true;
+                runSearch(searchText, searchPage + 1);
+            }
         }
 
         function selectSuggestion(index) {
             var row = suggestions[index];
             if (!row || detailLoading) { return; }
             closeDropdown();
-            $input.val(row.doNumber + ' - ' + row.customer);
+            $input.val(row.doNumber);
             if ($clearBtn) { $clearBtn.css('display', 'inline-flex'); }
             loadDetail(row.doId);
         }
@@ -492,7 +523,7 @@
                     fieldHtml(label('VAS_144_ContactPhone', 'Contact Phone'), order.contactPhone) +
                     fieldHtml(label('VAS_144_DeliveryLocation', 'Delivery Location'), order.location, true) +
                     fieldHtml(label('VAS_144_Representative', 'Representative'), order.representative) +
-                    fieldHtml(label('VAS_144_ShipFrom', 'Ship From'), order.warehouse) +
+                    fieldHtml(label('VAS_144_Warehouse', 'Warehouse'), order.warehouse) +
                 '</div>';
 
             var notes = '';
@@ -632,6 +663,7 @@
                 $input.focus();
             });
 
+            $dropdown.on('scroll' + eventNamespace, loadMoreOnScroll);
             $dropdown.on('mousedown' + eventNamespace, '.MPC-dos-dd-row', function (event) {
                 event.preventDefault();
                 selectSuggestion(Number($(this).attr('data-index')));
