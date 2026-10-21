@@ -373,10 +373,11 @@ namespace VASLogic.Models
                         IsCancelled = Util.GetValueOfString(r["IsCancelled"]) == "Y",
                         ActorName   = Util.GetValueOfString(r["ActorName"]),
                         Mails       = new List<VAS_ActivityMailRow>(),
-                        // Dated by when it is SCHEDULED, which is what a reader
-                        // scanning a timeline for a meeting is looking for; the
-                        // create stamp only stands in where there is no start.
-                        EventTime   = start ?? Stamp(r["Created"])
+                        // Dated by when it was CREATED (a UTC stamp the browser shows in
+                        // the viewer's own zone), like every other entry on the timeline -
+                        // not by the meeting's scheduled time (21-Oct-2026). The start only
+                        // stands in where there is no create stamp.
+                        EventTime   = Stamp(r["Created"]) ?? start
                     };
 
                     rows.Add(row);

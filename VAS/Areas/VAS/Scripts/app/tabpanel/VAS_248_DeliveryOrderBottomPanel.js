@@ -80,6 +80,9 @@
  *                        - Order Line is read-only on a saved line that holds one, and the
  *                          field's IsReadOnly / ReadOnlyLogic apply to a saved line as on
  *                          the window; a quantity edit no longer re-matches it.
+ *  19-Oct-2026           - Order Line and Product / Charge stay editable once an Order Line
+ *                          is entered, saved or not (the 08-Oct / 15-Oct locks are gone,
+ *                          model side too); a quantity edit still does not re-match it.
  ************************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -1093,8 +1096,7 @@
                 resetCatalog($inp.val(), inner, line, $inp);
                 setTimeout(function () { $inp.focus(); }, 0);
             } else {
-                wrap.append(dispInput(line, pField, primaryValue(line),
-                    { placeholder: primaryPlaceholder(), readOnly: savedOrderLineId(line) > 0 }));
+                wrap.append(dispInput(line, pField, primaryValue(line), { placeholder: primaryPlaceholder() }));
                 // No product code under the name (17-Sep-2026): the full "name (key)"
                 // stays in the catalog row's tooltip for telling look-alikes apart.
                 // For a product carrying (or able to carry) an attribute set, show the
@@ -1983,21 +1985,31 @@
         function matchOrderLine(line, fillQty, done) {
             var finish = function () { if (done) done(); };
             if (!(deliveryOrderId() > 0) || !parent || !parent.M_InOut_ID) { finish(); return; }
-            // A saved line's Order Line is read-only (orderLineReadOnly): a quantity edit
-            // must not re-match it behind the user's back.
-            if (orderLineReadOnly(line)) { finish(); return; }
+            // A quantity edit must not re-match a saved line's Order Line behind the
+            // user's back; a product just picked (fillQty) does re-match it.
+            if (!fillQty && savedOrderLineId(line) > 0) { finish(); return; }
             var v = line.values;
             if (!(v.M_Product_ID > 0 || v.C_Charge_ID > 0)) { finish(); return; }
             var seq = line._olSeq = (line._olSeq || 0) + 1;
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_248_DeliveryOrderBottomPanel/FindOrderLine",
                 type: "GET", dataType: "json",
-                data: { M_InOut_ID: parent.M_InOut_ID, M_Product_ID: v.M_Product_ID || 0, C_Charge_ID: v.C_Charge_ID || 0, QtyEntered: +v.QtyEntered || 0 },
+                data: { M_InOut_ID: parent.M_InOut_ID, M_Product_ID: v.M_Product_ID || 0, C_Charge_ID: v.C_Charge_ID || 0, QtyEntered: +v.QtyEntered || 0,
+                        CurrentOrderLine_ID: +lineVal(line, "C_OrderLine_ID") || 0 },
                 success: function (raw) {
                     if (seq !== line._olSeq || lines.indexOf(line) < 0) { finish(); return; }   // superseded / gone
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     var id = +(res && res.C_OrderLine_ID) || 0;
-                    if (!(id > 0)) { finish(); return; }
+                    if (!(id > 0)) {
+                        // The product just picked is on no line of the order: an Order Line left
+                        // over from the previous product no longer fits it - blank (21-Oct-2026).
+                        if (fillQty && (+lineVal(line, "C_OrderLine_ID") || 0) > 0) {
+                            clearOrderLineValue(line);
+                            $linesBody.find('[data-rowid="' + line.rowId + '"] .vas-dol-more-btn')
+                                .toggleClass("has-values", hasAdditionalValues(line, additionalInfoColumns(line)));
+                        }
+                        finish(); return;
+                    }
                     if (!sameVal(lineVal(line, "C_OrderLine_ID"), id)) setOrderLineValue(line, id, res.Name);
                     if (fillQty && +res.QtyOpen > 0) {
                         if (+res.C_UOM_ID > 0) {
@@ -2029,6 +2041,16 @@
             if (!line._dynTouched) line._dynTouched = {};
             line._dynTouched.C_OrderLine_ID = true;
             line.dirty = true;
+        }
+
+        /* Blank the Order Line (a deliberate null, TouchedCols) - the product now on the
+           line is not the one that order line was for. */
+        function clearOrderLineValue(line) {
+            setLineVal(line, "C_OrderLine_ID", null);
+            if (line._dynDisp) delete line._dynDisp.C_OrderLine_ID;
+            if (!line._dynTouched) line._dynTouched = {};
+            line._dynTouched.C_OrderLine_ID = true;
+            markDirty(line);
         }
 
         function applyOrderLine(line, id) {
@@ -2458,37 +2480,25 @@
             return +VAS.PanelUtil.lineVal(line._saved.values, "C_OrderLine_ID") || 0;
         }
 
-        /* Order Line follows the window's own field once the line is saved (08-Oct-2026):
-           the dictionary does not let a stored shipment line's order line be changed
-           (AD_Column not updateable - see ALWAYS_EDITABLE_COLUMNS in the model), so a saved
-           line that holds one shows it read-only, and the field's ReadOnlyLogic /
-           IsReadOnly applies to a saved line as it does on the screen. A line not saved yet
-           keeps the free pick (25-Sep-2026), restricted to the header's order. */
-        function orderLineReadOnly(line) {
-            if (!line || line.status !== "saved") return false;
-            if (savedOrderLineId(line) > 0) return true;
-            var m = columnMeta.C_OrderLine_ID;
-            if (!m) return false;
-            if (m.IsReadOnly) return true;
-            return !!(m.ReadOnlyLogic && evalLogic(line, m.ReadOnlyLogic));
-        }
-
+        /* Order Line stays editable on a saved line too (19-Oct-2026, replacing the 08-Oct
+           lock that followed the window's field): a wrong pick is corrected here rather
+           than by delete-and-re-enter. It is a FORCED_EDITABLE_COLS column, so the
+           dictionary's ReadOnlyLogic / IsReadOnly does not apply; the model writes it even
+           where AD_Column is not updateable (ALWAYS_EDITABLE_COLUMNS). */
         function isColumnReadOnly(line, col) {
-            if (col === "C_OrderLine_ID") return orderLineReadOnly(line);
             if (FORCED_EDITABLE_COLS[col]) return false;
             if (FORCED_READONLY_COLS[col]) return true;
-            // Product / Charge locks with the Order Line (15-Oct-2026, as on the screen): a
-            // line saved against an order line is that line's product, so it is not
-            // re-picked here. Ahead of the Drafted / new-line override below.
-            if ((col === "M_Product_ID" || col === "C_Charge_ID") && savedOrderLineId(line) > 0) return true;
             // Product / Charge stays SELECTABLE (27-Sep-2026, VAS_107 / VAS_249 rule): on a
             // Drafted delivery order, and on any line not saved yet, whatever the dictionary's
             // IsReadOnly / ReadOnlyLogic says. After a save refused for insufficient stock the
             // line is still new, and a ReadOnlyLogic that is true on such a line refused the
             // click in startEdit - the user could not pick a different product. The cell kept
-            // looking clickable because the resting display does not ask this test.
+            // looking clickable because the resting display does not ask this test. Also on a
+            // line that carries an Order Line (19-Oct-2026): the product stays editable with
+            // it, whatever the dictionary's "@C_OrderLine_ID@!0" style logic says.
             if ((col === "M_Product_ID" || col === "C_Charge_ID")
-                && ((line && line.status === "new") || (panelEditable() && liveDocStatus() === "DR"))) return false;
+                && ((line && line.status === "new")
+                    || (panelEditable() && (liveDocStatus() === "DR" || (line && (+lineVal(line, "C_OrderLine_ID") || 0) > 0))))) return false;
             // C_UOM_ID: always read-only for a charge line (the unit is auto-assigned).
             // For a product line: editable until saved, then locked — changing the unit of a
             // stored shipment line would restate a quantity the warehouse has already acted

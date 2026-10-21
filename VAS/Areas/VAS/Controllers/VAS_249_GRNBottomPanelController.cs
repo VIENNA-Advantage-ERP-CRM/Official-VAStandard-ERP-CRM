@@ -185,6 +185,30 @@ namespace VAS.Controllers
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
 
+        /// <summary>
+        /// The receipt's purchase-order line a product / charge and quantity are received
+        /// against (21-Oct-2026) - see the model's FindOrderLine for the choice.
+        /// </summary>
+        /// <param name="M_InOut_ID">receipt</param>
+        /// <param name="M_Product_ID">product on the line, or 0</param>
+        /// <param name="C_Charge_ID">charge on the line, or 0</param>
+        /// <param name="QtyEntered">quantity entered on the line</param>
+        /// <param name="CurrentOrderLine_ID">Order Line the line carries now, or 0</param>
+        /// <returns>serialized ReceiptOrderLineData (C_OrderLine_ID 0 when none)</returns>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult FindOrderLine(int M_InOut_ID, int M_Product_ID, int C_Charge_ID, decimal QtyEntered, int CurrentOrderLine_ID)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                VAS_249_GRNBottomPanelModel model = new VAS_249_GRNBottomPanelModel();
+                retJSON = JsonConvert.SerializeObject(model.FindOrderLine(ctx, M_InOut_ID, M_Product_ID, C_Charge_ID, QtyEntered, CurrentOrderLine_ID));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
         /// <summary>Returns the product's attribute-set definition for the attribute picker.</summary>
         /// <param name="M_Product_ID">product whose attribute set is read</param>
         /// <returns>serialized attribute-set definition</returns>

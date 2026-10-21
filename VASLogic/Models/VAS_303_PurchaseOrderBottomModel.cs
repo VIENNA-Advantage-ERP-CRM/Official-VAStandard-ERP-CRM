@@ -922,7 +922,7 @@ namespace VASLogic.Models.VAS_303
                               o.DateOrdered,
                               o.DateAcct,
                               o.IsSOTrx,
-                              COALESCE(pl.IsTaxIncluded, 'N') AS IsTaxIncluded,
+                              COALESCE(o.IsTaxIncluded, 'N') AS IsTaxIncluded,
                               o.DocStatus,
                               COALESCE(o.Processed, 'N') AS Processed,
                               cur.StdPrecision  AS StdPrecision,
@@ -1282,7 +1282,7 @@ namespace VASLogic.Models.VAS_303
             // already read 300.00. Tax-inclusive: LineNetAmt - TaxAmt - SurchargeAmt;
             // tax-exclusive: LineNetAmt.
             string sql = @"SELECT t.Name AS TaxName, ot.TaxAmt, ot.TaxBaseAmt,
-                                  (SELECT COALESCE(SUM(CASE WHEN COALESCE(pl.IsTaxIncluded, 'N') = 'Y'
+                                  (SELECT COALESCE(SUM(CASE WHEN COALESCE(co.IsTaxIncluded, 'N') = 'Y'
                                                             THEN ol2.LineNetAmt - COALESCE(ol2.TaxAmt, 0) - COALESCE(ol2.SurchargeAmt, 0)
                                                             ELSE ol2.LineNetAmt END), 0)
                                    FROM C_OrderLine ol2

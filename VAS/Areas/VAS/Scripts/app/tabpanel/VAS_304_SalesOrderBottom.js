@@ -1214,10 +1214,9 @@
                 // A blanket may be set OR cleared, so 0 on either side is a real value here.
                 if (idChanged(t, "C_Order_Blanket", +(parent.C_Order_Blanket || lg.C_Order_Blanket || 0), true)) return true;
                 if (flagChanged(t, "IsDropShip", !!parent.IsDropShip)) return true;
-                // NOT C_Order.IsTaxIncluded: the panel follows the PRICE LIST's flag, and the
-                // order's own copy can legitimately disagree with it (see renderTotals) - a
-                // permanent mismatch would re-fetch on every tab event. A price-list change
-                // is caught by M_PriceList_ID above.
+                // The panel follows the ORDER's own Prices-Include-Tax flag (C_Order.IsTaxIncluded,
+                // 21-Oct-2026, no longer the price list's), so a change of it re-fetches.
+                if (flagChanged(t, "IsTaxIncluded", !!parent.IsTaxIncluded)) return true;
                 return false;
             } catch (e) { return false; }
         }
@@ -2707,8 +2706,10 @@
             }
             // QtyEntered/QtyOrdered must remain editable whenever the panel is editable;
             // the DB ReadOnlyLogic (e.g. @Processed@=Y) is guarded at the header level
-            // by panelEditable() in startEdit, so we skip column-level locking here.
-            if (col === "QtyEntered" || col === "QtyOrdered") return false;
+            // by panelEditable() in startEdit, so we skip column-level locking here -
+            // except on a Contract line (19-Oct-2026): its quantity follows the contract
+            // (cycles x quantity per cycle), so it is read-only while Contract is ticked.
+            if (col === "QtyEntered" || col === "QtyOrdered") return isContractLine(line);
             // A saved product line of a release against a price-controlled blanket order
             // (VAS_ControlType PRC / PAQ) keeps its price: MOrderLine.BeforeSave refuses the
             // update with "PriceCantChange" otherwise (09-Oct-2026).
@@ -2721,6 +2722,13 @@
             // (06-Oct-2026: the Order Line reference stayed editable here after save).
             if (m.IsUpdateable === false && line && line.values && (+line.values.C_OrderLine_ID || 0) > 0) return true;
             return !!(m.ReadOnlyLogic && evalLogic(line, m.ReadOnlyLogic));
+        }
+        /* The line's Contract box (IsContract) is ticked. A saved line's bag holds 'Y' /
+           'N'; the modal's checkbox writes a boolean. */
+        function isContractLine(line) {
+            if (!line || !line.values) return false;
+            var v = lineVal(line, "IsContract");
+            return v === true || v === "Y" || v === "true";
         }
         var FIELD_COL = { product: "M_Product_ID", charge: "C_Charge_ID", uom: "C_UOM_ID", tax: "C_Tax_ID", quantity: "QtyEntered", price: "PriceEntered", description: "Description" };
         /* The server's IsBlanketPriceFixed (release document, blanket order PRC / PAQ),
@@ -2785,6 +2793,13 @@
                 // tuple defaulting to SHOW. Login/global gates fail CLOSED when absent.
                 return "";
             }
+            // @ProductType@ (e.g. the Contract box's ReadOnlyLogic) is the window's
+            // product-callout value: the panel keeps it in line._productType, set on every
+            // product pick. A line not saved yet has no ProductType in its bag, so the token
+            // read "" and the Contract box stayed locked for a service product until the
+            // line was saved (19-Oct-2026); a saved line's bag can also be stale after a
+            // product change. _productType is right in both cases.
+            if (key.toLowerCase() === "producttype" && line && line._productType !== undefined) return String(line._productType || "");
             var rv = lineVal(line, key);
             if (rv !== undefined && rv !== null && rv !== "") return String(rv);
             switch (key) {
@@ -3694,6 +3709,7 @@
             // in place: they appear under the checkbox, and disappear when it is cleared.
             if (String(col).toLowerCase() === "iscontract") {
                 refreshMoreDialog(line);
+                render();   // the grid's Qty cell locks / unlocks with the box (isContractLine)
                 return;
             }
             if (m && m.Callout) {

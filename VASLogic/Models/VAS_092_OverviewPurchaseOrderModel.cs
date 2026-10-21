@@ -870,7 +870,7 @@ namespace VASLogic.Models
         /// </summary>
         /// <param name="C_Order_ID">Owning purchase order id.</param>
         /// <param name="totalLines">C_Order.TotalLines, the fallback.</param>
-        /// <param name="taxIncluded">M_PriceList.IsTaxIncluded of the order's list.</param>
+        /// <param name="taxIncluded">C_Order.IsTaxIncluded of the order.</param>
         private decimal GetOrderLinesNet(int C_Order_ID, decimal totalLines, out bool taxIncluded)
         {
             taxIncluded = false;
@@ -878,13 +878,12 @@ namespace VASLogic.Models
             {
                 // One order row, no GROUP BY (a scalar sub-select beside a GROUP BY is
                 // an Oracle trap - ORA-22818).
-                string sql = @"SELECT COALESCE(pl.IsTaxIncluded, 'N') AS IsTaxIncluded,
+                string sql = @"SELECT COALESCE(o.IsTaxIncluded, 'N') AS IsTaxIncluded,
                                       (SELECT COALESCE(SUM(ol.LineNetAmt), 0)
                                          FROM C_OrderLine ol
                                         WHERE ol.C_Order_ID = o.C_Order_ID
                                           AND ol.IsActive   = 'Y') AS LinesNet
                                  FROM C_Order o
-                                 LEFT OUTER JOIN M_PriceList pl ON (pl.M_PriceList_ID = o.M_PriceList_ID)
                                 WHERE o.C_Order_ID = @C_Order_ID";
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
                 if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
