@@ -289,6 +289,37 @@ namespace VAdvantage.Model
         }
 
         /// <summary>
+        /// Describe where the time of one Save() went, from the timestamps the model took inside its Save hooks
+        /// </summary>
+        /// <param name="tsCall">timestamp just before Save()</param>
+        /// <param name="tsEnd">timestamp just after Save()</param>
+        /// <param name="bs">BeforeSave start</param>
+        /// <param name="be">BeforeSave end</param>
+        /// <param name="afs">AfterSave start</param>
+        /// <param name="ae">AfterSave end</param>
+        /// <returns>text for the log</returns>
+        public static string SaveBreakdown(long tsCall, long tsEnd, long bs, long be, long afs, long ae)
+        {
+            double toMs = 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+            if (bs < tsCall || be < bs)
+            {
+                return "total=" + (long)((tsEnd - tsCall) * toMs) + " ms, save hooks not run";
+            }
+            string s = "total=" + (long)((tsEnd - tsCall) * toMs) + " ms: before BeforeSave=" + (long)((bs - tsCall) * toMs)
+                + ", BeforeSave=" + (long)((be - bs) * toMs);
+            if (afs >= be && ae >= afs)
+            {
+                s += ", validators+DB write=" + (long)((afs - be) * toMs) + ", AfterSave=" + (long)((ae - afs) * toMs)
+                    + ", after AfterSave=" + (long)((tsEnd - ae) * toMs);
+            }
+            else
+            {
+                s += ", after BeforeSave (AfterSave not reached)=" + (long)((tsEnd - be) * toMs);
+            }
+            return s + " ms";
+        }
+
+        /// <summary>
         /// Process Allocation (does not update line).
         /// - Update and Link Invoice/Payment/Cash
         /// </summary>
@@ -310,7 +341,24 @@ namespace VAdvantage.Model
         /// <returns>C_BPartner_ID</returns>
         public int ProcessIt(bool reverse, HashSet<int> testedPayments)
         {
+            return ProcessIt(reverse, testedPayments, null);
+        }
+
+        /// <summary>
+        /// Process Allocation (does not update line).
+        /// - Update and Link Invoice/Payment/Cash
+        /// </summary>
+        /// <param name="reverse">reverse if true allocation is reversed</param>
+        /// <param name="testedPayments">see above</param>
+        /// <param name="reversePayments">only used when reversing: payments of the lines of one allocation are loaded once and
+        /// kept here with their changes; the caller saves each of them once after the last line. Without it every line loads
+        /// and saves its payment (a payment shared by several lines was saved once per line, with all its save hooks).</param>
+        /// <returns>C_BPartner_ID</returns>
+        public int ProcessIt(bool reverse, HashSet<int> testedPayments, Dictionary<int, MPayment> reversePayments)
+        {
             log.Fine("Reverse=" + reverse + " - " + ToString());
+            System.Diagnostics.Stopwatch swLine = System.Diagnostics.Stopwatch.StartNew();
+            long msPayment = 0, msInvoiceTest = 0, msInvoiceSave = 0;
             int C_Invoice_ID = GetC_Invoice_ID();
             MInvoicePaySchedule invoiceSchedule = null;
             MPayment payment = null;
@@ -330,7 +378,11 @@ namespace VAdvantage.Model
             //	Update Payment
             if (C_Payment_ID != 0 && (reverse || testedPayments == null || testedPayments.Add(C_Payment_ID)))
             {
-                payment = new MPayment(GetCtx(), C_Payment_ID, Get_TrxName());
+                bool deferPaymentSave = reverse && reversePayments != null;
+                if (!(deferPaymentSave && reversePayments.TryGetValue(C_Payment_ID, out payment)))
+                {
+                    payment = new MPayment(GetCtx(), C_Payment_ID, Get_TrxName());
+                }
                 if (GetC_BPartner_ID() != payment.GetC_BPartner_ID())
                 {
                     log.Warning("C_BPartner_ID different - Invoice=" + GetC_BPartner_ID() + " - Payment=" + payment.GetC_BPartner_ID());
@@ -367,7 +419,15 @@ namespace VAdvantage.Model
                         {
                             payment.Set_Value("VAS_UnAllocatedAmount", Decimal.Negate(addAllocatedtoUnallocated));
                         }
-                        payment.Save();
+                        if (deferPaymentSave)
+                        {
+                            // saved once by the caller after the last line, see reversePayments
+                            reversePayments[C_Payment_ID] = payment;
+                        }
+                        else
+                        {
+                            payment.Save();
+                        }
                     }
                 }
                 else
@@ -378,6 +438,7 @@ namespace VAdvantage.Model
             }
 
             //	Update Cash Journal
+            msPayment = swLine.ElapsedMilliseconds;
             if (C_CashLine_ID != 0)
             {
                 cashLine = new MCashLine(GetCtx(), C_CashLine_ID, Get_TrxName());
@@ -541,7 +602,23 @@ namespace VAdvantage.Model
             //	Update Balance / Credit used - Counterpart of MInvoice.completeIt
             if (invoice != null)
             {
-                if (invoice.TestAllocation() && !invoice.Save())
+                long tInv = swLine.ElapsedMilliseconds;
+                bool invoiceChanged = invoice.TestAllocation();
+                msInvoiceTest = swLine.ElapsedMilliseconds - tInv;
+                bool invoiceSaveFailed = false;
+                string invoiceSaveSplit = "";
+                if (invoiceChanged)
+                {
+                    tInv = swLine.ElapsedMilliseconds;
+                    long tsCall = System.Diagnostics.Stopwatch.GetTimestamp();
+                    invoiceSaveFailed = !invoice.Save();
+                    invoiceSaveSplit = " [" + SaveBreakdown(tsCall, System.Diagnostics.Stopwatch.GetTimestamp(), invoice.TsBeforeSaveStart,
+                        invoice.TsBeforeSaveEnd, invoice.TsAfterSaveStart, invoice.TsAfterSaveEnd) + "]";
+                    msInvoiceSave = swLine.ElapsedMilliseconds - tInv;
+                }
+                log.Info("MAllocationLine.ProcessIt: invoice " + C_Invoice_ID + " total=" + swLine.ElapsedMilliseconds + " ms (payment/cash part=" + msPayment
+                    + " ms, invoice allocated-amount query=" + msInvoiceTest + " ms, invoice save=" + msInvoiceSave + " ms" + invoiceSaveSplit + ")");
+                if (invoiceChanged && invoiceSaveFailed)
                 {
                     log.Log(Level.SEVERE, "Invoice not updated - " + invoice);
                 }

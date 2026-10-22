@@ -474,6 +474,20 @@ namespace VAdvantage.Model
             if (!success)
                 return success;
 
+            // Completing a payment saves every allocate row again only to store C_AllocationLine_ID (MPayment.AllocateIt).
+            // Everything below (IsPaymentAllocate flag, payment totals = sum of the rows, withholding on the payment amount) depends
+            // only on the amounts / links of the rows, which were already applied when the row was inserted or last edited.
+            // So when none of those changed, repeating it for each row only costs a payment load, 3 updates and a full payment save per row.
+            if (!newRecord
+                && !Is_ValueChanged("Amount") && !Is_ValueChanged("DiscountAmt") && !Is_ValueChanged("WriteOffAmt")
+                && !Is_ValueChanged("OverUnderAmt") && !Is_ValueChanged("InvoiceAmt") && !Is_ValueChanged("IsActive")
+                && !Is_ValueChanged("C_Payment_ID") && !Is_ValueChanged("C_Invoice_ID")
+                && !(Get_ColumnIndex("C_InvoicePaySchedule_ID") >= 0 && Is_ValueChanged("C_InvoicePaySchedule_ID"))
+                && !(Get_ColumnIndex("GL_JournalLine_ID") >= 0 && Is_ValueChanged("GL_JournalLine_ID")))
+            {
+                return true;
+            }
+
             // Added by Bharat on 25 July 2017 to set IsPaymentAllocate to True.
             MPayment pay = new MPayment(GetCtx(), GetC_Payment_ID(), Get_TrxName());
             if (pay.Get_ColumnIndex("IsPaymentAllocate") > 0)
