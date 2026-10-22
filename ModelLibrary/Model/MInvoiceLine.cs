@@ -3831,10 +3831,13 @@ namespace VAdvantage.Model
                 if (Env.IsModuleInstalled("VA009_") && !inv.IsProcessing() &&
                     !(inv.GetDocStatus() == "CO" || inv.GetDocStatus() == "CL" || inv.GetDocStatus() == "RE" || inv.GetDocStatus() == "VO"))
                 {
-                    bool isAdvance = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT SUM( CASE
+                    // depends only on the payment term of the invoice, so ask once per invoice object, not once per line
+                    int payTermId = inv.GetC_PaymentTerm_ID();
+                    bool isAdvance = inv.GetLineLookup<string>("VA009_IsAdvance:" + payTermId, () =>
+                        Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT SUM( CASE
                             WHEN c_paymentterm.VA009_Advance!= COALESCE(C_PaySchedule.VA009_Advance,'N') THEN 1 ELSE 0 END) AS isAdvance
                         FROM c_paymentterm LEFT JOIN C_PaySchedule ON c_paymentterm.c_paymentterm_ID = C_PaySchedule.c_paymentterm_ID
-                        WHERE c_paymentterm.c_paymentterm_ID = " + inv.GetC_PaymentTerm_ID(), null, Get_Trx())) > 0 ? true : false;
+                        WHERE c_paymentterm.c_paymentterm_ID = " + payTermId, null, Get_Trx())) > 0 ? "Y" : "N") == "Y";
 
                     if (inv.GetC_Order_ID() > 0 && GetC_OrderLine_ID() == 0 && isAdvance)
                     {
@@ -3880,6 +3883,7 @@ namespace VAdvantage.Model
                 if (!inv.IsSOTrx())
                 {
                     _IsSOTrx = inv.IsSOTrx();
+                    decimal? orderLinePriceEntered = null;  // filled by the open order qty check, reused for the discrepancy amount
                     QtyEntered = GetQtyEntered();
                     QtyInvoiced = GetQtyInvoiced();
 
@@ -3943,8 +3947,15 @@ namespace VAdvantage.Model
                         if (GetC_OrderLine_ID() > 0 && (newRecord || Is_ValueChanged("IsActive") || Is_ValueChanged("QtyInvoiced")))
                         {
                             /* Get Qty fom Order whose invoiced not created / completed */
-                            Decimal _openOrderQty = Util.GetValueOfDecimal(DB.ExecuteScalar(
-                                $@"SELECT  NVL(QtyOrdered, 0) - NVL(QtyInvoiced, 0) FROM C_OrderLine WHERE C_OrderLine_ID = { GetC_OrderLine_ID() }", null, Get_Trx()));
+                            // same order line row is needed again below for the discrepancy amount (PriceEntered), read both in one query
+                            Decimal _openOrderQty = 0;
+                            DataSet dsOrderLineQty = DB.ExecuteDataset(
+                                $@"SELECT  NVL(QtyOrdered, 0) - NVL(QtyInvoiced, 0) AS OpenQty, PriceEntered FROM C_OrderLine WHERE C_OrderLine_ID = { GetC_OrderLine_ID() }", null, Get_Trx());
+                            if (dsOrderLineQty != null && dsOrderLineQty.Tables.Count > 0 && dsOrderLineQty.Tables[0].Rows.Count > 0)
+                            {
+                                _openOrderQty = Util.GetValueOfDecimal(dsOrderLineQty.Tables[0].Rows[0][0]);
+                                orderLinePriceEntered = Util.GetValueOfDecimal(dsOrderLineQty.Tables[0].Rows[0][1]);
+                            }
 
                             decimal QtyNotInvoiced = 0; /* Contain Qty against order whose invoice is created but not completed */
                             if (newRecord)
@@ -3994,7 +4005,9 @@ namespace VAdvantage.Model
                             //}
                             if (GetC_OrderLine_ID() > 0)
                             {
-                                ordAmt = Util.GetValueOfDecimal(DB.ExecuteScalar(@"SELECT PriceEntered FROM C_OrderLine 
+                                // price already read together with the open qty above (same row, same save) - query only when it was not read
+                                ordAmt = orderLinePriceEntered.HasValue ? orderLinePriceEntered.Value
+                                    : Util.GetValueOfDecimal(DB.ExecuteScalar(@"SELECT PriceEntered FROM C_OrderLine
                                             WHERE C_OrderLine_ID = " + GetC_OrderLine_ID(), null, Get_Trx()));
                                 decimal diffAmt = Decimal.Subtract(invAmt, ordAmt);
                                 if (diffAmt > 0)
@@ -4469,7 +4482,10 @@ namespace VAdvantage.Model
                 MDocType doc = MDocType.Get(GetCtx(), inv.GetC_DocTypeTarget_ID());
                 if (!inv.IsSOTrx() && !doc.IsReturnTrx())
                 {
-                    if (inv.Get_ColumnIndex("DiscrepancyAmt") >= 0)
+                    // the header total can only move when this line's discrepancy (or its active flag) moved,
+                    // so skip the SUM + header UPDATE for saves that did not touch it
+                    if (inv.Get_ColumnIndex("DiscrepancyAmt") >= 0
+                        && (newRecord || Is_ValueChanged("DiscrepancyAmt") || Is_ValueChanged("IsActive")))
                     {
                         String sql = "SELECT SUM(NVL(DiscrepancyAmt,0))"
                                 + " FROM C_InvoiceLine WHERE C_Invoice_ID=" + GetC_Invoice_ID();
@@ -5040,6 +5056,22 @@ namespace VAdvantage.Model
         /// <param name="C_BPartner_Location_ID">business partner location</param>
         /// <param name="issotrx">transaction type</param>
         /// <returns>success</returns>
+        /// <summary>
+        /// Read withholding setup (business partner flags, withholding rules). The same SQL gives the same answer for every
+        /// line of an invoice, so when the parent invoice object is loaded it is asked once and the result is reused by the other lines.
+        /// </summary>
+        /// <param name="sql">query text (also the cache key)</param>
+        /// <returns>result of the query</returns>
+        private DataSet GetWithholdingSetup(string sql)
+        {
+            MInvoice owner = _parent;
+            if (owner == null)
+            {
+                return DB.ExecuteDataset(sql, null, null);
+            }
+            return owner.GetLineLookup<DataSet>("Withholding:" + sql, () => DB.ExecuteDataset(sql, null, null));
+        }
+
         private bool CalculateWithholding(int C_Bpartner_ID, int C_BPartner_Location_ID, bool issotrx)
         {
             Decimal withholdingAmt = 0.0M;
@@ -5058,7 +5090,7 @@ namespace VAdvantage.Model
                      C_Bpartner.C_Bpartner_ID = C_Bpartner_Location.C_Bpartner_ID 
                      INNER JOIN C_Location ON C_Bpartner_Location.C_Location_ID = C_Location.C_Location_ID  WHERE 
                      C_BPartner.C_Bpartner_ID = " + C_Bpartner_ID + @" AND C_Bpartner_Location.C_BPartner_Location_ID = " + C_BPartner_Location_ID;
-            DataSet ds = DB.ExecuteDataset(sql, null, null);
+            DataSet ds = GetWithholdingSetup(sql);
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
                 // check Withholding applicable on vendor/customer
@@ -5087,7 +5119,7 @@ namespace VAdvantage.Model
                         sql += " AND C_Withholding_ID = " + GetC_Withholding_ID();
                     }
                     sql += " ORDER BY InvCalculation ASC , NVL(C_Region_ID , 0) DESC , NVL(C_Country_ID , 0) DESC"; // priority to LineNetAmt, Region, Country
-                    ds = DB.ExecuteDataset(sql, null, null);
+                    ds = GetWithholdingSetup(sql);
                     if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                     {
                         // get amount on which we have to derive withholding tax amount

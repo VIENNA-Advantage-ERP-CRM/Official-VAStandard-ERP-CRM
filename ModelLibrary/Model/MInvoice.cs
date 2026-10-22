@@ -44,6 +44,36 @@ namespace VAdvantage.Model
         /**	Just Prepared Flag			*/
         private bool _justPrepared = false;
 
+        /** Lookups that give the same answer for every line of this invoice (used by the MInvoiceLine save hooks) */
+        private Dictionary<string, object> _lineLookupCache = null;
+
+        /// <summary>
+        /// Run a lookup once per invoice object instead of once per line save.
+        /// Only for configuration style data (payment term, withholding setup) that does not change while the invoice object is alive.
+        /// A null result is not cached, so the next caller tries the query again.
+        /// </summary>
+        /// <typeparam name="T">type of the cached value</typeparam>
+        /// <param name="key">unique key, e.g. the SQL text with its parameters</param>
+        /// <param name="loader">runs the actual query</param>
+        internal T GetLineLookup<T>(string key, Func<T> loader) where T : class
+        {
+            if (_lineLookupCache == null)
+            {
+                _lineLookupCache = new Dictionary<string, object>();
+            }
+            object cached;
+            if (_lineLookupCache.TryGetValue(key, out cached))
+            {
+                return (T)cached;
+            }
+            T value = loader();
+            if (value != null)
+            {
+                _lineLookupCache[key] = value;
+            }
+            return value;
+        }
+
         /** For Counter Document **/
         private MBPartner counterBPartner = null; // counter Business partner
         private int counterOrgId = 0; // counter Organization
@@ -1516,6 +1546,25 @@ namespace VAdvantage.Model
         /// <returns>true</returns>
         protected override bool BeforeSave(bool newRecord)
         {
+            TsBeforeSaveStart = System.Diagnostics.Stopwatch.GetTimestamp();
+            bool ok = BeforeSaveHeader(newRecord);
+            TsBeforeSaveEnd = System.Diagnostics.Stopwatch.GetTimestamp();
+            return ok;
+        }
+
+        /// <summary>
+        /// Stopwatch timestamps taken inside Save (0 when the hook was not reached), so a caller can split a slow save into
+        /// before BeforeSave / BeforeSave itself / BeforeSave→AfterSave (model validators, DB write) / AfterSave itself / after AfterSave
+        /// </summary>
+        public long TsBeforeSaveStart, TsBeforeSaveEnd, TsAfterSaveStart, TsAfterSaveEnd;
+
+        /// <summary>
+        /// Before Save logic
+        /// </summary>
+        /// <param name="newRecord">new</param>
+        /// <returns>true if ok</returns>
+        private bool BeforeSaveHeader(bool newRecord)
+        {
             /** Adhoc Payment - Validating DueDate ** Dt: 18/01/2021 ** Modified By: Kumar **/
             if (Get_ColumnIndex("DueDate") >= 0 && GetDueDate() != null && Util.GetValueOfDateTime(GetDueDate()) < Util.GetValueOfDateTime(GetDateInvoiced()))
             {
@@ -1856,6 +1905,20 @@ namespace VAdvantage.Model
          *	@return success
          */
         protected override bool AfterSave(bool newRecord, bool success)
+        {
+            TsAfterSaveStart = System.Diagnostics.Stopwatch.GetTimestamp();
+            bool ok = AfterSaveHeader(newRecord, success);
+            TsAfterSaveEnd = System.Diagnostics.Stopwatch.GetTimestamp();
+            return ok;
+        }
+
+        /// <summary>
+        /// After Save logic
+        /// </summary>
+        /// <param name="newRecord">new</param>
+        /// <param name="success">success</param>
+        /// <returns>success</returns>
+        private bool AfterSaveHeader(bool newRecord, bool success)
         {
             //if (!success || newRecord)
             if (!success)

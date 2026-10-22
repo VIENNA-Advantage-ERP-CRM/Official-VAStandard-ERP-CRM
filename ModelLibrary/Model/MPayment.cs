@@ -61,6 +61,49 @@ namespace VAdvantage.Model
         // when multiple user try to pay agaisnt same schedule from different scenarion at that tym lock record
         static readonly object objLock = new object();
 
+        // Setup data (business partner withholding flags, withholding rules, bank account auto check flag) read by the save and
+        // prepare/complete steps. One payment object goes through several of these steps in a single request, so each distinct
+        // query is run once per object. Not shared between objects.
+        // true only while CompleteIt creates the allocation: CompleteIt itself runs TestAllocation() right after and the document
+        // engine saves this payment, so the allocation does not need to load, test and save the payment a second time
+        private bool _paymentSavedByCompleteIt = false;
+
+        private void MarkAllocationForCaller(MAllocationHdr alloc)
+        {
+            if (_paymentSavedByCompleteIt)
+            {
+                alloc.PaymentsSavedByCaller = new HashSet<int> { GetC_Payment_ID() };
+            }
+        }
+
+        private Dictionary<string, DataSet> _setupDsCache = null;
+        private int _autoControlBankAccountId = -1;
+        private string _autoControlValue = null;
+
+        /// <summary>
+        /// Run a read-only setup query once per payment object
+        /// </summary>
+        /// <param name="sql">query text (also the cache key)</param>
+        /// <returns>query result (do not modify)</returns>
+        private DataSet GetSetupDataSet(string sql)
+        {
+            if (_setupDsCache == null)
+            {
+                _setupDsCache = new Dictionary<string, DataSet>();
+            }
+            DataSet cached;
+            if (_setupDsCache.TryGetValue(sql, out cached))
+            {
+                return cached;
+            }
+            DataSet ds = DB.ExecuteDataset(sql, null, Get_Trx());
+            if (ds != null)
+            {
+                _setupDsCache[sql] = ds;
+            }
+            return ds;
+        }
+
 
         /// <summary>
         /// Standard Constructor
@@ -506,6 +549,20 @@ namespace VAdvantage.Model
         /// <returns>true, on Save</returns>
         protected override bool BeforeSave(bool newRecord)
         {
+            TsBeforeSaveStart = System.Diagnostics.Stopwatch.GetTimestamp();
+            bool ok = BeforeSavePayment(newRecord);
+            TsBeforeSaveEnd = System.Diagnostics.Stopwatch.GetTimestamp();
+            return ok;
+        }
+
+        /// <summary>
+        /// Stopwatch timestamps taken inside Save (0 when the hook was not reached), so a caller can split a slow save into
+        /// before BeforeSave / BeforeSave itself / BeforeSave→AfterSave (model validators, DB write) / AfterSave itself / after AfterSave
+        /// </summary>
+        public long TsBeforeSaveStart, TsBeforeSaveEnd, TsAfterSaveStart, TsAfterSaveEnd;
+
+        private bool BeforeSavePayment(bool newRecord)
+        {
             MOrder order = null;
             MInvoice invoice = null;
             MDocType dt1 = MDocType.Get(GetCtx(), GetC_DocType_ID());
@@ -901,7 +958,13 @@ namespace VAdvantage.Model
                 return false;
             }
 
-            string isAutoControl = Util.GetValueOfString(DB.ExecuteScalar("SELECT ChkNoAutoControl FROM C_BankAccount  WHERE IsActive='Y' AND C_BankAccount_ID=" + GetC_BankAccount_ID()));
+            // bank account flag does not change between the saves of one payment object, read it once per bank account
+            if (_autoControlValue == null || _autoControlBankAccountId != GetC_BankAccount_ID())
+            {
+                _autoControlValue = Util.GetValueOfString(DB.ExecuteScalar("SELECT ChkNoAutoControl FROM C_BankAccount  WHERE IsActive='Y' AND C_BankAccount_ID=" + GetC_BankAccount_ID()));
+                _autoControlBankAccountId = GetC_BankAccount_ID();
+            }
+            string isAutoControl = _autoControlValue;
             if (GetTenderType() == "K")/*Check*/
             {
                 if (isAutoControl.Equals("N"))
@@ -1082,6 +1145,14 @@ namespace VAdvantage.Model
 
 
         protected override bool AfterSave(bool newRecord, bool success)
+        {
+            TsAfterSaveStart = System.Diagnostics.Stopwatch.GetTimestamp();
+            bool ok = AfterSavePayment(newRecord, success);
+            TsAfterSaveEnd = System.Diagnostics.Stopwatch.GetTimestamp();
+            return ok;
+        }
+
+        private bool AfterSavePayment(bool newRecord, bool success)
         {
             if (!success)
                 return success;
@@ -1959,24 +2030,33 @@ namespace VAdvantage.Model
 
             //	DocumentType
             Boolean? paymentSO = null;
-            sql = "SELECT IsSOTrx "
-                + "FROM C_DocType "
-                + "WHERE C_DocType_ID=" + GetC_DocType_ID();
-            try
+            // the document type is cached (MDocType.Get is used throughout this class), so read IsSOTrx from it; query only when it is not in the cache
+            MDocType payDocType = MDocType.Get(GetCtx(), GetC_DocType_ID());
+            if (payDocType != null && payDocType.GetC_DocType_ID() == GetC_DocType_ID())
             {
-                idr = DataBase.DB.ExecuteReader(sql, null, Get_Trx());
-                if (idr.Read())
-                    paymentSO = "Y".Equals(idr[0].ToString());
-                idr.Close();
-                idr = null;
+                paymentSO = payDocType.IsSOTrx();
             }
-            catch (Exception e)
+            else
             {
-                if (idr != null)
+                sql = "SELECT IsSOTrx "
+                    + "FROM C_DocType "
+                    + "WHERE C_DocType_ID=" + GetC_DocType_ID();
+                try
                 {
+                    idr = DataBase.DB.ExecuteReader(sql, null, Get_Trx());
+                    if (idr.Read())
+                        paymentSO = "Y".Equals(idr[0].ToString());
                     idr.Close();
+                    idr = null;
                 }
-                log.Log(Level.SEVERE, sql, e);
+                catch (Exception e)
+                {
+                    if (idr != null)
+                    {
+                        idr.Close();
+                    }
+                    log.Log(Level.SEVERE, sql, e);
+                }
             }
 
             //	No Payment Info
@@ -2685,6 +2765,63 @@ namespace VAdvantage.Model
          */
         public String PrepareIt()
         {
+            StartPhaseTiming();
+            try
+            {
+                return PrepareItCore();
+            }
+            finally
+            {
+                EndPhaseTiming("PrepareIt");
+            }
+        }
+
+        // Step timing for PrepareIt / CompleteIt, written to the log once per call ("PrepareIt: total=.. ms [step=.. ms, ..]")
+        // so slow steps show up without a profiler. CompleteIt may call PrepareIt, so only the outermost call logs.
+        private System.Diagnostics.Stopwatch _swPhase = null;
+        private System.Diagnostics.Stopwatch _swTotal = null;
+        private StringBuilder _phaseLog = null;
+        private int _phaseDepth = 0;
+
+        private void StartPhaseTiming()
+        {
+            if (_phaseDepth++ == 0)
+            {
+                _swTotal = System.Diagnostics.Stopwatch.StartNew();
+                _swPhase = System.Diagnostics.Stopwatch.StartNew();
+                _phaseLog = new StringBuilder();
+            }
+        }
+
+        /// <summary>
+        /// Add the time since the previous mark to the step list
+        /// </summary>
+        /// <param name="step">name of the step that just finished</param>
+        private void MarkPhase(string step)
+        {
+            if (_phaseDepth > 0 && _swPhase != null)
+            {
+                if (_phaseLog.Length > 0)
+                    _phaseLog.Append(", ");
+                _phaseLog.Append(step).Append('=').Append(_swPhase.ElapsedMilliseconds).Append(" ms");
+                _swPhase.Restart();
+            }
+        }
+
+        private void EndPhaseTiming(string name)
+        {
+            if (--_phaseDepth == 0 && _swTotal != null)
+            {
+                log.Info(name + ": " + GetDocumentNo() + " total=" + _swTotal.ElapsedMilliseconds + " ms [" + _phaseLog + (_phaseLog.Length > 0 ? ", " : "")
+                    + "rest=" + _swPhase.ElapsedMilliseconds + " ms]");
+                _swTotal = null;
+                _swPhase = null;
+                _phaseLog = null;
+            }
+        }
+
+        private String PrepareItCore()
+        {
             log.Info(ToString());
 
             //VIS-383 29/04/2024 :-Implement Skip Base functionality for PrepareIt
@@ -2734,6 +2871,7 @@ namespace VAdvantage.Model
             }
 
             //	Unsuccessful Online Payment
+            MarkPhase("validators+period");
             if (IsOnline() && !IsApproved())
             {
                 if (GetR_Result() != null)
@@ -2799,11 +2937,13 @@ namespace VAdvantage.Model
             }
 
             //	Consistency of Invoice / Document Type and IsReceipt
+            MarkPhase("orderCheck");
             if (!VerifyDocType())
             {
                 _processMsg = "@PaymentDocTypeInvoiceInconsistent@";
                 return DocActionVariables.STATUS_INVALID;
             }
+            MarkPhase("verifyDocType");
 
             //	Do not pay when Credit Stop/Hold
             if (!IsReceipt())
@@ -2848,6 +2988,7 @@ namespace VAdvantage.Model
                 }
             }
 
+            MarkPhase("creditCheck");
             MBankAccount bnkAct = MBankAccount.Get(GetCtx(), GetC_BankAccount_ID());
             MDocType dt1 = MDocType.Get(GetCtx(), GetC_DocType_ID());
 
@@ -2883,6 +3024,7 @@ namespace VAdvantage.Model
              * While calculating the withholding amount, the system has to check whether the withholding amount 
              * is zero or not equal to zero. If it's not equal to zero then the system will not calculate the withholding amount.
              * After confirmation with Surya  / Ashish By Amit */
+            MarkPhase("autoCheckNo");
             if (GetReversalDoc_ID() == 0 && GetC_BPartner_ID() > 0 && Get_ColumnIndex("C_Withholding_ID") > 0)
             {
                 if (!VerifyAndCalculateWithholding(false))
@@ -2890,6 +3032,7 @@ namespace VAdvantage.Model
                     return DocActionVariables.STATUS_INVALID;
                 }
             }
+            MarkPhase("withholding");
 
             //VIS-383 03/04/2024 User Validation After Prepare
             string valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_PREPARE);
@@ -2933,6 +3076,19 @@ namespace VAdvantage.Model
          */
         public String CompleteIt()
         {
+            StartPhaseTiming();
+            try
+            {
+                return CompleteItCore();
+            }
+            finally
+            {
+                EndPhaseTiming("CompleteIt");
+            }
+        }
+
+        private String CompleteItCore()
+        {
             //VIS-383 18/04/2024 :-Implement Skip Base functionality for CompleteIt
             if (this.ModelAction != null)
             {
@@ -2968,21 +3124,31 @@ namespace VAdvantage.Model
             SetCompletedDocumentDate();
 
             // Amit for VA009 27-10-2015
+            MarkPhase("validators+prepare");
             int countPaymentAllocateRecords = 0;
             if (Env.IsModuleInstalled("VA009_"))
             {
                 if (GetC_InvoicePaySchedule_ID() <= 0)
                 {
-                    string sql = "SELECT COUNT(C_PaymentAllocate_ID) FROM C_PaymentAllocate WHERE IsActive = 'Y' AND  NVL(C_InvoicePaySchedule_ID , 0) = 0 AND  NVL(C_Invoice_ID , 0) <> 0  AND  C_Payment_ID = " + GetC_Payment_ID();
-                    if (Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_Trx())) > 0)
+                    // both counts come from the same rows (active allocations with an invoice): rows without a schedule, and all rows - one query
+                    string sql = @"SELECT COUNT(C_PaymentAllocate_ID) AS AllRows,
+                                          COALESCE(SUM(CASE WHEN NVL(C_InvoicePaySchedule_ID , 0) = 0 THEN 1 ELSE 0 END), 0) AS NoScheduleRows
+                                   FROM C_PaymentAllocate WHERE IsActive = 'Y' AND  NVL(C_Invoice_ID , 0) <> 0 AND C_Payment_ID = " + GetC_Payment_ID();
+                    int noScheduleRows = 0;
+                    DataSet dsAllocCount = DB.ExecuteDataset(sql, null, Get_Trx());
+                    if (dsAllocCount != null && dsAllocCount.Tables.Count > 0 && dsAllocCount.Tables[0].Rows.Count > 0)
                     {
+                        countPaymentAllocateRecords = Util.GetValueOfInt(dsAllocCount.Tables[0].Rows[0][0]);
+                        noScheduleRows = Util.GetValueOfInt(dsAllocCount.Tables[0].Rows[0][1]);
+                    }
+                    if (noScheduleRows > 0)
+                    {
+                        countPaymentAllocateRecords = 0;
                         _processMsg = "Select Invoice Payment Schedule";
                         return DocActionVariables.STATUS_INVALID;
                     }
                     else
                     {
-                        sql = "SELECT COUNT(C_PaymentAllocate_ID) FROM C_PaymentAllocate WHERE IsActive = 'Y' AND  NVL(C_Invoice_ID , 0) <> 0 AND C_Payment_ID = " + GetC_Payment_ID();
-                        countPaymentAllocateRecords = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_Trx()));
                         if (countPaymentAllocateRecords > 0)
                         {
                             if (String.IsNullOrEmpty(GetDescription()) || (GetDescription() != null && !GetDescription().Contains("{->")))
@@ -3047,6 +3213,7 @@ namespace VAdvantage.Model
 
 
             //	Implicit Approval
+            MarkPhase("scheduleChecks");
             if (!IsApproved())
                 ApproveIt();
             log.Info(ToString());
@@ -3063,13 +3230,23 @@ namespace VAdvantage.Model
             }
             else if (GetReversalDoc_ID() == 0)
             {
-                AllocateIt();	//	Create Allocation Records
+                _paymentSavedByCompleteIt = true;
+                try
+                {
+                    AllocateIt();	//	Create Allocation Records
+                }
+                finally
+                {
+                    _paymentSavedByCompleteIt = false;
+                }
                 if (_AllocMsg != "")
                 {
                     _processMsg = _AllocMsg;
                     return DocActionVariables.STATUS_INVALID;
                 }
+                MarkPhase("AllocateIt total");
                 TestAllocation();
+                MarkPhase("payment.TestAllocation");
             }
 
             //	Project update
@@ -3077,6 +3254,7 @@ namespace VAdvantage.Model
             {
                 //	MProject project = new MProject(GetCtx(), GetC_Project_ID());
             }
+            MarkPhase("allocation(AllocateIt incl. allocation doc complete)");
             // Update Paid on Provisional Invoice
             if (Get_ColumnIndex("C_ProvisionalInvoice_ID") >= 0 && Util.GetValueOfInt(Get_Value("C_ProvisionalInvoice_ID")) > 0 && GetReversalDoc_ID() == 0)
             {
@@ -3093,6 +3271,7 @@ namespace VAdvantage.Model
 
 
 
+            MarkPhase("counterDoc");
             // change by Amit 27-5-2016 // Letter Of Credit module
             if (Env.IsModuleInstalled("VA026_"))
             {
@@ -3142,6 +3321,7 @@ namespace VAdvantage.Model
                 }
             }
 
+            MarkPhase("letterOfCredit");
             // nnayak - update BP open balance and credit used
             //Added by Vivek for Credit Limit on 25/08/2016
             if (GetC_BPartner_ID() != 0)
@@ -3362,6 +3542,7 @@ namespace VAdvantage.Model
                     }
                 }
             }
+            MarkPhase("bpBalance(BP load+save)");
             //Credit Limit
 
             if (GetC_InvoicePaySchedule_ID() != 0)
@@ -3431,25 +3612,14 @@ namespace VAdvantage.Model
             }
             else if (countPaymentAllocateRecords > 0)
             {
-                DataSet ds = DB.ExecuteDataset(@"SELECT C_PaymentAllocate.C_InvoicePaySchedule_ID , C_PaymentAllocate.C_Invoice_ID ,
-                            C_PaymentAllocate.overunderamt , C_PaymentAllocate.writeoffamt , C_PaymentAllocate.discountamt ,
-                            C_PaymentAllocate.amount  
-                            FROM C_PaymentAllocate INNER JOIN C_Payment ON C_Payment.C_Payment_ID =C_PaymentAllocate.C_Payment_ID 
-                            WHERE C_PaymentAllocate.IsActive = 'Y' AND  C_PaymentAllocate.C_Payment_ID =" + GetC_Payment_ID(), null, Get_Trx());
-                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
-                {
-                    for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
-                    {
-                        if (Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(C_InvoicePaySchedule_ID) FROM C_InvoicePaySchedule WHERE va009_ispaid = 'N' AND C_Invoice_ID = " + Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Invoice_ID"]), null, Get_Trx())) == 0)
-                        {
-                            DB.ExecuteQuery("UPDATE C_Invoice SET IsPaid = 'Y' WHERE C_Invoice_ID = " + GetC_Invoice_ID(), null, Get_Trx());
-                        }
-                        else
-                        {
-                            DB.ExecuteQuery("UPDATE C_Invoice SET IsPaid = 'N' WHERE C_Invoice_ID = " + GetC_Invoice_ID(), null, Get_Trx());
-                        }
-                    }
-                }
+                // Allocation lines may point to the same or to different invoices. Each distinct allocated invoice gets its own
+                // IsPaid flag (Y only when it has no unpaid schedule left), resolved in one set-based UPDATE for all of them.
+                DB.ExecuteQuery(@"UPDATE C_Invoice SET IsPaid = CASE WHEN EXISTS (
+                                SELECT 1 FROM C_InvoicePaySchedule ips
+                                WHERE ips.va009_ispaid = 'N' AND ips.C_Invoice_ID = C_Invoice.C_Invoice_ID
+                            ) THEN 'N' ELSE 'Y' END
+                            WHERE C_Invoice_ID IN (SELECT pa.C_Invoice_ID FROM C_PaymentAllocate pa
+                                WHERE pa.IsActive = 'Y' AND pa.C_Payment_ID = " + GetC_Payment_ID() + ")", null, Get_Trx());
             }
             else
             {
@@ -3471,6 +3641,7 @@ namespace VAdvantage.Model
             //    return DocActionVariables.STATUS_INVALID;
             //}
 
+            MarkPhase("scheduleUpdate");
             // Auto check work-Mohit-7 March 2020
             MBankAccount bnkAct = MBankAccount.Get(GetCtx(), GetC_BankAccount_ID());
             MDocType dt = MDocType.Get(GetCtx(), GetC_DocType_ID());
@@ -3509,10 +3680,12 @@ namespace VAdvantage.Model
                     }
                 }
             }
+            MarkPhase("autoCheckNo");
             if (!UpdateUnMatchedBalanceForAccount())
             {
                 return DocActionVariables.STATUS_INVALID;
             }
+            MarkPhase("bankBalance");
 
             //JID_0880 Show message on completion of Payment
             //avoid the ',' if Context of PrepayOrder not found
@@ -3524,6 +3697,7 @@ namespace VAdvantage.Model
 
             // Set the document number from completed document sequence after completed (if needed)
             SetCompletedDocumentNo();
+            MarkPhase("docNo");
 
             //VIS-383: 03/04/2024 User Validation After Complete
             //	User Validation
@@ -3622,7 +3796,7 @@ namespace VAdvantage.Model
                                  C_Bpartner.C_Bpartner_ID = C_Bpartner_Location.C_Bpartner_ID
                                  INNER JOIN C_Location ON C_Bpartner_Location.C_Location_ID = C_Location.C_Location_ID  WHERE
                                  C_BPartner.C_Bpartner_ID = " + GetC_BPartner_ID() + @" AND C_Bpartner_Location.C_BPartner_Location_ID = " + GetC_BPartner_Location_ID();
-            DataSet ds = DB.ExecuteDataset(sql, null, Get_Trx());
+            DataSet ds = GetSetupDataSet(sql);
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
                 // Applicable, but withholding not selected on Business partner record
@@ -3707,7 +3881,7 @@ namespace VAdvantage.Model
             {
                 sql += " AND NVL(C_Country_ID , 0) IN (0 ,  " + Country_ID + ")";
             }
-            DataSet dsWithholding = DB.ExecuteDataset(sql, null, Get_Trx());
+            DataSet dsWithholding = GetSetupDataSet(sql);
             if (dsWithholding != null && dsWithholding.Tables.Count > 0 && dsWithholding.Tables[0].Rows.Count > 0)
             {
                 // check on withholding - "Applicable on Payment" or not
@@ -4831,6 +5005,7 @@ namespace VAdvantage.Model
                     Msg.Translate(GetCtx(), "C_Payment_ID") + ": " + GetDocumentNo(),
                     Get_TrxName());
             alloc.SetAD_Org_ID(GetAD_Org_ID());
+            MarkAllocationForCaller(alloc);
             // Update ConversionDate from payment to view allocation 
             if (alloc.Get_ColumnIndex("DateAcct") > 0)
             {
@@ -4848,6 +5023,7 @@ namespace VAdvantage.Model
                 log.Severe("P.Allocations not created");
                 return false;
             }
+            MarkPhase("alloc.Save");
             DataSet ds = null;
             DataRow[] dr = null;
             if (Get_ColumnIndex("BackupWithholding_ID") > 0 && (GetC_Withholding_ID() > 0 || GetBackupWithholding_ID() > 0))
@@ -4910,14 +5086,19 @@ namespace VAdvantage.Model
                 }
                 else
                 {
+                    MarkPhase("aLine.Save");
                     pa.SetC_AllocationLine_ID(aLine.GetC_AllocationLine_ID());
                     pa.Save();
+                    MarkPhase("pa.Save");
                 }
             }
             //	Should start WF
             alloc.ProcessIt(DocActionVariables.ACTION_COMPLETE);
+            MarkPhase("alloc.ProcessIt(allocation CompleteIt)");
             _processMsg = "@C_AllocationHdr_ID@: " + alloc.GetDocumentNo();
-            return alloc.Save(Get_TrxName());
+            bool allocSaved = alloc.Save(Get_TrxName());
+            MarkPhase("alloc.Save(final)");
+            return allocSaved;
         }
 
         /// <summary>
@@ -4938,6 +5119,7 @@ namespace VAdvantage.Model
                     Msg.Translate(GetCtx(), "C_Payment_ID") + ": " + GetDocumentNo() + " [1]", Get_TrxName());
 
                 alloc.SetAD_Org_ID(GetAD_Org_ID());
+                MarkAllocationForCaller(alloc);
                 // Update conversion type from payment to view allocation (required for posting)
                 if (alloc.Get_ColumnIndex("C_ConversionType_ID") > 0)
                 {
@@ -4982,8 +5164,10 @@ namespace VAdvantage.Model
                     log.Log(Level.SEVERE, "Could not create Allocation Line");
                     return false;
                 }
+                MarkPhase("alloc+aLine.Save");
                 //	Should start WF
                 alloc.ProcessIt(DocActionVariables.ACTION_COMPLETE);
+                MarkPhase("alloc.ProcessIt(allocation CompleteIt)");
                 // SI_0745 : if view allocation not created or completed the not to complete current Trasaction
                 if (alloc.GetProcessMsg() != null)
                 {
@@ -4991,6 +5175,7 @@ namespace VAdvantage.Model
                     return false;
                 }
                 alloc.Save(Get_Trx());
+                MarkPhase("alloc.Save(final)");
                 //_processMsg = "@C_AllocationHdr_ID@: " + alloc.GetDocumentNo();
                 _processMsg = " View @C_AllocationHdr_ID@ created successfully with doc no: " + alloc.GetDocumentNo();
                 //	Get Project from Invoice
@@ -5032,6 +5217,7 @@ namespace VAdvantage.Model
                     Msg.Translate(GetCtx(), "C_Payment_ID") + ": " + GetDocumentNo() + " [1]", Get_TrxName());
 
                 alloc.SetAD_Org_ID(GetAD_Org_ID());
+                MarkAllocationForCaller(alloc);
                 // Update conversion type from payment to view allocation (required for posting)
                 if (alloc.Get_ColumnIndex("C_ConversionType_ID") > 0)
                 {
@@ -5129,6 +5315,7 @@ namespace VAdvantage.Model
                     Msg.Translate(GetCtx(), "C_Payment_ID") + ": " + GetDocumentNo() + " [1]", Get_TrxName());
 
                 alloc.SetAD_Org_ID(GetAD_Org_ID());
+                MarkAllocationForCaller(alloc);
                 // Update conversion type from payment to view allocation (required for posting)
                 if (alloc.Get_ColumnIndex("C_ConversionType_ID") > 0)
                 {
@@ -5208,6 +5395,7 @@ namespace VAdvantage.Model
                 GetDateTrx(), GetC_Currency_ID(),
                 Msg.Translate(GetCtx(), "C_Payment_ID") + ": " + GetDocumentNo() + " [n]", Get_Trx());
             alloc.SetAD_Org_ID(GetAD_Org_ID());
+            MarkAllocationForCaller(alloc);
             // Update conversion type from payment to view allocation (required for posting)
             if (alloc.Get_ColumnIndex("C_ConversionType_ID") > 0)
             {
