@@ -1590,8 +1590,10 @@
             // X = Cancel (discard; a plain close when view-only), Done = commit (a plain
             // close when view-only). One footer button in both modes.
             var footerBtn = '<button type="button" class="vas-obl-btn vas-obl-btn--primary" data-act="close-more">' + esc(lbl("VAS_107_Done", "Done")) + "</button>";
-            var lockNote = isRO
-                ? '<div class="vas-obl-more-note" role="status">' + esc(lbl("VAS_107_DocLockedViewOnly", "View only – this document is no longer editable.")) + "</div>"
+            // The "View only" note at the bottom shows on a Completed / Closed order only (23-Oct-2026).
+            var lockSt = docStatusNow();
+            var lockNote = (isRO && (lockSt === "CO" || lockSt === "CL"))
+                ? '<div class="vas-obl-more-note" role="status">' + esc(lbl("VAS_107_DocViewOnly", "View only - this document is no longer editable")) + "</div>"
                 : "";
             $dialog.html(
                 '<header class="vas-obl-dialog__header"><div class="vas-obl-dialog__header-row">' +
