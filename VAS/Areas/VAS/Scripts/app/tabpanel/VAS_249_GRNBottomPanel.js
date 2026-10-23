@@ -1414,8 +1414,9 @@
                 '<button type="button" class="vas-grn-dialog__close" data-act="cancel-more" aria-label="' + esc(lbl("VAS_249_Close", "Close")) + '" title="' + esc(lbl("VAS_249_Close", "Close")) + '">' + icon("x", "✕") + "</button>" +
                 "</div></header>" +
                 '<div class="vas-grn-dialog__body vas-grn-more-body vas-grn-more-grid" id="vasGrnMoreBody"></div>' +
-                (isRO ? '<div class="vas-grn-more-note" role="status">' +
-                        esc(lbl("VAS_249_DocLockedViewOnly", "View only – this document is no longer editable.")) + "</div>" : "") +
+                // The "View only" note at the bottom shows on a Completed / Closed receipt only (23-Oct-2026).
+                (isRO && (liveDocStatus() === "CO" || liveDocStatus() === "CL") ? '<div class="vas-grn-more-note" role="status">' +
+                        esc(lbl("VAS_249_DocViewOnly", "View only - this document is no longer editable")) + "</div>" : "") +
                 '<footer class="vas-grn-dialog__footer vas-grn-dialog__footer--end">' +
                 '<button type="button" class="vas-grn-btn vas-grn-btn--primary" data-act="close-more">' + esc(lbl("VAS_249_Done", "Done")) + "</button></footer>"
             );

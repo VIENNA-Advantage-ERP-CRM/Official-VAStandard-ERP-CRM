@@ -1327,7 +1327,9 @@
                 '<button type="button" class="vas-mtl-dialog__close" data-act="cancel-more" aria-label="' + esc(lbl("VAS_247_Close", "Close")) + '" title="' + esc(lbl("VAS_247_Close", "Close")) + '">' + icon("x", "✕") + "</button>" +
                 "</div></header>" +
                 '<div class="vas-mtl-dialog__body vas-mtl-more-body vas-mtl-more-grid" id="vasMtlMoreBody"></div>' +
-                (isRO ? '<div class="vas-mtl-more-note" role="status">' + esc(lbl("VAS_247_DocLockedViewOnly", "View only – this document is no longer editable.")) + "</div>" : "") +
+                // The "View only" note at the bottom shows on a Completed / Closed movement only (23-Oct-2026).
+                (isRO && (liveDocStatus() === "CO" || liveDocStatus() === "CL")
+                    ? '<div class="vas-mtl-more-note" role="status">' + esc(lbl("VAS_247_DocViewOnly", "View only - this document is no longer editable")) + "</div>" : "") +
                 '<footer class="vas-mtl-dialog__footer vas-mtl-dialog__footer--end">' +
                 '<button type="button" class="vas-mtl-btn vas-mtl-btn--primary" data-act="close-more">' + esc(lbl("VAS_247_Done", "Done")) + "</button></footer>"
             );
