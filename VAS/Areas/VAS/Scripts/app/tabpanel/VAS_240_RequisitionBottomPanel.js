@@ -1340,7 +1340,9 @@
                 '<button type="button" class="vas-rbl-dialog__close" data-act="cancel-more" aria-label="' + esc(lbl("VAS_240_Close", "Close")) + '" title="' + esc(lbl("VAS_240_Close", "Close")) + '">' + icon("x", "✕") + "</button>" +
                 "</div></header>" +
                 '<div class="vas-rbl-dialog__body vas-rbl-more-body vas-rbl-more-grid" id="vasRblMoreBody"></div>' +
-                (isRO ? '<div class="vas-rbl-more-note" role="status">' + esc(lbl("VAS_240_DocLockedViewOnly", "View only – this document is no longer editable.")) + "</div>" : "") +
+                // The "View only" note at the bottom shows on a Completed / Closed requisition only (23-Oct-2026).
+                (isRO && (liveDocStatus() === "CO" || liveDocStatus() === "CL")
+                    ? '<div class="vas-rbl-more-note" role="status">' + esc(lbl("VAS_240_DocViewOnly", "View only - this document is no longer editable")) + "</div>" : "") +
                 '<footer class="vas-rbl-dialog__footer vas-rbl-dialog__footer--end">' +
                 '<button type="button" class="vas-rbl-btn vas-rbl-btn--primary" data-act="close-more">' + esc(lbl("VAS_240_Done", "Done")) + "</button></footer>"
             );

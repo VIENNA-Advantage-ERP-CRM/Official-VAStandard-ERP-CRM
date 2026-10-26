@@ -1982,6 +1982,11 @@ namespace VASLogic.Models.VAS_304
             if (req.C_Charge_ID > 0 && line.GetC_UOM_ID() <= 0)
                 line.SetC_UOM_ID(GetDefaultUomId(ctx));
 
+            // A charge PICK is priced from the charge itself (23-Oct-2026), not from the
+            // row's current price the client sends (0 on a new line, the previous item's
+            // price on a changed one).
+            bool chargePick = req.M_Product_ID <= 0 && req.C_Charge_ID > 0 && IsChargeTrigger(req.TriggerColumn);
+
             // SetQty puts QtyOrdered = QtyEntered, which is only true on the product's base
             // unit. On any other unit (the Sales UOM a new product now defaults to, 08-Oct-2026,
             // or one the user picked) convert it, so SetLinePriceWithAttribute scales
@@ -1999,13 +2004,18 @@ namespace VASLogic.Models.VAS_304
             {
                 SetLinePriceWithAttribute(line, order, req.M_AttributeSetInstance_ID);
             }
+            else if (chargePick)
+            {
+                ApplyChargePrice(ctx, line, req.C_Charge_ID);
+            }
             else
             {
                 line.SetPriceEntered(req.PriceEntered);
                 line.SetPriceActual(req.PriceEntered);
             }
 
-            ApplyDiscount(line, req.Discount);
+            if (!chargePick)
+                ApplyDiscount(line, req.Discount);
 
             if (req.C_Tax_ID > 0)
                 line.SetC_Tax_ID(req.C_Tax_ID);
@@ -2068,6 +2078,25 @@ namespace VASLogic.Models.VAS_304
             return req + ": " + tax;
         }
 
+        /// <summary>True when the recalculation was triggered by picking a charge.</summary>
+        private static bool IsChargeTrigger(string trigger)
+        {
+            return trigger == "C_Charge_ID" || trigger == "charge";
+        }
+
+        /// <summary>
+        /// Prices a charge line the way the window's charge callout (CalloutOrder.Charge) does:
+        /// PriceEntered / PriceActual = C_Charge.ChargeAmt, with no list or limit price.
+        /// </summary>
+        private static void ApplyChargePrice(Ctx ctx, MOrderLine line, int C_Charge_ID)
+        {
+            decimal chargeAmt = new MCharge(ctx, C_Charge_ID, null).GetChargeAmt();
+            line.SetPriceEntered(chargeAmt);
+            line.SetPriceActual(chargeAmt);
+            line.SetPriceList(0);
+            line.SetPriceLimit(0);
+        }
+
         /// <summary>
         /// Prices a product line from the price list using the actual attribute-set-instance.
         /// </summary>
@@ -2124,6 +2153,9 @@ namespace VASLogic.Models.VAS_304
             res.Values["LineTotalAmt"] = decimal.Add(net, taxAmt);
             if (req.M_Product_ID > 0) res.Values["C_Charge_ID"] = 0;
             else if (req.C_Charge_ID > 0) { res.Values["M_Product_ID"] = 0; res.Values["M_AttributeSetInstance_ID"] = 0; }
+            // A charge pick drops the previous item's discount (BuildCalcLine skipped it).
+            if (req.M_Product_ID <= 0 && req.C_Charge_ID > 0 && IsChargeTrigger(req.TriggerColumn))
+                res.Values["Discount"] = 0m;
 
             res.Display["uomName"] = GetUomLabel(ctx, line.GetC_UOM_ID());
             res.Display["taxName"] = taxId > 0 ? MTax.Get(ctx, taxId).GetName() : "";
