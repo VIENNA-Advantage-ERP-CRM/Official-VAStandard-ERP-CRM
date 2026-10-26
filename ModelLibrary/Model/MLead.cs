@@ -4,6 +4,7 @@
  * Purpose        : for workflow
  * Chronological    Development
  * Raghunandan     05-Jun-2009
+ * VAI052           23-Oct-2026  CreateBPContact: unique AD_User.Value for the new contact
   ******************************************************/
 using System;
 using System.Collections;
@@ -397,6 +398,7 @@ namespace VAdvantage.Model
                 _bp.Set_Value("C_Lead_ID", GetC_Lead_ID());
                 _bp.SetEMail(GetEMail());
                 _bp.SetMobile(GetMobile());
+                _bp.Set_Value("Phone", Get_Value("Phone"));
                 _bp.Set_Value("R_Source_ID", GetR_Source_ID());
                 _bp.Set_Value("C_BPartnerSR_ID", GetC_BPartnerSR_ID());
                 _bp.Set_Value("LeadRating", GetLeadRating());
@@ -444,9 +446,10 @@ namespace VAdvantage.Model
             CreateBPLocation();
 
             try
-            {
+            {   
                 int id = _bp.GetC_BPartner_ID();
-                string qry = "UPDATE C_BPartner SET Description='', Value='" + _bp.GetValue() + GetBPName() + "' WHERE C_BPartner_ID=" + id;
+                //VAI052 22-oct-26 removed part , Value='" + _bp.GetValue() + GetBPName() + "';
+                string qry = "UPDATE C_BPartner SET Description='' WHERE C_BPartner_ID=" + id;
                 int check = DB.ExecuteQuery(qry, null, Get_TrxName());
 
                 if (GetR_InterestArea_ID() != 0)
@@ -572,6 +575,14 @@ namespace VAdvantage.Model
 
             _user.Set_Value("LinkedInProfile", Get_Value("LinkedInProfile"));
 
+            // VAI052: a new contact must get an AD_User.Value (User ID) that no other user has,
+            // otherwise the save fails with "User ID already exist". Use the contact name and,
+            // when it is taken, add the next free number (name1, name2, ...).
+            if (_user.Get_ID() == 0 && !string.IsNullOrWhiteSpace(GetContactName()))
+            {
+                _user.SetValue(GetUniqueUserValue(GetContactName()));
+            }
+
 
             if (!_user.Save())
             {
@@ -582,6 +593,35 @@ namespace VAdvantage.Model
             return null;
         }
 
+        /// <summary>
+        /// Returns an AD_User.Value that is not used yet: the given value, or the value followed by
+        /// 1, 2, 3 ... when it is already taken. Checked across all clients and ignoring case, so
+        /// the result is safe whichever way the framework scopes the User ID rule. The check runs
+        /// inside the current transaction, so users created earlier in the same run are seen.
+        /// </summary>
+        /// <param name="baseValue">wanted value, for example the contact name</param>
+        /// <returns>unused value</returns>
+        private string GetUniqueUserValue(string baseValue)
+        {
+            const int maxLength = 40;   // AD_User.Value length - keeps name + number inside the column
+            string root = baseValue.Trim();
+            if (root.Length > maxLength)
+                root = root.Substring(0, maxLength);
+
+            string sql = "SELECT COUNT(*) FROM AD_User WHERE UPPER(Value) = UPPER(@userValue)";
+            string candidate = root;
+            int seq = 0;
+            while (seq < 10000
+                && Util.GetValueOfInt(DB.ExecuteScalar(sql,
+                    new System.Data.SqlClient.SqlParameter[] { new System.Data.SqlClient.SqlParameter("@userValue", candidate) },
+                    Get_Trx())) > 0)
+            {
+                seq++;
+                string suffix = seq.ToString();
+                candidate = root.Substring(0, Math.Min(root.Length, maxLength - suffix.Length)) + suffix;
+            }
+            return candidate;
+        }
         /**
          * 	Create BP Location from Lead
          *	@return error message
