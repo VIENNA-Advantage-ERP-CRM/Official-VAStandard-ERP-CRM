@@ -1371,7 +1371,9 @@
                 '<button type="button" class="vas-dol-dialog__close" data-act="cancel-more" aria-label="' + esc(lbl("VAS_248_Close", "Close")) + '" title="' + esc(lbl("VAS_248_Close", "Close")) + '">' + icon("x", "✕") + "</button>" +
                 "</div></header>" +
                 '<div class="vas-dol-dialog__body vas-dol-more-body vas-dol-more-grid" id="vasDolMoreBody"></div>' +
-                (isRO ? '<div class="vas-dol-more-note" role="status">' + esc(lbl("VAS_248_DocLockedViewOnly", "View only – this document is no longer editable.")) + "</div>" : "") +
+                // The "View only" note at the bottom shows on a Completed / Closed shipment only (23-Oct-2026).
+                (isRO && (liveDocStatus() === "CO" || liveDocStatus() === "CL")
+                    ? '<div class="vas-dol-more-note" role="status">' + esc(lbl("VAS_248_DocViewOnly", "View only - this document is no longer editable")) + "</div>" : "") +
                 '<footer class="vas-dol-dialog__footer vas-dol-dialog__footer--end">' +
                 '<button type="button" class="vas-dol-btn vas-dol-btn--primary" data-act="close-more">' + esc(lbl("VAS_248_Done", "Done")) + "</button></footer>"
             );
