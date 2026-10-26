@@ -92,134 +92,8 @@ namespace ModelLibrary.Process
             //  lead.GetRef_BPartner_ID()))
             int ExCustomer = lead.GetC_BPartner_ID();
             int Pospect = lead.GetRef_BPartner_ID();
-
-            if (ExCustomer != 0)
-            {
-                X_VAS_Opportunity opp = new X_VAS_Opportunity(GetCtx(), 0, Get_TrxName());
-                opp.SetAD_Client_ID(lead.GetAD_Client_ID());
-                opp.SetAD_Org_ID(lead.GetAD_Org_ID());
-                opp.SetC_Lead_ID(lead.GetC_Lead_ID());
-                opp.SetC_BPartner_ID(lead.GetC_BPartner_ID());
-                if (lead.Get_ColumnIndex("VAS_LeadNextStep_ID") >= 0)
-                {
-                    opp.SetVAS_LeadNextStep_ID(Util.GetValueOfInt(lead.Get_Value("VAS_LeadNextStep_ID")));
-                }
-                // Addde by Bharat on 19 Feb 2018 to set Ref Partner/Prospect
-                if (opp.Get_ColumnIndex("Ref_BPartner_ID") >= 0)
-                {
-                    opp.Set_Value("Ref_BPartner_ID", lead.GetC_BPartner_ID());
-                }
-                opp.SetSalesRep_ID(lead.GetSalesRep_ID());
-                // X_C_Project.DateContract has no counterpart on X_VAS_Opportunity (dropped).
-                opp.SetC_Campaign_ID(lead.GetC_Campaign_ID());
-                //opp.SetR_Source_ID (lead.GetR_Source_ID());
-                opp.SetAD_User_ID(lead.GetAD_User_ID());
-                VAdvantage.Model.X_C_BPartner bp = new VAdvantage.Model.X_C_BPartner(GetCtx(), ExCustomer, Get_TrxName());
-                //VAdvantage.Model.X_C_BPartner_Location loc=new VAdvantage.Model.X_C_BPartner_Location (GetCtx(),ExCustomer,Get_TrxName());
-
-                opp.SetName(bp.GetName());
-                opp.SetC_BPartner_Location_ID(lead.GetC_BPartner_Location_ID());
-
-                opp.SetIsOpportunity(true);
-                opp.Set_Value("C_EnquiryRdate", lead.GetC_EnquiryRdate());
-
-                opp.SetC_BPartnerSR_ID(lead.GetC_BPartner_ID());
-
-                opp.SkipAIAssistantThreadUpdate = true;
-                if (opp.Save())
-                {
-                    //VAI050-To Save history data on opportunity window
-                    int FromTableID = PO.Get_Table_ID("C_Lead");
-                    // Target is now the VAS_Opportunity table (was hard-coded "C_Project").
-                    int ToTableID = opp.Get_Table_ID();
-                    VAS_CommonMethod.CopyHistorRecordData(FromTableID, ToTableID, opp.GetVAS_Opportunity_ID(), lead.GetC_Lead_ID(), Get_TrxName(), GetCtx());
-                    if (lead.Get_ColumnIndex("VAS_Opportunity_ID") > 0)
-                    {
-                        lead.Set_Value("VAS_Opportunity_ID", opp.GetVAS_Opportunity_ID());
-                    }
-                    lead.SetStatus(X_C_Lead.STATUS_Converted);
-                    lead.SetProcessed(true);
-                    if (lead.Get_ColumnIndex("VAS_IsArchived") >= 0)
-                        lead.Set_Value("VAS_IsArchived", "Y");
-                    if (lead.Get_ColumnIndex("VAS_ArchivedReason") >= 0)
-                        lead.Set_Value("VAS_ArchivedReason", "90");
-                    lead.Save();
-                    // Send Opportunity Data to Knowledge Base
-                    VAS_CommonMethod.SendInfoToAI(ToTableID, opp.Get_ID(), Get_Trx(), GetCtx());
-                    // Send Lead Data to Knowledge Base
-                    VAS_CommonMethod.SendInfoToAI(FromTableID, lead.Get_ID(), Get_Trx(), GetCtx());
-
-                    return Msg.GetMsg(GetCtx(), "OpprtunityGenerateDone");
-
-                }
-                else
-                {
-                    return GetRetrievedError(opp, "OpprtunityGenerateNotDone");
-                    //return Msg.GetMsg(GetCtx(), "OpprtunityGenerateNotDone");
-
-                }
-            }
-            if (Pospect != 0)
-            {
-                X_VAS_Opportunity opp = new X_VAS_Opportunity(GetCtx(), 0, Get_TrxName());
-                opp.SetAD_Client_ID(lead.GetAD_Client_ID());
-                opp.SetAD_Org_ID(lead.GetAD_Org_ID());
-                opp.SetC_Lead_ID(lead.GetC_Lead_ID());
-                opp.SetC_BPartnerSR_ID(lead.GetRef_BPartner_ID());
-                // Addde by Bharat on 19 Feb 2018 to set Ref Partner/Prospect
-                opp.SetRef_BPartner_ID(lead.GetRef_BPartner_ID());
-                opp.SetSalesRep_ID(lead.GetSalesRep_ID());
-                opp.SetC_Campaign_ID(lead.GetC_Campaign_ID());
-                opp.SetAD_User_ID(lead.GetAD_User_ID());
-                VAdvantage.Model.X_C_BPartner bp = new VAdvantage.Model.X_C_BPartner(GetCtx(), Pospect, Get_TrxName());
-                //X_C_BPartner_Location loc = new X_C_BPartner_Location(GetCtx(), Pospect, Get_TrxName());
-
-                opp.SetName(bp.GetName());
-                opp.SetC_BPartner_Location_ID(lead.GetC_BPartner_Location_ID());
-                opp.SetIsOpportunity(true);
-
-                /*Vivek*/
-                // C_EnquiryRdate is not a generated column on X_VAS_Opportunity - copy it only if present.
-                opp.SetC_EnquiryRdate(lead.GetC_EnquiryRdate());
-
-                opp.SkipAIAssistantThreadUpdate = true;
-                if (opp.Save())
-                {
-                    //VAI050-Save history chat data form lead window to opportunity window
-                    int FromTableID = lead.Get_Table_ID();
-                    int ToTableID = opp.Get_Table_ID();
-                    VAS_CommonMethod.CopyHistorRecordData(FromTableID, ToTableID, opp.GetVAS_Opportunity_ID(), lead.GetC_Lead_ID(), Get_TrxName(), GetCtx());
-                    //VAI050-Save history chat data form lead window to prospect window
-                    if (IsProspectCreated)
-                    {
-                        VAS_CommonMethod.CopyHistorRecordData(FromTableID, bp.Get_Table_ID(), bp.GetC_BPartner_ID(), lead.GetC_Lead_ID(), Get_TrxName(), GetCtx());
-                    }
-                    // C_Project_ID is a project FK; link the lead to the new opportunity
-                    // through its VAS_Opportunity_ID column instead (when available).
-                    if (lead.Get_ColumnIndex("VAS_Opportunity_ID") >= 0)
-                    {
-                        lead.Set_Value("VAS_Opportunity_ID", opp.GetVAS_Opportunity_ID());
-                    }
-                    // VIS0060: Set Lead status to Converted.
-                    lead.SetStatus(X_C_Lead.STATUS_Converted);
-                    lead.SetProcessed(true);
-                    lead.Save();
-                    // Send Opportunity Data to Knowledge Base
-                    VAS_CommonMethod.SendInfoToAI(ToTableID, opp.Get_ID(), Get_Trx(), GetCtx());
-                    // Send Lead Data to Knowledge Base
-                    VAS_CommonMethod.SendInfoToAI(FromTableID, lead.Get_ID(), Get_Trx(), GetCtx());
-                    return Msg.GetMsg(GetCtx(), "OpprtunityGenerateDone");
-                }
-                else
-                {
-                    return GetRetrievedError(opp, "OpprtunityGenerateNotDone");
-                    //return Msg.GetMsg(GetCtx(), "OpprtunityGenerateNotDone");
-                }
-
-            }
             if (ExCustomer == 0 && Pospect == 0)
             {
-
                 //CallProcess(_C_Lead_ID);
                 if (lead.GetBPName() == null)
                 {
@@ -235,8 +109,86 @@ namespace ModelLibrary.Process
                 return DoIt();
 
             }
+            int Bpartner_ID = ExCustomer != 0 ? ExCustomer : Pospect;
+            int User_ID = 0;
 
-            return Msg.GetMsg(GetCtx(), "OpprtunityGenerateNotDone");
+            User_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_User_ID FROM AD_User WHERE C_BPartner_ID=" + Bpartner_ID, null, Get_TrxName()));
+            X_VAS_Opportunity opp = new X_VAS_Opportunity(GetCtx(), 0, Get_TrxName());
+            opp.SetAD_Client_ID(lead.GetAD_Client_ID());
+            opp.SetAD_Org_ID(lead.GetAD_Org_ID());
+            opp.SetC_Lead_ID(lead.GetC_Lead_ID());
+            opp.SetC_BPartner_ID(lead.GetC_BPartner_ID());
+            opp.SetDescription(lead.GetDescription());
+            if (Env.IsModuleInstalled("SIT01_"))
+            {
+                opp.Set_Value("R_Source_ID", lead.GetR_Source_ID());
+            }
+            if (lead.Get_ColumnIndex("VAS_LeadNextStep_ID") >= 0)
+            {
+                opp.SetVAS_LeadNextStep_ID(Util.GetValueOfInt(lead.Get_Value("VAS_LeadNextStep_ID")));
+            }
+            // Addde by Bharat on 19 Feb 2018 to set Ref Partner/Prospect
+            if (opp.Get_ColumnIndex("Ref_BPartner_ID") >= 0)
+            {
+                opp.Set_Value("Ref_BPartner_ID", Bpartner_ID);
+            }
+            opp.SetSalesRep_ID(lead.GetSalesRep_ID());
+            // X_C_Project.DateContract has no counterpart on X_VAS_Opportunity (dropped).
+            opp.SetC_Campaign_ID(lead.GetC_Campaign_ID());
+            //opp.SetR_Source_ID (lead.GetR_Source_ID());
+            opp.SetAD_User_ID(User_ID);
+            VAdvantage.Model.X_C_BPartner bp = new VAdvantage.Model.X_C_BPartner(GetCtx(), Bpartner_ID, Get_TrxName());
+            //VAdvantage.Model.X_C_BPartner_Location loc=new VAdvantage.Model.X_C_BPartner_Location (GetCtx(),ExCustomer,Get_TrxName());
+
+            opp.SetName(bp.GetName());
+            opp.SetC_BPartner_Location_ID(lead.GetC_BPartner_Location_ID());
+
+            opp.SetIsOpportunity(true);
+            opp.Set_Value("C_EnquiryRdate", lead.GetC_EnquiryRdate());
+
+            opp.SetC_BPartnerSR_ID(Bpartner_ID);
+            opp.SkipAIAssistantThreadUpdate = true;
+            if (opp.Save())
+            {
+                //VAI050-To Save history data on opportunity window
+                int FromTableID = PO.Get_Table_ID("C_Lead");
+                // Target is now the VAS_Opportunity table (was hard-coded "C_Project").
+                int ToTableID = opp.Get_Table_ID();
+                VAS_CommonMethod.CopyHistorRecordData(FromTableID, ToTableID, opp.GetVAS_Opportunity_ID(), lead.GetC_Lead_ID(), Get_TrxName(), GetCtx());
+                if (IsProspectCreated)
+                {
+                    VAS_CommonMethod.CopyHistorRecordData(FromTableID, bp.Get_Table_ID(), bp.GetC_BPartner_ID(), lead.GetC_Lead_ID(), Get_TrxName(), GetCtx());
+                }
+                if (lead.Get_ColumnIndex("VAS_Opportunity_ID") > 0)
+                {
+                    lead.Set_Value("VAS_Opportunity_ID", opp.GetVAS_Opportunity_ID());
+                }
+
+                lead.SetStatus(X_C_Lead.STATUS_Converted);
+                lead.SetProcessed(true);
+                if (ExCustomer != 0)
+                {
+                    if (lead.Get_ColumnIndex("VAS_IsArchived") >= 0)
+                        lead.Set_Value("VAS_IsArchived", "Y");
+                    if (lead.Get_ColumnIndex("VAS_ArchivedReason") >= 0)
+                        lead.Set_Value("VAS_ArchivedReason", "90");
+                }
+
+                lead.Save();
+                // Send Opportunity Data to Knowledge Base
+                VAS_CommonMethod.SendInfoToAI(ToTableID, opp.Get_ID(), Get_Trx(), GetCtx());
+                // Send Lead Data to Knowledge Base
+                VAS_CommonMethod.SendInfoToAI(FromTableID, lead.Get_ID(), Get_Trx(), GetCtx());
+
+                return Msg.GetMsg(GetCtx(), "OpprtunityGenerateDone");
+
+            }
+            else
+            {
+                return GetRetrievedError(opp, "OpprtunityGenerateNotDone");
+                //return Msg.GetMsg(GetCtx(), "OpprtunityGenerateNotDone");
+
+            }
         }
         private void CallProcess(int lead_id)
         {
