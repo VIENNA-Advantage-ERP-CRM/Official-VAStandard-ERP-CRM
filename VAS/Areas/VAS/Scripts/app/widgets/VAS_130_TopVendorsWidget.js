@@ -570,8 +570,8 @@
             var head = el('div', 'MPC-vnd-m-row MPC-vnd-m-ghead' + (showAttrs ? '' : ' MPC-vnd-m-noattrs'));
             head.appendChild(el('span', null, lbl('VAS_130_TV_ColProduct', 'product')));
             head.appendChild(el('span', null, lbl('VAS_130_TV_ColCode', 'code')));
-            if (showAttrs) { head.appendChild(el('span', null, lbl('VAS_130_TV_ColAttributes', 'attributes'))); }
             head.appendChild(el('span', null, lbl('VAS_130_TV_ColQty', 'Qty (UOM)')));
+
             return head;
         }
 
@@ -579,22 +579,17 @@
             var showAttrs = modalHasAttributes();
             var row = el('div', 'MPC-vnd-m-row MPC-vnd-m-datarow' + (showAttrs ? '' : ' MPC-vnd-m-noattrs'));
 
-            row.appendChild(el('span', 'MPC-vnd-m-primary', item.name || ''));
+            // The product's attributes travel with its name in one cell.
+            var primary = el('span', 'MPC-vnd-m-primary', item.name || '');
+            var attrs = item.attributes || [];
+            var attrText = '';
+            attrs.forEach(function (a) {
+                primary.appendChild(el('span', 'MPC-vnd-chip', a.label + ': ' + a.value));
+                attrText += ' ' + a.label + ': ' + a.value;
+            });
+            primary.title = (item.name || '') + attrText;
+            row.appendChild(primary);
             row.appendChild(el('span', 'MPC-vnd-m-cell', item.code || ''));
-
-            if (showAttrs) {
-                var attrsCell = el('span', 'MPC-vnd-m-attrs');
-                var attrs = item.attributes || [];
-                if (attrs.length) {
-                    attrs.forEach(function (a) {
-                        attrsCell.appendChild(el('span', 'MPC-vnd-chip', a.label + ': ' + a.value));
-                    });
-                } else {
-                    attrsCell.appendChild(el('span', 'MPC-vnd-em-dash', '—'));
-                }
-                row.appendChild(attrsCell);
-            }
-
             var qty = (item.qty != null) ? item.qty : 0;
             row.appendChild(el('span', 'MPC-vnd-m-qty', qty + ' ' + (item.uom || '')));
 

@@ -15,14 +15,13 @@ namespace VIS.Controllers
     /// <summary>
     /// Module Name : Open Transfers KPI Widget (Material Transfer dashboard)
     /// Purpose     : KPI = COUNT(DISTINCT M_Movement_ID) of approved stock transfer documents
-    ///               awaiting dispatch (DocStatus IN ('IP', 'WC', 'IN')). Drafts ('DR')
-    ///               are excluded per §4 tie-breaker rule.
+    ///               awaiting dispatch plus drafts (DocStatus IN ('DR', 'IP', 'WC', 'IN')).
     /// ID Prefix   : VAS_168_
     /// </summary>
     public class VAS_168_OpenTransfersWidgetController : Controller
     {
-        // Excludes 'DR' (Drafted) per spec section 4 tie-breaker rule
-        private const string OpenStatusInList = "'IP', 'WC', 'IN'";
+        // Includes 'DR' (Drafted) so draft transfers count as open
+        private const string OpenStatusInList = "'DR', 'IP', 'WC', 'IN'";
 
 // ===== NEW CODE START — currency format (agent C02, 2026-08-19) =====
         /// <summary>

@@ -14,7 +14,6 @@
  *  # | Current Text                                     | Message Key
  * ---+--------------------------------------------------+------------------------
  *  1 | Search delivery orders by customer, line item... | VAS_144_SearchPlaceholder
- *  2 | Enter opens top match                            | VAS_144_EnterOpensTopMatch
  *  3 | Searching...                                     | VAS_144_Searching
  *  4 | No delivery orders match "..." / Try a customer... (query text appended in code) | VAS_144_NoMatchesHint / VAS_144_NoMatchesHintSuffix
  *  5 | Unable to search delivery orders. Please try...  | VAS_144_SearchError
@@ -624,7 +623,6 @@
                     '<button type="button" class="MPC-dos-clear" aria-label="' + escapeHtml(label('Clear', 'Clear')) + '" style="display:none">' +
                         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>' +
                     '</button>' +
-                    '<span class="MPC-dos-hint">' + escapeHtml(label('VAS_144_EnterOpensTopMatch', 'Enter opens top match')) + '</span>' +
                 '</div>'
             );
             $root.append($pill);

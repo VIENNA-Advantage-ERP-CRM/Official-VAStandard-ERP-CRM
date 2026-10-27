@@ -1947,6 +1947,10 @@ namespace VASLogic.Models
         /// The purchase-order line a product / charge is received against (21-Oct-2026).
         /// The line's current Order Line is kept when it is for the same product / charge;
         /// otherwise the first line (in line order) whose open quantity covers the quantity,
+        /// else the first with anything open, among the lines of the purchase order the
+        /// receipt names. A receipt with no purchase order gets nothing (26-Oct-2026).
+        /// Empty (C_OrderLine_ID = 0) when nothing matches - the panel then leaves the
+        /// Order Line blank.
         /// else the first with anything open. When the receipt names a purchase order only
         /// its lines are considered; without one, the open lines of the receipt's vendor's
         /// completed orders. Empty (C_OrderLine_ID = 0) when nothing matches - the panel
@@ -1975,11 +1979,12 @@ namespace VASLogic.Models
             }
 
             Dictionary<string, string> io = GetInOutVars(ctx, M_InOut_ID);
-            int headerOrder = 0, bpartner = 0;
+            int headerOrder = 0;
             if (io.ContainsKey("C_Order_ID")) int.TryParse(io["C_Order_ID"], out headerOrder);
-            if (io.ContainsKey("C_BPartner_ID")) int.TryParse(io["C_BPartner_ID"], out bpartner);
-            // No order on the receipt and no vendor to narrow by: nothing to pick from.
-            if (headerOrder <= 0 && bpartner <= 0) return none;
+            // Only a receipt created with reference to a purchase order gets its Order Line
+            // picked (26-Oct-2026); without one the field stays blank - no fallback to the
+            // vendor's other orders. A line the user picked by hand is still kept (above).
+            if (headerOrder <= 0) return none;
 
             string sql = @"SELECT ol.C_OrderLine_ID, COALESCE(ol.QtyOrdered, 0) AS QtyOrdered,
                                   COALESCE(ol.QtyDelivered, 0) AS QtyDelivered,
@@ -1991,9 +1996,7 @@ namespace VASLogic.Models
             sql += M_Product_ID > 0
                 ? " AND ol.M_Product_ID = " + M_Product_ID
                 : " AND ol.C_Charge_ID = " + C_Charge_ID;
-            sql += headerOrder > 0
-                ? " AND o.C_Order_ID = " + headerOrder
-                : " AND o.C_BPartner_ID = " + bpartner + " AND o.DocStatus IN ('CO', 'CL')";
+            sql += " AND o.C_Order_ID = " + headerOrder;
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "ol", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             sql += " ORDER BY ol.Line, ol.C_OrderLine_ID";
 

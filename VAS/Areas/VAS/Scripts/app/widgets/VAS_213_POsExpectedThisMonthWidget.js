@@ -1,4 +1,4 @@
-﻿/**
+/**
  * VAS_213_POsExpectedThisMonthWidget
  * Purchase Order Dashboard — Widget 11: POs Expected This Month
  * Widget size: 2 columns x 2 rows (2x2 Glass Widget).
@@ -341,7 +341,7 @@
                 $kpiMeta.attr('title', metaStr);
             }
 
-            // Render top 3 nearest promised orders
+            // Render every expected order, nearest promised first; the list scrolls when long
             if ($listContainer) {
                 $listContainer.empty();
 
@@ -352,10 +352,9 @@
                         '</div>'
                     );
                 } else {
-                    var top3 = records.slice(0, 3);
                     var html = '';
-                    for (var i = 0; i < top3.length; i++) {
-                        var p = top3[i];
+                    for (var i = 0; i < records.length; i++) {
+                        var p = records[i];
                         var pVal = formatMoney(p.POValue, p.CurrencySymbol, p.CurrencyISO);
                         var vendorShort = p.ShortVendorName || p.VendorName || '—';
                         var expDateDisplay = p.PromisedDateShort || p.PromisedDateDisplay || p.PromisedDate || '—';
@@ -428,9 +427,6 @@
                     '<div class="vas-213-modal">' +
                         '<div class="vas-213-modal-header">' +
                             '<div class="vas-213-htxt-wrap">' +
-                                '<button type="button" class="vas-213-xbtn vas-213-back-btn" aria-label="' + esc(lbl('VAS_Back', 'Back')) + '" style="display:none;">' +
-                                    ICON_BACK +
-                                '</button>' +
                                 '<div class="vas-213-htxt">' +
                                     '<h2 class="vas-213-mtitle"></h2>' +
                                     '<div class="vas-213-msub"></div>' +
@@ -451,7 +447,6 @@
             $('body').append($modalHost);
 
             $modalHost.find('.vas-213-close-btn').on('click', closeModal);
-            $modalHost.find('.vas-213-back-btn').on('click', popModal);
 
             $modalHost.on('click', function (e) {
                 if ($(e.target).closest('[data-vas-close]').length) { closeModal(); }
@@ -508,13 +503,6 @@
                 currentModalCfg = cfg;
             } else {
                 currentModalCfg = cfg;
-            }
-
-            var $backBtn = $modalHost.find('.vas-213-back-btn');
-            if (modalStack.length > 0) {
-                $backBtn.show();
-            } else {
-                $backBtn.hide();
             }
 
             var $modal = $modalHost.find('.vas-213-modal');
@@ -849,8 +837,7 @@
                         subtitle: (vendor || data.vendorName) + ' · ' + (dateDisplay || data.orderDateFormatted) + ' · ' + (data.deliveryStatus || lbl('VAS_Pending', 'Pending')),
                         body: bodyHtml,
                         foot: '<span class="vas-213-foot-note">' + esc(poNo) + ' · ' + esc(vendor || data.vendorName) + '</span>' +
-                              '<span><button type="button" class="vas-213-btn" onclick="VAS.VAS_213_POsExpectedThisMonthWidget.back()">' + esc(lbl('VAS_Back', 'Back')) + '</button> ' +
-                              '<button type="button" class="vas-213-btn" data-vas-close="1">' + esc(lbl('VAS_Close', 'Close')) + '</button></span>'
+                              '<span><button type="button" class="vas-213-btn" data-vas-close="1">' + esc(lbl('VAS_Close', 'Close')) + '</button></span>'
                     });
                 },
                 error: function () {
@@ -961,7 +948,6 @@
                                 body: bodyHtml,
                                 foot: '<span class="vas-213-foot-note">' + lines.length + ' ' + esc(lbl('VAS_Lines', 'lines')) + ' · ' + formatNumber(totalOrd) + ' ' + esc(lbl('VAS_QtyOrdered', 'qty ordered')) + ' · ' + esc(lData.deliveryStatus || lbl('VAS_Pending', 'Pending')) + '</span>' +
                                       '<span><button type="button" class="vas-213-btn vas-213-btn-primary" id="vas201_open_window_btn">' + ICON_OPEN_EXT + ' ' + esc(lbl('VAS_OpenInWindow', 'Open in Window')) + '</button> ' +
-                                      '<button type="button" class="vas-213-btn" onclick="VAS.VAS_213_POsExpectedThisMonthWidget.back()">' + esc(lbl('VAS_Back', 'Back')) + '</button> ' +
                                       '<button type="button" class="vas-213-btn" data-vas-close="1">' + esc(lbl('VAS_Close', 'Close')) + '</button></span>',
                                 after: function () {
                                     $('#vas201_open_window_btn').on('click', function () {

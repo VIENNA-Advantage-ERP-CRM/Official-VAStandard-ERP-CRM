@@ -79,10 +79,9 @@ namespace VIS.Controllers
                     mm.DocumentNo         AS DocumentNo,
                     mm.MovementDate       AS MovementDate,
                     COALESCE(u.Name, N'')   AS CreatedBy,
-                    COALESCE(usr.Name, N'') AS RequestedBy
+                    N''                     AS RequestedBy
                 FROM M_Movement mm
                 LEFT JOIN AD_User u   ON u.AD_User_ID = mm.CreatedBy
-                LEFT JOIN AD_User usr ON usr.AD_User_ID = mm.UpdatedBy
                 WHERE mm.IsActive = 'Y'
                   AND mm.DocStatus IN ('CO', 'CL')
                   AND EXTRACT(MONTH FROM mm.MovementDate) = " + month + @"
@@ -144,8 +143,17 @@ namespace VIS.Controllers
                 if (agg.TotalQty > maxQty) { maxQty = agg.TotalQty; }
             }
 
+            // Highest share first in every period; share is monotonic in quantity, so rank by
+            // quantity and break ties by warehouse name (Dictionary order is arbitrary).
+            var orderedAggs = new List<WarehouseAgg>(warehouseMap.Values);
+            orderedAggs.Sort((a, b) =>
+            {
+                int c = b.TotalQty.CompareTo(a.TotalQty);
+                return c != 0 ? c : string.Compare(a.WarehouseName, b.WarehouseName, StringComparison.CurrentCultureIgnoreCase);
+            });
+
             var warehouses = new List<object>();
-            foreach (var agg in warehouseMap.Values)
+            foreach (var agg in orderedAggs)
             {
                 decimal share = grandTotal > 0 ? Math.Round(agg.TotalQty / grandTotal * 100, 1) : 0;
                 int barFill = maxQty > 0 ? (int)Math.Round(agg.TotalQty / maxQty * 100) : 0;
@@ -161,7 +169,7 @@ namespace VIS.Controllers
                         ToLocator    = m.ToLocator,
                         MoveDate     = m.MovementDate.ToString("o"),
                         Products     = m.ProductCount + (m.ProductCount == 1 ? " product" : " products"),
-                        Qty          = m.TotalQty,
+                        Qty          = m.TotalQty, // SUM(MovementQty) = base-unit quantity
                         DoneBy       = m.DoneBy,
                         RequestedBy  = m.RequestedBy
                     });
@@ -322,8 +330,8 @@ namespace VIS.Controllers
                     wSrc.Name            AS SrcWarehouseName,
                     wDst.M_Warehouse_ID  AS DstWarehouseID,
                     wDst.Name            AS DstWarehouseName,
-                    lSrc.Value           AS FromLocator,
-                    lDst.Value           AS ToLocator
+                    COALESCE(lSrc.LocatorCombination, lSrc.Bin, lSrc.Value) AS FromLocator,
+                    COALESCE(lDst.LocatorCombination, lDst.Bin, lDst.Value) AS ToLocator
                 FROM M_MovementLine ml
                 LEFT JOIN M_Locator lSrc ON lSrc.M_Locator_ID = ml.M_Locator_ID
                 LEFT JOIN M_Warehouse wSrc ON wSrc.M_Warehouse_ID = lSrc.M_Warehouse_ID
@@ -357,6 +365,37 @@ namespace VIS.Controllers
             finally
             {
                 if (dr != null) { dr.Close(); dr.Dispose(); }
+            }
+
+            // Requestor = AD_User of the Requisition this transfer was created from
+            // (M_MovementLine.M_RequisitionLine_ID -> M_RequisitionLine -> M_Requisition).
+            // Blank when the transfer has no requisition. Several requisitions: lowest requisition id wins.
+            m.RequestedBy = "";
+            IDataReader rr = null;
+            try
+            {
+                rr = DB.ExecuteReader(@"
+                    SELECT ru.Name AS RequestorName
+                    FROM M_MovementLine rml
+                    INNER JOIN M_RequisitionLine rrl ON rrl.M_RequisitionLine_ID = rml.M_RequisitionLine_ID
+                    INNER JOIN M_Requisition rq ON rq.M_Requisition_ID = rrl.M_Requisition_ID
+                    INNER JOIN AD_User ru ON ru.AD_User_ID = rq.AD_User_ID
+                    WHERE rml.M_Movement_ID = " + m.MovementID + @"
+                      AND rml.IsActive = 'Y'
+                    ORDER BY rq.M_Requisition_ID, rml.Line");
+                if (rr != null && rr.Read())
+                {
+                    m.RequestedBy = Util.GetValueOfString(rr["RequestorName"]);
+                }
+            }
+            catch (Exception)
+            {
+                // Requisition link unavailable - leave the requestor blank, never fail the widget.
+                m.RequestedBy = "";
+            }
+            finally
+            {
+                if (rr != null) { rr.Close(); rr.Dispose(); }
             }
         }
 

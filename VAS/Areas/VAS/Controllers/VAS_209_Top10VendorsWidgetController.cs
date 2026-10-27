@@ -71,12 +71,16 @@ namespace VIS.Controllers
                             o.AD_Org_ID,
                             -- PO value is the order Sub total (excl. taxes), the Sub total field on the PO screen
                             MAX(COALESCE(o.TotalLines, 0)) AS po_value_document_currency,
-                            SUM(COALESCE(ol.QtyOrdered, 0)) AS ordered_qty,
-                            SUM(COALESCE(ol.QtyDelivered, 0)) AS delivered_qty
+                            -- Delivery is judged on Item-type product lines only; charge lines and
+                            -- other product types carry no stock movement.
+                            SUM(CASE WHEN prod.ProductType = 'I' THEN COALESCE(ol.QtyOrdered, 0) ELSE 0 END) AS ordered_qty,
+                            SUM(CASE WHEN prod.ProductType = 'I' THEN COALESCE(ol.QtyDelivered, 0) ELSE 0 END) AS delivered_qty
                         FROM C_Order o
                         INNER JOIN C_OrderLine ol
                             ON ol.C_Order_ID = o.C_Order_ID
                            AND ol.IsActive = 'Y'
+                        LEFT JOIN M_Product prod
+                            ON prod.M_Product_ID = ol.M_Product_ID
                         WHERE o.AD_Client_ID = @ClientID
                           AND o.IsActive = 'Y'
                           AND o.IsSOTrx = 'N'
@@ -302,8 +306,10 @@ namespace VIS.Controllers
                         c.ISO_Code AS DocCurIso,
                         -- Order Sub total (excl. taxes), matching the summary card
                         MAX(COALESCE(o.TotalLines, 0)) AS PoValueDoc,
-                        SUM(COALESCE(ol.QtyOrdered, 0)) AS OrderedQty,
-                        SUM(COALESCE(ol.QtyDelivered, 0)) AS DeliveredQty,
+                        -- Delivery is judged on Item-type product lines only; charge lines and
+                        -- other product types carry no stock movement.
+                        SUM(CASE WHEN prod.ProductType = 'I' THEN COALESCE(ol.QtyOrdered, 0) ELSE 0 END) AS OrderedQty,
+                        SUM(CASE WHEN prod.ProductType = 'I' THEN COALESCE(ol.QtyDelivered, 0) ELSE 0 END) AS DeliveredQty,
                         COUNT(ol.C_OrderLine_ID) AS LineCount,
                         (
                             SELECT MAX(io.MovementDate)
@@ -319,7 +325,9 @@ namespace VIS.Controllers
                     LEFT JOIN M_Warehouse wh ON wh.M_Warehouse_ID = o.M_Warehouse_ID
                     LEFT JOIN AD_User usr ON usr.AD_User_ID = o.SalesRep_ID
                     LEFT JOIN C_Currency c ON c.C_Currency_ID = o.C_Currency_ID
-                    LEFT JOIN C_OrderLine ol ON ol.C_Order_ID = o.C_Order_ID AND ol.IsActive = 'Y'                    WHERE o.AD_Client_ID = @ClientID
+                    LEFT JOIN C_OrderLine ol ON ol.C_Order_ID = o.C_Order_ID AND ol.IsActive = 'Y'
+                    LEFT JOIN M_Product prod ON prod.M_Product_ID = ol.M_Product_ID
+                    WHERE o.AD_Client_ID = @ClientID
                       AND o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
@@ -586,7 +594,7 @@ namespace VIS.Controllers
                         CASE WHEN COALESCE(ol.M_AttributeSetInstance_ID, 0) > 0
                              THEN asi.Description
                              ELSE NULL END AS AttributeDesc,
-                        COALESCE(uom.UOMSymbol, uom.Name) AS UomName,
+                        COALESCE(uom.Name, uom.UOMSymbol) AS UomName,
                         COALESCE(ol.QtyOrdered, 0) AS QtyOrdered,
                         -- QtyEntered is expressed in the line's own C_UOM_ID (the UOM the buyer
                         -- picked); QtyOrdered / QtyDelivered are in the product's base UOM. The

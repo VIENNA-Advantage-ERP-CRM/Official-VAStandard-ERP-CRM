@@ -346,6 +346,25 @@ namespace VAS.Controllers
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
 
+        /// <summary>
+        /// Whether another user's document action holds the order (C_Order.Processing = 'Y').
+        /// Polled by the panel when the hosting tab's data status changes.
+        /// </summary>
+        /// <param name="C_Order_ID">order shown by the panel</param>
+        /// <returns>true / false</returns>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetProcessingLock(int C_Order_ID)
+        {
+            bool locked = false;
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = (Ctx)Session["ctx"];
+                locked = new VAS_303_PurchaseOrderBottomModel().IsProcessingByOtherUser(ctx, C_Order_ID);
+            }
+            return Json(locked, JsonRequestBehavior.AllowGet);
+        }
+
         /// <summary>Deletes the supplied saved order lines through MOrderLine.</summary>
         /// <param name="payload">serialized OrderDeleteLinesRequest</param>
         /// <returns>serialized save result (refreshed lines or error key)</returns>

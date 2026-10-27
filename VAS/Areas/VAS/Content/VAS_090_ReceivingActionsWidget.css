@@ -303,6 +303,26 @@
     position: relative;
 }
 
+/* The confirmation-line and Quality Control pop-ups size to their content: no scroller
+   (the Quality Control rows are paged instead, see QC_PAGE_SIZE in the widget). */
+.vas-ra-modal-body:has(.vas-ra-qc-grid),
+.vas-ra-modal-body:has(.vas-ra-gc-quality-list) {
+    overflow: hidden;
+}
+
+/* GRN document number that opens the Goods Receipt Note window. */
+.vas-ra-grn-link {
+    color: #0083DA;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+    .vas-ra-grn-link:hover,
+    .vas-ra-grn-link:focus {
+        text-decoration: underline;
+        outline: none;
+    }
+
 .vas-ra-modal-busy {
     position: absolute;
     inset: 0;
@@ -725,6 +745,8 @@
     min-width: 0;
 }
 
+    /* Read-only but not greyed: the same white as the editable fields (GRN line, UOM,
+       attribute set instance, target and difference). */
     /* No grey fill on the read-only fields (QA sheet #187). */
     .vas-ra-qc-field.disabled {
         background: #FFFFFF;

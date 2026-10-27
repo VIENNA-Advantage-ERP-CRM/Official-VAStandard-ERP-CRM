@@ -8,6 +8,13 @@
 
 ; (function (VAS, $) {
 
+    // Material Transfer window (new name first, legacy name as the zoom fallback).
+    var TRANSFER_ZOOM_WINDOW_NEW = 'VAS_MaterialTransfer';
+    var TRANSFER_ZOOM_WINDOW_OLD = 'Material Transfer';
+
+    // Longest Description the line takes (the controller truncates to the same).
+    var DESCRIPTION_MAX = 255;
+
     function ensureDashInlineSizeVar($el) {
         if (window.__vasDashInlineSizeObserver) { return; }
         if (typeof ResizeObserver === 'undefined') { return; }
@@ -21,10 +28,13 @@
         write();
     }
 
-    /* Falls back to the English text when the AD_Message key is not defined. */
+    // A message the framework does not know comes back empty, as the key, or as "[key]" - in
+    // any of those cases the English fallback is what the user must see.
     function lbl(key, fallback) {
-        var t = VIS.Msg.getMsg(key);
-        return (t && t.charAt(0) !== '[') ? t : (fallback !== undefined ? fallback : t);
+        var t = '';
+        try { t = VIS.Msg.getMsg(key); } catch (e) { t = ''; }
+        if (t && String(t).charAt(0) !== '[' && t !== key) { return t; }
+        return (fallback !== undefined) ? fallback : key;
     }
 
     function escapeHtml(v) {
@@ -32,6 +42,15 @@
             .replace(/&/g, '&amp;').replace(/</g, '&lt;')
             .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
     }
+
+    // Quantities are shown without floating-point noise (0.1 + 0.2 must read 0.3).
+    function fmtQty(n) {
+        var v = Number(n);
+        if (isNaN(v)) { return '0'; }
+        return String(parseFloat(v.toFixed(6)));
+    }
+
+    function roundQty(n) { return parseFloat(Number(n).toFixed(6)); }
 
     function monthNames() {
         return lbl('VAS_172_Months', 'Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec').split(',');
@@ -76,17 +95,40 @@
 
     function deriveLineStatus(confirmed, target) {
         if (confirmed === null || confirmed === undefined) {
-            return { status: 'Pending', cls: 'vas-172-pill--amber', text: lbl('VAS_172_Pending') };
+            return { status: 'Pending', cls: 'vas-172-pill--amber', text: lbl('VAS_172_Pending', 'Pending') };
         }
         var c = Number(confirmed);
         var t = Number(target);
         if (c === t) {
-            return { status: 'Matched', cls: 'vas-172-pill--ok', text: lbl('VAS_172_Matched') };
+            return { status: 'Matched', cls: 'vas-172-pill--ok', text: lbl('VAS_172_Matched', 'Matched') };
         } else if (c < t) {
-            return { status: 'Short', cls: 'vas-172-pill--bad', text: lbl('VAS_172_Short') + ' (' + (t - c) + ')' };
+            return { status: 'Short', cls: 'vas-172-pill--bad', text: lbl('VAS_172_Short', 'Short') + ' (' + fmtQty(t - c) + ')' };
         } else {
-            return { status: 'Over', cls: 'vas-172-pill--amber', text: lbl('VAS_172_Over') + ' (+' + (c - t) + ')' };
+            return { status: 'Over', cls: 'vas-172-pill--amber', text: lbl('VAS_172_Over', 'Over') + ' (+' + fmtQty(c - t) + ')' };
         }
+    }
+
+    // Quantity precision: the UOM's StdPrecision decides how many decimals may be typed
+    // (0 = whole numbers only). Anything else typed is stripped.
+    function sanitizeQty(raw, prec) {
+        var s = String(raw == null ? '' : raw).replace(/[^0-9.]/g, '');
+        var dot = s.indexOf('.');
+        if (prec <= 0) { return dot >= 0 ? s.substring(0, dot) : s; }
+        if (dot >= 0) {
+            s = s.substring(0, dot + 1) + s.substring(dot + 1).replace(/\./g, '').substring(0, prec);
+        }
+        return s;
+    }
+
+    function numOf(s) {
+        var v = parseFloat(s);
+        return isNaN(v) ? 0 : v;
+    }
+
+    function showInfo(key, fallback) {
+        var msg = lbl(key, fallback);
+        try { VIS.ADialog.info(null, null, msg); }
+        catch (e) { alert(msg); }
     }
 
     VAS.VAS_172_PendingTransferConfirmationWidget = function () {
@@ -99,7 +141,7 @@
         var $root = $('<div class="vas-172-root vas-172-card">');
 
         var allQueueRecords = [];
-        var PAGE_SIZE = 4;
+        var PAGE_SIZE = 3;
         var currentPage = 1;
 
         var $modal = null;
@@ -148,8 +190,8 @@
             var html = '<div class="vas-172-queue">';
             for (var i = 0; i < slice.length; i++) {
                 var item = slice[i];
-                var routeStr = (item.SourceLocator || item.SourceWarehouse || 'Src') + ' → ' + (item.DestLocator || item.DestWarehouse || 'Dst') + ' · ' + (item.LineCount || 0) + ' ' + (item.LineCount === 1 ? lbl('VAS_172_LineCountSingular') : lbl('VAS_172_LineCountPlural'));
-                var statusPill = '<span class="vas-172-pill vas-172-pill--amber">' + escapeHtml(lbl('VAS_172_Pending')) + '</span>';
+                var routeStr = (item.SourceLocator || item.SourceWarehouse || 'Src') + ' → ' + (item.DestLocator || item.DestWarehouse || 'Dst') + ' · ' + (item.LineCount || 0) + ' ' + (item.LineCount === 1 ? lbl('VAS_172_LineCountSingular', 'line') : lbl('VAS_172_LineCountPlural', 'lines'));
+                var statusPill = '<span class="vas-172-pill vas-172-pill--amber">' + escapeHtml(lbl('VAS_172_Pending', 'Pending')) + '</span>';
 
                 html += '<button type="button" class="vas-172-row' + (i === slice.length - 1 ? ' vas-172-row--last' : '') + '" data-idx="' + (start + i) + '">' +
                     '<div class="vas-172-row-top">' +
@@ -215,6 +257,22 @@
             activeLine = null;
         }
 
+        // Opens the transfer in the Material Transfer window. The pop-up is closed first so the
+        // window does not open behind its scrim.
+        function openRecord() {
+            var tr = activeTransfer;
+            if (!tr || !tr.TransferID) { return; }
+            var id = Number(tr.TransferID);
+            closeModal();
+            try {
+                VAS.ZoomUtil.zoomToRecord('M_Movement_ID', id, 0, TRANSFER_ZOOM_WINDOW_NEW, TRANSFER_ZOOM_WINDOW_OLD);
+            } catch (e) { }
+        }
+
+        function openRecordButton() {
+            return '<button type="button" class="vas-172-btn-open" id="vas172-btn-open">' + escapeHtml(lbl('VAS_172_OpenRecord', 'Open Record')) + '</button>';
+        }
+
         function renderModalView1() {
             var tr = activeTransfer;
             var lines = tr.Lines || [];
@@ -226,14 +284,14 @@
                 var s = deriveLineStatus(l.ConfirmedQty, l.TargetQty);
                 if (s.status !== 'Matched') { allMatched = false; }
 
-                var confStr = (l.ConfirmedQty === null || l.ConfirmedQty === undefined) ? '–' : l.ConfirmedQty;
+                var confStr = (l.ConfirmedQty === null || l.ConfirmedQty === undefined) ? '–' : fmtQty(l.ConfirmedQty);
                 linesHtml +=
                     '<button type="button" class="vas-172-line-row" data-lidx="' + i + '">' +
                         '<div class="vas-172-line-left">' +
-                            '<div class="vas-172-line-no">' + escapeHtml(lbl('VAS_172_LineNoPrefix') + ' ' + (l.LineNo || (i + 1))) + '</div>' +
-                            '<div class="vas-172-line-sub">' + escapeHtml((l.ItemName || lbl('VAS_172_Item')) + ' · ' + (l.UOM || '')) + '</div>' +
+                            '<div class="vas-172-line-no">' + escapeHtml(lbl('VAS_172_LineNoPrefix', 'Line') + ' ' + (l.LineNo || (i + 1))) + '</div>' +
+                            '<div class="vas-172-line-sub">' + escapeHtml((l.ItemName || lbl('VAS_172_Item', 'Item')) + ' · ' + (l.UOM || '')) + '</div>' +
                         '</div>' +
-                        '<div class="vas-172-line-count">' + confStr + ' / ' + l.TargetQty + '</div>' +
+                        '<div class="vas-172-line-count">' + confStr + ' / ' + fmtQty(l.TargetQty) + '</div>' +
                         '<span class="vas-172-pill ' + s.cls + '">' + escapeHtml(s.text) + '</span>' +
                         '<span class="vas-172-chevron">&#8250;</span>' +
                     '</button>';
@@ -243,36 +301,36 @@
                 '<div class="vas-172-modal-scrim">' +
                     '<div class="vas-172-modal">' +
                         '<div class="vas-172-modal-header">' +
-                            '<span class="vas-172-modal-title">' + escapeHtml((tr.TransferNo || 'TR') + ' · ' + lbl('VAS_172_TransferConfirmation')) + '</span>' +
-                            '<span class="vas-172-pill vas-172-pill--amber">' + escapeHtml(lbl('VAS_172_Pending')) + '</span>' +
+                            '<span class="vas-172-modal-title">' + escapeHtml((tr.TransferNo || 'TR') + ' · ' + lbl('VAS_172_TransferConfirmation', 'Transfer Confirmation')) + '</span>' +
+                            '<span class="vas-172-pill vas-172-pill--amber">' + escapeHtml(lbl('VAS_172_Pending', 'Pending')) + '</span>' +
+                            openRecordButton() +
                             '<button type="button" class="vas-172-modal-close" id="vas172-m-close">&#215;</button>' +
                         '</div>' +
                         '<div class="vas-172-modal-body">' +
-                            '<button type="button" class="vas-172-back-link" id="vas172-b1">&#8249; ' + escapeHtml(lbl('VAS_172_BackToPendingConfirmations')) + '</button>' +
                             '<div class="vas-172-field-grid">' +
                                 '<div class="vas-172-field">' +
-                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_SourceTransfer')) + '</div>' +
+                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_DocumentNumber', 'Document Number')) + '</div>' +
                                     '<div class="vas-172-field-value">' + escapeHtml(tr.TransferNo || '—') + '</div>' +
                                 '</div>' +
                                 '<div class="vas-172-field">' +
-                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_Route')) + '</div>' +
+                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_Route', 'Route')) + '</div>' +
                                     '<div class="vas-172-field-value">' + escapeHtml((tr.SourceLocator || '') + ' → ' + (tr.DestLocator || '')) + '</div>' +
                                 '</div>' +
                                 '<div class="vas-172-field">' +
-                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_FromToWarehouse')) + '</div>' +
+                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_FromToWarehouse', 'From → To Warehouse')) + '</div>' +
                                     '<div class="vas-172-field-value">' + escapeHtml((tr.SourceWarehouse || '') + ' → ' + (tr.DestWarehouse || '')) + '</div>' +
                                 '</div>' +
                                 '<div class="vas-172-field">' +
-                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_Date')) + '</div>' +
+                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_Date', 'Date')) + '</div>' +
                                     '<div class="vas-172-field-value">' + escapeHtml(formatDate(tr.MovementDate)) + '</div>' +
                                 '</div>' +
                             '</div>' +
-                            '<div class="vas-172-section-heading">' + escapeHtml(lbl('VAS_172_ConfirmationLines')) + '</div>' +
+                            '<div class="vas-172-section-heading">' + escapeHtml(lbl('VAS_172_ConfirmationLines', 'Confirmation Lines')) + '</div>' +
                             '<div class="vas-172-lines-list-container">' +
                                 '<div class="vas-172-lines-list">' + linesHtml + '</div>' +
                             '</div>' +
                             '<div class="vas-172-action-bar">' +
-                                '<button type="button" class="vas-172-btn-complete' + (!allMatched ? ' vas-172-btn-complete--disabled' : '') + '" id="vas172-btn-comp"' + (!allMatched ? ' disabled' : '') + '>' + escapeHtml(lbl('VAS_172_CompleteTransferConfirmation')) + '</button>' +
+                                '<button type="button" class="vas-172-btn-complete' + (!allMatched ? ' vas-172-btn-complete--disabled' : '') + '" id="vas172-btn-comp"' + (!allMatched ? ' disabled' : '') + '>' + escapeHtml(lbl('VAS_172_CompleteTransferConfirmation', 'Complete Transfer Confirmation')) + '</button>' +
                             '</div>' +
                         '</div>' +
                     '</div>' +
@@ -283,7 +341,7 @@
             $('body').append($modal);
 
             $modal.find('#vas172-m-close').on('click', closeModal);
-            $modal.find('#vas172-b1').on('click', closeModal);
+            $modal.find('#vas172-btn-open').on('click', openRecord);
 
             $modal.find('.vas-172-line-row').on('click', function () {
                 var lidx = parseInt($(this).attr('data-lidx'), 10);
@@ -301,59 +359,72 @@
             var tr = activeTransfer;
             var l = activeLine;
 
-            var prefillConf = (l.ConfirmedQty === null || l.ConfirmedQty === undefined) ? l.TargetQty : l.ConfirmedQty;
-            var initialDiff = Number(l.TargetQty || 0) - Number(prefillConf || 0);
+            var target = Number(l.TargetQty || 0);
+            var scrap0 = Number(l.ScrappedQty || 0);
+            // A line not confirmed yet (no value, or the untouched 0) starts at its target.
+            var unconfirmed = (l.ConfirmedQty === null || l.ConfirmedQty === undefined) ||
+                (Number(l.ConfirmedQty) === 0 && scrap0 === 0);
+            var prefillConf = unconfirmed ? roundQty(target - scrap0) : Number(l.ConfirmedQty);
+            var initialDiff = roundQty(target - prefillConf - scrap0);
             var diffCls = initialDiff === 0 ? 'vas-172-diff--ok' : 'vas-172-diff--bad';
+
+            var prec = (l.UOMPrecision === null || l.UOMPrecision === undefined || isNaN(Number(l.UOMPrecision))) ? 0 : Number(l.UOMPrecision);
+            var inputMode = prec > 0 ? 'decimal' : 'numeric';
 
             var modalHtml =
                 '<div class="vas-172-modal-scrim">' +
                     '<div class="vas-172-modal">' +
                         '<div class="vas-172-modal-header">' +
-                            '<span class="vas-172-modal-title">' + escapeHtml(lbl('VAS_172_ReviewConfirmationLine')) + '</span>' +
+                            '<span class="vas-172-modal-title">' + escapeHtml(lbl('VAS_172_ReviewConfirmationLine', 'Review Confirmation Line')) + '</span>' +
+                            openRecordButton() +
                             '<button type="button" class="vas-172-modal-close" id="vas172-m-close2">&#215;</button>' +
                         '</div>' +
-                        '<div class="vas-172-modal-body">' +
-                            '<button type="button" class="vas-172-back-link" id="vas172-b2">&#8249; ' + escapeHtml(lbl('VAS_172_BackTo')) + ' ' + escapeHtml(tr.TransferNo || 'TR') + '</button>' +
+                        '<div class="vas-172-modal-body vas-172-modal-body--v2">' +
+                            '<button type="button" class="vas-172-back-link" id="vas172-b2">&#8249; ' + escapeHtml(lbl('VAS_172_BackTo', 'Back to')) + ' ' + escapeHtml(tr.TransferNo || 'TR') + '</button>' +
                             '<div class="vas-172-v2-grid">' +
                                 '<div class="vas-172-v2-field vas-172-v2-readonly">' +
-                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_TransferLine')) + '</div>' +
-                                    '<div class="vas-172-field-value">' + escapeHtml(lbl('VAS_172_LineNoPrefix') + ' ' + (l.LineNo || 1) + ' · ' + (l.ItemName || lbl('VAS_172_Item'))) + '</div>' +
+                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_TransferLine', 'Transfer Line')) + '</div>' +
+                                    '<div class="vas-172-field-value">' + escapeHtml(lbl('VAS_172_LineNoPrefix', 'Line') + ' ' + (l.LineNo || 1) + ' · ' + (l.ItemName || lbl('VAS_172_Item', 'Item'))) + '</div>' +
                                 '</div>' +
                                 '<div class="vas-172-v2-field vas-172-v2-readonly">' +
-                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_UOM')) + '</div>' +
+                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_UOM', 'UOM')) + '</div>' +
                                     '<div class="vas-172-field-value">' + escapeHtml(l.UOM || '—') + '</div>' +
                                 '</div>' +
                                 '<div class="vas-172-v2-field vas-172-v2-readonly">' +
-                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_AttributeSetInstance')) + '</div>' +
+                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_AttributeSetInstance', 'Attribute Set Instance')) + '</div>' +
                                     '<div class="vas-172-field-value">' + escapeHtml(l.AttributeSetInstance || '—') + '</div>' +
                                 '</div>' +
                                 '<div class="vas-172-v2-field vas-172-v2-readonly">' +
-                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_ScrapLocator')) + '</div>' +
-                                    '<div class="vas-172-field-value">' + escapeHtml(l.ScrapLocator || '—') + '</div>' +
+                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_ReceivingLocator', 'Receiving Locator')) + '</div>' +
+                                    '<div class="vas-172-field-value">' + escapeHtml(l.ReceivingLocator || '—') + '</div>' +
                                 '</div>' +
                                 '<div class="vas-172-v2-field vas-172-v2-readonly">' +
-                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_TargetQuantity')) + '</div>' +
-                                    '<div class="vas-172-field-value" style="font-weight:700;">' + l.TargetQty + '</div>' +
-                                '</div>' +
-                                '<div class="vas-172-v2-field vas-172-v2-editable">' +
-                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_ConfirmedQuantity')) + '</div>' +
-                                    '<input type="number" step="any" class="vas-172-input" id="vas172-inp-conf" value="' + prefillConf + '">' +
+                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_TargetQuantity', 'Target Quantity')) + '</div>' +
+                                    '<div class="vas-172-field-value" style="font-weight:700;">' + fmtQty(target) + '</div>' +
                                 '</div>' +
                                 '<div class="vas-172-v2-field vas-172-v2-readonly">' +
-                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_Difference')) + '</div>' +
-                                    '<div class="vas-172-field-value ' + diffCls + '" id="vas172-diff-val">' + initialDiff + '</div>' +
-                                '</div>' +
-                                '<div class="vas-172-v2-field vas-172-v2-editable vas-172-v2-span2" style="grid-row: span 2;">' +
-                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_DescriptionNote')) + '</div>' +
-                                    '<textarea class="vas-172-textarea" id="vas172-inp-desc" placeholder="' + escapeHtml(lbl('VAS_172_AddNoteOptional')) + '">' + escapeHtml(l.Description || '') + '</textarea>' +
+                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_Difference', 'Difference')) + '</div>' +
+                                    '<div class="vas-172-field-value ' + diffCls + '" id="vas172-diff-val">' + fmtQty(initialDiff) + '</div>' +
                                 '</div>' +
                                 '<div class="vas-172-v2-field vas-172-v2-editable">' +
-                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_ScrappedQuantity')) + '</div>' +
-                                    '<input type="number" step="any" class="vas-172-input" id="vas172-inp-scrap" value="' + (l.ScrappedQty || 0) + '">' +
+                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_ConfirmedQuantity', 'Confirmed Quantity')) + '</div>' +
+                                    '<input type="text" inputmode="' + inputMode + '" autocomplete="off" class="vas-172-input" id="vas172-inp-conf" value="' + fmtQty(prefillConf) + '">' +
+                                '</div>' +
+                                '<div class="vas-172-v2-field vas-172-v2-editable">' +
+                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_ScrappedQuantity', 'Scrapped Quantity')) + '</div>' +
+                                    '<input type="text" inputmode="' + inputMode + '" autocomplete="off" class="vas-172-input" id="vas172-inp-scrap" value="' + fmtQty(scrap0) + '">' +
+                                '</div>' +
+                                '<div class="vas-172-v2-field vas-172-v2-editable vas-172-v2-span2">' +
+                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_ScrapLocator', 'Scrap Locator')) + '</div>' +
+                                    '<select class="vas-172-select" id="vas172-sel-scrap"></select>' +
+                                '</div>' +
+                                '<div class="vas-172-v2-field vas-172-v2-editable vas-172-v2-span2">' +
+                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_DescriptionNote', 'Description / Note')) + '</div>' +
+                                    '<textarea class="vas-172-textarea" id="vas172-inp-desc" rows="2" maxlength="' + DESCRIPTION_MAX + '" placeholder="' + escapeHtml(lbl('VAS_172_AddNoteOptional', 'Add a note (optional)')) + '">' + escapeHtml(l.Description || '') + '</textarea>' +
                                 '</div>' +
                             '</div>' +
-                            '<div style="margin-top:0.75rem; text-align:right;">' +
-                                '<button type="button" class="vas-172-btn-save" id="vas172-btn-save">' + escapeHtml(lbl('VAS_172_SaveLine')) + '</button>' +
+                            '<div class="vas-172-v2-footer">' +
+                                '<button type="button" class="vas-172-btn-save" id="vas172-btn-save">' + escapeHtml(lbl('VAS_172_SaveLine', 'Save Line')) + '</button>' +
                             '</div>' +
                         '</div>' +
                     '</div>' +
@@ -364,38 +435,111 @@
             $('body').append($modal);
 
             $modal.find('#vas172-m-close2').on('click', closeModal);
+            $modal.find('#vas172-btn-open').on('click', openRecord);
             $modal.find('#vas172-b2').on('click', function () { renderModalView1(); });
 
-            var calcDiff = function () {
-                var target = Number(l.TargetQty || 0);
-                var confVal = parseFloat($modal.find('#vas172-inp-conf').val());
-                if (isNaN(confVal)) { confVal = 0; }
-                var diff = target - confVal;
-                var $d = $modal.find('#vas172-diff-val');
-                $d.text(diff);
-                if (diff === 0) {
-                    $d.attr('class', 'vas-172-field-value vas-172-diff--ok');
-                } else {
-                    $d.attr('class', 'vas-172-field-value vas-172-diff--bad');
+            // ---- Scrap locator: options by NAME; the line's current locator is always one of them ----
+            var $sel = $modal.find('#vas172-sel-scrap');
+            var scrapLocatorId = Number(l.ScrapLocatorID || 0);
+            var fillLocators = function (locs) {
+                var html = '';
+                var found = false;
+                for (var i = 0; i < locs.length; i++) {
+                    if (Number(locs[i].LocatorID) === scrapLocatorId) { found = true; }
+                    html += '<option value="' + locs[i].LocatorID + '">' + escapeHtml(locs[i].LocatorName || '') + '</option>';
                 }
+                if (!found && scrapLocatorId > 0) {
+                    html = '<option value="' + scrapLocatorId + '">' + escapeHtml(l.ScrapLocator || '') + '</option>' + html;
+                }
+                if (html === '') { html = '<option value="0">—</option>'; }
+                $sel.html(html);
+                $sel.val(String(scrapLocatorId > 0 ? scrapLocatorId : $sel.find('option').first().val()));
+            };
+            fillLocators([]);
+            if (l.LineID) {
+                $.ajax({
+                    url: VIS.Application.contextUrl + 'VAS_172_PendingTransferConfirmationWidget/GetLocators',
+                    type: 'GET',
+                    cache: false,
+                    data: { lineId: l.LineID },
+                    success: function (res) {
+                        var data = typeof res === 'string' ? JSON.parse(res) : res;
+                        if (data && typeof data === 'string') { data = JSON.parse(data); }
+                        if (data && !data.error && Array.isArray(data.locators) && $modal && $sel.closest('body').length) {
+                            var cur = $sel.val();
+                            scrapLocatorId = Number(cur || scrapLocatorId);
+                            fillLocators(data.locators);
+                        }
+                    }
+                });
+            }
+
+            // ---- Quantities: Target = Confirmed + Difference + Scrapped, always ----
+            var $conf = $modal.find('#vas172-inp-conf');
+            var $scrap = $modal.find('#vas172-inp-scrap');
+            var lastConf = $conf.val();
+            var lastScrap = $scrap.val();
+
+            var showDiff = function () {
+                var diff = roundQty(target - numOf($conf.val()) - numOf($scrap.val()));
+                var $d = $modal.find('#vas172-diff-val');
+                $d.text(fmtQty(diff));
+                $d.attr('class', 'vas-172-field-value ' + (diff === 0 ? 'vas-172-diff--ok' : 'vas-172-diff--bad'));
             };
 
-            $modal.find('#vas172-inp-conf').on('input change', calcDiff);
+            var onQtyInput = function (isConf) {
+                var $inp = isConf ? $conf : $scrap;
+                var clean = sanitizeQty($inp.val(), prec);
+                if (clean !== $inp.val()) { $inp.val(clean); }
+
+                var conf = numOf($conf.val());
+                var scrap = numOf($scrap.val());
+                var msgKey = null, msgFallback = '';
+                if (isConf && conf > target) {
+                    msgKey = 'VAS_172_ConfQtyExceedsTarget'; msgFallback = 'Confirmed Quantity cannot be greater than Target Quantity.';
+                } else if (!isConf && scrap > target) {
+                    msgKey = 'VAS_172_ScrapQtyExceedsTarget'; msgFallback = 'Scrapped Quantity cannot be greater than Target Quantity.';
+                } else if (roundQty(conf + scrap) > target) {
+                    msgKey = 'VAS_172_ConfScrapExceedsTarget'; msgFallback = 'Confirmed Quantity plus Scrapped Quantity cannot be greater than Target Quantity.';
+                }
+
+                if (msgKey) {
+                    // Revert to the last accepted value, then tell the user why.
+                    $inp.val(isConf ? lastConf : lastScrap);
+                    showDiff();
+                    showInfo(msgKey, msgFallback);
+                    return;
+                }
+                if (isConf) { lastConf = $conf.val(); } else { lastScrap = $scrap.val(); }
+                showDiff();
+            };
+
+            $conf.on('input', function () { onQtyInput(true); });
+            $scrap.on('input', function () { onQtyInput(false); });
 
             $modal.find('#vas172-btn-save').on('click', function () {
-                var confVal = parseFloat($modal.find('#vas172-inp-conf').val());
-                var scrapVal = parseFloat($modal.find('#vas172-inp-scrap').val());
-                var descVal = $modal.find('#vas172-inp-desc').val();
+                var confVal = parseFloat($conf.val());
+                var scrapVal = parseFloat($scrap.val());
+                var descVal = String($modal.find('#vas172-inp-desc').val() || '');
+                if (descVal.length > DESCRIPTION_MAX) { descVal = descVal.substring(0, DESCRIPTION_MAX); }
 
                 if (isNaN(confVal) || confVal < 0) {
-                    alert(lbl('VAS_172_ConfirmedQtyValidation'));
+                    alert(lbl('VAS_172_ConfirmedQtyValidation', 'Confirmed quantity must be a number of zero or more.'));
                     return;
                 }
                 if (isNaN(scrapVal) || scrapVal < 0) { scrapVal = 0; }
+                if (roundQty(confVal + scrapVal) > target) {
+                    showInfo('VAS_172_ConfScrapExceedsTarget', 'Confirmed Quantity plus Scrapped Quantity cannot be greater than Target Quantity.');
+                    return;
+                }
+
+                var selId = Number($sel.val() || 0);
+                var selName = $sel.find('option:selected').text();
 
                 l.ConfirmedQty = confVal;
                 l.ScrappedQty = scrapVal;
                 l.Description = descVal;
+                if (selId > 0) { l.ScrapLocatorID = selId; l.ScrapLocator = selName; }
 
                 $.ajax({
                     url: VIS.Application.contextUrl + 'VAS_172_PendingTransferConfirmationWidget/SaveConfirmationLine',
@@ -407,6 +551,7 @@
                         LineNo: l.LineNo || 1,
                         ConfirmedQty: confVal,
                         ScrappedQty: scrapVal,
+                        ScrapLocatorID: selId,
                         Description: descVal
                     }),
                     success: function () {

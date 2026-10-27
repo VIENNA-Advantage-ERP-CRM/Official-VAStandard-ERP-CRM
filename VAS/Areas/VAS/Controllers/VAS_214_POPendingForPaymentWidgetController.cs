@@ -436,7 +436,7 @@ namespace VIS.Controllers
                         CASE WHEN COALESCE(ol.M_AttributeSetInstance_ID, 0) > 0
                              THEN COALESCE(asi.Description, N'')
                              ELSE N'' END AS attribute_desc,
-                        COALESCE(u.UOMSymbol, u.Name) AS uom_name,
+                        COALESCE(u.Name, u.UOMSymbol) AS uom_name,
                         COALESCE(ol.QtyOrdered, 0) AS ordered_qty,
                         -- QtyEntered is expressed in the line's own C_UOM_ID (the UOM the buyer
                         -- picked); QtyOrdered / QtyDelivered are in the product's base UOM. The

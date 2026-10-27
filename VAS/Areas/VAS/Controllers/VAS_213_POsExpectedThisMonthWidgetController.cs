@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿/************************************************************
+﻿﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Controller for Widget 11: POs Expected This Month
  *                  (VAS_213_POsExpectedThisMonthWidget)
@@ -129,7 +129,7 @@ namespace VIS.Controllers
                         rep.Name AS representative_name,
                         c.CurSymbol AS doc_cur_symbol,
                         c.ISO_Code AS doc_cur_iso,
-                        COALESCE(o.GrandTotal, 0) AS po_value,
+                        COALESCE(o.TotalLines, 0) AS po_value,
                         q.ordered_qty,
                         q.delivered_qty
                     FROM C_Order o
@@ -143,12 +143,13 @@ namespace VIS.Controllers
                         ON c.C_Currency_ID = o.C_Currency_ID
                     INNER JOIN (
                         SELECT
-                            C_Order_ID,
-                            SUM(COALESCE(QtyOrdered, 0)) AS ordered_qty,
-                            SUM(COALESCE(QtyDelivered, 0)) AS delivered_qty
-                        FROM C_OrderLine
-                        WHERE IsActive = 'Y'
-                        GROUP BY C_Order_ID
+                            qol.C_Order_ID,
+                            SUM(COALESCE(qol.QtyOrdered, 0)) AS ordered_qty,
+                            SUM(COALESCE(qol.QtyDelivered, 0)) AS delivered_qty
+                        FROM C_OrderLine qol
+                        INNER JOIN M_Product qp ON (qp.M_Product_ID = qol.M_Product_ID AND qp.ProductType = 'I')
+                        WHERE qol.IsActive = 'Y'
+                        GROUP BY qol.C_Order_ID
                     ) q
                         ON q.C_Order_ID = o.C_Order_ID
                     WHERE o.AD_Client_ID = @P_AD_Client_ID
@@ -304,12 +305,13 @@ namespace VIS.Controllers
                     SELECT COUNT(DISTINCT o.C_Order_ID) AS open_count
                     FROM C_Order o
                     INNER JOIN (
-                        SELECT C_Order_ID,
-                               SUM(COALESCE(QtyOrdered, 0)) AS ordered_qty,
-                               SUM(COALESCE(QtyDelivered, 0)) AS delivered_qty
-                        FROM C_OrderLine
-                        WHERE IsActive = 'Y'
-                        GROUP BY C_Order_ID
+                        SELECT qol.C_Order_ID,
+                               SUM(COALESCE(qol.QtyOrdered, 0)) AS ordered_qty,
+                               SUM(COALESCE(qol.QtyDelivered, 0)) AS delivered_qty
+                        FROM C_OrderLine qol
+                        INNER JOIN M_Product qp ON (qp.M_Product_ID = qol.M_Product_ID AND qp.ProductType = 'I')
+                        WHERE qol.IsActive = 'Y'
+                        GROUP BY qol.C_Order_ID
                     ) q ON q.C_Order_ID = o.C_Order_ID
                     WHERE o.AD_Client_ID = " + clientId + @"
                       AND o.IsActive = 'Y'
@@ -393,7 +395,7 @@ namespace VIS.Controllers
                         o.DateOrdered,
                         o.DatePromised,
                         o.DocStatus,
-                        o.GrandTotal,
+                        o.TotalLines AS GrandTotal,
                         bp.Name AS VendorName,
                         w.Name AS WarehouseName,
                         rep.Name AS RepName,
@@ -467,7 +469,7 @@ namespace VIS.Controllers
                         CASE WHEN COALESCE(ol.M_AttributeSetInstance_ID, 0) > 0
                              THEN COALESCE(asi.Description, N'')
                              ELSE N'' END AS attribute_desc,
-                        COALESCE(u.UOMSymbol, u.Name, N'') AS uom_name,
+                        COALESCE(u.Name, u.UOMSymbol, N'') AS uom_name,
                         COALESCE(ol.QtyOrdered, 0) AS ordered_qty,
                         -- QtyEntered is expressed in the line's own C_UOM_ID (the UOM the buyer
                         -- picked); QtyOrdered / QtyDelivered are in the product's base UOM. The
@@ -504,9 +506,13 @@ namespace VIS.Controllers
                         decimal amount = Util.GetValueOfDecimal(lDr["line_net_amt"]);
                         decimal pending = Math.Max(0m, ordered - delivered);
 
-                        totalOrderedQty += ordered;
-                        totalDeliveredQty += delivered;
                         totalLineNetAmt += amount;
+                        // Delivery roll-ups count Item products only - charges and other product types are excluded.
+                        if (Util.GetValueOfString(lDr["IsNonStock"]) != "Y")
+                        {
+                            totalOrderedQty += ordered;
+                            totalDeliveredQty += delivered;
+                        }
 
                         // Quantities are shown in the UOM the line was entered in. QtyEntered is in the
                         // line's own C_UOM_ID; QtyOrdered / QtyDelivered are in the product's base UOM,
@@ -652,7 +658,7 @@ namespace VIS.Controllers
                         o.DateOrdered AS order_date,
                         o.DatePromised AS promised_date,
                         o.DocStatus AS doc_status,
-                        o.GrandTotal AS grand_total,
+                        o.TotalLines AS grand_total,
                         bp.Name AS vendor_name,
                         w.Name AS warehouse_name,
                         u.Name AS created_by_name,

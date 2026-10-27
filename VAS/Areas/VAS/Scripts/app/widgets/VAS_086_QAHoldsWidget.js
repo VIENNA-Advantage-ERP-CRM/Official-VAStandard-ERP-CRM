@@ -11,7 +11,6 @@
  *  #  | Current Text            | Message Key
  * ----+-------------------------+---------------------------
  *  1  | QA Holds                | VAS_086_QAHolds
- *  2  | Tap a receipt...        | VAS_086_QAHoldsSubtitle
  *  3  | Quality Control         | VAS_086_QualityControl
  *  4  | Quality check           | VAS_086_QualityCheck
  *  5  | Actual Value            | VAS_086_ActualValue
@@ -217,7 +216,6 @@
                 '<span class="vas-qah-ico">' + icon("shield") + '</span>' +
                 '<div class="vas-qah-titles">' +
                 '<div class="vas-qah-title">' + escapeHtml(lbl("VAS_086_QAHolds", "QA Holds")) + '</div>' +
-                '<div class="vas-qah-sub">' + escapeHtml(lbl("VAS_086_QAHoldsSubtitle", "Tap a receipt to verify quality")) + '</div>' +
                 '</div>' +
                 '</div>'
             );

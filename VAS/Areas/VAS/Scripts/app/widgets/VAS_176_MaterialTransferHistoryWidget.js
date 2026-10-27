@@ -22,10 +22,10 @@
         write();
     }
 
-    /* Falls back to the English text when the AD_Message key is not defined. */
+    /* Falls back to the English text when the AD_Message key is not defined (getMsg echoes the key or [key]). */
     function lbl(key, fallback) {
         var t = VIS.Msg.getMsg(key);
-        return (t && t.charAt(0) !== '[') ? t : fallback;
+        return (t && t !== key && t !== '[' + key + ']') ? t : fallback;
     }
 
     function escapeHtml(v) {
@@ -81,13 +81,13 @@
         var DATE_FIELD = 'MovementDate';
 
         /* Single column template shared by the header row and every body row. */
-        var COLS = [{"label": "Document", "fr": 1.0}, {"label": "Date", "fr": 1.4}, {"label": "From / To", "fr": 2.2}, {"label": "Qty", "fr": 0.7, "right": true}];
+        var COLS = [{"label": "Document", "fr": 1.0}, {"label": "Date", "fr": 1.4}, {"label": "From / To", "fr": 2.2}, {"label": "Qty (In Base UOM)", "key": "VAS_176_ColQtyInBaseUOM", "fr": 1.0, "right": true}];
         var GRID = COLS.map(function (c) { return 'minmax(0,' + c.fr + 'fr)'; }).join(' ');
 
         function rowCells(r) {
             var route = (r.FromWarehouse || '—') + ' → ' + (r.ToWarehouse || '—');
             return [
-                { t: r.DocumentNo || '—', primary: true },
+                { t: r.DocumentNo || '—', primary: true, link: r.MovementID },
                 { t: formatDate(r.MovementDate) },
                 { t: route },
                 { t: formatQty(r.TotalQty), title: formatQty(r.TotalQty) + ' (' + (r.LineCount || 0) + ' ' + lbl('VAS_176_Lines', 'lines') + ')' }
@@ -105,14 +105,14 @@
                         '<div class="vas-176-icon-well"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg></div>' +
                         '<div class="vas-176-title-block">' +
                             '<div class="vas-176-title" title="' + escapeHtml(lbl('VAS_176_Title', 'Material Transfer History')) + '">' + escapeHtml(lbl('VAS_176_Title', 'Material Transfer History')) + '</div>' +
-                            '<div class="vas-176-subtitle">' + escapeHtml(lbl('VAS_176_Subtitle', 'Completed and closed transfers')) + '</div>' +
+                            '<div class="vas-176-subtitle" title="' + escapeHtml(lbl('VAS_176_SubtitleHistory', 'History of completed and closed material transfers')) + '">' + escapeHtml(lbl('VAS_176_SubtitleHistory', 'History of completed and closed material transfers')) + '</div>' +
                         '</div>' +
                     '</div>' +
                     '<span class="vas-176-pills"></span>' +
                     (HAS_FILTERS ?
                     '<div class="vas-176-filters">' +
-                        '<div class="vas-176-dropdown" data-dd="m"><button type="button" class="vas-176-dropdown-btn"><span class="vas-176-dd-lbl">' + escapeHtml(MONTHS[selMonth - 1] || lbl('VAS_176_AllMonths', 'All Months')) + '</span></button></div>' +
-                        '<div class="vas-176-dropdown" data-dd="y"><button type="button" class="vas-176-dropdown-btn"><span class="vas-176-dd-lbl">' + escapeHtml(selYear ? String(selYear) : lbl('VAS_176_AllYears', 'All Years')) + '</span></button></div>' +
+                        '<div class="vas-176-dropdown" data-dd="m"><button type="button" class="vas-176-dropdown-btn"><span class="vas-176-dd-lbl">' + escapeHtml(MONTHS[selMonth - 1]) + '</span></button></div>' +
+                        '<div class="vas-176-dropdown" data-dd="y"><button type="button" class="vas-176-dropdown-btn"><span class="vas-176-dd-lbl">' + escapeHtml(String(selYear)) + '</span></button></div>' +
                     '</div>' : '') +
                 '</div>' +
                 '<div class="vas-176-table-wrap">' +
@@ -125,7 +125,7 @@
 
             var hdr = '';
             COLS.forEach(function (c) {
-                var t = lbl('VAS_176_Col' + c.label.replace(/[^A-Za-z]/g, ''), c.label);
+                var t = lbl(c.key || ('VAS_176_Col' + c.label.replace(/[^A-Za-z]/g, '')), c.label);
                 hdr += '<span class="vas-176-th' + (c.right ? ' vas-176-right' : '') + '" title="' + escapeHtml(t) + '">' + escapeHtml(t) + '</span>';
             });
             $root.find('.vas-176-table-header').css('grid-template-columns', GRID).html(hdr);
@@ -140,12 +140,17 @@
                 var key = $(this).closest('.vas-176-dropdown').attr('data-dd');
                 var val = parseInt($(this).attr('data-v'), 10);
                 if (key === 'm') { selMonth = val; } else { selYear = val; }
-                $(this).closest('.vas-176-dropdown').find('.vas-176-dd-lbl').text(val === 0 ? (key === 'm' ? lbl('VAS_176_AllMonths', 'All Months') : lbl('VAS_176_AllYears', 'All Years')) : $(this).text());
+                $(this).closest('.vas-176-dropdown').find('.vas-176-dd-lbl').text($(this).text());
                 closeMenus();
                 page = 1;
                 applyFilter();
             });
             $(document).on('click.vas176', closeMenus);
+            $root.on('click', '.vas-176-doc-link', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                openTransfer($(this).attr('data-id'));
+            });
             $root.on('click', '.vas-176-pager-btn', function () {
                 var dir = parseInt($(this).attr('data-dir'), 10);
                 var total = Math.max(1, Math.ceil(filtered.length / rowsPerPage));
@@ -154,6 +159,21 @@
             });
 
             setupObservers();
+        }
+
+        /* Shows the full subtitle as a tooltip only when it is clipped (ellipsis). */
+        function updateSubtitleTip() {
+            var el = $root.find('.vas-176-subtitle')[0];
+            if (!el) { return; }
+            var full = lbl('VAS_176_SubtitleHistory', 'History of completed and closed material transfers');
+            if (el.scrollWidth > el.clientWidth) { el.setAttribute('title', full); } else { el.removeAttribute('title'); }
+        }
+
+        function openTransfer(id) {
+            if (!id) { return; }
+            try {
+                VAS.ZoomUtil.zoomToRecord('M_Movement_ID', Number(id), 0, 'VAS_MaterialTransfer', 'Material Transfer');
+            } catch (e) { }
         }
 
         function closeMenus() {
@@ -168,12 +188,10 @@
             openMenu = key;
             var html = '<div class="vas-176-dropdown-menu">';
             if (key === 'm') {
-                html += '<div class="vas-176-dd-option' + (selMonth === 0 ? ' vas-176-dd-option--sel' : '') + '" data-v="0">' + escapeHtml(lbl('VAS_176_AllMonths', 'All Months')) + '</div>';
                 MONTHS.forEach(function (m, i) {
                     html += '<div class="vas-176-dd-option' + (selMonth === i + 1 ? ' vas-176-dd-option--sel' : '') + '" data-v="' + (i + 1) + '">' + m + '</div>';
                 });
             } else {
-                html += '<div class="vas-176-dd-option' + (selYear === 0 ? ' vas-176-dd-option--sel' : '') + '" data-v="0">' + escapeHtml(lbl('VAS_176_AllYears', 'All Years')) + '</div>';
                 years().forEach(function (y) {
                     html += '<div class="vas-176-dd-option' + (selYear === y ? ' vas-176-dd-option--sel' : '') + '" data-v="' + y + '">' + y + '</div>';
                 });
@@ -192,6 +210,7 @@
         function setupObservers() {
             if (typeof ResizeObserver === 'undefined') { return; }
             widgetObserver = new ResizeObserver(function (entries) {
+                updateSubtitleTip();
                 for (var i = 0; i < entries.length; i++) {
                     var width = entries[i].contentRect.width;
                     if (width > 0) { $root[0].style.setProperty('--widget-inline-size', width + 'px'); }
@@ -202,7 +221,7 @@
             widgetObserver.observe($wrapper[0]);
 
             /* Adaptive row count: rows that fit the body = floor(height / row height). */
-            bodyObserver = new ResizeObserver(function () { recalcRows(); });
+            bodyObserver = new ResizeObserver(function () { recalcRows(); updateSubtitleTip(); });
             bodyObserver.observe($root.find('.vas-176-table-body')[0]);
         }
 
@@ -217,7 +236,6 @@
 
         function applyFilter() {
             filtered = allRecords.filter(function (r) {
-                if (!selYear && !selMonth) { return true; }
                 var d = ymd(r[DATE_FIELD]);
                 if (!d) { return false; }
                 if (selYear && d.y !== selYear) { return false; }
@@ -256,11 +274,12 @@
                 for (var j = 0; j < cells.length; j++) {
                     var c = cells[j];
                     var cls = 'vas-176-cell' + (c.primary ? ' vas-176-cell--primary' : '') + (COLS[j].right ? ' vas-176-right' : '');
-                    html += '<span class="' + cls + '" title="' + escapeHtml(c.title || c.t) + '">' + (c.html || escapeHtml(c.t)) + '</span>';
+                    html += '<span class="' + cls + '" title="' + escapeHtml(c.title || c.t) + '">' + (c.link ? '<a class="vas-176-doc-link" href="javascript:void(0)" data-id="' + escapeHtml(c.link) + '">' + escapeHtml(c.t) + '</a>' : (c.html || escapeHtml(c.t))) + '</span>';
                 }
                 html += '</div>';
             }
             $body.html(html);
+            updateSubtitleTip();
 
             if (filtered.length > rowsPerPage) {
                 $footer.html(
