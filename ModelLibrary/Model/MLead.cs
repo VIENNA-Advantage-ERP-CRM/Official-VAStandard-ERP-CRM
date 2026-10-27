@@ -5,6 +5,7 @@
  * Chronological    Development
  * Raghunandan     05-Jun-2009
  * VAI052           23-Oct-2026  CreateBPContact: unique AD_User.Value for the new contact
+ * VAI052           26-Oct-2026  CreateBP: clear error messages (VAS_LeadCreateBP*), real save error reported
   ******************************************************/
 using System;
 using System.Collections;
@@ -427,13 +428,16 @@ namespace VAdvantage.Model
                 }
                 if (!_bp.Save())
                 {
-                    return "@SaveError@";
+                    return GetSaveErrorMessage("VAS_LeadCreateBPFailed");
                 }
                 //	Update User
                 if (_user != null && _user.GetC_BPartner_ID() == 0)
                 {
                     _user.SetC_BPartner_ID(_bp.GetC_BPartner_ID());
-                    _user.Save();
+                    if (!_user.Save())
+                    {
+                        return GetSaveErrorMessage("VAS_LeadCreateBPUserLinkFailed");
+                    }
                 }
                 //	Save BP
                 SetRef_BPartner_ID(_bp.GetC_BPartner_ID());
@@ -443,10 +447,19 @@ namespace VAdvantage.Model
             string error = CreateBPContact();
             if (error != null && error.Length > 0)
                 return error;
-            CreateBPLocation();
+
+            //VAI052-Without a Business Partner the location and the update below cannot work
+            //(previously ended in a NullReferenceException), so report it clearly instead
+            if (_bp == null)
+            {
+                return Msg.GetMsg(GetCtx(), "VAS_LeadCreateBPNoPartner");
+            }
+            error = CreateBPLocation();
+            if (error != null && error.Length > 0)
+                return error;
 
             try
-            {   
+            {
                 int id = _bp.GetC_BPartner_ID();
                 //VAI052 22-oct-26 removed part , Value='" + _bp.GetValue() + GetBPName() + "';
                 string qry = "UPDATE C_BPartner SET Description='' WHERE C_BPartner_ID=" + id;
@@ -493,9 +506,9 @@ namespace VAdvantage.Model
                             Prospect.SetC_Job_ID(jobID);
                             Prospect.SetSubscribeDate(DateTime.Today);
                             Prospect.SetEMail(mail);
-                            if (Prospect.Save())
+                            if (!Prospect.Save())
                             {
-
+                                return GetSaveErrorMessage("VAS_LeadCreateBPInterestFailed");
                             }
                         }
                     }
@@ -505,7 +518,7 @@ namespace VAdvantage.Model
             catch (Exception ex)
             {
                 log.Log(Level.SEVERE, "MLead" + ex.Message, ex);
-                return "@SaveError@";
+                return Msg.GetMsg(GetCtx(), "VAS_LeadCreateBPUpdateFailed");
                 //if (dr != null)
                 //{
                 //    dr.Close();
@@ -586,10 +599,9 @@ namespace VAdvantage.Model
 
             if (!_user.Save())
             {
-                log.Warning("Contact not saved");
+                return GetSaveErrorMessage("VAS_LeadCreateBPContactFailed");
             }
-            else
-                SetAD_User_ID(_user.GetAD_User_ID());
+            SetAD_User_ID(_user.GetAD_User_ID());
             return null;
         }
 
@@ -663,10 +675,42 @@ namespace VAdvantage.Model
                 bpl.SetPhone2(GetPhone2());
                 bpl.SetFax(GetFax());
                 bpl.SetC_SalesRegion_ID(GetC_SalesRegion_ID());
-                if (bpl.Save())
-                    SetC_BPartner_Location_ID(bpl.GetC_BPartner_Location_ID());
+                if (!bpl.Save())
+                {
+                    return GetSaveErrorMessage("VAS_LeadCreateBPPartnerLocationFailed");
+                }
+                SetC_BPartner_Location_ID(bpl.GetC_BPartner_Location_ID());
+            }
+            else
+            {
+                return GetSaveErrorMessage("VAS_LeadCreateBPAddressFailed");
             }
             return null;
+        }
+
+        /// <summary>
+        /// Translated message for a failed save, followed by the reason the framework recorded
+        /// (when there is one), so the user sees why and not only that the save failed.
+        /// </summary>
+        /// <param name="msgKey">message key</param>
+        /// <returns>message</returns>
+        private string GetSaveErrorMessage(string msgKey)
+        {
+            string msg = Msg.GetMsg(GetCtx(), msgKey);
+            ValueNamePair vp = VLogger.RetrieveError();
+            if (vp != null)
+            {
+                string detail = vp.GetName();
+                if (string.IsNullOrEmpty(detail))
+                {
+                    detail = vp.GetValue();
+                }
+                if (!string.IsNullOrEmpty(detail))
+                {
+                    msg += ": " + detail;
+                }
+            }
+            return msg;
         }
 
         /**

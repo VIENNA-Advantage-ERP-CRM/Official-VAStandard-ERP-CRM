@@ -5,6 +5,7 @@
  * Class Used     : ProcessEngine.SvrProcess
  * Chronological    Development
  * Deepak           09-Dec-2009
+ * VAI052           26-Oct-2026   Clear, translatable error messages (VAS_LeadToBP*)
   ******************************************************/
 using System;
 using System.Collections;
@@ -79,7 +80,7 @@ namespace ViennaAdvantage.Process
             log.Info("C_Lead_ID=" + _C_Lead_ID);
             if (_C_Lead_ID == 0)
             {
-                throw new Exception("@C_Lead_ID@ ID=0");
+                throw new Exception(Msg.GetMsg(GetCtx(), "VAS_LeadToBPLeadNotSelected"));
             }
 
             MLead lead = new MLead(GetCtx(), _C_Lead_ID, Get_TrxName());
@@ -125,11 +126,11 @@ namespace ViennaAdvantage.Process
             }
             if (lead.GetBPName() == null)
             {
-                return Msg.GetMsg(GetCtx(), "PleaseEnterProspectDetails");
+                return Msg.GetMsg(GetCtx(), "VAS_LeadToBPCompanyNameRequired");
             }
             if (lead.Get_ID() != _C_Lead_ID)
             {
-                throw new Exception("@NotFound@: @C_Lead_ID@ ID=" + _C_Lead_ID);
+                throw new Exception(Msg.GetMsg(GetCtx(), "VAS_LeadToBPLeadNotFound") + " ID=" + _C_Lead_ID);
             }
             //
             String retValue = lead.CreateBP();
@@ -157,7 +158,8 @@ namespace ViennaAdvantage.Process
             // VIS0060: Set Lead status to Converted.
             lead.SetStatus(X_C_Lead.STATUS_Converted);
             //lead.SetProcessed(true);
-            lead.Save();
+            if (!lead.Save())
+                return GetRetrievedError(lead, "VAS_LeadToBPLeadNotSaved");
 
             // Work done specific to SOTC Module
             if (Env.IsModuleInstalled("VA047_"))
@@ -183,7 +185,7 @@ namespace ViennaAdvantage.Process
                     }
 
                     if (!_cbp.Save())
-                        log.SaveError("ERROR:", "Error in Saving Bpartner");
+                        return GetRetrievedError(_cbp, "VAS_LeadToBPBPartnerNotSaved");
                 }
                 if (lead.GetAD_User_ID() > 0)
                 { // Commented few lines as it is overwriting data and few fields are not available on DB level
@@ -203,7 +205,7 @@ namespace ViennaAdvantage.Process
                     _user.SetEMail(lead.GetEMail());
                     _user.SetDescription(lead.GetDescription());
                     if (!_user.Save())
-                        log.SaveError("ERROR:", "Error in Saving User");
+                        return GetRetrievedError(_user, "VAS_LeadToBPContactNotSaved");
                 }
 
                 #region Customer Screening
@@ -244,7 +246,8 @@ namespace ViennaAdvantage.Process
 
                     //C_Location_ID
 
-                    bp.Save();
+                    if (!bp.Save())
+                        return GetRetrievedError(bp, "VAS_LeadToBPBPartnerNotSaved");
 
                     if (val == "CO")
                     {
@@ -283,9 +286,10 @@ namespace ViennaAdvantage.Process
                                     cspr.Set_Value("VA047_WealthEvaluation", Util.GetValueOfString(cus.Get_Value("VA047_WealthEvaluation")));
                                 cspr.Set_Value("Va047_BuyDate", Util.GetValueOfDateTime(cus.Get_Value("Va047_BuyDate")));
                                 if (!cspr.Save())
-                                    log.SaveError("ERROR:", "Error in Saving CustomerScreening");
+                                    return GetRetrievedError(cspr, "VAS_LeadToBPScreeningNotSaved");
                                 bp.Set_Value("C_Lead_Target", "CO");
-                                bp.Save();
+                                if (!bp.Save())
+                                    return GetRetrievedError(bp, "VAS_LeadToBPBPartnerNotSaved");
                             }
                         }
                     }
@@ -332,16 +336,18 @@ namespace ViennaAdvantage.Process
                                     cspr.Set_Value("VA047_WealthEvaluation", Util.GetValueOfString(cus.Get_Value("VA047_WealthEvaluation")));
                                 cspr.Set_Value("VA047_DecideDate", Util.GetValueOfDateTime(cus.Get_Value("VA047_DecideDate")));
                                 if (!cspr.Save())
-                                    log.SaveError("ERROR:", "Error in Saving PartnererScreening");
+                                    return GetRetrievedError(cspr, "VAS_LeadToBPScreeningNotSaved");
                                 bp.Set_Value("C_Lead_Target", "PS");
                                 bp.SkipAIAssistantThreadUpdate = true;
-                                bp.Save();
+                                if (!bp.Save())
+                                    return GetRetrievedError(bp, "VAS_LeadToBPBPartnerNotSaved");
                             }
                         }
                     }
                     //lead.SetC_BPartner_ID(C_BpID);
                     lead.Set_Value("Ref_BPartner_ID", C_BpID);
-                    lead.Save(Get_TrxName());
+                    if (!lead.Save(Get_TrxName()))
+                        return GetRetrievedError(lead, "VAS_LeadToBPLeadNotSaved");
                 }
                 #endregion                
             }
