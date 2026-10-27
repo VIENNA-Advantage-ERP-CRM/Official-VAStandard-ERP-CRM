@@ -1667,27 +1667,6 @@
         function persistGRNConfirmationLine(payload) {
             if (!gcDetail || gcLineIndex < 0) { return; }
 
-                    var lineRows = [];
-                    var allRows = (data && !data.error && data.rows) ? data.rows : [];
-                    for (var q = 0; q < allRows.length; q++) {
-                        if (Number(allRows[q].lineConfirmId) === Number(line.lineConfirmId)) { lineRows.push(allRows[q]); }
-                    }
-                    if (lineRows.length === 0) {
-                        postGRNConfirmationLine(payload);
-                        return;
-                    }
-                    gcQualityRows = lineRows;
-                    gcQualityPendingLine = payload;
-                    loadGCQualityValueOptions(0);
-                },
-                error: function () {
-                    /* The quality lookup is best-effort: the line itself must still be saveable. */
-                    postGRNConfirmationLine(payload);
-                }
-            });
-        }
-
-        function postGRNConfirmationLine(payload) {
             showDialogBusy(true);
             $dialogBody.find('.vas-ra-gc-save-line').prop('disabled', true);
 
@@ -1894,14 +1873,7 @@
                 gcQualityRows = [];
                 var afterSave = gcQualityAfterSave;
                 gcQualityAfterSave = null;
-                if (afterSave) { afterSave(); }
-                if (gcQualityPendingLine) {
-                    /* QA #189: the values are recorded, now the confirmation line itself is saved. */
-                    var pendingLine = gcQualityPendingLine;
-                    gcQualityPendingLine = null;
-                    postGRNConfirmationLine(pendingLine);
-                    return;
-                }
+                if (afterSave) { afterSave(); return; }
                 resolveGRNConfirmation('CompleteGRNConfirmation', '.vas-ra-gc-quality-save');
                 return;
             }
