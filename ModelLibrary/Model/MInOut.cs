@@ -2667,6 +2667,14 @@ namespace VAdvantage.Model
 
                 log.Info("Line=" + sLine.GetLine() + " - Qty=" + sLine.GetMovementQty() + "Return " + IsReturnTrx());
 
+
+                // VIS_045: 27-Oct-2026  reset transaction id on Costing Check for the product which is not marked as stocked.
+                // This is done so that no to update costing for non stocked product on product transaction.
+                if (costingCheck != null && product != null && !product.IsStocked())
+                {
+                    costingCheck.M_Transaction_ID = 0;
+                }
+
                 //	Stock Movement - Counterpart MOrder.reserveStock
                 if (product != null
                     && product.IsStocked())
