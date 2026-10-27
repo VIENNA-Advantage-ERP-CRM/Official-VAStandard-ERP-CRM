@@ -54,7 +54,8 @@
         var $busy;
 
         function lbl(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            var m = VIS.Msg.getMsg(key);
+            return (m && m !== key && m !== '[' + key + ']') ? m : fallback;
         }
 
         function showBusy(show) {

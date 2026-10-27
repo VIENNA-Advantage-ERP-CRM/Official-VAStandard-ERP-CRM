@@ -415,6 +415,11 @@
            up that element's expected landed cost for the selected month.
            ============================================================ */
         var $elcMask = null;
+        // Drill-down popup pages client-side: 10 purchase orders per page.
+        var MODAL_PAGE_SIZE = 10;
+        var modalRows = [];
+        var modalPageNo = 1;
+        var modalData = null;
 
         function ensureCostModal() {
             if ($elcMask && $elcMask.length && document.body.contains($elcMask[0])) { return; }
@@ -434,6 +439,15 @@
                         '<div class="vas-elc-modal-body"></div>' +
                         '<div class="vas-elc-modal-foot">' +
                             '<span class="vas-elc-mnote"></span>' +
+                            '<span class="vas-elc-pager vas-elc-mpager" style="display:none">' +
+                                '<button type="button" class="vas-elc-pbtn vas-elc-mprev" aria-label="' + escapeHtml(label('VAS_Previous', 'Previous')) + '">' +
+                                    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>' +
+                                '</button>' +
+                                '<span class="vas-elc-ptxt vas-elc-mptxt"></span>' +
+                                '<button type="button" class="vas-elc-pbtn vas-elc-mnext" aria-label="' + escapeHtml(label('VAS_Next', 'Next')) + '">' +
+                                    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>' +
+                                '</button>' +
+                            '</span>' +
                             '<button type="button" class="vas-elc-mbtn">' + escapeHtml(label('VAS_Close', 'Close')) + '</button>' +
                         '</div>' +
                     '</div>' +
@@ -442,6 +456,12 @@
 
             $('body').append($elcMask);
             $elcMask.find('.vas-elc-mclose, .vas-elc-mbtn').on('click', closeCostModal);
+            $elcMask.find('.vas-elc-mprev').on('click', function () {
+                if (modalPageNo > 1) { modalPageNo--; renderCostModalPage(); }
+            });
+            $elcMask.find('.vas-elc-mnext').on('click', function () {
+                if (modalPageNo < Math.ceil(modalRows.length / MODAL_PAGE_SIZE)) { modalPageNo++; renderCostModalPage(); }
+            });
             $elcMask.on('click', '.vas-elc-lnk', function () {
                 openPurchaseOrder(Number($(this).data('orderid')));
             });
@@ -481,6 +501,7 @@
             $elcMask.find('.vas-elc-msub').text(label('VAS_Loading', 'Loading...'));
             $elcMask.find('.vas-elc-modal-body').empty();
             $elcMask.find('.vas-elc-mnote').text('');
+            $elcMask.find('.vas-elc-mpager').hide();
             $elcMask.addClass('vas-elc-mask-open');
 
             $.ajax({
@@ -510,6 +531,9 @@
 
         function renderCostModalRows(data) {
             var rows = data.rows || [];
+            modalRows = rows;
+            modalData = data;
+            modalPageNo = 1;
             var sym = data.curSymbol || data.curIso || '';
             var prec = (typeof data.stdPrecision === 'number') ? data.stdPrecision : 2;
 
@@ -522,6 +546,18 @@
                 return;
             }
 
+            renderCostModalPage();
+        }
+
+        function renderCostModalPage() {
+            var rows = modalRows;
+            var sym = modalData.curSymbol || modalData.curIso || '';
+            var prec = (typeof modalData.stdPrecision === 'number') ? modalData.stdPrecision : 2;
+            var totalModalPages = Math.max(1, Math.ceil(rows.length / MODAL_PAGE_SIZE));
+            if (modalPageNo > totalModalPages) { modalPageNo = totalModalPages; }
+            var startIdx = (modalPageNo - 1) * MODAL_PAGE_SIZE;
+            var endIdx = Math.min(startIdx + MODAL_PAGE_SIZE, rows.length);
+
             var head =
                 '<div class="vas-elc-mrow vas-elc-mhead">' +
                     '<span class="vas-elc-mcell">' + escapeHtml(label('VAS_PurchaseOrder', 'Purchase order')) + '</span>' +
@@ -533,7 +569,7 @@
                 '</div>';
 
             var body = '';
-            for (var i = 0; i < rows.length; i++) {
+            for (var i = startIdx; i < endIdx; i++) {
                 var r = rows[i];
                 var amt = formatCurrency(r.amount, sym, prec);
                 body +=
@@ -551,8 +587,18 @@
 
             $elcMask.find('.vas-elc-modal-body').html(head + '<div class="vas-elc-mbody">' + body + '</div>');
             $elcMask.find('.vas-elc-mnote').text(
-                label('VAS_Showing', 'Showing') + ' ' + rows.length + ' ' +
+                label('VAS_Showing', 'Showing') + ' ' + (startIdx + 1) + '-' + endIdx + ' ' + label('VAS_Of', 'of') + ' ' + rows.length + ' ' +
                 label('VAS_PurchaseOrders', 'purchase orders'));
+
+            // Pager only appears once there is more than one page.
+            if (rows.length > MODAL_PAGE_SIZE) {
+                $elcMask.find('.vas-elc-mptxt').text(modalPageNo + ' ' + label('VAS_Of', 'of') + ' ' + totalModalPages);
+                $elcMask.find('.vas-elc-mprev').prop('disabled', modalPageNo <= 1);
+                $elcMask.find('.vas-elc-mnext').prop('disabled', modalPageNo >= totalModalPages);
+                $elcMask.find('.vas-elc-mpager').css('display', 'flex');
+            } else {
+                $elcMask.find('.vas-elc-mpager').hide();
+            }
         }
 
         function docStatusText(code) {

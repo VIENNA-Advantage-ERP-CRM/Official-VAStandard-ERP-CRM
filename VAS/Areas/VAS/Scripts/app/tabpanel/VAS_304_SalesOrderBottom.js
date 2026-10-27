@@ -553,6 +553,9 @@
                     render();
                     if ($root && $root[0]) $root.scrollTop(0);
                     refreshSummary();
+                    // Loaded while another user's document action holds the order: say why
+                    // the lines are read-only (not again on a page change).
+                    if (!isPageChange && parent && parent.IsProcessingByOther) showLockedByOtherToast();
                 },
                 error: function (err) {
                     console.log(err);
@@ -1089,6 +1092,9 @@
            When false the whole panel is read-only: no Add / Save / Delete and no cell edit. */
         function panelEditable() {
             if (!parent) return false;
+            // Another user's document action holds the order (C_Order.Processing = 'Y',
+            // 26-Oct-2026): read-only until it finishes, whatever DocStatus still reads.
+            if (parent.IsProcessingByOther) return false;
             var locked = liveDocLocked();
             if (locked !== null) return !locked;
             return !!parent.IsEditable;
@@ -1181,6 +1187,14 @@
                 moreOpenEditable = false;
                 closeDialogs(); render();
             }
+            applyLockState();
+            checkProcessingLock();
+        }
+
+        /* Repaints on a real lock transition. The "no longer editable" notice is shown
+           ONLY when another user's document action has locked the order (C_Order.Processing
+           = 'Y', 26-Oct-2026) - the user's own Complete / Close / Void needs no telling. */
+        function applyLockState() {
             var locked = !panelEditable();
             if (lastLockState === null || locked === lastLockState) return;
             // Any open dialog was built against the previous state (the "..." modal's
@@ -1189,10 +1203,39 @@
             try { if (window.VIS && VIS.AttributeControl && VIS.AttributeControl.close) VIS.AttributeControl.close(); } catch (e) { }
             editing = null;
             render();                                // rebuilds rows + toolbar for the new state
-            if (locked) {
-                showToast(docMsg("VAS_107_DocLockedNow",
-                    "This {0} is no longer editable - the lines are now read-only"));
-            }
+            if (locked && parent.IsProcessingByOther) showLockedByOtherToast();
+        }
+        function showLockedByOtherToast() {
+            showToast(docMsg("VAS_107_DocLockedNow",
+                "This {0} is no longer editable - the lines are now read-only"));
+        }
+
+        /* C_Order.Processing is not on the tab, so on a data-status event (refresh,
+           navigation, save) the server is asked whether another user's processing now
+           holds the order. Debounced, skipped while the header has unsaved edits, and a
+           stale answer (newer check, other order) is dropped. */
+        var lockCheckTimer = null, lockCheckSeq = 0;
+        function checkProcessingLock() {
+            if (!parent || !(parent.C_Order_ID > 0) || isHeaderDirty()) return;
+            clearTimeout(lockCheckTimer);
+            lockCheckTimer = setTimeout(function () {
+                var id = parent && parent.C_Order_ID;
+                if ($self._disposed || !(id > 0)) return;
+                var mySeq = ++lockCheckSeq;
+                $.ajax({
+                    url: VIS.Application.contextUrl + "VAS_304_SalesOrderBottom/GetProcessingLock",
+                    type: "GET", dataType: "json", data: { C_Order_ID: id },
+                    success: function (raw) {
+                        if (mySeq !== lockCheckSeq || !parent || parent.C_Order_ID !== id) return;
+                        var v = (typeof raw === "string") ? JSON.parse(raw) : raw;
+                        v = (v === true);
+                        if (!!parent.IsProcessingByOther === v) return;
+                        parent.IsProcessingByOther = v;
+                        applyLockState();
+                    },
+                    error: function (err) { if (window.console) console.log(err); }
+                });
+            }, 300);
         }
         /* True when a header value the panel was loaded against now reads differently on
            the hosting tab - the tab sitting on the very record the panel shows:

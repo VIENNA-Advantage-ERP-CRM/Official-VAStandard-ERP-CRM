@@ -245,8 +245,8 @@ namespace VAS.Controllers
 
         /// <summary>
         /// Returns one page (2-8 rows) of active BOMs with verification
-        /// status, not-verified rows first (oldest updated first), then
-        /// verified rows (most recently updated first).
+        /// status, most recently updated first - verified and not-verified
+        /// rows are interleaved, not grouped.
         /// </summary>
         /// <param name="offset">Zero-based result offset.</param>
         /// <param name="pageSize">Requested page size; clamped to 2-8.</param>
@@ -301,11 +301,7 @@ namespace VAS.Controllers
                             COUNT(*) OVER () AS total_count,
                             SUM(CASE WHEN nb.is_verified = 'N' THEN 1 ELSE 0 END) OVER () AS not_verified_count,
                             ROW_NUMBER() OVER (
-                                ORDER BY
-                                    CASE WHEN nb.is_verified = 'N' THEN 0 ELSE 1 END ASC,
-                                    CASE WHEN nb.is_verified = 'N' THEN nb.updated_at END ASC,
-                                    CASE WHEN nb.is_verified = 'Y' THEN nb.updated_at END DESC,
-                                    nb.bom_code ASC, nb.bom_id ASC
+                                ORDER BY nb.updated_at DESC, nb.bom_code ASC, nb.bom_id ASC
                             ) AS row_num
                         FROM normalized_boms nb
                     )

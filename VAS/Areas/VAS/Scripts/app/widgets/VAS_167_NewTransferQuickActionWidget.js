@@ -40,7 +40,8 @@
         var $root = $('<div class="vas-new-transfer-quick-action-root">');
 
         function lbl(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            var msg = VIS.Msg.getMsg(key);
+            return (!msg || msg === key || msg === '[' + key + ']') ? fallback : msg;
         }
 
         function escapeHtml(value) {

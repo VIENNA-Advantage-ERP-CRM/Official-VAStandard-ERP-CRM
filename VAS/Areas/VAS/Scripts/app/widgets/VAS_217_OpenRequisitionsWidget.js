@@ -188,8 +188,13 @@
         var ICON_DESC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>';
         var ICON_PRINT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>';
 
+        // A message the dictionary does not hold comes back as "[Key]" or as the bare key itself;
+        // both are a miss and must never reach the screen - the English fallback is shown instead.
         function lbl(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            var t = "";
+            try { t = VIS.Msg.getMsg(key); } catch (e) { t = ""; }
+            if (t && String(t).charAt(0) !== "[" && String(t) !== key) return t;
+            return (fallback !== undefined) ? fallback : key;
         }
 
         // The server sends the requisition status as plain English text. Show it through
@@ -265,6 +270,33 @@
             var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
             var mIdx = parseInt(q[1], 10) - 1;
             return q[2] + ' ' + (MONTHS[mIdx] || q[1]) + ' ' + q[0];
+        }
+
+        // Typed date text -> yyyy-mm-dd ('' when it is not a real date). Accepts yyyy-mm-dd, dd/mm/yyyy,
+        // dd-mm-yyyy, dd.mm.yyyy and dd MMM yyyy (month typed as a name or a number).
+        function parseDateText(txt) {
+            var s = String(txt == null ? '' : txt).trim();
+            if (!s) return '';
+            var MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+            var y, m, d;
+            var iso = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s);
+            if (iso) {
+                y = +iso[1]; m = +iso[2]; d = +iso[3];
+            } else {
+                var dmy = /^(\d{1,2})[\/\-. ]+(\d{1,2}|[A-Za-z]{3,9})[\/\-. ,]+(\d{4})$/.exec(s);
+                if (!dmy) return '';
+                d = +dmy[1]; y = +dmy[3];
+                m = /^\d+$/.test(dmy[2]) ? +dmy[2] : MONTHS.indexOf(dmy[2].substring(0, 3).toLowerCase()) + 1;
+            }
+            if (!(y >= 1900 && y <= 9999 && m >= 1 && m <= 12 && d >= 1)) return '';
+            var dt = new Date(y, m - 1, d);
+            if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) return '';
+            return y + '-' + (m < 10 ? '0' : '') + m + '-' + (d < 10 ? '0' : '') + d;
+        }
+
+        // Value of a date text box as yyyy-mm-dd ('' when blank or not a valid date)
+        function dateVal($el) {
+            return parseDateText($el.val());
         }
 
         function toast(msg) {
@@ -736,7 +768,7 @@
             var needDisplay = req.neededByDisplay || req.neededBy || '';
 
             var title = reqNo;
-            var subtitle = (needDisplay ? lbl('VAS_217_NeededByPrefix') + ' ' + needDisplay + ' · ' : '') + lbl('VAS_217_SelectLinesToRaisePO', 'select the lines to raise a PO against');
+            var subtitle = (needDisplay ? lbl('VAS_217_NeededByPrefix', 'needed by') + ' ' + needDisplay + ' · ' : '') + lbl('VAS_217_SelectLinesToRaisePO', 'select the lines to raise a PO against');
 
             var summaryStripHtml = '<div class="vas-217-orw-posum">' +
                 '  <div><div class="l">' + esc(lbl('VAS_217_Requisition', 'Requisition')) + '</div><div class="v">' + esc(reqNo) + '</div></div>' +
@@ -990,7 +1022,7 @@
                 html = '<option value="' + line.vendorId + '" selected>' + esc(line.vendorName) + '</option>' + html;
             }
             if (!(line.vendorId > 0)) {
-                html = '<option value="0" selected>' + esc(lbl('VAS_SelectVendor', 'Select vendor')) + '</option>' + html;
+                html = '<option value="0" selected>' + esc(lbl('VAS_SelectVendor', 'Select Vendor')) + '</option>' + html;
             }
             return html;
         }
@@ -1090,9 +1122,56 @@
             return list.length ? list[0].id : 0;
         }
 
+        // Price list, payment term and payment method configured on the chosen vendor. They are fetched once
+        // per vendor and applied to the header as its starting values - the user can still change all three.
+        var pendingVendorDefaults = null;
+
+        function loadVendorDefaults(vendorId, done) {
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_217_OpenRequisitionsWidget/GetVendorDefaults',
+                type: 'GET',
+                data: { vendorId: vendorId },
+                cache: false,
+                success: function (res) {
+                    var data = parseResponse(res);
+                    pendingVendorDefaults = (data && data.success !== false) ? data : null;
+                },
+                error: function () {
+                    pendingVendorDefaults = null;
+                },
+                complete: function () {
+                    poHeaderValues.defaultsVendorId = vendorId;
+                    done();
+                }
+            });
+        }
+
+        function applyVendorDefaults() {
+            var d = pendingVendorDefaults;
+            pendingVendorDefaults = null;
+            if (!d) return;
+            var priceList = findById(formLookups.priceLists, d.priceListId);
+            if (priceList) {
+                poHeaderValues.priceListId = priceList.id;
+                if (priceList.currencyId) { poHeaderValues.currencyId = priceList.currencyId; }
+            }
+            if (findById(formLookups.paymentTerms, d.paymentTermId)) {
+                poHeaderValues.paymentTermId = d.paymentTermId;
+            }
+            if (d.paymentMethodId && findById(formLookups.paymentMethods, String(d.paymentMethodId))) {
+                poHeaderValues.paymentMethod = String(d.paymentMethodId);
+            }
+        }
+
         function proceedToStep3Details() {
             var sel = getSelectedStep2Lines();
             if (!sel.length) return;
+
+            // A different vendor than the one the header defaults were taken from: fetch its defaults first
+            if (poHeaderValues.defaultsVendorId !== selectedVendorId) {
+                loadVendorDefaults(selectedVendorId, proceedToStep3Details);
+                return;
+            }
 
             // Initialize default header values once per requisition (reset when a requisition row is clicked)
             if (!poHeaderValues.initialized) {
@@ -1115,8 +1194,9 @@
                 poHeaderValues.paymentTermId = (formLookups.paymentTerms && formLookups.paymentTerms[0]) ? formLookups.paymentTerms[0].id : 0;
                 poHeaderValues.paymentMethod = (formLookups.paymentMethods && formLookups.paymentMethods[0]) ? String(formLookups.paymentMethods[0].id) : '';
                 poHeaderValues.taxId = (formLookups.taxes && formLookups.taxes[0]) ? formLookups.taxes[0].id : 0;
-                poHeaderValues.description = lbl('VAS_PurchaseAgainst', 'Purchase against') + ' ' + activeRequisition.requisitionNumber;
+                poHeaderValues.description = (lbl('VAS_PurchaseAgainst', 'Purchase against') + ' ' + activeRequisition.requisitionNumber).substring(0, 255);
             }
+            applyVendorDefaults();
 
             // Initialize PO Lines State from selected lines
             poLinesState = sel.map(function (l) {
@@ -1124,6 +1204,7 @@
                     requisitionLineId: l.requisitionLineId,
                     lineNo: l.lineNo,
                     productId: l.productId,
+                    chargeId: l.chargeId || 0,
                     productName: l.productName,
                     productCode: l.productCode,
                     attributeSetInstanceId: l.attributeSetInstanceId,
@@ -1259,8 +1340,8 @@
                 '  <div class="vas-217-orw-form-grid">' +
                 '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_217_TargetDocType', 'Target document type')) + star + '</label><select class="vas-217-orw-fctl" id="fDocType">' + docTypeOpts + '</select></div>' +
                 '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_217_OrderReference', 'Order reference')) + '</label><input class="vas-217-orw-fctl" id="fOrderRef" maxlength="20" value="' + esc(poHeaderValues.orderReference || '') + '"></div>' +
-                '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_PODate', 'PO date')) + star + '</label><input type="date" max="9999-12-31" class="vas-217-orw-fctl" id="fPoDate" value="' + (poHeaderValues.dateOrdered || fIso()) + '"></div>' +
-                '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_217_DatePromised', 'Date promised')) + star + '</label><input type="date" max="9999-12-31" class="vas-217-orw-fctl" id="fPromised" value="' + (poHeaderValues.datePromised || fIso()) + '"></div>' +
+                '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_PODate', 'PO date')) + star + '</label><input type="text" maxlength="20" autocomplete="off" placeholder="' + esc(lbl('VAS_217_DateFormatHint', 'dd mmm yyyy')) + '" class="vas-217-orw-fctl vas-217-date" id="fPoDate" value="' + esc(isoDisp(poHeaderValues.dateOrdered || fIso())) + '"></div>' +
+                '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_217_DatePromised', 'Date promised')) + star + '</label><input type="text" maxlength="20" autocomplete="off" placeholder="' + esc(lbl('VAS_217_DateFormatHint', 'dd mmm yyyy')) + '" class="vas-217-orw-fctl vas-217-date" id="fPromised" value="' + esc(isoDisp(poHeaderValues.datePromised || fIso())) + '"></div>' +
                 '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_217_Priority', 'Priority')) + star + '</label><select class="vas-217-orw-fctl" id="fPriority">' + prioOpts + '</select></div>' +
                 '  </div>' +
 
@@ -1348,7 +1429,7 @@
             var anyBlank = false;
             for (var i = 0; i < REQUIRED_HEADER_FIELDS.length; i++) {
                 var $f = $host.find(REQUIRED_HEADER_FIELDS[i]);
-                var blank = isBlankHeaderValue($f.val());
+                var blank = $f.hasClass('vas-217-date') ? !dateVal($f) : isBlankHeaderValue($f.val());
                 $f.toggleClass('vas-217-orw-invalid', blank);
                 if (blank) { anyBlank = true; }
             }
@@ -1363,13 +1444,18 @@
         }
 
         function validateHeaderDates($host) {
-            var invalid = isPromisedBeforeOrdered($host.find('#fPromised').val(), $host.find('#fPoDate').val());
-            $host.find('#fPromised').toggleClass('vas-217-orw-invalid', invalid);
+            var promised = dateVal($host.find('#fPromised'));
+            var ordered = dateVal($host.find('#fPoDate'));
+            var invalid = isPromisedBeforeOrdered(promised, ordered);
+            $host.find('#fPromised').toggleClass('vas-217-orw-invalid', invalid || !promised);
+            $host.find('#fPoDate').toggleClass('vas-217-orw-invalid', !ordered);
             // A back-dated Date promised blocks the next step until it is corrected.
             $('#vas_217_to_lines').prop('disabled', invalid);
-            // The date picker greys out days before the PO date.
-            $host.find('#fPromised').attr('min', $host.find('#fPoDate').val() || '');
             var $note = $('#vas_217_details_note');
+            if (!promised || !ordered) {
+                $note.attr('class', 'vas-217-orw-warnnote').text(lbl('VAS_217_InvalidDate', 'Enter a valid date, for example 15 Nov 2026'));
+                return false;
+            }
             if (invalid) {
                 $note.attr('class', 'vas-217-orw-warnnote').text(datePromisedErrorText());
             } else {
@@ -1416,19 +1502,27 @@
                 }
             });
 
+            // A typed date is tidied to "dd Mon yyyy" when it is a real date (bound first, so the
+            // handlers below read the tidied value)
+            $host.find('.vas-217-date').on('change', function () {
+                var iso = dateVal($(this));
+                if (iso) { $(this).val(isoDisp(iso)); }
+            });
+
             $host.find('#fPoDate, #fPromised').on('change', function () {
                 validateHeaderDates($host);
             });
 
             // Clear the red mark as soon as a mandatory field is filled in.
             $host.find(REQUIRED_HEADER_FIELDS.join(', ')).on('change input', function () {
-                if (!isBlankHeaderValue($(this).val()) && !$(this).is('#fPromised')) {
+                if (!isBlankHeaderValue($(this).val()) && !$(this).is('.vas-217-date')) {
                     $(this).removeClass('vas-217-orw-invalid');
                 }
             });
 
             $host.find('#fPromised').on('change', function () {
-                var pDate = $(this).val();
+                var pDate = dateVal($(this));
+                if (!pDate) return; // not a valid date yet - validateHeaderDates flags it
                 poHeaderValues.datePromised = pDate;
                 // Cascade promised date to all lines
                 for (var i = 0; i < poLinesState.length; i++) {
@@ -1441,8 +1535,8 @@
             var $h = getModalHost();
             poHeaderValues.docTypeId = parseInt($h.find('#fDocType').val(), 10) || 0;
             poHeaderValues.orderReference = $h.find('#fOrderRef').val() || '';
-            poHeaderValues.dateOrdered = $h.find('#fPoDate').val() || fIso();
-            poHeaderValues.datePromised = $h.find('#fPromised').val() || fIso();
+            poHeaderValues.dateOrdered = dateVal($h.find('#fPoDate')) || fIso();
+            poHeaderValues.datePromised = dateVal($h.find('#fPromised')) || fIso();
             poHeaderValues.priority = $h.find('#fPriority').val() || '5';
             poHeaderValues.vendorLocationId = parseInt($h.find('#fVendLoc').val(), 10) || 0;
             poHeaderValues.vendorContactId = parseInt($h.find('#fVendCon').val(), 10) || 0;
@@ -1482,8 +1576,8 @@
                 '      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>' +
                 '    </button></div>' +
                 '  <div class="ldgrid">' +
-                '    <div class="vas-217-orw-field"><label>' + ICON_DESC + esc(lbl('VAS_217_Description', 'Description')) + '</label><textarea class="vas-217-orw-fctl" id="vas_217_ldDesc" rows="2"></textarea></div>' +
-                '    <div class="vas-217-orw-field"><label>' + ICON_PRINT + esc(lbl('VAS_217_PrintDescription', 'Print description')) + '</label><textarea class="vas-217-orw-fctl" id="vas_217_ldPrint" rows="2" placeholder="' + esc(lbl('VAS_217_TextPrintedOnVendorCopy', 'Text printed on the vendor copy')) + '"></textarea></div>' +
+                '    <div class="vas-217-orw-field"><label>' + ICON_DESC + esc(lbl('VAS_217_Description', 'Description')) + '</label><textarea class="vas-217-orw-fctl" id="vas_217_ldDesc" rows="2" maxlength="255"></textarea></div>' +
+                '    <div class="vas-217-orw-field"><label>' + ICON_PRINT + esc(lbl('VAS_217_PrintDescription', 'Print description')) + '</label><textarea class="vas-217-orw-fctl" id="vas_217_ldPrint" rows="2" maxlength="255" placeholder="' + esc(lbl('VAS_217_TextPrintedOnVendorCopy', 'Text printed on the vendor copy')) + '"></textarea></div>' +
                 '  </div>' +
                 '</div>';
 
@@ -1602,7 +1696,7 @@
                         '<span class="vas-217-orw-cell"><input class="vas-217-orw-rowin in-lrate" type="number" min="0" step="any" value="' + (Number(l.rate) || 0) + '" data-idx="' + globalIdx + '" aria-label="' + esc(lbl('VAS_Rate', 'Rate')) + '"></span>' +
                         '<span class="vas-217-orw-cell"><select class="vas-217-orw-rowsel sel-ltax" data-idx="' + globalIdx + '" aria-label="' + esc(lbl('VAS_217_Tax', 'Tax')) + '">' + taxOptionsHtml + '</select></span>' +
                         '<span class="vas-217-orw-cell right c-emph amt-cell" title="' + esc(fmtMoney(amt)) + '">' + esc(fmtMoney(amt)) + '</span>' +
-                        '<span class="vas-217-orw-cell"><input class="vas-217-orw-rowin in-ldate" type="date" max="9999-12-31" min="' + (poHeaderValues.dateOrdered || '') + '" value="' + (l.datePromised || fIso()) + '" data-idx="' + globalIdx + '" aria-label="' + esc(lbl('VAS_217_DatePromised', 'Date promised')) + '"></span>' +
+                        '<span class="vas-217-orw-cell"><input class="vas-217-orw-rowin in-ldate" type="text" maxlength="20" autocomplete="off" value="' + esc(isoDisp(l.datePromised || fIso())) + '" data-idx="' + globalIdx + '" aria-label="' + esc(lbl('VAS_217_DatePromised', 'Date promised')) + '"></span>' +
                         '<span class="vas-217-orw-cell vas-217-orw-actcell">' +
                         '  <button type="button" class="vas-217-orw-iconbtn sm btn-act-desc" data-idx="' + globalIdx + '" title="' + esc(lbl('VAS_217_Description', 'Description')) + '">' + ICON_DESC + '</button>' +
                         '</span>' +
@@ -1650,8 +1744,15 @@
             $tableBody.off('change.ldate').on('change.ldate', '.in-ldate', function () {
                 var idx = parseInt($(this).data('idx'), 10);
                 if (poLinesState[idx]) {
-                    poLinesState[idx].datePromised = $(this).val();
-                    validateLineDates($host);
+                    var iso = dateVal($(this));
+                    if (iso) {
+                        poLinesState[idx].datePromised = iso;
+                        $(this).val(isoDisp(iso)).removeClass('vas-217-orw-invalid');
+                        validateLineDates($host);
+                    } else {
+                        // Not a real date: mark it and keep the last valid date on the line
+                        $(this).addClass('vas-217-orw-invalid');
+                    }
                 }
             });
 
@@ -1731,14 +1832,19 @@
             var $desc = $host.find('#vas_217_ldDesc');
             var $print = $host.find('#vas_217_ldPrint');
 
-            $desc.val(line.description || '');
-            $print.val(line.printDescription || '');
+            // Description and print description are limited to 255 characters (also pasted text)
+            $desc.val((line.description || '').substring(0, 255));
+            $print.val((line.printDescription || '').substring(0, 255));
+            line.description = $desc.val();
+            line.printDescription = $print.val();
 
             $desc.off('input.ld').on('input.ld', function () {
+                if ($(this).val().length > 255) { $(this).val($(this).val().substring(0, 255)); }
                 line.description = $(this).val();
             });
 
             $print.off('input.lp').on('input.lp', function () {
+                if ($(this).val().length > 255) { $(this).val($(this).val().substring(0, 255)); }
                 line.printDescription = $(this).val();
             });
 
@@ -1771,6 +1877,7 @@
                     requisitionLineId: l.requisitionLineId,
                     lineNo: l.lineNo,
                     productId: l.productId,
+                    chargeId: l.chargeId || 0,
                     attributeSetInstanceId: l.attributeSetInstanceId,
                     uomId: l.uomId,
                     qty: l.orderQty,
@@ -1818,12 +1925,16 @@
                         closeModal();
                         loadOpenRequisitions();
 
-                        // Confirmation with the created document number and stage
-                        var lineCountStr = payloadLines.length + ' ' + (payloadLines.length > 1 ? lbl('VAS_Lines', 'lines') : lbl('VAS_217_LineSelected', 'line'));
-                        var docNoStr = (data && data.documentNo) ? ' (' + data.documentNo + ')' : '';
-                        var confirmMsg = lbl('VAS_217_POCreatedFor', 'Purchase order created for') + ' ' + selectedVendorName + docNoStr + ' · ' + lineCountStr + ' · ' + fmtExact(totals.grandTotal);
-                        var info = (VIS && VIS.ADialog && VIS.ADialog.info) ? VIS.ADialog.info : toast;
-                        info(confirmMsg);
+                        // Confirmation with the created document number (the server builds the full sentence;
+                        // the English text is the fallback when the response carries none)
+                        var confirmMsg = data.message || (lbl('VAS_217_POCreatedWithDocNo', 'Purchase order created successfully with document number:') + ' ' + (data.documentNo || ''));
+                        // ADialog.info looks its first argument up as a message key (an unknown one is shown as
+                        // "[text]"), so the finished sentence goes in as the text argument with an empty key
+                        if (VIS && VIS.ADialog && VIS.ADialog.info) {
+                            VIS.ADialog.info("", true, confirmMsg);
+                        } else {
+                            toast(confirmMsg);
+                        }
                     } else {
                         var errMsg = (data && data.error) ? data.error : (data && data.message ? data.message : lbl('VAS_217_ErrorCreatingPO', 'Error creating Purchase Order'));
                         alert(errMsg);

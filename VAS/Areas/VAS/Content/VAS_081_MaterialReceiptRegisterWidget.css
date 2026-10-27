@@ -293,9 +293,9 @@
 .vas-mrr-modal {
     position: relative;
     width: min(55em, calc(100vw - 2em));
-    /* Fixed height: the popup size never changes with the number of lines
-       on the current page (max 5 lines per page). */
-    height: min(40em, 88vh);
+    /* Sized to its content (no fixed/min height, so no blank area below the
+       table); the body scrolls only when the content exceeds the viewport. */
+    height: auto;
     max-height: 88vh;
     background: #FFFFFF;
     border-radius: 14px;                /* px */
@@ -377,7 +377,7 @@
     }
 
 .vas-mrr-modal-body {
-    flex: 1 1 auto;                     /* fills the fixed modal height */
+    flex: 0 1 auto;                     /* content height, shrinks only past max-height */
     min-height: 0;
     display: flex;
     flex-direction: column;
@@ -386,45 +386,39 @@
     position: relative;
 }
 
-/* The lines area takes the remaining space and keeps the pager pinned at the
-   bottom, so a page with 2 lines occupies the same room as a page with 5. */
+/* The lines area is content-sized (table + pager), no reserved space. */
 .vas-mrr-lines-wrap {
-    flex: 1 1 auto;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-}
-
-.vas-mrr-lines-wrap .vas-mrr-lines-table {
     flex: 0 0 auto;
 }
 
-.vas-mrr-lines-wrap .vas-mrr-lines-foot {
-    margin-top: auto;
-}
-
-/* Detail form (2-column label/value grid) */
+/* Detail summary cards: always ONE line of 4 equal columns that shrink. */
 .vas-mrr-form {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0 1.5em;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0 0.75em;
 }
 
 .vas-mrr-field {
-    padding: 0.5em 0.75em;
+    padding: 0.5em 0.5em;
     border-bottom: 1px solid #D7D7D7;
     min-width: 0;
+    overflow: hidden;
 }
 
 .vas-mrr-field-lbl {
     font-size: 0.75em;
     color: #5F7283;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .vas-mrr-field-val {
     font-size: 1em;
     color: #102C3F;
     margin-top: 0.375em;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -455,6 +449,7 @@
 .vas-mrr-lines-table {
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed;
     margin-top: 0.375em;
 }
 
@@ -494,12 +489,23 @@
 }
 
 .vas-mrr-l-uom {
-    width: 6em;
+    width: 8em;
     color: #5F7283;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .vas-mrr-l-item {
     min-width: 0;
+    overflow: hidden;
+}
+
+.vas-mrr-lines-table tbody td.vas-mrr-l-item .vas-mrr-l-attr {
+    font-size: 0.8em;
+    font-weight: 400;
+    color: #748494;
+    margin-top: 0.15em;
 }
 
 .vas-mrr-lines-table tbody td.vas-mrr-l-item {
@@ -526,10 +532,6 @@
 
 .vas-mrr-hidden {
     display: none !important;
-}
-
-@media (max-width: 40em) {
-    .vas-mrr-form { grid-template-columns: 1fr; }
 }
 
 .vas-mrr-grn-link {

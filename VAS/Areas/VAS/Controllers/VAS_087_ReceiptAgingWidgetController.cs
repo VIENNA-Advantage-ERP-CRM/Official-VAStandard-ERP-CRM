@@ -269,8 +269,8 @@ namespace VIS.Controllers
             // character set column and mixing it with a literal raises ORA-12704. The JS already
             // renders "-" for an empty value.
             string locatorSql = hasLineConfirmTable
-                ? "COALESCE(Locator.Value, LocatorConfirm.Value)"
-                : "Locator.Value";
+                ? "COALESCE(Locator.LocatorCombination, Locator.Bin, Locator.Value, LocatorConfirm.LocatorCombination, LocatorConfirm.Bin, LocatorConfirm.Value)"
+                : "COALESCE(Locator.LocatorCombination, Locator.Bin, Locator.Value)";
 
             // QA sheet GRN #7/#14 (2026-09-15): the line's attribute instance is returned for the popup's
             // Attribute column, and the received quantity is QtyEntered - the unit the line was received in

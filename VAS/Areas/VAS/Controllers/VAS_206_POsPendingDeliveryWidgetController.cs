@@ -145,7 +145,7 @@ namespace VIS.Controllers
                         SUM(
                             CASE
                                 WHEN prod.ProductType = 'I' AND COALESCE(ol.QtyOrdered, 0) > COALESCE(ol.QtyDelivered, 0)
-                                THEN (COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0)) * COALESCE(ol.PriceActual, 0)
+                                THEN (COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) - (COALESCE(ol.QtyDelivered, 0) * " + uomRatio + @")) * COALESCE(ol.PriceEntered, ol.PriceActual, 0)
                                 ELSE 0
                             END
                         ) AS pending_value_document_currency,
@@ -378,7 +378,7 @@ namespace VIS.Controllers
                         CASE WHEN COALESCE(ol.M_AttributeSetInstance_ID, 0) > 0
                              THEN COALESCE(asi.Description, N'')
                              ELSE N'' END AS attribute_desc,
-                        COALESCE(u.UOMSymbol, u.Name) AS uom_name,
+                        COALESCE(u.Name, u.UOMSymbol) AS uom_name,
                         COALESCE(ol.QtyOrdered, 0) AS ordered_qty,
                         -- QtyEntered is expressed in the line's own C_UOM_ID (the UOM the buyer
                         -- picked); QtyOrdered / QtyDelivered are in the product's base UOM. The
@@ -390,7 +390,9 @@ namespace VIS.Controllers
                             THEN COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0)
                             ELSE 0
                         END AS pending_qty,
-                        COALESCE(ol.PriceActual, 0) AS price_actual,
+                        -- Rate is on the line's selected UOM (PriceEntered), the same basis as the
+                        -- entered-UOM pending qty, so qty x rate agrees with the summary value.
+                        COALESCE(ol.PriceEntered, ol.PriceActual, 0) AS price_actual,
                         COALESCE(ol.LineNetAmt, COALESCE(ol.QtyOrdered, 0) * COALESCE(ol.PriceActual, 0)) AS line_net_amt,
                         c.CurSymbol AS cur_symbol,
                         c.ISO_Code AS cur_iso,

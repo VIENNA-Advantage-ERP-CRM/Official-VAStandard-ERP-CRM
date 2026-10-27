@@ -3,7 +3,7 @@
  * Purpose        : Widget 03 — Purchase Orders Completed MTD
  *                  KPI card & document drill-down modal counting
  *                  purchase orders reaching terminal states
- *                  (Completed / Closed) in the current MTD window.
+ *                  (Completed only) in the current MTD window.
  * Author         : Builder Agent 3
  * Date           : 17 August 2026
  * Claude 2026-09-29: GetPOCompletedMTDData always returned 0. Two compounding bugs:
@@ -33,14 +33,14 @@ namespace VIS.Controllers
 {
     /// <summary>
     /// Controller for VAS_205_POCompletedMTDWidget.
-    /// Provides MTD completed/closed PO summary figures and drill-down document list.
+    /// Provides MTD completed PO summary figures and drill-down document list.
     /// </summary>
     public class VAS_205_POCompletedMTDWidgetController : Controller
     {
         private static readonly VLogger _log = VLogger.GetVLogger(typeof(VAS_205_POCompletedMTDWidgetController).FullName);
 
         /// <summary>
-        /// Gets the MTD completed/closed purchase orders summary and list of records.
+        /// Gets the MTD completed purchase orders summary and list of records.
         /// Both the KPI card and the drill-down modal consume this single endpoint.
         /// </summary>
         /// <returns>JSON object with KPI metrics and records array.</returns>
@@ -103,7 +103,7 @@ namespace VIS.Controllers
                 DateTime mtdStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0);
                 DateTime mtdEndExclusive = mtdStart.AddMonths(1);
 
-                // 3. Query MTD Completed/Closed Purchase Orders
+                // 3. Query MTD Completed (DocStatus 'CO' only - Closed 'CL' orders are excluded) Purchase Orders
                 // OrderCompletionDatetime is a POS-shift field (see MOrder.GetOrderCompletionDatetime()/
                 // MInvoice's VAPOS_ShiftDetails_ID usage) - it is only ever populated for
                 // point-of-sale orders, so on ordinary vendor Purchase Orders (IsSOTrx='N') it is
@@ -148,7 +148,7 @@ namespace VIS.Controllers
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
                       AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
-                      AND o.DocStatus IN ('CO', 'CL')
+                      AND o.DocStatus = 'CO'
                       AND COALESCE(o.OrderCompletionDatetime, o.Updated) >= @P_MTD_START
                       AND COALESCE(o.OrderCompletionDatetime, o.Updated) < @P_MTD_END_EXCLUSIVE
                       AND o.C_Order_ID IN (@P_ORDER_ACCESS@)
@@ -458,7 +458,7 @@ namespace VIS.Controllers
                         CASE WHEN COALESCE(ol.M_AttributeSetInstance_ID, 0) > 0
                              THEN COALESCE(asi.Description, N'')
                              ELSE N'' END AS AttributeDesc,
-                        COALESCE(uom.UOMSymbol, uom.Name, N'') AS UOMSymbol,
+                        COALESCE(uom.Name, uom.UOMSymbol, N'') AS UOMSymbol,
                         COALESCE(ol.QtyOrdered, 0) AS QtyOrdered,
                         -- QtyEntered is expressed in the line's own C_UOM_ID (the UOM the buyer
                         -- picked); QtyOrdered / QtyDelivered are in the product's base UOM. The

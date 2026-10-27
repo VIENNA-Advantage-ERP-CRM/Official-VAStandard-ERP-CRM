@@ -15,7 +15,7 @@ namespace VIS.Controllers
     /// Module Name : Locator Transfer Matrix Widget (Material Transfer dashboard)
     /// Purpose     : Returns completed / closed transfer lines for a month/year, aggregated
     ///               as from-locator x to-locator (quantity and document count). Locators
-    ///               are labelled with their name (LocatorCombination), falling back to the code.
+    ///               are labelled with their name COALESCE(LocatorCombination, Bin, Value), never the bare code.
     /// ID Prefix   : VAS_177_
     /// </summary>
     public class VAS_177_LocatorTransferMatrixWidgetController : Controller
@@ -35,14 +35,13 @@ namespace VIS.Controllers
             DateTime from = new DateTime(year, month <= 0 ? 1 : month, 1);
             DateTime to = month <= 0 ? from.AddYears(1) : from.AddMonths(1);
 
-            // Locator display name = LocatorCombination (the descriptive name, e.g. "North Locator").
-            // When it is empty or just the generated X*Y*Z, the Value (code) is used instead.
+            // Locator display name = COALESCE(LocatorCombination, Bin, Value); Value is the code and is the last resort.
             string sql = @"
                 SELECT lSrc.M_Locator_ID AS FromID,
-                       lSrc.LocatorCombination AS FromComb, lSrc.Value AS FromValue, lSrc.X AS FromX, lSrc.Y AS FromY, lSrc.Z AS FromZ,
+                       lSrc.LocatorCombination AS FromComb, lSrc.Bin AS FromBin, lSrc.Value AS FromValue,
                        wSrc.Name AS FromWarehouse,
                        lDst.M_Locator_ID AS ToID,
-                       lDst.LocatorCombination AS ToComb, lDst.Value AS ToValue, lDst.X AS ToX, lDst.Y AS ToY, lDst.Z AS ToZ,
+                       lDst.LocatorCombination AS ToComb, lDst.Bin AS ToBin, lDst.Value AS ToValue,
                        wDst.Name AS ToWarehouse,
                        ml.MovementQty AS Qty,
                        mm.M_Movement_ID AS MovementID
@@ -121,13 +120,10 @@ namespace VIS.Controllers
         private static string PickName(IDataReader dr, string prefix)
         {
             string comb = (Util.GetValueOfString(dr[prefix + "Comb"]) ?? "").Trim();
-            string value = Util.GetValueOfString(dr[prefix + "Value"]);
-            string auto = Util.GetValueOfString(dr[prefix + "X"]) + "*" + Util.GetValueOfString(dr[prefix + "Y"]) + "*" + Util.GetValueOfString(dr[prefix + "Z"]);
-            if (comb.Length == 0 || string.Equals(comb, auto, StringComparison.OrdinalIgnoreCase))
-            {
-                return value;
-            }
-            return comb;
+            if (comb.Length > 0) { return comb; }
+            string bin = (Util.GetValueOfString(dr[prefix + "Bin"]) ?? "").Trim();
+            if (bin.Length > 0) { return bin; }
+            return Util.GetValueOfString(dr[prefix + "Value"]);
         }
 
         private static string DisplayName(string[] n, Dictionary<string, int> nameCount)

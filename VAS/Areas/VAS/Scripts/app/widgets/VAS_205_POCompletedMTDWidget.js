@@ -1,7 +1,7 @@
 ﻿/**
  * VAS_205_POCompletedMTDWidget
  * 2x1 KPI Widget & Drill-down modal for Purchase Orders dashboard.
- * Displays count of purchase orders reaching terminal states (Completed / Closed) Month-to-Date.
+ * Displays count of purchase orders reaching the Completed state (DocStatus CO) Month-to-Date.
  *
  * =========================================================================
  * Summary Message Table
@@ -10,7 +10,7 @@
  *  1 | Purchase Orders Completed MTD                   | VAS_205_POCompletedMTD
  *  2 | received in full                                 | VAS_205_ReceivedInFull
  *  3 | closed short                                     | VAS_205_ClosedShort
- *  4 | Completed and closed documents                   | VAS_205_CompletedAndClosedDocs
+ *  4 | Completed documents                              | VAS_205_CompletedDocs
  *  5 | Completed                                        | VAS_205_Completed
  *  6 | Closed                                           | VAS_205_Closed
  *  7 | Received value                                   | VAS_205_ReceivedValue
@@ -267,7 +267,6 @@
         function renderMetric(data) {
             var total = Number(data.totalCount || 0);
             var receivedVal = Number(data.receivedValue || 0);
-            var closedShort = Number(data.closedShortCount || 0);
             var curSym = data.currencySymbol || '₹';
 
             if ($valueEl) {
@@ -277,8 +276,7 @@
 
             if ($metaEl) {
                 var recText = formatMoney(receivedVal, curSym) + ' ' + lbl("VAS_205_ReceivedInFull", "received in full");
-                var shortText = formatCount(closedShort) + ' ' + lbl("VAS_205_ClosedShort", "closed short");
-                var metaString = recText + ' · ' + shortText;
+                var metaString = recText;
                 $metaEl.text(metaString);
                 $metaEl.attr('title', metaString);
             }
@@ -442,10 +440,9 @@
             var yearStr = now.getFullYear();
 
             var title = lbl("VAS_205_POCompletedMTD", "Purchase Orders Completed MTD");
-            var subtitle = lbl("VAS_205_CompletedAndClosedDocs", "Completed and closed documents") + ' · 01–' + dayPad + ' ' + monStr + ' ' + yearStr;
+            var subtitle = lbl("VAS_205_CompletedDocs", "Completed documents") + ' · 01–' + dayPad + ' ' + monStr + ' ' + yearStr;
 
             var completedVal = formatCount(data.completedCount || 0);
-            var closedVal = formatCount(data.closedCount || 0);
             var receivedFormatted = formatMoney(data.receivedValue || 0, data.currencySymbol || '₹');
             var onTimeStr = (data.onTimePercent != null) ? (data.onTimePercent + '%') : '—';
 
@@ -454,10 +451,6 @@
                     '<div class="vas-w205-mstat mstat">' +
                         '<div class="vas-w205-mstat-l l">' + escapeHtml(lbl("VAS_205_Completed", "Completed")) + '</div>' +
                         '<div class="vas-w205-mstat-v v">' + escapeHtml(completedVal) + '</div>' +
-                    '</div>' +
-                    '<div class="vas-w205-mstat mstat">' +
-                        '<div class="vas-w205-mstat-l l">' + escapeHtml(lbl("VAS_205_Closed", "Closed")) + '</div>' +
-                        '<div class="vas-w205-mstat-v v">' + escapeHtml(closedVal) + '</div>' +
                     '</div>' +
                     '<div class="vas-w205-mstat mstat">' +
                         '<div class="vas-w205-mstat-l l">' + escapeHtml(lbl("VAS_205_ReceivedValue", "Received value")) + '</div>' +
@@ -469,16 +462,10 @@
                     '</div>' +
                 '</div>';
 
-            var noteHtml =
-                '<div class="vas-w205-mnote mnote">' +
-                    escapeHtml(lbl("VAS_205_ClosedDocNote", "Closed documents carry no delivery — the balance quantity is written off at closure.")) +
-                '</div>';
-
             var secHtml = '<div class="vas-w205-msec msec">' + escapeHtml(lbl("VAS_205_Documents", "Documents")) + '</div>';
 
             var bodyHtml =
                 statStripHtml +
-                noteHtml +
                 secHtml +
                 '<div class="vas-w205-tbl-wrap" id="vas205-doc-tbl-wrap"></div>';
 

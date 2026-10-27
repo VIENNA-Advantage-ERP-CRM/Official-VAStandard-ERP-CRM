@@ -25,7 +25,7 @@
  *  7  | Linked PO                             | VAS_081_LinkedPO
  *  8  | (removed - review #23)                | VAS_081_Supplier
  *  9  | (removed - review #23)                | VAS_081_CustomerProject
- * 10  | Received on                           | VAS_081_ReceivedOn
+ * 10  | Movement Date                         | VAS_081_MovementDate (was VAS_081_ReceivedOn)
  * 11  | (removed - review #23)                | VAS_081_PutAwayOn
  * 12  | Receipt Lines                         | VAS_081_ReceiptLines
  * 13  | Item                                  | VAS_081_Product
@@ -89,8 +89,13 @@
         var filterMonth = 0;
         var $monthSelect, $yearSelect;
 
+        // A missing message comes back empty, as the key itself or as "[key]";
+        // fall back to the English text in each case.
         function lbl(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            var t = "";
+            try { t = VIS.Msg.getMsg(key); } catch (e) { t = ""; }
+            if (t && t !== key && t !== "[" + key + "]") { return t; }
+            return (fallback !== undefined) ? fallback : key;
         }
 
         function escapeHtml(value) {
@@ -425,7 +430,7 @@
                 // Review #24: Warehouse and Representative shown on the modal.
                 field("VAS_081_Warehouse", "Warehouse", r.warehouseName || "—") +
                 field("VAS_081_Representative", "Representative", r.salesRepName || "—") +
-                field("VAS_081_ReceivedOn", "Received on", formatFullDate(r.receivedOn)) +
+                field("VAS_081_MovementDate", "Movement Date", formatFullDate(r.receivedOn)) +
                 '</div>' +
                 '<div class="vas-mrr-lines-title">' + escapeHtml(lbl("VAS_081_ReceiptLines", "Receipt Lines")) + '</div>' +
                 '<div class="vas-mrr-lines-wrap"></div>';
@@ -456,14 +461,12 @@
         // Review #22: the modal line table is paginated client-side.
         var detailLines = [];
         var detailPage = 1;
-        var detailPageSize = 5;
-        var detailResizeObserver = null;
+        var detailPageSize = 5;   // fixed: 5 lines per page, pager only above 5
 
         function renderLines(lines) {
             detailLines = lines || [];
             detailPage = 1;
             renderLinesPage();
-            bindDetailResizeObserver();
         }
 
         function renderLinesPage() {
@@ -483,9 +486,17 @@
             var body = '';
             for (var i = 0; i < pageLines.length; i++) {
                 var ln = pageLines[i];
+                // Attribute values sit under the product name; nothing is rendered
+                // for a line (or a whole receipt) without attributes.
+                var attrText = '';
+                var attrs = ln.attributes || [];
+                for (var a = 0; a < attrs.length; a++) {
+                    attrText += (a ? ', ' : '') + attrs[a].label + ': ' + attrs[a].value;
+                }
                 body +=
                     '<tr>' +
-                    '<td class="vas-mrr-l-item" title="' + escapeHtml(ln.itemName) + '"><span class="vas-mrr-trunc">' + escapeHtml(ln.itemName) + '</span></td>' +
+                    '<td class="vas-mrr-l-item" title="' + escapeHtml(ln.itemName + (attrText ? ' - ' + attrText : '')) + '"><span class="vas-mrr-trunc">' + escapeHtml(ln.itemName) + '</span>' +
+                    (attrText ? '<span class="vas-mrr-trunc vas-mrr-l-attr">' + escapeHtml(attrText) + '</span>' : '') + '</td>' +
                     '<td class="vas-mrr-l-num">' + escapeHtml(formatQty(ln.receivedQty)) + '</td>' +
                     '<td class="vas-mrr-l-uom" title="' + escapeHtml(ln.uom) + '">' + escapeHtml(ln.uom) + '</td>' +
                     '</tr>';
@@ -514,55 +525,12 @@
                 '<th class="vas-mrr-l-uom">' + escapeHtml(lbl("VAS_081_Uom", "UOM")) + '</th>' +
                 '</tr></thead><tbody>' + body + '</tbody></table>' + pager
             );
-            window.setTimeout(syncDetailPageSize, 0);
-        }
-
-        function measureDetailPageSize() {
-            var $wrap = $dialog.find('.vas-mrr-lines-wrap');
-            if (!$wrap.length) { return detailPageSize; }
-
-            var $pager = $wrap.find('.vas-mrr-lines-foot');
-            var available = $wrap.innerHeight()
-                - ($wrap.find('thead').outerHeight(true) || 30)
-                - ($pager.length ? $pager.outerHeight(true) : 0)
-                - 8;
-            var rowHeight = $wrap.find('tbody tr').first().outerHeight(true) || 34;
-            if (!available || !rowHeight) { return detailPageSize; }
-
-            return Math.max(3, Math.floor(available / rowHeight));
-        }
-
-        function syncDetailPageSize() {
-            var nextPageSize = measureDetailPageSize();
-            if (nextPageSize === detailPageSize) { return; }
-
-            var firstLine = ((detailPage - 1) * detailPageSize) + 1;
-            detailPageSize = nextPageSize;
-            detailPage = Math.max(1, Math.ceil(firstLine / detailPageSize));
-            renderLinesPage();
-        }
-
-        function bindDetailResizeObserver() {
-            if (!window.ResizeObserver) { return; }
-            if (detailResizeObserver) { detailResizeObserver.disconnect(); }
-
-            var wrap = $dialog.find('.vas-mrr-lines-wrap')[0];
-            if (!wrap) { return; }
-
-            detailResizeObserver = new ResizeObserver(function () {
-                window.setTimeout(syncDetailPageSize, 0);
-            });
-            detailResizeObserver.observe(wrap);
         }
 
         function closeDetail() {
             if (!$dialog) { return; }
             $dialog.addClass('vas-mrr-hidden');
             $('body').removeClass('vas-mrr-body-lock');
-            if (detailResizeObserver) {
-                detailResizeObserver.disconnect();
-                detailResizeObserver = null;
-            }
         }
 
         this.refreshWidget = function () {
@@ -576,7 +544,6 @@
             $(document).off('keydown.vas-mrr');
             $('body').removeClass('vas-mrr-body-lock');
             if (rowResizeObserver) { rowResizeObserver.disconnect(); rowResizeObserver = null; }
-            if (detailResizeObserver) { detailResizeObserver.disconnect(); detailResizeObserver = null; }
             if ($dialog) { $dialog.remove(); $dialog = null; }
             $root.remove();
         };

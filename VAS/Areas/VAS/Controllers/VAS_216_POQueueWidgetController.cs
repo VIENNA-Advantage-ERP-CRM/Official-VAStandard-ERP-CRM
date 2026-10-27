@@ -1,4 +1,4 @@
-﻿﻿﻿﻿/************************************************************
+﻿﻿﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Controller for PO Queue Widget (Widget 14: VAS_216_POQueueWidget)
  *                  Main operational worklist of live purchase orders
@@ -604,7 +604,7 @@ namespace VIS.Controllers
                         CASE WHEN COALESCE(ol.M_AttributeSetInstance_ID, 0) > 0
                              THEN COALESCE(asi.Description, N'')
                              ELSE N'' END AS attribute_description,
-                        COALESCE(u.UOMSymbol, u.Name) AS uom,
+                        COALESCE(u.Name, u.UOMSymbol) AS uom,
                         COALESCE(ol.QtyOrdered, 0) AS ordered_qty,
                         -- QtyEntered is expressed in the line's own C_UOM_ID (the UOM the buyer
                         -- picked); QtyOrdered / QtyDelivered are in the product's base UOM. The

@@ -181,7 +181,7 @@ namespace VAS.Controllers
                 SELECT LineConfirm.M_InOutLineConfirm_ID AS Line_Confirm_ID,
                        InOutLine.Line AS Line_No,
                        Product.Name AS Product_Name,
-                       COALESCE(UomInfo.UOMSymbol, UomInfo.Name) AS UOM_Name,
+                       COALESCE(UomInfo.Name, UomInfo.UOMSymbol) AS UOM_Name,
                        AttributeInstance.Description AS Attribute_Description,
                        LineConfirm.M_Locator_ID AS Scrap_Locator_ID,
                        " + scrapLocatorSql + @" AS Scrap_Locator_Value,

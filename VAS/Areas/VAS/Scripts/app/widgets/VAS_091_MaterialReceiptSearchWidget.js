@@ -36,6 +36,8 @@
         // ---- Per-widget configuration ----
         var ENDPOINT      = 'VAS/VAS_091_MaterialReceiptSearchWidget/Search';
         var ZOOM_TABLE    = 'M_InOut';
+        var ZOOM_WINDOW_NEW = 'VAS_MaterialReceipt';
+        var ZOOM_WINDOW_OLD = 'Material Receipt';
         var CHIP_CLASS    = 'receipt';
         var PLACEHOLDER_K = 'VAS_091_Placeholder';
         var PLACEHOLDER_D = 'Search receipts by GRN no., supplier, PO no., reference, warehouse...';
@@ -295,6 +297,7 @@
                             statusPill(item.DocStatus) +
                         '</div>' +
                         '<div class="vas-dssrch-title">' + dsEsc(item.Title || '') + '</div>' +
+                        productsLine(item.Products) +
                         invoiceTag(item.MatchedInvoiceNo) +
                     '</div>' +
                     '<div class="vas-dssrch-meta">' +
@@ -335,14 +338,45 @@
             }
             // Navigate the CURRENT window's grid to the clicked record (no new window).
             try {
-                $self.widgetFirevalueChanged({
-                    "TabWhereClause": ZOOM_TABLE + "." + ZOOM_TABLE + "_ID=" + recordId,
-                    "TabLayout": "Y",
-                    "TabIndex": "0",
-                    "ActionName": hostWindowName() || "VAS_MaterialReceipt",
-                    "ActionType": "W"
-                });
+                if ($self.windowNo >= 0) {
+                    // Hosted in a window tab: navigate the CURRENT window's grid to the clicked record (no new window).
+                    $self.widgetFirevalueChanged({
+                        "TabWhereClause": ZOOM_TABLE + "." + ZOOM_TABLE + "_ID=" + recordId,
+                        "TabLayout": "Y",
+                        "TabIndex": "0",
+                        "ActionName": hostWindowName() || "VAS_MaterialReceipt",
+                        "ActionType": "W"
+                    });
+                }
+                else if (window.VAS && VAS.ZoomUtil && typeof VAS.ZoomUtil.zoomToRecord === 'function') {
+                    // Home dashboard placement (no host window): open the receipt window on the record directly.
+                    // windowId comes from the search result; when 0 the util resolves it by window name.
+                    VAS.ZoomUtil.zoomToRecord(ZOOM_TABLE + "_ID", recordId, windowId, ZOOM_WINDOW_NEW, ZOOM_WINDOW_OLD)
+                        .done(function (id) {
+                            if (id > 0) { windowId = id; }
+                        });
+                }
             } catch (e) { /* zoom is best-effort */ }
+        }
+
+        // Received products with their attribute values; empty when the receipt has no product lines.
+        // Shows the first few products and a "+N" count for the rest.
+        function productsLine(products) {
+            if (!products || !products.length) { return ''; }
+            var MAX = 3;
+            var html = '';
+            for (var i = 0; i < products.length && i < MAX; i++) {
+                var p = products[i];
+                html += '<span class="vas-dssrch-prod-name">' + dsEsc(p.Name || '') + '</span>';
+                var attrs = p.Attributes || [];
+                for (var j = 0; j < attrs.length; j++) {
+                    html += '<span class="vas-dssrch-attr">' + dsEsc(attrs[j].Label + ': ' + attrs[j].Value) + '</span>';
+                }
+            }
+            if (products.length > MAX) {
+                html += '<span>+' + (products.length - MAX) + '</span>';
+            }
+            return '<div class="vas-dssrch-prods">' + html + '</div>';
         }
 
         /* ---- Panel helpers ---- */

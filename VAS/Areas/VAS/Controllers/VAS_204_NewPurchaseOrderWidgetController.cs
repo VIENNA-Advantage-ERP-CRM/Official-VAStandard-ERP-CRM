@@ -231,7 +231,7 @@ namespace VIS.Controllers
                     rl.M_Product_ID AS product_id,
                     COALESCE(p.Name, rl.Description, N'') AS product_name,
                     COALESCE(p.Value, N'') AS product_code,
-                    COALESCE(u.UOMSymbol, u.Name, N'') AS uom,
+                    COALESCE(u.Name, u.UOMSymbol, N'') AS uom,
                     COALESCE(rl.Qty, 0) AS req_qty,
                     COALESCE(rl.QtyOrdered, 0) AS already_ordered_qty,
                     CASE

@@ -32,7 +32,17 @@
     backdrop-filter: blur(10px);
     cursor: pointer;
     transition: box-shadow 180ms ease;
+    outline: none;
 }
+
+/* Drop the browser's dotted focus ring around the tile (Firefox inner ring included) */
+.vas-new-transfer-quick-action-card::-moz-focus-inner {
+    border: 0;
+}
+
+    .vas-new-transfer-quick-action-card:focus {
+        outline: none;
+    }
 
     .vas-new-transfer-quick-action-card:hover {
         box-shadow: 0 14px 30px rgba(15, 61, 97, .13);
@@ -73,14 +83,14 @@
 
 .vas-new-transfer-quick-action-title {
     display: block;
-    font-size: .75em;
-    font-weight: 400;
+    font-size: .9375em;
+    font-weight: 500;
     color: #102C3F;
     line-height: 1.2;
 }
 
 .vas-new-transfer-quick-action-sub {
-    font-size: .625em;
+    font-size: .8125em;
     color: #5F7283;
     line-height: 1.25;
     margin-top: .25em;

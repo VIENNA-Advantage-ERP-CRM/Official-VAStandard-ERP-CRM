@@ -1,4 +1,4 @@
-﻿/**
+/**
  * VAS_215_RepresentativeWisePOWidget
  * Purchase Order Dashboard - Widget 13: Representative Wise PO (3x2 Ranked Bar List)
  *
@@ -19,7 +19,7 @@
  *   6 | of                                               | VAS_Of
  *   7 | PO value                                         | VAS_POValue
  *   8 | POs raised                                       | VAS_215_POsRaised
- *   9 | Share of month                                   | VAS_215_ShareOfMonth
+ *   9 | Share of Month (Completed POs)                   | VAS_215_ShareOfMonthCompleted
  *  10 | Avg cycle                                        | VAS_215_AvgCycle
  *  11 | Purchase orders                                  | VAS_PurchaseOrders
  *  12 | Purchase order lines                             | VAS_PurchaseOrderLines
@@ -136,9 +136,12 @@
         var modalStack = [];
         var currentModalCfg = null;
         var $modalHost = null;
+        var refitModal = null; // refits the table currently shown in the popup to the screen
 
         function lbl(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            // Fall back to the English text when the message row is not seeded (getMsg echoes the key back).
+            var m = VIS.Msg.getMsg(key);
+            return (!m || m === key || m === '[' + key + ']') ? (fallback != null ? fallback : key) : m;
         }
 
         function getStatusLabel(text) {
@@ -471,6 +474,15 @@
 
             $listContainer.html(rowsHtml);
 
+            // Rows are content-height, so a short widget clips the last ones: shrink the page size
+            // until every row on the page is really visible, keeping Showing a-b of N truthful.
+            var lc = $listContainer[0];
+            if (pageSize > 1 && pageReps.length > 1 && lc.scrollHeight - lc.clientHeight > 1) {
+                pageSize--;
+                renderRepresentativePage();
+                return;
+            }
+
             // Update footer helper and pager
             var helperString = lbl('VAS_Showing', 'Showing') + ' ' + (startIdx + 1) + '–' + endIdx + ' ' +
                 lbl('VAS_Of', 'of') + ' ' + count + ' · ' + lbl('VAS_215_RankedByPOValue', 'ranked by PO value');
@@ -519,6 +531,10 @@
 
                 $modalHost.find('#vas_rwpo_mBack').on('click', function () {
                     popModal();
+                });
+
+                $(window).off('resize.vas_rwpo_fit').on('resize.vas_rwpo_fit', function () {
+                    if (refitModal && $modalHost && $modalHost.hasClass('vas-rwpo-open')) { refitModal(); }
                 });
 
             }
@@ -620,7 +636,7 @@
             var statStripHtml = '<div class="vas-rwpo-mstats">' +
                 '  <div class="vas-rwpo-mstat"><div class="l">' + esc(lbl('VAS_POValue', 'PO value')) + '</div><div class="v" id="vas_rwpo_stat_val" title="' + esc(fmtMoney(rSpend)) + '">' + esc(fmtMoney(rSpend)) + '</div></div>' +
                 '  <div class="vas-rwpo-mstat"><div class="l">' + esc(lbl('VAS_215_POsRaised', 'POs raised')) + '</div><div class="v" id="vas_rwpo_stat_pos">' + num(rPOs) + '</div></div>' +
-                '  <div class="vas-rwpo-mstat"><div class="l">' + esc(lbl('VAS_215_ShareOfMonth', 'Share of month')) + '</div><div class="v" id="vas_rwpo_stat_share">' + esc(rShare) + '</div></div>' +
+                '  <div class="vas-rwpo-mstat"><div class="l">' + esc(lbl('VAS_215_ShareOfMonthCompleted', 'Share of Month (Completed POs)')) + '</div><div class="v" id="vas_rwpo_stat_share">' + esc(rShare) + '</div></div>' +
                 '  <div class="vas-rwpo-mstat"><div class="l">' + esc(lbl('VAS_215_AvgCycle', 'Avg cycle')) + '</div><div class="v" id="vas_rwpo_stat_cycle">' + esc(rAvgCycle) + '</div></div>' +
                 '</div>' +
                 '<div class="vas-rwpo-msec">' + esc(lbl('VAS_PurchaseOrders', 'Purchase orders')) + '</div>' +
@@ -699,6 +715,19 @@
             var rows = Math.floor((maxH - overhead) / rowH);
             rows = Math.max(4, Math.min(10, rows));
             $body[0].style.setProperty('--vas-rwpo-rows', rows);
+            return rows;
+        }
+
+        // fitModalRows is an estimate (the still-empty pager footer has borders and margins that
+        // it cannot see), so it can ask for more rows than the dialog really shows. Once the page
+        // is drawn, drop rows until the table no longer overflows its clipped wrapper; the
+        // returned count is the page size, so Showing a-b of N matches the rows on screen.
+        function settleRows($wrap, $body, rows) {
+            var w = $wrap[0];
+            while (rows > 1 && w.scrollHeight - w.clientHeight > 1) {
+                rows--;
+                $body[0].style.setProperty('--vas-rwpo-rows', rows);
+            }
             return rows;
         }
 
@@ -792,7 +821,22 @@
                 });
             }
 
+            // Fit to the rows that are really visible, and refit when the screen changes.
+            function fitPage() {
+                for (var g = 0; g < 4; g++) {
+                    var fr = settleRows($tableWrap, $tableBody, mPageSize);
+                    if (fr === mPageSize) { break; }
+                    mPageSize = fr;
+                    drawPage();
+                }
+            }
             drawPage();
+            fitPage();
+            refitModal = function () {
+                mPageSize = fitModalRows($tableBody);
+                drawPage();
+                fitPage();
+            };
 
             // Link click: open PO record
             $tableWrap.on('click', '.vas-rwpo-lnk', function (e) {
@@ -1016,7 +1060,22 @@
                 });
             }
 
+            // Fit to the rows that are really visible, and refit when the screen changes.
+            function fitLinesPage() {
+                for (var g = 0; g < 4; g++) {
+                    var fr = settleRows($tableWrap, $tableBody, lPageSize);
+                    if (fr === lPageSize) { break; }
+                    lPageSize = fr;
+                    drawLinesPage();
+                }
+            }
             drawLinesPage();
+            fitLinesPage();
+            refitModal = function () {
+                lPageSize = fitModalRows($tableBody);
+                drawLinesPage();
+                fitLinesPage();
+            };
         }
 
         // Canonical Home/Landing-page zoom handling (2026-09-30, per user-supplied reference
@@ -1063,6 +1122,7 @@
                 widgetObserver = null;
             }
             $(document).off('keydown.vas_rwpo_esc');
+            $(window).off('resize.vas_rwpo_fit');
             if ($modalHost) {
                 $modalHost.remove();
                 $modalHost = null;

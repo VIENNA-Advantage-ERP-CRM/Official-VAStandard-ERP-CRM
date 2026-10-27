@@ -40,7 +40,7 @@
 .vas-173-header-row {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
     gap: 0.5em;
     flex-shrink: 0;
 }
@@ -50,7 +50,7 @@
     align-items: center;
     gap: 0.5em;
     min-width: 0;
-    flex: 1;
+    flex: 0 1 auto;
 }
 
 .vas-173-icon-well {
@@ -104,7 +104,9 @@
 .vas-173-filter-cluster {
     display: flex;
     align-items: center;
+    justify-content: flex-start;
     gap: 0.5em;
+    flex-shrink: 0;
 }
 
 /* Arrow-less select, copied verbatim from VAS_165 Location Wise Count. */
@@ -122,8 +124,8 @@
     border-radius: 8px;
     padding: 0.35em 0.75em;
     min-width: 4.5em;
-    text-align: center;
-    text-align-last: center;
+    text-align: left;
+    text-align-last: left;
     outline: none;
     cursor: pointer;
     box-sizing: border-box;
@@ -474,7 +476,7 @@
     font-weight: 600;
     color: #748494;
     text-transform: uppercase;
-    padding: clamp(0.4rem, 0.7vw, 1rem) clamp(0.5rem, 0.9vw, 1.2rem);
+    padding: clamp(0.25rem, 0.45vw, 0.6rem) clamp(0.5rem, 0.9vw, 1.2rem);
     border-bottom: 1px solid #E4EDF4;
     box-sizing: border-box;
     white-space: nowrap;
@@ -483,7 +485,8 @@
 }
 
 .vas-173-tbl td {
-    padding: clamp(0.35rem, 0.65vw, 0.95rem) clamp(0.5rem, 0.9vw, 1.2rem);
+    padding: clamp(0.15rem, 0.25vw, 0.35rem) clamp(0.5rem, 0.9vw, 1.2rem);
+    line-height: 1.25;
     color: #102C3F;
     border-bottom: 1px solid #EDF2F6;
     vertical-align: middle;
@@ -508,6 +511,7 @@
 
 .vas-173-loc-sub {
     font-size: clamp(10px, 0.75vw, 14px);
+    line-height: 1.2;
     color: #748494;
 }
 

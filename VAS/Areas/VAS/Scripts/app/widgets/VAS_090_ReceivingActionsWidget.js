@@ -122,6 +122,17 @@
         var gcDetail = null;
         var gcLineIndex = -1;
         var gcQualityRows = [];
+        /* Quality Control pop-up state. Mode 'line' = shown before a confirmation line is saved
+           (only that line's parameters), 'complete' = shown by Complete GRN Confirmation (only
+           lines whose QC was not captured yet). gcQcDone remembers the confirmation lines whose
+           actual values were already captured so Complete does not ask for them again. */
+        var gcQualityMode = "complete";
+        var gcQualityPageNo = 1;
+        var gcQualityAfterSave = null;
+        var gcQualityBack = null;
+        var gcQcDone = {};
+        var gcQcDoneConfirmId = 0;
+        var QC_PAGE_SIZE = 5;
         var gcQualityPendingLine = null;   /* line payload waiting for its Quality Control values (QA #189) */
 
         var labelRows = [];
@@ -374,11 +385,11 @@
             }
         }
 
-        function fieldHtml(label, value, strong) {
+        function fieldHtml(label, value, strong, rawHtml) {
             var shown = value == null || value === "" ? "-" : value;
             return '<div class="vas-ra-field">' +
                 '<div class="vas-ra-field-label">' + escapeHtml(label) + '</div>' +
-                '<div class="vas-ra-field-value' + (strong ? ' strong' : '') + '" title="' + escapeHtml(shown) + '">' + escapeHtml(shown) + '</div>' +
+                '<div class="vas-ra-field-value' + (strong ? ' strong' : '') + '" title="' + escapeHtml(shown) + '">' + (rawHtml || escapeHtml(shown)) + '</div>' +
                 '</div>';
         }
 
@@ -562,7 +573,18 @@
             $dialog.on('click', '.vas-ra-gc-line-row', function () { openGRNConfirmationLine(Number($(this).data('lineidx'))); });
             $dialog.on('click', '.vas-ra-gc-back-detail', function () { gcLineIndex = -1; openGRNConfirmationDetail(gcDetail ? gcDetail.header.confirmId : 0); });
             $dialog.on('click', '.vas-ra-gc-complete', completeGRNConfirmation);
-            $dialog.on('click', '.vas-ra-gc-quality-back', function () { gcQualityPendingLine = null; openGRNConfirmationDetail(gcDetail ? gcDetail.header.confirmId : 0); });
+            $dialog.on('click', '.vas-ra-gc-quality-back', function () {
+                if (gcQualityBack) { gcQualityBack(); }
+                else { openGRNConfirmationDetail(gcDetail ? gcDetail.header.confirmId : 0); }
+            });
+            $dialog.on('change', '.vas-ra-gc-quality-actual', function () {
+                var qaRecordId = Number($(this).data('qarecordid') || 0);
+                for (var i = 0; i < gcQualityRows.length; i++) {
+                    if (Number(gcQualityRows[i].qaRecordId) === qaRecordId) { gcQualityRows[i].actualValue = $(this).val(); break; }
+                }
+            });
+            $dialog.on('click', '.vas-ra-gc-quality-prev', function () { if (gcQualityPageNo > 1) { gcQualityPageNo--; renderGRNConfirmationQualityControl(); } });
+            $dialog.on('click', '.vas-ra-gc-quality-next', function () { gcQualityPageNo++; renderGRNConfirmationQualityControl(); });
             $dialog.on('click', '.vas-ra-gc-quality-save', saveQualityParametersAndComplete);
             $dialog.on('click', '.vas-ra-gc-dispute', disputeGRNConfirmation);
             $dialog.on('click', '.vas-ra-gc-save-line', saveGRNConfirmationLine);
@@ -1287,6 +1309,12 @@
         function openGRNConfirmationDetail(confirmId) {
             if (!confirmId) { return; }
 
+            /* QC captured so far belongs to one confirmation - another one starts clean. */
+            if (gcQcDoneConfirmId !== Number(confirmId)) {
+                gcQcDone = {};
+                gcQcDoneConfirmId = Number(confirmId);
+            }
+
             showDialogBusy(true);
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_090_ReceivingActionsWidget/GetGRNConfirmationDetail',
@@ -1586,8 +1614,14 @@
                 description: String($dialogBody.find('.vas-ra-desc').val() || "").substring(0, 255)
             };
 
-            /* QA sheet #189: a line whose product has quality parameters opens the Quality Control
-               popup first; the line is saved once its actual values are recorded. */
+            /* A line whose product has quality parameters gets its Quality Control pop-up BEFORE the
+               line is saved; once its values were captured the pop-up is not shown again (here or
+               on Complete GRN Confirmation). */
+            if (gcQcDone[line.lineConfirmId]) {
+                persistGRNConfirmationLine(payload);
+                return;
+            }
+
             showDialogBusy(true);
             $dialogBody.find('.vas-ra-gc-save-line').prop('disabled', true);
             $.ajax({
@@ -1597,6 +1631,42 @@
                 data: { confirmId: gcDetail.header.confirmId },
                 success: function (res) {
                     var data = parseResponse(res);
+                    var rows = (data && !data.error && data.rows) ? data.rows : [];
+                    var lineRows = [];
+                    for (var i = 0; i < rows.length; i++) {
+                        if (Number(rows[i].lineConfirmId) === Number(line.lineConfirmId)) { lineRows.push(rows[i]); }
+                    }
+                    if (!lineRows.length) {
+                        persistGRNConfirmationLine(payload);
+                        return;
+                    }
+                    gcQualityMode = "line";
+                    gcQualityRows = lineRows;
+                    gcQualityPageNo = 1;
+                    gcQualityAfterSave = function () { persistGRNConfirmationLine(payload); };
+                    /* Back returns to the line with what was typed, not the stored values. */
+                    gcQualityBack = function () {
+                        openGRNConfirmationLine(gcLineIndex);
+                        $dialogBody.find('.vas-ra-gc-qty[data-k="target"]').val(toInputValue(target));
+                        $dialogBody.find('.vas-ra-gc-qty[data-k="confirmed"]').val(toInputValue(confirmed));
+                        $dialogBody.find('.vas-ra-gc-qty[data-k="scrapped"]').val(toInputValue(scrapped));
+                        $dialogBody.find('.vas-ra-gc-scrap-loc').val(String(payload.scrapLocatorId));
+                        $dialogBody.find('.vas-ra-desc').val(payload.description);
+                        paintGRNConfirmDifference();
+                    };
+                    loadGCQualityValueOptions(0);
+                },
+                error: function () {
+                    showDialogBusy(false);
+                    $dialogBody.find('.vas-ra-gc-save-line').prop('disabled', false);
+                    notify(lbl("VAS_090_SaveFailed", "Save failed."));
+                }
+            });
+        }
+
+        function persistGRNConfirmationLine(payload) {
+            if (!gcDetail || gcLineIndex < 0) { return; }
+
                     var lineRows = [];
                     var allRows = (data && !data.error && data.rows) ? data.rows : [];
                     for (var q = 0; q < allRows.length; q++) {
@@ -1672,11 +1742,21 @@
                         notify(data.error);
                         return;
                     }
-                    gcQualityRows = (data && data.rows) ? data.rows : [];
+                    var allRows = (data && data.rows) ? data.rows : [];
+                    /* Lines whose Quality Control was already captured (before their Save Line)
+                       are not asked for again. */
+                    gcQualityRows = [];
+                    for (var i = 0; i < allRows.length; i++) {
+                        if (!gcQcDone[allRows[i].lineConfirmId]) { gcQualityRows.push(allRows[i]); }
+                    }
                     if (!gcQualityRows.length) {
                         completeWithoutQuality = true;
                         return;
                     }
+                    gcQualityMode = "complete";
+                    gcQualityPageNo = 1;
+                    gcQualityAfterSave = function () { resolveGRNConfirmation('CompleteGRNConfirmation', '.vas-ra-gc-quality-save'); };
+                    gcQualityBack = function () { openGRNConfirmationDetail(gcDetail ? gcDetail.header.confirmId : 0); };
                     qualityPopupOpening = true;
                     loadGCQualityValueOptions(0);
                 },
@@ -1737,12 +1817,22 @@
 
         function renderGRNConfirmationQualityControl() {
             setModal(lbl("VAS_086_QualityControl", "Quality Control"), "", "info");
+            var isLineMode = gcQualityMode === "line";
+            var backText = isLineMode
+                ? lbl("VAS_090_ReviewConfirmationLine", "Review Confirmation Line")
+                : (gcDetail.header.confirmNo || "-");
             var html =
-                '<div class="vas-ra-modal-back vas-ra-gc-quality-back">' + icon("chevL") + '<span>' + escapeHtml(lbl("VAS_090_BackTo", "Back to") + ' ' + (gcDetail.header.confirmNo || "-")) + '</span></div>' +
+                '<div class="vas-ra-modal-back vas-ra-gc-quality-back">' + icon("chevL") + '<span>' + escapeHtml(lbl("VAS_090_BackTo", "Back to") + ' ' + backText) + '</span></div>' +
                 '<div class="vas-ra-qc-headline">' + escapeHtml(lbl("VAS_086_QualityControl", "Quality Control")) + '</div>' +
                 '<div class="vas-ra-gc-quality-list">';
 
-            for (var i = 0; i < gcQualityRows.length; i++) {
+            /* No scrollbar: at most QC_PAGE_SIZE parameters per page, the rest are paged. Values
+               picked on one page are kept in gcQualityRows (see the change handler). */
+            var qcTotalPages = Math.max(1, Math.ceil(gcQualityRows.length / QC_PAGE_SIZE));
+            if (gcQualityPageNo > qcTotalPages) { gcQualityPageNo = qcTotalPages; }
+            var qcStart = (gcQualityPageNo - 1) * QC_PAGE_SIZE;
+            var qcEnd = Math.min(qcStart + QC_PAGE_SIZE, gcQualityRows.length);
+            for (var i = qcStart; i < qcEnd; i++) {
                 var qualityRow = gcQualityRows[i];
                 html +=
                     '<div class="vas-ra-gc-quality-row">' +
@@ -1752,9 +1842,19 @@
                     '</div>';
             }
 
-            html += '</div>' +
+            html += '</div>';
+            if (qcTotalPages > 1) {
+                html +=
+                    '<div class="vas-ra-modal-pager">' +
+                    '<button type="button" class="vas-ra-pgbtn vas-ra-gc-quality-prev"' + (gcQualityPageNo <= 1 ? ' disabled' : '') + '>' + icon("chevL") + '</button>' +
+                    '<span class="vas-ra-pgtext">' + escapeHtml(gcQualityPageNo + ' ' + lbl("VAS_090_Of", "of") + ' ' + qcTotalPages) + '</span>' +
+                    '<button type="button" class="vas-ra-pgbtn vas-ra-gc-quality-next"' + (gcQualityPageNo >= qcTotalPages ? ' disabled' : '') + '>' + icon("chevR") + '</button>' +
+                    '</div>';
+            }
+            html +=
                 '<div class="vas-ra-action-footer right">' +
-                '<button type="button" class="vas-ra-primary vas-ra-gc-quality-save">' + icon("check") + escapeHtml(gcQualityPendingLine ? lbl("VAS_090_SaveLine", "Save Line") : lbl("VAS_090_CompleteGRNConfirmation", "Complete GRN Confirmation")) + '</button>' +
+                '<button type="button" class="vas-ra-primary vas-ra-gc-quality-save">' + icon("check") +
+                escapeHtml(isLineMode ? lbl("VAS_090_SaveLine", "Save Line") : lbl("VAS_090_CompleteGRNConfirmation", "Complete GRN Confirmation")) + '</button>' +
                 '</div>';
             $dialogBody.html(html);
         }
@@ -1762,13 +1862,19 @@
         function saveQualityParametersAndComplete() {
             var valuesByRecord = {};
             var incomplete = false;
-            $dialogBody.find('.vas-ra-gc-quality-actual').each(function () {
-                var qaRecordId = Number($(this).data('qarecordid') || 0);
-                var actualValue = $(this).val();
-                if (!qaRecordId || !actualValue) { incomplete = true; return false; }
+            for (var r = 0; r < gcQualityRows.length; r++) {
+                var qaRecordId = Number(gcQualityRows[r].qaRecordId || 0);
+                var actualValue = gcQualityRows[r].actualValue;
+                if (!qaRecordId || !actualValue) {
+                    incomplete = true;
+                    /* Show the page that still needs a value. */
+                    gcQualityPageNo = Math.floor(r / QC_PAGE_SIZE) + 1;
+                    break;
+                }
                 valuesByRecord[qaRecordId] = actualValue;
-            });
+            }
             if (incomplete) {
+                renderGRNConfirmationQualityControl();
                 notify(lbl("VAS_086_SelectQAActualValue", "Select an actual value before saving."));
                 return;
             }
@@ -1780,7 +1886,15 @@
 
         function saveNextQualityParameter(index, valuesByRecord) {
             if (index >= gcQualityRows.length) {
+                /* Remember which confirmation lines had their values captured, so neither the
+                   next Save Line nor Complete GRN Confirmation opens the pop-up for them again. */
+                for (var q = 0; q < gcQualityRows.length; q++) {
+                    gcQcDone[gcQualityRows[q].lineConfirmId] = true;
+                }
                 gcQualityRows = [];
+                var afterSave = gcQualityAfterSave;
+                gcQualityAfterSave = null;
+                if (afterSave) { afterSave(); }
                 if (gcQualityPendingLine) {
                     /* QA #189: the values are recorded, now the confirmation line itself is saved. */
                     var pendingLine = gcQualityPendingLine;

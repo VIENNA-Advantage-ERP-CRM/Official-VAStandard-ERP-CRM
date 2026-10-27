@@ -370,10 +370,10 @@ namespace VIS.Controllers
                             productName = "—";
                         }
 
-                        string uom = Util.GetValueOfString(dr["uom_symbol_raw"]);
+                        string uom = Util.GetValueOfString(dr["uom_name_raw"]);
                         if (string.IsNullOrEmpty(uom))
                         {
-                            uom = Util.GetValueOfString(dr["uom_name_raw"]);
+                            uom = Util.GetValueOfString(dr["uom_symbol_raw"]);
                         }
 
                         lines.Add(new

@@ -614,13 +614,9 @@ namespace VAS.Areas.VAS.Controllers
                         CASE WHEN COALESCE(ol.M_AttributeSetInstance_ID, 0) > 0
                              THEN COALESCE(asi.Description, N'')
                              ELSE N'' END AS Attribute,
-                        COALESCE(uom.UOMSymbol, uom.Name) AS UomName,
-                        -- Quantities in the line's own (selected) UOM: QtyEntered, and QtyDelivered
-                        -- scaled by the entered/ordered ratio (QtyOrdered / QtyDelivered are base UOM).
-                        COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) AS QtyOrdered,
-                        CASE WHEN COALESCE(ol.QtyOrdered, 0) <> 0
-                             THEN COALESCE(ol.QtyDelivered, 0) * COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) / ol.QtyOrdered
-                             ELSE COALESCE(ol.QtyDelivered, 0) END AS QtyDelivered,
+                        COALESCE(uom.Name, uom.UOMSymbol) AS UomName,
+                        COALESCE(ol.QtyOrdered, 0) AS QtyOrdered,
+                        COALESCE(ol.QtyDelivered, 0) AS QtyDelivered,
                         COALESCE(ol.PriceActual, 0) AS PriceActual,
                         COALESCE(ol.LineNetAmt, 0) AS LineNetAmt,
                         o.DocStatus

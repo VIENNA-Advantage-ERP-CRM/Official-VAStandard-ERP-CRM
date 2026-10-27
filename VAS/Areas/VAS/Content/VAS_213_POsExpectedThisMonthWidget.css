@@ -152,7 +152,8 @@
     flex-direction: column;
     flex: 1;
     min-height: 0;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
     border-top: 1px solid #E2EAF1;
     padding-top: 0.47em;
     justify-content: flex-start;

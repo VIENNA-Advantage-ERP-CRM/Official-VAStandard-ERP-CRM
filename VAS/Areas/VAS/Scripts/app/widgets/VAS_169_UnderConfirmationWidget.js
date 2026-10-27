@@ -45,7 +45,8 @@
         var widgetObserver = null;
 
         function lbl(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            var msg = VIS.Msg.getMsg(key);
+            return (!msg || msg === key || msg === '[' + key + ']') ? fallback : msg;
         }
 
         function showBusy(show) {

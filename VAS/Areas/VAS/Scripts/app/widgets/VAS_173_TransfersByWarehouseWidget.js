@@ -25,8 +25,9 @@
 
     /* Falls back to the English text when the AD_Message key is not defined. */
     function lbl(key, fallback) {
-        var t = VIS.Msg.getMsg(key);
-        return (t && t.charAt(0) !== '[') ? t : (fallback !== undefined ? fallback : t);
+        // getMsg echoes the key (or [key]) when no AD_Message row exists - fall back to the English text.
+        var m = VIS.Msg.getMsg(key);
+        return (m && m !== key && m !== '[' + key + ']') ? m : fallback;
     }
 
     function escapeHtml(v) {
@@ -103,7 +104,10 @@
         var $modal = null;
         var activeWH = null;
         var modalPage = 1;
-        var MODAL_PAGE_SIZE = 8;
+        var MODAL_PAGE_MAX = 4;                 // never more than 4 lines per page
+        var modalPageSize = MODAL_PAGE_MAX;     // shrinks (never grows past the max) to what fits
+        var modalFitPasses = 0;
+        var modalFitRaf = null;
 
         var YEAR_MIN = 2024;
 
@@ -198,7 +202,7 @@
 
             if (total === 0) {
                 $body.html('<div class="vas-173-empty">' + escapeHtml(lbl('VAS_173_NoTransfers', 'No transfers in') + ' ' + monthNames()[selMonth - 1] + ' ' + selYear) + '</div>');
-                renderFooter($footer, 0, 0, 0, 1, 1);
+                $footer.empty(); // nothing to page - no pagination on an empty widget
                 return;
             }
 
@@ -262,7 +266,16 @@
                     if (data && typeof data === 'string') { data = JSON.parse(data); }
                     if (data && data.currency) { orgCurrency = data.currency; }
                     var raw = (data && !data.error && Array.isArray(data.warehouses)) ? data.warehouses : [];
-                    
+
+                    // Highest share first, ties by quantity then name (same order the server returns).
+                    raw.sort(function (a, b) {
+                        var d = (Number(b.Share) || 0) - (Number(a.Share) || 0);
+                        if (d !== 0) { return d; }
+                        d = (Number(b.TotalQty) || 0) - (Number(a.TotalQty) || 0);
+                        if (d !== 0) { return d; }
+                        return String(a.WarehouseName || '').toLowerCase() < String(b.WarehouseName || '').toLowerCase() ? -1 :
+                               String(a.WarehouseName || '').toLowerCase() > String(b.WarehouseName || '').toLowerCase() ? 1 : 0;
+                    });
                     for (var i = 0; i < raw.length; i++) {
                         raw[i].PaletteIndex = i;
                     }
@@ -281,6 +294,9 @@
             if (!wh) { return; }
             activeWH = wh;
             modalPage = 1;
+            modalPageSize = MODAL_PAGE_MAX;
+            modalFitPasses = 0;
+            $(window).off('resize.vas173').on('resize.vas173', onWindowResize);
             renderModal();
         }
 
@@ -290,11 +306,11 @@
             var periodTxt = monthNames()[selMonth - 1] + ' ' + selYear;
             var transfers = wh.Transfers || [];
             var totalLines = transfers.length;
-            var totalPages = Math.max(1, Math.ceil(totalLines / MODAL_PAGE_SIZE));
+            var totalPages = Math.max(1, Math.ceil(totalLines / modalPageSize));
             modalPage = Math.min(modalPage, totalPages);
 
-            var start = totalLines === 0 ? 0 : (modalPage - 1) * MODAL_PAGE_SIZE;
-            var end = Math.min(start + MODAL_PAGE_SIZE, totalLines);
+            var start = totalLines === 0 ? 0 : (modalPage - 1) * modalPageSize;
+            var end = Math.min(start + modalPageSize, totalLines);
             var slice = transfers.slice(start, end);
 
             var rowsHtml = '';
@@ -327,7 +343,7 @@
                         '</div>' +
                         '<div class="vas-173-modal-body">' +
                             '<div class="vas-173-summary-strip">' +
-                                '<div class="vas-173-sum-cell" style="background-color:' + color + '33; border-color:' + color + ';">' +
+                                '<div class="vas-173-sum-cell">' +
                                     '<span class="vas-173-sum-label">' + escapeHtml(lbl('VAS_173_Warehouse', 'Warehouse')) + '</span>' +
                                     '<span class="vas-173-sum-val">' + escapeHtml(wh.WarehouseName) + '</span>' +
                                 '</div>' +
@@ -358,9 +374,9 @@
                                     '<thead>' +
                                         '<tr>' +
                                             '<th style="text-align:left;">' + escapeHtml(lbl('VAS_173_FromTo', 'From → To')) + '</th>' +
-                                            '<th style="text-align:left;">' + escapeHtml(lbl('VAS_173_MoveDate', 'Move Date')) + '</th>' +
+                                            '<th style="text-align:left;">' + escapeHtml(lbl('VAS_173_MovementDate', 'Movement Date')) + '</th>' +
                                             '<th style="text-align:right;">' + escapeHtml(lbl('VAS_173_Products', 'Products')) + '</th>' +
-                                            '<th style="text-align:right;">' + escapeHtml(lbl('VAS_173_Qty', 'Qty')) + '</th>' +
+                                            '<th style="text-align:right;">' + escapeHtml(lbl('VAS_173_QtyBaseUOM', 'Qty (In Base UOM)')) + '</th>' +
                                             '<th style="text-align:left;">' + escapeHtml(lbl('VAS_173_DoneBy', 'Done By')) + '</th>' +
                                             '<th style="text-align:left;">' + escapeHtml(lbl('VAS_173_RequestedBy', 'Requested By')) + '</th>' +
                                         '</tr>' +
@@ -387,9 +403,54 @@
             $modal.find('#vas173-modal-close').on('click', closeModal);
             $modal.find('#vas173-m-prev').on('click', function () { if (modalPage > 1) { modalPage--; renderModal(); } });
             $modal.find('#vas173-m-next').on('click', function () { if (modalPage < totalPages) { modalPage++; renderModal(); } });
+
+            scheduleModalFit();
+        }
+
+        function scheduleModalFit() {
+            if (modalFitRaf) { window.cancelAnimationFrame(modalFitRaf); }
+            modalFitRaf = window.requestAnimationFrame(fitModalLines);
+        }
+
+        /* Convergent fit: the table viewport is clipped (never scrolled), so the page
+           size is the number of rows (max 4) that fit between the header and the pager.
+           Row height does not depend on the page size, so one re-render settles it. */
+        function fitModalLines() {
+            modalFitRaf = null;
+            if (!$modal || !activeWH) { return; }
+            var $box = $modal.find('.vas-173-modal-tbl-container');
+            var $row = $box.find('tbody tr').first();
+            if (!$box.length || !$row.length) { return; }
+            var rowHeight = $row.outerHeight();
+            var headHeight = $box.find('thead').outerHeight() || 0;
+            if (!rowHeight || rowHeight <= 0) { return; }
+
+            var fit = Math.max(1, Math.min(MODAL_PAGE_MAX, Math.floor(($box[0].clientHeight - headHeight) / rowHeight)));
+            if (fit !== modalPageSize && modalFitPasses < 6) {
+                var firstIndex = (modalPage - 1) * modalPageSize;
+                modalPageSize = fit;
+                modalPage = Math.floor(firstIndex / modalPageSize) + 1;
+                modalFitPasses++;
+                renderModal();
+                return;
+            }
+            modalFitPasses = 0;
+        }
+
+        function onWindowResize() {
+            if ($modal && activeWH) {
+                // Window/zoom changed: allow the page size to grow back up to the max before re-measuring.
+                var firstIndex = (modalPage - 1) * modalPageSize;
+                modalPageSize = MODAL_PAGE_MAX;
+                modalPage = Math.floor(firstIndex / modalPageSize) + 1;
+                modalFitPasses = 0;
+                renderModal();
+            }
         }
 
         function closeModal() {
+            if (modalFitRaf) { window.cancelAnimationFrame(modalFitRaf); modalFitRaf = null; }
+            $(window).off('resize.vas173');
             if ($modal) { $modal.remove(); $modal = null; }
             activeWH = null;
         }

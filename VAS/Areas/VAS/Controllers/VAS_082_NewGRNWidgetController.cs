@@ -178,7 +178,7 @@ namespace VIS.Controllers
                        COALESCE(ol.QtyOrdered, 0) AS PO_Qty,
                        COALESCE(ol.QtyDelivered, 0) AS Already_Received_Qty,
                        COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) AS Default_Received_Qty,
-                       COALESCE(u.UOMSymbol, u.Name) AS UOM
+                       COALESCE(u.Name, u.UOMSymbol) AS UOM
                 FROM C_Order o
                 INNER JOIN C_OrderLine ol ON (ol.C_Order_ID=o.C_Order_ID)
                 INNER JOIN M_Product p ON (p.M_Product_ID=ol.M_Product_ID AND p.IsActive='Y')

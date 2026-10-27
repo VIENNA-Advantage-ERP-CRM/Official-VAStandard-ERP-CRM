@@ -959,7 +959,8 @@ namespace VASLogic.Models
             data.StdPrecision = Util.GetValueOfInt(r["StdPrecision"]);
             data.CurSymbol = Util.GetValueOfString(r["CurrencySymbol"]);
             data.CurISO = Util.GetValueOfString(r["CurrencyISOCode"]);
-            data.IsEditable = !data.Processed
+            data.IsProcessingByOther = IsProcessingByOtherUser(ctx, data.C_Order_ID);
+            data.IsEditable = !data.Processed && !data.IsProcessingByOther
                 && data.DocStatus != "CO" && data.DocStatus != "CL"
                 && data.DocStatus != "VO" && data.DocStatus != "RE";
             if (data.LogicContext.ContainsKey("C_Order_Blanket"))
@@ -1179,6 +1180,35 @@ namespace VASLogic.Models
             otherNet = gNet - pNet;
             otherTax = gTax - pTax;
             otherTcs = gTcs - pTcs;
+        }
+
+        /// <summary>
+        /// True when the order is locked for processing (C_Order.Processing = 'Y', set by
+        /// PO.Lock while a document action runs) by a user OTHER than the current one.
+        /// PO.Lock writes only the flag, not UpdatedBy, so the user is taken from the newest
+        /// process instance run on this order by one of C_Order's button processes
+        /// (Document Action); UpdatedBy is the fallback when there is no such instance.
+        /// </summary>
+        /// <param name="ctx">session context</param>
+        /// <param name="C_Order_ID">order shown by the panel</param>
+        /// <returns>true when another user's processing holds the order</returns>
+        public bool IsProcessingByOtherUser(Ctx ctx, int C_Order_ID)
+        {
+            if (C_Order_ID <= 0) return false;
+            DataSet ds = DB.ExecuteDataset("SELECT COALESCE(Processing, 'N') AS Processing, UpdatedBy FROM C_Order WHERE C_Order_ID = @C_Order_ID",
+                new SqlParameter[] { new SqlParameter("@C_Order_ID", C_Order_ID) }, null);
+            if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return false;
+            DataRow r = ds.Tables[0].Rows[0];
+            if (Util.GetValueOfString(r["Processing"]) != "Y") return false;
+            int userId = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT pi.AD_User_ID FROM AD_PInstance pi
+                             WHERE pi.Record_ID = @Record_ID
+                               AND pi.AD_Process_ID IN (SELECT c.AD_Process_ID FROM AD_Column c
+                                                         WHERE c.AD_Table_ID = @AD_Table_ID AND c.AD_Process_ID IS NOT NULL)
+                             ORDER BY pi.AD_PInstance_ID DESC",
+                new SqlParameter[] { new SqlParameter("@Record_ID", C_Order_ID),
+                                     new SqlParameter("@AD_Table_ID", MTable.Get_Table_ID("C_Order")) }, null));
+            if (userId <= 0) userId = Util.GetValueOfInt(r["UpdatedBy"]);
+            return userId != ctx.GetAD_User_ID();
         }
 
         /// <summary>
@@ -2873,6 +2903,8 @@ namespace VASLogic.Models
         public bool IsTaxIncluded { get; set; }
         public string DocStatus { get; set; }
         public bool Processed { get; set; }
+        /// <summary>C_Order.Processing = 'Y' by another user's document action - lines read-only.</summary>
+        public bool IsProcessingByOther { get; set; }
         public bool IsEditable { get; set; }
         public int LinesTotal { get; set; }
         public int LinePage { get; set; }
