@@ -95,6 +95,82 @@
 
 ; (function (VAS, $) {
 
+    /* Sales Order dashboard request queue (shared by VAS_270-289).
+       The dashboard starts ~20 widget calls at once on one login session and the server
+       answers the overflow with HTTP 500 ("request queue limit of the session exceeded").
+       GET calls are therefore run at most 3 at a time and retried (up to 2 times, with a
+       short back-off) when the server answers 500/503/0. The first widget file loaded
+       creates the singleton; every other widget reuses it. A failed card also gets a
+       Retry button so the user never has to close and re-open the screen. */
+    var VASSONet = window.__vasSONet = window.__vasSONet || (function () {
+        var MAX_PARALLEL = 3, MAX_RETRIES = 2, running = 0, waiting = [];
+
+        function pump() {
+            while (running < MAX_PARALLEL && waiting.length) { start(waiting.shift()); }
+        }
+
+        function start(job) {
+            running++;
+            var o = job.opts;
+            $.ajax($.extend({}, o, {
+                success: function () {
+                    running--;
+                    if (o.success) { o.success.apply(this, arguments); }
+                    pump();
+                },
+                error: function (xhr) {
+                    var self = this, args = arguments;
+                    running--;
+                    var st = xhr ? xhr.status : 0;
+                    if (job.tries < MAX_RETRIES && (st === 500 || st === 503 || st === 0) && xhr.statusText !== 'abort') {
+                        job.tries++;
+                        setTimeout(function () { waiting.push(job); pump(); }, 400 * job.tries + Math.floor(Math.random() * 300));
+                    } else if (o.error) {
+                        o.error.apply(self, args);
+                    }
+                    pump();
+                }
+            }));
+        }
+
+        function injectStyle() {
+            if (document.getElementById('vasso-retry-style')) { return; }
+            var st = document.createElement('style');
+            st.id = 'vasso-retry-style';
+            st.textContent = '.vasso-retry{position:absolute;right:10px;bottom:8px;z-index:3;border:1px solid currentColor;' +
+                'background:rgba(255,255,255,.85);color:#1a5fb4;border-radius:12px;padding:2px 12px;font-size:12px;' +
+                'line-height:18px;cursor:pointer}.vasso-retry:hover,.vasso-retry:focus{background:#fff;outline:2px solid #1a5fb4}';
+            document.head.appendChild(st);
+        }
+
+        return {
+            // GET calls are queued/retried; anything else (e.g. a POST that creates a record) runs untouched.
+            ajax: function (o) {
+                if (o && o.type && String(o.type).toUpperCase() !== 'GET') { return $.ajax(o); }
+                waiting.push({ opts: o, tries: 0 });
+                pump();
+            },
+            // Adds a Retry button to a widget root that is showing its error state.
+            retry: function ($root, widget) {
+                injectStyle();
+                $root.find('.vasso-retry').remove();
+                if ($root.css('position') === 'static') { $root.css('position', 'relative'); }
+                var text = '';
+                try { text = VIS.Msg.getMsg('VAS_SO_Retry'); } catch (e) { text = ''; }
+                if (!text || text === 'VAS_SO_Retry') { text = 'Retry'; }
+                $('<button type="button" class="vasso-retry"></button>').text(text)
+                    .attr('title', text)
+                    .on('click', function (e) {
+                        e.stopPropagation();
+                        $(this).remove();
+                        widget.refreshWidget();
+                    })
+                    .appendTo($root);
+            }
+        };
+    })();
+
+
     var MAX_ROWS_PER_PAGE = 10;
     var MIN_ROWS_PER_PAGE = 2;
     var TOP_COUNT = 4;
@@ -179,6 +255,11 @@
                 return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>';
             }
             return '';
+        }
+
+        // List rows show the full amount (not a mix of "₹ 1.37 L" and "₹ 42,240") so values in one list compare at a glance.
+        function formatINRFull(value) {
+            return '₹ ' + Math.round(Number(value || 0)).toLocaleString('en-IN');
         }
 
         function formatINR(value) {
@@ -295,7 +376,7 @@
             rankState = 'loading';
             renderList();
 
-            $.ajax({
+            VASSONet.ajax({
                 url: VIS.Application.contextUrl + SELF_ENDPOINT + 'GetTopProducts',
                 type: 'GET', dataType: 'json', cache: false,
                 data: { month: selectedMonth(), year: selectedYear() },
@@ -319,6 +400,7 @@
             }
             if (rankState === 'error') {
                 $list.html('<div class="vas285-empty">' + escapeHtml(label('VAS_285_ErrorState', 'Ranking unavailable')) + '</div>');
+                VASSONet.retry($root, $self);
                 return;
             }
             if (products.length <= 0) {
@@ -338,7 +420,7 @@
                 var color = BAR_COLORS[i % BAR_COLORS.length];
                 return '<button type="button" class="vas285-hrow" data-pid="' + p.ProductId + '" data-pname="' + escapeHtml(p.ProductName) + '" data-psku="' + escapeHtml(p.Sku) + '">' +
                     '<span class="vas285-line"><span class="vas285-nm" title="' + escapeHtml(p.ProductName) + '">' + escapeHtml(p.ProductName) + '</span>' +
-                    '<span class="vas285-vl" title="' + escapeHtml(formatINR(p.OrderValue)) + '">' + escapeHtml(formatINR(p.OrderValue)) + '</span></span>' +
+                    '<span class="vas285-vl" title="' + escapeHtml(formatINRFull(p.OrderValue)) + '">' + escapeHtml(formatINRFull(p.OrderValue)) + '</span></span>' +
                     '<span class="vas285-track"><span class="vas285-fill" style="width:' + pct + '%;background:' + color + '"></span></span></button>';
             }).join(''));
         }
@@ -471,7 +553,7 @@
         }
 
         function fetchProductDemand(productId, cb) {
-            $.ajax({
+            VASSONet.ajax({
                 url: VIS.Application.contextUrl + SELF_ENDPOINT + 'GetProductDemand',
                 type: 'GET', dataType: 'json', cache: false,
                 data: { productId: productId, month: selectedMonth(), year: selectedYear() },
@@ -485,7 +567,7 @@
         }
 
         function fetchProductOrders(productId, page, size, cb) {
-            $.ajax({
+            VASSONet.ajax({
                 url: VIS.Application.contextUrl + SELF_ENDPOINT + 'GetProductOrders',
                 type: 'GET', dataType: 'json', cache: false,
                 data: { productId: productId, month: selectedMonth(), year: selectedYear(), page: page, size: size },
@@ -621,7 +703,7 @@
         }
 
         function fetchOrderDetail(orderId, cb) {
-            $.ajax({
+            VASSONet.ajax({
                 url: VIS.Application.contextUrl + SELF_ENDPOINT + 'GetSalesOrderDetail',
                 type: 'GET', dataType: 'json', cache: false,
                 data: { id: orderId },

@@ -87,6 +87,8 @@ namespace VIS.Controllers
             bool allowNonItem = Util.GetValueOfString(ctx.GetContext("$AllowNonItem")).Equals("Y");
             bool pendingMode = "PG".Equals(type, StringComparison.OrdinalIgnoreCase);
 
+            // QA sheet GRN #98 / #99: PO_Value is the order's own total (TotalLines) in the PO price list currency,
+            // not converted to the base currency; on a tax-inclusive price list the line amounts already contain the tax.
             string rawSql = @"
                 SELECT o.C_Order_ID AS PO_ID,
                        o.DocumentNo AS PO_NO,
@@ -94,7 +96,10 @@ namespace VIS.Controllers
                        l.Name AS Address_Line,
                        w.Name AS Warehouse_Name,
                        o.DatePromised AS Promise_Date,
-                       COALESCE(CURRENCYCONVERT(CASE WHEN o.IsTaxIncluded='Y' THEN o.TotalLines - COALESCE(OrderTax.Tax_Amt, 0) ELSE o.TotalLines END, o.C_Currency_ID, @Base_Currency_ID, o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID), 0) AS PO_Value,
+                       COALESCE(o.TotalLines, 0) AS PO_Value,
+                       cur.CurSymbol AS Cur_Symbol,
+                       cur.ISO_Code AS Cur_ISO,
+                       cur.StdPrecision AS Cur_Precision,
                        ol.C_OrderLine_ID AS PO_Line_ID
                 FROM C_Order o
                 INNER JOIN C_OrderLine ol ON (ol.C_Order_ID=o.C_Order_ID)"
@@ -103,7 +108,7 @@ namespace VIS.Controllers
                 INNER JOIN M_Warehouse w ON (w.M_Warehouse_ID=o.M_Warehouse_ID)
                 INNER JOIN C_BPartner cb ON (cb.C_BPartner_ID=o.C_BPartner_ID)
                 INNER JOIN C_BPartner_Location l ON (l.C_BPartner_Location_ID=o.C_BPartner_Location_ID)
-                LEFT OUTER JOIN (SELECT OrdTax.C_Order_ID, SUM(OrdTax.TaxAmt) AS Tax_Amt FROM C_OrderTax OrdTax GROUP BY OrdTax.C_Order_ID) OrderTax ON (OrderTax.C_Order_ID=o.C_Order_ID)
+                INNER JOIN C_Currency cur ON (cur.C_Currency_ID=o.C_Currency_ID)
                 WHERE o.AD_Client_ID=@AD_Client_ID
                   AND o.DocStatus='CO'
                   AND o.DatePromised" + (pendingMode ? "<" : ">=") + @"@Promised_From
@@ -129,6 +134,9 @@ namespace VIS.Controllers
                        ExpectedPO.Promise_Date,
                        ExpectedPO.Line_Count,
                        ExpectedPO.PO_Value,
+                       ExpectedPO.Cur_Symbol,
+                       ExpectedPO.Cur_ISO,
+                       ExpectedPO.Cur_Precision,
                        COUNT(1) OVER () AS TotalRecords
                 FROM (
                     SELECT RawData.PO_ID,
@@ -138,6 +146,9 @@ namespace VIS.Controllers
                            RawData.Warehouse_Name,
                            RawData.Promise_Date,
                            RawData.PO_Value,
+                           RawData.Cur_Symbol,
+                           RawData.Cur_ISO,
+                           RawData.Cur_Precision,
                            COUNT(RawData.PO_Line_ID) AS Line_Count
                     FROM (
                         " + rawSql + @"
@@ -148,44 +159,20 @@ namespace VIS.Controllers
                              RawData.Address_Line,
                              RawData.Warehouse_Name,
                              RawData.Promise_Date,
-                             RawData.PO_Value
+                             RawData.PO_Value,
+                             RawData.Cur_Symbol,
+                             RawData.Cur_ISO,
+                             RawData.Cur_Precision
                 ) ExpectedPO
                 ORDER BY ExpectedPO.Promise_Date DESC, ExpectedPO.PO_NO
                 OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 
             // Parameters in order of appearance (the DB layer binds positionally).
             List<SqlParameter> parameters = new List<SqlParameter>();
-            parameters.Add(new SqlParameter("@Base_Currency_ID", ctx.GetContextAsInt("$C_Currency_ID")));
             parameters.Add(new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()));
             parameters.Add(new SqlParameter("@Promised_From", SqlDbType.DateTime) { Value = DateTime.Today });
             parameters.Add(new SqlParameter("@Offset", offset));
             parameters.Add(new SqlParameter("@PageSize", pageSize));
-
-            // Legacy behaviour: the value is shown in the session/base currency,
-            // so every row carries that one currency's symbol and precision.
-            string baseCurSymbol = "";
-            string baseCurIso = "";
-            int baseStdPrecision = 2;
-            IDataReader curReader = null;
-            try
-            {
-                curReader = DB.ExecuteReader(
-                    @"SELECT CurSymbol, ISO_Code, StdPrecision
-                      FROM C_Currency
-                      WHERE C_Currency_ID=@Cur_ID",
-                    new SqlParameter[] { new SqlParameter("@Cur_ID", ctx.GetContextAsInt("$C_Currency_ID")) });
-                if (curReader != null && curReader.Read())
-                {
-                    baseCurSymbol = Util.GetValueOfString(curReader["CurSymbol"]);
-                    baseCurIso = Util.GetValueOfString(curReader["ISO_Code"]);
-                    baseStdPrecision = Util.GetValueOfInt(curReader["StdPrecision"]);
-                    if (String.IsNullOrEmpty(baseCurSymbol)) { baseCurSymbol = baseCurIso; }
-                }
-            }
-            finally
-            {
-                if (curReader != null) { curReader.Close(); curReader.Dispose(); }
-            }
 
             List<object> rows = new List<object>();
             int totalRecords = 0;
@@ -199,6 +186,9 @@ namespace VIS.Controllers
                 {
                     totalRecords = Util.GetValueOfInt(dr["TotalRecords"]);
                     DateTime? promiseDate = Util.GetValueOfDateTime(dr["Promise_Date"]);
+                    string curIso = Util.GetValueOfString(dr["Cur_ISO"]);
+                    string curSymbol = Util.GetValueOfString(dr["Cur_Symbol"]);
+                    if (String.IsNullOrEmpty(curSymbol)) { curSymbol = curIso; }
 
                     rows.Add(new
                     {
@@ -207,9 +197,9 @@ namespace VIS.Controllers
                         supplier = Util.GetValueOfString(dr["Supplier"]),
                         addressLine = Util.GetValueOfString(dr["Address_Line"]),
                         warehouseName = Util.GetValueOfString(dr["Warehouse_Name"]),
-                        curSymbol = baseCurSymbol,
-                        currencyIso = baseCurIso,
-                        stdPrecision = baseStdPrecision,
+                        curSymbol = curSymbol,
+                        currencyIso = curIso,
+                        stdPrecision = Util.GetValueOfInt(dr["Cur_Precision"]),
                         promiseDate = promiseDate.HasValue ? promiseDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                         lineCount = Util.GetValueOfInt(dr["Line_Count"]),
                         poValue = Util.GetValueOfDecimal(dr["PO_Value"])

@@ -163,6 +163,21 @@
                 "TabIndex": "0"
             };
 
+            /* QA sheet GRN #107: on the Home screen there is no host window to relay to, so open the
+               Material Receipt window (new tab) with the same filter. */
+            if (!$self.listener) {
+                if (!window.VAS || !VAS.ZoomUtil || !window.VIS || !VIS.viewManager || typeof VIS.Query !== 'function') { return; }
+                VAS.ZoomUtil.getWindowId('VAS_MaterialReceipt', 'Material Receipt').done(function (windowId) {
+                    if (!(windowId > 0)) { return; }
+                    try {
+                        var query = new VIS.Query('M_InOut');
+                        query.addRestriction(where);
+                        VIS.viewManager.startWindow(windowId, query);
+                    } catch (e) { /* zoom is best-effort */ }
+                });
+                return;
+            }
+
             $self.widgetFirevalueChanged(windowParam);
         }
 

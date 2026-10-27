@@ -38,10 +38,10 @@
 ; (function (VAS, $) {
 
     /* Design height of one category row, in em against the body's font size.
-       MUST stay in sync with  min-height: 2em  on .vas-pcu-row in
+       MUST stay in sync with  height: 2.75em  on .vas-pcu-row in
        VAS_186_ProductCategoryUsageWidget.css - the stylesheet enforces the floor, this constant
        decides how many rows fit. See recalcPageSize() for why the rendered height is not used. */
-    var VAS_PCU_ROW_MIN_EM = 2;
+    var VAS_PCU_ROW_MIN_EM = 2.75;
 
     function ensureDashInlineSizeVar($el) {
         if (window.__vasDashInlineSizeObserver) { return; }
@@ -86,7 +86,7 @@
         var categoriesData = [];
         // Starting guess only: recalcPageSize() replaces this with however many bars actually fit.
         var pageNo = 1;
-        var pageSize = 6;
+        var pageSize = 4;
         var totalPages = 1;
         var isRefitting = false;
 
@@ -420,6 +420,9 @@
            rendered row rather than assumed, because it scales with the card's clamp() font size.
            Returns true when the page size changed and a re-render is needed. */
         function recalcPageSize() {
+            /* Page size is fixed at 4 rows (rows are a fixed quarter of the body in the stylesheet),
+               so there is nothing to recalculate. The measuring code below is kept but unused. */
+            if (true) { return false; }
             if (!$body || !$body[0]) { return false; }
 
             var bodyH = $body[0].clientHeight;
@@ -517,15 +520,18 @@
                 '</div>' +
                 '<div class="vas-pcu-modal-body">' +
                 '<table class="vas-pcu-lines-table">' +
+                '<colgroup><col style="width:10%"><col style="width:10%"><col style="width:23%"><col style="width:22%"><col style="width:8%"><col style="width:8%"><col style="width:10%"><col style="width:9%"></colgroup>' +
                 '<thead><tr>' +
                 '<th>' + escapeHtml(label("VAS_186_DocNo", "Doc No.")) + '</th>' +
-                '<th>' + escapeHtml(label("VAS_186_Product", "Product")) + '</th>' +
-                '<th>' + escapeHtml(label("VAS_186_UoM", "UoM")) + '</th>' +
-                '<th>' + escapeHtml(label("VAS_186_WarehouseLocator", "WH + Loc")) + '</th>' +
-                '<th>' + escapeHtml(label("VAS_186_Qty", "Qty")) + '</th>' +
                 '<th>' + escapeHtml(label("VAS_186_Date", "Date")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_186_Product", "Product")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_186_WarehouseLocator", "Warehouse + Locator")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_186_Qty", "Qty")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_186_UoM", "UOM")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_186_QtyBaseUom", "Qty (In Base UOM)")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_186_Value", "Value")) + '</th>' +
                 '</tr></thead>' +
-                '<tbody class="vas-pcu-m-tbody"><tr><td colspan="6" class="vas-pcu-m-msgcell">' + escapeHtml(label("VAS_186_Loading", "Loading...")) + '</td></tr></tbody>' +
+                '<tbody class="vas-pcu-m-tbody"><tr><td colspan="8" class="vas-pcu-m-msgcell">' + escapeHtml(label("VAS_186_Loading", "Loading...")) + '</td></tr></tbody>' +
                 '</table>' +
                 '<div class="vas-pcu-modal-foot">' +
                 '<div class="vas-pcu-m-helper">' + escapeHtml(showingNone) + '</div>' +
@@ -562,7 +568,7 @@
                 function fillerRows(count) {
                     var html = '';
                     for (var f = 0; f < count; f++) {
-                        html += '<tr class="vas-pcu-m-filler" aria-hidden="true"><td colspan="6">&nbsp;</td></tr>';
+                        html += '<tr class="vas-pcu-m-filler" aria-hidden="true"><td colspan="8">&nbsp;</td></tr>';
                     }
                     return html;
                 }
@@ -572,7 +578,7 @@
                    rows were on screen, because both the range start and the grand total are
                    numbers larger than the six rows actually rendered. */
                 if (issueLines.length === 0) {
-                    $tbody.html('<tr><td colspan="6" class="vas-pcu-m-msgcell">' +
+                    $tbody.html('<tr><td colspan="8" class="vas-pcu-m-msgcell">' +
                         escapeHtml(label("VAS_186_NoLinesForPeriod", "No lines for this period.")) + '</td></tr>' +
                         fillerRows(mPageSize - 1));
                     $mHelper.text('0 ' + ofTxt + ' 0 ' + label("VAS_186_Lines", "lines"));
@@ -595,14 +601,16 @@
                             ? '<button type="button" class="vas-pcu-m-doclink" data-invid="' + rec.inventoryId + '">' + escapeHtml(rec.documentNo) + '</button>'
                             : escapeHtml(rec.documentNo)) +
                         '</td>' +
+                        '<td>' + escapeHtml(rec.movementDate) + '</td>' +
                         '<td title="' + escapeHtml(rec.productName) + '">' +
                         '<span class="vas-pcu-m-product">' + escapeHtml(rec.productName) + '</span>' +
                         (rec.attribute ? ('<span class="vas-pcu-m-attr">' + escapeHtml(rec.attribute) + '</span>') : '') +
                         '</td>' +
-                        '<td>' + escapeHtml(rec.uomName || label("VAS_186_Each", "Each")) + '</td>' +
                         '<td title="' + escapeHtml(rec.whLoc) + '">' + escapeHtml(rec.whLoc) + '</td>' +
                         '<td>' + escapeHtml(formatQty(rec.qty)) + '</td>' +
-                        '<td>' + escapeHtml(rec.movementDate) + '</td>' +
+                        '<td>' + escapeHtml(rec.uomName || label("VAS_186_Each", "Each")) + '</td>' +
+                        '<td>' + escapeHtml(formatQty(rec.qtyBase)) + '</td>' +
+                        '<td title="' + escapeHtml(formatCurrencyExact(rec.value)) + '">' + escapeHtml(formatCurrency(rec.value)) + '</td>' +
                         '</tr>';
                 }
 

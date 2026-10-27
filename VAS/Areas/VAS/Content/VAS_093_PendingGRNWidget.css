@@ -6,9 +6,22 @@
    next to the item name (reference design), matching the tightened flat rows
    in the shared modal styles. */
 
-/* Item | Attribute | Remaining Qty | UOM */
+/* Item | Remaining Quantity | UOM | Attribute - the quantity columns sit next to the item so the
+   UOM is shown without truncation (QA sheet Pending GRN #55) */
 .vas-egrn-rcv-line.vas-pgrn-line {
-    grid-template-columns: minmax(0, 1.1fr) minmax(7.5em, 1.3fr) 5.5em 3.25em;
+    grid-template-columns: minmax(0, 1.2fr) 7.5em 6em minmax(0, 1.1fr);
+}
+
+.vas-egrn-rcv-head.vas-pgrn-line div:nth-child(n+2) {
+    text-align: right;
+}
+
+.vas-egrn-rcv-head.vas-pgrn-line div:nth-child(4) {
+    text-align: left;
+}
+
+.vas-egrn-rcv-head.vas-pgrn-line.vas-pgrn-noattr div:nth-child(4) {
+    display: none;
 }
 
 .vas-pgrn-name {
@@ -37,7 +50,7 @@
 
 /* Item | Remaining Qty | UOM - no line of the PO carries an attribute (QA sheet Pending GRN #54) */
 .vas-egrn-rcv-line.vas-pgrn-line.vas-pgrn-noattr {
-    grid-template-columns: minmax(0, 1.8fr) 5.5em 4.5em;
+    grid-template-columns: minmax(0, 1.5fr) 7.5em 6em;
 }
 
 /* Quantity above the remaining quantity or beyond the UOM precision (QA sheet Pending GRN #58 / #61) */
@@ -50,10 +63,10 @@
 
 @media (max-width: 720px) {
     .vas-egrn-rcv-line.vas-pgrn-line {
-        grid-template-columns: minmax(0, 1.1fr) minmax(5.5em, 1.2fr) 4.5em 2.75em;
+        grid-template-columns: minmax(0, 1.1fr) 4.5em 5em minmax(0, 1fr);
     }
 
     .vas-egrn-rcv-line.vas-pgrn-line.vas-pgrn-noattr {
-        grid-template-columns: minmax(0, 1.6fr) 4.5em 3.75em;
+        grid-template-columns: minmax(0, 1.4fr) 4.5em 5em;
     }
 }

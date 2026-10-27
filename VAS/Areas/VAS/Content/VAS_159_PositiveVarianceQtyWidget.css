@@ -434,3 +434,13 @@
     .vas-pos-var-filler:hover {
         background: transparent !important;
     }
+
+/* No line carries an attribute: drop the Attribute column and its track. */
+.vas-pos-var-no-attr .vas-pos-var-attr {
+    display: none;
+}
+
+.vas-pos-var-no-attr .vas-pos-var-modal-grid-header,
+.vas-pos-var-no-attr .vas-pos-var-row {
+    grid-template-columns: minmax(0,1.2fr) minmax(0,1.8fr) minmax(0,1.4fr) minmax(0,1fr) minmax(0,0.7fr) minmax(0,0.7fr);
+}

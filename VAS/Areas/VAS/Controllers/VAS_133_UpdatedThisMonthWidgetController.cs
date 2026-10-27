@@ -290,6 +290,8 @@ namespace VAS.Controllers
 
                 List<object> rows = new List<object>();
                 int total = 0;
+                // "x ago" is measured on the DATABASE clock (see GetDbNow), not the web server's or the browser's.
+                DateTime? dbNow = GetDbNow();
 
                 IDataReader dr = null;
                 try
@@ -299,6 +301,9 @@ namespace VAS.Controllers
                     {
                         total = Util.GetValueOfInt(dr["total_count"]);
                         DateTime? updatedAt = Util.GetValueOfDateTime(dr["updated_at"]);
+                        int? ageMinutes = (updatedAt.HasValue && dbNow.HasValue)
+                            ? (int?)Math.Max(0, (int)Math.Floor((dbNow.Value - updatedAt.Value).TotalMinutes))
+                            : null;
                         string updatedByName = Util.GetValueOfString(dr["updated_by_name"]);
                         // Shift the stored (server-clock) timestamp onto the user's
                         // local clock before display.
@@ -315,7 +320,8 @@ namespace VAS.Controllers
                             category = Util.GetValueOfString(dr["update_category"]),
                             updatedById = Util.GetValueOfInt(dr["updated_by_id"]),
                             updatedByName = updatedByName,
-                            updatedAt = updatedAt.HasValue ? updatedAt.Value.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) : ""
+                            updatedAt = updatedAt.HasValue ? updatedAt.Value.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) : "",
+                            updatedAgeMinutes = ageMinutes
                         });
                     }
                 }
@@ -436,6 +442,20 @@ namespace VAS.Controllers
                 new SqlParameter("@TodayStart", SqlDbType.DateTime) { Value = bounds.TodayStart },
                 new SqlParameter("@TomorrowStart", SqlDbType.DateTime) { Value = bounds.TomorrowStart }
             };
+        }
+
+        /// <summary>
+        /// Current time on the DATABASE clock, the clock that stamps Created / Updated (the Receipt Queue
+        /// widget already documents it: the DB can run in UTC while the web server and the users sit in
+        /// other zones). Comparing a stored timestamp with the web server's or the browser's "now" is off by
+        /// the zone gap - a record saved moments ago read "5h ago". Age = this value - stored timestamp.
+        /// </summary>
+        private static DateTime? GetDbNow()
+        {
+            string sql = DB.IsPostgreSQL() ? "SELECT LOCALTIMESTAMP"
+                       : DB.IsOracle() ? "SELECT SYSDATE FROM DUAL"
+                       : "SELECT NOW()";
+            return Util.GetValueOfDateTime(DB.ExecuteScalar(sql, new SqlParameter[0], null));
         }
 
         /// <summary>

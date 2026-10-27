@@ -54,8 +54,11 @@
     margin: 0;
     font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .011375), 17px);
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 /* ---------- Month / Year filter ---------- */

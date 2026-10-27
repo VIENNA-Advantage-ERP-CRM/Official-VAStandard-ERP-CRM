@@ -314,6 +314,8 @@ namespace VIS.Controllers
                       wh.Name AS WarehouseName,
                       " + locatorSql + @" AS LocatorCode,
                       line.QtyEntered,
+                      (line.QtyInternalUse * " + UomToProductFactorSql + @") AS QtyBase,
+                      (line.QtyInternalUse * COALESCE(NULLIF(line.CurrentCostPrice, 0), NULLIF(line.PriceCost, 0), NULLIF(line.VA024_CostPrice, 0), pcst.CurrentCostPrice, 0)) AS LineValue,
                       ai.MovementDate
                     FROM M_InventoryLine line
                     INNER JOIN (" + invAccessSql + @") ai ON ai.M_Inventory_ID = line.M_Inventory_ID
@@ -322,6 +324,7 @@ namespace VIS.Controllers
                     LEFT JOIN M_AttributeSetInstance asi ON asi.M_AttributeSetInstance_ID = line.M_AttributeSetInstance_ID
                     LEFT JOIN M_Locator loc ON loc.M_Locator_ID = line.M_Locator_ID
                     LEFT JOIN M_Warehouse wh ON wh.M_Warehouse_ID = loc.M_Warehouse_ID
+                    LEFT JOIN (" + ProductCurrentCostSql + @") pcst ON pcst.M_Product_ID = line.M_Product_ID
                     WHERE line.IsActive = 'Y'
                       AND COALESCE(line.QtyInternalUse, 0) > 0
                       AND p.M_Product_Category_ID = " + categoryId + @"
@@ -340,7 +343,9 @@ namespace VIS.Controllers
                             uomName = Util.GetValueOfString(dr["UomName"]),
                             whLoc = BuildWarehouseLocator(Util.GetValueOfString(dr["WarehouseName"]), Util.GetValueOfString(dr["LocatorCode"])),
                             qty = Util.GetValueOfDecimal(dr["QtyEntered"]),
-                            movementDate = Convert.ToDateTime(dr["MovementDate"]).ToString("dd MMM")
+                            qtyBase = Util.GetValueOfDecimal(dr["QtyBase"]),
+                            value = Util.GetValueOfDecimal(dr["LineValue"]),
+                            movementDate = Convert.ToDateTime(dr["MovementDate"]).ToString("dd MMM yyyy")
                         });
                     }
                 }
@@ -351,7 +356,7 @@ namespace VIS.Controllers
                 Log.Log(Level.SEVERE, "VAS_186_ProductCategoryUsageWidget.GetCategoryIssueLines", ex);
                 return Json(JsonConvert.SerializeObject(new { error = Msg.GetMsg(ctx, "Error") ?? "Error" }), JsonRequestBehavior.AllowGet);
             }
-            return Json(JsonConvert.SerializeObject(new { lines = lines, success = true }), JsonRequestBehavior.AllowGet);
+            return Json(JsonConvert.SerializeObject(new { lines = lines, currency = GetCurrencyInfoData(ctx), success = true }), JsonRequestBehavior.AllowGet);
         }
 
         /// <summary>

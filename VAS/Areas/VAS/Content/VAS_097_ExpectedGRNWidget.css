@@ -20,7 +20,9 @@
        cqi keeps every em-based child in proportion at 1080p, 2K and 4K.
        The --dash-inline-size form is retained as the fallback for any browser without cqi. */
     font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .014), 24px);
-    font-size: clamp(13px, 3.6cqi, 26px);
+    /* QA sheet GRN #16 / Pending GRN #48: same text scale as the other dashboard widgets
+       (VAS_183 and siblings: clamp(15px, 4cqi, 24px)). */
+    font-size: clamp(15px, 4cqi, 24px);
     width: 100%;
     height: 100%;
     display: flex;
@@ -111,6 +113,9 @@
        top, and every child inside the row is sized in em off the card anchor, so the whole line -
        text, chips, numbers, padding - shrinks and grows together with the widget. */
     flex: 1 1 0;
+    /* QA sheet GRN #17 / Pending GRN #49: with only 1-2 records the rows keep their normal height
+       and stack from the top instead of stretching over (and centring in) the whole list. */
+    max-height: 25%;
     min-height: 2.6em;
     display: flex;
     align-items: center;
@@ -614,6 +619,31 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* Row-selection checkbox + item name (QA sheet GRN #101) */
+.vas-egrn-rcv-sel {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    margin: 0;
+    cursor: pointer;
+}
+
+    .vas-egrn-rcv-sel span {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+.vas-egrn-rcv-chk {
+    width: 1em;
+    height: 1em;
+    flex: 0 0 auto;
+    margin: 0;
+    accent-color: #1F83FF;
+    cursor: pointer;
 }
 
 /* Compact bordered quantity input (reference design .qty-input). */

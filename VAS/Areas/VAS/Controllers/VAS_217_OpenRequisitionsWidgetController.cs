@@ -27,6 +27,11 @@ namespace VIS.Controllers
     ///                         linked back to source M_RequisitionLine records.
     /// Chronological development:
     ///   Builder Agent 15   2026-08-17 Created
+    ///   Claude             2026-10-16 Quantities are shown, defaulted and ordered in the requisition line's SELECTED
+    ///                      unit (C_UOM_ID, e.g. millilitre) instead of the product's base unit (litre): the line
+    ///                      figures are Qty / QtyOrdered (base) divided by the unit's base-per-selected rate, and the
+    ///                      order quantity typed in the selected unit is converted back to base for QtyOrdered and for
+    ///                      the requisition line's QtyOrdered.
     /// </summary>
     public class VAS_217_OpenRequisitionsWidgetController : Controller
     {
@@ -249,6 +254,38 @@ namespace VIS.Controllers
         }
 
         /// <summary>
+        /// How many BASE units one unit of the line's SELECTED unit is (0.001 for a millilitre of a product held
+        /// in litres). The product's own UOM conversion is the definition of the rate (it is what
+        /// MRequisitionLine.BeforeSave converts QtyEntered to Qty with); the line's own Qty / QtyEntered is the
+        /// fallback for a unit with no conversion; 1 when nothing can be read, or the line is in the base unit.
+        /// </summary>
+        private static decimal ResolveUomRatio(Ctx ctx, int productId, int uomId, int productUomId, decimal baseQty, decimal enteredQty)
+        {
+            if (productId <= 0 || uomId <= 0) { return 1m; }
+            if (productUomId > 0 && productUomId == uomId) { return 1m; }
+
+            try
+            {
+                decimal? rate = MUOMConversion.GetProductRateFrom(ctx, productId, uomId);
+                if (rate.HasValue && rate.Value > 0m) { return rate.Value; }
+            }
+            catch (Exception ex)
+            {
+                Log.Log(Level.SEVERE, "VAS_217_OpenRequisitionsWidget.ResolveUomRatio", ex);
+            }
+
+            if (baseQty > 0m && enteredQty > 0m) { return baseQty / enteredQty; }
+            return 1m;
+        }
+
+        /// <summary>A base-unit quantity restated in the line's selected unit.</summary>
+        private static decimal ToSelectedUom(decimal baseQty, decimal uomRatio)
+        {
+            if (uomRatio <= 0m || uomRatio == 1m) { return baseQty; }
+            return Math.Round(baseQty / uomRatio, 6, MidpointRounding.AwayFromZero);
+        }
+
+        /// <summary>
         /// Returns active pending lines of a specific requisition (M_RequisitionLine),
         /// alongside preferred vendor lookups from M_Product_PO.
         /// </summary>
@@ -278,6 +315,11 @@ namespace VIS.Controllers
                 ? "rl.C_BPartner_ID"
                 : "NULL";
 
+            // QtyEntered is the quantity in the line's selected unit; not every database carries the column.
+            string enteredQtyExpr = HasColumn("M_RequisitionLine", "QtyEntered")
+                ? "COALESCE(rl.QtyEntered, 0)"
+                : "0";
+
             string rawSql = @"
                 SELECT
                     rl.M_RequisitionLine_ID AS requisition_line_id,
@@ -292,6 +334,8 @@ namespace VIS.Controllers
                              ELSE N'' END AS attribute_description,
                     COALESCE(rl.C_UOM_ID, p.C_UOM_ID, 0) AS uom_id,
                     COALESCE(u.Name, u.UOMSymbol, N'') AS uom_name,
+                    COALESCE(p.C_UOM_ID, 0) AS product_uom_id,
+                    " + enteredQtyExpr + @" AS entered_qty,
                     COALESCE(rl.Qty, 0) AS requested_qty,
                     COALESCE(rl.QtyOrdered, 0) AS already_ordered_qty,
                     CASE
@@ -369,6 +413,8 @@ namespace VIS.Controllers
                         attributeDescription = Util.GetValueOfString(dr["attribute_description"]),
                         uomId = Util.GetValueOfInt(dr["uom_id"]),
                         uomName = Util.GetValueOfString(dr["uom_name"]),
+                        productUomId = Util.GetValueOfInt(dr["product_uom_id"]),
+                        enteredQty = Util.GetValueOfDecimal(dr["entered_qty"]),
                         requestedQty = Util.GetValueOfDecimal(dr["requested_qty"]),
                         alreadyOrderedQty = Util.GetValueOfDecimal(dr["already_ordered_qty"]),
                         pendingQty = Util.GetValueOfDecimal(dr["pending_qty"]),
@@ -418,6 +464,13 @@ namespace VIS.Controllers
                     }
                 }
 
+                // The row is stated in the line's SELECTED unit (uomName), not the product's base unit that
+                // Qty / QtyOrdered are stored in: 5 litre of a product requested in millilitre reads 5000.
+                decimal uomRatio = ResolveUomRatio(ctx, l.productId, l.uomId, l.productUomId, l.requestedQty, l.enteredQty);
+                decimal requestedSel = ToSelectedUom(l.requestedQty, uomRatio);
+                decimal orderedSel = ToSelectedUom(l.alreadyOrderedQty, uomRatio);
+                decimal pendingSel = ToSelectedUom(l.pendingQty, uomRatio);
+
                 lines.Add(new
                 {
                     requisitionLineId = l.requisitionLineId,
@@ -430,13 +483,13 @@ namespace VIS.Controllers
                     attributeDescription = l.attributeDescription,
                     uomId = l.uomId,
                     uomName = l.uomName,
-                    requestedQty = l.requestedQty,
-                    alreadyOrderedQty = l.alreadyOrderedQty,
-                    pendingQty = l.pendingQty,
-                    orderQty = l.pendingQty,
+                    requestedQty = requestedSel,
+                    alreadyOrderedQty = orderedSel,
+                    pendingQty = pendingSel,
+                    orderQty = pendingSel,
                     requisitionRate = l.requisitionRate,
                     rate = effectiveRate,
-                    amount = l.pendingQty * effectiveRate,
+                    amount = pendingSel * effectiveRate,
                     description = l.description,
                     printDescription = l.printDescription,
                     vendorId = effectiveVendorId,
@@ -1238,11 +1291,25 @@ namespace VIS.Controllers
                 {
                     if (item == null || item.Qty <= 0) { continue; }
 
+                    // item.Qty is in the line's selected unit (item.UomId); the requisition line's Qty / QtyOrdered
+                    // and the order line's QtyOrdered are in the product's base unit, so the quantity is restated
+                    // in base before it is checked and stored.
+                    int itemProductUomId = item.ProductId > 0
+                        ? Util.GetValueOfInt(DB.ExecuteScalar(
+                            "SELECT C_UOM_ID FROM M_Product WHERE M_Product_ID = @M_Product_ID",
+                            new SqlParameter[] { new SqlParameter("@M_Product_ID", item.ProductId) }, trx))
+                        : 0;
+                    decimal itemEnteredQty = 0m;
+                    decimal itemBaseQtyOnLine = 0m;
+                    decimal itemUomRatio = ResolveUomRatio(ctx, item.ProductId, item.UomId, itemProductUomId, 0m, 0m);
+                    decimal orderBaseQty = Math.Round(item.Qty * itemUomRatio, 12, MidpointRounding.AwayFromZero);
+
                     // Re-validate remaining pending quantity immediately before insert
                     if (item.RequisitionLineId > 0)
                     {
+                        string checkEnteredExpr = HasColumn("M_RequisitionLine", "QtyEntered") ? "COALESCE(QtyEntered, 0)" : "0";
                         string checkLineQtySql = @"
-                            SELECT COALESCE(Qty, 0) AS ReqQty, COALESCE(QtyOrdered, 0) AS QtyOrdered
+                            SELECT COALESCE(Qty, 0) AS ReqQty, COALESCE(QtyOrdered, 0) AS QtyOrdered, " + checkEnteredExpr + @" AS EnteredQty
                             FROM M_RequisitionLine
                             WHERE M_RequisitionLine_ID = @M_RequisitionLine_ID AND M_Requisition_ID = @M_Requisition_ID AND IsActive = 'Y'";
 
@@ -1258,15 +1325,29 @@ namespace VIS.Controllers
                             {
                                 curReqQty = Util.GetValueOfDecimal(drLine["ReqQty"]);
                                 curOrderedQty = Util.GetValueOfDecimal(drLine["QtyOrdered"]);
+                                itemEnteredQty = Util.GetValueOfDecimal(drLine["EnteredQty"]);
+                                itemBaseQtyOnLine = curReqQty;
                             }
                         }
 
+                        // A unit with no product conversion falls back on the line's own Qty / QtyEntered.
+                        if (itemUomRatio == 1m && item.UomId != itemProductUomId)
+                        {
+                            itemUomRatio = ResolveUomRatio(ctx, item.ProductId, item.UomId, itemProductUomId, itemBaseQtyOnLine, itemEnteredQty);
+                            orderBaseQty = Math.Round(item.Qty * itemUomRatio, 12, MidpointRounding.AwayFromZero);
+                        }
+
                         decimal remainingPending = curReqQty - curOrderedQty;
-                        if (remainingPending <= 0 || item.Qty > remainingPending)
+                        // The tolerance absorbs the rounding of the quantity the pop-up displayed in the selected unit.
+                        if (remainingPending <= 0 || orderBaseQty > remainingPending + 0.000001m)
                         {
                             trx.Rollback();
-                            return Fail(string.Format(Msg.GetMsg(ctx, "VAS_RequisitionLineQtyExceeded") ?? "Order quantity for line {0} exceeds remaining pending quantity ({1}).", item.LineNo, remainingPending));
+                            return Fail(string.Format(Msg.GetMsg(ctx, "VAS_RequisitionLineQtyExceeded") ?? "Order quantity for line {0} exceeds remaining pending quantity ({1}).", item.LineNo, ToSelectedUom(remainingPending, itemUomRatio)));
                         }
+
+                        // Ordering the whole pending balance consumes exactly that balance, however the
+                        // selected-unit figure was rounded for display.
+                        if (orderBaseQty > remainingPending) { orderBaseQty = remainingPending; }
                     }
 
                     MOrderLine ol = new MOrderLine(order);
@@ -1286,8 +1367,10 @@ namespace VIS.Controllers
                         ol.SetC_UOM_ID(item.UomId);
                     }
 
+                    // QtyEntered is in the selected unit (what the buyer typed); QtyOrdered is the same quantity in
+                    // the product's base unit.
                     ol.SetQty(item.Qty);
-                    ol.SetQtyOrdered(item.Qty);
+                    ol.SetQtyOrdered(orderBaseQty);
                     ol.SetQtyEntered(item.Qty);
 
                     if (item.Rate > 0)
@@ -1352,7 +1435,7 @@ namespace VIS.Controllers
 
                         DB.ExecuteQuery(updateReqLineSql, new SqlParameter[]
                         {
-                            new SqlParameter("@OrderQty", item.Qty),
+                            new SqlParameter("@OrderQty", orderBaseQty),
                             new SqlParameter("@Updated", DateTime.Now),
                             new SqlParameter("@UpdatedBy", ctx.GetAD_User_ID()),
                             new SqlParameter("@M_RequisitionLine_ID", item.RequisitionLineId)
@@ -1734,6 +1817,8 @@ namespace VIS.Controllers
             public string attributeDescription { get; set; }
             public int uomId { get; set; }
             public string uomName { get; set; }
+            public int productUomId { get; set; }
+            public decimal enteredQty { get; set; }
             public decimal requestedQty { get; set; }
             public decimal alreadyOrderedQty { get; set; }
             public decimal pendingQty { get; set; }

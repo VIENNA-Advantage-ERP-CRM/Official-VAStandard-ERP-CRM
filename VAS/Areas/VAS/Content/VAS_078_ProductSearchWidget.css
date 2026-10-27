@@ -174,6 +174,22 @@
     height: 1em;
 }
 
+/* Product picture in a suggestion row (Widget_Bug_Fix Sr 60): the whole image fits its box. */
+.MPC-product-search-option-icon.has-image {
+    padding: 0;
+    overflow: hidden;
+    background: #FFFFFF;
+    border: 1px solid #E4EDF4;
+}
+
+.MPC-product-search-option-img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 7px;
+}
+
 .MPC-product-search-option-main {
     min-width: 0;
     display: flex;

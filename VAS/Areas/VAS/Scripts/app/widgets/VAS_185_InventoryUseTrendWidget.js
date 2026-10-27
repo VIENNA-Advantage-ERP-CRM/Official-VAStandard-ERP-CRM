@@ -592,7 +592,7 @@
                 '<div class="vas-iut-legend">' +
                 '<div class="vas-iut-leg-item"><span class="vas-iut-swatch-bar"></span><span>' + escapeHtml(label("VAS_185_Quantity", "Quantity")) + '</span></div>' +
                 '<div class="vas-iut-leg-item"><span class="vas-iut-swatch-line"></span><span>' + escapeHtml(label("VAS_185_Value", "Value")) + '</span></div>' +
-                '<div class="vas-iut-leg-hint">' + escapeHtml(label("VAS_185_ClickMonthForDetails", "Select a month to view details")) + '</div>' +
+                '<div class="vas-iut-leg-hint">' + escapeHtml(label("VAS_185_ClickMonthForDetails", "Hover over a month to view details")) + '</div>' +
                 '</div>' +
                 '<div class="vas-iut-chart-wrap">' +
                 '<svg class="vas-iut-svg"></svg>' +
@@ -622,11 +622,14 @@
                 loadTrendData();
             });
 
-            $svg.on('click', 'rect, circle', function (e) {
-                e.stopPropagation();
+            /* The month details show only while the pointer is over a bar or point (the popover has
+               pointer-events:none, so it never steals the hover) and hide as soon as it leaves. */
+            $svg.on('mouseover', 'rect, circle', function () {
                 var idx = Number($(this).attr('data-idx'));
+                if (isNaN(idx)) { return; }
                 showPopover(idx, this.getBoundingClientRect());
             });
+            $svg.on('mouseout', 'rect, circle', function () { closePopover(); });
 
             $(document).on('click.vas-iut', function () { closePopover(); });
             // The popover is fixed-positioned against the viewport, so it must follow scroll/resize.

@@ -253,7 +253,7 @@
                 '    <div class="vas-neg-var-modal-grid-header">' +
                 '      <span>' + escapeHtml(lbl("VAS_160_DocNo", "Document No.")) + '</span>' +
                 '      <span>' + escapeHtml(lbl("VAS_160_Product", "Product")) + '</span>' +
-                '      <span>' + escapeHtml(lbl("VAS_160_Attribute", "Attribute")) + '</span>' +
+                '      <span class="vas-neg-var-attr">' + escapeHtml(lbl("VAS_160_Attribute", "Attribute")) + '</span>' +
                 '      <span>' + escapeHtml(lbl("VAS_160_Warehouse", "Warehouse")) + '</span>' +
                 '      <span>' + escapeHtml(lbl("VAS_160_Locator", "Locator")) + '</span>' +
                 '      <span class="vas-neg-var-tr">' + escapeHtml(lbl("VAS_160_Qty", "Qty")) + '</span>' +
@@ -357,6 +357,9 @@
             var rows = data.rows || [];
             currentTotalRows = Number(data.totalRows || 0);
 
+            // The Attribute column only appears when some line in the result carries an attribute.
+            $modalOverlay.toggleClass('vas-neg-var-no-attr', !data.hasAttribute);
+
             if (rows.length === 0) {
                 renderModalEmpty();
                 return;
@@ -376,7 +379,7 @@
                     '<div class="vas-neg-var-row" role="button" tabindex="0" data-inv-id="' + item.mInventoryId + '" data-line-id="' + item.mInventoryLineId + '">' +
                     '  <span class="vas-neg-var-cell-doc vas-neg-var-doclink" role="link" tabindex="0" title="' + escapeHtml(item.documentNo) + '">' + escapeHtml(item.documentNo) + '</span>' +
                     '  <span class="vas-neg-var-cell" title="' + escapeHtml(productTooltip) + '">' + escapeHtml(item.productName) + '</span>' +
-                    '  <span class="vas-neg-var-cell" title="' + escapeHtml(attributeDisplay) + '">' + escapeHtml(attributeDisplay) + '</span>' +
+                    '  <span class="vas-neg-var-cell vas-neg-var-attr" title="' + escapeHtml(attributeDisplay) + '">' + escapeHtml(attributeDisplay) + '</span>' +
                     '  <span class="vas-neg-var-cell" title="' + escapeHtml(item.warehouse) + '">' + escapeHtml(item.warehouse) + '</span>' +
                     '  <span class="vas-neg-var-cell" title="' + escapeHtml(locatorDisplay) + '">' + escapeHtml(locatorDisplay) + '</span>' +
                     '  <span class="vas-neg-var-cell vas-neg-var-tr" title="' + item.qtyCount + '">' + Number(item.qtyCount).toLocaleString() + '</span>' +

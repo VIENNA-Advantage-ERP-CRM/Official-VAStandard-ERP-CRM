@@ -249,6 +249,70 @@
         ctx = windowNo = mTab = mField = value = oldValue = null;
         return "";
     };
+    /**
+     * To update price and amount fields of VAS_OppLines on the basis of selected Product and UOM.
+     * Attach to the C_UOM_ID column of VAS_OppLines.
+     * @param {any} ctx
+     * @param {any} windowNo
+     * @param {any} mTab
+     * @param {any} mField
+     * @param {any} value
+     * @param {any} oldValue
+     * @returns
+     */
+    CalloutVASOpportunity.prototype.UOMInfo = function (ctx, windowNo, mTab, mField, value, oldValue) {
+
+        if (this.isCalloutActive() || value == null || value.toString() == "") {
+            return "";
+        }
+        var productID = Util.getValueOfInt(mTab.getValue("M_Product_ID"));
+        if (productID == 0) {
+            return "";
+        }
+        this.setCalloutActive(true);
+
+        var OpportunityID = Util.getValueOfInt(mTab.getValue("VAS_Opportunity_ID"));
+        var uomID = Util.getValueOfInt(value);
+        var attributeID = 0;
+        if (mTab.findColumn("M_AttributeSetInstance_ID") > 0) {
+            attributeID = Util.getValueOfInt(mTab.getValue("M_AttributeSetInstance_ID"));
+        }
+
+        // last parameter 'Y' - price is fetched for the selected UOM (not the Sales UOM of product)
+        var paramString = OpportunityID.toString() + "," + productID.toString() + "," + attributeID.toString() + "," + uomID.toString() + ",Y";
+        var dr = VIS.dataContext.getJSONRecord("MProject/GetVASProjectDetail", paramString);
+        if (dr != null) {
+            var PriceList = Util.getValueOfDecimal(dr["PriceList"]);
+            var PriceStd = Util.getValueOfDecimal(dr["PriceStd"]);
+            var PriceLimit = Util.getValueOfDecimal(dr["PriceLimit"]);
+            var PlannedQty = Util.getValueOfDecimal(mTab.getValue("PlannedQty"));
+            var StdPrecision = ctx.getStdPrecision();
+
+            var discount = 0;
+            if (PriceList != 0) {
+                discount = ((PriceList - PriceStd) * 100) / PriceList;
+            }
+
+            mTab.setValue("PriceList", PriceList);
+            mTab.setValue("PlannedPrice", PriceStd);
+            mTab.setValue("PriceLimit", PriceLimit);
+            mTab.setValue("Discount", discount.toFixed(2));
+            mTab.setValue("PlannedAmt", (PlannedQty * PriceStd).toFixed(StdPrecision));
+            mTab.setValue("PlannedMarginAmt", ((PriceStd - PriceLimit) * PlannedQty).toFixed(StdPrecision));
+        }
+        else {
+            // no price defined for this product and UOM
+            mTab.setValue("PriceList", 0);
+            mTab.setValue("PlannedPrice", 0);
+            mTab.setValue("PriceLimit", 0);
+            mTab.setValue("Discount", 0);
+            mTab.setValue("PlannedMarginAmt", 0);
+            mTab.setValue("PlannedAmt", 0);
+        }
+        this.setCalloutActive(false);
+        ctx = windowNo = mTab = mField = value = oldValue = null;
+        return "";
+    };
     VAS.Model = VAS.Model || {};
     VAS.Model.CalloutVASOpportunity = CalloutVASOpportunity;
     //*********** CalloutVASOpportunity End*************

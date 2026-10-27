@@ -105,7 +105,8 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.26em;
+    /* QA sheet GRN #6: more room between records. */
+    gap: 0.7em;
     overflow: hidden;
 }
 
@@ -116,7 +117,7 @@
     width: 100%;
     min-height: 2.35em;
     text-align: left;
-    padding: 0.06em 0.15em;
+    padding: 0.3em 0.25em;
     border: 0;
     border-radius: 8px;
     /* Review #19: no grey block behind each line; hover keeps its light tint. */
@@ -531,6 +532,31 @@
 }
 
 /* Attribute column (QA sheet GRN #7) - present only when a line of the receipt carries an attribute. */
+.vas-rag-grn-link {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #1F83FF;
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* QA sheet GRN #12: pager under the popup lines. */
+.vas-rag-lines-pager {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.6em;
+    padding-top: 0.6em;
+    font-size: 0.8125em;
+    color: #5F7283;
+}
+
 .vas-rag-l-attr {
     width: 9em;
     max-width: 9em;

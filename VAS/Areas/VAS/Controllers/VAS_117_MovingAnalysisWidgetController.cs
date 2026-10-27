@@ -24,6 +24,8 @@ namespace VAS.Controllers
     ///               excluded. Widget number 117 - reassign on hand-off.
     /// Chronological development:
     ///   117         2026-07-15 Created
+    ///   Claude      2026-10-15 Widget_Bug_Fix Sr 47: response now carries max_rows_per_list so the
+    ///                          widget footer can state how many fast / slow movers it lists.
     /// </summary>
     public class VAS_117_MovingAnalysisWidgetController : Controller
     {
@@ -218,6 +220,7 @@ namespace VAS.Controllers
 
             result.fast_window_days = FAST_WINDOW_DAYS;
             result.slow_window_days = SLOW_WINDOW_DAYS;
+            result.max_rows_per_list = MAX_ROWS_PER_LIST;
             return result;
         }
 
@@ -285,6 +288,7 @@ namespace VAS.Controllers
         {
             public int fast_window_days { get; set; }
             public int slow_window_days { get; set; }
+            public int max_rows_per_list { get; set; }
             public List<MovingProduct> fast { get; set; }
             public List<MovingProduct> slow { get; set; }
         }

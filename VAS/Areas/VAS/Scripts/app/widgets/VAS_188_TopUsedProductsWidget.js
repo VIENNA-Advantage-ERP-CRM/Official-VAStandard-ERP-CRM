@@ -408,7 +408,6 @@
                 '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_188_ConsumedQty", "Consumed Qty") + ' (In Base UOM)') + '</div><div class="vas-tup-field-val vas-tup-m-qtybase">' + escapeHtml(formatQty(totalQty)) + '</div></div>' +
                 '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_188_ConsumedValue", "Consumed Value")) + '</div><div class="vas-tup-field-val" title="' + escapeHtml(formatCurrencyFull(totalValue)) + '">' + escapeHtml(formatCurrencyCompact(totalValue)) + '</div></div>' +
                 '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_188_UnitPrice", "Unit Price")) + '</div><div class="vas-tup-field-val" title="' + escapeHtml(unitPriceStr) + '">' + escapeHtml(unitPriceStr) + '</div></div>' +
-                '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_188_IssueLines", "Issue Lines")) + '</div><div class="vas-tup-field-val vas-tup-m-lines-cnt">—</div></div>' +
                 '</div>' +
                 '<table class="vas-tup-lines-table">' +
                 '<thead><tr>' +
@@ -556,7 +555,6 @@
                         currencySymbol = data.currency.symbol || currencySymbol;
                     }
                     usageLines = data.lines || [];
-                    $modal.find('.vas-tup-m-lines-cnt').text(usageLines.length);
                     // Consumed Qty (In Base UOM) is re-derived as the sum of the lines actually
                     // shown in the table below, rather than left as the tile's own separately
                     // computed totalQty - the two can drift (different access-filter timing),

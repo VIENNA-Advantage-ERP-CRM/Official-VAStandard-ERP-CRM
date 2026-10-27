@@ -154,6 +154,73 @@
 //        }
 // ----- END OLD CODE -----
 
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function setupWidgetSizeObserver() {
+            if (typeof ResizeObserver === 'undefined') { return; }
+            widgetObserver = new ResizeObserver(function (entries) {
+                for (var i = 0; i < entries.length; i++) {
+                    var width = entries[i].contentRect.width;
+                    if (width > 0) {
+                        $root[0].style.setProperty('--widget-inline-size', width + 'px');
+                        $root[0].style.setProperty('--widget-block-size', entries[i].contentRect.height + 'px');
+                    }
+                }
+            });
+            widgetObserver.observe($wrapper[0]);
+        }
+
+        /* Build first-of-month and tomorrow date literals for the TabWhereClause.
+           Mirrors the backend SQL predicate (Created >= month start AND Created < month end). */
+        function monthStartIso() {
+            var d = new Date();
+            return d.getFullYear() + '-' +
+                   String(d.getMonth() + 1).padStart(2, '0') + '-01';
+        }
+
+        function tomorrowIso() {
+            var d = new Date();
+            d.setDate(d.getDate() + 1);
+            return d.getFullYear() + '-' +
+                   String(d.getMonth() + 1).padStart(2, '0') + '-' +
+                   String(d.getDate()).padStart(2, '0');
+        }
+
+        /* Drill-through to Material Transfer list filtered to transfers created this month.
+           Excludes cancelled (DocStatus NOT IN ('VO','RE')) to match the backend count.
+           Uses TabWhereClause so the list row count equals the KPI number. */
+        this.Initalize = function () {
+            createWidget();
+            loadKpi();
+        };
+
+        function loadKpi() {
+            showBusy(true);
+
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_171_InitiatedMTDWidget/GetInitiatedMTDData',
+                type: 'GET',
+                cache: false,
+                success: function (res) {
+                    var data = typeof res === 'string' ? JSON.parse(res) : res;
+                    if (data && typeof data === 'string') { data = JSON.parse(data); }
+
+                    if (data && data.error) { setError(); return; }
+
+                    renderMetric(data || {});
+                },
+                error: function () { setError(); },
+                complete: function () { showBusy(false); }
+            });
+        }
+
         function setError() {
             if ($valueEl) {
                 $valueEl.text('—');
@@ -171,15 +238,14 @@
             var metaText = lbl('VAS_171_ThisMonthToDate', 'This month to date');
 
             var $card = $(
-                '<button type="button" class="vas-initiated-mtd-card" aria-label="' + escapeHtml(title) + '">' +
+                '<div class="vas-initiated-mtd-card" aria-label="' + escapeHtml(title) + '">' +
                 '<div class="vas-initiated-mtd-label">' + escapeHtml(title) + '</div>' +
                 '<div class="vas-initiated-mtd-value">—</div>' +
                 '<div class="vas-initiated-mtd-meta">' + escapeHtml(metaText) + '</div>' +
-                '</button>'
+                '</div>'
             );
 
-            $card.on('click', function () { openTransferList(); });
-
+            
             $valueEl = $card.find('.vas-initiated-mtd-value');
             $metaEl = $card.find('.vas-initiated-mtd-meta');
 

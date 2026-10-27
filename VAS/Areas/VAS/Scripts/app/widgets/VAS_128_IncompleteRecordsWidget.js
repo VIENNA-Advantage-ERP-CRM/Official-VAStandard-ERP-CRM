@@ -33,7 +33,7 @@
  *    | fields/parens assembled in code from keys 5+6)   |
  * 12 | Missing                                          | VAS_128_Missing
  * 13 | Only fields selected in the widget's preference. | VAS_128_ModalNote
- * 14 | Close / Open Record                              | Close / VAS_128_OpenRecord
+ * 14 | Close (header X aria-label) / Open Record        | Close / VAS_128_OpenRecord
  * 15 | Couldn't load / Retry                            | VAS_CouldntLoad / VAS_128_Retry
  * 16 | Preference not saved.                            | VAS_128_PrefNotSaved
  * 17 | Configure missing data                           | VAS_128_ConfigureAria
@@ -238,6 +238,7 @@
             listState.appendChild(foot);
             els.rows = rowsClip;
             els.helper = helper;
+            els.pager = pager;
             els.pageText = pageText;
             els.prev = prev;
             els.next = next;
@@ -318,15 +319,13 @@
             var mBody = el('div', 'MPC-ir-m-body');
 
             var mFoot = el('div', 'MPC-ir-m-foot');
-            var mCancel = el('button', 'MPC-ir-btn-ghost', lbl('Close', 'Close'));
-            mCancel.type = 'button';
-            mCancel.addEventListener('click', closeModal);
+            // Footer "Close" button removed (Widget_Bug_Fix Sr 33) - the header X (mClose) is the
+            // single way to dismiss the popup, so only "Open Record" remains in the footer.
             var mOpen = el('button', 'MPC-ir-btn-primary');
             mOpen.type = 'button';
             mOpen.appendChild(document.createTextNode(lbl('VAS_128_OpenRecord', 'Open Record') + ' '));
             mOpen.appendChild(svg('<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>'));
             mOpen.addEventListener('click', openActiveRecord);
-            mFoot.appendChild(mCancel);
             mFoot.appendChild(mOpen);
 
             modal.appendChild(mHead);
@@ -486,6 +485,14 @@
             els.pageText.textContent = state.page + ' ' + lbl('VAS_Of', 'of') + ' ' + pages;
             els.prev.disabled = state.page <= 1;
             els.next.disabled = state.page >= pages;
+            setPagerVisible(pages > 1);
+        }
+
+        // Pager shows only when the records span more than one page (Widget_Bug_Fix Sr 42).
+        // Hidden with visibility (not display) so the footer keeps its height and the
+        // rows-per-page measurement stays stable.
+        function setPagerVisible(visible) {
+            els.pager.style.visibility = visible ? '' : 'hidden';
         }
 
         function buildRow(item) {
@@ -510,6 +517,8 @@
             var updCell = el('span', 'MPC-ir-c-upd');
             updCell.appendChild(el('span', 'MPC-ir-upd-date', formatDate(item.updatedAt)));
             updCell.appendChild(el('span', 'MPC-ir-upd-by', lbl('VAS_128_By', 'by') + ' ' + (item.updatedBy || '')));
+            // The user name is ellipsised when long; hovering the cell shows it in full with the date.
+            updCell.title = formatDate(item.updatedAt) + ' ' + lbl('VAS_128_By', 'by') + ' ' + (item.updatedBy || '');
 
             row.appendChild(itemCell);
             row.appendChild(chipCell);
@@ -529,6 +538,7 @@
             els.pageText.textContent = '1 ' + lbl('VAS_Of', 'of') + ' 1';
             els.prev.disabled = true;
             els.next.disabled = true;
+            setPagerVisible(false);
         }
 
         function showRowsError() {
@@ -544,6 +554,7 @@
             els.pageText.textContent = '1 ' + lbl('VAS_Of', 'of') + ' 1';
             els.prev.disabled = true;
             els.next.disabled = true;
+            setPagerVisible(false);
         }
 
         /* ---- Settings ---- */

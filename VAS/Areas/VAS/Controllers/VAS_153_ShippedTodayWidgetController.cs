@@ -71,8 +71,8 @@ namespace VAS.Controllers
                   AND io.IsReturnTrx = 'N'
                   AND io.MovementType = 'C-'
                   AND io.DocStatus IN ('CO', 'CL')
-                  AND io.MovementDate >= CURRENT_DATE
-                  AND io.MovementDate < CURRENT_DATE + 1";
+                  AND io.MovementDate >= @Today
+                  AND io.MovementDate < @Tomorrow";
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "io", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
@@ -81,7 +81,11 @@ namespace VAS.Controllers
             IDataReader dr = null;
             try
             {
-                dr = DB.ExecuteReader(sql, new SqlParameter[0]);
+                dr = DB.ExecuteReader(sql, new SqlParameter[]
+                {
+                    new SqlParameter("@Today", DateTime.Today),
+                    new SqlParameter("@Tomorrow", DateTime.Today.AddDays(1))
+                });
                 if (dr != null && dr.Read())
                 {
                     shipped = Util.GetValueOfInt(dr["Shipped_Today_Count"]);

@@ -328,6 +328,11 @@
         function zoomTo(recordId) {
             if (!recordId) { return; }
             closePanel();
+            // Home screen (no host window to relay to): open the Material Receipt window on the record in a new tab.
+            if (!$self.listener && window.VAS && VAS.ZoomUtil) {
+                try { VAS.ZoomUtil.zoomToRecord('M_InOut_ID', recordId, 0, 'VAS_MaterialReceipt', 'Material Receipt'); } catch (e) { /* zoom is best-effort */ }
+                return;
+            }
             // Navigate the CURRENT window's grid to the clicked record (no new window).
             try {
                 $self.widgetFirevalueChanged({

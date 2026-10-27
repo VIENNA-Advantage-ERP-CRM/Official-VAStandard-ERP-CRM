@@ -10,6 +10,13 @@
  *     - Step 3: Fill PO details (Page 1) and line overrides (Page 2), then transactionally
  *               create the Purchase Order linked to the source requisition lines.
  *
+ * Chronological development:
+ *   Claude 2026-10-16 Quantities are shown in the line's selected UOM (server-side conversion);
+ *                     a back-dated Date promised now also disables Continue to lines / Create PO,
+ *                     and the line date pickers start at the PO date.
+ *   Claude 2026-10-16 On a tax-inclusive price list the Subtotal is the gross less the extracted tax
+ *                     (it showed the gross), and the Order total stays the gross.
+ *
  * Message Table:
  *   # | Fallback Text                                    | Message Key
  *  ---+--------------------------------------------------+---------------------------------------
@@ -1148,11 +1155,16 @@
                 totalQty += l.orderQty;
             }
 
+            // On a tax-inclusive price list (M_PriceList.IsTaxIncluded = Y) qty x rate is the GROSS amount: it
+            // already contains the tax, which the server returns as the extracted tax per line. The order total is
+            // that gross, and the subtotal is the gross less the tax (as the Purchase Order window states it).
+            var gross = subtotal;
+            if (poHeaderValues.taxIncluded) { subtotal = gross - taxTotal; }
+
             return {
                 subtotal: subtotal,
                 taxTotal: taxTotal,
-                // On a tax-inclusive price list the line amounts already contain the tax
-                grandTotal: poHeaderValues.taxIncluded ? subtotal : subtotal + taxTotal,
+                grandTotal: poHeaderValues.taxIncluded ? gross : subtotal + taxTotal,
                 totalQty: totalQty,
                 lineCount: poLinesState.length
             };
@@ -1353,6 +1365,8 @@
         function validateHeaderDates($host) {
             var invalid = isPromisedBeforeOrdered($host.find('#fPromised').val(), $host.find('#fPoDate').val());
             $host.find('#fPromised').toggleClass('vas-217-orw-invalid', invalid);
+            // A back-dated Date promised blocks the next step until it is corrected.
+            $('#vas_217_to_lines').prop('disabled', invalid);
             // The date picker greys out days before the PO date.
             $host.find('#fPromised').attr('min', $host.find('#fPoDate').val() || '');
             var $note = $('#vas_217_details_note');
@@ -1501,6 +1515,7 @@
                 afterRender: function ($host) {
                     renderPagedStep3LinesTable($host.find('#vas_217_polines_table_wrap'), $host);
                     recalcTaxes($host);
+                    validateLineDates($host);
                 }
             });
         }
@@ -1587,7 +1602,7 @@
                         '<span class="vas-217-orw-cell"><input class="vas-217-orw-rowin in-lrate" type="number" min="0" step="any" value="' + (Number(l.rate) || 0) + '" data-idx="' + globalIdx + '" aria-label="' + esc(lbl('VAS_Rate', 'Rate')) + '"></span>' +
                         '<span class="vas-217-orw-cell"><select class="vas-217-orw-rowsel sel-ltax" data-idx="' + globalIdx + '" aria-label="' + esc(lbl('VAS_217_Tax', 'Tax')) + '">' + taxOptionsHtml + '</select></span>' +
                         '<span class="vas-217-orw-cell right c-emph amt-cell" title="' + esc(fmtMoney(amt)) + '">' + esc(fmtMoney(amt)) + '</span>' +
-                        '<span class="vas-217-orw-cell"><input class="vas-217-orw-rowin in-ldate" type="date" max="9999-12-31" value="' + (l.datePromised || fIso()) + '" data-idx="' + globalIdx + '" aria-label="' + esc(lbl('VAS_217_DatePromised', 'Date promised')) + '"></span>' +
+                        '<span class="vas-217-orw-cell"><input class="vas-217-orw-rowin in-ldate" type="date" max="9999-12-31" min="' + (poHeaderValues.dateOrdered || '') + '" value="' + (l.datePromised || fIso()) + '" data-idx="' + globalIdx + '" aria-label="' + esc(lbl('VAS_217_DatePromised', 'Date promised')) + '"></span>' +
                         '<span class="vas-217-orw-cell vas-217-orw-actcell">' +
                         '  <button type="button" class="vas-217-orw-iconbtn sm btn-act-desc" data-idx="' + globalIdx + '" title="' + esc(lbl('VAS_217_Description', 'Description')) + '">' + ICON_DESC + '</button>' +
                         '</span>' +
@@ -1670,6 +1685,8 @@
                 if (invalid) anyInvalid = true;
                 $host.find('.in-ldate[data-idx="' + i + '"]').toggleClass('vas-217-orw-invalid', invalid);
             }
+            // Create PO stays disabled while any line carries a back-dated Date promised.
+            $('#vas_217_btn_create_po').prop('disabled', anyInvalid);
             var $footNote = $host.find('#vas_217_step3_footnote');
             if (anyInvalid) {
                 $footNote.attr('class', 'vas-217-orw-warnnote').text(datePromisedErrorText());

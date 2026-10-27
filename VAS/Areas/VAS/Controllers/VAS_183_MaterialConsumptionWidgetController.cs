@@ -1,4 +1,4 @@
-using System.Data.SqlClient;
+﻿using System.Data.SqlClient;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -17,6 +17,7 @@ namespace VIS.Controllers
     /// Purpose     : Supplies locator-wise material consumption summary and item-level detail modal data.
     /// Chronological development:
     ///   AI-Dev      2026-08-02 Created
+    ///   Claude      2026-10-14 Source changed from M_Transaction to M_Inventory / M_InventoryLine (DocStatus 'CO', internal use only).
     /// </summary>
     public class VAS_183_MaterialConsumptionWidgetController : Controller
     {
@@ -206,7 +207,10 @@ namespace VIS.Controllers
                             uomName = Util.GetValueOfString(dr["UomName"]),
                             attributes = NormalizeAttributes(Util.GetValueOfString(dr["Attributes"])),
                             consumedQty = qty,
-                            lineValue = val
+                            lineValue = val,
+                            // Unit cost shown in the modal's Value column: the line CurrentCostPrice
+                            // (weighted by quantity when one row groups lines with different costs).
+                            costPrice = qty != 0 ? val / qty : 0m
                         });
                     }
                 }
@@ -323,41 +327,33 @@ namespace VIS.Controllers
         // ===== NEW CODE END — currency format =====
 
         /// <summary>
-        /// Role-filtered consumption transactions for the period. Kept as a plain SELECT with no
+        /// Role-filtered consumption lines (completed internal-use inventory) for the period. Kept as a plain SELECT with no
         /// GROUP BY / ORDER BY: AddAccessSQL appends its predicate to the end of the statement, so
         /// it is only safe on a query whose alias is still in scope there.
         /// </summary>
         private static string BuildAccessibleTransactionSql(Ctx ctx, string periodStart, string periodEnd)
         {
-            // Consumption = stock issued for internal use / production. Movement types:
-            //   'P-' production issue and 'W-' work order issue are consumption by definition.
-            //   'I-' is "Inventory Out", which covers BOTH internal-use issues AND physical
-            //        inventory count adjustments that write stock down. Only the former is
-            //        consumption, so an 'I-' row is accepted only when its source document is an
-            //        internal-use document (M_Inventory.IsInternalUse = 'Y').
-            // Without that restriction physical inventory adjustments dominated the figures on
-            // FSMTesting6: 20,732 of the 23,411 reported units (~89%) came from count documents.
+            // Consumption = completed internal-use inventory documents, read straight from
+            // M_Inventory (header) and M_InventoryLine (lines) instead of M_Transaction:
+            //   - only documents with DocStatus = 'CO' (Completed) are counted;
+            //   - only internal-use documents (IsInternalUse = 'Y'), so physical inventory
+            //     count documents never inflate consumption;
+            //   - QtyInternalUse > 0 is the quantity issued on the line (stocking UOM).
+            // The column aliases match what the callers read (mt.M_Product_ID, mt.MovementQty ...).
             string sql = @"
-                    SELECT mt.M_Transaction_ID, mt.M_Product_ID, mt.M_Locator_ID,
-                           mt.M_AttributeSetInstance_ID, mt.MovementQty, mt.M_InventoryLine_ID
-                    FROM M_Transaction mt
-                    WHERE mt.IsActive = 'Y'
-                      AND COALESCE(mt.IsReversed, 'N') = 'N'
-                      AND (
-                            mt.MovementType IN ('P-', 'W-')
-                            OR (mt.MovementType = 'I-' AND EXISTS (
-                                  SELECT 1
-                                  FROM M_InventoryLine iline
-                                  INNER JOIN M_Inventory ihdr ON ihdr.M_Inventory_ID = iline.M_Inventory_ID
-                                  WHERE iline.M_InventoryLine_ID = mt.M_InventoryLine_ID
-                                    AND iline.IsActive = 'Y'
-                                    AND ihdr.IsActive = 'Y'
-                                    AND COALESCE(ihdr.IsInternalUse, 'N') = 'Y'))
-                          )
-                      AND mt.MovementDate >= " + periodStart + @"
-                      AND mt.MovementDate < " + periodEnd;
+                    SELECT line.M_InventoryLine_ID, line.M_Product_ID, line.M_Locator_ID,
+                           line.M_AttributeSetInstance_ID, line.QtyInternalUse AS MovementQty
+                    FROM M_InventoryLine line
+                    INNER JOIN M_Inventory inv ON inv.M_Inventory_ID = line.M_Inventory_ID
+                    WHERE line.IsActive = 'Y'
+                      AND inv.IsActive = 'Y'
+                      AND inv.DocStatus = 'CO'
+                      AND COALESCE(inv.IsInternalUse, 'N') = 'Y'
+                      AND COALESCE(line.QtyInternalUse, 0) > 0
+                      AND inv.MovementDate >= " + periodStart + @"
+                      AND inv.MovementDate < " + periodEnd;
 
-            return MRole.GetDefault(ctx).AddAccessSQL(sql, "mt", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            return MRole.GetDefault(ctx).AddAccessSQL(sql, "line", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
         }
 
         /// <summary>

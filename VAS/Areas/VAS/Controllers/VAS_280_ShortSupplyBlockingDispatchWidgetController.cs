@@ -69,6 +69,7 @@ namespace VAS.Controllers
     /// Chronological development:
     ///   VAI052      2026-09-14 Created
     /// </summary>
+    [System.Web.Mvc.SessionState(System.Web.SessionState.SessionStateBehavior.ReadOnly)]
     public class VAS_280_ShortSupplyBlockingDispatchWidgetController : Controller
     {
         private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_280_ShortSupplyBlockingDispatchWidgetController).FullName);
@@ -203,7 +204,7 @@ namespace VAS.Controllers
                  WHERE o.AD_Client_ID = @AD_Client_ID" + suffix + @"
                    AND o.IsActive = 'Y'
                    AND o.IsSOTrx = 'Y'
-                   AND COALESCE(o.IsSalesQuotation, 'N') = 'N'
+                   AND EXISTS (SELECT 1 FROM C_DocType dt WHERE dt.C_DocType_ID = o.C_DocTypeTarget_ID AND dt.DocSubTypeSO IN ('SO', 'WR', 'BO'))
                    AND COALESCE(o.IsReturnTrx, 'N') = 'N'
                    AND o.DocStatus = 'CO'" + filter;
         }
@@ -285,8 +286,8 @@ namespace VAS.Controllers
                         d.M_Warehouse_ID AS M_Warehouse_ID,
                         d.Demand_Qty AS Demand_Qty,
                         COALESCE(st.Free_Stock, 0) AS Free_Stock,
-                        CASE WHEN d.Demand_Qty > COALESCE(st.Free_Stock, 0)
-                             THEN d.Demand_Qty - COALESCE(st.Free_Stock, 0)
+                        CASE WHEN d.Demand_Qty > CASE WHEN COALESCE(st.Free_Stock, 0) > 0 THEN st.Free_Stock ELSE 0 END
+                             THEN d.Demand_Qty - CASE WHEN COALESCE(st.Free_Stock, 0) > 0 THEN st.Free_Stock ELSE 0 END
                              ELSE 0
                         END AS Short_Qty,
                         CASE WHEN d.Demand_Qty <> 0 THEN ROUND(d.Pending_Value / d.Demand_Qty, 2) ELSE 0 END AS Weighted_Rate,
@@ -558,7 +559,7 @@ namespace VAS.Controllers
                  WHERE o.AD_Client_ID = @AD_Client_ID
                    AND o.IsActive = 'Y'
                    AND o.IsSOTrx = 'Y'
-                   AND COALESCE(o.IsSalesQuotation, 'N') = 'N'
+                   AND EXISTS (SELECT 1 FROM C_DocType dt WHERE dt.C_DocType_ID = o.C_DocTypeTarget_ID AND dt.DocSubTypeSO IN ('SO', 'WR', 'BO'))
                    AND COALESCE(o.IsReturnTrx, 'N') = 'N'
                    AND o.DocStatus = 'CO'
                    AND o.M_Warehouse_ID = @M_Warehouse_ID";

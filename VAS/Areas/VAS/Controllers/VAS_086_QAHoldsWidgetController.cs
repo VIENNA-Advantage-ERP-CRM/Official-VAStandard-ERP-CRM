@@ -93,12 +93,13 @@ namespace VIS.Controllers
                Created is stamped by the database, so the browser/server time-zone gap no longer
                shifts the "held Xh" figure. */
             string holdAgeExpr = DB.IsPostgreSQL()
-                ? "(EXTRACT(EPOCH FROM (LOCALTIMESTAMP - LineConfirm.Created)) / 3600)"
-                : "((SYSDATE - LineConfirm.Created) * 24)";
+                ? "ROUND(CAST(EXTRACT(EPOCH FROM (LOCALTIMESTAMP - LineConfirm.Created)) / 3600 AS NUMERIC), 4)"
+                : "ROUND((SYSDATE - LineConfirm.Created) * 24, 4)";
 
             string holdSql = @"
                 SELECT LineConfirm.M_InOutLineConfirm_ID AS GRN_Confirmation_Line_ID,
                        QAParam.VA010_ShipConfParameters_ID AS QA_Record_ID,
+                       InOut.M_InOut_ID AS GRN_ID,
                        InOut.DocumentNo AS GRN_No,
                        BPartner.Name AS Supplier,
                        Product.Name AS Item_Name,
@@ -151,6 +152,7 @@ namespace VIS.Controllers
             string sql = @"
                 SELECT HoldData.GRN_Confirmation_Line_ID,
                        HoldData.QA_Record_ID,
+                       HoldData.GRN_ID,
                        HoldData.GRN_No,
                        HoldData.Supplier,
                        HoldData.Item_Name,
@@ -205,6 +207,7 @@ namespace VIS.Controllers
                     {
                         grnConfirmationLineId = Util.GetValueOfInt(dr["GRN_Confirmation_Line_ID"]),
                         qaRecordId = Util.GetValueOfInt(dr["QA_Record_ID"]),
+                        grnId = Util.GetValueOfInt(dr["GRN_ID"]),
                         grnNo = Util.GetValueOfString(dr["GRN_No"]),
                         supplier = Util.GetValueOfString(dr["Supplier"]),
                         itemName = Util.GetValueOfString(dr["Item_Name"]),
@@ -476,6 +479,9 @@ namespace VIS.Controllers
             }
 
             Ctx ctx = Session["ctx"] as Ctx;
+
+            // QA sheet GRN #31: the note is limited to 275 characters (the popup enforces it too).
+            if (description != null && description.Length > 275) { description = description.Substring(0, 275); }
 
             string sql = @"
                 UPDATE " + GetQATableName("VA010_ShipConfParameters") + @"

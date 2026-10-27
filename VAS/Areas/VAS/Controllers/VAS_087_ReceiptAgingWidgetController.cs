@@ -48,8 +48,8 @@ namespace VIS.Controllers
         private static string AgeHoursSql(string column)
         {
             return DB.IsPostgreSQL()
-                ? "(EXTRACT(EPOCH FROM (LOCALTIMESTAMP - " + column + ")) / 3600)"
-                : "((SYSDATE - " + column + ") * 24)";
+                ? "ROUND(CAST(EXTRACT(EPOCH FROM (LOCALTIMESTAMP - " + column + ")) / 3600 AS NUMERIC), 4)"
+                : "ROUND((SYSDATE - " + column + ") * 24, 4)";
         }
 
         /// <summary>
@@ -134,7 +134,7 @@ namespace VIS.Controllers
                            MIN(Product.Name) AS First_Item_Name,
                            COUNT(InOutLine.M_InOutLine_ID) AS Line_Count,
                            SUM(COALESCE(InOutLine.QtyEntered, InOutLine.MovementQty, 0)) AS Total_Qty,
-                           CASE WHEN COUNT(DISTINCT InOutLine.C_UOM_ID) = 1 THEN MIN(COALESCE(UOM.UOMSymbol, UOM.Name)) ELSE NULL END AS Uom,
+                           CASE WHEN COUNT(DISTINCT InOutLine.C_UOM_ID) = 1 THEN MIN(COALESCE(UOM.Name, UOM.UOMSymbol)) ELSE NULL END AS Uom,
                            HeaderData.Received_On,
                            MAX(HeaderData.Age_Hours) AS Age_Hours,
                            HeaderData.Doc_Status,
@@ -279,7 +279,7 @@ namespace VIS.Controllers
                 SELECT Product.Name AS Item_Name,
                        AttrInstance.Description AS Attribute_Name,
                        COALESCE(InOutLine.QtyEntered, InOutLine.MovementQty, 0) AS Received_Qty,
-                       COALESCE(UOM.UOMSymbol, UOM.Name) AS Uom,
+                       COALESCE(UOM.Name, UOM.UOMSymbol) AS Uom,
                        " + locatorSql + @" AS Locator_Code,
                        InOut.DocStatus AS Doc_Status
                 FROM M_InOut InOut

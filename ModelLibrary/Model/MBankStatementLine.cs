@@ -86,6 +86,9 @@ namespace VAdvantage.Model
             SetClientOrg(statement);
             SetC_BankStatement_ID(statement.GetC_BankStatement_ID());
             SetStatementLineDate(statement.GetStatementDate());
+            // Reuse the parent already in memory: BeforeSave -> CheckBankStatementLineAvailablity -> GetParent() would
+            // otherwise reload C_BankStatement from the database for every line created from the same statement.
+            _parent = statement;
         }
 
         /// <summary>
@@ -546,7 +549,8 @@ namespace VAdvantage.Model
             if (!success)
                 return success;
 
-            bool updateBS = UpdateBSAndLine();
+            //VIS_045: If context variable VA012_SkipBSHeaderUpdate is set to Y then skip update of bank statement header
+            bool updateBS = (GetCtx().GetContext("VA012_SkipBSHeaderUpdate") == "Y") ? true : UpdateBSAndLine();
 
             //JID_1325: On save on bank statment system should give warning message "Payment and charge reference not found. Either create payment or the system will not complete bank statement."
             if (GetC_Payment_ID() == 0 && GetC_Charge_ID() == 0)
