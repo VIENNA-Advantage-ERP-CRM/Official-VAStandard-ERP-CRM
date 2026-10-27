@@ -6,22 +6,18 @@
    next to the item name (reference design), matching the tightened flat rows
    in the shared modal styles. */
 
-/* Item | Remaining Quantity | UOM | Attribute - the quantity columns sit next to the item so the
-   UOM is shown without truncation (QA sheet Pending GRN #55) */
+/* Item | Attribute | Remaining Quantity | UOM - the attribute sits right after the item (QA sheet
+   Pending GRN #184) and the UOM is shown without truncation (QA sheet Pending GRN #55) */
 .vas-egrn-rcv-line.vas-pgrn-line {
-    grid-template-columns: minmax(0, 1.2fr) 7.5em 6em minmax(0, 1.1fr);
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.1fr) 7.5em 6em;
 }
 
 .vas-egrn-rcv-head.vas-pgrn-line div:nth-child(n+2) {
     text-align: right;
 }
 
-.vas-egrn-rcv-head.vas-pgrn-line div:nth-child(4) {
+.vas-egrn-rcv-head.vas-pgrn-line:not(.vas-pgrn-noattr) div:nth-child(2) {
     text-align: left;
-}
-
-.vas-egrn-rcv-head.vas-pgrn-line.vas-pgrn-noattr div:nth-child(4) {
-    display: none;
 }
 
 .vas-pgrn-name {
@@ -63,7 +59,7 @@
 
 @media (max-width: 720px) {
     .vas-egrn-rcv-line.vas-pgrn-line {
-        grid-template-columns: minmax(0, 1.1fr) 4.5em 5em minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) 4.5em 5em;
     }
 
     .vas-egrn-rcv-line.vas-pgrn-line.vas-pgrn-noattr {

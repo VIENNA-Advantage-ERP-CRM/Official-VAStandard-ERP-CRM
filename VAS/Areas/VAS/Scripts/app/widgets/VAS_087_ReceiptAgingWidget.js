@@ -60,7 +60,8 @@
         var rows = [];
         var rowsById = {};
         var pageNo = 1;
-        var pageSize = 4;
+        /* QA sheet GRN #177: 3 receipts per page (fixed, no longer measured from the card height). */
+        var pageSize = 3;
         var totalPages = 0;
         var totalRecords = 0;
         var oldestReceivedOn = "";
@@ -76,7 +77,7 @@
         /* Falls back to the English text when the message is not seeded (getMsg then echoes the key). */
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
-            return (!text || text === key) && fallback ? fallback : text;
+            return (!text || text === key || text === "[" + key + "]") && fallback ? fallback : text;
         }
 
         function escapeHtml(value) {
@@ -209,13 +210,7 @@
         }
 
         function measurePageSize() {
-            if (!$listBody || !$listBody[0]) { return pageSize; }
-
-            var listHeight = $listBody.innerHeight();
-            var rowHeight = $listBody.find('.vas-rag-row').first().outerHeight(true) || 46;
-            if (!listHeight || !rowHeight) { return pageSize; }
-
-            return Math.max(3, Math.floor(listHeight / rowHeight));
+            return 3;
         }
 
         function syncPageSize() {

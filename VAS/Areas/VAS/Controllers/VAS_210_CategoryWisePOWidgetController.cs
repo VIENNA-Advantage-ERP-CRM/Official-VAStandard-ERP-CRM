@@ -324,9 +324,15 @@ namespace VAS.Areas.VAS.Controllers
                         o.C_ConversionType_ID,
                         o.AD_Client_ID,
                         o.AD_Org_ID,
+                        COALESCE(o.TotalLines, 0) AS PoSubTotal, -- PO sub total (excl. taxes)
                         SUM(COALESCE(ol.LineNetAmt, 0)) AS CategoryLineNetAmt,
-                        SUM(COALESCE(ol.QtyOrdered, 0)) AS TotalQtyOrdered,
-                        SUM(COALESCE(ol.QtyDelivered, 0)) AS TotalQtyDelivered
+                        -- Ordered / delivered count Item-type products only (no charges, services), and
+                        -- are in each line's own entered UOM: QtyEntered, with QtyDelivered scaled by the
+                        -- line's entered/ordered ratio (QtyOrdered / QtyDelivered are in the base UOM).
+                        SUM(CASE WHEN p.ProductType = 'I' THEN COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) ELSE 0 END) AS TotalQtyOrdered,
+                        SUM(CASE WHEN p.ProductType = 'I' AND COALESCE(ol.QtyOrdered, 0) <> 0
+                                 THEN COALESCE(ol.QtyDelivered, 0) * COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) / ol.QtyOrdered
+                                 ELSE 0 END) AS TotalQtyDelivered
                     FROM C_Order o
                     INNER JOIN C_OrderLine ol ON (ol.C_Order_ID = o.C_Order_ID AND ol.IsActive = 'Y')
                     LEFT JOIN M_Product p ON (p.M_Product_ID = ol.M_Product_ID)
@@ -354,7 +360,8 @@ namespace VAS.Areas.VAS.Controllers
                         o.C_Currency_ID,
                         o.C_ConversionType_ID,
                         o.AD_Client_ID,
-                        o.AD_Org_ID
+                        o.AD_Org_ID,
+                        o.TotalLines
                     ORDER BY o.DateOrdered DESC, o.DocumentNo DESC";
 
                 List<PurchaseOrderRecord> records = new List<PurchaseOrderRecord>();
@@ -373,7 +380,8 @@ namespace VAS.Areas.VAS.Controllers
                         int curFromId = Util.GetValueOfInt(dr["C_Currency_ID"]);
                         int convTypeId = Util.GetValueOfInt(dr["C_ConversionType_ID"]);
                         int orgId = Util.GetValueOfInt(dr["AD_Org_ID"]);
-                        decimal lineNetAmt = Util.GetValueOfDecimal(dr["CategoryLineNetAmt"]);
+                        // Value column shows the PO sub total (TotalLines), not the category line value.
+                        decimal lineNetAmt = Util.GetValueOfDecimal(dr["PoSubTotal"]);
                         decimal qtyOrdered = Util.GetValueOfDecimal(dr["TotalQtyOrdered"]);
                         decimal qtyDelivered = Util.GetValueOfDecimal(dr["TotalQtyDelivered"]);
 
@@ -518,11 +526,15 @@ namespace VAS.Areas.VAS.Controllers
                         o.C_Currency_ID,
                         o.C_ConversionType_ID,
                         o.AD_Org_ID,
-                        SUM(COALESCE(ol.LineNetAmt, 0)) AS TotalOrderAmt,
-                        SUM(COALESCE(ol.QtyOrdered, 0)) AS TotalQtyOrdered,
-                        SUM(COALESCE(ol.QtyDelivered, 0)) AS TotalQtyDelivered
+                        COALESCE(o.TotalLines, 0) AS TotalOrderAmt, -- PO sub total (excl. taxes)
+                        -- Item-type products only, in each line's entered UOM (see GetCategoryPODrillDown).
+                        SUM(CASE WHEN p.ProductType = 'I' THEN COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) ELSE 0 END) AS TotalQtyOrdered,
+                        SUM(CASE WHEN p.ProductType = 'I' AND COALESCE(ol.QtyOrdered, 0) <> 0
+                                 THEN COALESCE(ol.QtyDelivered, 0) * COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) / ol.QtyOrdered
+                                 ELSE 0 END) AS TotalQtyDelivered
                     FROM C_Order o
                     INNER JOIN C_OrderLine ol ON (ol.C_Order_ID = o.C_Order_ID AND ol.IsActive = 'Y')
+                    LEFT JOIN M_Product p ON (p.M_Product_ID = ol.M_Product_ID)
                     LEFT JOIN C_BPartner bp ON (bp.C_BPartner_ID = o.C_BPartner_ID)
                     LEFT JOIN M_Warehouse wh ON (wh.M_Warehouse_ID = o.M_Warehouse_ID)
                     LEFT JOIN AD_User u ON (u.AD_User_ID = o.CreatedBy)
@@ -540,7 +552,8 @@ namespace VAS.Areas.VAS.Controllers
                         o.DocStatus,
                         o.C_Currency_ID,
                         o.C_ConversionType_ID,
-                        o.AD_Org_ID";
+                        o.AD_Org_ID,
+                        o.TotalLines";
 
                 POHeaderDetails header = null;
 

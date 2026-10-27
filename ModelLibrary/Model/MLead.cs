@@ -4,6 +4,8 @@
  * Purpose        : for workflow
  * Chronological    Development
  * Raghunandan     05-Jun-2009
+ * VAI052           23-Oct-2026  CreateBPContact: unique AD_User.Value for the new contact
+ * VAI052           26-Oct-2026  CreateBP: clear error messages (VAS_LeadCreateBP*), real save error reported
   ******************************************************/
 using System;
 using System.Collections;
@@ -397,6 +399,7 @@ namespace VAdvantage.Model
                 _bp.Set_Value("C_Lead_ID", GetC_Lead_ID());
                 _bp.SetEMail(GetEMail());
                 _bp.SetMobile(GetMobile());
+                _bp.Set_Value("Phone", Get_Value("Phone"));
                 _bp.Set_Value("R_Source_ID", GetR_Source_ID());
                 _bp.Set_Value("C_BPartnerSR_ID", GetC_BPartnerSR_ID());
                 _bp.Set_Value("LeadRating", GetLeadRating());
@@ -425,13 +428,16 @@ namespace VAdvantage.Model
                 }
                 if (!_bp.Save())
                 {
-                    return "@SaveError@";
+                    return GetSaveErrorMessage("VAS_LeadCreateBPFailed");
                 }
                 //	Update User
                 if (_user != null && _user.GetC_BPartner_ID() == 0)
                 {
                     _user.SetC_BPartner_ID(_bp.GetC_BPartner_ID());
-                    _user.Save();
+                    if (!_user.Save())
+                    {
+                        return GetSaveErrorMessage("VAS_LeadCreateBPUserLinkFailed");
+                    }
                 }
                 //	Save BP
                 SetRef_BPartner_ID(_bp.GetC_BPartner_ID());
@@ -441,12 +447,22 @@ namespace VAdvantage.Model
             string error = CreateBPContact();
             if (error != null && error.Length > 0)
                 return error;
-            CreateBPLocation();
+
+            //VAI052-Without a Business Partner the location and the update below cannot work
+            //(previously ended in a NullReferenceException), so report it clearly instead
+            if (_bp == null)
+            {
+                return Msg.GetMsg(GetCtx(), "VAS_LeadCreateBPNoPartner");
+            }
+            error = CreateBPLocation();
+            if (error != null && error.Length > 0)
+                return error;
 
             try
             {
                 int id = _bp.GetC_BPartner_ID();
-                string qry = "UPDATE C_BPartner SET Description='', Value='" + _bp.GetValue() + GetBPName() + "' WHERE C_BPartner_ID=" + id;
+                //VAI052 22-oct-26 removed part , Value='" + _bp.GetValue() + GetBPName() + "';
+                string qry = "UPDATE C_BPartner SET Description='' WHERE C_BPartner_ID=" + id;
                 int check = DB.ExecuteQuery(qry, null, Get_TrxName());
 
                 if (GetR_InterestArea_ID() != 0)
@@ -490,9 +506,9 @@ namespace VAdvantage.Model
                             Prospect.SetC_Job_ID(jobID);
                             Prospect.SetSubscribeDate(DateTime.Today);
                             Prospect.SetEMail(mail);
-                            if (Prospect.Save())
+                            if (!Prospect.Save())
                             {
-
+                                return GetSaveErrorMessage("VAS_LeadCreateBPInterestFailed");
                             }
                         }
                     }
@@ -502,7 +518,7 @@ namespace VAdvantage.Model
             catch (Exception ex)
             {
                 log.Log(Level.SEVERE, "MLead" + ex.Message, ex);
-                return "@SaveError@";
+                return Msg.GetMsg(GetCtx(), "VAS_LeadCreateBPUpdateFailed");
                 //if (dr != null)
                 //{
                 //    dr.Close();
@@ -572,16 +588,52 @@ namespace VAdvantage.Model
 
             _user.Set_Value("LinkedInProfile", Get_Value("LinkedInProfile"));
 
+            // VAI052: a new contact must get an AD_User.Value (User ID) that no other user has,
+            // otherwise the save fails with "User ID already exist". Use the contact name and,
+            // when it is taken, add the next free number (name1, name2, ...).
+            if (_user.Get_ID() == 0 && !string.IsNullOrWhiteSpace(GetContactName()))
+            {
+                _user.SetValue(GetUniqueUserValue(GetContactName()));
+            }
+
 
             if (!_user.Save())
             {
-                log.Warning("Contact not saved");
+                return GetSaveErrorMessage("VAS_LeadCreateBPContactFailed");
             }
-            else
-                SetAD_User_ID(_user.GetAD_User_ID());
+            SetAD_User_ID(_user.GetAD_User_ID());
             return null;
         }
 
+        /// <summary>
+        /// Returns an AD_User.Value that is not used yet: the given value, or the value followed by
+        /// 1, 2, 3 ... when it is already taken. Checked across all clients and ignoring case, so
+        /// the result is safe whichever way the framework scopes the User ID rule. The check runs
+        /// inside the current transaction, so users created earlier in the same run are seen.
+        /// </summary>
+        /// <param name="baseValue">wanted value, for example the contact name</param>
+        /// <returns>unused value</returns>
+        private string GetUniqueUserValue(string baseValue)
+        {
+            const int maxLength = 40;   // AD_User.Value length - keeps name + number inside the column
+            string root = baseValue.Trim();
+            if (root.Length > maxLength)
+                root = root.Substring(0, maxLength);
+
+            string sql = "SELECT COUNT(*) FROM AD_User WHERE UPPER(Value) = UPPER(@userValue)";
+            string candidate = root;
+            int seq = 0;
+            while (seq < 10000
+                && Util.GetValueOfInt(DB.ExecuteScalar(sql,
+                    new System.Data.SqlClient.SqlParameter[] { new System.Data.SqlClient.SqlParameter("@userValue", candidate) },
+                    Get_Trx())) > 0)
+            {
+                seq++;
+                string suffix = seq.ToString();
+                candidate = root.Substring(0, Math.Min(root.Length, maxLength - suffix.Length)) + suffix;
+            }
+            return candidate;
+        }
         /**
          * 	Create BP Location from Lead
          *	@return error message
@@ -623,10 +675,42 @@ namespace VAdvantage.Model
                 bpl.SetPhone2(GetPhone2());
                 bpl.SetFax(GetFax());
                 bpl.SetC_SalesRegion_ID(GetC_SalesRegion_ID());
-                if (bpl.Save())
-                    SetC_BPartner_Location_ID(bpl.GetC_BPartner_Location_ID());
+                if (!bpl.Save())
+                {
+                    return GetSaveErrorMessage("VAS_LeadCreateBPPartnerLocationFailed");
+                }
+                SetC_BPartner_Location_ID(bpl.GetC_BPartner_Location_ID());
+            }
+            else
+            {
+                return GetSaveErrorMessage("VAS_LeadCreateBPAddressFailed");
             }
             return null;
+        }
+
+        /// <summary>
+        /// Translated message for a failed save, followed by the reason the framework recorded
+        /// (when there is one), so the user sees why and not only that the save failed.
+        /// </summary>
+        /// <param name="msgKey">message key</param>
+        /// <returns>message</returns>
+        private string GetSaveErrorMessage(string msgKey)
+        {
+            string msg = Msg.GetMsg(GetCtx(), msgKey);
+            ValueNamePair vp = VLogger.RetrieveError();
+            if (vp != null)
+            {
+                string detail = vp.GetName();
+                if (string.IsNullOrEmpty(detail))
+                {
+                    detail = vp.GetValue();
+                }
+                if (!string.IsNullOrEmpty(detail))
+                {
+                    msg += ": " + detail;
+                }
+            }
+            return msg;
         }
 
         /**

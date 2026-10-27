@@ -38,6 +38,14 @@ namespace VAdvantage.Model
         decimal Variance = 0;
         decimal varianceAmount = 0;
         decimal ShiftVarianceOnOther = 0;
+
+        /// <summary>
+        /// Payments that the creator of this allocation (MPayment.CompleteIt) tests (IsAllocated, unallocated amount) and saves
+        /// itself right after the allocation is completed. For these CompleteIt does not load, test and save the payment again
+        /// through the allocation lines. Null for every allocation created elsewhere (forms, processes): they behave as before.
+        /// </summary>
+        public HashSet<int> PaymentsSavedByCaller = null;
+
         /// <summary>
         /// Standard Constructor
         /// </summary>
@@ -440,12 +448,16 @@ namespace VAdvantage.Model
             HashSet<int> bps = new HashSet<int>();
             // one payment / cash line is often shared by many lines (one receipt against N invoices):
             // test & save it once, and load it once for the read-only use below
-            HashSet<int> testedPayments = new HashSet<int>();
+            // payments the caller (MPayment completion) tests and saves itself right after this allocation: no need to load,
+            // test and save them here as well
+            HashSet<int> testedPayments = PaymentsSavedByCaller != null ? new HashSet<int>(PaymentsSavedByCaller) : new HashSet<int>();
             Dictionary<int, MPayment> paymentCache = new Dictionary<int, MPayment>();
             Dictionary<int, MCashLine> cashLineCache = new Dictionary<int, MCashLine>();
             System.Diagnostics.Stopwatch swComplete = System.Diagnostics.Stopwatch.StartNew();
             System.Diagnostics.Stopwatch swStep = new System.Diagnostics.Stopwatch();
             long processItMs = 0, scheduleMs = 0;
+            long paySchSaveMs = 0, validateMs = 0, invoiceSaveMs = 0;
+            System.Diagnostics.Stopwatch swSub = new System.Diagnostics.Stopwatch();
             for (int i = 0; i < _lines.Length; i++)
             {
                 MAllocationLine line = _lines[i];
@@ -665,7 +677,10 @@ namespace VAdvantage.Model
                         paySch.SetVA009_OpenAmnt(BaseCurrency != invoice.GetC_Currency_ID() ? (paySch.GetDueAmt() * multiplyRate) : paySch.GetDueAmt());
                         paySch.SetVA009_OpnAmntInvce(paySch.GetDueAmt());
                         paySch.ByPassValidatePayScheduleCondition(true);
-                        if (!paySch.Save(Get_Trx()))
+                        swSub.Restart();
+                        bool paySchSaved = paySch.Save(Get_Trx());
+                        paySchSaveMs += swSub.ElapsedMilliseconds;
+                        if (!paySchSaved)
                         {
                             log.Info("Not Updated Paid Amount on Invoice Schedule for this schedule <==> " + line.GetC_InvoicePaySchedule_ID());
                         }
@@ -780,8 +795,13 @@ namespace VAdvantage.Model
                         }
 
                         // this is used to validate invoice and its schedule
+                        swSub.Restart();
                         invoice.ValidatePaySchedule();
-                        if (!invoice.Save(Get_Trx()))
+                        validateMs += swSub.ElapsedMilliseconds;
+                        swSub.Restart();
+                        bool invoiceSaved = invoice.Save(Get_Trx());
+                        invoiceSaveMs += swSub.ElapsedMilliseconds;
+                        if (!invoiceSaved)
                         {
                             ValueNamePair pp = VLogger.RetrieveError();
                             _log.Info("Error found for updating ispayschedulevalid as true at Invoice  for  Invoice ID = " + invoice.GetC_Invoice_ID() +
@@ -814,7 +834,8 @@ namespace VAdvantage.Model
                 //End
             }
             log.Info("CompleteIt: " + _lines.Length + " lines in " + swComplete.ElapsedMilliseconds + " ms (line ProcessIt=" + processItMs
-                + " ms, invoice schedule update=" + scheduleMs + " ms)");
+                + " ms, invoice schedule update=" + scheduleMs + " ms [paySch.Save=" + paySchSaveMs + " ms, ValidatePaySchedule=" + validateMs
+                + " ms, invoice.Save=" + invoiceSaveMs + " ms])");
             //VA228:update amount paid on invoice,get total of paid schedule invoice amount from C_InvoicePaySchedule and update on invoice header
             if (invoiceIds.Count > 0)
             {
@@ -1049,11 +1070,18 @@ namespace VAdvantage.Model
             //	Unlink Invoices
             GetLines(true);
             HashSet<int> bps = new HashSet<int>();
+            // a payment shared by several lines is loaded once, updated by each line and saved once after the last line
+            Dictionary<int, MPayment> reversePayments = new Dictionary<int, MPayment>();
+            System.Diagnostics.Stopwatch swReverse = System.Diagnostics.Stopwatch.StartNew();
+            long reverseProcessMs = 0, reverseLineSaveMs = 0, reverseScheduleMs = 0;
             for (int i = 0; i < _lines.Length; i++)
             {
                 MAllocationLine line = _lines[i];
 
-                bps.Add(line.ProcessIt(true));	//	reverse
+                long tStep = swReverse.ElapsedMilliseconds;
+                bps.Add(line.ProcessIt(true, null, reversePayments));	//	reverse
+                reverseProcessMs += swReverse.ElapsedMilliseconds - tStep;
+                tStep = swReverse.ElapsedMilliseconds;
 
                 line.SetIsActive(false);
                 // set Amount as ZERO on Reversal of Allocation
@@ -1064,9 +1092,11 @@ namespace VAdvantage.Model
                 line.SetWithholdingAmt(Env.ZERO);
                 line.SetBackupWithholdingAmount(Env.ZERO);
                 line.Save();
+                reverseLineSaveMs += swReverse.ElapsedMilliseconds - tStep;
+                tStep = swReverse.ElapsedMilliseconds;
 
 
-                // Added by Amit for Payment Management 5-11-2015   
+                // Added by Amit for Payment Management 5-11-2015
                 if (Env.IsModuleInstalled("VA009_") && line.GetC_InvoicePaySchedule_ID() > 0)
                 {
                     MInvoicePaySchedule paySch = new MInvoicePaySchedule(GetCtx(), line.GetC_InvoicePaySchedule_ID(), Get_Trx());
@@ -1079,7 +1109,20 @@ namespace VAdvantage.Model
                     inv.Save(Get_Trx());
                 }
                 //End
+                reverseScheduleMs += swReverse.ElapsedMilliseconds - tStep;
             }
+            long tPay = swReverse.ElapsedMilliseconds;
+            foreach (MPayment reversedPayment in reversePayments.Values)
+            {
+                long tsCall = System.Diagnostics.Stopwatch.GetTimestamp();
+                reversedPayment.Save();
+                log.Info("ReverseIt: payment " + reversedPayment.GetC_Payment_ID() + " save [" + MAllocationLine.SaveBreakdown(tsCall,
+                    System.Diagnostics.Stopwatch.GetTimestamp(), reversedPayment.TsBeforeSaveStart, reversedPayment.TsBeforeSaveEnd,
+                    reversedPayment.TsAfterSaveStart, reversedPayment.TsAfterSaveEnd) + "]");
+            }
+            log.Info("ReverseIt: " + _lines.Length + " lines in " + swReverse.ElapsedMilliseconds + " ms (line ProcessIt=" + reverseProcessMs
+                + " ms, allocation line save=" + reverseLineSaveMs + " ms, schedule+invoice update=" + reverseScheduleMs
+                + " ms, payment save=" + (swReverse.ElapsedMilliseconds - tPay) + " ms for " + reversePayments.Count + " payment(s))");
             // stopped updation of open balance for customer at reversal of allocation by Vivek on 24/11/2017
             //UpdateBP(bps);
 

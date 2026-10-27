@@ -114,7 +114,7 @@
         var gcPageNo = 1;
         var gcPageSize = 5;   /* fixed - never re-measured (QA #80 / #82 / #92) */
         var gcLinePageNo = 1;
-        var GC_LINE_PAGE_SIZE = 5;
+        var GC_LINE_PAGE_SIZE = 4;   /* QA sheet #174: 4 confirmation lines per page */
         var gcTotalPages = 0;
         var gcTotalRecords = 0;
         var gcPendingCount = 0;
@@ -133,6 +133,7 @@
         var gcQcDone = {};
         var gcQcDoneConfirmId = 0;
         var QC_PAGE_SIZE = 5;
+        var gcQualityPendingLine = null;   /* line payload waiting for its Quality Control values (QA #189) */
 
         var labelRows = [];
         var labelRowsById = {};
@@ -425,6 +426,7 @@
             currentLines = [];
             gcDetail = null;
             gcLineIndex = -1;
+            gcQualityPendingLine = null;
             showDialogBusy(false);
         }
 
@@ -523,8 +525,26 @@
                 lineEntry[id].qty = String($(this).val() || "");
                 /* QA sheet #75: the typed quantity is validated as it changes (UOM precision, open qty). */
                 var line = currentLineById(id);
+                /* QA sheet #173: decimals beyond the UOM precision are cut off as they are typed (precision 0
+                   = whole numbers only) and the reason is shown inline under the table. */
+                var precisionMsg = "";
+                if (line && exceedsUomPrecision(lineEntry[id].qty, line.uomPrecision)) {
+                    var precisionDigits = Math.max(0, Number(line.uomPrecision || 0));
+                    var dotAt = lineEntry[id].qty.indexOf(".");
+                    if (dotAt >= 0) {
+                        lineEntry[id].qty = lineEntry[id].qty.substring(0, dotAt + (precisionDigits > 0 ? precisionDigits + 1 : 0));
+                        $(this).val(lineEntry[id].qty);
+                    }
+                    precisionMsg = uomPrecisionMessage(line);
+                }
                 var qtyError = line ? receiveQtyError(line, lineEntry[id].qty) : "";
                 $(this).toggleClass('vas-ra-rcv-invalid', !!qtyError).attr('title', qtyError);
+                $dialogBody.find('.vas-ra-rcv-msg').text(precisionMsg || qtyError).toggleClass('vas-ra-hidden', !(precisionMsg || qtyError));
+            });
+            $dialog.on('keydown', '.vas-ra-rcv-input', function (e) {
+                var line = currentLineById(Number($(this).data('polineid')));
+                if (e.key === 'e' || e.key === 'E' || e.key === '+' || e.key === '-') { e.preventDefault(); return; }
+                if ((e.key === '.' || e.key === ',') && line && Number(line.uomPrecision || 0) <= 0) { e.preventDefault(); }
             });
             $dialog.on('change', '.vas-ra-loc-select', function () {
                 var id = Number($(this).data('polineid'));
@@ -540,7 +560,13 @@
             $dialog.on('click', '.vas-ra-gc-row[data-gcid]', function () { gcLinePageNo = 1; openGRNConfirmationDetail(Number($(this).data('gcid'))); });
             $dialog.on('click', '.vas-ra-gc-line-prev', function () { if (gcLinePageNo > 1) { gcLinePageNo--; renderGRNConfirmDetail(); } });
             $dialog.on('click', '.vas-ra-gc-line-next', function () { gcLinePageNo++; renderGRNConfirmDetail(); });
-            $dialog.on('click', '.vas-ra-grn-link', function (e) { e.stopPropagation(); zoomToGRN($(this).data('grnid')); });
+            /* QA sheet #186 / #188: the popup closes first, then the GRN opens in the Material Receipt window. */
+            $dialog.on('click', '.vas-ra-grn-link', function (e) {
+                e.stopPropagation();
+                var grnId = $(this).data('grnid');
+                closeDialog();
+                zoomToGRN(grnId);
+            });
             $dialog.on('click', '.vas-ra-gc-prev', function () { if (gcPageNo > 1) { loadGRNConfirmations(gcPageNo - 1); } });
             $dialog.on('click', '.vas-ra-gc-next', function () { if (gcPageNo < gcTotalPages) { loadGRNConfirmations(gcPageNo + 1); } });
             $dialog.on('click', '.vas-ra-gc-back-list', function () { gcDetail = null; gcLineIndex = -1; renderGRNConfirmList(); });
@@ -926,6 +952,7 @@
             }
 
             html += '</div>';
+            html += '<div class="vas-ra-rcv-msg vas-ra-hidden" role="alert"></div>';
 
             if (rcvTotalPages > 1) {
                 html +=
@@ -1342,7 +1369,7 @@
                 '<div class="vas-ra-gc-list vas-ra-gc-compact">';
 
             var lines = gcDetail.lines || [];
-            /* QA #80 / #82: 5 lines per page with a pager instead of a scrollbar. */
+            /* QA #80 / #82 / #174: GC_LINE_PAGE_SIZE lines per page with a pager instead of a scrollbar. */
             var linePages = Math.max(1, Math.ceil(lines.length / GC_LINE_PAGE_SIZE));
             if (gcLinePageNo > linePages) { gcLinePageNo = linePages; }
             if (gcLinePageNo < 1) { gcLinePageNo = 1; }
@@ -1640,6 +1667,27 @@
         function persistGRNConfirmationLine(payload) {
             if (!gcDetail || gcLineIndex < 0) { return; }
 
+                    var lineRows = [];
+                    var allRows = (data && !data.error && data.rows) ? data.rows : [];
+                    for (var q = 0; q < allRows.length; q++) {
+                        if (Number(allRows[q].lineConfirmId) === Number(line.lineConfirmId)) { lineRows.push(allRows[q]); }
+                    }
+                    if (lineRows.length === 0) {
+                        postGRNConfirmationLine(payload);
+                        return;
+                    }
+                    gcQualityRows = lineRows;
+                    gcQualityPendingLine = payload;
+                    loadGCQualityValueOptions(0);
+                },
+                error: function () {
+                    /* The quality lookup is best-effort: the line itself must still be saveable. */
+                    postGRNConfirmationLine(payload);
+                }
+            });
+        }
+
+        function postGRNConfirmationLine(payload) {
             showDialogBusy(true);
             $dialogBody.find('.vas-ra-gc-save-line').prop('disabled', true);
 
@@ -1847,6 +1895,14 @@
                 var afterSave = gcQualityAfterSave;
                 gcQualityAfterSave = null;
                 if (afterSave) { afterSave(); }
+                if (gcQualityPendingLine) {
+                    /* QA #189: the values are recorded, now the confirmation line itself is saved. */
+                    var pendingLine = gcQualityPendingLine;
+                    gcQualityPendingLine = null;
+                    postGRNConfirmationLine(pendingLine);
+                    return;
+                }
+                resolveGRNConfirmation('CompleteGRNConfirmation', '.vas-ra-gc-quality-save');
                 return;
             }
 

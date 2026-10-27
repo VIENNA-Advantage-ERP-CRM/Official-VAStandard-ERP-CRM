@@ -549,6 +549,13 @@
         background: #FCEFEF;
     }
 
+/* Inline quantity message under the Receive Against PO table (QA sheet #173). */
+.vas-ra-rcv-msg {
+    margin-top: 0.5em;
+    color: #A33F3F;
+    font-size: 0.8125em;
+}
+
 .vas-ra-action-footer {
     display: flex;
     align-items: center;
@@ -740,6 +747,7 @@
 
     /* Read-only but not greyed: the same white as the editable fields (GRN line, UOM,
        attribute set instance, target and difference). */
+    /* No grey fill on the read-only fields (QA sheet #187). */
     .vas-ra-qc-field.disabled {
         background: #FFFFFF;
     }
@@ -1436,7 +1444,7 @@
 
 /* #87: read-only Target Quantity. */
 .vas-ra-gc-inp[readonly] {
-    background: #F6F8FA;
+    background: transparent;
     color: #5F7283;
     cursor: default;
 }

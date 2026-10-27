@@ -3008,7 +3008,9 @@ namespace VAdvantage.Model
                 + "FROM C_OrderLine ol"
                 + " INNER JOIN M_Product p ON (ol.M_Product_ID=p.M_Product_ID)"
                 + " INNER JOIN M_AttributeSet pas ON (p.M_AttributeSet_ID=pas.M_AttributeSet_ID) "
-                + "WHERE pas.MandatoryType" + mandatoryType
+                + "WHERE (pas.MandatoryType" + mandatoryType
+                // sales orders: same combined test as MAttributeSet.IsMandatory() used by MInOut
+                + (IsSOTrx() ? " OR pas.IsSerNoMandatory='Y' OR pas.IsLotMandatory='Y' OR pas.IsGuaranteeDateMandatory='Y'" : "") + ")"
                 + " AND ol.M_AttributeSetInstance_ID IS NULL"
                 + " AND ol.C_Order_ID=" + GetC_Order_ID();
             int no = DataBase.DB.GetSQLValue(Get_TrxName(), sql);

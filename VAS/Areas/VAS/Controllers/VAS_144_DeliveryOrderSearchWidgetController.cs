@@ -21,7 +21,7 @@ namespace VAS.Controllers
     ///               DocStatus DR/IP/WC/CO only) across eight facets in fixed
     ///               priority (DO number, customer, contact, contact phone,
     ///               ship-to location, sales order, representative, line item),
-    ///               capped at 7 results, plus a full detail payload (header,
+    ///               paged (scroll for more), plus a full detail payload (header,
     ///               lines with product images, subtotal/tax/total honouring
     ///               C_Order.IsTaxIncluded and C_Tax.Rate) for the drill-down
     ///               modal. Amounts are derived from the DO's own lines
@@ -40,7 +40,8 @@ namespace VAS.Controllers
     /// </summary>
     public class VAS_144_DeliveryOrderSearchWidgetController : Controller
     {
-        private const int MAX_RESULTS = 7;
+        // Page size of the type-ahead list; further pages are fetched on scroll.
+        private const int PAGE_SIZE = 20;
 
         /// <summary>DB-appropriate character literal (Oracle N'..', PostgreSQL '..').</summary>
         private static string NLiteral(string text)
@@ -56,16 +57,17 @@ namespace VAS.Controllers
         }
 
         /// <summary>
-        /// Type-ahead search: at most 7 delivery orders matching the trimmed
+        /// Type-ahead search: delivery orders matching the trimmed
         /// text on any of the eight facets, ranked by the facet priority and
-        /// then newest delivery date. Empty input returns an empty list without
-        /// touching the database.
+        /// then newest delivery date, returned one page at a time. Empty input
+        /// returns an empty list without touching the database.
         /// </summary>
         /// <param name="q">Search text (substring, case-insensitive).</param>
-        /// <returns>JSON { rows[] }.</returns>
+        /// <param name="page">Zero-based page number.</param>
+        /// <returns>JSON { rows[], hasMore }.</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult SearchDeliveryOrders(string q = "")
+        public JsonResult SearchDeliveryOrders(string q = "", int page = 0)
         {
             if (Session["ctx"] == null)
             {
@@ -74,6 +76,7 @@ namespace VAS.Controllers
 
             Ctx ctx = Session["ctx"] as Ctx;
 
+            if (page < 0) { page = 0; }
             string trimmed = (q ?? "").Trim();
             if (trimmed.Length == 0)
             {
@@ -181,7 +184,7 @@ namespace VAS.Controllers
                        OR m.m_loc=1 OR m.m_so=1 OR m.m_rep=1 OR m.m_line=1
                 ) ranked
                 ORDER BY ranked.matched_priority, ranked.delivery_date DESC, ranked.do_number DESC
-                FETCH FIRST " + MAX_RESULTS + @" ROWS ONLY";
+                OFFSET " + (page * PAGE_SIZE) + @" ROWS FETCH FIRST " + (PAGE_SIZE + 1) + @" ROWS ONLY";
 
             List<SqlParameter> parameters = new List<SqlParameter>();
             parameters.Add(new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()));
@@ -197,8 +200,11 @@ namespace VAS.Controllers
             {
                 dr = DB.ExecuteReader(sql, parameters.ToArray());
 
+                bool hasMore = false;
                 while (dr != null && dr.Read())
                 {
+                    // One row beyond the page size only signals that more pages exist.
+                    if (rows.Count >= PAGE_SIZE) { hasMore = true; break; }
                     rows.Add(new
                     {
                         doId = Util.GetValueOfInt(dr["do_id"]),
@@ -212,7 +218,7 @@ namespace VAS.Controllers
                     });
                 }
 
-                return Ok(new { rows = rows });
+                return Ok(new { rows = rows, hasMore = hasMore });
             }
             catch (Exception ex)
             {

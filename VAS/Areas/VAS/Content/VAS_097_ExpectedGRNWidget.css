@@ -743,12 +743,12 @@
     }
 }
 
-/* Expected GRN line entry (QA sheet GRN #21/#22): Item | PO Qty | Received | UOM | Attribute.
+/* Expected GRN line entry (QA sheet GRN #21/#22/#180): Item | Attribute | PO Qty | Received | UOM.
    Quantities sit next to the item so the UOM column is wide enough for full unit names
    ("Milliliter"); without any attribute on the PO the Attribute column is dropped.
    Scoped to Expected GRN - Pending GRN keeps the base .vas-egrn-rcv-line template. */
 .vas-egrn-rcv-line.vas-egrn-qtyfirst {
-    grid-template-columns: minmax(0, 1.3fr) 4.25em 4.75em 6em minmax(0, 1.2fr);
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.2fr) 4.25em 4.75em 6em;
 }
 
 .vas-egrn-rcv-line.vas-egrn-qtyfirst.vas-egrn-noattr {
@@ -759,13 +759,13 @@
     text-align: right;
 }
 
-.vas-egrn-rcv-head.vas-egrn-qtyfirst div:nth-child(5) {
+.vas-egrn-rcv-head.vas-egrn-qtyfirst:not(.vas-egrn-noattr) div:nth-child(2) {
     text-align: left;
 }
 
 @media (max-width: 720px) {
     .vas-egrn-rcv-line.vas-egrn-qtyfirst {
-        grid-template-columns: minmax(0, 1.1fr) 3.5em 4.25em 5em minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) 3.5em 4.25em 5em;
     }
 
     .vas-egrn-rcv-line.vas-egrn-qtyfirst.vas-egrn-noattr {

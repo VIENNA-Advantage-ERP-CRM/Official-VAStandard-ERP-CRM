@@ -1027,7 +1027,7 @@ namespace VASLogic.Models
                 .Append(" COALESCE(t.Name,N'') AS VASCILDISP_TaxName,")
                 .Append(" COALESCE(asi.Description,N'') AS VASCILDISP_AttrName,")
                 .Append(" COALESCE(p.M_AttributeSet_ID,0) AS VASCILDISP_HasAttrSet,")
-                .Append(" COALESCE(p.ProductType,N'') AS VASCILDISP_ProductType")
+                .Append(" COALESCE(p.ProductType,'') AS VASCILDISP_ProductType")
                 .Append(" FROM (").Append(accessSql).Append(") b")
                 .Append(" LEFT OUTER JOIN M_Product p ON (p.M_Product_ID=b.M_Product_ID)")
                 .Append(" LEFT OUTER JOIN C_Charge ch ON (ch.C_Charge_ID=b.C_Charge_ID)")

@@ -362,7 +362,7 @@
 
             // 2. Table Grid with 5 Columns: Requisition | Lines | Pending qty | Needed by | Status (NO Department)
             $tblContainer = $('<div class="vas-217-orw-tbl"></div>');
-            var R_COLS = 'minmax(0, 1.6fr) minmax(0, 0.6fr) minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 1fr)';
+            var R_COLS = 'minmax(0, 1.5fr) minmax(0, 0.5fr) minmax(0, 1.2fr) minmax(0, 0.9fr) minmax(0, 1fr)';
             $tblHead = $('<div class="vas-217-orw-trow vas-217-orw-thead" style="grid-template-columns:' + R_COLS + ';">' +
                 '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_217_Requisition', 'Requisition')) + '">' + esc(lbl('VAS_217_Requisition', 'Requisition')) + '</span>' +
                 '<span class="vas-217-orw-cell" title="' + esc(lbl('VAS_Lines', 'Lines')) + '">' + esc(lbl('VAS_Lines', 'Lines')) + '</span>' +
@@ -481,7 +481,7 @@
 
         function renderSkeletonRows() {
             $tblBody.empty();
-            var R_COLS = 'minmax(0, 1.6fr) minmax(0, 0.6fr) minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 1fr)';
+            var R_COLS = 'minmax(0, 1.5fr) minmax(0, 0.5fr) minmax(0, 1.2fr) minmax(0, 0.9fr) minmax(0, 1fr)';
             var html = '';
             // Seeded from pageSize so the placeholder never paints more rows than fit.
             for (var i = 0; i < pageSize; i++) {
@@ -576,7 +576,7 @@
             var endIdx = Math.min(count, startIdx + pageSize);
             var pageSlice = requisitionsData.slice(startIdx, endIdx);
 
-            var R_COLS = 'minmax(0, 1.6fr) minmax(0, 0.6fr) minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 1fr)';
+            var R_COLS = 'minmax(0, 1.5fr) minmax(0, 0.5fr) minmax(0, 1.2fr) minmax(0, 0.9fr) minmax(0, 1fr)';
             var rowsHtml = '';
 
             for (var i = 0; i < pageSlice.length; i++) {

@@ -9,6 +9,8 @@
  * Chronological Development:
  *   Claude 2026-10-16 Blanket Purchase Order documents (C_DocType.IsBlanketTrx / DocSubTypeSO 'BO') are
  *                     no longer queued; the order-level IsBlanketTrx flag alone did not catch them.
+ *   Claude 2026-10-21 Release Purchase Orders (Ref_Order_ID set) are queued even when their document
+ *                     type is the blanket one; only the blanket order itself stays out.
  ***********************************************************/
 
 using Newtonsoft.Json;
@@ -128,10 +130,12 @@ namespace VIS.Controllers
                       AND o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
-                      AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
-                      -- Blanket Purchase Orders are not queued: also excluded by document type (C_DocType.IsBlanketTrx / Blanket Order sub-type)
-                      AND NOT EXISTS (SELECT 1 FROM C_DocType dt WHERE dt.C_DocType_ID = o.C_DocTypeTarget_ID
-                                    AND (COALESCE(dt.IsBlanketTrx, 'N') = 'Y' OR COALESCE(dt.DocSubTypeSO, ' ') = 'BO'))
+                      -- Blanket Purchase Orders are not queued (order flag, or document type IsBlanketTrx / Blanket Order sub-type),
+                      -- but Release Purchase Orders (Ref_Order_ID points to the blanket order) are queued.
+                      AND (o.Ref_Order_ID > 0
+                           OR (COALESCE(o.IsBlanketTrx, 'N') = 'N'
+                               AND NOT EXISTS (SELECT 1 FROM C_DocType dt WHERE dt.C_DocType_ID = o.C_DocTypeTarget_ID
+                                             AND (COALESCE(dt.IsBlanketTrx, 'N') = 'Y' OR COALESCE(dt.DocSubTypeSO, ' ') = 'BO'))))
                       AND o.DocStatus IN ('DR', 'IP', 'CO', 'CL') -- queue includes Completed and Closed per specification; only Voided/Reversed stay out
                       AND o.C_Order_ID IN (@P_ORDER_ACCESS@)
                       AND o.DatePromised >= @MonthStart
@@ -209,10 +213,12 @@ namespace VIS.Controllers
                       AND o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
-                      AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
-                      -- Blanket Purchase Orders are not queued: also excluded by document type (C_DocType.IsBlanketTrx / Blanket Order sub-type)
-                      AND NOT EXISTS (SELECT 1 FROM C_DocType dt WHERE dt.C_DocType_ID = o.C_DocTypeTarget_ID
-                                    AND (COALESCE(dt.IsBlanketTrx, 'N') = 'Y' OR COALESCE(dt.DocSubTypeSO, ' ') = 'BO'))
+                      -- Blanket Purchase Orders are not queued (order flag, or document type IsBlanketTrx / Blanket Order sub-type),
+                      -- but Release Purchase Orders (Ref_Order_ID points to the blanket order) are queued.
+                      AND (o.Ref_Order_ID > 0
+                           OR (COALESCE(o.IsBlanketTrx, 'N') = 'N'
+                               AND NOT EXISTS (SELECT 1 FROM C_DocType dt WHERE dt.C_DocType_ID = o.C_DocTypeTarget_ID
+                                             AND (COALESCE(dt.IsBlanketTrx, 'N') = 'Y' OR COALESCE(dt.DocSubTypeSO, ' ') = 'BO'))))
                       AND o.DocStatus IN ('DR', 'IP', 'CO', 'CL') -- queue includes Completed and Closed per specification; only Voided/Reversed stay out
                       AND o.C_Order_ID IN (@P_ORDER_ACCESS@)
                       AND o.DatePromised >= @MonthStart

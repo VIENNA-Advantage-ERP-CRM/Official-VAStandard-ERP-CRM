@@ -380,12 +380,31 @@
         }
 
         /* ---- Panel helpers ---- */
-        function openPanel() { positionPanel(); $panel.addClass('vas-dssrch-open'); $bar.addClass('vas-dssrch-bar-focus'); }
+        function openPanel() { $panel.addClass('vas-dssrch-open'); positionPanel(); $bar.addClass('vas-dssrch-bar-focus'); }
         function closePanel() { $panel.removeClass('vas-dssrch-open'); $bar.removeClass('vas-dssrch-bar-focus'); }
+        /* QA sheet GRN #190: the list opens below the search bar; when the space below is too small for it
+           and there is more room above, it opens above the bar instead. The panel must already be shown
+           (display:block) so its height can be measured. */
         function positionPanel() {
             if (!$bar || !$bar[0]) { return; }
             var rect = $bar[0].getBoundingClientRect();
-            $panel.css({ left: Math.round(rect.left) + 'px', top: Math.round(rect.bottom + 6) + 'px', width: Math.round(rect.width) + 'px' });
+            var gap = 6, margin = 8;
+            var viewH = window.innerHeight || document.documentElement.clientHeight;
+            var spaceBelow = viewH - rect.bottom - gap - margin;
+            var spaceAbove = rect.top - gap - margin;
+            var panelH = Math.min($panel[0].scrollHeight + 4, Math.round(viewH * 0.6));
+            var openAbove = panelH > spaceBelow && spaceAbove > spaceBelow;
+            var css = { left: Math.round(rect.left) + 'px', width: Math.round(rect.width) + 'px' };
+            if (openAbove) {
+                css.top = 'auto';
+                css.bottom = Math.round(viewH - rect.top + gap) + 'px';
+                css.maxHeight = Math.max(120, Math.min(Math.round(viewH * 0.6), Math.round(spaceAbove))) + 'px';
+            } else {
+                css.top = Math.round(rect.bottom + gap) + 'px';
+                css.bottom = 'auto';
+                css.maxHeight = Math.max(120, Math.min(Math.round(viewH * 0.6), Math.round(spaceBelow))) + 'px';
+            }
+            $panel.css(css);
         }
         function setBusy(on) { $bar.toggleClass('vas-dssrch-busy', !!on); }
 

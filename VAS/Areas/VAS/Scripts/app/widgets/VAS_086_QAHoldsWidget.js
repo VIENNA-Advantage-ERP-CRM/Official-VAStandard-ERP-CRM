@@ -63,8 +63,10 @@
         var loading = false;
         var rowResizeObserver = null;
 
+        /* Falls back to the English text when the message is not seeded (getMsg then echoes the key, or [key]). */
         function lbl(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            var text = VIS.Msg.getMsg(key);
+            return (!text || text === key || text === "[" + key + "]") && fallback ? fallback : text;
         }
 
         function escapeHtml(value) {

@@ -482,7 +482,7 @@
                 var r = pageRows[i];
                 // Drafted shown in orange (2026-09-30, user request: "Drafted badge should be
                 // visible in orange color") - was the neutral gray chip.
-                var stageChipClass = r.DocStatus === 'DR' ? 'vas-207-chip-warn' : 'vas-207-chip-prop';
+                var stageChipClass = r.DocStatus === 'DR' ? 'vas-207-chip-orange' : 'vas-207-chip-prop';
                 var stageText = r.DocStatus === 'DR' ? lbl("VAS_Drafted", "Drafted") : lbl("VAS_207_InProgress", "In Progress");
                 var formattedVal = formatCurrency(r.ConvertedValue, sym, iso);
 

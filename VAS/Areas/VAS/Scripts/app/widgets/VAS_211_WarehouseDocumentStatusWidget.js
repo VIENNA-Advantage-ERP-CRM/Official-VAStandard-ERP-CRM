@@ -151,7 +151,7 @@
 
     function getDeliveryStatusText(status) {
         if (!status) { return ''; }
-        if (status === 'Fully delivered') { return lbl('VAS_211_FullyDelivered', 'Fully delivered'); }
+        if (status === 'Fully delivered') { return lbl('VAS_211_FullyReceived', 'Fully Received'); }
         if (status === 'Partial') { return lbl('VAS_211_Partial', 'Partial'); }
         if (status === 'Pending') { return lbl('VAS_211_Pending', 'Pending'); }
         if (status === 'Not applicable') { return lbl('VAS_211_NotApplicable', 'Not applicable'); }

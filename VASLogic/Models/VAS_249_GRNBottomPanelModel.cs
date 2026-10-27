@@ -1951,6 +1951,10 @@ namespace VASLogic.Models
         /// receipt names. A receipt with no purchase order gets nothing (26-Oct-2026).
         /// Empty (C_OrderLine_ID = 0) when nothing matches - the panel then leaves the
         /// Order Line blank.
+        /// else the first with anything open. When the receipt names a purchase order only
+        /// its lines are considered; without one, the open lines of the receipt's vendor's
+        /// completed orders. Empty (C_OrderLine_ID = 0) when nothing matches - the panel
+        /// then leaves the Order Line blank.
         /// </summary>
         /// <param name="ctx">session context</param>
         /// <param name="M_InOut_ID">receipt</param>
