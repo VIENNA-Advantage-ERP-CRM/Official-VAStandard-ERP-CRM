@@ -43,6 +43,11 @@ using ViennaAdvantage.Model;
 *   - The lead.SetC_Project_ID(...) back-link is replaced with a guarded write to
 *     the lead's VAS_Opportunity_ID column (if present); C_Project_ID is a project
 *     foreign key and must not hold an opportunity id.
+*
+* VAI052 26-Oct-26 : Error handling - hard-coded / key-less messages replaced with
+*     translatable VAS_LeadToOpp* messages; added lead-not-found and
+*     prospect-not-created guards (the latter also prevents endless DoIt recursion);
+*     every lead save is checked and a failure is returned with its error message.
 */
 namespace ModelLibrary.Process
 {
@@ -82,7 +87,15 @@ namespace ModelLibrary.Process
 
         protected override String DoIt()
         {
+            if (_C_Lead_ID == 0)
+            {
+                return Msg.GetMsg(GetCtx(), "VAS_LeadToOppLeadNotSelected");
+            }
             lead = new VAdvantage.Model.MLead(GetCtx(), _C_Lead_ID, Get_TrxName());
+            if (lead.Get_ID() != _C_Lead_ID)
+            {
+                return Msg.GetMsg(GetCtx(), "VAS_LeadToOppLeadNotFound");
+            }
             //VAI050-Set Bp name and group iD
             if (Env.IsModuleInstalled("VA061_"))
             {
@@ -95,9 +108,14 @@ namespace ModelLibrary.Process
             if (ExCustomer == 0 && Pospect == 0)
             {
                 //CallProcess(_C_Lead_ID);
+                //VAI052-Prospect was already attempted once; stop instead of recursing forever
+                if (IsProspectCreated)
+                {
+                    return Msg.GetMsg(GetCtx(), "VAS_LeadToOppProspectNotCreated");
+                }
                 if (lead.GetBPName() == null)
                 {
-                    return Msg.GetMsg(GetCtx(), "Company Name, Prospect or Bpartner is Mandatory to fill");
+                    return Msg.GetMsg(GetCtx(), "VAS_LeadToOppCompanyNameRequired");
                 }
                 if (lead.GetC_BP_Group_ID() == 0)
                 {
@@ -174,7 +192,10 @@ namespace ModelLibrary.Process
                         lead.Set_Value("VAS_ArchivedReason", "90");
                 }
 
-                lead.Save();
+                if (!lead.Save())
+                {
+                    return GetRetrievedError(lead, "VAS_LeadToOppLeadNotSaved");
+                }
                 // Send Opportunity Data to Knowledge Base
                 VAS_CommonMethod.SendInfoToAI(ToTableID, opp.Get_ID(), Get_Trx(), GetCtx());
                 // Send Lead Data to Knowledge Base
@@ -231,7 +252,7 @@ namespace ModelLibrary.Process
             log.Info("C_Lead_ID=" + _C_Lead_ID);
             if (_C_Lead_ID == 0)
             {
-                throw new Exception("@C_Lead_ID@ ID=0");
+                throw new Exception(Msg.GetMsg(GetCtx(), "VAS_LeadToOppLeadNotSelected"));
             }
             //VAdvantage.Model.MLead lead = new VAdvantage.Model.MLead(GetCtx(), _C_Lead_ID, Get_TrxName());
 
@@ -241,7 +262,7 @@ namespace ModelLibrary.Process
             //}
             if (lead.Get_ID() != _C_Lead_ID)
             {
-                throw new Exception("@NotFound@: @C_Lead_ID@ ID=" + _C_Lead_ID);
+                throw new Exception(Msg.GetMsg(GetCtx(), "VAS_LeadToOppLeadNotFound") + " ID=" + _C_Lead_ID);
             }
             //
             String retValue = lead.CreateBP();
@@ -249,7 +270,10 @@ namespace ModelLibrary.Process
             {
                 throw new SystemException(retValue);
             }
-            lead.Save();
+            if (!lead.Save())
+            {
+                throw new SystemException(GetRetrievedError(lead, "VAS_LeadToOppProspectLeadNotSaved"));
+            }
             //
             VAdvantage.Model.MBPartner bp = lead.GetBPartner();
             if (bp != null)
