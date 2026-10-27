@@ -24,10 +24,10 @@
         write();
     }
 
-    /* Falls back to the English text when the AD_Message key is not defined. */
+    /* Falls back to the English text when the AD_Message key is not defined (getMsg echoes the key or [key]). */
     function lbl(key, fallback) {
         var t = VIS.Msg.getMsg(key);
-        return (t && t.charAt(0) !== '[') ? t : fallback;
+        return (t && t !== key && t !== '[' + key + ']') ? t : fallback;
     }
 
     function escapeHtml(v) {

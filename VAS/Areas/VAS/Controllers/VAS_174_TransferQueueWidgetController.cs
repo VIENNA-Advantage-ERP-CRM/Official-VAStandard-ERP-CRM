@@ -173,7 +173,7 @@ namespace VIS.Controllers
                 SELECT
                     ml.Line             AS LineNo,
                     p.Name              AS ItemName,
-                    u.UOMSymbol         AS UOM,
+                    COALESCE(u.Name, u.UOMSymbol) AS UOM,
                     ml.MovementQty      AS Sent,
                     ml.ConfirmedQty     AS Received,
                     ai.Description      AS AttributeSetInstance

@@ -283,6 +283,36 @@
     flex-shrink: 0;
 }
 
+/* Product + attribute chips line (VAS_091): the received products with their
+   attribute values, wrapping under the supplier name; nothing renders for a
+   receipt whose lines carry no product. */
+.vas-dssrch-prods {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.4rem;
+    margin-top: 0.25rem;
+    font-size: 0.72rem;
+    color: #5F7283;
+    line-height: 1.3;
+    min-width: 0;
+}
+
+.vas-dssrch-prod-name {
+    font-weight: 600;
+    color: #102F4A;
+}
+
+.vas-dssrch-attr {
+    display: inline-block;
+    padding: 0.05rem 0.4rem;
+    border-radius: 6px;
+    background: rgba(16, 47, 74, 0.07);
+    color: #3E566B;
+    font-size: 0.68rem;
+    white-space: nowrap;
+}
+
 /* ---------- Vendor-first result row (VAS_068, VAS_067) -----------------
    An initials avatar of the business partner leads the row. In VAS_068 the
    vendor name follows and everything that describes the payment - doc no,

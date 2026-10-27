@@ -601,7 +601,7 @@ namespace VAS.Areas.VAS.Controllers
                         CASE WHEN COALESCE(ol.M_AttributeSetInstance_ID, 0) > 0
                              THEN COALESCE(asi.Description, N'')
                              ELSE N'' END AS Attribute,
-                        COALESCE(uom.UOMSymbol, uom.Name) AS UomName,
+                        COALESCE(uom.Name, uom.UOMSymbol) AS UomName,
                         COALESCE(ol.QtyOrdered, 0) AS QtyOrdered,
                         COALESCE(ol.QtyDelivered, 0) AS QtyDelivered,
                         COALESCE(ol.PriceActual, 0) AS PriceActual,

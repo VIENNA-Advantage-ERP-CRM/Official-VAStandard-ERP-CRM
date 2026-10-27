@@ -326,7 +326,8 @@ namespace VIS.Controllers
                     rl.M_Requisition_ID AS requisition_id,
                     rl.Line AS line_no,
                     rl.M_Product_ID AS product_id,
-                    COALESCE(p.Name, rl.Description, N'') AS product_name,
+                    rl.C_Charge_ID AS charge_id,
+                    COALESCE(p.Name, ch.Name, rl.Description, N'') AS product_name,
                     COALESCE(p.Value, N'') AS product_code,
                     rl.M_AttributeSetInstance_ID AS attribute_set_instance_id,
                     CASE WHEN COALESCE(rl.M_AttributeSetInstance_ID, 0) > 0
@@ -351,8 +352,10 @@ namespace VIS.Controllers
                 FROM M_RequisitionLine rl
                 INNER JOIN M_Requisition r
                     ON r.M_Requisition_ID = rl.M_Requisition_ID
-                INNER JOIN M_Product p
+                LEFT JOIN M_Product p
                     ON p.M_Product_ID = rl.M_Product_ID
+                LEFT JOIN C_Charge ch
+                    ON ch.C_Charge_ID = rl.C_Charge_ID
                 LEFT JOIN M_AttributeSetInstance asi
                     ON asi.M_AttributeSetInstance_ID = rl.M_AttributeSetInstance_ID
                 LEFT JOIN C_UOM u
@@ -407,6 +410,7 @@ namespace VIS.Controllers
                         requisitionId = Util.GetValueOfInt(dr["requisition_id"]),
                         lineNo = Util.GetValueOfInt(dr["line_no"]),
                         productId = pId,
+                        chargeId = Util.GetValueOfInt(dr["charge_id"]),
                         productName = Util.GetValueOfString(dr["product_name"]),
                         productCode = Util.GetValueOfString(dr["product_code"]),
                         attributeSetInstanceId = Util.GetValueOfInt(dr["attribute_set_instance_id"]),
@@ -477,6 +481,7 @@ namespace VIS.Controllers
                     requisitionId = l.requisitionId,
                     lineNo = l.lineNo,
                     productId = l.productId,
+                    chargeId = l.chargeId,
                     productName = l.productName,
                     productCode = l.productCode,
                     attributeSetInstanceId = l.attributeSetInstanceId,
@@ -1045,6 +1050,13 @@ namespace VIS.Controllers
             {
                 return Fail(Msg.GetMsg(ctx, "VAS_VendorRequired") ?? "Vendor is required.");
             }
+            // The order is placed on a vendor business partner only - never on a requestor or any other partner
+            if (Util.GetValueOfInt(DB.ExecuteScalar(
+                "SELECT COUNT(1) FROM C_BPartner WHERE C_BPartner_ID = @C_BPartner_ID AND IsVendor = 'Y' AND IsActive = 'Y'",
+                new SqlParameter[] { new SqlParameter("@C_BPartner_ID", vendorId) }, null)) <= 0)
+            {
+                return Fail(MsgOr(ctx, "VAS_217_VendorNotAVendor", "The selected business partner is not a vendor."));
+            }
 
             List<POLinePayload> lineInputs = string.IsNullOrWhiteSpace(linesJson)
                 ? new List<POLinePayload>()
@@ -1272,7 +1284,7 @@ namespace VIS.Controllers
 
                 if (!string.IsNullOrEmpty(description))
                 {
-                    order.SetDescription(description);
+                    order.SetDescription(Truncate(description, 255));
                 }
 
                 order.SetDocStatus(MOrder.DOCSTATUS_Drafted);
@@ -1358,13 +1370,25 @@ namespace VIS.Controllers
                     {
                         ol.SetM_Product_ID(item.ProductId);
                     }
+                    else if (item.ChargeId > 0)
+                    {
+                        // Charge line: no product, the charge itself is ordered
+                        ol.SetC_Charge_ID(item.ChargeId);
+                    }
                     if (item.AttributeSetInstanceId > 0)
                     {
                         ol.SetM_AttributeSetInstance_ID(item.AttributeSetInstanceId);
                     }
-                    if (item.UomId > 0)
+                    int lineUomId = item.UomId;
+                    if (lineUomId <= 0 && item.ProductId <= 0 && HasColumn("C_UOM", "IsDefault"))
                     {
-                        ol.SetC_UOM_ID(item.UomId);
+                        // A charge carries no unit of its own: use the default unit of measure
+                        lineUomId = Util.GetValueOfInt(DB.ExecuteScalar(
+                            "SELECT MIN(C_UOM_ID) FROM C_UOM WHERE IsActive = 'Y' AND IsDefault = 'Y'", null, trx));
+                    }
+                    if (lineUomId > 0)
+                    {
+                        ol.SetC_UOM_ID(lineUomId);
                     }
 
                     // QtyEntered is in the selected unit (what the buyer typed); QtyOrdered is the same quantity in
@@ -1403,11 +1427,11 @@ namespace VIS.Controllers
 
                     if (!string.IsNullOrEmpty(item.Description))
                     {
-                        ol.SetDescription(item.Description);
+                        ol.SetDescription(Truncate(item.Description, 255));
                     }
                     if (!string.IsNullOrEmpty(item.PrintDescription) && ol.Get_ColumnIndex("PrintDescription") >= 0)
                     {
-                        ol.Set_Value("PrintDescription", item.PrintDescription);
+                        ol.Set_Value("PrintDescription", Truncate(item.PrintDescription, 255));
                     }
 
                     // Mandatory source link to M_RequisitionLine_ID
@@ -1470,7 +1494,10 @@ namespace VIS.Controllers
                     orderId = order.GetC_Order_ID(),
                     documentNo = order.GetDocumentNo(),
                     docStatus = order.GetDocStatus(),
-                    message = MsgOr(ctx, "VAS_POSaved", "Purchase Order created successfully.")
+                    // New key (not VAS_POSaved) so a seeded row of the old wording cannot override this text;
+                    // the real document number is appended, or placed at {0} when the message carries it
+                    message = BuildCreatedMessage(MsgOr(ctx, "VAS_217_POCreatedWithDocNo",
+                        "Purchase order created successfully with document number:"), order.GetDocumentNo())
                 });
             }
             catch (Exception ex)
@@ -1644,6 +1671,8 @@ namespace VIS.Controllers
                     ON bp.C_BPartner_ID = mpo.C_BPartner_ID
                 WHERE mpo.IsActive = 'Y'
                   AND mpo.IsCurrentVendor = 'Y'
+                  AND bp.IsVendor = 'Y'
+                  AND bp.IsActive = 'Y'
                   AND mpo.M_Product_ID IN ({0})
                 ORDER BY mpo.M_Product_ID, bp.Name", idList);
 
@@ -1741,6 +1770,112 @@ namespace VIS.Controllers
             return (string.IsNullOrEmpty(msg) || msg == key || msg == "[" + key + "]") ? fallback : msg;
         }
 
+        private static string Truncate(string value, int maxLength)
+        {
+            return (value != null && value.Length > maxLength) ? value.Substring(0, maxLength) : value;
+        }
+
+        private static string BuildCreatedMessage(string text, string documentNo)
+        {
+            return text.Contains("{0}")
+                ? string.Format(text, documentNo)
+                : text.TrimEnd() + " " + documentNo;
+        }
+
+        /// <summary>
+        /// Vendor business partner's own purchasing configuration: price list, payment term and payment method.
+        /// The caller still lets the user change all three.
+        /// </summary>
+        /// <param name="vendorId">C_BPartner_ID</param>
+        /// <returns>JSON { success, priceListId, paymentTermId, paymentMethodId }</returns>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetVendorDefaults(int vendorId = 0)
+        {
+            if (Session["ctx"] == null)
+            {
+                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+            }
+
+            try
+            {
+                int priceListId = 0;
+                int paymentTermId = 0;
+                string paymentMethodId = "";
+                if (vendorId > 0)
+                {
+                    // Purchase side first; the generic payment term is the fallback. Columns are checked because
+                    // not every tenant carries them (payment method comes from the optional payment module).
+                    List<string> priceListColumns = new List<string>();
+                    if (HasColumn("C_BPartner", "PO_PriceList_ID"))
+                    {
+                        priceListColumns.Add("PO_PriceList_ID");
+                    }
+                    if (priceListColumns.Count > 0)
+                    {
+                        priceListColumns.Add("0");
+                        priceListId = Util.GetValueOfInt(DB.ExecuteScalar(
+                            "SELECT COALESCE(" + string.Join(", ", priceListColumns) + ") FROM C_BPartner WHERE C_BPartner_ID=@C_BPartner_ID",
+                            new SqlParameter[] { new SqlParameter("@C_BPartner_ID", vendorId) }, null));
+                    }
+
+                    List<string> termColumns = new List<string>();
+                    if (HasColumn("C_BPartner", "PO_PaymentTerm_ID"))
+                    {
+                        termColumns.Add("PO_PaymentTerm_ID");
+                    }
+                    if (HasColumn("C_BPartner", "C_PaymentTerm_ID"))
+                    {
+                        termColumns.Add("C_PaymentTerm_ID");
+                    }
+                    if (termColumns.Count > 0)
+                    {
+                        termColumns.Add("0");
+                        paymentTermId = Util.GetValueOfInt(DB.ExecuteScalar(
+                            "SELECT COALESCE(" + string.Join(", ", termColumns) + ") FROM C_BPartner WHERE C_BPartner_ID=@C_BPartner_ID",
+                            new SqlParameter[] { new SqlParameter("@C_BPartner_ID", vendorId) }, null));
+                    }
+
+                    if (HasColumn("C_Order", "VA009_PaymentMethod_ID"))
+                    {
+                        List<string> methodColumns = new List<string>();
+                        if (HasColumn("C_BPartner", "VA009_PO_PaymentMethod_ID"))
+                        {
+                            methodColumns.Add("VA009_PO_PaymentMethod_ID");
+                        }
+                        if (HasColumn("C_BPartner", "VA009_PaymentMethod_ID"))
+                        {
+                            methodColumns.Add("VA009_PaymentMethod_ID");
+                        }
+                        if (methodColumns.Count > 0)
+                        {
+                            methodColumns.Add("0");
+                            int methodId = Util.GetValueOfInt(DB.ExecuteScalar(
+                                "SELECT COALESCE(" + string.Join(", ", methodColumns) + ") FROM C_BPartner WHERE C_BPartner_ID=@C_BPartner_ID",
+                                new SqlParameter[] { new SqlParameter("@C_BPartner_ID", vendorId) }, null));
+                            if (methodId > 0)
+                            {
+                                paymentMethodId = methodId.ToString(CultureInfo.InvariantCulture);
+                            }
+                        }
+                    }
+                }
+
+                return Ok(new
+                {
+                    success = true,
+                    priceListId = priceListId,
+                    paymentTermId = paymentTermId,
+                    paymentMethodId = paymentMethodId
+                });
+            }
+            catch (Exception ex)
+            {
+                Log.Log(Level.SEVERE, "VAS_217_OpenRequisitionsWidget.GetVendorDefaults", ex);
+                return Fail(ex.Message);
+            }
+        }
+
         private int GetDefaultWarehouse(Ctx ctx, int orgId)
         {
             string sql = "SELECT M_Warehouse_ID FROM M_Warehouse WHERE IsActive='Y' AND AD_Client_ID=@AD_Client_ID ORDER BY AD_Org_ID DESC, M_Warehouse_ID ASC";
@@ -1811,6 +1946,7 @@ namespace VIS.Controllers
             public int requisitionId { get; set; }
             public int lineNo { get; set; }
             public int productId { get; set; }
+            public int chargeId { get; set; }
             public string productName { get; set; }
             public string productCode { get; set; }
             public int attributeSetInstanceId { get; set; }
@@ -1848,6 +1984,9 @@ namespace VIS.Controllers
 
             [JsonProperty("productId")]
             public int ProductId { get; set; }
+
+            [JsonProperty("chargeId")]
+            public int ChargeId { get; set; }
 
             [JsonProperty("attributeSetInstanceId")]
             public int AttributeSetInstanceId { get; set; }

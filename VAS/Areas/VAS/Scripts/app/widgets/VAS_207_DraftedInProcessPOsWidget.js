@@ -97,6 +97,7 @@
         var modalPageSize = 10;
         var linesCurrentPage = 0;
         var linesPageSize = 10;
+        var linesRefit = null;
 
         function lbl(key, fallback) {
             return VIS.Msg.getMsg(key);
@@ -375,7 +376,11 @@
             fitModalTableRows($dialog, $body);
             $(window).off('resize.vas207modal').on('resize.vas207modal', function () {
                 if ($activeModalOverlay) {
-                    fitModalTableRows($dialog, $body);
+                    if (linesRefit && $body.find('.vas-207-lines-grid')[0]) {
+                        linesRefit();
+                    } else {
+                        fitModalTableRows($dialog, $body);
+                    }
                 }
             });
         }
@@ -622,7 +627,9 @@
             for (var i = 0; i < lines.length; i++) {
                 // Per specification the summary cards count ITEM type products
                 // only; charges and other non-item lines are excluded.
-                if (lines[i].ProductType && lines[i].ProductType !== 'I') { continue; }
+                // A charge line carries no product (ProductType is empty), so it must be
+                // skipped too - only an explicit 'I' counts.
+                if (lines[i].ProductType !== 'I') { continue; }
                 totalOrderedQty += Number(lines[i].QtyOrdered || 0);
                 totalPendingQty += Number(lines[i].QtyPending || 0);
             }
@@ -676,8 +683,10 @@
             renderLinesTableRows(poRec, lines, $tableWrap);
         }
 
-        function renderLinesTableRows(poRec, lines, $tableWrap) {
+        function renderLinesTableRows(poRec, lines, $tableWrap, fitPass) {
             $tableWrap.empty();
+            fitPass = fitPass || 0;
+            linesRefit = function () { renderLinesTableRows(poRec, lines, $tableWrap, 0); };
 
             if (!lines || lines.length === 0) {
                 $tableWrap.html('<div class="vas-207-empty-msg">' + esc(lbl("VAS_207_NoRecordsFound", "No line items found.")) + '</div>');
@@ -785,6 +794,24 @@
             }
 
             $tableWrap.append($tfoot);
+
+            // The body clips (never scrolls), so a page holding more rows than the popup can
+            // show hides its last rows while "from-to of total" still counts them. Measure
+            // how many rows really fit the clipped body and re-page by that count; it
+            // converges in a pass or two because the body height does not depend on the rows.
+            if (fitPass < 3 && $mbody[0].isConnected) {
+                var $firstRow = $mbody.find('.vas-207-lines-row').first();
+                var rowH = $firstRow[0] ? $firstRow[0].getBoundingClientRect().height : 0;
+                var bodyH = $mbody[0].clientHeight;
+                if (rowH > 0 && bodyH > 0) {
+                    var fit = Math.max(1, Math.min(20, Math.floor(bodyH / rowH + 0.02)));
+                    if (fit !== linesPageSize) {
+                        linesPageSize = fit;
+                        linesCurrentPage = Math.floor(startIdx / fit);
+                        renderLinesTableRows(poRec, lines, $tableWrap, fitPass + 1);
+                    }
+                }
+            }
         }
 
         /* ============================================================

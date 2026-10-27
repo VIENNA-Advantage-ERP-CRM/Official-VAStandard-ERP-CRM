@@ -1265,15 +1265,15 @@ namespace VIS.Controllers
 
                     string qtySql = @"
                         SELECT InOutLine.M_InOut_ID AS GRN_ID,
-                               COALESCE(UOM.UOMSymbol, UOM.Name) AS Uom,
+                               COALESCE(UOM.Name, UOM.UOMSymbol) AS Uom,
                                COALESCE(UOM.StdPrecision, 0) AS Uom_Precision,
                                SUM(COALESCE(InOutLine.QtyEntered, InOutLine.MovementQty, 0)) AS Qty
                         FROM M_InOutLine InOutLine
                         LEFT OUTER JOIN C_UOM UOM ON (UOM.C_UOM_ID=InOutLine.C_UOM_ID)
                         WHERE InOutLine.IsActive='Y'
                           AND InOutLine.M_InOut_ID IN (" + string.Join(",", grnIdParameters) + @")
-                        GROUP BY InOutLine.M_InOut_ID, COALESCE(UOM.UOMSymbol, UOM.Name), COALESCE(UOM.StdPrecision, 0)
-                        ORDER BY InOutLine.M_InOut_ID, COALESCE(UOM.UOMSymbol, UOM.Name)";
+                        GROUP BY InOutLine.M_InOut_ID, COALESCE(UOM.Name, UOM.UOMSymbol), COALESCE(UOM.StdPrecision, 0)
+                        ORDER BY InOutLine.M_InOut_ID, COALESCE(UOM.Name, UOM.UOMSymbol)";
 
                     dr = DB.ExecuteReader(qtySql, qtyParameters.ToArray());
                     while (dr != null && dr.Read())
@@ -1540,6 +1540,7 @@ namespace VIS.Controllers
                        Confirm.DocumentNo AS Confirm_No,
                        Confirm.DocStatus AS Doc_Status,
                        COALESCE(CAST(Confirm.IsInDispute AS VARCHAR(1)),'N') AS In_Dispute,
+                       InOut.M_InOut_ID AS GRN_ID,
                        InOut.DocumentNo AS GRN_No,
                        InOut.M_InOut_ID AS GRN_ID,
                        BPartner.Name AS Supplier_Name,
@@ -1616,8 +1617,8 @@ namespace VIS.Controllers
                     {
                         confirmId = Util.GetValueOfInt(dr["Confirm_ID"]),
                         confirmNo = Util.GetValueOfString(dr["Confirm_No"]),
-                        grnNo = Util.GetValueOfString(dr["GRN_No"]),
                         grnId = Util.GetValueOfInt(dr["GRN_ID"]),
+                        grnNo = Util.GetValueOfString(dr["GRN_No"]),
                         supplier = Util.GetValueOfString(dr["Supplier_Name"]),
                         warehouseName = Util.GetValueOfString(dr["Warehouse_Name"]),
                         // Scrap Locator options on the confirmation line come from this warehouse (#84).

@@ -29,7 +29,7 @@
  *  8 | BOM / BOMs (count prepended in code)                | VAS_134_BOM_BomCount / VAS_134_BOM_BomCountPlural
  *  9 | No active products are used as BOM components.      | VAS_134_BOM_ProductsEmpty
  * 10 | BOM Verification                                    | VAS_134_BOM_VerifyTitle
- * 11 | Verification status across active BOMs · not verified listed first. | VAS_134_BOM_VerifyIntro
+ * 11 | Verification status across active BOMs · latest updated first. | VAS_134_BOM_VerifyIntro2
  * 12 | BOMs                                                | VAS_134_BOM_VerifySection
  * 13 | BOMs / not verified (counts prepended in code)      | VAS_134_BOM_VerifySummaryBoms / VAS_134_BOM_VerifySummaryNotVerified
  * 14 | Verified / Not verified                             | VAS_134_BOM_Verified / VAS_134_BOM_NotVerified
@@ -325,7 +325,7 @@
             },
             verify: {
                 endpoint: 'GetVerification',
-                introText: lbl('VAS_134_BOM_VerifyIntro', 'Verification status across active BOMs · not verified listed first.'),
+                introText: lbl('VAS_134_BOM_VerifyIntro2', 'Verification status across active BOMs · latest updated first.'),
                 emptyText: lbl('VAS_134_BOM_VerifyEmpty', 'No active BOMs were found.'),
                 buildRow: buildVerifyRow,
                 summaryText: function (st) {

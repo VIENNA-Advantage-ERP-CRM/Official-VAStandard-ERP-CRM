@@ -268,7 +268,7 @@ namespace VIS.Controllers
                        CASE WHEN COALESCE(ol.QtyOrdered, 0) <> 0
                             THEN ROUND((COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0)) * COALESCE(ol.QtyEntered, ol.QtyOrdered) / ol.QtyOrdered, 12)
                             ELSE 0 END AS Default_Received_Qty,
-                       COALESCE(u.UOMSymbol, u.Name) AS UOM,
+                       COALESCE(u.Name, u.UOMSymbol) AS UOM,
                        COALESCE(u.StdPrecision, 0) AS UOM_Precision
                 FROM C_Order o
                 INNER JOIN C_OrderLine ol ON (ol.C_Order_ID=o.C_Order_ID)

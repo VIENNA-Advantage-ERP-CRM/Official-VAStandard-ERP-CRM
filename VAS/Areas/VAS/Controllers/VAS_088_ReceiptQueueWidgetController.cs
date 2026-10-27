@@ -240,7 +240,7 @@ namespace VIS.Controllers
                        InOutLine.C_OrderLine_ID AS Order_Line_ID,
                        COALESCE(Product.Name, " + NLiteral("-") + @") AS Item_Name,
                        AttrInstance.Description AS Attribute_Name,
-                       COALESCE(UOM.UOMSymbol, UOM.Name) AS Uom,
+                       COALESCE(UOM.Name, UOM.UOMSymbol) AS Uom,
                        COALESCE(OrderLine.QtyEntered, OrderLine.QtyOrdered, 0) AS Ordered_Qty,
                        COALESCE(OrderLine.QtyOrdered, 0) AS Ordered_Base_Qty,
                        COALESCE(InOutLine.QtyEntered, InOutLine.MovementQty, 0) AS Received_Qty

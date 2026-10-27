@@ -248,9 +248,10 @@ namespace VIS.Controllers
             string linesSql = @"
                 SELECT Product.Name AS Item_Name,
                        COALESCE(OrderLine.QtyOrdered, 0) AS PO_Qty,
-                       COALESCE(InOutLine.MovementQty, 0) AS Received_Qty,
-                       COALESCE(UOM.UOMSymbol, UOM.Name) AS Uom,
-                       InOutLine.Line AS Line_No
+                       COALESCE(InOutLine.QtyEntered, InOutLine.MovementQty, 0) AS Received_Qty,
+                       COALESCE(UOM.Name, UOM.UOMSymbol) AS Uom,
+                       InOutLine.Line AS Line_No,
+                       InOutLine.M_InOutLine_ID AS InOutLine_Id
                 FROM M_InOutLine InOutLine
                 INNER JOIN M_InOut InOut ON (InOut.M_InOut_ID=InOutLine.M_InOut_ID AND InOut.IsActive='Y')
                 INNER JOIN M_Product Product ON (Product.M_Product_ID=InOutLine.M_Product_ID AND Product.IsActive='Y')
@@ -278,6 +279,7 @@ namespace VIS.Controllers
             parameters.Add(new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()));
 
             List<object> rows = new List<object>();
+            Dictionary<int, List<object>> attributesByLine = new Dictionary<int, List<object>>();
             IDataReader dr = null;
 
             try
@@ -286,13 +288,63 @@ namespace VIS.Controllers
 
                 while (dr != null && dr.Read())
                 {
+                    List<object> lineAttributes = new List<object>();
+                    attributesByLine[Util.GetValueOfInt(dr["InOutLine_Id"])] = lineAttributes;
                     rows.Add(new
                     {
                         itemName = Util.GetValueOfString(dr["Item_Name"]),
                         poQty = Util.GetValueOfDecimal(dr["PO_Qty"]),
+                        // Received is the quantity on the line's selected unit (QtyEntered), not base.
                         receivedQty = Util.GetValueOfDecimal(dr["Received_Qty"]),
-                        uom = Util.GetValueOfString(dr["Uom"])
+                        uom = Util.GetValueOfString(dr["Uom"]),
+                        attributes = lineAttributes
                     });
+                }
+                dr.Close();
+                dr.Dispose();
+                dr = null;
+
+                // Attribute values per line (M_AttributeInstance via the line's attribute set
+                // instance); only fetched when the receipt has lines the role may see.
+                if (rows.Count > 0)
+                {
+                    string attrSql = @"
+                        SELECT InOutLine.M_InOutLine_ID AS InOutLine_Id,
+                               Attribute.Name AS AttributeName,
+                               AttrValue.Name AS AttributeListValue,
+                               AttrInstance.Value AS AttributeTextValue,
+                               AttrInstance.ValueNumber AS AttributeNumberValue
+                        FROM M_InOutLine InOutLine
+                        INNER JOIN M_AttributeInstance AttrInstance ON (AttrInstance.M_AttributeSetInstance_ID=InOutLine.M_AttributeSetInstance_ID AND AttrInstance.IsActive='Y')
+                        INNER JOIN M_Attribute Attribute ON (Attribute.M_Attribute_ID=AttrInstance.M_Attribute_ID AND Attribute.IsActive='Y')
+                        LEFT OUTER JOIN M_AttributeValue AttrValue ON (AttrValue.M_AttributeValue_ID=AttrInstance.M_AttributeValue_ID AND AttrValue.M_Attribute_ID=AttrInstance.M_Attribute_ID AND AttrValue.IsActive='Y')
+                        WHERE InOutLine.IsActive='Y'
+                          AND InOutLine.M_InOut_ID=@ReceiptId
+                          AND InOutLine.AD_Client_ID=@AD_Client_ID
+                          AND InOutLine.M_AttributeSetInstance_ID>0
+                        ORDER BY InOutLine.Line, Attribute.Name";
+
+                    List<SqlParameter> attrParameters = new List<SqlParameter>();
+                    attrParameters.Add(new SqlParameter("@ReceiptId", receiptId));
+                    attrParameters.Add(new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()));
+
+                    dr = DB.ExecuteReader(attrSql, attrParameters.ToArray());
+                    while (dr != null && dr.Read())
+                    {
+                        List<object> target;
+                        if (!attributesByLine.TryGetValue(Util.GetValueOfInt(dr["InOutLine_Id"]), out target)) { continue; }
+
+                        string label = Util.GetValueOfString(dr["AttributeName"]);
+                        string value = Util.GetValueOfString(dr["AttributeListValue"]);
+                        if (string.IsNullOrEmpty(value)) { value = Util.GetValueOfString(dr["AttributeTextValue"]); }
+                        if (string.IsNullOrEmpty(value) && dr["AttributeNumberValue"] != DBNull.Value)
+                        {
+                            value = Util.GetValueOfDecimal(dr["AttributeNumberValue"]).ToString("0.####", CultureInfo.InvariantCulture);
+                        }
+                        if (string.IsNullOrEmpty(label) || string.IsNullOrEmpty(value)) { continue; }
+
+                        target.Add(new { label = label, value = value });
+                    }
                 }
 
                 return Json(JsonConvert.SerializeObject(new { rows = rows }), JsonRequestBehavior.AllowGet);

@@ -133,7 +133,7 @@ namespace VAS.Controllers
                         o.DateOrdered AS order_date,
                         o.DocStatus AS document_status,
                         bp.Name AS vendor_name,
-                        COALESCE(o.TotalLines, 0) AS total_amount, -- Sub total (excl. taxes)
+                        CASE WHEN COALESCE((SELECT pl.IsTaxIncluded FROM M_PriceList pl WHERE pl.M_PriceList_ID = o.M_PriceList_ID), 'N') = 'Y' THEN COALESCE(o.TotalLines, 0) - (SELECT COALESCE(SUM(COALESCE(tl.TaxAmt, 0)), 0) FROM C_OrderLine tl WHERE tl.C_Order_ID = o.C_Order_ID AND tl.IsActive = 'Y') ELSE COALESCE(o.TotalLines, 0) END AS total_amount, -- Sub total (excl. taxes; TotalLines already holds the tax on a tax-inclusive price list)
                         curr.ISO_Code AS currency_code,
                         curr.CurSymbol AS currency_symbol,
                         curr.StdPrecision AS currency_precision
@@ -245,7 +245,7 @@ namespace VAS.Controllers
                         p.Value AS product_code,
                         p.SKU AS product_sku,
                         r.DocumentNo AS requisition_number,
-                        COALESCE(o.TotalLines, 0) AS total_amount, -- Sub total (excl. taxes)
+                        CASE WHEN COALESCE((SELECT pl.IsTaxIncluded FROM M_PriceList pl WHERE pl.M_PriceList_ID = o.M_PriceList_ID), 'N') = 'Y' THEN COALESCE(o.TotalLines, 0) - (SELECT COALESCE(SUM(COALESCE(tl.TaxAmt, 0)), 0) FROM C_OrderLine tl WHERE tl.C_Order_ID = o.C_Order_ID AND tl.IsActive = 'Y') ELSE COALESCE(o.TotalLines, 0) END AS total_amount, -- Sub total (excl. taxes; TotalLines already holds the tax on a tax-inclusive price list)
                         curr.ISO_Code AS currency_code,
                         curr.CurSymbol AS currency_symbol,
                         curr.StdPrecision AS currency_precision

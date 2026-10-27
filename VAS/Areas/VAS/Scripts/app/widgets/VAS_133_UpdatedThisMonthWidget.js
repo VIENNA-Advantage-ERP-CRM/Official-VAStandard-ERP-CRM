@@ -12,7 +12,9 @@
  * the SAME fluid modal font-size, so "8 rows fit without a scrollbar" holds
  * by construction at every screen size - the ratio never changes because
  * both values scale together. This is a LATEST-RECORD update view
- * (M_Product -> "Attribute", M_ProductPrice -> "Price"), not AD_ChangeLog /
+ * (SUPERSEDED: rows are now field-level AD_ChangeLog entries - field, new value,
+ * tab badge, user, time - plus a record-level row for a product saved with no
+ * field log; the old note follows) (M_Product -> "Attribute", M_ProductPrice -> "Price"), not AD_ChangeLog /
  * a field-level audit trail. Read-only. Plain DOM internals (no jQuery in
  * the widget logic); jQuery is used only at the framework boundary.
  * Backend - VAS_133_UpdatedThisMonthWidget/GetSummary, GetPagedUpdates
@@ -404,8 +406,18 @@
             var updatedByName = row.updatedByName && String(row.updatedByName).trim()
                 ? row.updatedByName
                 : lbl('VAS_133_UTM_UnknownUser', 'Unknown user');
-            var metaText = (row.description || '') + ' · ' + updatedByName + ' · ' + formatRelativeTime(row.updatedAt, row.updatedAgeMinutes);
-            left.appendChild(el('div', 'MPC-utm-row-meta', metaText));
+            // "Field: new value · user · time" - the field name leads, the tab is the pill.
+            var hasValue = row.newValue && String(row.newValue).trim();
+            // A record-level entry (no field log) has neither value, so no ": value".
+            var hasChange = hasValue || (row.oldValue && String(row.oldValue).trim());
+            var valueText = hasValue ? row.newValue : lbl('VAS_133_UTM_Cleared', '(empty)');
+            var fieldText = row.fieldName || '';
+            var tail = ' · ' + updatedByName + ' · ' + formatRelativeTime(row.updatedAt, row.updatedAgeMinutes);
+            var metaEl = el('div', 'MPC-utm-row-meta');
+            metaEl.appendChild(el('strong', null, fieldText));
+            metaEl.appendChild(document.createTextNode((hasChange ? ': ' + valueText : '') + tail));
+            metaEl.title = fieldText + (hasChange ? ': ' + valueText : '') + tail;
+            left.appendChild(metaEl);
             rowEl.appendChild(left);
 
             var right = el('div', 'MPC-utm-row-right');

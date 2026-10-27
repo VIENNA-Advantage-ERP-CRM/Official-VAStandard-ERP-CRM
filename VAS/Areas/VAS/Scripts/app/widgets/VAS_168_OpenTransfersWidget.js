@@ -1,13 +1,13 @@
 /**
  * Open Transfers KPI Widget (Material Transfer Dashboard)
- * Purpose - Read-only 2x1 glass KPI tile showing total count of open outbound transfers awaiting dispatch.
+ * Purpose - Read-only 2x1 glass KPI tile showing total count of open outbound transfers (drafted or awaiting dispatch).
  * Prefix  - VAS_168_
  *
  * Labels / Message Keys Table:
  *  #  | Fallback Text                                    | Message Key
  * ----+--------------------------------------------------+-----------------------------------
  *  1  | Open Transfers                                   | VAS_168_OpenTransfers
- *  2  | Awaiting dispatch                                | VAS_168_AwaitingDispatch
+ *  2  | Drafted or awaiting dispatch                     | VAS_168_DraftedOrAwaitingDispatch
  *  3  | Unable to load open transfers                    | VAS_168_UnableToLoadData
  */
 ; VAS = window.VAS || {};
@@ -28,7 +28,8 @@
         var widgetObserver = null;
 
         function lbl(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            var msg = VIS.Msg.getMsg(key);
+            return (!msg || msg === key || msg === '[' + key + ']') ? fallback : msg;
         }
 
         function showBusy(show) {
@@ -110,8 +111,8 @@
             widgetObserver.observe($wrapper[0]);
         }
 
-        /* DocStatus list matching backend predicate exactly ('IP', 'WC', 'IN') — excludes 'DR' (Drafts) per spec §4 */
-        var OPEN_STATUS_LIST = "'IP', 'WC', 'IN'";
+        /* DocStatus list matching backend predicate exactly ('DR', 'IP', 'WC', 'IN') — Drafts are included in Open Transfers */
+        var OPEN_STATUS_LIST = "'DR', 'IP', 'WC', 'IN'";
 
         this.Initalize = function () {
             createWidget();
@@ -148,7 +149,7 @@
             }
 
             if ($metaEl) {
-                var metaMsg = lbl("VAS_168_AwaitingDispatch", "Awaiting dispatch");
+                var metaMsg = lbl("VAS_168_DraftedOrAwaitingDispatch", "Drafted or awaiting dispatch");
                 $metaEl.text(metaMsg);
                 $metaEl.attr('title', metaMsg);
             }
@@ -168,7 +169,7 @@
 
         function createWidget() {
             var title = lbl("VAS_168_OpenTransfers", "Open Transfers");
-            var metaText = lbl("VAS_168_AwaitingDispatch", "Awaiting dispatch");
+            var metaText = lbl("VAS_168_DraftedOrAwaitingDispatch", "Drafted or awaiting dispatch");
 
             var $card = $(
                 '<div class="vas-open-transfers-card" aria-label="' + escapeHtml(title) + '">' +

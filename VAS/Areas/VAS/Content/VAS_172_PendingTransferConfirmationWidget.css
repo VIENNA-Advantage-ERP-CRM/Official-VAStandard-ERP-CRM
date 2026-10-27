@@ -100,7 +100,8 @@
 .vas-172-body {
     flex: 1;
     min-height: 0;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
 }
@@ -115,9 +116,9 @@
 .vas-172-queue {
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
-    height: 100%;
-    flex: 1;
+    justify-content: flex-start;
+    align-content: flex-start;
+    gap: .15em;
 }
 
 .vas-172-row {
@@ -126,7 +127,7 @@
     flex-direction: column;
     justify-content: center;
     gap: .15em;
-    padding: .2em .3em;
+    padding: .3em .3em;
     border: none;
     border-bottom: 1px solid #EDF2F6;
     background: transparent;
@@ -134,7 +135,8 @@
     text-align: left;
     border-radius: 6px;
     transition: background 120ms;
-    flex: 1;
+    /* Natural height: 1-2 records sit at the top, and a row never clips its details. */
+    flex: 0 0 auto;
     min-height: 0;
 }
 
@@ -158,9 +160,10 @@
 .vas-172-row-meta {
     font-size: .6875em;
     color: #748494;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    /* Wraps instead of truncating, so the whole route is readable. */
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.3;
 }
 
 /* ── Pills ──────────────────────────────────────────────────────────── */
@@ -319,6 +322,28 @@
     gap: clamp(0.5rem, 1vw, 1.25rem);
 }
 
+/* Review Confirmation Line: tighter spacing so every field fits; scrolls only on a very short window. */
+.vas-172-modal-body--v2 {
+    overflow-y: auto;
+    gap: clamp(0.25rem, 0.5vw, 0.6rem);
+    padding: clamp(0.5rem, 1vw, 1.1rem) clamp(0.75rem, 1.5vw, 2rem);
+}
+
+.vas-172-btn-open {
+    font-size: clamp(11px, 0.8vw, 14px);
+    font-weight: 600;
+    color: #1F83FF;
+    background: #fff;
+    border: 1px solid #1F83FF;
+    border-radius: 999px;
+    padding: 0.25rem 0.85rem;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.vas-172-btn-open:hover { background: #EEF6FF; }
+
 .vas-172-back-link {
     background: none;
     border: none;
@@ -361,9 +386,8 @@
     font-size: clamp(12px, 0.9vw, 16px);
     font-weight: 600;
     color: #102C3F;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 .vas-172-section-heading {
@@ -377,7 +401,9 @@
 .vas-172-lines-list-container {
     flex: 1;
     min-height: 0;
-    overflow: hidden;
+    /* Many lines scroll inside this region instead of being clipped. */
+    overflow-x: hidden;
+    overflow-y: auto;
     border: 1px solid #E4EDF4;
     border-radius: clamp(8px, 1vw, 16px);
     background: #FFFFFF;
@@ -387,7 +413,7 @@
     justify-content: flex-start;
 }
 
-.vas-172-lines-list { display: flex; flex-direction: column; gap: 6px; }
+.vas-172-lines-list { display: flex; flex-direction: column; gap: 6px; flex: 0 0 auto; }
 
 .vas-172-line-row {
     display: flex;
@@ -401,6 +427,7 @@
     cursor: pointer;
     text-align: left;
     transition: background 120ms;
+    flex-shrink: 0;
 }
 
 .vas-172-line-row:hover { background: #EEF6FF; }
@@ -446,32 +473,50 @@
 .vas-172-v2-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: clamp(6px, 0.8vw, 14px) clamp(10px, 1.2vw, 20px);
+    gap: clamp(3px, 0.4vw, 8px) clamp(8px, 1vw, 16px);
 }
 
-.vas-172-v2-field { display: flex; flex-direction: column; gap: .2rem; }
+.vas-172-v2-field { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
 
 .vas-172-v2-span2 { grid-column: span 2; }
 
+/* Read-only fields stay white - no blue fill. */
 .vas-172-v2-readonly {
-    background: #EEF6FF;
+    background: #fff;
     border: 1px solid #E4EDF4;
-    border-radius: 999px;
-    padding: clamp(4px, 0.6vw, 10px) clamp(10px, 1vw, 18px);
+    border-radius: 10px;
+    padding: clamp(2px, 0.3vw, 6px) clamp(8px, 0.8vw, 14px);
 }
 
 .vas-172-v2-editable {
     background: #fff;
     border: 1px solid #E4EDF4;
     border-radius: 10px;
-    padding: clamp(4px, 0.6vw, 10px) clamp(10px, 1vw, 18px);
+    padding: clamp(2px, 0.3vw, 6px) clamp(8px, 0.8vw, 14px);
 }
+
+.vas-172-v2-readonly .vas-172-field-value { background: #fff; }
+
+.vas-172-v2-footer { margin-top: 0.35rem; text-align: right; flex-shrink: 0; }
+
+.vas-172-select {
+    border: 1px solid #D7D7D7;
+    border-radius: 6px;
+    font-size: clamp(12px, 0.9vw, 16px);
+    padding: .2rem .4rem;
+    width: 100%;
+    box-sizing: border-box;
+    outline: none;
+    background: #fff;
+}
+
+.vas-172-select:focus { border-color: #1F83FF; }
 
 .vas-172-input {
     border: 1px solid #D7D7D7;
     border-radius: 6px;
     font-size: clamp(12px, 0.9vw, 16px);
-    padding: .25rem .5rem;
+    padding: .2rem .5rem;
     text-align: right;
     width: 100%;
     box-sizing: border-box;
@@ -484,11 +529,11 @@
     border: 1px solid #D7D7D7;
     border-radius: 6px;
     font-size: clamp(12px, 0.9vw, 16px);
-    padding: .25rem .5rem;
+    padding: .2rem .5rem;
     width: 100%;
     box-sizing: border-box;
     resize: none;
-    min-height: 3rem;
+    min-height: 2.6rem;
     outline: none;
     font-family: Roboto, Arial, sans-serif;
 }

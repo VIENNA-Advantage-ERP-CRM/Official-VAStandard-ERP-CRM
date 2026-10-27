@@ -106,19 +106,6 @@
     color: #102C3F;
 }
 
-.MPC-dos-hint {
-    flex: 0 0 auto;
-    font-size: 0.6875em;
-    color: #748494;
-    white-space: nowrap;
-}
-
-@media (max-width: 900px) {
-    .MPC-dos-hint {
-        display: none;
-    }
-}
-
 /* ---- Suggestion dropdown (the search-result pop-up) ----
    Appended directly to <body> by the widget JS, so it sits OUTSIDE the
    .MPC-dos-root DOM tree and never inherited the pill's font-size - it was

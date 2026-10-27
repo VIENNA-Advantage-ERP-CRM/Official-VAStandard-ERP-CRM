@@ -263,7 +263,7 @@ namespace VAS.Controllers
                            p.Name AS ProductName,
                            p.Value AS ProductCode,
                            p.C_UOM_ID AS UomId,
-                           p.M_AttributeSetInstance_ID AS AttributeSetInstanceId,
+                           COALESCE(il.M_AttributeSetInstance_ID, 0) AS AttributeSetInstanceId,
                            SUM(il.MovementQty) AS Qty,
                            MAX(io.MovementDate) AS LastDate
                     FROM M_InOut io
@@ -283,13 +283,13 @@ namespace VAS.Controllers
 
                 innerSql = MRole.GetDefault(ctx).AddAccessSQL(innerSql, "io", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
                 innerSql += @"
-                    GROUP BY p.M_Product_ID, p.Name, p.Value, p.C_UOM_ID, p.M_AttributeSetInstance_ID";
+                    GROUP BY p.M_Product_ID, p.Name, p.Value, p.C_UOM_ID, COALESCE(il.M_AttributeSetInstance_ID, 0)";
 
                 string sql = @"
                     WITH ProdQty AS (
                         " + innerSql + @"
                     )
-                    SELECT q.ProductId, q.ProductName, q.ProductCode, q.Qty, q.LastDate,
+                    SELECT q.ProductId, q.ProductName, q.ProductCode, q.Qty, q.LastDate, q.AttributeSetInstanceId,
                            u.Name AS UomName, u.UOMSymbol AS UomSymbol,
                            ai.M_AttributeInstance_ID AS AttributeInstanceId,
                            a.M_Attribute_ID AS AttributeId,
@@ -302,10 +302,10 @@ namespace VAS.Controllers
                     LEFT JOIN M_AttributeInstance ai ON (ai.M_AttributeSetInstance_ID = q.AttributeSetInstanceId AND ai.IsActive = 'Y')
                     LEFT JOIN M_Attribute a ON (a.M_Attribute_ID = ai.M_Attribute_ID AND a.IsActive = 'Y')
                     LEFT JOIN M_AttributeValue av ON (av.M_AttributeValue_ID = ai.M_AttributeValue_ID AND av.M_Attribute_ID = ai.M_Attribute_ID AND av.IsActive = 'Y')
-                    ORDER BY q.ProductName, q.ProductCode, a.Name, av.Name";
+                    ORDER BY q.ProductName, q.ProductCode, q.AttributeSetInstanceId, a.Name, av.Name";
 
-                List<int> order = new List<int>();
-                Dictionary<int, DetailRow> byId = new Dictionary<int, DetailRow>();
+                List<string> order = new List<string>();
+                Dictionary<string, DetailRow> byId = new Dictionary<string, DetailRow>();
                 DateTime? overallLastDate = null;
 
                 IDataReader dr = null;
@@ -322,9 +322,12 @@ namespace VAS.Controllers
                     while (dr != null && dr.Read())
                     {
                         int productId = Util.GetValueOfInt(dr["ProductId"]);
+                        // One row per product AND attribute set: the same product received/delivered with
+                        // different attributes stays on separate lines, each carrying its own attributes.
+                        string rowKey = productId + "|" + Util.GetValueOfInt(dr["AttributeSetInstanceId"]);
 
                         DetailRow row;
-                        if (!byId.TryGetValue(productId, out row))
+                        if (!byId.TryGetValue(rowKey, out row))
                         {
                             string uomSymbol = Util.GetValueOfString(dr["UomSymbol"]);
                             string uomName = Util.GetValueOfString(dr["UomName"]);
@@ -339,8 +342,8 @@ namespace VAS.Controllers
                                 attributes = new List<Attr>(),
                                 seenChips = new HashSet<string>()
                             };
-                            byId[productId] = row;
-                            order.Add(productId);
+                            byId[rowKey] = row;
+                            order.Add(rowKey);
 
                             DateTime? rowLastDate = Util.GetValueOfDateTime(dr["LastDate"]);
                             if (rowLastDate.HasValue && (!overallLastDate.HasValue || rowLastDate.Value > overallLastDate.Value))

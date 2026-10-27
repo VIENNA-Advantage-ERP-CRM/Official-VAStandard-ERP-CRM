@@ -25,6 +25,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Globalization;
 using System.Data.SqlClient;
 using System.Web.Mvc;
 using VAdvantage.Model;
@@ -171,7 +172,7 @@ namespace VAS.Areas.VAS.Controllers
                 }
 
                 // Record ids are integers read from the database - safe to inline.
-                string qtySql = @"SELECT iol.M_InOut_ID AS InOutId, COALESCE(u.UOMSymbol, u.Name) AS Uom, u.StdPrecision AS StdPrecision,
+                string qtySql = @"SELECT iol.M_InOut_ID AS InOutId, COALESCE(u.Name, u.UOMSymbol) AS Uom, u.StdPrecision AS StdPrecision,
                            SUM(COALESCE(iol.QtyEntered, iol.MovementQty)) AS Qty
                       FROM M_InOutLine iol
                       LEFT OUTER JOIN C_UOM u ON (u.C_UOM_ID = iol.C_UOM_ID)
@@ -193,6 +194,57 @@ namespace VAS.Areas.VAS.Controllers
                                 Precision = Util.GetValueOfInt(row["StdPrecision"])
                             });
                         }
+                    }
+                }
+
+                // Products received on each receipt with their attribute values (chips), read from the
+                // line's attribute set instance; a line without attributes carries an empty list.
+                string prodSql = @"SELECT iol.M_InOut_ID AS InOutId, iol.M_AttributeSetInstance_ID AS AsiId, p.M_Product_ID AS ProductId,
+                           p.Name AS ProductName, a.Name AS AttrName, av.Name AS AttrListValue,
+                           ai.Value AS AttrTextValue, ai.ValueNumber AS AttrNumberValue
+                      FROM M_InOutLine iol
+                      INNER JOIN M_Product p ON (p.M_Product_ID = iol.M_Product_ID)
+                      LEFT OUTER JOIN M_AttributeInstance ai ON (ai.M_AttributeSetInstance_ID = iol.M_AttributeSetInstance_ID AND ai.IsActive = 'Y')
+                      LEFT OUTER JOIN M_Attribute a ON (a.M_Attribute_ID = ai.M_Attribute_ID AND a.IsActive = 'Y')
+                      LEFT OUTER JOIN M_AttributeValue av ON (av.M_AttributeValue_ID = ai.M_AttributeValue_ID AND av.M_Attribute_ID = ai.M_Attribute_ID AND av.IsActive = 'Y')
+                     WHERE iol.IsActive = 'Y' AND iol.M_InOut_ID IN (" + string.Join(",", hitsById.Keys) + @")
+                     ORDER BY iol.M_InOut_ID, iol.Line, iol.M_InOutLine_ID, a.Name";
+                DataSet prodDs = DB.ExecuteDataset(prodSql, null, null);
+                if (prodDs != null && prodDs.Tables.Count > 0)
+                {
+                    foreach (SearchHit hit in result.Items) { hit.Products = new List<ProductInfo>(); }
+                    Dictionary<string, ProductInfo> seen = new Dictionary<string, ProductInfo>();
+                    foreach (DataRow row in prodDs.Tables[0].Rows)
+                    {
+                        int inOutId = Util.GetValueOfInt(row["InOutId"]);
+                        SearchHit hit;
+                        if (!hitsById.TryGetValue(inOutId, out hit)) { continue; }
+
+                        // One entry per product AND attribute set instance on a receipt.
+                        string key = inOutId + "|" + Util.GetValueOfInt(row["ProductId"]) + "|" + Util.GetValueOfInt(row["AsiId"]);
+                        ProductInfo info;
+                        if (!seen.TryGetValue(key, out info))
+                        {
+                            info = new ProductInfo { Name = Util.GetValueOfString(row["ProductName"]), Attributes = new List<AttrInfo>() };
+                            seen[key] = info;
+                            hit.Products.Add(info);
+                        }
+
+                        string label = Util.GetValueOfString(row["AttrName"]);
+                        if (string.IsNullOrEmpty(label)) { continue; }
+                        string value = Util.GetValueOfString(row["AttrListValue"]);
+                        if (string.IsNullOrEmpty(value)) { value = Util.GetValueOfString(row["AttrTextValue"]); }
+                        if (string.IsNullOrEmpty(value) && row["AttrNumberValue"] != DBNull.Value)
+                        {
+                            value = Util.GetValueOfDecimal(row["AttrNumberValue"]).ToString("0.####", CultureInfo.InvariantCulture);
+                        }
+                        if (string.IsNullOrEmpty(value)) { continue; }
+                        bool dup = false;
+                        foreach (AttrInfo existing in info.Attributes)
+                        {
+                            if (existing.Label == label && existing.Value == value) { dup = true; break; }
+                        }
+                        if (!dup) { info.Attributes.Add(new AttrInfo { Label = label, Value = value }); }
                     }
                 }
             }
@@ -237,6 +289,19 @@ namespace VAS.Areas.VAS.Controllers
             public string  DocDate    { get; set; }
             public string  DocStatus  { get; set; }
             public List<QtyByUom> Quantities { get; set; }
+            public List<ProductInfo> Products { get; set; }
+        }
+
+        public class ProductInfo
+        {
+            public string Name { get; set; }
+            public List<AttrInfo> Attributes { get; set; }
+        }
+
+        public class AttrInfo
+        {
+            public string Label { get; set; }
+            public string Value { get; set; }
         }
 
         public class QtyByUom
