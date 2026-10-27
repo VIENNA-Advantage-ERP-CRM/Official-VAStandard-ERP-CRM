@@ -61,10 +61,18 @@ namespace ModelLibrary.Classes
             {
                 Thread thread = new Thread(new ThreadStart(() =>
                 {
-                    // copy attachment data 
-                    CopyAttachments(FromRecordID, FromTableID, ToRecordID, ToTableID, ctx, trx);
-                    // copy dms document
-                    CopyDmsDocument(FromTableID, ToTableID, ToRecordID, FromRecordID, ctx, trx);
+                    //VAI052-An unhandled exception on a background thread would stop the whole web application
+                    try
+                    {
+                        // copy attachment data
+                        CopyAttachments(FromRecordID, FromTableID, ToRecordID, ToTableID, ctx, trx);
+                        // copy dms document
+                        CopyDmsDocument(FromTableID, ToTableID, ToRecordID, FromRecordID, ctx, trx);
+                    }
+                    catch (Exception ex)
+                    {
+                        log.Severe(Msg.GetMsg(ctx, "VAS_CopyBackgroundFailed") + ": " + ex.Message);
+                    }
                 }));
 
                 thread.IsBackground = true;
@@ -90,7 +98,7 @@ namespace ModelLibrary.Classes
                         if (ToTableID > 0)
                             newAttachment.SetAD_Table_ID(ToTableID);
                         if (!newAttachment.Save())
-                            log.SaveError("ERROR:", "Error in Copying Email");
+                            log.SaveError("", Msg.GetMsg(ctx, "VAS_CopyEmailFailed"));
                     }
                 }
 
@@ -107,8 +115,11 @@ namespace ModelLibrary.Classes
                         oldAppointment = new MAppointmentsInfo(ctx, historyRecordIDs[i], trx);
                         newAppointment = new MAppointmentsInfo(ctx, 0, trx);
                         oldAppointment.CopyTo(newAppointment);
-                        newAppointment.SetStartDate(oldAppointment.GetStartDate().Value.ToLocalTime());
-                        newAppointment.SetEndDate(oldAppointment.GetEndDate().Value.ToLocalTime());
+                        //VAI052-Start/End date may be empty; .Value would throw and stop the whole copy
+                        if (oldAppointment.GetStartDate().HasValue)
+                            newAppointment.SetStartDate(oldAppointment.GetStartDate().Value.ToLocalTime());
+                        if (oldAppointment.GetEndDate().HasValue)
+                            newAppointment.SetEndDate(oldAppointment.GetEndDate().Value.ToLocalTime());
                         newAppointment.Set_ValueNoCheck("Created", oldAppointment.GetCreated());
 
                         if (ToRecordID != 0)
@@ -117,7 +128,7 @@ namespace ModelLibrary.Classes
                             newAppointment.SetAD_Table_ID(ToTableID);
 
                         if (!newAppointment.Save())
-                            log.SaveError("ERROR:", "Error in Copying History Records");
+                            log.SaveError("", Msg.GetMsg(ctx, "VAS_CopyHistoryFailed"));
 
                         //To copy Appointment transcript
                         int[] AppointmentTranscriptIDs = MAppointmentsInfo.GetAllIDs("AppointmentTranscript", "AppointmentsInfo_ID = " + historyRecordIDs[i], trx);
@@ -134,7 +145,7 @@ namespace ModelLibrary.Classes
                                 toTranscript.Set_ValueNoCheck("AppointmentsInfo_ID", newAppointment.GetAppointmentsInfo_ID());
                                 if (!toTranscript.Save())
                                 {
-                                    log.SaveError("ERROR:", "Error in Copying appointmenttranscript Records");
+                                    log.SaveError("", Msg.GetMsg(ctx, "VAS_CopyTranscriptFailed"));
                                 }
                                 else
                                 {
@@ -145,7 +156,7 @@ namespace ModelLibrary.Classes
                                         if (!ExecuteThreadAction(actionType: ActionType.Update, tableID: AD_Table_ID, recordID: toTranscript.Get_ID(),
                                             attachmentID: toTranscript.Get_ID(), userID: ctx.GetAD_User_ID(), ctx: ctx, threadID: threadID, attachmentType: "A"))
                                         {
-                                            log.SaveError("", "Error in execution of insert/update data against appointment transcript thread : " + toTranscript.Get_ID());
+                                            log.SaveError("", Msg.GetMsg(ctx, "VAS_CopyTranscriptThreadFailed") + ": " + toTranscript.Get_ID());
                                         }
 
                                     }
@@ -629,7 +640,8 @@ namespace ModelLibrary.Classes
                       "%' AND t.AD_Column_ID IS NULL AND t.AD_Table_ID=" + ToTableID + " ORDER BY t.SeqNo ASC";
 
                 DataSet ds2 = DB.ExecuteDataset(query, null, trx);
-                if (ds2 != null && ds2.Tables.Count == 0 || ds2.Tables[0].Rows.Count == 0)
+                //VAI052-Null check first; the old condition read ds2.Tables when ds2 was null
+                if (ds2 == null || ds2.Tables.Count == 0 || ds2.Tables[0].Rows.Count == 0)
                     return;
 
                 int windowId = Util.GetValueOfInt(ds2.Tables[0].Rows[0]["AD_Window_ID"]);
@@ -882,7 +894,7 @@ namespace ModelLibrary.Classes
                     para.setParameter("AD_Table_ID", AD_Table_ID);
                     if (!para.Save())
                     {
-                        String msg = "No AD_Table_ID Parameter added";  //  not translated
+                        String msg = Msg.GetMsg(ctx, "VAS_AIParamNotAdded") + ": AD_Table_ID";
                         if (log != null)
                             log.Log(Level.SEVERE, msg);
                         return "";
@@ -891,7 +903,7 @@ namespace ModelLibrary.Classes
                     para.setParameter("AD_Tab_ID", AD_Tab_ID);
                     if (!para.Save())
                     {
-                        String msg = "No AD_Tab_ID Parameter added";  //  not translated
+                        String msg = Msg.GetMsg(ctx, "VAS_AIParamNotAdded") + ": AD_Tab_ID";
                         if (log != null)
                             log.Log(Level.SEVERE, msg);
                         return "";
@@ -900,7 +912,7 @@ namespace ModelLibrary.Classes
                     para.setParameter("record_ID", Record_ID);
                     if (!para.Save())
                     {
-                        String msg = "No record_ID Parameter added";  //  not translated
+                        String msg = Msg.GetMsg(ctx, "VAS_AIParamNotAdded") + ": record_ID";
                         if (log != null)
                             log.Log(Level.SEVERE, msg);
                         return "";
@@ -909,7 +921,7 @@ namespace ModelLibrary.Classes
                     para.setParameter("IsUpdate", "true");
                     if (!para.Save())
                     {
-                        String msg = "No IsUpdate Parameter added";  //  not translated
+                        String msg = Msg.GetMsg(ctx, "VAS_AIParamNotAdded") + ": IsUpdate";
                         if (log != null)
                             log.Log(Level.SEVERE, msg);
                         return "";
@@ -918,7 +930,7 @@ namespace ModelLibrary.Classes
                     para.setParameter("HasRecordTrx", "false");
                     if (!para.Save())
                     {
-                        String msg = "No HasRecordTrx Parameter added";  //  not translated
+                        String msg = Msg.GetMsg(ctx, "VAS_AIParamNotAdded") + ": HasRecordTrx";
                         if (log != null)
                             log.Log(Level.SEVERE, msg);
                         return "";
@@ -1006,13 +1018,13 @@ namespace ModelLibrary.Classes
                     //objAttachMetaData.SetRecord_ID(wlink.GetRecord_ID());
                     if (!objAttachMetaData.Save())
                     {
-                        log.SaveError("Document Not Saved", "Meta data");
+                        log.SaveError("", Msg.GetMsg(ctx, "VAS_CopyDmsMetaDataFailed"));
                     }
 
                 }
                 else
                 {
-                    log.SaveError("Document Not Saved", "Wlink data");
+                    log.SaveError("", Msg.GetMsg(ctx, "VAS_CopyDmsLinkFailed"));
                 }
             }
 

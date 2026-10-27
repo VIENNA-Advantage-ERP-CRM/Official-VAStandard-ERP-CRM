@@ -31,6 +31,10 @@ using ViennaAdvantage.Model;
 *   - The lead.SetC_Project_ID(...) back-link is replaced with a guarded write to
 *     the lead's VAS_Opportunity_ID column (if present); C_Project_ID is a project
 *     foreign key and must not hold an opportunity id.
+*
+* VAI052 26-Oct-26 : Error handling - added prospect-not-found guard, the failed
+*     opportunity save now reports the underlying save error (GetRetrievedError), and
+*     every lead/prospect save is checked and a failure is returned with its VAS_ProspectToOpp* message.
 */
 namespace ModelLibrary.Process
 {
@@ -49,6 +53,10 @@ namespace ModelLibrary.Process
         protected override string DoIt()
         {
             X_C_BPartner partner = new X_C_BPartner(GetCtx(), GetRecord_ID(), null);
+            if (GetRecord_ID() == 0 || partner.Get_ID() != GetRecord_ID())
+            {
+                return Msg.GetMsg(GetCtx(), "VAS_ProspectToOppProspectNotFound");
+            }
             string _retVal = "";
             string _sql = $@"SELECT C_Lead_ID FROM C_Lead Where Ref_BPartner_ID={GetRecord_ID()}  AND IsActive = 'Y'";
             DataSet ds = DB.ExecuteDataset(_sql.ToString());
@@ -100,18 +108,24 @@ namespace ModelLibrary.Process
                         lead.Set_Value("VAS_Opportunity_ID", opp.GetVAS_Opportunity_ID());
                     }
                     lead.SetProcessed(true);
-                    lead.Save();
+                    if (!lead.Save())
+                    {
+                        return GetRetrievedError(lead, "VAS_ProspectToOppLeadNotSaved");
+                    }
                     // Send Lead Data to Knowledge Base
                     VAS_CommonMethod.SendInfoToAI(lead.Get_Table_ID(), lead.Get_ID(), Get_Trx(), GetCtx());
                     partner.SetCreateProject("Y");
                     // Send opp Data to Knowledge Base
                     VAS_CommonMethod.SendInfoToAI(opp.Get_Table_ID(), opp.Get_ID(), Get_Trx(), GetCtx());
-                    partner.Save();
+                    if (!partner.Save())
+                    {
+                        return GetRetrievedError(partner, "VAS_ProspectToOppProspectNotSaved");
+                    }
                     _retVal = Msg.GetMsg(GetCtx(), "OpprtunityGenerateDone");
                 }
                 else
                 {
-                    _retVal = Msg.GetMsg(GetCtx(), "OpprtunityGenerateNotDone");
+                    _retVal = GetRetrievedError(opp, "OpprtunityGenerateNotDone");
                 }
             }
             else
@@ -148,12 +162,15 @@ namespace ModelLibrary.Process
                     partner.SetCreateProject("Y");
                     // Send opp Data to Knowledge Base
                     VAS_CommonMethod.SendInfoToAI(opp.Get_Table_ID(), opp.Get_ID(), Get_Trx(), GetCtx());
-                    partner.Save();
+                    if (!partner.Save())
+                    {
+                        return GetRetrievedError(partner, "VAS_ProspectToOppProspectNotSaved");
+                    }
                     _retVal = Msg.GetMsg(GetCtx(), "OpprtunityGenerateDone");
                 }
                 else
                 {
-                    _retVal = Msg.GetMsg(GetCtx(), "OpprtunityGenerateNotDone");
+                    _retVal = GetRetrievedError(opp, "OpprtunityGenerateNotDone");
                 }
             }
             return _retVal;
