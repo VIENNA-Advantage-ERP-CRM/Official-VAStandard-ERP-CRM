@@ -17,6 +17,7 @@
         var widgetID       = null;
         var currentCtrId   = 0;
         var pendingXhr     = {};
+        var actionBusy     = false;   // a header action (schedule / invoice / renew) is running
 
         // Schedules client-side pagination (6 rows per page as per HTML design)
         var SCHED_PER_PAGE = 6;
@@ -47,11 +48,29 @@
                 .replace(/'/g, '&#039;');
         }
 
-        function msg(k) {
+        function msg(k, fallback) {
             var v = (VIS && VIS.Msg && VIS.Msg.getMsg) ? VIS.Msg.getMsg(k) : '';
-            // VIS.Msg.getMsg returns '[KeyName]' when AD_Message row is missing — fall back to key
-            if (!v || (v.charAt(0) === '[' && v.charAt(v.length - 1) === ']')) return k;
+            // VIS.Msg.getMsg returns '[KeyName]' when AD_Message row is missing — fall back to the
+            // optional fallback text, otherwise to the key
+            if (!v || (v.charAt(0) === '[' && v.charAt(v.length - 1) === ']')) return fallback || k;
             return v;
+        }
+
+        // One reference value for the contract: the linked contract's document number
+        // (Ref_Contract_ID), or the stored RefContract text when there is no link.
+        function contractReferenceText(data) {
+            return (data && (data.refContractDocumentNo || data.refContract)) || '';
+        }
+
+        // Business partner wording follows the contract type: AP contracts are with a Vendor,
+        // everything else (AR) with a Customer.
+        function partnerLabels(data) {
+            var isAP = !!data && data.contractType === 'AP';
+            return {
+                role:    isAP ? msg('VAS_290_Vendor', 'Vendor')                : msg('VAS_290_Customer'),
+                details: isAP ? msg('VAS_290_VendorDetails', 'Vendor Details') : msg('VAS_290_CustomerDetails'),
+                name:    isAP ? msg('VAS_290_VendorName', 'Vendor Name')       : msg('VAS_290_CustomerName')
+            };
         }
 
         function toNum(v) { var n = Number(v); return isFinite(n) ? n : 0; }
@@ -117,7 +136,18 @@
             if (count > 0 && invoicedCount === count) status = 'VAS_290_FullyBilled';
             else if (invoicedCount > 0)               status = 'VAS_290_PartiallyBilled';
             else if (count > 0)                       status = 'VAS_290_NotYetBilled';
-            return { count: count, invoicedCount: invoicedCount, status: status };
+
+            // Total invoiced = sum of the invoices that were generated for the schedules: each
+            // invoice's own grand total (the schedule's amount when the invoice amount is not
+            // available). Voided / reversed invoices are not counted.
+            var invoicedTotal = 0;
+            for (var i = 0; schedules && i < schedules.length; i++) {
+                var r = schedules[i];
+                if (r.cInvoiceId == null || r.cInvoiceId === 0) continue;
+                if (r.invoiceDocStatus === 'VO' || r.invoiceDocStatus === 'RE') continue;
+                invoicedTotal += toNum(r.invoiceGrandTotal != null ? r.invoiceGrandTotal : r.grandTotal);
+            }
+            return { count: count, invoicedCount: invoicedCount, invoicedTotal: invoicedTotal, status: status };
         }
 
         // ── SVG icon helpers (inline SVG for zero dependency) ──────────────────
@@ -345,16 +375,16 @@
                 validityStr = Math.max(0, mths) + ' ' + msg('VAS_290_Months');
             }
 
-            var statusLabel = esc(data.docStatusLabel || data.docStatus || '');
-            var statusCls   = (data.docStatus === 'CO' || data.processed === true || data.processed === 'Y') ? 'cs' : 'ci';
-            var readOnlyChip = isProcessed
-                ? '<span class="vas_290_sc-chip ci" style="margin-left:0.5em;">' + esc(msg('VAS_290_ReadOnly')) + '</span>'
-                : '';
+            // Single status chip driven by Processed: Drafted until processed, then Processed.
+            // (The separate "Read Only" chip is dropped - Processed already implies it.)
+            var statusLabel = esc(isProcessed ? msg('VAS_290_Processed', 'Processed') : msg('VAS_290_Drafted', 'Drafted'));
+            var statusCls   = isProcessed ? 'cs' : 'ci';
 
             var contractTypeTxt = esc(data.contractTypeLabel || (data.contractType === 'AR'
                 ? msg('VAS_290_AccountsReceivable') : msg('VAS_290_AccountsPayable')));
 
             var customerLoc = esc(data.billingLocationName || data.billingLocationAddress || '');
+            var partnerLbl  = partnerLabels(data);
 
             var html =
                 '<div class="vas_290_sc-identity">' +
@@ -362,7 +392,7 @@
                         '<div style="min-width:0;">' +
                             '<p class="vas_290_sc-hero-no">' + esc(data.documentNo || '') + '</p>' +
                             '<p class="vas_290_sc-hero-ref">' +
-                                esc(msg('VAS_290_ContractID')) + ' ' + esc(String(data.id || '')) +
+                                esc(msg('VAS_290_ContractReference')) + ': ' + esc(contractReferenceText(data) || '—') +
                                 (data.orderDocumentNo ? ' · ' + esc(data.orderDocumentNo) : '') +
                             '</p>' +
                             '<div class="vas_290_sc-hero-val">' +
@@ -371,13 +401,12 @@
                             '</div>' +
                         '</div>' +
                         '<div>' +
-                            '<p class="vas_290_sc-hero-cust__lbl">' + esc(msg('VAS_290_Customer')) + '</p>' +
+                            '<p class="vas_290_sc-hero-cust__lbl">' + esc(partnerLbl.role) + '</p>' +
                             '<p class="vas_290_sc-hero-cust__name" title="' + esc(data.bPartnerName || '') + '">' + esc(data.bPartnerName || '—') + '</p>' +
                             (customerLoc ? '<p class="vas_290_sc-hero-cust__loc">' + svgIcon('pin') + '<span>' + customerLoc + '</span></p>' : '') +
                         '</div>' +
                         '<div>' +
                             '<span class="vas_290_sc-chip ' + statusCls + '">' + statusLabel + '</span>' +
-                            readOnlyChip +
                         '</div>' +
                     '</div>' +
                     '<div class="vas_290_sc-frows">' +
@@ -386,6 +415,7 @@
                         frowPlain(msg('VAS_290_Validity'),     validityStr) +
                         frowPlain(msg('VAS_290_ContractType'), contractTypeTxt) +
                     '</div>' +
+                    actionButtonsHtml(data) +
                 '</div>';
 
             setIdentityHtml(html);
@@ -433,13 +463,136 @@
             lblEl.textContent = displayLabel;
         }
 
+        // ── Header actions: Generate Schedule / Generate Invoice / Renew ─────────
+        // Availability comes from the server (data.canGenerateSchedule / canGenerateInvoice /
+        // canRenew, derived from ScheduleContract, RenewContract and RenewalType); the server
+        // re-checks the same rules when the action is run, so the buttons only mirror them.
+        //   Generate Schedule : shown only while ScheduleContract = N
+        //   Generate Invoice  : shown once ScheduleContract = Y
+        //   Renew             : always shown, enabled only when ScheduleContract = Y,
+        //                       RenewContract = N and RenewalType is not Automatic
+        function actionButtonsHtml(data) {
+            var h = '';
+            if (data.canGenerateSchedule) {
+                h += '<button type="button" class="vas_290_sc-btn bs" data-sc-action="GenerateSchedule">' +
+                        svgIcon('refresh') + esc(msg('VAS_290_GenerateSchedule', 'Generate Schedule')) +
+                     '</button>';
+            }
+            if (data.canGenerateInvoice) {
+                h += '<button type="button" class="vas_290_sc-btn bs" data-sc-action="GenerateInvoice">' +
+                        svgIcon('file') + esc(msg('VAS_290_GenerateInvoice', 'Generate Invoice')) +
+                     '</button>';
+            }
+            h += '<button type="button" class="vas_290_sc-btn bs" data-sc-action="Renew"' +
+                    (data.canRenew ? '' : ' disabled aria-disabled="true"') + '>' +
+                    svgIcon('cal') + esc(msg('VAS_290_Renew', 'Renew')) +
+                 '</button>';
+            return '<div class="vas_290_sc-id-actions">' + h + '</div>';
+        }
+
+        function showInfo(text) {
+            if (window.VIS && VIS.ADialog && VIS.ADialog.info) VIS.ADialog.info('', '', text);
+        }
+
+        function showError(text) {
+            if (window.VIS && VIS.ADialog && VIS.ADialog.error) VIS.ADialog.error('', '', text);
+        }
+
+        function setActionBusy(busy) {
+            actionBusy = busy;
+            if ($root) $root.find('[data-sc-action]').prop('disabled', busy);
+        }
+
+        // Repaint the hosting window's CURRENT record so the header fields the process changed
+        // (Processed, Schedule Contract, Renew Contract, ...) are not stale in the form.
+        function refreshHostTab() {
+            try {
+                var t = $self.curTab;
+                if (!t) return;
+                if (typeof t.dataRefresh === 'function') { t.dataRefresh(); return; }
+                if (typeof t.dataRefreshAll === 'function') t.dataRefreshAll();
+            } catch (e) { if (window.console) console.log(e); }
+        }
+
+        // Re-read the header (and, through afterHeaderLoad, the schedules) for the same contract.
+        // loadContract() is not used because it ignores a reload of the already-loaded contract.
+        function reloadPanel() {
+            if (!currentCtrId) return;
+            abortAll();
+            fetchSection('header', 'GetContractOverview', {}, afterHeaderLoad);
+        }
+
+        function headerActionAllowed(action, data) {
+            if (!data || data.error || !data.id) return false;
+            if (action === 'GenerateSchedule') return !!data.canGenerateSchedule;
+            if (action === 'GenerateInvoice')  return !!data.canGenerateInvoice;
+            if (action === 'Renew')            return !!data.canRenew;
+            return false;
+        }
+
+        function executeHeaderAction(action, contractId) {
+            setActionBusy(true);
+            $.ajax({
+                url:   VIS.Application.contextUrl + 'VAS/VAS_290_ServiceContractRightPanel/RunContractAction',
+                type:  'POST',
+                data:  { contractId: contractId, actionName: action },
+                async: true,
+                success: function (raw) {
+                    var res = null;
+                    try { res = (typeof raw === 'string') ? jQuery.parseJSON(raw) : raw; } catch (e) { res = null; }
+                    setActionBusy(false);
+                    if (res && res.success) {
+                        refreshHostTab();
+                        reloadPanel();
+                        showInfo(res.message || msg('VAS_290_ActionDone', 'The action completed successfully.'));
+                    } else {
+                        // Reload as well: a refused action usually means the panel was stale.
+                        reloadPanel();
+                        showError((res && res.message) || msg('VAS_290_ActionFailed', 'The action failed.'));
+                    }
+                },
+                error: function () {
+                    setActionBusy(false);
+                    showError(msg('VAS_290_ActionFailed', 'The action failed.'));
+                }
+            });
+        }
+
+        function runHeaderAction(action) {
+            var d = sectionState.header.data;
+            if (actionBusy || !headerActionAllowed(action, d)) return;
+
+            var question;
+            if (action === 'GenerateSchedule') {
+                question = msg('VAS_290_ConfirmGenerateSchedule', 'Generate the invoice schedule for this contract?');
+            } else if (action === 'GenerateInvoice') {
+                question = msg('VAS_290_ConfirmGenerateInvoice', 'Generate invoices for the schedules that are due on this contract?');
+            } else {
+                question = msg('VAS_290_ConfirmRenew', 'Renew this contract?');
+            }
+
+            // Platform confirmation dialog, with the question passed as resolved text so an
+            // unseeded message key can never surface in the dialog.
+            if (window.VIS && VIS.ADialog && typeof VIS.ADialog.confirm === 'function') {
+                VIS.ADialog.confirm('', true, question, msg('VAS_290_Confirm', 'Confirm'), function (ok) {
+                    if (ok) executeHeaderAction(action, d.id);
+                });
+            } else {
+                showError(question);
+            }
+        }
+
         // ── Zoom to Invoice window ────────────────────────────────────────────
-        // Resolution order mirrors SIT01_001:
-        //   1. Backend GetWindowIdByTable — reads AD_Table.AD_Window_ID (canonical).
-        //      Preferred because ZoomTarget can pick the wrong window when multiple
-        //      VA windows share the same underlying table.
-        //   2. VIS.ZoomTarget.getZoomAD_Window_ID — client-side fallback.
-        //   3. VIS.viewManager.startWindow — opens the resolved window.
+        // AR contracts open the AR invoice window, AP contracts the AP (vendor) one. The window
+        // is resolved by name through the shared VAS.ZoomUtil (new VAS_* window name first, then
+        // the standard one), as the other VAS panels do. The old table-level lookup
+        // (AD_Table.AD_Window_ID) always returned the AR window, whatever the contract type.
+        //   Fallback: VIS.ZoomTarget.getZoomAD_Window_ID with the sales flag.
+        var INVOICE_WINDOW_AR     = 'VAS_ARInvoice';
+        var INVOICE_WINDOW_AR_OLD = 'Invoice (Customer)';
+        var INVOICE_WINDOW_AP     = 'VAS_APInvoice';
+        var INVOICE_WINDOW_AP_OLD = 'Invoice (Vendor)';
+
         function openInvoice(invoiceId, isSOTrx) {
             if (!invoiceId || +invoiceId <= 0 || !window.VIS) return;
 
@@ -460,18 +613,17 @@
                 startWindow(wid);
             }
 
-            $.ajax({
-                url:  VIS.Application.contextUrl + 'VAS/VAS_290_ServiceContractRightPanel/GetWindowIdByTable',
-                type: 'POST',
-                data: { fields: 'C_Invoice' },
-                async: true,
-                success: function (raw) {
-                    var id = 0;
-                    try { id = parseInt(typeof raw === 'string' ? JSON.parse(raw) : raw, 10) || 0; } catch (e) {}
-                    if (id > 0) { startWindow(id); } else { zoomFallback(); }
-                },
-                error: function () { zoomFallback(); }
-            });
+            if (window.VAS && VAS.ZoomUtil && typeof VAS.ZoomUtil.zoomToRecord === 'function') {
+                VAS.ZoomUtil.zoomToRecord('C_Invoice_ID', +invoiceId, 0,
+                        isSOTrx ? INVOICE_WINDOW_AR     : INVOICE_WINDOW_AP,
+                        isSOTrx ? INVOICE_WINDOW_AR_OLD : INVOICE_WINDOW_AP_OLD)
+                    .done(function (usedWindowId) {
+                        // 0 = no window found by name, so nothing opened: try the framework lookup
+                        if (!usedWindowId) zoomFallback();
+                    });
+            } else {
+                zoomFallback();
+            }
         }
 
         // ── Render all sections from header data ──────────────────────────────
@@ -488,9 +640,15 @@
         // ── Section 2: Customer Details ───────────────────────────────────────
         function renderCustomerSection(data) {
             var ccy  = esc(data.currencyIsoCode || '');
+            var partnerLbl = partnerLabels(data);
+
+            // Section title was drawn before the data (and so the contract type) was known
+            var titleEl = $root ? $root.find('#' + secHeadId('customer') + ' .vas_290_sc-sec__title')[0] : null;
+            if (titleEl) titleEl.innerHTML = svgIcon('user') + esc(partnerLbl.details);
+
             var body =
                 '<div class="vas_290_sc-frows">' +
-                    frowPlain(msg('VAS_290_CustomerName'), data.bPartnerName) +
+                    frowPlain(partnerLbl.name, data.bPartnerName) +
                     frowPlain(msg('VAS_290_Location'),     data.billingLocationName || data.billingLocationAddress || '—') +
                     frowPlain(msg('VAS_290_AccountType'),  data.contractTypeLabel || (data.contractType === 'AR' ? msg('VAS_290_AccountsReceivable') : msg('VAS_290_AccountsPayable'))) +
                     frowPlain(msg('VAS_290_Currency'),     (data.currencyIsoCode ? data.currencyIsoCode + (data.currencySymbol ? ' (' + data.currencySymbol + ')' : '') : '—')) +
@@ -504,48 +662,46 @@
 
         // ── Section 3: Contract Details ───────────────────────────────────────
         function renderContractDetailsSection(data) {
+            // One reference field, shared with the hero line (see contractReferenceText).
+            var refContractTxt = contractReferenceText(data);
+
             var body =
                 '<div class="vas_290_sc-frows">' +
                     frowPlain(msg('VAS_290_ContractType'),      data.contractTypeLabel || (data.contractType === 'AR' ? msg('VAS_290_AccountsReceivable') : msg('VAS_290_AccountsPayable'))) +
-                    frowPlain(msg('VAS_290_ContractReference'),  data.refContract) +
-                    (data.refContractDocumentNo ? frowPlain(msg('VAS_290_ReferencedContract'), data.refContractDocumentNo) : '') +
+                    frowPlain(msg('VAS_290_ContractReference'),  refContractTxt) +
                     frowPlain(msg('VAS_290_StartDate'),          fmtDate(data.startDate)) +
                     frowPlain(msg('VAS_290_EndDate'),            fmtDate(data.endDate)) +
                     frowPlain(msg('VAS_290_SourceOrder'),        data.orderDocumentNo) +
-                    frowPlain(msg('VAS_290_OrderLine'),          data.orderLineNo ? (data.orderLineNo + (data.orderDescription ? ' — ' + data.orderDescription : '')) : '—') +
+                    frowPlain(msg('VAS_290_OrderLine'),          data.orderLineDisplay || (data.orderLineNo ? (data.orderLineNo + (data.orderDescription ? ' — ' + data.orderDescription : '')) : '—')) +
                     frow(msg('VAS_290_Description'), esc(data.description || '—'), '', 'span-full stacked') +
                 '</div>';
 
             setSecBodyHtml('contractDetails', body);
-            updateSectionSum('contractDetails', esc(data.refContract || ''));
+            updateSectionSum('contractDetails', esc(refContractTxt));
         }
 
         // ── Section 4: Product and Pricing ────────────────────────────────────
         function renderProductPricingSection(data) {
             var ccy  = data.currencyIsoCode;
             var prec = (data.currencyPrecision != null) ? parseInt(data.currencyPrecision, 10) : 2;
-            var isMonthly = String(data.frequencyName || '').toLowerCase().indexOf('month') >= 0;
-
-            var contractValueLabel = isMonthly ? msg('VAS_290_PerSchedulePricingValue') :msg('VAS_290_TotalContractValue');
-
-            //var contractValueLabel = msg('VAS_290_ContractTotalValue');
-
+            // Per Schedule Contract Value = what one schedule is worth: line net amount + tax +
+            // surcharge, i.e. the contract's grand total (the same figure as each schedule's Total).
             var body =
                 '<div class="vas_290_sc-frows">' +
                     frowPlain(msg('VAS_290_Product'),        data.productName, '', 'span-full') +
                     frowPlain(msg('VAS_290_UnitOfMeasure'),  data.uomName) +
                     frowPlain(msg('VAS_290_Attribute'),      data.attributeDisplay) +
-                    frowPlain(msg('VAS_290_UnitPrice'),      fmtMoney(data.priceActual,    ccy, prec)) +
                     frowPlain(msg('VAS_290_Price'),          fmtMoney(data.priceEntered,   ccy, prec)) +
                     frowPlain(msg('VAS_290_ListPrice'),      fmtMoney(data.priceListAmount, ccy, prec)) +
                     frowPlain(msg('VAS_290_Discount'),       (data.discount != null ? toNum(data.discount).toFixed(2) + '%' : '—')) +
-                    frowPlain(msg('VAS_290_TaxAmount'),      fmtMoney(data.taxAmt,         ccy, prec)) +
                     frowPlain(msg('VAS_290_LineNetAmount'),  fmtMoney(data.lineNetAmt,      ccy, prec)) +
-                    frowPlain(contractValueLabel,            fmtMoney(data.lineNetAmt, ccy, prec), 'va', 'span-full') +
+                    frowPlain(msg('VAS_290_TaxAmount'),      fmtMoney(data.taxAmt,         ccy, prec)) +
+                    frowPlain(msg('VAS_290_SurchargeAmount', 'Surcharge Amount'), fmtMoney(data.surchargeAmt, ccy, prec)) +
+                    frowPlain(msg('VAS_290_PerScheduleContractValue', 'Per Schedule Contract Value'), fmtMoney(data.grandTotal, ccy, prec), 'va', 'span-full') +
                 '</div>';
 
             setSecBodyHtml('productPricing', body);
-            updateSectionSum('productPricing', esc(fmtMoney(data.priceActual, ccy, prec)));
+            updateSectionSum('productPricing', esc(fmtMoney(data.grandTotal, ccy, prec)));
         }
 
         // ── Section 5: Billing ────────────────────────────────────────────────
@@ -556,6 +712,13 @@
                 ? (sectionState.schedules.data.items || []) : [];
             var summary   = getBillingSummary(schedules);
 
+            // Total invoiced: the sum of the invoices generated for the contract, read from the
+            // invoices themselves (server). Only if that is unavailable, fall back to the invoices
+            // linked from the schedules; '—' until those are loaded so a wrong 0 never flashes.
+            var invoicedTxt = (data.invoicedTotal != null)
+                ? fmtMoney(data.invoicedTotal, ccy, prec)
+                : (sectionState.schedules.loaded ? fmtMoney(summary.invoicedTotal, ccy, prec) : '—');
+
             var statusCls = summary.status === 'VAS_290_FullyBilled' ? 'cs'
                 : summary.status === 'VAS_290_PartiallyBilled' ? 'cs'
                 : summary.status === 'VAS_290_NotYetBilled' ? 'cw'
@@ -565,7 +728,7 @@
                 '<div class="vas_290_sc-frows">' +
                     frowPlain(msg('VAS_290_BillingFrequency'), data.frequencyName || '—') +
                     frowPlain(msg('VAS_290_NoOfSchedules'),    String(summary.count)) +
-                    frowPlain(msg('VAS_290_TotalInvoiced'),    fmtMoney(data.grandTotal, ccy, prec)) +
+                    frowPlain(msg('VAS_290_TotalInvoiced'),    invoicedTxt) +
                     frow(msg('VAS_290_InvoiceStatus'), chip(summary.status, statusCls)) +
                 '</div>';
 
@@ -581,15 +744,16 @@
                 : pendingMonths + ' ' + msg('VAS_290_Months');
 
             var renewalCls = (data.renewalTypeLabel || '').toLowerCase().indexOf('auto') >= 0 ? 'vs' : '';
-            var cancelDateTxt = data.cancellationDate ? fmtDate(data.cancellationDate) : msg('VAS_290_NotCancelled');
-            var cancelDateCls = data.cancellationDate ? '' : 'vm';
+
+            // The notice period only applies to automatic renewal, so it is hidden for Manual
+            // (compared on the code, not the translated label).
+            var isManualRenewal = data.renewalType === 'M';
 
             var body =
                 '<div class="vas_290_sc-frows">' +
                     frow(msg('VAS_290_RenewalType'),    esc(data.renewalTypeLabel || data.renewalType || '—'), renewalCls) +
                     frowPlain(msg('VAS_290_PendingMonths'),  pendingTxt) +
-                    frowPlain(msg('VAS_290_NoticeDays'),     data.cancelBeforeDays != null ? String(data.cancelBeforeDays) : '—') +
-                    frow(msg('VAS_290_CancellationDate'), esc(cancelDateTxt), cancelDateCls) +
+                    (isManualRenewal ? '' : frowPlain(msg('VAS_290_NoticeDays'), data.cancelBeforeDays != null ? String(data.cancelBeforeDays) : '—')) +
                 '</div>';
 
             setSecBodyHtml('renewal', body);
@@ -610,8 +774,19 @@
             var d     = sectionState.header.data;
             var ccy   = d ? d.currencyIsoCode : '';
             var prec  = (d && d.currencyPrecision != null) ? parseInt(d.currencyPrecision, 10) : 2;
-            var total = d ? toNum(d.grandTotal) : 0;
-            var tax   = d ? toNum(d.taxAmt)     : 0;
+            // Footer totals follow the schedules that were created (every page, not only the
+            // visible one) - not the contract header, whose amounts are for a single period.
+            var total     = 0;
+            var tax       = 0;
+            var surcharge = 0;
+            for (var s = 0; s < items.length; s++) {
+                total     += toNum(items[s].grandTotal);
+                tax       += toNum(items[s].taxAmt);
+                surcharge += toNum(items[s].surchargeAmt);
+            }
+            // The Surcharge column (and footer figure) only appears when a schedule has one.
+            var hasSurcharge = surcharge > 0;
+            var surCls       = hasSurcharge ? ' vas_290_sc-dg--sur' : '';
 
             if (items.length === 0) {
                 setSecBodyHtml('schedule', '<div class="vas_290_sc-empty-row">' + esc(msg('VAS_290_NoSchedulesAvailable')) + '</div>');
@@ -636,12 +811,13 @@
             var statusMsgKey = { Invoiced: 'VAS_290_Invoiced', Due: 'VAS_290_Due', Scheduled: 'VAS_290_Scheduled' };
 
             var head =
-                '<div class="vas_290_sc-dg-head">' +
+                '<div class="vas_290_sc-dg-head' + surCls + '">' +
                     '<span class="vas_290_sc-cell"></span>' +
                     '<span class="vas_290_sc-cell">' + esc(msg('VAS_290_PeriodStart')) + '</span>' +
                     '<span class="vas_290_sc-cell">' + esc(msg('VAS_290_PeriodEnd')) + '</span>' +
                     '<span class="vas_290_sc-cell rt">' + esc(msg('VAS_290_Amount')) + '</span>' +
                     '<span class="vas_290_sc-cell rt">' + esc(msg('VAS_290_Tax')) + '</span>' +
+                    (hasSurcharge ? '<span class="vas_290_sc-cell rt">' + esc(msg('VAS_290_Surcharge', 'Surcharge')) + '</span>' : '') +
                     '<span class="vas_290_sc-cell rt">' + esc(msg('VAS_290_Total')) + '</span>' +
                     '<span class="vas_290_sc-cell">' + esc(msg('VAS_290_BillingStatus')) + '</span>' +
                 '</div>';
@@ -656,6 +832,8 @@
                 var ico = statusIcon[st]  || ['cal', 't-info'];
                 var cls = statusCls[st]   || 'cn';
                 var lbl = statusMsgKey[st] || 'VAS_290_Scheduled';
+                // Amount column = taxable amount (Total - Tax - Surcharge, computed server-side)
+                var taxable = (r.taxableAmt != null) ? r.taxableAmt : r.totalAmt;
 
                 // Invoiced rows are clickable — they carry the invoice ID and open C_Invoice
                 var isInvoiced  = (st === 'Invoiced' && r.cInvoiceId && +r.cInvoiceId > 0);
@@ -664,7 +842,7 @@
                       ' tabindex="0" role="button" aria-label="' + esc(msg(lbl)) +
                       (r.invoiceDocumentNo ? ' ' + r.invoiceDocumentNo : '') + '"'
                     : '';
-                var rowCls = 'vas_290_sc-dg-row' + (isInvoiced ? ' vas_290_sc-dg-row--link' : '');
+                var rowCls = 'vas_290_sc-dg-row' + (isInvoiced ? ' vas_290_sc-dg-row--link' : '') + surCls;
 
                 // Status chip: for invoiced rows append a tiny external-link icon
                 var chipHtml = chip(lbl, cls);
@@ -677,8 +855,9 @@
                         '<span class="vas_290_sc-cell ico ' + ico[1] + '" title="' + esc(msg(lbl)) + '">' + svgIcon(ico[0]) + '</span>' +
                         '<span class="vas_290_sc-cell cp" title="' + esc(fmtDate(r.fromDate)) + '">' + esc(fmtDate(r.fromDate)) + '</span>' +
                         '<span class="vas_290_sc-cell" title="' + esc(fmtDate(r.endDate)) + '">'  + esc(fmtDate(r.endDate))  + '</span>' +
-                        '<span class="vas_290_sc-cell rt" title="' + esc(fmtMoney(r.totalAmt,   ccy, prec)) + '">' + esc(fmtMoney(r.totalAmt,   ccy, prec)) + '</span>' +
+                        '<span class="vas_290_sc-cell rt" title="' + esc(fmtMoney(taxable, ccy, prec)) + '">' + esc(fmtMoney(taxable, ccy, prec)) + '</span>' +
                         '<span class="vas_290_sc-cell rt" title="' + esc(fmtMoney(r.taxAmt,     ccy, prec)) + '">' + esc(fmtMoney(r.taxAmt,     ccy, prec)) + '</span>' +
+                        (hasSurcharge ? '<span class="vas_290_sc-cell rt" title="' + esc(fmtMoney(r.surchargeAmt, ccy, prec)) + '">' + esc(fmtMoney(r.surchargeAmt, ccy, prec)) + '</span>' : '') +
                         '<span class="vas_290_sc-cell rt ce" title="' + esc(fmtMoney(r.grandTotal, ccy, prec)) + '">' + esc(fmtMoney(r.grandTotal, ccy, prec)) + '</span>' +
                         '<span class="vas_290_sc-cell chc" title="' + esc(msg(lbl)) + (r.invoiceDocumentNo ? ' · ' + r.invoiceDocumentNo : '') + '">' +
                             chipHtml +
@@ -691,6 +870,7 @@
                     '<span class="vas_290_sc-dg-foot__lbl">' +
                         esc(msg('VAS_290_Total')) + ' · ' + items.length + ' ' + esc(msg('VAS_290_Schedules')) +
                         ' · ' + esc(msg('VAS_290_Tax')) + ' ' + esc(fmtMoney(tax, ccy, prec)) +
+                        (hasSurcharge ? ' · ' + esc(msg('VAS_290_Surcharge', 'Surcharge')) + ' ' + esc(fmtMoney(surcharge, ccy, prec)) : '') +
                     '</span>' +
                     '<span class="vas_290_sc-dg-foot__total">' + esc(fmtMoney(total, ccy, prec)) + '</span>' +
                 '</div>';
@@ -856,6 +1036,14 @@
                 var invoiceId = +$(this).attr('data-open-invoice') || 0;
                 var isSOTrx   = $(this).attr('data-sotrx') === 'Y';
                 openInvoice(invoiceId, isSOTrx);
+            });
+
+            // Delegated click for the header action buttons - wired once on $root so it
+            // survives every re-render of the hero card.
+            $root.on('click', '[data-sc-action]', function (e) {
+                e.stopPropagation();
+                if (this.disabled) return;
+                runHeaderAction($(this).attr('data-sc-action'));
             });
 
             // Initial empty state
