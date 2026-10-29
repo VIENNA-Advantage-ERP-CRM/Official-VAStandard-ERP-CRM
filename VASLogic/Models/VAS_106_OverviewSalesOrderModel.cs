@@ -1830,6 +1830,7 @@ namespace VASLogic.Models
                                   inv.Created,
                                   inv.Updated,
                                   COALESCE(inv.GrandTotal, 0) AS GrandTotal,
+                                  COALESCE(inv.TotalLines, 0) AS SubTotal,
                                   inv.IsPaid
                                 FROM C_Invoice inv
                                 WHERE inv.C_Order_ID = @C_Order_ID
@@ -1855,7 +1856,8 @@ namespace VASLogic.Models
                     iv.DateInvoiced = Stamp(r["DateInvoiced"]);
                     iv.Created      = Stamp(r["Created"]);
                     iv.GrandTotal   = Util.GetValueOfDecimal(r["GrandTotal"]);
-                    iv.IsPaid       = Util.GetValueOfString(r["IsPaid"]) == "Y";
+                    iv.SubTotal     = Util.GetValueOfDecimal(r["SubTotal"]);
+                    iv.IsPaid      = Util.GetValueOfString(r["IsPaid"]) == "Y";
                     iv.CompletedDate = CompletedOn(stamps, iv.C_Invoice_ID, iv.DocStatus,
                                                    Stamp(r["Updated"]));
                     rows.Add(iv);
@@ -3518,6 +3520,8 @@ namespace VASLogic.Models
             /// The Invoiced stage reports the LATEST of these.</summary>
             public DateTime? CompletedDate { get; set; }
             public decimal  GrandTotal   { get; set; }
+            /// <summary>C_Invoice.TotalLines - the invoice subtotal, before tax.</summary>
+            public decimal  SubTotal     { get; set; }
             public bool     IsPaid       { get; set; }
         }
 
