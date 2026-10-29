@@ -213,9 +213,11 @@ namespace VAS.Controllers
             "THEN COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) ELSE 0 END";
 
         // Sr 8.13: undelivered quantity in the line's selected UOM (scaled by QtyEntered / QtyOrdered).
+        // ROUND: on PostgreSQL a numeric division carries a scale too large for System.Decimal
+        // ("Numeric value does not fit in a System.Decimal"), so the quotient is rounded in SQL.
         private const string PendingEnteredQtySql =
             "CASE WHEN COALESCE(ol.QtyOrdered, 0) > COALESCE(ol.QtyDelivered, 0) AND COALESCE(ol.QtyOrdered, 0) <> 0 " +
-            "THEN (COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0)) * COALESCE(ol.QtyEntered, ol.QtyOrdered) / ol.QtyOrdered ELSE 0 END";
+            "THEN ROUND((COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0)) * COALESCE(ol.QtyEntered, ol.QtyOrdered) / ol.QtyOrdered, 6) ELSE 0 END";
 
         // Sr 8.21: value of the undelivered quantity WITHOUT tax - the undelivered share
         // of the line's net amount (so discounts are respected), with the line tax taken
@@ -223,8 +225,8 @@ namespace VAS.Controllers
         // PriceActual, which carried the tax on tax-inclusive lists and counted charges.
         private const string PendingValueSql =
             "CASE WHEN COALESCE(ol.QtyOrdered, 0) > COALESCE(ol.QtyDelivered, 0) AND COALESCE(ol.QtyOrdered, 0) <> 0 " +
-            "THEN (COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0)) / ol.QtyOrdered " +
-            "* (COALESCE(ol.LineNetAmt, 0) - CASE WHEN bo.Tax_Included = 'Y' THEN COALESCE(ol.TaxAmt, 0) ELSE 0 END) ELSE 0 END";
+            "THEN ROUND((COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0)) / ol.QtyOrdered " +
+            "* (COALESCE(ol.LineNetAmt, 0) - CASE WHEN bo.Tax_Included = 'Y' THEN COALESCE(ol.TaxAmt, 0) ELSE 0 END), 6) ELSE 0 END";
 
         private SummaryResult GetSummaryData(Ctx ctx)
         {
