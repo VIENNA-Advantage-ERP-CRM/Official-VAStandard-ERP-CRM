@@ -273,20 +273,30 @@
         }
 
         // Typed date text -> yyyy-mm-dd ('' when it is not a real date). Accepts yyyy-mm-dd, dd/mm/yyyy,
-        // dd-mm-yyyy, dd.mm.yyyy and dd MMM yyyy (month typed as a name or a number).
+        // dd-mm-yyyy, dd.mm.yyyy, dd MMM yyyy and MMM dd yyyy - the month typed as a name (short or full,
+        // any case) or a number, the year as four or two digits.
         function parseDateText(txt) {
             var s = String(txt == null ? '' : txt).trim();
             if (!s) return '';
             var MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+            var monthOf = function (t) {
+                return /^\d+$/.test(t) ? +t : MONTHS.indexOf(t.substring(0, 3).toLowerCase()) + 1;
+            };
+            var yearOf = function (t) {
+                return t.length === 2 ? 2000 + (+t) : +t;
+            };
             var y, m, d;
             var iso = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s);
+            var dmy, mdy;
             if (iso) {
                 y = +iso[1]; m = +iso[2]; d = +iso[3];
+            } else if ((dmy = /^(\d{1,2})[\/\-. ]+(\d{1,2}|[A-Za-z]{3,9})[\/\-. ,]+(\d{4}|\d{2})$/.exec(s))) {
+                d = +dmy[1]; y = yearOf(dmy[3]);
+                m = monthOf(dmy[2]);
+            } else if ((mdy = /^([A-Za-z]{3,9})[\/\-. ]+(\d{1,2})[\/\-. ,]+(\d{4}|\d{2})$/.exec(s))) {
+                m = monthOf(mdy[1]); d = +mdy[2]; y = yearOf(mdy[3]);
             } else {
-                var dmy = /^(\d{1,2})[\/\-. ]+(\d{1,2}|[A-Za-z]{3,9})[\/\-. ,]+(\d{4})$/.exec(s);
-                if (!dmy) return '';
-                d = +dmy[1]; y = +dmy[3];
-                m = /^\d+$/.test(dmy[2]) ? +dmy[2] : MONTHS.indexOf(dmy[2].substring(0, 3).toLowerCase()) + 1;
+                return '';
             }
             if (!(y >= 1900 && y <= 9999 && m >= 1 && m <= 12 && d >= 1)) return '';
             var dt = new Date(y, m - 1, d);
@@ -1021,9 +1031,9 @@
             if (line.vendorId > 0 && !found) {
                 html = '<option value="' + line.vendorId + '" selected>' + esc(line.vendorName) + '</option>' + html;
             }
-            if (!(line.vendorId > 0)) {
-                html = '<option value="0" selected>' + esc(lbl('VAS_SelectVendor', 'Select Vendor')) + '</option>' + html;
-            }
+            // The "Select vendor" entry is always offered first, so the user can see it by default and
+            // pick (or clear back to) a vendor of their choice; it is the selection when the line has none.
+            html = '<option value="0"' + (line.vendorId > 0 ? '' : ' selected') + '>' + esc(lbl('VAS_SelectVendor', 'Select Vendor')) + '</option>' + html;
             return html;
         }
 

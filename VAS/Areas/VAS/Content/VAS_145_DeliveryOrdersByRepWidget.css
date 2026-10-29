@@ -88,23 +88,26 @@
     text-overflow: ellipsis;
 }
 
-/* Legend rides in the subtitle slot */
+/* Legend: own full-width row under the header; wraps instead of clipping so
+   every status and its color is always visible. */
 .MPC-dor-legend {
     display: flex;
     align-items: center;
-    gap: 0.625em;
-    margin-top: 2px;
+    flex-wrap: wrap;
+    column-gap: 0.875em;
+    row-gap: 0.25em;
+    margin-top: 0.5em;
     min-width: 0;
-    overflow: hidden;
+    flex-shrink: 0;
 }
 
 .MPC-dor-legend-item {
     display: flex;
     align-items: center;
-    gap: 0.3125em;
-    font-weight: 400;
+    gap: 0.375em;
+    font-weight: 500;
     font-size: 0.6875em;
-    color: #748494;
+    color: #5F7283;
     white-space: nowrap;
 }
 
@@ -138,8 +141,8 @@
     padding: 0.35em 0.75em;
     cursor: pointer;
     line-height: 1.2;
-    text-align: center;
-    text-align-last: center;
+    text-align: left;
+    text-align-last: left;
 }
 
 .MPC-dor-select.MPC-dor-month {
@@ -160,7 +163,10 @@
     outline-offset: 1px;
 }
 
-/* ---- Status-mix rows (5 airy rows fill the body) ---- */
+/* ---- Status-mix rows (5 airy rows fill the body) ----
+   Each row takes a fixed 1/5 of the body and rows stack from the top, so a
+   page with only 1-2 representatives sits at the top instead of being
+   vertically centered. */
 .MPC-dor-body {
     flex: 1;
     min-height: 0;
@@ -168,7 +174,12 @@
     margin-top: 0.25em;
     display: flex;
     flex-direction: column;
-    justify-content: space-evenly;
+    justify-content: flex-start;
+}
+
+.MPC-dor-body > .MPC-dor-row {
+    flex: 0 0 20%;
+    min-height: 0;
 }
 
 .MPC-dor-row {
@@ -471,6 +482,17 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.MPC-dor-do-link {
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.MPC-dor-do-link:hover,
+.MPC-dor-do-link:focus {
+    text-decoration: underline;
 }
 
 .MPC-dor-do-cell {

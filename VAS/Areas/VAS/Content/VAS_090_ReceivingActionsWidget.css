@@ -747,9 +747,13 @@
 
     /* Read-only but not greyed: the same white as the editable fields (GRN line, UOM,
        attribute set instance, target and difference). */
-    /* No grey fill on the read-only fields (QA sheet #187). */
-    .vas-ra-qc-field.disabled {
-        background: #FFFFFF;
+    /* No grey fill on the read-only fields (QA sheet #187). 29-Oct 4.2: the read-only boxes no
+       longer carry the generic "disabled" class (host/framework styles grey it out), and the rule
+       is dialog-scoped so no outer style can win over it. */
+    .vas-ra-qc-field.disabled,
+    .vas-ra-dialog .vas-ra-qc-field.vas-ra-qc-ro {
+        background: #FFFFFF !important;
+        opacity: 1;
     }
 
     .vas-ra-qc-field.active {
@@ -1412,9 +1416,24 @@
     align-content: flex-start;
 }
 
+/* 29-Oct 4.3: about the room GC_LINE_PAGE_SIZE (4) compact two-line rows take (~2.8em each plus
+   gaps), so the page height stays stable without the old spare space that pushed the pop-up
+   past its max-height and brought up a scroller. */
 .vas-ra-gc-list.vas-ra-gc-compact {
-    min-height: 14.6em;
+    min-height: 12em;
 }
+
+/* 29-Oct 4.3: the confirmation lines pop-up shows no scroller. Lines are paged (4 per page), so
+   the content is bounded; on a very short screen it can still be reached by wheel/touch, but no
+   scrollbar is drawn. */
+.vas-ra-modal-body:has(.vas-ra-gc-compact) {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+    .vas-ra-modal-body:has(.vas-ra-gc-compact)::-webkit-scrollbar {
+        display: none;
+    }
 
 .vas-ra-label-shell {
     min-height: 22em;
@@ -1442,10 +1461,14 @@
     }
 }
 
-/* #87: read-only Target Quantity. */
-.vas-ra-gc-inp[readonly] {
-    background: transparent;
-    color: #5F7283;
+/* #87: read-only Target Quantity - no grey fill (29-Oct 4.2), whatever the host styles do to
+   read-only inputs; it reads like the other read-only boxes (no underline either). */
+.vas-ra-gc-inp[readonly],
+.vas-ra-dialog .vas-ra-qc-field input.vas-ra-gc-inp[readonly] {
+    background: transparent !important;
+    border-bottom-color: transparent;
+    box-shadow: none;
+    color: #102C3F;
     cursor: default;
 }
 

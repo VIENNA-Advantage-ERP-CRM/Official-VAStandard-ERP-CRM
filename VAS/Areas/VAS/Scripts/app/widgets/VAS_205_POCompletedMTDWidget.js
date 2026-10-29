@@ -107,7 +107,8 @@
         var CURCFG = null;
         var $activeModal = null;
 
-        var PAGE_SIZE = 10;
+        // 8 rows per page - the popup tables are paged and never scroll
+        var PAGE_SIZE = 8;
         var currentTablePage = 0;
         var currentLinesPage = 0;
 
@@ -359,7 +360,8 @@
             $mTitle.text(cfg.title || '');
             $mSub.text(cfg.subtitle || '');
             $mBody.html(cfg.body || '');
-            $mFoot.html(cfg.foot || '<span class="vas-w205-foot-note foot-note"></span><button class="vas-w205-btn" data-close="1">' + escapeHtml(lbl("VAS_205_Close", "Close")) + '</button>');
+            // No footer Close button: the header X closes the popup.
+            $mFoot.html(cfg.foot || '<span class="vas-w205-foot-note foot-note"></span>');
 
             $mask.addClass('vas-w205-mask-open open');
 
@@ -473,7 +475,6 @@
                 '<span class="vas-w205-foot-note foot-note" id="vas205-doc-foot-note"></span>' +
                 '<span style="display:flex;align-items:center;gap:8px;">' +
                     '<span class="vas-w205-pager" id="vas205-doc-pager"></span>' +
-                    '<button type="button" class="vas-w205-btn" data-close="1">' + escapeHtml(lbl("VAS_205_Close", "Close")) + '</button>' +
                 '</span>';
 
             openModal({
@@ -694,7 +695,6 @@
                         escapeHtml(lbl("VAS_205_OpenInWindow", "Open in Window")) +
                     '</button>' +
                     '<button type="button" class="vas-w205-btn" id="vas205-btn-back">' + escapeHtml(lbl("VAS_205_Back", "Back")) + '</button>' +
-                    '<button type="button" class="vas-w205-btn" data-close="1">' + escapeHtml(lbl("VAS_205_Close", "Close")) + '</button>' +
                 '</span>';
 
             openModal({
@@ -796,7 +796,6 @@
                 '<span style="display:flex;align-items:center;gap:8px;">' +
                     '<span class="vas-w205-pager" id="vas205-lines-pager"></span>' +
                     '<button type="button" class="vas-w205-btn" id="vas205-btn-back">' + escapeHtml(lbl("VAS_205_Back", "Back")) + '</button>' +
-                    '<button type="button" class="vas-w205-btn" data-close="1">' + escapeHtml(lbl("VAS_205_Close", "Close")) + '</button>' +
                 '</span>';
 
             openModal({

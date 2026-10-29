@@ -514,11 +514,31 @@
     overflow-y: auto;
 }
 
+/* Item | [Attribute] | Qty | UOM | Locator - the Attribute column is shown
+   only when some line has an attribute value (.MPC-dow-has-attr). */
 .MPC-dow-lrow {
     display: grid;
-    grid-template-columns: 1fr 0.45fr 0.6fr;
+    grid-template-columns: 1fr 0.45fr 0.45fr 0.6fr;
     column-gap: 1em;
     align-items: center;
+}
+
+.MPC-dow-m-lines.MPC-dow-has-attr .MPC-dow-lrow {
+    grid-template-columns: 1fr 0.8fr 0.45fr 0.45fr 0.6fr;
+}
+
+.MPC-dow-m-lines:not(.MPC-dow-has-attr) .MPC-dow-l-attrcol {
+    display: none;
+}
+
+.MPC-dow-l-attr,
+.MPC-dow-l-uom {
+    font-size: 0.85em;
+    color: #5F7283;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
 }
 
 .MPC-dow-lhead {

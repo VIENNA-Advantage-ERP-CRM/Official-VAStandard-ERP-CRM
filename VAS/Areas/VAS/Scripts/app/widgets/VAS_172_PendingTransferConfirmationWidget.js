@@ -127,7 +127,8 @@
 
     function showInfo(key, fallback) {
         var msg = lbl(key, fallback);
-        try { VIS.ADialog.info(null, null, msg); }
+        // Already-resolved text goes in the raw-text argument with an empty key (as VAS_090 does).
+        try { VIS.ADialog.info("", true, msg); }
         catch (e) { alert(msg); }
     }
 
@@ -257,15 +258,25 @@
             activeLine = null;
         }
 
-        // Opens the transfer in the Material Transfer window. The pop-up is closed first so the
-        // window does not open behind its scrim.
+        // Opens the transfer. The pop-up is closed first so nothing stays behind its scrim.
+        // Hosted on the Material Transfer window (windowNo >= 0) the window's own grid is navigated
+        // to the record (same pattern as InvoicesWidget / VAS_227); on a home dashboard the
+        // Material Transfer window is opened on it.
         function openRecord() {
             var tr = activeTransfer;
             if (!tr || !tr.TransferID) { return; }
             var id = Number(tr.TransferID);
             closeModal();
             try {
-                VAS.ZoomUtil.zoomToRecord('M_Movement_ID', id, 0, TRANSFER_ZOOM_WINDOW_NEW, TRANSFER_ZOOM_WINDOW_OLD);
+                if ($self.windowNo >= 0) {
+                    $self.widgetFirevalueChanged({
+                        "TabWhereClause": "M_Movement.M_Movement_ID=" + id,
+                        "TabLayout": "Y",
+                        "TabIndex": "0"
+                    });
+                } else {
+                    VAS.ZoomUtil.zoomToRecord('M_Movement_ID', id, 0, TRANSFER_ZOOM_WINDOW_NEW, TRANSFER_ZOOM_WINDOW_OLD);
+                }
             } catch (e) { }
         }
 
@@ -362,8 +373,13 @@
             var target = Number(l.TargetQty || 0);
             var scrap0 = Number(l.ScrappedQty || 0);
             // A line not confirmed yet (no value, or the untouched 0) starts at its target.
+            // So the default is Confirmed = Target, Difference = 0 (Target 10 -> Confirmed 10).
+            // A stored figure that breaks Target = Confirmed + Difference + Scrapped (confirmed above
+            // target, or confirmed + scrapped above target) is not trusted either.
+            if (scrap0 > target) { scrap0 = 0; }
             var unconfirmed = (l.ConfirmedQty === null || l.ConfirmedQty === undefined) ||
-                (Number(l.ConfirmedQty) === 0 && scrap0 === 0);
+                (Number(l.ConfirmedQty) === 0 && scrap0 === 0) ||
+                roundQty(Number(l.ConfirmedQty) + scrap0) > target;
             var prefillConf = unconfirmed ? roundQty(target - scrap0) : Number(l.ConfirmedQty);
             var initialDiff = roundQty(target - prefillConf - scrap0);
             var diffCls = initialDiff === 0 ? 'vas-172-diff--ok' : 'vas-172-diff--bad';
@@ -394,9 +410,9 @@
                                     '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_AttributeSetInstance', 'Attribute Set Instance')) + '</div>' +
                                     '<div class="vas-172-field-value">' + escapeHtml(l.AttributeSetInstance || '—') + '</div>' +
                                 '</div>' +
-                                '<div class="vas-172-v2-field vas-172-v2-readonly">' +
+                                '<div class="vas-172-v2-field vas-172-v2-editable">' +
                                     '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_ReceivingLocator', 'Receiving Locator')) + '</div>' +
-                                    '<div class="vas-172-field-value">' + escapeHtml(l.ReceivingLocator || '—') + '</div>' +
+                                    '<select class="vas-172-select" id="vas172-sel-recv"></select>' +
                                 '</div>' +
                                 '<div class="vas-172-v2-field vas-172-v2-readonly">' +
                                     '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_TargetQuantity', 'Target Quantity')) + '</div>' +
@@ -438,22 +454,30 @@
             $modal.find('#vas172-btn-open').on('click', openRecord);
             $modal.find('#vas172-b2').on('click', function () { renderModalView1(); });
 
-            // ---- Scrap locator: options by NAME; the line's current locator is always one of them ----
+            // ---- Receiving / scrap locator: options by locator NAME (search key), not the code; the
+            //      line's current locator is always one of them ----
             var $sel = $modal.find('#vas172-sel-scrap');
+            var $recv = $modal.find('#vas172-sel-recv');
             var scrapLocatorId = Number(l.ScrapLocatorID || 0);
-            var fillLocators = function (locs) {
+            var recvLocatorId0 = Number(l.ReceivingLocatorID || 0);
+            var recvLocatorId = recvLocatorId0;
+            var fillSelect = function ($s, locs, curId, curName) {
                 var html = '';
                 var found = false;
                 for (var i = 0; i < locs.length; i++) {
-                    if (Number(locs[i].LocatorID) === scrapLocatorId) { found = true; }
+                    if (Number(locs[i].LocatorID) === curId) { found = true; }
                     html += '<option value="' + locs[i].LocatorID + '">' + escapeHtml(locs[i].LocatorName || '') + '</option>';
                 }
-                if (!found && scrapLocatorId > 0) {
-                    html = '<option value="' + scrapLocatorId + '">' + escapeHtml(l.ScrapLocator || '') + '</option>' + html;
+                if (!found && curId > 0) {
+                    html = '<option value="' + curId + '">' + escapeHtml(curName || '') + '</option>' + html;
                 }
                 if (html === '') { html = '<option value="0">—</option>'; }
-                $sel.html(html);
-                $sel.val(String(scrapLocatorId > 0 ? scrapLocatorId : $sel.find('option').first().val()));
+                $s.html(html);
+                $s.val(String(curId > 0 ? curId : $s.find('option').first().val()));
+            };
+            var fillLocators = function (locs) {
+                fillSelect($sel, locs, scrapLocatorId, l.ScrapLocator);
+                fillSelect($recv, locs, recvLocatorId, l.ReceivingLocator);
             };
             fillLocators([]);
             if (l.LineID) {
@@ -466,8 +490,9 @@
                         var data = typeof res === 'string' ? JSON.parse(res) : res;
                         if (data && typeof data === 'string') { data = JSON.parse(data); }
                         if (data && !data.error && Array.isArray(data.locators) && $modal && $sel.closest('body').length) {
-                            var cur = $sel.val();
-                            scrapLocatorId = Number(cur || scrapLocatorId);
+                            // Keep whatever the user already picked while the list was loading.
+                            scrapLocatorId = Number($sel.val() || scrapLocatorId);
+                            recvLocatorId = Number($recv.val() || recvLocatorId);
                             fillLocators(data.locators);
                         }
                     }
@@ -535,11 +560,19 @@
 
                 var selId = Number($sel.val() || 0);
                 var selName = $sel.find('option:selected').text();
+                var recvId = Number($recv.val() || 0);
+                var recvName = $recv.find('option:selected').text();
+                // Only a changed receiving locator is sent; it then wins over the scrap locator
+                // (both land on the line's destination locator).
+                var recvChanged = recvId > 0 && recvId !== recvLocatorId0;
 
                 l.ConfirmedQty = confVal;
                 l.ScrappedQty = scrapVal;
                 l.Description = descVal;
-                if (selId > 0) { l.ScrapLocatorID = selId; l.ScrapLocator = selName; }
+                if (recvChanged) {
+                    l.ReceivingLocatorID = recvId; l.ReceivingLocator = recvName;
+                    l.ScrapLocatorID = recvId; l.ScrapLocator = recvName;
+                } else if (selId > 0) { l.ScrapLocatorID = selId; l.ScrapLocator = selName; }
 
                 $.ajax({
                     url: VIS.Application.contextUrl + 'VAS_172_PendingTransferConfirmationWidget/SaveConfirmationLine',
@@ -552,6 +585,7 @@
                         ConfirmedQty: confVal,
                         ScrappedQty: scrapVal,
                         ScrapLocatorID: selId,
+                        ReceivingLocatorID: recvChanged ? recvId : 0,
                         Description: descVal
                     }),
                     success: function () {

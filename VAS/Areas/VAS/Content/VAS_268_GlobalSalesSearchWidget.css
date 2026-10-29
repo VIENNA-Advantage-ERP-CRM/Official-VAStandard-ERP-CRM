@@ -73,6 +73,26 @@
 
 .vas268-box .vas268-input::placeholder { color: #9F9F9F; }
 
+/* Sr 7.3: clear (x) button - shown only while the box has text. */
+.vas268-box .vas268-clear {
+    flex: none;
+    width: 1.5em;
+    height: 1.5em;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: #5F7283;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vas268-box .vas268-clear[hidden] { display: none; }
+.vas268-box .vas268-clear:hover { background: #EAF1F8; color: #102C3F; }
+.vas268-box .vas268-clear svg { width: 1em; height: 1em; }
+
 .vas268-kbd {
     font-size: .6875em;
     color: #9F9F9F;

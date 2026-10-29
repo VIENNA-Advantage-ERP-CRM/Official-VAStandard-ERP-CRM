@@ -1146,6 +1146,7 @@ namespace VASLogic.Models
                 //  Requisition sets M_RequisitionLine.C_OrderLine_ID, while the
                 //  New Purchase Order (VAS_204) and Open Requisitions (VAS_217)
                 //  widgets set C_OrderLine.M_RequisitionLine_ID only — accept both.
+                //  (29-Oct-2026) The Open Requisitions widget now writes both sides.
                 string sql = @"SELECT r.M_Requisition_ID, r.DocumentNo
                                  FROM C_OrderLine ol
                                  INNER JOIN M_RequisitionLine rl

@@ -513,6 +513,17 @@
     color: #102C3F;
 }
 
+/* 29-Oct 4.11: Attribute column next to the product (only rendered when a line has one). */
+.vas-mrr-l-attrcol {
+    width: 35%;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.vas-mrr-lines-table tbody td.vas-mrr-l-attrcol {
+    color: #5F7283;
+}
+
 .vas-mrr-trunc {
     display: block;
     overflow: hidden;

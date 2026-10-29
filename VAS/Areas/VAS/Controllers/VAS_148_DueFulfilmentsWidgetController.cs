@@ -378,6 +378,14 @@ namespace VAS.Controllers
                     if (openQty <= 0) { continue; }
                     decimal qty = input.qty > openQty ? openQty : input.qty;
 
+                    // Honour the line UOM precision (StdPrecision): truncate any
+                    // extra decimals so e.g. a precision-0 UOM never ships 1.5.
+                    int uomPrecision = MUOM.GetPrecision(ctx, orderLine.GetC_UOM_ID());
+                    if (uomPrecision < 0) { uomPrecision = 0; }
+                    decimal precisionFactor = (decimal)Math.Pow(10, uomPrecision);
+                    qty = decimal.Truncate(qty * precisionFactor) / precisionFactor;
+                    if (qty <= 0) { continue; }
+
                     int lineLocatorId = input.locatorId > 0 ? input.locatorId : GetDefaultLocatorId(shipWarehouseId, trx);
 
                     MInOutLine shipLine = new MInOutLine(ship);
@@ -639,7 +647,7 @@ namespace VAS.Controllers
                     FROM stock_by_locator
                 )
                 SELECT ol.C_OrderLine_ID, ol.M_Product_ID, p.Name AS Product_Name,
-                       ol.C_UOM_ID, u.Name AS UOM_Name,
+                       ol.C_UOM_ID, u.Name AS UOM_Name, u.StdPrecision AS UOM_Precision,
                        COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) AS Required_Qty,
                        rs.M_Locator_ID AS Default_Locator_ID,
                        rs.Locator_Code AS Default_Locator_Code,
@@ -675,6 +683,7 @@ namespace VAS.Controllers
                         productId = Util.GetValueOfInt(dr["M_Product_ID"]),
                         productName = Util.GetValueOfString(dr["Product_Name"]),
                         uomName = Util.GetValueOfString(dr["UOM_Name"]),
+                        uomPrecision = Util.GetValueOfInt(dr["UOM_Precision"]),
                         requiredQty = required,
                         defaultLocatorId = Util.GetValueOfInt(dr["Default_Locator_ID"]),
                         onHandQty = onHand,

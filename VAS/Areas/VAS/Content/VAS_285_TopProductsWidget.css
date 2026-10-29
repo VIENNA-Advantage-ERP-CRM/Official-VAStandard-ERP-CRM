@@ -118,16 +118,18 @@
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    /* Sr 8.33: rows are stacked from the top with a small fixed gap. space-between
+       spread them over the whole cell height, leaving large gaps between records. */
+    justify-content: flex-start;
+    gap: .2em;
 }
 
-/* Fewer than four rows (sparse period data): space-between would stretch 1-3 rows
-   to the two extreme edges of the cell, leaving a large dead gap in the middle.
-   Stack them from the top with normal spacing instead. */
 .vas285-hlist.vas285-hlist-top {
     justify-content: flex-start;
-    gap: .5em;
+    gap: .2em;
 }
+
+.vas285-hlist > .vas285-hrow { flex: none; }
 
 .vas285-hrow {
     padding: .28em .3em;

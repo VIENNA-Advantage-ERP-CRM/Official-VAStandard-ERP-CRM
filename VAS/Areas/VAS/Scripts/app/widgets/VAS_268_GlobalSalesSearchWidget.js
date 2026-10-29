@@ -1,8 +1,9 @@
 /**
  * VAS_268 Global Sales Search Widget (Sales Order dashboard, 9x1)
  * Purpose - the first widget on the Sales Order dashboard: a full-width omni
- *           search band. Empty focus shows "Recent across sales" (the 6 sales
- *           orders most recently updated by the logged-in user); typing (>=2
+ *           search band. Nothing is listed until the user types (Sr 7.1 - the
+ *           old "Recent across sales" list on focus is retired); an (x) button
+ *           clears the search (Sr 7.3); typing (>=2
  *           chars, ~200ms debounce) searches nine field families in a fixed
  *           priority order (Sales order, Customer, Product, Representative,
  *           Warehouse, Quotation, Description, Order reference, Location) and
@@ -21,18 +22,12 @@
  *           height (capped 10/page, minimum 2) so the modal body itself never
  *           scrolls.
  * Routing - Row click opens the preview modal only (no navigation). The
- *           modal's "Open Record" button navigates to the real Sales Order
- *           window (name VAS_SalesOrder) positioned on that exact C_Order_ID
- *           via the shared VAS.ZoomUtil helper (same mechanism VAS_120/078
- *           already use for cross-window record zoom - Prompt_Instructions
- *           "Scenario 2"). "View all N results" is best-effort: it opens the
- *           Sales Order window via the same ZoomUtil path without a record
- *           filter (ZoomUtil only supports a single-column EQUAL restriction,
- *           and reconstructing this widget's 9-category OR predicate as a
- *           client-side TabWhereClause risks the exact "duplicate document"
- *           grid-diagnostic bug already hit and fixed on VAS_181/182 earlier
- *           in this project) - the spec's own fallback clause explicitly
- *           allows this when the router cannot pre-apply the search text.
+ *           modal's "Open Record" button opens that exact C_Order_ID in the
+ *           SAME tab (Sr 7.2): hosted in the Sales Order window it fires the
+ *           host's TabWhereClause channel (VAS_078/203 pattern); on the Home
+ *           page it falls back to VAS.ZoomUtil. "View all N results" (Sr 7.4)
+ *           re-runs the search without the 10-row cap and lists every match
+ *           in the scrollable dropdown instead of opening the landing page.
  *
  * Backend - VAS_268_GlobalSalesSearchWidget/SearchSalesOrders     (GET q,max -> rows + total)
  *           VAS_268_GlobalSalesSearchWidget/GetRecentSalesOrders  (GET -> rows)
@@ -87,6 +82,8 @@
  * 44  | of                                                                    | VAS_268_Of
  * 45  | Showing                                                               | VAS_268_Showing
  * 46  | Esc                                                                   | VAS_268_EscHint
+ * 47  | Warehouse                                                             | VAS_268_Warehouse
+ * 48  | Clear                                                                 | VAS_268_Clear
  */
 ; VAS = window.VAS || {};
 
@@ -100,6 +97,7 @@
     var MIN_QUERY_LENGTH = 2;
     var DEBOUNCE_MS = 200;
     var DROPDOWN_ROWS = 10;
+    var VIEW_ALL_ROWS = 500;   // server-side cap for "View all" (MaxViewAllRows)
     var MAX_LINES_PER_PAGE = 10;
     var MIN_LINES_PER_PAGE = 2;
     var ZOOM_WINDOW_NAME = 'VAS_SalesOrder';
@@ -111,16 +109,20 @@
 
         var $self = this;
         var $root = $('<div class="vas268-root">');
-        var $input, $results;
+        var $input, $clear, $results;
         var $mask, $modal, $mHead, $mTitle, $mSub, $mBack, $mBody, $mFoot;
 
         var SELF_ENDPOINT = 'VAS_268_GlobalSalesSearchWidget/';
+        // Per-instance suffix for the event namespace (Sr 8.28): when the dashboard
+        // re-creates a widget, disposing the OLD instance must not unbind the
+        // document/window handlers the NEW instance (same AD_UserHomeWidgetID) bound.
+        var instanceTag = 'i' + Math.random().toString(36).slice(2, 9);
 
         var searchTimer = null;
         var requestSequence = 0;
         var rows = [];
         var totalMatches = 0;
-        var isRecentState = true;
+        var isRecentState = false;   // "recent" list retired (Sr 7.1) - kept false
         var activeIndex = -1;
         var lastQuery = '';
 
@@ -179,6 +181,26 @@
             return Math.round(Number(value || 0)).toLocaleString('en-IN');
         }
 
+        // Sr 8.7: amounts in the order's (price list's) own currency, with that
+        // currency's precision - not a hard-coded rupee sign.
+        function formatMoney(value, symbol, precision) {
+            var prec = (typeof precision === 'number' && precision >= 0) ? precision : 2;
+            var text = Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: prec, maximumFractionDigits: prec });
+            return symbol ? symbol + ' ' + text : text;
+        }
+
+        // Sr 7.6: quantities are in the line's selected UOM and can be fractional.
+        function formatQty(value) {
+            return Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+        }
+
+        // An attribute set instance with no values can still carry a description made
+        // of blanks or separators only (e.g. "-") - that is not an attribute value
+        // (same rule as VAS_203, Sr 8.2).
+        function hasAttributeValue(text) {
+            return !!text && /[^\s\-‐-―_.,:;()\[\]\/\\|]/.test(String(text));
+        }
+
         var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         function formatDateShort(iso) {
             if (!iso) { return ''; }
@@ -201,6 +223,7 @@
                     '<div class="vas268-box">' +
                         '<span class="vas268-icon">' + icon('search') + '</span>' +
                         '<input class="vas268-input" type="text" autocomplete="off" aria-label="' + escapeHtml(placeholder) + '" placeholder="' + escapeHtml(placeholder) + '">' +
+                        '<button type="button" class="vas268-clear" tabindex="-1" hidden aria-label="' + escapeHtml(label('VAS_268_Clear', 'Clear')) + '" title="' + escapeHtml(label('VAS_268_Clear', 'Clear')) + '">' + icon('close') + '</button>' +
                         '<span class="vas268-kbd">' + escapeHtml(label('VAS_268_EscHint', 'Esc')) + '</span>' +
                     '</div>' +
                     '<div class="vas268-results" role="listbox"></div>' +
@@ -208,6 +231,7 @@
             );
 
             $input = $root.find('.vas268-input');
+            $clear = $root.find('.vas268-clear');
             $results = $root.find('.vas268-results');
         }
 
@@ -239,23 +263,42 @@
             $closeBtn.on('click', closeModal);
         }
 
+        /* Every handler is bound under one namespace and unbound first, so this can
+           run again at any time (Sr 8.28: refreshWidget re-runs it - if the host
+           strips jQuery handlers while re-laying out the mosaic, the search box and
+           the modal would otherwise stay dead until the page is reloaded). */
         function bindEvents() {
-            var ns = '.vas268-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget');
+            var ns = '.vas268-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '-' + instanceTag;
 
-            $input.on('focus', function () {
-                if ($input.val().trim().length < MIN_QUERY_LENGTH) { loadRecent(); }
-                else { scheduleSearch(); }
+            $input.off(ns);
+            $clear.off(ns);
+            $results.off(ns);
+            $mBody.off(ns);
+            $(document).off(ns);
+            $(window).off(ns);
+
+            // Sr 7.1: nothing is listed on focus - results appear only once the user
+            // has typed a search; focusing again just re-opens an existing result list.
+            $input.on('focus' + ns, function () {
+                if ($input.val().trim().length >= MIN_QUERY_LENGTH && rows.length) { renderRows(); }
             });
-            $input.on('input', scheduleSearch);
-            $input.on('keydown', handleKeydown);
+            $input.on('input' + ns, function () { toggleClear(); scheduleSearch(); });
+            $input.on('keydown' + ns, handleKeydown);
 
-            $results.on('mousedown', '.vas268-ritem', function (event) {
+            // Sr 7.3: clear the entered search.
+            $clear.on('mousedown' + ns, function (event) { event.preventDefault(); });
+            $clear.on('click' + ns, function () {
+                clearSearch();
+                $input.focus();
+            });
+
+            $results.on('mousedown' + ns, '.vas268-ritem', function (event) {
                 event.preventDefault();
                 selectRow(Number($(this).attr('data-index')));
             });
-            $results.on('mousedown', '.vas268-rmore', function (event) {
+            $results.on('mousedown' + ns, '.vas268-rmore', function (event) {
                 event.preventDefault();
-                openSalesOrderList();
+                viewAllResults();
             });
 
             $(document).on('mousedown' + ns, function (event) {
@@ -271,10 +314,25 @@
                 if ($mask.hasClass('is-open')) { fitLineTable(); }
             });
 
-            $mBody.on('click', function (event) {
+            $mBody.on('click' + ns, function (event) {
                 var pageBtn = event.target.closest ? event.target.closest('[data-dir]') : null;
                 if (pageBtn) { turnLinePage(Number(pageBtn.getAttribute('data-dir'))); }
             });
+        }
+
+        function toggleClear() {
+            $clear.prop('hidden', !$input.val().length);
+        }
+
+        function clearSearch() {
+            if (searchTimer) { clearTimeout(searchTimer); searchTimer = null; }
+            requestSequence += 1;          // drop any in-flight response
+            $input.val('');
+            lastQuery = '';
+            rows = [];
+            totalMatches = 0;
+            toggleClear();
+            closeResults();
         }
 
         function scheduleSearch() {
@@ -282,41 +340,24 @@
 
             var text = $input.val().trim();
             if (text.length < MIN_QUERY_LENGTH) {
+                // Sr 7.1: an empty / too-short box shows nothing (no default orders).
                 requestSequence += 1;
-                if (text.length === 0) { loadRecent(); }
-                else { closeResults(); }
+                rows = [];
+                closeResults();
                 return;
             }
 
-            searchTimer = setTimeout(function () { doSearch(text); }, DEBOUNCE_MS);
+            searchTimer = setTimeout(function () { doSearch(text, false); }, DEBOUNCE_MS);
         }
 
-        function loadRecent() {
-            var sequence = ++requestSequence;
-            isRecentState = true;
-            lastQuery = '';
-            renderState(label('VAS_268_Searching', 'Searching…'));
-
-            $.ajax({
-                url: VIS.Application.contextUrl + SELF_ENDPOINT + 'GetRecentSalesOrders',
-                type: 'GET', dataType: 'json', cache: false,
-                success: function (res) {
-                    if (sequence !== requestSequence) { return; }
-                    var parsed = parseResponse(res);
-                    if (parsed.Error) { renderState(label('VAS_268_SearchError', 'Search is unavailable right now. Try again in a moment.')); return; }
-                    rows = (parsed.Rows || []).map(normalizeRow);
-                    totalMatches = rows.length;
-                    activeIndex = rows.length ? 0 : -1;
-                    renderRows();
-                },
-                error: function () {
-                    if (sequence !== requestSequence) { return; }
-                    renderState(label('VAS_268_SearchError', 'Search is unavailable right now. Try again in a moment.'));
-                }
-            });
+        // Sr 7.4: "View all N results" lists every match for the typed text right
+        // here in the (scrollable) results dropdown instead of leaving the dashboard.
+        function viewAllResults() {
+            if (!lastQuery) { return; }
+            doSearch(lastQuery, true);
         }
 
-        function doSearch(text) {
+        function doSearch(text, all) {
             var sequence = ++requestSequence;
             isRecentState = false;
             lastQuery = text;
@@ -325,7 +366,7 @@
             $.ajax({
                 url: VIS.Application.contextUrl + SELF_ENDPOINT + 'SearchSalesOrders',
                 type: 'GET', dataType: 'json', cache: false,
-                data: { q: text, max: DROPDOWN_ROWS },
+                data: { q: text, max: all ? VIEW_ALL_ROWS : DROPDOWN_ROWS },
                 success: function (res) {
                     // Stale-response guard: a newer keystroke already fired.
                     if (sequence !== requestSequence) { return; }
@@ -335,6 +376,7 @@
                     totalMatches = Number(parsed.Total || rows.length);
                     activeIndex = rows.length ? 0 : -1;
                     renderRows();
+                    if (all) { $results.scrollTop(0); }
                 },
                 error: function () {
                     if (sequence !== requestSequence) { return; }
@@ -352,7 +394,8 @@
                 SalesOrderDate: row.SalesOrderDate || '',
                 CustomerName: row.CustomerName || '',
                 DocumentStatus: row.DocumentStatus || '',
-                OrderValue: Number(row.OrderValue) || 0
+                OrderValue: Number(row.OrderValue) || 0,
+                CurrencySymbol: row.CurrencySymbol || ''
             };
         }
 
@@ -401,7 +444,7 @@
                         '<span class="vas268-t1" title="' + escapeHtml(primary) + '">' + escapeHtml(primary) + '</span>' +
                         '<span class="vas268-t2" title="' + escapeHtml(secondary) + '">' + escapeHtml(secondary) + '</span>' +
                     '</span>' +
-                    '<span class="vas268-t3">' + escapeHtml(formatINR(row.OrderValue)) + '</span>' +
+                    '<span class="vas268-t3">' + escapeHtml(formatMoney(row.OrderValue, row.CurrencySymbol)) + '</span>' +
                 '</button>';
             });
 
@@ -424,9 +467,9 @@
                 if (activeIndex >= 0 && rows[activeIndex]) {
                     event.preventDefault();
                     selectRow(activeIndex);
-                } else if (!isRecentState && totalMatches > 0) {
+                } else if (!isRecentState && totalMatches > rows.length) {
                     event.preventDefault();
-                    openSalesOrderList();
+                    viewAllResults();
                 }
                 return;
             }
@@ -449,16 +492,6 @@
             if (!row) { return; }
             closeResults();
             openOrderModal(row.SalesOrderId);
-        }
-
-        // Best-effort: opens the Sales Order window without pre-applying the typed
-        // search text (see the file header note on why a TabWhereClause
-        // reconstruction of the 9-category predicate is deliberately avoided).
-        function openSalesOrderList() {
-            closeResults();
-            if (!window.VAS || !VAS.ZoomUtil) { return; }
-            VAS.ZoomUtil.zoomToRecord('C_Order_ID', 0, zoomWindowId, ZOOM_WINDOW_NAME, ZOOM_WINDOW_NAME)
-                .done(function (id) { if (id > 0) { zoomWindowId = id; } });
         }
 
         /* ============================================================
@@ -516,14 +549,12 @@
             $mTitle.text(order.SalesOrderNumber);
             $mSub.text([order.CustomerName, formatDateShort(order.SalesOrderDate), order.DocumentStatus].filter(function (p) { return p; }).join(' · '));
 
+            // Sr 8.8: Customer / SO date / Delivery mode / Document status cards removed
+            // (already in the subtitle). Sr 7.9: "Ship from" is now "Warehouse".
             var statsHtml = '<div class="vas268-mstats">' +
-                statTile(label('VAS_268_Customer', 'Customer'), order.CustomerName) +
-                statTile(label('VAS_268_SoDate', 'SO date'), formatDateShort(order.SalesOrderDate)) +
                 statTile(label('VAS_268_DatePromised', 'Date promised'), formatDateShort(order.DatePromised)) +
-                statTile(label('VAS_268_SoValue', 'SO value'), formatINR(order.OrderValue)) +
-                statTile(label('VAS_268_ShipFrom', 'Ship from'), order.WarehouseName) +
-                statTile(label('VAS_268_DeliveryMode', 'Delivery mode'), order.DeliveryMode) +
-                statTile(label('VAS_268_DocumentStatus', 'Document status'), order.DocumentStatus) +
+                statTile(label('VAS_268_SoValue', 'SO value'), formatMoney(order.OrderValue, order.CurrencySymbol, order.CurrencyPrecision)) +
+                statTile(label('VAS_268_Warehouse', 'Warehouse'), order.WarehouseName) +
                 statTile(label('VAS_268_DeliveryStatus', 'Delivery status'), order.DeliveryStatus) +
             '</div>';
 
@@ -531,21 +562,25 @@
 
             $mBody.html(statsHtml + secHtml + '<div class="vas268-mtwrap"><div class="vas268-mtbl" id="vas268-linetbl"></div></div>');
 
+            // Ordered / shortage totals count Item-type product lines only (Sr 7.11 /
+            // 8.1). Shortage = pending - on hand per line (Sr 8.3), never negative.
             var qtyOrdered = 0, qtyShort = 0;
             lines.forEach(function (line) {
+                if (!line.IsItem) { return; }
                 qtyOrdered += Number(line.QtyOrdered) || 0;
                 var pending = Number(line.QtyPending) || 0;
-                var freeStock = Number(line.FreeStock) || 0;
-                if (pending > freeStock) { qtyShort += (pending - freeStock); }
+                var onHand = Math.max(0, Number(line.FreeStock) || 0);
+                if (pending > onHand) { qtyShort += (pending - onHand); }
             });
 
-            lineState = { order: order, lines: lines, page: 0, size: MAX_LINES_PER_PAGE };
+            var showAttribute = lines.some(function (line) { return hasAttributeValue(line.AttributeText); });
+            lineState = { order: order, lines: lines, page: 0, size: MAX_LINES_PER_PAGE, showAttribute: showAttribute };
             drawLineTable();
 
             var footNote = lines.length + ' ' + label('VAS_268_LinesSuffix', 'lines') +
-                ' · ' + formatNum(qtyOrdered) + ' ' + label('VAS_268_QtyOrderedSuffix', 'qty ordered') +
+                ' · ' + formatQty(qtyOrdered) + ' ' + label('VAS_268_QtyOrderedSuffix', 'qty ordered') +
                 ' · ' + order.DeliveryStatus +
-                (qtyShort > 0 ? ' · ' + formatNum(qtyShort) + ' ' + label('VAS_268_QtyShortSuffix', 'qty short of stock') : '');
+                (qtyShort > 0 ? ' · ' + formatQty(qtyShort) + ' ' + label('VAS_268_QtyShortSuffix', 'qty short of stock') : '');
 
             $mFoot.html(
                 '<span class="vas268-foot-note">' + escapeHtml(footNote) + '</span>' +
@@ -564,19 +599,24 @@
             var el = document.getElementById('vas268-linetbl');
             if (!el || !lineState) { return; }
 
+            // Sr 8.2: the Attribute column is drawn only when at least one line of the
+            // order carries an attribute value (decided over ALL lines, not the page).
+            var showAttribute = !!lineState.showAttribute;
             var cols = [
-                { label: label('VAS_268_ColLine', 'Line'), w: .35, align: 'right' },
-                { label: label('VAS_268_ColProduct', 'Product'), w: 1.5 },
-                { label: label('VAS_268_ColAttribute', 'Attribute'), w: 1.1 },
-                { label: label('VAS_268_ColUom', 'UoM'), w: .5 },
-                { label: label('VAS_268_ColOrdered', 'Ordered'), w: .7, align: 'right' },
-                { label: label('VAS_268_ColDelivered', 'Delivered'), w: .7, align: 'right' },
-                { label: label('VAS_268_ColPending', 'Pending'), w: .7, align: 'right' },
-                { label: label('VAS_268_ColInStock', 'In stock'), w: .7, align: 'right' },
-                { label: label('VAS_268_ColRate', 'Rate'), w: .7, align: 'right' },
-                { label: label('VAS_268_ColAmount', 'Amount'), w: .9, align: 'right' },
-                { label: label('VAS_268_ColLineStatus', 'Line status'), w: 1 }
-            ];
+                { key: 'line', label: label('VAS_268_ColLine', 'Line'), w: .35, align: 'right' },
+                { key: 'product', label: label('VAS_268_ColProduct', 'Product'), w: 1.5 },
+                { key: 'attr', label: label('VAS_268_ColAttribute', 'Attribute'), w: 1.1 },
+                { key: 'uom', label: label('VAS_268_ColUom', 'UoM'), w: .5 },
+                { key: 'ordered', label: label('VAS_268_ColOrdered', 'Ordered'), w: .7, align: 'right' },
+                { key: 'delivered', label: label('VAS_268_ColDelivered', 'Delivered'), w: .7, align: 'right' },
+                { key: 'pending', label: label('VAS_268_ColPending', 'Pending'), w: .7, align: 'right' },
+                { key: 'instock', label: label('VAS_268_ColInStock', 'In stock'), w: .7, align: 'right' },
+                { key: 'rate', label: label('VAS_268_ColRate', 'Rate'), w: .8, align: 'right' },
+                { key: 'amount', label: label('VAS_268_ColAmount', 'Amount'), w: .9, align: 'right' },
+                { key: 'status', label: label('VAS_268_ColLineStatus', 'Line status'), w: 1 }
+            ].filter(function (c) { return showAttribute || c.key !== 'attr'; });
+            var cur = lineState.order.CurrencySymbol;
+            var prec = lineState.order.CurrencyPrecision;
             var tpl = cols.map(function (c) { return 'minmax(0,' + c.w + 'fr)'; }).join(' ');
 
             var pages = Math.max(1, Math.ceil(lineState.lines.length / lineState.size));
@@ -590,18 +630,23 @@
 
             var body = slice.map(function (line) {
                 var st = lineStatus(lineState.order, line);
+                // Delivered / pending / in-stock are shown for Item-type products only
+                // (Sr 7.11 / 8.1); charges and other product types show a dash.
+                var isItem = !!line.IsItem;
                 var cells = [
                     { v: String(line.LineNo), cls: 'vas268-c-std', align: 'right' },
-                    { v: line.ProductName, cls: 'vas268-c-prim' },
-                    { v: line.AttributeText, cls: 'vas268-c-std' },
-                    { v: line.UomName, cls: 'vas268-c-std' },
-                    { v: formatNum(line.QtyOrdered), cls: 'vas268-c-std', align: 'right' },
-                    { v: formatNum(line.QtyDelivered), cls: 'vas268-c-std', align: 'right' },
-                    { v: formatNum(line.QtyPending), cls: 'vas268-c-prim', align: 'right' },
-                    { v: formatNum(line.FreeStock), cls: (line.FreeStock < line.QtyPending ? 'vas268-c-short' : 'vas268-c-ok'), align: 'right' },
-                    { v: '₹ ' + formatNum(line.Rate), cls: 'vas268-c-std', align: 'right' },
-                    { v: formatINR(line.Amount), cls: 'vas268-c-emph', align: 'right' }
+                    { v: line.ProductName, cls: 'vas268-c-prim' }
                 ];
+                if (showAttribute) { cells.push({ v: hasAttributeValue(line.AttributeText) ? line.AttributeText : '', cls: 'vas268-c-std' }); }
+                cells = cells.concat([
+                    { v: line.UomName, cls: 'vas268-c-std' },
+                    { v: formatQty(line.QtyOrdered), cls: 'vas268-c-std', align: 'right' },
+                    { v: isItem ? formatQty(line.QtyDelivered) : '—', cls: 'vas268-c-std', align: 'right' },
+                    { v: isItem ? formatQty(line.QtyPending) : '—', cls: 'vas268-c-prim', align: 'right' },
+                    { v: isItem ? formatQty(line.FreeStock) : '—', cls: (isItem && line.FreeStock < line.QtyPending ? 'vas268-c-short' : 'vas268-c-ok'), align: 'right' },
+                    { v: formatMoney(line.Rate, cur, 2), cls: 'vas268-c-std', align: 'right' },
+                    { v: formatMoney(line.Amount, cur, prec), cls: 'vas268-c-emph', align: 'right' }
+                ]);
                 var rowHtml = cells.map(function (c, ci) {
                     return '<span class="vas268-cell' + (cols[ci].align === 'right' ? ' right' : '') + ' ' + c.cls + '" title="' + escapeHtml(c.v) + '">' + escapeHtml(c.v) + '</span>';
                 }).join('') + '<span class="vas268-cell"><span class="vas268-chip ' + st.cls + '" title="' + escapeHtml(st.text) + '">' + escapeHtml(st.text) + '</span></span>';
@@ -652,11 +697,22 @@
             lineState = null;
         }
 
-        // "Open Record" - navigates to the real Sales Order window positioned on
-        // this exact record, via the shared cross-window zoom helper
-        // (Prompt_Instructions "Scenario 2: Open Another Screen from Widget").
+        // "Open Record" (Sr 7.2) - navigates to the Sales Order record in the SAME tab.
+        // Hosted inside the Sales Order window (windowNo >= 0) the host's value-changed
+        // channel re-queries the window it is already in (TabWhereClause) - nothing new
+        // is opened (same pattern as VAS_078 / VAS_203). Only on the Home page, where
+        // there is no host window, the shared cross-window zoom helper is used.
         function openRecordInWindow(orderId) {
             closeModal();
+            if (!orderId) { return; }
+            if ($self.windowNo >= 0) {
+                $self.widgetFirevalueChanged({
+                    "TabWhereClause": "C_Order.C_Order_ID=" + Number(orderId),
+                    "TabLayout": "Y",
+                    "TabIndex": "0"
+                });
+                return;
+            }
             if (!window.VAS || !VAS.ZoomUtil) { return; }
             VAS.ZoomUtil.zoomToRecord('C_Order_ID', orderId, zoomWindowId, ZOOM_WINDOW_NAME, ZOOM_WINDOW_NAME)
                 .done(function (id) { if (id > 0) { zoomWindowId = id; } });
@@ -665,14 +721,19 @@
         this.getRoot = function () { return $root; };
 
         this.disposeComponent = function () {
-            var ns = '.vas268-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget');
+            var ns = '.vas268-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '-' + instanceTag;
             $(document).off(ns);
             $(window).off(ns);
             if ($mask) { $mask.remove(); }
             $root.remove();
         };
 
-        this.refreshWidget = function () { /* stateless search widget - nothing to refresh */ };
+        // Stateless search widget - a refresh only re-binds the handlers (Sr 8.28) and
+        // re-attaches the modal shell if the host removed it from <body>.
+        this.refreshWidget = function () {
+            if (!$mask || !$.contains(document.body, $mask[0])) { createModal(); }
+            bindEvents();
+        };
     };
 
     VAS.VAS_268_GlobalSalesSearchWidget.prototype.widgetFirevalueChanged = function (value) {

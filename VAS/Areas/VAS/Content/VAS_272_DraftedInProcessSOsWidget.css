@@ -443,5 +443,7 @@
 .vas272-chip-risk { background: #FCEFEF; color: #A33F3F; }
 .vas272-chip-neutral { background: #F1F4F8; color: #41576A; font-weight: 500; }
 .vas272-chip-prop { background: #EFEEFF; color: #5F4AA6; }
+/* Sr 8.23: Drafted badge in orange (was the grey "neutral" chip). */
+.vas272-chip-drafted { background: #FFEBD6; color: #C25400; }
 
 .vas272-mstate { padding: 1em; font-size: .8125em; color: #5F7283; text-align: center; }

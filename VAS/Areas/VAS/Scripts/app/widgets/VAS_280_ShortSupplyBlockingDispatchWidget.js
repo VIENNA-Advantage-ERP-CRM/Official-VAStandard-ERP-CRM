@@ -156,7 +156,7 @@
                 if ($root.css('position') === 'static') { $root.css('position', 'relative'); }
                 var text = '';
                 try { text = VIS.Msg.getMsg('VAS_SO_Retry'); } catch (e) { text = ''; }
-                if (!text || text === 'VAS_SO_Retry') { text = 'Retry'; }
+                if (!text || text === 'VAS_SO_Retry' || text === '[VAS_SO_Retry]') { text = 'Retry'; }
                 $('<button type="button" class="vasso-retry"></button>').text(text)
                     .attr('title', text)
                     .on('click', function (e) {
@@ -170,7 +170,8 @@
     })();
 
 
-    var WIDGET_PAGE_SIZE = 7;   // rows per widget page
+    var WIDGET_PAGE_SIZE = 7;   // initial rows per widget page - refitted to the real height (Sr 8.32)
+    var MAX_WIDGET_ROWS = 25;   // upper bound for the height-fitted widget page
     var MAX_ROWS_PER_PAGE = 10;
     var MIN_ROWS_PER_PAGE = 2;
     var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -211,6 +212,12 @@
         var $mask, $modal, $mHead, $mTitle, $mSub, $mBack, $mBody, $mFoot;
 
         var SELF_ENDPOINT = 'VAS_280_ShortSupplyBlockingDispatchWidget/';
+        // Per-instance event-namespace suffix (Sr 8.28): disposing an old instance must
+        // not unbind the window handlers of a re-created one with the same widget id.
+        var instanceTag = 'i' + Math.random().toString(36).slice(2, 9);
+        var bodyObserver = null;   // ResizeObserver on the table body (Sr 8.32)
+        var refitTimer = null;
+        var loadSequence = 0;      // drops a stale page response after a re-fit
 
         var listState = 'loading'; // 'loading' | 'ready' | 'error'
         var docsState = { page: 0, size: WIDGET_PAGE_SIZE, total: 0, rows: [], totalValueBlocked: 0 };
@@ -333,19 +340,67 @@
             $shell.append($head, $tbl, $foot);
             $root.append($shell);
 
-            $prevBtn.on('click', function () { turnWidgetPage(-1); });
-            $nextBtn.on('click', function () { turnWidgetPage(1); });
+            bindWidgetEvents();
 
-            $tbody.on('click', function (event) {
+            // Sr 8.32: re-fit the page size whenever the table body changes height
+            // (resolution, browser zoom, dashboard re-layout).
+            if (typeof ResizeObserver !== 'undefined') {
+                bodyObserver = new ResizeObserver(function () {
+                    if (refitTimer) { clearTimeout(refitTimer); }
+                    refitTimer = setTimeout(refitWidgetPage, 120);
+                });
+                bodyObserver.observe($tbody[0]);
+            }
+        }
+
+        /* Sr 8.28: (re)binds the widget's own handlers. Run on init AND on every refresh -
+           after a "refresh all" from the mosaic panel the host can strip jQuery handlers
+           from the widget's DOM (re-attaching the same nodes), which left rows that
+           rendered fine but opened nothing. off() first keeps it to one handler each. */
+        function bindWidgetEvents() {
+            $prevBtn.off('click.vas280').on('click.vas280', function () { turnWidgetPage(-1); });
+            $nextBtn.off('click.vas280').on('click.vas280', function () { turnWidgetPage(1); });
+
+            $tbody.off('click.vas280').on('click.vas280', function (event) {
                 var row = event.target.closest ? event.target.closest('[data-pid]') : null;
                 if (row) { openProductWarehouseModal(Number(row.getAttribute('data-pid')), Number(row.getAttribute('data-wid'))); }
             });
         }
 
+        /* Sr 8.32: rows per widget page = how many rows actually fit the table body at
+           the current height, so "Showing a–b of N" always matches the visible rows
+           (a fixed 7 showed "1–7 of 34" while only 6 fitted). The row height is taken
+           from a rendered row, or estimated from the font size before any row exists. */
+        function computeWidgetPageSize() {
+            var body = $tbody && $tbody[0];
+            if (!body) { return docsState.size; }
+            var avail = body.clientHeight;
+            if (avail < 20) { return docsState.size; }   // not laid out yet
+            var row = body.querySelector('.vas280-trow');
+            var rowHeight = row ? row.getBoundingClientRect().height : 0;
+            if (!rowHeight) {
+                var fs = parseFloat(window.getComputedStyle(body).fontSize) || 16;
+                rowHeight = fs * .75 * 2.25 + 1;
+            }
+            var n = Math.floor((avail + 1) / rowHeight);   // +1: the last row has no bottom border
+            return Math.max(1, Math.min(MAX_WIDGET_ROWS, n));
+        }
+
+        // Re-fits after a render / resize; reloads only when the size really changed,
+        // keeping the first visible row on screen (so this converges, never loops).
+        function refitWidgetPage() {
+            if (listState !== 'ready' || docsState.total <= 0) { return; }
+            var n = computeWidgetPageSize();
+            if (n === docsState.size) { return; }
+            var firstRow = docsState.page * docsState.size;
+            docsState.size = n;
+            loadShortSupply(Math.floor(firstRow / n));
+        }
+
         function skeletonRows() {
             var tpl = TABLE_TEMPLATE;
             var rows = '';
-            for (var i = 0; i < WIDGET_PAGE_SIZE; i++) {
+            for (var i = 0; i < docsState.size; i++) {
                 rows += '<div class="vas280-trow" style="grid-template-columns:' + tpl + ';cursor:default">' +
                     '<span class="vas280-cell"><span class="vas280-skel-cell" style="width:70%"></span></span>' +
                     '<span class="vas280-cell"><span class="vas280-skel-cell" style="width:60%"></span></span>' +
@@ -360,26 +415,35 @@
         }
 
         function loadShortSupply(page) {
+            // Size from the space available now (falls back to the last size before layout).
+            docsState.size = computeWidgetPageSize();
+            var size = docsState.size;
+            var sequence = ++loadSequence;
             listState = 'loading';
             renderWidget();
 
             VASSONet.ajax({
                 url: VIS.Application.contextUrl + SELF_ENDPOINT + 'GetShortSupply',
                 type: 'GET', dataType: 'json', cache: false,
-                data: { page: page, size: WIDGET_PAGE_SIZE },
+                data: { page: page, size: size },
                 success: function (res) {
+                    if (sequence !== loadSequence) { return; }   // a newer (re-fitted) load won
                     var parsed = parseResponse(res);
                     if (parsed.Error) { listState = 'error'; }
                     else {
                         listState = 'ready';
                         docsState.page = page;
+                        docsState.size = size;
                         docsState.total = Number(parsed.Total || 0);
                         docsState.totalValueBlocked = Number(parsed.TotalValueBlocked || 0);
                         docsState.rows = parsed.Rows || [];
                     }
                     renderWidget();
+                    // First load runs before the widget is laid out - fit once it is.
+                    requestAnimationFrame(refitWidgetPage);
                 },
                 error: function () {
+                    if (sequence !== loadSequence) { return; }
                     listState = 'error';
                     renderWidget();
                 }
@@ -493,7 +557,7 @@
         }
 
         function bindDocumentLevelEvents() {
-            var ns = '.vas280-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget');
+            var ns = '.vas280-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '-' + instanceTag;
 
             $(window).on('resize' + ns, function () {
                 if ($mask.hasClass('is-open')) { fitAllTables(); }
@@ -947,14 +1011,26 @@
         this.getRoot = function () { return $root; };
 
         this.disposeComponent = function () {
-            var ns = '.vas280-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget');
+            var ns = '.vas280-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '-' + instanceTag;
             $(document).off(ns);
             $(window).off(ns);
+            if (bodyObserver) { bodyObserver.disconnect(); bodyObserver = null; }
+            if (refitTimer) { clearTimeout(refitTimer); refitTimer = null; }
             if ($mask) { $mask.remove(); }
             $root.remove();
         };
 
-        this.refreshWidget = function () { loadShortSupply(0); };
+        // Sr 8.28: a refresh also re-arms the widget's handlers and re-creates the modal
+        // shell if the host removed it, so the widget stays clickable after "refresh all".
+        this.refreshWidget = function () {
+            if (!$mask || !$.contains(document.body, $mask[0])) { createModal(); }
+            if ($shell && !$.contains($root[0], $shell[0])) { $root.append($shell); }
+            bindWidgetEvents();
+            loadShortSupply(0);
+        };
+
+        // Sr 8.32: the host's size-change hook re-fits the rows per page.
+        this.refitPage = function () { refitWidgetPage(); };
     };
 
     VAS.VAS_280_ShortSupplyBlockingDispatchWidget.prototype.widgetFirevalueChanged = function (value) {
@@ -974,7 +1050,9 @@
         ensureDashInlineSizeVar(this.getRoot());
     };
 
-    VAS.VAS_280_ShortSupplyBlockingDispatchWidget.prototype.widgetSizeChange = function () { };
+    VAS.VAS_280_ShortSupplyBlockingDispatchWidget.prototype.widgetSizeChange = function () {
+        if (this.refitPage) { this.refitPage(); }
+    };
 
     VAS.VAS_280_ShortSupplyBlockingDispatchWidget.prototype.dispose = function () {
         if (this.disposeComponent) { this.disposeComponent(); }

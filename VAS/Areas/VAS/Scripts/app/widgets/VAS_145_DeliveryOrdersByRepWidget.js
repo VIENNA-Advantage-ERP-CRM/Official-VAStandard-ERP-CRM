@@ -377,6 +377,10 @@
             $('body').append($modal);
 
             $modal.on('click' + modalEventNamespace, '.MPC-dor-m-close', closeModal);
+            $modal.on('click' + modalEventNamespace, '.MPC-dor-do-link', function (event) {
+                event.preventDefault();
+                zoomDeliveryOrder($(this).attr('data-id'));
+            });
         }
 
         function openModal(index) {
@@ -497,7 +501,7 @@
                 var bucket = statusBucket(order.documentStatus);
                 html +=
                     '<div class="MPC-dor-do-row">' +
-                        '<div class="MPC-dor-do-id" title="' + escapeHtml(order.deliveryOrderNumber) + '">' + escapeHtml(order.deliveryOrderNumber) + '</div>' +
+                        '<div class="MPC-dor-do-id" title="' + escapeHtml(order.deliveryOrderNumber) + '"><a href="javascript:void(0)" class="MPC-dor-do-link" data-id="' + Number(order.deliveryOrderId || 0) + '">' + escapeHtml(order.deliveryOrderNumber) + '</a></div>' +
                         '<div class="MPC-dor-do-cell" title="' + escapeHtml(order.customerName) + '">' + escapeHtml(order.customerName) + '</div>' +
                         '<div class="MPC-dor-do-cell">' + escapeHtml(formatDate(order.documentDate)) + '</div>' +
                         '<div><span class="MPC-dor-do-status ' + bucket.chip + '"><span class="MPC-dor-dot"></span>' + escapeHtml(label(bucket.msgKey, bucket.fallback)) + '</span></div>' +
@@ -551,6 +555,43 @@
             }
         }
 
+        function legendItemHtml(bucket) {
+            var text = label(bucket.msgKey, bucket.fallback);
+            return '<span class="MPC-dor-legend-item" title="' + escapeHtml(text) + '"><span class="MPC-dor-sw ' + bucket.seg + '"></span>' + escapeHtml(text) + '</span>';
+        }
+
+        /* Navigate to the Delivery Order record WITHOUT spawning a second window
+           (same two paths as VAS_078_ProductSearchWidget.zoomProductRecord):
+             - Hosted inside a window (windowNo >= 0): fire the host's value-changed
+               channel with a TabWhereClause; the host re-queries in place.
+             - Standalone (Home / landing dashboard): VAS.ZoomUtil opens the standard
+               Delivery Order window (VAS_DeliveryOrder, else Shipment (Customer)).
+           The resolved AD_Window_ID is cached so later clicks skip the lookup. */
+        var ZOOM_WINDOW_NAME_NEW = 'VAS_DeliveryOrder';
+        var ZOOM_WINDOW_NAME_OLD = 'Shipment (Customer)';
+        var doWindowId = 0;
+        function zoomDeliveryOrder(doId) {
+            var recordId = Number(doId || 0);
+            if (recordId <= 0) { return; }
+            try {
+                if ($self.windowNo >= 0) {
+                    lastFocusedRow = -1;
+                    closeModal();
+                    $self.widgetFirevalueChanged({
+                        "TabWhereClause": "M_InOut.M_InOut_ID=" + recordId,
+                        "TabLayout": "Y",   /* 'N' Grid, 'Y' Single, 'C' Card */
+                        "TabIndex": "0"
+                    });
+                    return;
+                }
+                if (!VAS.ZoomUtil || typeof VAS.ZoomUtil.zoomToRecord !== 'function') { return; }
+                VAS.ZoomUtil.zoomToRecord("M_InOut_ID", recordId, doWindowId, ZOOM_WINDOW_NAME_NEW, ZOOM_WINDOW_NAME_OLD)
+                    .done(function (id) {
+                        if (id > 0) { doWindowId = id; lastFocusedRow = -1; closeModal(); }
+                    });
+            } catch (e) { /* best-effort */ }
+        }
+
         this.Initalize = function () {
             var previousLabel = label('VAS_PreviousPage', 'Previous page');
             var nextLabel = label('VAS_NextPage', 'Next page');
@@ -570,19 +611,23 @@
                                 '</svg>' +
                             '</span>' +
                             '<span class="MPC-dor-titles">' +
-                                '<span class="MPC-dor-title">' + escapeHtml(label('VAS_145_Title', 'Delivery Orders by Representative')) + '</span>' +
-                                '<span class="MPC-dor-legend">' +
-                                    '<span class="MPC-dor-legend-item"><span class="MPC-dor-sw MPC-dor-seg-inprogress"></span>' + escapeHtml(label('VAS_145_InProgress', 'In Progress')) + '</span>' +
-                                    '<span class="MPC-dor-legend-item"><span class="MPC-dor-sw MPC-dor-seg-draft"></span>' + escapeHtml(label('VAS_145_Draft', 'Draft')) + '</span>' +
-                                    '<span class="MPC-dor-legend-item"><span class="MPC-dor-sw MPC-dor-seg-completed"></span>' + escapeHtml(label('VAS_145_Completed', 'Completed')) + '</span>' +
-                                    '<span class="MPC-dor-legend-item"><span class="MPC-dor-sw MPC-dor-seg-voided"></span>' + escapeHtml(label('VAS_145_Voided', 'Voided')) + '</span>' +
-                                '</span>' +
+                                /* Full title on hover when it is truncated. */
+                                '<span class="MPC-dor-title" title="' + escapeHtml(label('VAS_145_Title', 'Delivery Orders by Representative')) + '">' + escapeHtml(label('VAS_145_Title', 'Delivery Orders by Representative')) + '</span>' +
                             '</span>' +
                         '</div>' +
                         '<div class="MPC-dor-filters">' +
                             '<select class="MPC-dor-select MPC-dor-month" aria-label="' + escapeHtml(label('VAS_145_FilterByMonth', 'Filter by month')) + '"></select>' +
                             '<select class="MPC-dor-select MPC-dor-year" aria-label="' + escapeHtml(label('VAS_145_FilterByYear', 'Filter by year')) + '"></select>' +
                         '</div>' +
+                    '</div>' +
+                    /* Status legend on its own full-width row so all four
+                       statuses and their colors are always visible (never
+                       clipped by the title column). */
+                    '<div class="MPC-dor-legend">' +
+                        legendItemHtml(STATUS_BUCKETS[0]) +
+                        legendItemHtml(STATUS_BUCKETS[1]) +
+                        legendItemHtml(STATUS_BUCKETS[2]) +
+                        legendItemHtml(STATUS_BUCKETS[3]) +
                     '</div>' +
                     '<div class="MPC-dor-body"></div>' +
                     '<div class="MPC-dor-foot">' +
@@ -669,6 +714,14 @@
     };
 
     VAS.VAS_145_DeliveryOrdersByRepWidget.prototype.widgetSizeChange = function () { };
+
+    VAS.VAS_145_DeliveryOrdersByRepWidget.prototype.widgetFirevalueChanged = function (value) {
+        if (this.listener) { this.listener.widgetFirevalueChanged(value); }
+    };
+
+    VAS.VAS_145_DeliveryOrdersByRepWidget.prototype.addChangeListener = function (listener) {
+        this.listener = listener;
+    };
 
     VAS.VAS_145_DeliveryOrdersByRepWidget.prototype.refreshWidget = function () {
         this.refreshWidget();

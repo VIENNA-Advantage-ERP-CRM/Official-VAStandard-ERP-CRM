@@ -199,8 +199,9 @@ namespace VIS.Controllers
                     COALESCE(u.StdPrecision, 0) AS UOMPrecision,
                     COALESCE(asi.Description, N'') AS AttributeSetInstance,
                     COALESCE(ml.M_LocatorTo_ID, 0) AS ScrapLocatorID,
-                    COALESCE(lDst.LocatorCombination, lDst.Bin, lDst.Value, N'') AS ScrapLocator,
-                    COALESCE(lRecv.LocatorCombination, lRecv.Bin, lRecv.Value, N'') AS ReceivingLocator,
+                    COALESCE(lDst.Value, lDst.LocatorCombination, lDst.Bin, N'') AS ScrapLocator,
+                    COALESCE(lRecv.M_Locator_ID, 0) AS ReceivingLocatorID,
+                    COALESCE(lRecv.Value, lRecv.LocatorCombination, lRecv.Bin, N'') AS ReceivingLocator,
                     COALESCE(ml.MovementQty, 0) AS TargetQty,
                     ml.ConfirmedQty             AS ConfirmedQty,
                     COALESCE(ml.ScrappedQty, 0) AS ScrappedQty,
@@ -231,6 +232,7 @@ namespace VIS.Controllers
                         AttributeSetInstance = Util.GetValueOfString(dr["AttributeSetInstance"]),
                         ScrapLocatorID = Util.GetValueOfInt(dr["ScrapLocatorID"]),
                         ScrapLocator = Util.GetValueOfString(dr["ScrapLocator"]),
+                        ReceivingLocatorID = Util.GetValueOfInt(dr["ReceivingLocatorID"]),
                         ReceivingLocator = Util.GetValueOfString(dr["ReceivingLocator"]),
                         TargetQty = Util.GetValueOfDecimal(dr["TargetQty"]),
                         ConfirmedQty = dr["ConfirmedQty"] == DBNull.Value ? (decimal?)null : Util.GetValueOfDecimal(dr["ConfirmedQty"]),
@@ -265,7 +267,7 @@ namespace VIS.Controllers
             {
                 string sql = @"
                     SELECT loc.M_Locator_ID AS LocatorID,
-                           COALESCE(loc.LocatorCombination, loc.Bin, loc.Value) AS LocatorName
+                           COALESCE(loc.Value, loc.LocatorCombination, loc.Bin) AS LocatorName
                     FROM M_Locator loc
                     WHERE loc.IsActive = 'Y'
                       AND loc.AD_Client_ID = " + ctx.GetAD_Client_ID() + @"
@@ -274,7 +276,7 @@ namespace VIS.Controllers
                             FROM M_MovementLine ml
                             INNER JOIN M_Locator lt ON lt.M_Locator_ID = ml.M_LocatorTo_ID
                             WHERE ml.M_MovementLine_ID = " + lineId + @")
-                    ORDER BY COALESCE(loc.LocatorCombination, loc.Bin, loc.Value)";
+                    ORDER BY COALESCE(loc.Value, loc.LocatorCombination, loc.Bin)";
 
                 dr = DB.ExecuteReader(sql);
                 while (dr != null && dr.Read())
@@ -330,8 +332,13 @@ namespace VIS.Controllers
                 if (description.Length > DescriptionMaxLength)
                     description = description.Substring(0, DescriptionMaxLength);
 
+                // Receiving locator picked in the pop-up (sent only when the user changed it).
+                int receivingLocatorId = Util.GetValueOfInt(data.ContainsKey("ReceivingLocatorID") ? data["ReceivingLocatorID"] : 0);
+
                 // The scrap lands in the line's destination locator, so changing it moves that locator.
-                string locatorSet = scrapLocatorId > 0 ? ", M_LocatorTo_ID = " + scrapLocatorId : "";
+                // A changed receiving locator is that same destination and takes precedence.
+                int locatorToId = receivingLocatorId > 0 ? receivingLocatorId : scrapLocatorId;
+                string locatorSet = locatorToId > 0 ? ", M_LocatorTo_ID = " + locatorToId : "";
 
                 string sql = "";
                 if (lineId > 0)
@@ -352,6 +359,25 @@ namespace VIS.Controllers
                 }
 
                 DB.ExecuteQuery(sql);
+
+                // The confirmation line's own receiving locator overrides the movement line's
+                // destination when it is read back (GetLines), so it is kept in step as well.
+                if (receivingLocatorId > 0
+                    && ColumnExists("M_MovementLineConfirm", "VAS_ReceivingLocator_ID")
+                    && ColumnExists("M_MovementLineConfirm", "M_MovementLine_ID"))
+                {
+                    if (lineId <= 0 && transferId > 0)
+                    {
+                        lineId = Util.GetValueOfInt(DB.ExecuteScalar("SELECT M_MovementLine_ID FROM M_MovementLine WHERE M_Movement_ID = "
+                            + transferId + " AND Line = " + lineNo, null, null));
+                    }
+                    if (lineId > 0)
+                    {
+                        DB.ExecuteQuery("UPDATE M_MovementLineConfirm SET VAS_ReceivingLocator_ID = " + receivingLocatorId
+                            + " WHERE M_MovementLine_ID = " + lineId + " AND IsActive = 'Y'");
+                    }
+                }
+
                 return Json(new { success = true }, JsonRequestBehavior.AllowGet);
             }
             catch (Exception ex)

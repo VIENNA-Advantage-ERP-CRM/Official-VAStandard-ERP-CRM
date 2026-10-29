@@ -162,6 +162,11 @@
                         if (width > 0 && $root[0]) {
                             $root[0].style.setProperty('--widget-inline-size', width + 'px');
                         }
+                        // Height caps the font scale so the 4 rows of a page always fit in full.
+                        var height = entries[i].contentRect.height;
+                        if (height > 0 && $root[0]) {
+                            $root[0].style.setProperty('--widget-block-size', height + 'px');
+                        }
                     }
                 });
                 widgetObserver.observe($wrapper[0]);

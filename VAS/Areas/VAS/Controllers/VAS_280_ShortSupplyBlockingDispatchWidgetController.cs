@@ -76,6 +76,7 @@ namespace VAS.Controllers
 
         private const int DefaultPageSize = 7;
         private const int MaxPageSize = 10;
+        private const int MaxWidgetPageSize = 25;   // widget list: rows fitted to the tile height (Sr 8.32)
         private const int MaxLineRows = 200;
 
         /// <summary>
@@ -94,7 +95,11 @@ namespace VAS.Controllers
 
             Ctx ctx = Session["ctx"] as Ctx;
             if (page < 0) { page = 0; }
-            if (size <= 0 || size > MaxPageSize) { size = DefaultPageSize; }
+            // Sr 8.32: the widget sends the number of rows that fit its current height, so
+            // a larger size is honoured (clamped) instead of silently falling back to 7 -
+            // otherwise "Showing a-b of N" would again disagree with the visible rows.
+            if (size <= 0) { size = DefaultPageSize; }
+            if (size > MaxWidgetPageSize) { size = MaxWidgetPageSize; }
 
             try
             {
