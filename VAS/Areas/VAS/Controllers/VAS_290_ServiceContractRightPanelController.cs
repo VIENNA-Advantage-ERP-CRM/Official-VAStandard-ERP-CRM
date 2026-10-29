@@ -9,6 +9,7 @@ using System.Web.Mvc;
 using Newtonsoft.Json;
 using VAdvantage.Utility;
 using VAS.Models;
+using VIS.Filters;
 
 namespace VAS.Controllers
 {
@@ -22,6 +23,7 @@ namespace VAS.Controllers
     ///                 jQuery.parseJSON() on the already-parsed string.
     /// Chronological development:
     ///   VAI154  17-Sep-2026  Created
+    ///   VAI052  28-Oct-2026  Added RunContractAction (Generate Schedule / Generate Invoice / Renew)
     /// </summary>
     public class VAS_290_ServiceContractRightPanelController : Controller
     {
@@ -77,6 +79,29 @@ namespace VAS.Controllers
             Ctx ctx    = (Ctx)Session["ctx"];
             var model  = new VAS_290_ServiceContractRightPanelModel();
             var result = model.GetContractSchedules(ctx, safeId);
+            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+        }
+
+        // ─────────────────────────────────────────────────────────
+        // §2b  Header actions
+        // ─────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Runs a header action (Generate Schedule, Generate Invoice or Renew) for the
+        /// contract through the standard process engine. The model re-checks that the
+        /// action is allowed for the contract's current state before anything runs.
+        /// </summary>
+        /// <param name="contractId">C_Contract_ID of the selected service contract.</param>
+        /// <param name="actionName">GenerateSchedule, GenerateInvoice or Renew.</param>
+        /// <returns>Double-serialized JSON <c>{ success, message }</c>.</returns>
+        [HttpPost]
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public ActionResult RunContractAction(int contractId, string actionName)
+        {
+            Ctx ctx    = (Ctx)Session["ctx"];
+            var model  = new VAS_290_ServiceContractRightPanelModel();
+            var result = model.RunContractAction(ctx, Util.GetValueOfInt(contractId), Util.GetValueOfString(actionName));
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
         }
 
