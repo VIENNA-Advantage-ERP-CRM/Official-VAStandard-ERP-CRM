@@ -34,6 +34,9 @@ namespace VAdvantage.Process
         string isExcludeEmployee = string.Empty, excludedEmails = string.Empty;
         string isAutoAttach = string.Empty;
         string accessToken = string.Empty, provider = string.Empty, userEmail = string.Empty, userDomain = string.Empty;
+        // VA101_Protocol of the current mail configuration; isVA101Fetch is true when its mails are fetched through VA101
+        string protocol = string.Empty;
+        bool isVA101Fetch = false;
         DataSet dsUser = null;
         private Assembly assembly;
         private Type emailServiceType;
@@ -126,7 +129,11 @@ namespace VAdvantage.Process
                     continue;
                 }
 
-                if (Env.IsModuleInstalled("VA101_") && Util.GetValueOfString(ds.Tables[0].Rows[i]["VA101_Protocol"]).Equals("OA"))
+                // OA = OAuth (Google, Microsoft), EX = Exchange Web Services: both fetch through VA101
+                protocol = Env.IsModuleInstalled("VA101_") ? Util.GetValueOfString(ds.Tables[0].Rows[i]["VA101_Protocol"]) : string.Empty;
+                isVA101Fetch = protocol.Equals("OA") || protocol.Equals("EX");
+
+                if (isVA101Fetch)
                 {
                     provider = Util.GetValueOfString(ds.Tables[0].Rows[i]["VA101_Provider"]);
                     apiAuthCred_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["VA101_APIAuthCredential_ID"]);
@@ -137,9 +144,10 @@ namespace VAdvantage.Process
                         continue;
                     }
 
-                    accessToken = Util.GetValueOfString(ds.Tables[0].Rows[0]["VA101_AccessToken"]);
+                    accessToken = Util.GetValueOfString(ds.Tables[0].Rows[i]["VA101_AccessToken"]);
 
-                    if (string.IsNullOrEmpty(accessToken))
+                    // Exchange signs in with the stored user name and password and has no access token
+                    if (protocol.Equals("OA") && string.IsNullOrEmpty(accessToken))
                     {
                         log.Log(Level.SEVERE, Msg.GetMsg(GetCtx(), "TokenNotGenerated") + " " + ds.Tables[0].Rows[i]["AD_User_ID"].ToString());
                         continue;
@@ -226,7 +234,7 @@ namespace VAdvantage.Process
 
                 if (AD_User_ID > 0)
                 {
-                    if (Env.IsModuleInstalled("VA101_") && Util.GetValueOfString(ds.Tables[0].Rows[i]["VA101_Protocol"]).Equals("OA"))
+                    if (isVA101Fetch)
                     {
                         assembly = Assembly.Load("VA101Svc");
                         // Load type VA101.Common.EmailServices
