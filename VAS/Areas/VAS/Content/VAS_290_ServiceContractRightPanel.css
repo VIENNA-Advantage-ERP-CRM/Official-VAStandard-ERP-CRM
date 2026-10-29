@@ -318,6 +318,12 @@
     grid-template-columns: 1.75em minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 0.95fr);
 }
 
+/* Schedules that carry a surcharge get an extra Surcharge column between Tax and Total */
+.vas_290_sc-dg--sur.vas_290_sc-dg-head,
+.vas_290_sc-dg--sur.vas_290_sc-dg-row {
+    grid-template-columns: 1.75em minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 0.95fr);
+}
+
 .vas_290_sc-dg-head { border-bottom: 1px solid var(--sc-strong-div); }
 
 .vas_290_sc-dg-head .vas_290_sc-cell {
@@ -508,10 +514,19 @@
         grid-template-columns: 1.75em minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr);
     }
 
+    .vas_290_sc-dg--sur.vas_290_sc-dg-head,
+    .vas_290_sc-dg--sur.vas_290_sc-dg-row {
+        grid-template-columns: 1.75em minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr);
+    }
+
     .vas_290_sc-dg-head .vas_290_sc-cell:nth-child(5),
     .vas_290_sc-dg-row  .vas_290_sc-cell:nth-child(5),
     .vas_290_sc-dg-head .vas_290_sc-cell:nth-child(6),
     .vas_290_sc-dg-row  .vas_290_sc-cell:nth-child(6) { display: none; }
+
+    /* with the surcharge column, Total is the 7th cell and is hidden as well */
+    .vas_290_sc-dg--sur.vas_290_sc-dg-head .vas_290_sc-cell:nth-child(7),
+    .vas_290_sc-dg--sur.vas_290_sc-dg-row  .vas_290_sc-cell:nth-child(7) { display: none; }
 }
 
 @media (max-width: 440px) {

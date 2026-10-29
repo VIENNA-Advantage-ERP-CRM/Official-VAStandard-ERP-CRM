@@ -13,7 +13,9 @@ using System.Text;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
+using VAdvantage.Login;
 using VAdvantage.Model;
+using VAdvantage.ProcessEngine;
 using VAdvantage.Utility;
 
 namespace VAS.Models
@@ -25,6 +27,7 @@ namespace VAS.Models
     ///                 right-side detail panel on the Service Contract screen.
     /// Chronological development:
     ///   VAI154  17-Sep-2026  Created
+    ///   VAI052  28-Oct-2026  Header actions: ScheduleContract/RenewContract flags, RunContractAction
     /// </summary>
     public class VAS_290_ServiceContractRightPanelModel
     {
@@ -59,6 +62,9 @@ namespace VAS.Models
 
             try
             {
+                // Surcharge amount only exists once the surcharge-tax columns are installed.
+                bool hasSurcharge = ColumnExists("C_Contract", "SurchargeAmt");
+
                 var sb = new StringBuilder();
                 sb.Append("SELECT c.C_Contract_ID,");
                 sb.Append("       c.DocumentNo,");
@@ -92,6 +98,8 @@ namespace VAS.Models
                 sb.Append("       c.PriceList AS PriceListAmount,");
                 sb.Append("       c.Discount,");
                 sb.Append("       c.TaxAmt,");
+                if (hasSurcharge)
+                    sb.Append("       c.SurchargeAmt,");
                 sb.Append("       c.LineNetAmt,");
                 sb.Append("       c.GrandTotal,");
                 sb.Append("       c.M_PriceList_ID,");
@@ -104,6 +112,8 @@ namespace VAS.Models
                 sb.Append("       cur.StdPrecision AS CurrencyPrecision,");
                 sb.Append("       COALESCE(c.Description, N'') AS Description,");
                 sb.Append("       c.RenewalType,");
+                sb.Append("       c.ScheduleContract,");
+                sb.Append("       c.RenewContract,");
                 sb.Append("       c.CancelBeforeDays,");
                 sb.Append("       c.CancellationDate");
                 sb.Append("  FROM C_Contract c");
@@ -171,6 +181,7 @@ namespace VAS.Models
                 response.priceListAmount = row["PriceListAmount"] != DBNull.Value ? Convert.ToDecimal(row["PriceListAmount"]) : (decimal?)null;
                 response.discount = row["Discount"] != DBNull.Value ? Convert.ToDecimal(row["Discount"]) : (decimal?)null;
                 response.taxAmt = row["TaxAmt"] != DBNull.Value ? Convert.ToDecimal(row["TaxAmt"]) : (decimal?)null;
+                response.surchargeAmt = (hasSurcharge && row["SurchargeAmt"] != DBNull.Value) ? Convert.ToDecimal(row["SurchargeAmt"]) : (decimal?)null;
                 response.lineNetAmt = row["LineNetAmt"] != DBNull.Value ? Convert.ToDecimal(row["LineNetAmt"]) : (decimal?)null;
                 response.grandTotal = row["GrandTotal"] != DBNull.Value ? Convert.ToDecimal(row["GrandTotal"]) : (decimal?)null;
                 response.priceListName = Util.GetValueOfString(row["PriceListName"]);
@@ -180,6 +191,18 @@ namespace VAS.Models
                 response.currencyPrecision = row["CurrencyPrecision"] != DBNull.Value ? Util.GetValueOfInt(row["CurrencyPrecision"]) : 2;
                 response.description = Util.GetValueOfString(row["Description"]);
                 response.renewalType = Util.GetValueOfString(row["RenewalType"]);
+
+                // Header action availability. The same rule set re-checks every action on the
+                // server (RunContractAction), so the buttons only mirror what is allowed.
+                string scheduleContract = NormalizeYN(row["ScheduleContract"]);
+                string renewContract    = NormalizeYN(row["RenewContract"]);
+                string renewalTypeCode  = Util.GetValueOfString(row["RenewalType"]);
+                response.scheduleContract     = scheduleContract;
+                response.renewContract        = renewContract;
+                response.canGenerateSchedule  = CanRunAction(ACTION_GENERATE_SCHEDULE, scheduleContract, renewContract, renewalTypeCode);
+                response.canGenerateInvoice   = CanRunAction(ACTION_GENERATE_INVOICE,  scheduleContract, renewContract, renewalTypeCode);
+                response.canRenew             = CanRunAction(ACTION_RENEW,             scheduleContract, renewContract, renewalTypeCode);
+
                 response.cancelBeforeDays = row["CancelBeforeDays"] != DBNull.Value ? Util.GetValueOfInt(row["CancelBeforeDays"]) : (int?)null;
                 response.cancellationDate = row["CancellationDate"] != DBNull.Value ? Convert.ToDateTime(row["CancellationDate"]).ToString("yyyy-MM-dd") : null;
             }
@@ -189,6 +212,17 @@ namespace VAS.Models
                 response.error = "not_found";
                 return response;
             }
+
+            // ── Order Line: the same text the window shows in its Order Line field ──
+            // Separate, guarded query so a lookup problem falls back to the line number in the
+            // panel instead of failing the whole header.
+            if (!string.IsNullOrEmpty(Util.GetValueOfString(response.orderLineNo)))
+            {
+                response.orderLineDisplay = GetOrderLineDisplay(ctx, contractId);
+            }
+
+            // ── Total invoiced: the invoices generated for this contract ────────────
+            response.invoicedTotal = GetInvoicedTotal(ctx, contractId);
 
             // ── Translate reference display values via AD_Ref_List ─────────────
             // These are resolved via separate targeted queries so that a missing
@@ -229,6 +263,246 @@ namespace VAS.Models
             return response;
         }
 
+        /// <summary>
+        /// Display text of the contract's Order Line, built by the framework's own TableDir lookup
+        /// (the identifier columns of C_OrderLine) - the same text the window's Order Line field shows.
+        /// </summary>
+        /// <param name="ctx">Current session context.</param>
+        /// <param name="contractId">C_Contract_ID.</param>
+        /// <returns>Display text, or null when it cannot be resolved (caller falls back to the line number).</returns>
+        private string GetOrderLineDisplay(Ctx ctx, int contractId)
+        {
+            try
+            {
+                Language language = Language.GetLoginLanguage(ctx);
+                string embed = VLookUpFactory.GetLookup_TableDirEmbed(language, "C_OrderLine_ID", "c", "C_OrderLine_ID");
+                if (string.IsNullOrEmpty(embed)) return null;
+
+                string text = Util.GetValueOfString(DB.ExecuteScalar(
+                    "SELECT (" + embed + ") FROM C_Contract c WHERE c.C_Contract_ID = @contractId",
+                    new SqlParameter[] { new SqlParameter("@contractId", contractId) },
+                    null));
+                return string.IsNullOrEmpty(text) ? null : text;
+            }
+            catch (Exception ex)
+            {
+                _log.SaveError("VAS_290_ServiceContractRightPanelModel.GetOrderLineDisplay", ex.Message);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Sum of the grand totals of the invoices generated for the contract: every invoice that
+        /// carries the contract (C_Invoice.C_Contract_ID, set by the Generate Invoice process) plus any
+        /// invoice linked from one of its schedules. Voided and reversed invoices and the negative
+        /// reversal documents are left out. Independent of whether the schedule rows kept their link.
+        /// </summary>
+        /// <param name="ctx">Current session context.</param>
+        /// <param name="contractId">C_Contract_ID.</param>
+        /// <returns>Total, or null when it cannot be read (the panel then falls back to the schedules).</returns>
+        private decimal? GetInvoicedTotal(Ctx ctx, int contractId)
+        {
+            try
+            {
+                string sql = @"SELECT COALESCE(SUM(i.GrandTotal), 0)
+                                 FROM C_Invoice i
+                                WHERE i.AD_Client_ID = @adClientId
+                                  AND i.IsActive = 'Y'
+                                  AND i.DocStatus NOT IN ('VO', 'RE')
+                                  AND i.GrandTotal > 0
+                                  AND (i.C_Contract_ID = @contractId
+                                       OR i.C_Invoice_ID IN (SELECT s.C_Invoice_ID
+                                                               FROM C_ContractSchedule s
+                                                              WHERE s.C_Contract_ID = @contractId
+                                                                AND s.C_Invoice_ID IS NOT NULL))";
+                object value = DB.ExecuteScalar(sql, new SqlParameter[]
+                {
+                    new SqlParameter("@adClientId", ctx.GetAD_Client_ID()),
+                    new SqlParameter("@contractId", contractId)
+                }, null);
+                return (value == null || value == DBNull.Value) ? (decimal?)null : Convert.ToDecimal(value);
+            }
+            catch (Exception ex)
+            {
+                _log.SaveError("VAS_290_ServiceContractRightPanelModel.GetInvoicedTotal", ex.Message);
+                return null;
+            }
+        }
+
+        // ─────────────────────────────────────────────────────────
+        // §1b  Header actions (Generate Schedule / Generate Invoice / Renew)
+        // ─────────────────────────────────────────────────────────
+
+        private const string ACTION_GENERATE_SCHEDULE = "GenerateSchedule";
+        private const string ACTION_GENERATE_INVOICE  = "GenerateInvoice";
+        private const string ACTION_RENEW             = "Renew";
+
+        /// <summary>Y/N flag as stored; anything other than Y (including empty) counts as N.</summary>
+        private static string NormalizeYN(object value)
+        {
+            return Util.GetValueOfString(value) == "Y" ? "Y" : "N";
+        }
+
+        /// <summary>
+        /// Rules for the three header actions:
+        ///   Generate Schedule : ScheduleContract = N
+        ///   Generate Invoice  : ScheduleContract = Y
+        ///   Renew             : ScheduleContract = Y AND RenewContract = N AND RenewalType != 'A'
+        /// </summary>
+        private static bool CanRunAction(string action, string scheduleContract, string renewContract, string renewalType)
+        {
+            switch (action)
+            {
+                case ACTION_GENERATE_SCHEDULE:
+                    return scheduleContract == "N";
+                case ACTION_GENERATE_INVOICE:
+                    return scheduleContract == "Y";
+                case ACTION_RENEW:
+                    return scheduleContract == "Y" && renewContract == "N" && renewalType != X_C_Contract.RENEWALTYPE_Automatic;
+                default:
+                    return false;
+            }
+        }
+
+        /// <summary>C_Contract button column whose AD_Column.AD_Process_ID is the process behind an action.</summary>
+        private static string GetActionColumnName(string action)
+        {
+            switch (action)
+            {
+                case ACTION_GENERATE_SCHEDULE: return "ScheduleContract";
+                case ACTION_GENERATE_INVOICE:  return "GenerateInvoice";
+                case ACTION_RENEW:             return "RenewContract";
+                default:                       return null;
+            }
+        }
+
+        private static string GetMsgOr(Ctx ctx, string key, string fallback)
+        {
+            string text = Msg.GetMsg(ctx, key);
+            return (string.IsNullOrEmpty(text) || text == key || text == "[" + key + "]") ? fallback : text;
+        }
+
+        /// <summary>
+        /// Runs one of the header actions through the standard process engine, exactly as the
+        /// classic window's own button would. The posted contract id is never trusted on its own:
+        /// the row is re-read with role access, and the action is re-validated against the same
+        /// rules that drive the buttons before the process starts.
+        /// </summary>
+        /// <param name="ctx">Current session context.</param>
+        /// <param name="contractId">C_Contract_ID (or a child schedule id) of the selected contract.</param>
+        /// <param name="actionName">GenerateSchedule, GenerateInvoice or Renew.</param>
+        /// <returns>Object with <c>success</c> and a user-facing <c>message</c>.</returns>
+        public dynamic RunContractAction(Ctx ctx, int contractId, string actionName)
+        {
+            dynamic response = new ExpandoObject();
+            response.success = false;
+            response.message = null;
+
+            contractId = ResolveToContractId(contractId);
+            string buttonColumn = GetActionColumnName(actionName);
+            if (contractId <= 0 || buttonColumn == null)
+            {
+                response.message = GetMsgOr(ctx, "VAS_290_ActionNotAllowed", "This action is not available for the selected contract.");
+                return response;
+            }
+
+            try
+            {
+                string baseSql = "SELECT c.ScheduleContract, c.RenewContract, c.RenewalType"
+                               + "  FROM C_Contract c"
+                               + " WHERE c.C_Contract_ID = @contractId"
+                               + "   AND c.AD_Client_ID = @adClientId"
+                               + "   AND c.IsActive = 'Y'";
+                string accessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                    baseSql, "c", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW);
+                if (DB.IsOracle())
+                    accessSql = RemovePrivateAccessClauses(accessSql);
+
+                DataSet ds = DB.ExecuteDataset(accessSql, new SqlParameter[]
+                {
+                    new SqlParameter("@contractId", contractId),
+                    new SqlParameter("@adClientId", ctx.GetAD_Client_ID())
+                }, null);
+
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                {
+                    response.message = GetMsgOr(ctx, "VAS_290_ContractNotFound", "Contract not found or not accessible.");
+                    return response;
+                }
+
+                DataRow row = ds.Tables[0].Rows[0];
+                if (!CanRunAction(actionName, NormalizeYN(row["ScheduleContract"]), NormalizeYN(row["RenewContract"]),
+                                  Util.GetValueOfString(row["RenewalType"])))
+                {
+                    response.message = GetMsgOr(ctx, "VAS_290_ActionNotAllowed", "This action is not available for the selected contract.");
+                    return response;
+                }
+
+                int processId = GetColumnProcessId("C_Contract", buttonColumn);
+                if (processId <= 0)
+                {
+                    response.message = GetMsgOr(ctx, "VAS_290_ProcessNotConfigured", "This action is not configured.");
+                    return response;
+                }
+
+                MPInstance instance = new MPInstance(ctx, processId, contractId);
+                if (!instance.Save())
+                {
+                    response.message = GetMsgOr(ctx, "VAS_290_ProcessStartFailed", "The process could not be started.");
+                    return response;
+                }
+
+                ProcessInfo pi = new ProcessInfo(string.Empty, processId, MTable.Get_Table_ID("C_Contract"), contractId);
+                pi.SetAD_PInstance_ID(instance.GetAD_PInstance_ID());
+                pi.SetAD_Client_ID(ctx.GetAD_Client_ID());
+                pi.SetAD_Org_ID(ctx.GetAD_Org_ID());
+                pi.SetAD_User_ID(ctx.GetAD_User_ID());
+
+                ProcessCtl worker = new ProcessCtl(ctx, null, pi, null);
+                worker.Run();
+
+                string summary = pi.GetSummary();
+                if (pi.IsError())
+                {
+                    response.message = !string.IsNullOrEmpty(summary)
+                        ? summary
+                        : GetMsgOr(ctx, "VAS_290_ProcessFailed", "The process reported an error.");
+                    return response;
+                }
+
+                response.success = true;
+                response.message = summary;
+            }
+            catch (Exception ex)
+            {
+                _log.SaveError("VAS_290_ServiceContractRightPanelModel.RunContractAction(" + actionName + ")", ex.Message);
+                response.success = false;
+                response.message = ex.Message;
+            }
+            return response;
+        }
+
+        /// <summary>
+        /// AD_Process_ID wired to a table button column (AD_Table -> AD_Column.AD_Process_ID).
+        /// Resolved from the dictionary every time because the id differs per tenant/import.
+        /// </summary>
+        private static int GetColumnProcessId(string tableName, string columnName)
+        {
+            string sql = @"SELECT c.AD_Process_ID
+                             FROM AD_Table t
+                             JOIN AD_Column c ON (c.AD_Table_ID = t.AD_Table_ID)
+                            WHERE t.TableName = @tbl
+                              AND c.ColumnName = @col
+                              AND t.IsActive = 'Y'
+                              AND c.IsActive = 'Y'
+                              AND c.AD_Process_ID IS NOT NULL";
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql, new SqlParameter[]
+            {
+                new SqlParameter("@tbl", tableName),
+                new SqlParameter("@col", columnName)
+            }, null));
+        }
+
         // ─────────────────────────────────────────────────────────
         // §2  Contract schedules
         // ─────────────────────────────────────────────────────────
@@ -263,6 +537,10 @@ namespace VAS.Models
 
             try
             {
+                // SurchargeAmt only exists once the surcharge-tax columns are installed (the
+                // Schedule Contract process guards it the same way), so read it only when present.
+                bool hasSurcharge = ColumnExists("C_ContractSchedule", "SurchargeAmt");
+
                 var sb = new StringBuilder();
                 sb.Append("SELECT s.C_ContractSchedule_ID,");
                 sb.Append("       s.C_Contract_ID,");
@@ -271,11 +549,17 @@ namespace VAS.Models
                 sb.Append("       s.TotalAmt,");
                 sb.Append("       s.TaxAmt,");
                 sb.Append("       s.GrandTotal,");
+                if (hasSurcharge)
+                    sb.Append("       COALESCE(s.SurchargeAmt, 0) AS SurchargeAmt,");
                 sb.Append("       s.C_Invoice_ID,");
                 // Correlated subquery instead of LEFT JOIN so AddAccessSQL does not inject
                 // "i.C_Invoice_ID NOT IN (SELECT Record_ID ...)" which causes ORA-01722 on Oracle
                 // when C_Invoice_ID is NULL (LEFT JOIN miss) or when Record_ID type-mismatches NUMBER.
                 sb.Append("       (SELECT inv.DocumentNo FROM C_Invoice inv WHERE inv.C_Invoice_ID = s.C_Invoice_ID AND inv.IsActive = 'Y') AS InvoiceDocumentNo, ");
+                // The generated invoice's own amount and status (Total Invoiced in the Billing section
+                // sums these rather than the schedule's planned amounts).
+                sb.Append("       (SELECT inv.GrandTotal FROM C_Invoice inv WHERE inv.C_Invoice_ID = s.C_Invoice_ID AND inv.IsActive = 'Y') AS InvoiceGrandTotal, ");
+                sb.Append("       (SELECT inv.DocStatus FROM C_Invoice inv WHERE inv.C_Invoice_ID = s.C_Invoice_ID AND inv.IsActive = 'Y') AS InvoiceDocStatus, ");
                 sb.Append("       CASE");
                 sb.Append("           WHEN s.C_Invoice_ID IS NOT NULL THEN 'Invoiced'");
                 // Date literal is inlined for both dialects so no bind parameter is needed.
@@ -323,11 +607,22 @@ namespace VAS.Models
                     item.contractId = Util.GetValueOfInt(row["C_Contract_ID"]);
                     item.fromDate = row["FROMDATE"] != DBNull.Value ? Convert.ToDateTime(row["FROMDATE"]).ToString("yyyy-MM-dd") : null;
                     item.endDate = row["EndDate"] != DBNull.Value ? Convert.ToDateTime(row["EndDate"]).ToString("yyyy-MM-dd") : null;
-                    item.totalAmt = row["TotalAmt"] != DBNull.Value ? Convert.ToDecimal(row["TotalAmt"]) : (decimal?)null;
-                    item.taxAmt = row["TaxAmt"] != DBNull.Value ? Convert.ToDecimal(row["TaxAmt"]) : (decimal?)null;
-                    item.grandTotal = row["GrandTotal"] != DBNull.Value ? Convert.ToDecimal(row["GrandTotal"]) : (decimal?)null;
+                    decimal? totalAmt   = row["TotalAmt"] != DBNull.Value ? Convert.ToDecimal(row["TotalAmt"]) : (decimal?)null;
+                    decimal? taxAmt     = row["TaxAmt"] != DBNull.Value ? Convert.ToDecimal(row["TaxAmt"]) : (decimal?)null;
+                    decimal? grandTotal = row["GrandTotal"] != DBNull.Value ? Convert.ToDecimal(row["GrandTotal"]) : (decimal?)null;
+                    decimal surchargeAmt = (hasSurcharge && row["SurchargeAmt"] != DBNull.Value) ? Convert.ToDecimal(row["SurchargeAmt"]) : 0m;
+                    item.totalAmt = totalAmt;
+                    item.taxAmt = taxAmt;
+                    item.grandTotal = grandTotal;
+                    item.surchargeAmt = surchargeAmt;
+                    // Taxable amount = the base the tax and surcharge are charged on. TotalAmt is not
+                    // that: it carries the contract's line amount, which is tax-inclusive when the
+                    // price list is, so it can equal the grand total.
+                    item.taxableAmt = grandTotal.HasValue ? grandTotal.Value - (taxAmt ?? 0m) - surchargeAmt : totalAmt;
                     item.cInvoiceId = row["C_Invoice_ID"] != DBNull.Value ? Util.GetValueOfInt(row["C_Invoice_ID"]) : (int?)null;
                     item.invoiceDocumentNo = Util.GetValueOfString(row["InvoiceDocumentNo"]);
+                    item.invoiceGrandTotal = row["InvoiceGrandTotal"] != DBNull.Value ? Convert.ToDecimal(row["InvoiceGrandTotal"]) : (decimal?)null;
+                    item.invoiceDocStatus = Util.GetValueOfString(row["InvoiceDocStatus"]);
                     item.billingStatus = Util.GetValueOfString(row["BillingStatus"]);
                     items.Add(item);
                 }
@@ -346,6 +641,31 @@ namespace VAS.Models
         // ─────────────────────────────────────────────────────────
         // Private helpers
         // ─────────────────────────────────────────────────────────
+
+        /// <summary>Whether the dictionary defines an active column on a table.</summary>
+        private static bool ColumnExists(string tableName, string columnName)
+        {
+            try
+            {
+                int count = Util.GetValueOfInt(DB.ExecuteScalar(
+                    @"SELECT COUNT(*)
+                        FROM AD_Column c
+                        JOIN AD_Table t ON (t.AD_Table_ID = c.AD_Table_ID)
+                       WHERE t.TableName = @tbl AND c.ColumnName = @col
+                         AND t.IsActive = 'Y' AND c.IsActive = 'Y'",
+                    new SqlParameter[]
+                    {
+                        new SqlParameter("@tbl", tableName),
+                        new SqlParameter("@col", columnName)
+                    }, null));
+                return count > 0;
+            }
+            catch (Exception ex)
+            {
+                _log.SaveError("VAS_290_ServiceContractRightPanelModel.ColumnExists", ex.Message);
+                return false;
+            }
+        }
 
         /// <summary>
         /// Resolves a possible C_ContractSchedule_ID to its parent C_Contract_ID.
