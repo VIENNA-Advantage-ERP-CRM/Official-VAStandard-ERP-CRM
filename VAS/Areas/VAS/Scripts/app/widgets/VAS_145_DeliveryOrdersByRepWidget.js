@@ -372,7 +372,8 @@
             $modalRows = $modal.find('.MPC-dor-m-rows');
             $modalFooter = $modal.find('.MPC-dor-m-foot');
 
-            var closeText = label('Close', 'Close');
+            // Own key, like VAS_144 / VAS_146: the framework "Close" text reads "Close Window".
+            var closeText = label('VAS_145_Close', 'Close');
             $modal.find('.MPC-dor-m-close').attr({ 'aria-label': closeText, title: closeText });
             $('body').append($modal);
 
@@ -615,10 +616,13 @@
                                 '<span class="MPC-dor-title" title="' + escapeHtml(label('VAS_145_Title', 'Delivery Orders by Representative')) + '">' + escapeHtml(label('VAS_145_Title', 'Delivery Orders by Representative')) + '</span>' +
                             '</span>' +
                         '</div>' +
-                        '<div class="MPC-dor-filters">' +
-                            '<select class="MPC-dor-select MPC-dor-month" aria-label="' + escapeHtml(label('VAS_145_FilterByMonth', 'Filter by month')) + '"></select>' +
-                            '<select class="MPC-dor-select MPC-dor-year" aria-label="' + escapeHtml(label('VAS_145_FilterByYear', 'Filter by year')) + '"></select>' +
-                        '</div>' +
+                    '</div>' +
+                    /* Month / Year filters on their own row, left-aligned with the
+                       card content (Book1 row 14, Sr. 22), so the title keeps the
+                       full header width. */
+                    '<div class="MPC-dor-filters">' +
+                        '<select class="MPC-dor-select MPC-dor-month" aria-label="' + escapeHtml(label('VAS_145_FilterByMonth', 'Filter by month')) + '"></select>' +
+                        '<select class="MPC-dor-select MPC-dor-year" aria-label="' + escapeHtml(label('VAS_145_FilterByYear', 'Filter by year')) + '"></select>' +
                     '</div>' +
                     /* Status legend on its own full-width row so all four
                        statuses and their colors are always visible (never

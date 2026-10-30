@@ -179,56 +179,9 @@
             return via ? label(via.msgKey, via.fallback) : '';
         }
 
-        function formatAmount(value, order) {
-            var precision = Number(order && order.currencyPrecision);
-            if (!isFinite(precision) || precision < 0) { precision = 2; }
-            var code = (order && order.currencyCode) || '';
-            try {
-                if (code) {
-                    return new Intl.NumberFormat(window.navigator.language, {
-                        style: 'currency',
-                        currency: code,
-                        minimumFractionDigits: precision,
-                        maximumFractionDigits: precision
-                    }).format(Number(value || 0));
-                }
-            } catch (ignored) { /* unknown ISO code - fall through */ }
-            return (code ? code + ' ' : '') + Number(value || 0).toLocaleString(window.navigator.language, {
-                minimumFractionDigits: precision,
-                maximumFractionDigits: precision
-            });
-        }
-
-        // Same currency-compaction rule used across the dashboard (see Top 10
-        // Highest Selling Products / Shipping Method): Indian-numbering
-        // currencies compact as Lakh/Crore, every other currency (including
-        // this order's own currencyCode, e.g. IQD) compacts as K/M/B. Small
-        // amounts (below the first threshold) still go through formatAmount's
-        // exact Intl currency formatting - only large values that would
-        // otherwise overflow a tight box (stat tiles, totals, line amounts)
-        // get shortened.
+        // Indian-numbering currencies group as Lakh/Crore (1,05,500.00).
         var INDIAN_NUMBERING_CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
         function usesIndianNumbering(code) { return INDIAN_NUMBERING_CURRENCIES.indexOf(String(code || '').toUpperCase()) >= 0; }
-        function trimZeros(text) { return text.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1'); }
-
-        function formatAmountCompact(value, order) {
-            var n = Number(value || 0);
-            var abs = Math.abs(n);
-            var code = (order && order.currencyCode) || '';
-            var num;
-            if (usesIndianNumbering(code)) {
-                if (abs >= 1e7) { num = trimZeros((n / 1e7).toFixed(2)) + 'Cr'; }
-                else if (abs >= 1e5) { num = trimZeros((n / 1e5).toFixed(2)) + 'L'; }
-                else if (abs >= 1e3) { num = trimZeros((n / 1e3).toFixed(1)) + 'K'; }
-                else { return formatAmount(value, order); }
-            } else {
-                if (abs >= 1e9) { num = trimZeros((n / 1e9).toFixed(1)) + 'B'; }
-                else if (abs >= 1e6) { num = trimZeros((n / 1e6).toFixed(1)) + 'M'; }
-                else if (abs >= 1e3) { num = trimZeros((n / 1e3).toFixed(1)) + 'K'; }
-                else { return formatAmount(value, order); }
-            }
-            return code ? (code + ' ' + num) : num;
-        }
 
         function amountPrecision(order) {
             var precision = Number(order && order.currencyPrecision);
@@ -252,6 +205,14 @@
             var symbol = (order && (order.currencySymbol || order.currencyCode)) || '';
             var number = formatNumberFull(value, order);
             return symbol ? (symbol + ' ' + number) : number;
+        }
+
+        /* Full amount with the ISO code in front ("INR 1,05,500.00") - the
+           header Total Value card (Book1 rows 6-7: no K/L/M abbreviations). */
+        function formatAmountWithCode(value, order) {
+            var code = (order && order.currencyCode) || '';
+            var number = formatNumberFull(value, order);
+            return code ? (code + ' ' + number) : number;
         }
 
         function formatQty(value) {
@@ -557,7 +518,7 @@
 
             var stats =
                 '<span class="MPC-dos-stats">' +
-                    '<span class="MPC-dos-stat"><span class="MPC-dos-stat-k">' + escapeHtml(label('VAS_144_TotalValue', 'Total Value')) + '</span><span class="MPC-dos-stat-v" title="' + escapeHtml(formatAmount(order.total, order)) + '">' + escapeHtml(formatAmountCompact(order.total, order)) + '</span></span>' +
+                    '<span class="MPC-dos-stat"><span class="MPC-dos-stat-k">' + escapeHtml(label('VAS_144_TotalValue', 'Total Value')) + '</span><span class="MPC-dos-stat-v" title="' + escapeHtml(formatAmountWithCode(order.total, order)) + '">' + escapeHtml(formatAmountWithCode(order.total, order)) + '</span></span>' +
                     '<span class="MPC-dos-stat"><span class="MPC-dos-stat-k">' + escapeHtml(label('VAS_144_Lines', 'Lines')) + '</span><span class="MPC-dos-stat-v">' + ((order.lines || []).length) + '</span></span>' +
                     '<span class="MPC-dos-stat"><span class="MPC-dos-stat-k">' + escapeHtml(label('VAS_144_DeliveryDate', 'Delivery Date')) + '</span><span class="MPC-dos-stat-v">' + escapeHtml(formatDate(order.deliveryDate) || '-') + '</span></span>' +
                 '</span>';

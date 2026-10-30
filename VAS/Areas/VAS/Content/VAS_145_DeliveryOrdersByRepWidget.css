@@ -119,11 +119,14 @@
 }
 
 /* ---- Month / Year filters ---- */
+/* Own row under the header, starting at the card's left padding. */
 .MPC-dor-filters {
     display: flex;
     align-items: center;
+    justify-content: flex-start;
     gap: 0.375em;
     flex-shrink: 0;
+    margin-top: 0.5em;
 }
 
 .MPC-dor-select {

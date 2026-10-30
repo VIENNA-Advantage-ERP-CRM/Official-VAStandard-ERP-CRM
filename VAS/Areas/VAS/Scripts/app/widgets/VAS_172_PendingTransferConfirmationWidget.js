@@ -125,8 +125,21 @@
         return isNaN(v) ? 0 : v;
     }
 
+    var infoTimer = null;
+
     function showInfo(key, fallback) {
         var msg = lbl(key, fallback);
+        // While the Review Confirmation Line pop-up is open the message is shown inside it: the
+        // framework dialog can end up under the pop-up's fixed overlay, so a quantity was reset
+        // with no visible reason (30-Oct test pass).
+        var box = document.getElementById('vas172-msg');
+        if (box) {
+            box.textContent = msg;
+            box.hidden = false;
+            clearTimeout(infoTimer);
+            infoTimer = setTimeout(function () { box.hidden = true; }, 6000);
+            return;
+        }
         // Already-resolved text goes in the raw-text argument with an empty key (as VAS_090 does).
         try { VIS.ADialog.info("", true, msg); }
         catch (e) { alert(msg); }
@@ -439,6 +452,7 @@
                                     '<textarea class="vas-172-textarea" id="vas172-inp-desc" rows="2" maxlength="' + DESCRIPTION_MAX + '" placeholder="' + escapeHtml(lbl('VAS_172_AddNoteOptional', 'Add a note (optional)')) + '">' + escapeHtml(l.Description || '') + '</textarea>' +
                                 '</div>' +
                             '</div>' +
+                            '<div class="vas-172-v2-msg" id="vas172-msg" role="alert" hidden></div>' +
                             '<div class="vas-172-v2-footer">' +
                                 '<button type="button" class="vas-172-btn-save" id="vas172-btn-save">' + escapeHtml(lbl('VAS_172_SaveLine', 'Save Line')) + '</button>' +
                             '</div>' +
@@ -454,8 +468,8 @@
             $modal.find('#vas172-btn-open').on('click', openRecord);
             $modal.find('#vas172-b2').on('click', function () { renderModalView1(); });
 
-            // ---- Receiving / scrap locator: options by locator NAME (search key), not the code; the
-            //      line's current locator is always one of them ----
+            // ---- Receiving / scrap locator: every locator of the To Warehouse, by locator NAME (not the
+            //      search key / code); the line's current locator is always one of them ----
             var $sel = $modal.find('#vas172-sel-scrap');
             var $recv = $modal.find('#vas172-sel-recv');
             var scrapLocatorId = Number(l.ScrapLocatorID || 0);

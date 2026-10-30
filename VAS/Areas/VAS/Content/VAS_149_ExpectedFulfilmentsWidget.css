@@ -66,8 +66,8 @@
     white-space: nowrap;
 }
 
-/* 4 rows per page with breathing room between records. */
-.vas-exf-body { flex: 1; min-height: 0; display: grid; grid-template-rows: repeat(4, minmax(0, 1fr)); row-gap: .25em; overflow: hidden; }
+/* 4 rows per page with at least 8px between records (Book1 row 21, Sr. 27 - default pending confirmation). */
+.vas-exf-body { flex: 1; min-height: 0; display: grid; grid-template-rows: repeat(4, minmax(0, 1fr)); row-gap: max(8px, .5em); overflow: hidden; }
 .vas-exf-empty { grid-row: 1 / -1; display: flex; align-items: center; justify-content: center; color: #748494; font-size: .8125em; }
 
 .vas-exf-row {

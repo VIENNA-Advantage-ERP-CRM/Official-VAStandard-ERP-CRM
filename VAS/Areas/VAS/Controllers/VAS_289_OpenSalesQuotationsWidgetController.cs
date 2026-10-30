@@ -370,7 +370,6 @@ namespace VAS.Controllers
                     COALESCE(p.Name, p.Value) AS Product_Name,
                     COALESCE(p.IsStocked, 'N') AS Is_Stocked,
                     ql.M_AttributeSetInstance_ID AS Asi_Id,
-                    asi.Description AS Attribute_Text,
                     ql.C_UOM_ID AS Uom_Id,
                     u.Name AS Uom_Name,
                     COALESCE(u.StdPrecision, 0) AS Uom_Precision,
@@ -387,7 +386,6 @@ namespace VAS.Controllers
                   LEFT OUTER JOIN linked_orders lo ON ( lo.Quotation_Line_Id = ql.C_OrderLine_ID )
                   LEFT OUTER JOIN M_Product p ON ( p.M_Product_ID = ql.M_Product_ID )
                   LEFT OUTER JOIN C_UOM u ON ( u.C_UOM_ID = ql.C_UOM_ID )
-                  LEFT OUTER JOIN M_AttributeSetInstance asi ON ( asi.M_AttributeSetInstance_ID = ql.M_AttributeSetInstance_ID )
                  WHERE ql.C_Order_ID = @Quotation_Id
                    AND ql.IsActive = 'Y'
                  ORDER BY ql.Line ASC";
@@ -429,7 +427,6 @@ namespace VAS.Controllers
                         ProductName = Util.GetValueOfString(dr2["Product_Name"]),
                         IsStocked = isStocked,
                         AttributeSetInstanceId = dr2["Asi_Id"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr2["Asi_Id"]),
-                        AttributeText = Util.GetValueOfString(dr2["Attribute_Text"]),
                         UomId = dr2["Uom_Id"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr2["Uom_Id"]),
                         UomName = Util.GetValueOfString(dr2["Uom_Name"]),
                         UomPrecision = uomPrecision,
@@ -452,6 +449,15 @@ namespace VAS.Controllers
                 CloseReader(dr2);
             }
 
+            // Book1 row 110 (Sr. 32): readable attribute text, never the instance's raw
+            // description (e.g. "2_@AU180@"); a line without attributes gets none.
+            Dictionary<int, string> attributeTexts = LoadAttributeTexts(ctx, result.Lines.Select(l => l.AttributeSetInstanceId));
+            foreach (QuotationLineRow line in result.Lines)
+            {
+                string text;
+                line.AttributeText = attributeTexts.TryGetValue(line.AttributeSetInstanceId, out text) ? text : string.Empty;
+            }
+
             result.Quotation.LineCount = result.Lines.Count;
             result.Quotation.QuotedQty = result.Lines.Sum(l => l.QuotedQty);
             result.Quotation.AlreadyOrderedQty = result.Lines.Sum(l => l.AlreadyOrderedQty);
@@ -462,6 +468,81 @@ namespace VAS.Controllers
             result.Quotation.StatusChipClass = statusChip;
 
             return result;
+        }
+
+        /// <summary>
+        /// Readable text per attribute set instance: "Attribute: value" for each attribute value,
+        /// then Lot and Serial No (they sit on the instance itself), joined with ", ". The raw
+        /// M_AttributeSetInstance.Description is an internal encoding ("2_@AU180@") and is never shown.
+        /// Instances with nothing readable are left out of the map.
+        /// </summary>
+        private Dictionary<int, string> LoadAttributeTexts(Ctx ctx, IEnumerable<int> asiIds)
+        {
+            Dictionary<int, string> texts = new Dictionary<int, string>();
+            List<int> ids = asiIds.Where(id => id > 0).Distinct().ToList();
+            if (ids.Count == 0) { return texts; }
+
+            Dictionary<int, List<string>> parts = ids.ToDictionary(id => id, id => new List<string>());
+            string idList = string.Join(",", ids);
+
+            IDataReader dr = null;
+            try
+            {
+                dr = DB.ExecuteReader(@"
+                    SELECT ai.M_AttributeSetInstance_ID AS Asi_Id,
+                           a.Name AS Attribute_Name,
+                           av.Name AS List_Value,
+                           ai.Value AS Text_Value,
+                           ai.ValueNumber AS Number_Value
+                      FROM M_AttributeInstance ai
+                     INNER JOIN M_Attribute a ON ( a.M_Attribute_ID = ai.M_Attribute_ID AND a.IsActive = 'Y' )
+                      LEFT OUTER JOIN M_AttributeValue av ON ( av.M_AttributeValue_ID = ai.M_AttributeValue_ID )
+                     WHERE ai.M_AttributeSetInstance_ID IN (" + idList + @")
+                       AND ai.IsActive = 'Y'
+                     ORDER BY ai.M_AttributeSetInstance_ID, a.Name");
+                while (dr != null && dr.Read())
+                {
+                    string value = Util.GetValueOfString(dr["List_Value"]);
+                    if (string.IsNullOrWhiteSpace(value)) { value = Util.GetValueOfString(dr["Text_Value"]); }
+                    if (string.IsNullOrWhiteSpace(value) && dr["Number_Value"] != DBNull.Value)
+                    {
+                        value = Util.GetValueOfDecimal(dr["Number_Value"]).ToString("0.####", CultureInfo.InvariantCulture);
+                    }
+                    AddAttributePart(parts[Util.GetValueOfInt(dr["Asi_Id"])], Util.GetValueOfString(dr["Attribute_Name"]), value);
+                }
+            }
+            finally
+            {
+                CloseReader(dr);
+            }
+
+            try
+            {
+                dr = DB.ExecuteReader("SELECT M_AttributeSetInstance_ID AS Asi_Id, Lot, SerNo FROM M_AttributeSetInstance WHERE M_AttributeSetInstance_ID IN (" + idList + ")");
+                while (dr != null && dr.Read())
+                {
+                    List<string> list = parts[Util.GetValueOfInt(dr["Asi_Id"])];
+                    AddAttributePart(list, Msg.Translate(ctx, "Lot"), Util.GetValueOfString(dr["Lot"]));
+                    AddAttributePart(list, Msg.Translate(ctx, "SerNo"), Util.GetValueOfString(dr["SerNo"]));
+                }
+            }
+            finally
+            {
+                CloseReader(dr);
+            }
+
+            foreach (KeyValuePair<int, List<string>> entry in parts)
+            {
+                if (entry.Value.Count > 0) { texts[entry.Key] = string.Join(", ", entry.Value); }
+            }
+            return texts;
+        }
+
+        private static void AddAttributePart(List<string> list, string label, string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) { return; }
+            string part = string.IsNullOrWhiteSpace(label) ? value.Trim() : label.Trim() + ": " + value.Trim();
+            if (!list.Contains(part)) { list.Add(part); }
         }
 
         /// <summary>Warehouse-level free stock for one product+attribute: QtyOnHand - QtyReserved - QtyDedicated - QtyAllocated, summed across the warehouse's active locators. Called only for stocked products (M_Product.IsStocked='Y').</summary>
@@ -909,10 +990,15 @@ namespace VAS.Controllers
 
             if (ColumnExists("C_Order", "VA009_PaymentMethod_ID") && ColumnExists("VA009_PaymentMethod", "VA009_PaymentMethod_ID"))
             {
+                // Book1 row 129: the login tenant's methods only, as the window's "VA009_PayMethod
+                // for PO" rule does (AD_Client_ID = @AD_Client_ID@). Reading tenant 0 as well
+                // listed the system "Cash" / "Check" next to the tenant's own copies.
                 string nameCol = ResolvePaymentMethodNameColumn();
                 options.PaymentMethods = string.IsNullOrEmpty(nameCol)
                     ? new List<OptionItem>()
-                    : LoadOptionList("SELECT VA009_PaymentMethod_ID AS Id, " + nameCol + " AS Name FROM VA009_PaymentMethod WHERE IsActive='Y' AND AD_Client_ID IN (0, @c) ORDER BY " + nameCol, clientId);
+                    : LoadOptionList(
+                        role.AddAccessSQL("SELECT pm.VA009_PaymentMethod_ID AS Id, pm." + nameCol + " AS Name FROM VA009_PaymentMethod pm WHERE pm.IsActive='Y' AND pm.AD_Client_ID = @c", "pm", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO)
+                        + " ORDER BY pm." + nameCol, clientId);
             }
             else
             {

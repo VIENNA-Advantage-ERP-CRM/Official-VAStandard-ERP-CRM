@@ -94,7 +94,7 @@
             });
             $root.on('change', '.vas-177-select--year', function () {
                 selYear = parseInt($(this).val(), 10) || selYear;
-                clampFutureMonths();
+                renderMonthOptions();
                 load();
             });
             $root.on('click', '.vas-177-pager-btn', function () {
@@ -109,35 +109,28 @@
             return new Date(2000, m - 1, 1).toLocaleDateString(window.navigator.language, { month: 'long' });
         }
 
-        /* Month list: the twelve months only - no "All Months" entry (the matrix is always one
-           month). Years: the current year and the four before it. */
+        /* Years: the current year and the four before it. Months: see renderMonthOptions. */
         function renderFilterOptions() {
-            var mHtml = '';
-            for (var m = 1; m <= 12; m++) {
-                mHtml += '<option value="' + m + '">' + escapeHtml(monthName(m)) + '</option>';
-            }
-            $root.find('.vas-177-select--month').html(mHtml).val(String(selMonth));
-
             var yHtml = '';
             for (var y = now.getFullYear(); y >= now.getFullYear() - 4; y--) {
                 yHtml += '<option value="' + y + '">' + y + '</option>';
             }
             $root.find('.vas-177-select--year').html(yHtml).val(String(selYear));
-            clampFutureMonths();
+            renderMonthOptions();
         }
 
-        /* Future months are unselectable while the current year is chosen (as in VAS_145). */
-        function clampFutureMonths() {
-            var curMonth = now.getMonth() + 1;
-            var isCurrentYear = selYear === now.getFullYear();
-            var $m = $root.find('.vas-177-select--month');
-            $m.find('option').each(function () {
-                $(this).prop('disabled', isCurrentYear && Number($(this).val()) > curMonth);
-            });
-            if (isCurrentYear && selMonth > curMonth) {
-                selMonth = curMonth;
-                $m.val(String(selMonth));
+        /* Book1 rows 52/59 (Sr. 37/48, default pending confirmation): the current year lists
+           January to the current month only - months that have not happened are not offered -
+           and a past year lists all twelve. No "All Months" entry (the matrix is always one
+           month). The list is short enough to open without a scroller. */
+        function renderMonthOptions() {
+            var lastMonth = selYear === now.getFullYear() ? now.getMonth() + 1 : 12;
+            if (selMonth > lastMonth) { selMonth = lastMonth; }
+            var mHtml = '';
+            for (var m = 1; m <= lastMonth; m++) {
+                mHtml += '<option value="' + m + '">' + escapeHtml(monthName(m)) + '</option>';
             }
+            $root.find('.vas-177-select--month').html(mHtml).val(String(selMonth));
         }
 
         function setupObservers() {
