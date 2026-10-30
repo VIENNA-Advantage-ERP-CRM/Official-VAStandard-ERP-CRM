@@ -278,6 +278,10 @@ namespace VAdvantage.Model
                 log.SaveError("FillMandatory", Msg.GetElement(GetCtx(), "RecurringType"));
                 return false;
             }
+            if (GetFrequency() < 1)
+            {
+                SetFrequency(1);
+            }
             if (rt.Equals(MRecurring.RECURRINGTYPE_Order)
                 && GetC_Order_ID() == 0)
             {

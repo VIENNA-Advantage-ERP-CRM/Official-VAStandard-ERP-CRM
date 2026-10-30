@@ -30,7 +30,7 @@ namespace ModelLibrary.Process
                 {
                     productCategoryID = Util.GetValueOfString(para[i].GetParameter());
                 }
-                if (name.Equals("M_Product_ID"))
+                else if (name.Equals("M_Product_ID"))
                 {
                     productID = Util.GetValueOfString(para[i].GetParameter());
                 }

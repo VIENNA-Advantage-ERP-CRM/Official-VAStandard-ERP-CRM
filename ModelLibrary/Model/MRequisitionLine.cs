@@ -547,6 +547,19 @@ namespace VAdvantage.Model
             {
                 return success;
             }
+
+            // Budget breach approval was given for the old lines, so check budget again on complete
+            if (!IsProcessed() && Env.IsModuleInstalled("FRPT_")
+                && (newRecord || Is_ValueChanged("Qty") || Is_ValueChanged("QtyEntered") || Is_ValueChanged("PriceActual")
+                || Is_ValueChanged("C_UOM_ID") || Is_ValueChanged("M_Product_ID") || Is_ValueChanged("C_Charge_ID")
+                || Is_ValueChanged("IsActive") || Is_ValueChanged("C_Project_ID") || Is_ValueChanged("C_Activity_ID")
+                || Is_ValueChanged("C_Campaign_ID") || Is_ValueChanged("AD_OrgTrx_ID")))
+            {
+                if (MRequisition.ResetBudgetBreachApproval(GetM_Requisition_ID(), Get_TrxName()) < 0)
+                {
+                    return false;
+                }
+            }
             return UpdateHeader();
         }
 

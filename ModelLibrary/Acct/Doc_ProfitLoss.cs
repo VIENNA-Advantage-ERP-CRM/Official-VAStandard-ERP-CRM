@@ -61,7 +61,7 @@ namespace ModelLibrary.Acct
                 MProfitLossLines line = lines[i];
                 DocLine docLine = new DocLine(line, this);
                 docLine.SetAmount(line.GetC_ProfitAndLoss_ID() != 0 ? line.GetAccountDebit() : Math.Abs(line.GetAccountDebit()),
-                                  line.GetC_ProfitAndLoss_ID() != 0 ? line.GetAccountCredit():Math.Abs(line.GetAccountCredit()));
+                                  line.GetC_ProfitAndLoss_ID() != 0 ? line.GetAccountCredit() : Math.Abs(line.GetAccountCredit()));
                 //docLine.SetConvertedAmt(line.GetC_AcctSchema_ID(), line.GetAccountDebit(), line.GetAccountCredit());
 
                 // set primary key value 
@@ -163,7 +163,8 @@ namespace ModelLibrary.Acct
                 if (_ListAcctSch.Count > 0)
                 {
 
-                    int CurrencyType_ID = GetDefaultConversionType(GetAD_Client_ID(), GetAD_Org_ID());
+                    // resolved only when a line has to be converted
+                    int CurrencyType_ID = 0;
                     for (int asch = 0; asch < _ListAcctSch.Count; asch++)
                     {
                         MAcctSchema AccountingSchema = new MAcctSchema(GetCtx(), _ListAcctSch[asch], null);
@@ -186,6 +187,16 @@ namespace ModelLibrary.Acct
                             }
                             else
                             {
+                                if (CurrencyType_ID == 0)
+                                {
+                                    CurrencyType_ID = GetDefaultConversionType(GetAD_Client_ID(), GetAD_Org_ID());
+                                    if (CurrencyType_ID == 0)
+                                    {
+                                        _error = "No default Currency Type found for this tenant";
+                                        log.Log(Level.SEVERE, _error);
+                                        return null;
+                                    }
+                                }
                                 credit = MConversionRate.Convert(GetCtx(), Util.GetValueOfDecimal(dline.GetAmtSourceCr()), HeaderAcctSchema.GetC_Currency_ID(), AccountingSchema.GetC_Currency_ID(),
                                                                      PLoss.GetDateAcct(), CurrencyType_ID, GetAD_Client_ID(), GetAD_Org_ID());
 
@@ -251,35 +262,20 @@ namespace ModelLibrary.Acct
             }
             return AcctSch;
         }
+        /// <summary>
+        /// Default Currency Type of the tenant: organization default first, then tenant default, then system default
+        /// </summary>
+        /// <param name="AD_Client_ID">Tenant</param>
+        /// <param name="AD_Org_ID">Organization</param>
+        /// <returns>C_ConversionType_ID, 0 when no default is defined</returns>
         private int GetDefaultConversionType(int AD_Client_ID, int AD_Org_ID)
         {
-            int C_ConversionType_ID = 0;
-
-            if (Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT (*) from C_ConversionType where ISDEFAULT='Y'")) > 1)
-            {
-                if (C_ConversionType_ID == 0)
-                {
-                    C_ConversionType_ID = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT C_ConversionType_ID from 
-                    C_ConversionType where ISDEFAULT='Y' AND AD_Client_ID=" + AD_Client_ID + @" AND AD_Org_ID=" + AD_Org_ID));
-                }
-                if (C_ConversionType_ID == 0)
-                {
-                    C_ConversionType_ID = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT C_ConversionType_ID from 
-                    C_ConversionType where ISDEFAULT='Y' AND AD_Client_ID=" + AD_Client_ID + @" AND AD_Org_ID=0"));
-                }
-                if (C_ConversionType_ID == 0)
-                {
-                    C_ConversionType_ID = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT C_ConversionType_ID from 
-                    C_ConversionType where ISDEFAULT='Y' AND AD_Client_ID=0 AND AD_Org_ID=0"));
-                }
-            }
-            else
-            {
-                C_ConversionType_ID = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT C_ConversionType_ID from 
-                    C_ConversionType where ISDEFAULT='Y' "));
-            }
-
-            return C_ConversionType_ID;
+            SqlParameter[] param = new SqlParameter[2];
+            param[0] = new SqlParameter("@AD_Client_ID", AD_Client_ID);
+            param[1] = new SqlParameter("@AD_Org_ID", AD_Org_ID);
+            return Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT C_ConversionType_ID FROM C_ConversionType
+                        WHERE IsActive = 'Y' AND IsDefault = 'Y' AND AD_Client_ID IN (0, @AD_Client_ID) AND AD_Org_ID IN (0, @AD_Org_ID)
+                        ORDER BY AD_Client_ID DESC, AD_Org_ID DESC", param, null));
         }
     }
 

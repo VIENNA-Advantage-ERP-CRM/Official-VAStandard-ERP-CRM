@@ -3431,7 +3431,7 @@ namespace VAdvantage.Model
                 }	//	PO Matching
 
                 //Enhanced By amit
-                if (client.IsCostImmediate() && !IsSOTrx())
+                if (client.IsCostImmediate())
                 {
                     #region Manage Cost Queue
 
@@ -3448,487 +3448,498 @@ namespace VAdvantage.Model
                         costingCheck.orderline = oLine;
                     }
 
-                    // Transaction Update Query
-                    query.Clear();
-                    query.Append("Update M_Transaction SET ");
-
-                    productCQ = GetCachedProduct(sLine.GetM_Product_ID());
-                    costingCheck.product = productCQ;
-
-                    if (sLine.GetM_Product_ID() > 0 && productCQ.GetProductType() == "I") // for Item Type product
+                    if (!IsSOTrx())
                     {
-                        // Reset IsCostError
-                        if (Convert.ToBoolean(sLine.Get_Value("IsCostError")))
-                        {
-                            DB.ExecuteQuery("UPDATE M_InOutLine SET IsCostError = 'N' WHERE M_InOutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
-                        }
+                        // Transaction Update Query
+                        query.Clear();
+                        query.Append("Update M_Transaction SET ");
 
-                        // get price from m_cost (Current Cost Price)
-                        currentCostPrice = 0;
-                        if ((!IsSOTrx() && IsReturnTrx())) // Return to vendor 
+                        productCQ = GetCachedProduct(sLine.GetM_Product_ID());
+                        costingCheck.product = productCQ;
+
+                        if (sLine.GetM_Product_ID() > 0 && productCQ.GetProductType() == "I") // for Item Type product
                         {
-                            currentCostPrice = MCost.GetproductCosts(sLine.GetAD_Client_ID(), sLine.GetAD_Org_ID(),
-                                sLine.GetM_Product_ID(), sLine.GetM_AttributeSetInstance_ID(), Get_Trx(), GetM_Warehouse_ID());
-                            if (currentCostPrice != 0)
+                            // Reset IsCostError
+                            if (Convert.ToBoolean(sLine.Get_Value("IsCostError")))
                             {
-                                query.Append(" ProductApproxCost = " + currentCostPrice);
+                                DB.ExecuteQuery("UPDATE M_InOutLine SET IsCostError = 'N' WHERE M_InOutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
                             }
-                        }
-                        else // Material Receipt 
-                        {
-                            currentCostPrice = MCost.GetproductCostAndQtyMaterial(sLine.GetAD_Client_ID(), sLine.GetAD_Org_ID(),
-                               sLine.GetM_Product_ID(), sLine.GetM_AttributeSetInstance_ID(), Get_Trx(), GetM_Warehouse_ID(), false);
 
-                            // Transaction Update Query
-                            if (currentCostPrice != 0)
+                            // get price from m_cost (Current Cost Price)
+                            currentCostPrice = 0;
+                            if ((!IsSOTrx() && IsReturnTrx())) // Return to vendor 
                             {
-                                // this column will be added when current cost available else to be added after cost calculation
-                                // query.Append(" ProductApproxCost = " + currentCostPrice);
-                            }
-                        }
-                        DB.ExecuteQuery("UPDATE M_InoutLine SET CurrentCostPrice = " + currentCostPrice +
-                                                          @" WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
-
-                        // update Price Difference as (PO Cost - GRN Current Cost Price)) on match PO
-                        if (Matchpo != null && Matchpo.Get_ID() > 0)
-                        {
-                            DB.ExecuteQuery(@"UPDATE M_MatchPO SET PriceDifference = " + (currentCostPrice == 0 ? 0 : (Matchpo.GetPricePO() - currentCostPrice))
-                                + ", CurrentCostPrice = " + currentCostPrice + @" WHERE M_MatchPO_ID = " + Matchpo.GetM_MatchPO_ID(), null, Get_Trx());
-                        }
-
-                        // Get Order Line object 
-                        if (lines[lineIndex].GetC_OrderLine_ID() > 0)
-                        {
-                            orderLine = oLine != null && oLine.GetC_OrderLine_ID() == lines[lineIndex].GetC_OrderLine_ID() ? oLine
-                                        : new MOrderLine(GetCtx(), lines[lineIndex].GetC_OrderLine_ID(), Get_Trx());
-                        }
-                        else
-                        {
-                            orderLine = null;
-                        }
-
-                        if (!IsSOTrx() && !IsReturnTrx()) // Material Receipt
-                        {
-                            bool isUpdatePostCurrentcostPriceFromMR = MCostElement.IsPOCostingmethod(GetCtx(), GetAD_Client_ID(),
-                                                                        productCQ.GetM_Product_ID(), Get_Trx());
-                            costingCheck.IsPOCostingethodBindedonProduct = isUpdatePostCurrentcostPriceFromMR;
-
-                            if (orderLine == null || orderLine.GetC_OrderLine_ID() == 0)  // MR without PO
-                            {
-                                #region MR without PO
-                                if (!MCostQueue.CreateProductCostsDetails(GetCtx(), GetAD_Client_ID(), GetAD_Org_ID(), productCQ, sLine.GetM_AttributeSetInstance_ID(),
-                                    "Material Receipt", null, sLine, null, null, null, 0, sLine.GetMovementQty(), Get_Trx(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
+                                currentCostPrice = MCost.GetproductCosts(sLine.GetAD_Client_ID(), sLine.GetAD_Org_ID(),
+                                    sLine.GetM_Product_ID(), sLine.GetM_AttributeSetInstance_ID(), Get_Trx(), GetM_Warehouse_ID());
+                                if (currentCostPrice != 0)
                                 {
-                                    if (!conversionNotFoundInOut1.Contains(conversionNotFoundInOut))
-                                    {
-                                        conversionNotFoundInOut1 += conversionNotFoundInOut + " , ";
-                                    }
-                                    _processMsg = Msg.GetMsg(GetCtx(), "VIS_CostNotCalculated");
-                                    if (!string.IsNullOrEmpty(costingCheck.errorMessage))
-                                    {
-                                        _processMsg += costingCheck.errorMessage;
-                                    }
+                                    query.Append(" ProductApproxCost = " + currentCostPrice);
+                                }
+                            }
+                            else // Material Receipt 
+                            {
+                                currentCostPrice = MCost.GetproductCostAndQtyMaterial(sLine.GetAD_Client_ID(), sLine.GetAD_Org_ID(),
+                                   sLine.GetM_Product_ID(), sLine.GetM_AttributeSetInstance_ID(), Get_Trx(), GetM_Warehouse_ID(), false);
 
-                                    // Update Error message on Line
-                                    if (client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory())
+                                // Transaction Update Query
+                                if (currentCostPrice != 0)
+                                {
+                                    // this column will be added when current cost available else to be added after cost calculation
+                                    // query.Append(" ProductApproxCost = " + currentCostPrice);
+                                }
+                            }
+                            DB.ExecuteQuery("UPDATE M_InoutLine SET CurrentCostPrice = " + currentCostPrice +
+                                                              @" WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
+
+                            // update Price Difference as (PO Cost - GRN Current Cost Price)) on match PO
+                            if (Matchpo != null && Matchpo.Get_ID() > 0)
+                            {
+                                DB.ExecuteQuery(@"UPDATE M_MatchPO SET PriceDifference = " + (currentCostPrice == 0 ? 0 : (Matchpo.GetPricePO() - currentCostPrice))
+                                    + ", CurrentCostPrice = " + currentCostPrice + @" WHERE M_MatchPO_ID = " + Matchpo.GetM_MatchPO_ID(), null, Get_Trx());
+                            }
+
+                            // Get Order Line object 
+                            if (lines[lineIndex].GetC_OrderLine_ID() > 0)
+                            {
+                                orderLine = oLine != null && oLine.GetC_OrderLine_ID() == lines[lineIndex].GetC_OrderLine_ID() ? oLine
+                                            : new MOrderLine(GetCtx(), lines[lineIndex].GetC_OrderLine_ID(), Get_Trx());
+                            }
+                            else
+                            {
+                                orderLine = null;
+                            }
+
+                            if (!IsSOTrx() && !IsReturnTrx()) // Material Receipt
+                            {
+                                bool isUpdatePostCurrentcostPriceFromMR = MCostElement.IsPOCostingmethod(GetCtx(), GetAD_Client_ID(),
+                                                                            productCQ.GetM_Product_ID(), Get_Trx());
+                                costingCheck.IsPOCostingethodBindedonProduct = isUpdatePostCurrentcostPriceFromMR;
+
+                                if (orderLine == null || orderLine.GetC_OrderLine_ID() == 0)  // MR without PO
+                                {
+                                    #region MR without PO
+                                    if (!MCostQueue.CreateProductCostsDetails(GetCtx(), GetAD_Client_ID(), GetAD_Org_ID(), productCQ, sLine.GetM_AttributeSetInstance_ID(),
+                                        "Material Receipt", null, sLine, null, null, null, 0, sLine.GetMovementQty(), Get_Trx(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
                                     {
-                                        Get_Trx().Rollback();
-                                        costingCheck.UpdateCostError("M_InOutLine", sLine.GetM_InOutLine_ID(), costingCheck.errorMessage, Get_Trx(), true);
-                                        return DocActionVariables.STATUS_INVALID;
+                                        if (!conversionNotFoundInOut1.Contains(conversionNotFoundInOut))
+                                        {
+                                            conversionNotFoundInOut1 += conversionNotFoundInOut + " , ";
+                                        }
+                                        _processMsg = Msg.GetMsg(GetCtx(), "VIS_CostNotCalculated");
+                                        if (!string.IsNullOrEmpty(costingCheck.errorMessage))
+                                        {
+                                            _processMsg += costingCheck.errorMessage;
+                                        }
+
+                                        // Update Error message on Line
+                                        if (client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory())
+                                        {
+                                            Get_Trx().Rollback();
+                                            costingCheck.UpdateCostError("M_InOutLine", sLine.GetM_InOutLine_ID(), costingCheck.errorMessage, Get_Trx(), true);
+                                            return DocActionVariables.STATUS_INVALID;
+                                        }
+                                        else
+                                        {
+                                            costingCheck.UpdateCostError("M_InOutLine", sLine.GetM_InOutLine_ID(), costingCheck.errorMessage, Get_Trx(), false);
+                                        }
                                     }
                                     else
                                     {
-                                        costingCheck.UpdateCostError("M_InOutLine", sLine.GetM_InOutLine_ID(), costingCheck.errorMessage, Get_Trx(), false);
-                                    }
-                                }
-                                else
-                                {
-                                    currentCostPrice = MCost.GetproductCostAndQtyMaterial(sLine.GetAD_Client_ID(), sLine.GetAD_Org_ID(),
-                                                       sLine.GetM_Product_ID(), sLine.GetM_AttributeSetInstance_ID(), Get_Trx(), GetM_Warehouse_ID(), false);
-                                    DB.ExecuteQuery("UPDATE M_InoutLine SET CurrentCostPrice = CASE WHEN CurrentCostPrice <> 0 THEN CurrentCostPrice ELSE " + currentCostPrice +
-                                                                      @" END , IsCostImmediate = 'Y' , 
+                                        currentCostPrice = MCost.GetproductCostAndQtyMaterial(sLine.GetAD_Client_ID(), sLine.GetAD_Org_ID(),
+                                                           sLine.GetM_Product_ID(), sLine.GetM_AttributeSetInstance_ID(), Get_Trx(), GetM_Warehouse_ID(), false);
+                                        DB.ExecuteQuery("UPDATE M_InoutLine SET CurrentCostPrice = CASE WHEN CurrentCostPrice <> 0 THEN CurrentCostPrice ELSE " + currentCostPrice +
+                                                                          @" END , IsCostImmediate = 'Y' , 
                                                      PostCurrentCostPrice = CASE WHEN 1 = " + (isUpdatePostCurrentcostPriceFromMR ? 1 : 0) +
-                                                     @" THEN " + currentCostPrice + $@" ELSE PostCurrentCostPrice END, 
+                                                         @" THEN " + currentCostPrice + $@" ELSE PostCurrentCostPrice END, 
                                                      VAS_IsStandardCosting = {(costingCheck.materialCostingMethod.Equals("S") ? GlobalVariable.TO_STRING("Y") : GlobalVariable.TO_STRING("N"))}
                                                 WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
 
-                                    // Transaction Update Query
-                                    if (!query.ToString().Contains("ProductApproxCost"))
-                                    {
-                                        query.Append(" ProductApproxCost = " + currentCostPrice);
-                                    }
-                                    // VIS_0045: 18-Mar-2025, When GRN created with Invoice reference then update Product cost also on product trx record 
-                                    if (isUpdatePostCurrentcostPriceFromMR || costingCheck.isInvoiceLinkedwithGRN)
-                                    {
-                                        // when selected costing method is average po, weighted average po, last po
-                                        // else to be updated from invoice
-                                        query.Append(" , ProductCost = " + currentCostPrice);
-                                    }
-                                    query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
-                                    query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
-                                    //22-Jan-2025, Update posting Cost on Transaction
-                                    query.Append(" , VAS_PostingCost = " + costingCheck.OrderLineAmtinBaseCurrency);
-                                    query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
-                                    DB.ExecuteQuery(query.ToString(), null, Get_Trx());
-                                    log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Material Receipt is {query.ToString()}");
+                                        // Transaction Update Query
+                                        if (!query.ToString().Contains("ProductApproxCost"))
+                                        {
+                                            query.Append(" ProductApproxCost = " + currentCostPrice);
+                                        }
+                                        // VIS_0045: 18-Mar-2025, When GRN created with Invoice reference then update Product cost also on product trx record 
+                                        if (isUpdatePostCurrentcostPriceFromMR || costingCheck.isInvoiceLinkedwithGRN)
+                                        {
+                                            // when selected costing method is average po, weighted average po, last po
+                                            // else to be updated from invoice
+                                            query.Append(" , ProductCost = " + currentCostPrice);
+                                        }
+                                        query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
+                                        query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
+                                        //22-Jan-2025, Update posting Cost on Transaction
+                                        query.Append(" , VAS_PostingCost = " + costingCheck.OrderLineAmtinBaseCurrency);
+                                        query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
+                                        DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                        log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Material Receipt is {query.ToString()}");
 
-                                    // VIS_045: 19-Mar-2025, Update Match Invoice record (Differenec Price of (AP - PO))
-                                    DB.ExecuteQuery($@"UPDATE M_MatchInv 
+                                        // VIS_045: 19-Mar-2025, Update Match Invoice record (Differenec Price of (AP - PO))
+                                        DB.ExecuteQuery($@"UPDATE M_MatchInv 
                                     SET PriceDifferenceAPPO = CASE WHEN PricePO = 0 THEN PriceDifferenceAPPO - {costingCheck.OrderLineAmtinBaseCurrency}
                                         ELSE PriceDifferenceAPPO END WHERE M_InOutLine_ID = {sLine.GetM_InOutLine_ID()}", null, Get_Trx());
+                                    }
+                                    #endregion
                                 }
-                                #endregion
-                            }
-                            else if (orderLine != null && orderLine.GetC_Order_ID() > 0) // MR with PO
-                            {
-                                #region MR with PO
-                                string Ord_DocStatus = Util.GetValueOfString(DB.ExecuteScalar("SELECT DocStatus FROM C_Order WHERE C_Order_ID ="
-                                                + orderLine.GetC_Order_ID(), null, Get_Trx()));
+                                else if (orderLine != null && orderLine.GetC_Order_ID() > 0) // MR with PO
+                                {
+                                    #region MR with PO
+                                    string Ord_DocStatus = Util.GetValueOfString(DB.ExecuteScalar("SELECT DocStatus FROM C_Order WHERE C_Order_ID ="
+                                                    + orderLine.GetC_Order_ID(), null, Get_Trx()));
 
-                                if (Ord_DocStatus != "VO")
-                                {
-                                    if (orderLine.GetQtyOrdered() == 0)
-                                        continue;
-                                }
-
-                                Decimal ProductOrderLineCost = orderLine.GetProductLineCost(orderLine);
-                                Decimal ProductOrderPriceActual = ProductOrderLineCost / orderLine.GetQtyEntered();
-
-                                amt = 0;
-                                if (productCQ.IsCostAdjustmentOnLost() && sLine.GetMovementQty() < orderLine.GetQtyOrdered() && Ord_DocStatus != "VO")
-                                {
-                                    if (sLine.GetMovementQty() > 0)
-                                        amt = ProductOrderLineCost;
-                                    else
-                                        amt = Decimal.Negate(ProductOrderLineCost);
-                                }
-                                else if (!productCQ.IsCostAdjustmentOnLost() && sLine.GetMovementQty() < orderLine.GetQtyOrdered() && Ord_DocStatus != "VO")
-                                {
-                                    amt = Decimal.Multiply(Decimal.Divide(ProductOrderLineCost, orderLine.GetQtyOrdered()), sLine.GetMovementQty());
-                                }
-                                else if (Ord_DocStatus != "VO")
-                                {
-                                    amt = Decimal.Multiply(Decimal.Divide(ProductOrderLineCost, orderLine.GetQtyOrdered()), sLine.GetMovementQty());
-                                }
-                                else if (Ord_DocStatus == "VO")
-                                {
-                                    amt = Decimal.Multiply(ProductOrderPriceActual, sLine.GetQtyEntered());
-                                }
-
-                                //VIS_045: 15-May-2025, Get the Consolidate Amount of Multiple Order which are linked with Same GRN Line
-                                if (IsReversal() && sLine.GetReversalDoc_ID() > 0)
-                                {
-                                    (decimal, decimal) POAmtandPrice = GetConsolidatedPriceofPO(productCQ, sLine.GetReversalDoc_ID(), orderLine.GetParent().GetC_Currency_ID(), isUpdatePostCurrentcostPriceFromMR);
-                                    if (POAmtandPrice.Item1 != 0)
+                                    if (Ord_DocStatus != "VO")
                                     {
-                                        amt = POAmtandPrice.Item1;
-                                        if (amt > 0 && sLine.GetMovementQty() < 0)
+                                        if (orderLine.GetQtyOrdered() == 0)
+                                            continue;
+                                    }
+
+                                    Decimal ProductOrderLineCost = orderLine.GetProductLineCost(orderLine);
+                                    Decimal ProductOrderPriceActual = ProductOrderLineCost / orderLine.GetQtyEntered();
+
+                                    amt = 0;
+                                    if (productCQ.IsCostAdjustmentOnLost() && sLine.GetMovementQty() < orderLine.GetQtyOrdered() && Ord_DocStatus != "VO")
+                                    {
+                                        if (sLine.GetMovementQty() > 0)
+                                            amt = ProductOrderLineCost;
+                                        else
+                                            amt = Decimal.Negate(ProductOrderLineCost);
+                                    }
+                                    else if (!productCQ.IsCostAdjustmentOnLost() && sLine.GetMovementQty() < orderLine.GetQtyOrdered() && Ord_DocStatus != "VO")
+                                    {
+                                        amt = Decimal.Multiply(Decimal.Divide(ProductOrderLineCost, orderLine.GetQtyOrdered()), sLine.GetMovementQty());
+                                    }
+                                    else if (Ord_DocStatus != "VO")
+                                    {
+                                        amt = Decimal.Multiply(Decimal.Divide(ProductOrderLineCost, orderLine.GetQtyOrdered()), sLine.GetMovementQty());
+                                    }
+                                    else if (Ord_DocStatus == "VO")
+                                    {
+                                        amt = Decimal.Multiply(ProductOrderPriceActual, sLine.GetQtyEntered());
+                                    }
+
+                                    //VIS_045: 15-May-2025, Get the Consolidate Amount of Multiple Order which are linked with Same GRN Line
+                                    if (IsReversal() && sLine.GetReversalDoc_ID() > 0)
+                                    {
+                                        (decimal, decimal) POAmtandPrice = GetConsolidatedPriceofPO(productCQ, sLine.GetReversalDoc_ID(), orderLine.GetParent().GetC_Currency_ID(), isUpdatePostCurrentcostPriceFromMR);
+                                        if (POAmtandPrice.Item1 != 0)
                                         {
-                                            amt = decimal.Negate(amt);
+                                            amt = POAmtandPrice.Item1;
+                                            if (amt > 0 && sLine.GetMovementQty() < 0)
+                                            {
+                                                amt = decimal.Negate(amt);
+                                            }
                                         }
                                     }
-                                }
 
-                                if (!MCostQueue.CreateProductCostsDetails(GetCtx(), GetAD_Client_ID(), GetAD_Org_ID(), productCQ,
-                                    sLine.GetM_AttributeSetInstance_ID(), "Material Receipt", null, sLine, null, null, null, amt,
-                                   sLine.GetMovementQty(), Get_Trx(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
-                                {
-                                    if (!conversionNotFoundInOut1.Contains(conversionNotFoundInOut))
+                                    if (!MCostQueue.CreateProductCostsDetails(GetCtx(), GetAD_Client_ID(), GetAD_Org_ID(), productCQ,
+                                        sLine.GetM_AttributeSetInstance_ID(), "Material Receipt", null, sLine, null, null, null, amt,
+                                       sLine.GetMovementQty(), Get_Trx(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
                                     {
-                                        conversionNotFoundInOut1 += conversionNotFoundInOut + " , ";
-                                    }
-                                    _processMsg = Msg.GetMsg(GetCtx(), "VIS_CostNotCalculated");
-                                    if (!string.IsNullOrEmpty(costingCheck.errorMessage))
-                                    {
-                                        _processMsg += costingCheck.errorMessage;
-                                    }
+                                        if (!conversionNotFoundInOut1.Contains(conversionNotFoundInOut))
+                                        {
+                                            conversionNotFoundInOut1 += conversionNotFoundInOut + " , ";
+                                        }
+                                        _processMsg = Msg.GetMsg(GetCtx(), "VIS_CostNotCalculated");
+                                        if (!string.IsNullOrEmpty(costingCheck.errorMessage))
+                                        {
+                                            _processMsg += costingCheck.errorMessage;
+                                        }
 
-                                    // Update Error message on Line
-                                    if (client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory())
-                                    {
-                                        Get_Trx().Rollback();
-                                        costingCheck.UpdateCostError("M_InOutLine", sLine.GetM_InOutLine_ID(), costingCheck.errorMessage, Get_Trx(), true);
-                                        return DocActionVariables.STATUS_INVALID;
+                                        // Update Error message on Line
+                                        if (client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory())
+                                        {
+                                            Get_Trx().Rollback();
+                                            costingCheck.UpdateCostError("M_InOutLine", sLine.GetM_InOutLine_ID(), costingCheck.errorMessage, Get_Trx(), true);
+                                            return DocActionVariables.STATUS_INVALID;
+                                        }
+                                        else
+                                        {
+                                            costingCheck.UpdateCostError("M_InOutLine", sLine.GetM_InOutLine_ID(), costingCheck.errorMessage, Get_Trx(), false);
+                                        }
                                     }
                                     else
                                     {
-                                        costingCheck.UpdateCostError("M_InOutLine", sLine.GetM_InOutLine_ID(), costingCheck.errorMessage, Get_Trx(), false);
-                                    }
-                                }
-                                else
-                                {
-                                    currentCostPrice = MCost.GetproductCostAndQtyMaterial(sLine.GetAD_Client_ID(), sLine.GetAD_Org_ID(),
-                                                       sLine.GetM_Product_ID(), sLine.GetM_AttributeSetInstance_ID(), Get_Trx(), GetM_Warehouse_ID(), false);
-                                    DB.ExecuteQuery("UPDATE M_InoutLine SET CurrentCostPrice = CASE WHEN CurrentCostPrice <> 0 THEN CurrentCostPrice ELSE " + currentCostPrice +
-                                                                     @" END , IsCostImmediate = 'Y' ,
+                                        currentCostPrice = MCost.GetproductCostAndQtyMaterial(sLine.GetAD_Client_ID(), sLine.GetAD_Org_ID(),
+                                                           sLine.GetM_Product_ID(), sLine.GetM_AttributeSetInstance_ID(), Get_Trx(), GetM_Warehouse_ID(), false);
+                                        DB.ExecuteQuery("UPDATE M_InoutLine SET CurrentCostPrice = CASE WHEN CurrentCostPrice <> 0 THEN CurrentCostPrice ELSE " + currentCostPrice +
+                                                                         @" END , IsCostImmediate = 'Y' ,
                                                       PostCurrentCostPrice = CASE WHEN 1 = " + (isUpdatePostCurrentcostPriceFromMR ? 1 : 0) +
-                                                      @" THEN " + currentCostPrice + @" ELSE PostCurrentCostPrice END, 
+                                                          @" THEN " + currentCostPrice + @" ELSE PostCurrentCostPrice END, 
                                                       VAS_LandedCost = " + costingCheck.ExpectedLandedCost + $@"
                                                      ,VAS_IsStandardCosting = {(costingCheck.materialCostingMethod.Equals("S") ? GlobalVariable.TO_STRING("Y") : GlobalVariable.TO_STRING("N"))}
                                                     WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
 
-                                    // Transaction Update Query
-                                    if (!query.ToString().Contains("ProductApproxCost"))
-                                    {
-                                        query.Append(" ProductApproxCost = " + currentCostPrice);
-                                    }
-                                    if (isUpdatePostCurrentcostPriceFromMR)
-                                    {
-                                        // when selected costing method is average po, weighted average po, last po
-                                        // else to be updated from invoice
-                                        query.Append(" , ProductCost = " + currentCostPrice);
-                                    }
-                                    query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
-                                    query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
-                                    //22-Jan-2025, Update posting Cost / Expected Landed Cost on Transaction
-                                    query.Append(", VAS_LandedCost = " + costingCheck.ExpectedLandedCost);
-                                    query.Append(" , VAS_PostingCost = " + costingCheck.OrderLineAmtinBaseCurrency);
-                                    query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
-                                    DB.ExecuteQuery(query.ToString(), null, Get_Trx());
-                                    log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Material Receipt is {query.ToString()}");
-
-                                    // calculate cost of Invoice if invoice created before this MR
-                                    if (matchedInvoice.Count > 0)
-                                    {
-                                        #region calculate cost of Invoice if invoice created before this MR
-                                        for (int mi = 0; mi < matchedInvoice.Count; mi++)
+                                        // Transaction Update Query
+                                        if (!query.ToString().Contains("ProductApproxCost"))
                                         {
-                                            // when cost alreday calculated, then no need to calculate cost
-                                            if (matchedInvoice[mi].IsCostImmediate())
-                                                continue;
+                                            query.Append(" ProductApproxCost = " + currentCostPrice);
+                                        }
+                                        if (isUpdatePostCurrentcostPriceFromMR)
+                                        {
+                                            // when selected costing method is average po, weighted average po, last po
+                                            // else to be updated from invoice
+                                            query.Append(" , ProductCost = " + currentCostPrice);
+                                        }
+                                        query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
+                                        query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
+                                        //22-Jan-2025, Update posting Cost / Expected Landed Cost on Transaction
+                                        query.Append(", VAS_LandedCost = " + costingCheck.ExpectedLandedCost);
+                                        query.Append(" , VAS_PostingCost = " + costingCheck.OrderLineAmtinBaseCurrency);
+                                        query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
+                                        DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                        log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Material Receipt is {query.ToString()}");
 
-                                            // calculate Pre Cost - means cost before updation price impact of current record
-                                            if (matchedInvoice[mi].Get_ColumnIndex("CurrentCostPrice") >= 0)
+                                        // calculate cost of Invoice if invoice created before this MR
+                                        if (matchedInvoice.Count > 0)
+                                        {
+                                            #region calculate cost of Invoice if invoice created before this MR
+                                            for (int mi = 0; mi < matchedInvoice.Count; mi++)
                                             {
-                                                // get cost from Product Cost before cost calculation
-                                                currentCostPrice = MCost.GetproductCostAndQtyMaterial(GetAD_Client_ID(), GetAD_Org_ID(),
-                                                                  matchedInvoice[mi].GetM_Product_ID(), matchedInvoice[mi].GetM_AttributeSetInstance_ID(),
-                                                                  Get_Trx(), GetM_Warehouse_ID(), false);
+                                                // when cost alreday calculated, then no need to calculate cost
+                                                if (matchedInvoice[mi].IsCostImmediate())
+                                                    continue;
 
-                                                DB.ExecuteQuery("UPDATE M_MatchInv SET CurrentCostPrice = " + currentCostPrice +
-                                                                 @" WHERE M_MatchInv_ID = " + matchedInvoice[mi].GetM_MatchInv_ID(), null, Get_Trx());
-
-                                            }
-
-                                            // calculate invoice line costing after calculating costing of linked MR line 
-                                            MInvoiceLine invoiceLine = new MInvoiceLine(GetCtx(), matchedInvoice[mi].GetC_InvoiceLine_ID(), Get_Trx());
-                                            costingCheck.invoiceline = invoiceLine;
-
-                                            Decimal ProductLineCost = invoiceLine.GetProductLineCost(invoiceLine);
-                                            if (!MCostQueue.CreateProductCostsDetails(GetCtx(), GetAD_Client_ID(), GetAD_Org_ID(), productCQ,
-                                                matchedInvoice[mi].GetM_AttributeSetInstance_ID(),
-                                                  "Invoice(Vendor)", null, sLine, null, invoiceLine, null,
-                                                  productCQ.IsCostAdjustmentOnLost() && (matchedInvoice[mi].GetQty() < invoiceLine.GetQtyInvoiced())
-                                                  ? ProductLineCost : Decimal.Multiply(Decimal.Divide(ProductLineCost, invoiceLine.GetQtyInvoiced()),
-                                                  matchedInvoice[mi].GetQty()), matchedInvoice[mi].GetQty(), Get_Trx(),
-                                                  costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
-                                            {
-                                                _processMsg = Msg.GetMsg(GetCtx(), "VIS_CostNotCalculated");
-                                                if (!string.IsNullOrEmpty(costingCheck.errorMessage))
+                                                // calculate Pre Cost - means cost before updation price impact of current record
+                                                if (matchedInvoice[mi].Get_ColumnIndex("CurrentCostPrice") >= 0)
                                                 {
-                                                    _processMsg += costingCheck.errorMessage;
+                                                    // get cost from Product Cost before cost calculation
+                                                    currentCostPrice = MCost.GetproductCostAndQtyMaterial(GetAD_Client_ID(), GetAD_Org_ID(),
+                                                                      matchedInvoice[mi].GetM_Product_ID(), matchedInvoice[mi].GetM_AttributeSetInstance_ID(),
+                                                                      Get_Trx(), GetM_Warehouse_ID(), false);
+
+                                                    DB.ExecuteQuery("UPDATE M_MatchInv SET CurrentCostPrice = " + currentCostPrice +
+                                                                     @" WHERE M_MatchInv_ID = " + matchedInvoice[mi].GetM_MatchInv_ID(), null, Get_Trx());
+
                                                 }
 
-                                                // Update Error message on Line
-                                                if (client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory())
+                                                // calculate invoice line costing after calculating costing of linked MR line 
+                                                MInvoiceLine invoiceLine = new MInvoiceLine(GetCtx(), matchedInvoice[mi].GetC_InvoiceLine_ID(), Get_Trx());
+                                                costingCheck.invoiceline = invoiceLine;
+
+                                                Decimal ProductLineCost = invoiceLine.GetProductLineCost(invoiceLine);
+                                                if (!MCostQueue.CreateProductCostsDetails(GetCtx(), GetAD_Client_ID(), GetAD_Org_ID(), productCQ,
+                                                    matchedInvoice[mi].GetM_AttributeSetInstance_ID(),
+                                                      "Invoice(Vendor)", null, sLine, null, invoiceLine, null,
+                                                      productCQ.IsCostAdjustmentOnLost() && (matchedInvoice[mi].GetQty() < invoiceLine.GetQtyInvoiced())
+                                                      ? ProductLineCost : Decimal.Multiply(Decimal.Divide(ProductLineCost, invoiceLine.GetQtyInvoiced()),
+                                                      matchedInvoice[mi].GetQty()), matchedInvoice[mi].GetQty(), Get_Trx(),
+                                                      costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                                                 {
-                                                    Get_Trx().Rollback();
-                                                    costingCheck.UpdateCostError("C_InvoiceLine", invoiceLine.GetC_InvoiceLine_ID(), costingCheck.errorMessage, Get_Trx(), true);
-                                                    return DocActionVariables.STATUS_INVALID;
+                                                    _processMsg = Msg.GetMsg(GetCtx(), "VIS_CostNotCalculated");
+                                                    if (!string.IsNullOrEmpty(costingCheck.errorMessage))
+                                                    {
+                                                        _processMsg += costingCheck.errorMessage;
+                                                    }
+
+                                                    // Update Error message on Line
+                                                    if (client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory())
+                                                    {
+                                                        Get_Trx().Rollback();
+                                                        costingCheck.UpdateCostError("C_InvoiceLine", invoiceLine.GetC_InvoiceLine_ID(), costingCheck.errorMessage, Get_Trx(), true);
+                                                        return DocActionVariables.STATUS_INVALID;
+                                                    }
+                                                    else
+                                                    {
+                                                        costingCheck.UpdateCostError("C_InvoiceLine", invoiceLine.GetC_InvoiceLine_ID(), costingCheck.errorMessage, Get_Trx(), false);
+                                                    }
                                                 }
                                                 else
                                                 {
-                                                    costingCheck.UpdateCostError("C_InvoiceLine", invoiceLine.GetC_InvoiceLine_ID(), costingCheck.errorMessage, Get_Trx(), false);
+                                                    DB.ExecuteQuery("UPDATE C_InvoiceLine SET IsCostImmediate = 'Y' WHERE C_InvoiceLine_ID = " + matchedInvoice[mi].GetC_InvoiceLine_ID(), null, Get_Trx());
+
+                                                    if (matchedInvoice[mi].Get_ColumnIndex("PostCurrentCostPrice") >= 0)
+                                                    {
+                                                        // get cost from Product Cost after cost calculation
+                                                        currentCostPrice = MCost.GetproductCostAndQtyMaterial(GetAD_Client_ID(), GetAD_Org_ID(),
+                                                                         matchedInvoice[mi].GetM_Product_ID(), matchedInvoice[mi].GetM_AttributeSetInstance_ID(), Get_Trx(), GetM_Warehouse_ID(), false);
+                                                        matchedInvoice[mi].SetPostCurrentCostPrice(currentCostPrice);
+                                                    }
+                                                    matchedInvoice[mi].SetIsCostImmediate(true);
+                                                    matchedInvoice[mi].Save(Get_Trx());
+
+                                                    // update the Post current price after Invoice receving on inoutline
+                                                    if (!isUpdatePostCurrentcostPriceFromMR)
+                                                    {
+                                                        DB.ExecuteQuery("UPDATE M_InoutLine SET PostCurrentCostPrice =  " + currentCostPrice +
+                                                                     @"  WHERE M_InoutLine_ID = " + matchedInvoice[mi].GetM_InOutLine_ID(), null, Get_Trx());
+
+                                                        DB.ExecuteQuery("UPDATE M_Transaction SET ProductCost = " + currentCostPrice +
+                                                            @" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID, null, Get_Trx());
+                                                    }
+
+                                                    // Create Transaction Entry for Vendor Invoice
+                                                    _processMsg = invoiceLine.CreateTransactionEntry(currentCostPrice, sLine, 0, costingCheck.definedCostingElement, costingCheck.costinglevel, costingCheck, out int M_Trx_ID);
+                                                    if (!string.IsNullOrEmpty(_processMsg))
+                                                    {
+                                                        return DocActionVariables.STATUS_INVALID;
+                                                    }
                                                 }
                                             }
-                                            else
-                                            {
-                                                DB.ExecuteQuery("UPDATE C_InvoiceLine SET IsCostImmediate = 'Y' WHERE C_InvoiceLine_ID = " + matchedInvoice[mi].GetC_InvoiceLine_ID(), null, Get_Trx());
-
-                                                if (matchedInvoice[mi].Get_ColumnIndex("PostCurrentCostPrice") >= 0)
-                                                {
-                                                    // get cost from Product Cost after cost calculation
-                                                    currentCostPrice = MCost.GetproductCostAndQtyMaterial(GetAD_Client_ID(), GetAD_Org_ID(),
-                                                                     matchedInvoice[mi].GetM_Product_ID(), matchedInvoice[mi].GetM_AttributeSetInstance_ID(), Get_Trx(), GetM_Warehouse_ID(), false);
-                                                    matchedInvoice[mi].SetPostCurrentCostPrice(currentCostPrice);
-                                                }
-                                                matchedInvoice[mi].SetIsCostImmediate(true);
-                                                matchedInvoice[mi].Save(Get_Trx());
-
-                                                // update the Post current price after Invoice receving on inoutline
-                                                if (!isUpdatePostCurrentcostPriceFromMR)
-                                                {
-                                                    DB.ExecuteQuery("UPDATE M_InoutLine SET PostCurrentCostPrice =  " + currentCostPrice +
-                                                                 @"  WHERE M_InoutLine_ID = " + matchedInvoice[mi].GetM_InOutLine_ID(), null, Get_Trx());
-
-                                                    DB.ExecuteQuery("UPDATE M_Transaction SET ProductCost = " + currentCostPrice +
-                                                        @" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID, null, Get_Trx());
-                                                }
-
-                                                // Create Transaction Entry for Vendor Invoice
-                                                _processMsg = invoiceLine.CreateTransactionEntry(currentCostPrice, sLine, 0, costingCheck.definedCostingElement, costingCheck.costinglevel, costingCheck, out int M_Trx_ID);
-                                                if (!string.IsNullOrEmpty(_processMsg))
-                                                {
-                                                    return DocActionVariables.STATUS_INVALID;
-                                                }
-                                            }
+                                            #endregion
                                         }
-                                        #endregion
                                     }
+                                    #endregion
                                 }
-                                #endregion
                             }
-                        }
-                        else if (!IsSOTrx() && IsReturnTrx()) // Return To Vendor
-                        {
-                            costingCheck.IsPOCostingethodBindedonProduct = MCostElement.IsPOCostingmethod(GetCtx(), GetAD_Client_ID(),
-                                                                        productCQ.GetM_Product_ID(), Get_Trx());
-
-                            if (GetOrig_Order_ID() == 0 || orderLine == null || orderLine.GetC_OrderLine_ID() == 0)
+                            else if (!IsSOTrx() && IsReturnTrx()) // Return To Vendor
                             {
-                                #region Return To Vendor -- without order refernce
-                                if (!MCostQueue.CreateProductCostsDetails(GetCtx(), GetAD_Client_ID(), GetAD_Org_ID(), productCQ, sLine.GetM_AttributeSetInstance_ID(),
-                               "Return To Vendor", null, sLine, null, null, null, 0, Decimal.Negate(sLine.GetMovementQty()), Get_Trx(), costingCheck,
-                                out conversionNotFoundInOut, optionalstr: "window"))
-                                {
-                                    if (!conversionNotFoundInOut1.Contains(conversionNotFoundInOut))
-                                    {
-                                        conversionNotFoundInOut1 += conversionNotFoundInOut + " , ";
-                                    }
-                                    _processMsg = Msg.GetMsg(GetCtx(), "VIS_CostNotCalculated");
-                                    if (!string.IsNullOrEmpty(costingCheck.errorMessage))
-                                    {
-                                        _processMsg += costingCheck.errorMessage;
-                                    }
+                                costingCheck.IsPOCostingethodBindedonProduct = MCostElement.IsPOCostingmethod(GetCtx(), GetAD_Client_ID(),
+                                                                            productCQ.GetM_Product_ID(), Get_Trx());
 
-                                    // Update Error message on Line
-                                    if (client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory())
+                                if (GetOrig_Order_ID() == 0 || orderLine == null || orderLine.GetC_OrderLine_ID() == 0)
+                                {
+                                    #region Return To Vendor -- without order refernce
+                                    if (!MCostQueue.CreateProductCostsDetails(GetCtx(), GetAD_Client_ID(), GetAD_Org_ID(), productCQ, sLine.GetM_AttributeSetInstance_ID(),
+                                   "Return To Vendor", null, sLine, null, null, null, 0, Decimal.Negate(sLine.GetMovementQty()), Get_Trx(), costingCheck,
+                                    out conversionNotFoundInOut, optionalstr: "window"))
                                     {
-                                        Get_Trx().Rollback();
-                                        costingCheck.UpdateCostError("M_InOutLine", sLine.GetM_InOutLine_ID(), costingCheck.errorMessage, Get_Trx(), true);
-                                        return DocActionVariables.STATUS_INVALID;
+                                        if (!conversionNotFoundInOut1.Contains(conversionNotFoundInOut))
+                                        {
+                                            conversionNotFoundInOut1 += conversionNotFoundInOut + " , ";
+                                        }
+                                        _processMsg = Msg.GetMsg(GetCtx(), "VIS_CostNotCalculated");
+                                        if (!string.IsNullOrEmpty(costingCheck.errorMessage))
+                                        {
+                                            _processMsg += costingCheck.errorMessage;
+                                        }
+
+                                        // Update Error message on Line
+                                        if (client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory())
+                                        {
+                                            Get_Trx().Rollback();
+                                            costingCheck.UpdateCostError("M_InOutLine", sLine.GetM_InOutLine_ID(), costingCheck.errorMessage, Get_Trx(), true);
+                                            return DocActionVariables.STATUS_INVALID;
+                                        }
+                                        else
+                                        {
+                                            costingCheck.UpdateCostError("M_InOutLine", sLine.GetM_InOutLine_ID(), costingCheck.errorMessage, Get_Trx(), false);
+                                        }
                                     }
                                     else
                                     {
-                                        costingCheck.UpdateCostError("M_InOutLine", sLine.GetM_InOutLine_ID(), costingCheck.errorMessage, Get_Trx(), false);
-                                    }
-                                }
-                                else
-                                {
-                                    currentCostPrice = MCost.GetproductCosts(sLine.GetAD_Client_ID(), sLine.GetAD_Org_ID(),
-                                                        sLine.GetM_Product_ID(), sLine.GetM_AttributeSetInstance_ID(), Get_Trx(), GetM_Warehouse_ID());
-                                    DB.ExecuteQuery("UPDATE M_InoutLine SET CurrentCostPrice = CASE WHEN CurrentCostPrice <> 0 THEN CurrentCostPrice ELSE " + currentCostPrice +
-                                                            $@" END , IsCostImmediate = 'Y',
+                                        currentCostPrice = MCost.GetproductCosts(sLine.GetAD_Client_ID(), sLine.GetAD_Org_ID(),
+                                                            sLine.GetM_Product_ID(), sLine.GetM_AttributeSetInstance_ID(), Get_Trx(), GetM_Warehouse_ID());
+                                        DB.ExecuteQuery("UPDATE M_InoutLine SET CurrentCostPrice = CASE WHEN CurrentCostPrice <> 0 THEN CurrentCostPrice ELSE " + currentCostPrice +
+                                                                $@" END , IsCostImmediate = 'Y',
                                                             VAS_IsStandardCosting = {(costingCheck.materialCostingMethod.Equals("S") ? GlobalVariable.TO_STRING("Y") : GlobalVariable.TO_STRING("N"))}, 
                                                      PostCurrentCostPrice = CASE WHEN 1 = " + (costingCheck.IsPOCostingethodBindedonProduct.Value ? 1 : 0) +
-                                                     @" THEN " + currentCostPrice + $@" ELSE PostCurrentCostPrice END 
+                                                         @" THEN " + currentCostPrice + $@" ELSE PostCurrentCostPrice END 
                                                      WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
 
-                                    // Transaction Update Query
-                                    if (!query.ToString().Contains("ProductApproxCost"))
-                                    {
-                                        query.Append(" ProductApproxCost = " + currentCostPrice);
+                                        // Transaction Update Query
+                                        if (!query.ToString().Contains("ProductApproxCost"))
+                                        {
+                                            query.Append(" ProductApproxCost = " + currentCostPrice);
+                                        }
+                                        query.Append(" , ProductCost = " + currentCostPrice);
+                                        query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
+                                        query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
+                                        //22-Jan-2025, Update posting Cost on Transaction
+                                        query.Append(" , VAS_PostingCost = " + Math.Abs(costingCheck.OrderLineAmtinBaseCurrency));
+                                        query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
+                                        DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                        log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Return to Vendor is {query.ToString()}");
                                     }
-                                    query.Append(" , ProductCost = " + currentCostPrice);
-                                    query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
-                                    query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
-                                    //22-Jan-2025, Update posting Cost on Transaction
-                                    query.Append(" , VAS_PostingCost = " + Math.Abs(costingCheck.OrderLineAmtinBaseCurrency));
-                                    query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
-                                    DB.ExecuteQuery(query.ToString(), null, Get_Trx());
-                                    log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Return to Vendor is {query.ToString()}");
+                                    #endregion
                                 }
-                                #endregion
-                            }
-                            else if (orderLine != null && orderLine.GetC_Order_ID() > 0)
-                            {
-                                #region Return To Vendor -- with order refernce
-                                string Ord_DocStatus = Util.GetValueOfString(DB.ExecuteScalar("SELECT DocStatus FROM C_Order WHERE C_Order_ID ="
-                                                + orderLine.GetC_Order_ID(), null, Get_Trx()));
-                                if (Ord_DocStatus != "VO")
+                                else if (orderLine != null && orderLine.GetC_Order_ID() > 0)
                                 {
-                                    if (orderLine.GetQtyOrdered() == 0)
-                                        continue;
-                                }
+                                    #region Return To Vendor -- with order refernce
+                                    string Ord_DocStatus = Util.GetValueOfString(DB.ExecuteScalar("SELECT DocStatus FROM C_Order WHERE C_Order_ID ="
+                                                    + orderLine.GetC_Order_ID(), null, Get_Trx()));
+                                    if (Ord_DocStatus != "VO")
+                                    {
+                                        if (orderLine.GetQtyOrdered() == 0)
+                                            continue;
+                                    }
 
-                                Decimal ProductOrderLineCost = orderLine.GetProductLineCost(orderLine);
-                                Decimal ProductOrderPriceActual = ProductOrderLineCost / orderLine.GetQtyEntered();
+                                    Decimal ProductOrderLineCost = orderLine.GetProductLineCost(orderLine);
+                                    Decimal ProductOrderPriceActual = ProductOrderLineCost / orderLine.GetQtyEntered();
 
-                                amt = 0;
-                                if (productCQ.IsCostAdjustmentOnLost() && sLine.GetMovementQty() < orderLine.GetQtyOrdered() && Ord_DocStatus != "VO")
-                                {
-                                    // Cost Adjustment case
-                                    if (sLine.GetMovementQty() < 0)
-                                        amt = ProductOrderLineCost;
+                                    amt = 0;
+                                    if (productCQ.IsCostAdjustmentOnLost() && sLine.GetMovementQty() < orderLine.GetQtyOrdered() && Ord_DocStatus != "VO")
+                                    {
+                                        // Cost Adjustment case
+                                        if (sLine.GetMovementQty() < 0)
+                                            amt = ProductOrderLineCost;
+                                        else
+                                            amt = Decimal.Negate(ProductOrderLineCost);
+                                    }
+                                    else if (!productCQ.IsCostAdjustmentOnLost() && sLine.GetMovementQty() < orderLine.GetQtyOrdered() && Ord_DocStatus != "VO")
+                                    {
+                                        amt = Decimal.Multiply(Decimal.Divide(ProductOrderLineCost, orderLine.GetQtyOrdered()), Decimal.Negate(sLine.GetMovementQty()));
+                                    }
+                                    else if (Ord_DocStatus != "VO")
+                                    {
+                                        amt = Decimal.Multiply(Decimal.Divide(ProductOrderLineCost, orderLine.GetQtyOrdered()), Decimal.Negate(sLine.GetMovementQty()));
+                                    }
+                                    else if (Ord_DocStatus == "VO")
+                                    {
+                                        amt = Decimal.Multiply(ProductOrderPriceActual, Decimal.Negate(sLine.GetQtyEntered()));
+                                    }
+
+                                    if (!MCostQueue.CreateProductCostsDetails(GetCtx(), GetAD_Client_ID(), GetAD_Org_ID(), productCQ, sLine.GetM_AttributeSetInstance_ID(),
+                                        "Return To Vendor", null, sLine, null, null, null, amt,
+                                        Decimal.Negate(sLine.GetMovementQty()), Get_Trx(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
+                                    {
+                                        if (!conversionNotFoundInOut1.Contains(conversionNotFoundInOut))
+                                        {
+                                            conversionNotFoundInOut1 += conversionNotFoundInOut + " , ";
+                                        }
+                                        _processMsg = Msg.GetMsg(GetCtx(), "VIS_CostNotCalculated");
+                                        if (!string.IsNullOrEmpty(costingCheck.errorMessage))
+                                        {
+                                            _processMsg += costingCheck.errorMessage;
+                                        }
+
+                                        // Update Error message on Line
+                                        if (client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory())
+                                        {
+                                            Get_Trx().Rollback();
+                                            costingCheck.UpdateCostError("M_InOutLine", sLine.GetM_InOutLine_ID(), costingCheck.errorMessage, Get_Trx(), true);
+                                            return DocActionVariables.STATUS_INVALID;
+                                        }
+                                        else
+                                        {
+                                            costingCheck.UpdateCostError("M_InOutLine", sLine.GetM_InOutLine_ID(), costingCheck.errorMessage, Get_Trx(), false);
+                                        }
+                                    }
                                     else
-                                        amt = Decimal.Negate(ProductOrderLineCost);
-                                }
-                                else if (!productCQ.IsCostAdjustmentOnLost() && sLine.GetMovementQty() < orderLine.GetQtyOrdered() && Ord_DocStatus != "VO")
-                                {
-                                    amt = Decimal.Multiply(Decimal.Divide(ProductOrderLineCost, orderLine.GetQtyOrdered()), Decimal.Negate(sLine.GetMovementQty()));
-                                }
-                                else if (Ord_DocStatus != "VO")
-                                {
-                                    amt = Decimal.Multiply(Decimal.Divide(ProductOrderLineCost, orderLine.GetQtyOrdered()), Decimal.Negate(sLine.GetMovementQty()));
-                                }
-                                else if (Ord_DocStatus == "VO")
-                                {
-                                    amt = Decimal.Multiply(ProductOrderPriceActual, Decimal.Negate(sLine.GetQtyEntered()));
-                                }
-
-                                if (!MCostQueue.CreateProductCostsDetails(GetCtx(), GetAD_Client_ID(), GetAD_Org_ID(), productCQ, sLine.GetM_AttributeSetInstance_ID(),
-                                    "Return To Vendor", null, sLine, null, null, null, amt,
-                                    Decimal.Negate(sLine.GetMovementQty()), Get_Trx(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
-                                {
-                                    if (!conversionNotFoundInOut1.Contains(conversionNotFoundInOut))
                                     {
-                                        conversionNotFoundInOut1 += conversionNotFoundInOut + " , ";
-                                    }
-                                    _processMsg = Msg.GetMsg(GetCtx(), "VIS_CostNotCalculated");
-                                    if (!string.IsNullOrEmpty(costingCheck.errorMessage))
-                                    {
-                                        _processMsg += costingCheck.errorMessage;
-                                    }
-
-                                    // Update Error message on Line
-                                    if (client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory())
-                                    {
-                                        Get_Trx().Rollback();
-                                        costingCheck.UpdateCostError("M_InOutLine", sLine.GetM_InOutLine_ID(), costingCheck.errorMessage, Get_Trx(), true);
-                                        return DocActionVariables.STATUS_INVALID;
-                                    }
-                                    else
-                                    {
-                                        costingCheck.UpdateCostError("M_InOutLine", sLine.GetM_InOutLine_ID(), costingCheck.errorMessage, Get_Trx(), false);
-                                    }
-                                }
-                                else
-                                {
-                                    currentCostPrice = MCost.GetproductCosts(sLine.GetAD_Client_ID(), sLine.GetAD_Org_ID(),
-                                                      sLine.GetM_Product_ID(), sLine.GetM_AttributeSetInstance_ID(), Get_Trx(), GetM_Warehouse_ID());
-                                    DB.ExecuteQuery("UPDATE M_InoutLine SET CurrentCostPrice = CASE WHEN CurrentCostPrice <> 0 THEN CurrentCostPrice ELSE " + currentCostPrice +
-                                                        $@" END , IsCostImmediate = 'Y', 
+                                        currentCostPrice = MCost.GetproductCosts(sLine.GetAD_Client_ID(), sLine.GetAD_Org_ID(),
+                                                          sLine.GetM_Product_ID(), sLine.GetM_AttributeSetInstance_ID(), Get_Trx(), GetM_Warehouse_ID());
+                                        DB.ExecuteQuery("UPDATE M_InoutLine SET CurrentCostPrice = CASE WHEN CurrentCostPrice <> 0 THEN CurrentCostPrice ELSE " + currentCostPrice +
+                                                            $@" END , IsCostImmediate = 'Y', 
                                                         VAS_IsStandardCosting = {(costingCheck.materialCostingMethod.Equals("S") ? GlobalVariable.TO_STRING("Y") : GlobalVariable.TO_STRING("N"))}, 
                                                      PostCurrentCostPrice = CASE WHEN 1 = " + (costingCheck.IsPOCostingethodBindedonProduct.Value ? 1 : 0) +
-                                                     @" THEN " + currentCostPrice + $@" ELSE PostCurrentCostPrice END 
+                                                         @" THEN " + currentCostPrice + $@" ELSE PostCurrentCostPrice END 
                                                      WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
 
-                                    // Transaction Update Query
-                                    if (!query.ToString().Contains("ProductApproxCost"))
-                                    {
-                                        query.Append(" ProductApproxCost = " + currentCostPrice);
+                                        // Transaction Update Query
+                                        if (!query.ToString().Contains("ProductApproxCost"))
+                                        {
+                                            query.Append(" ProductApproxCost = " + currentCostPrice);
+                                        }
+                                        query.Append(" , ProductCost = " + currentCostPrice);
+                                        query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
+                                        query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
+                                        //22-Jan-2025, Update posting Cost on Transaction
+                                        query.Append(" , VAS_PostingCost = " + Math.Abs(costingCheck.OrderLineAmtinBaseCurrency));
+                                        query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
+                                        DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                        log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Return to Vendor is {query.ToString()}");
                                     }
-                                    query.Append(" , ProductCost = " + currentCostPrice);
-                                    query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
-                                    query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
-                                    //22-Jan-2025, Update posting Cost on Transaction
-                                    query.Append(" , VAS_PostingCost = " + Math.Abs(costingCheck.OrderLineAmtinBaseCurrency));
-                                    query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
-                                    DB.ExecuteQuery(query.ToString(), null, Get_Trx());
-                                    log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Return to Vendor is {query.ToString()}");
+                                    #endregion
                                 }
-                                #endregion
                             }
+                        }
+                    }
+                    else if (IsSOTrx() && product != null && !product.IsStocked())
+                    {
+                        // VIS_045: 30-Oct-2026, for sale cycle and unstocked item
+                        if (!CalculateCosting(client, sLine, costingCheck, sLine.GetMovementQty()))
+                        {
+                            return DocActionVariables.STATUS_INVALID;
                         }
                     }
                     #endregion

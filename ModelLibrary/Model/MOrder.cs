@@ -2369,6 +2369,15 @@ namespace VAdvantage.Model
                     SetDatePromised(GetDateOrdered());
                 }
 
+                // Budget breach approval was given for the old period / org / currency, so ask for it again
+                if (!newRecord && !IsProcessed() && !IsSOTrx() && !IsReturnTrx() && IsBudgetBreachApproved()
+                    && !Is_ValueChanged("IsBudgetBreachApproved") && Env.IsModuleInstalled("FRPT_")
+                    && (Is_ValueChanged("DateAcct") || Is_ValueChanged("AD_Org_ID") || Is_ValueChanged("C_Currency_ID")
+                    || Is_ValueChanged("C_ConversionType_ID") || Is_ValueChanged("C_DocTypeTarget_ID")))
+                {
+                    SetIsBudgetBreachApproved(false);
+                }
+
                 //	Warehouse Org
                 MWarehouse wh = null;
                 if (newRecord
@@ -4708,6 +4717,20 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
         /// This function is used to check, document is budget control or not.
         /// </summary>
         /// <returns>True, when budget controlled or not applicable</returns>
+        /// <summary>
+        /// Clear Budget Breach Approved on the order so that budget is checked again on complete
+        /// </summary>
+        /// <param name="C_Order_ID">Order</param>
+        /// <param name="trx">Transaction</param>
+        /// <returns>no of records updated</returns>
+        public static int ResetBudgetBreachApproval(int C_Order_ID, Trx trx)
+        {
+            SqlParameter[] param = new SqlParameter[1];
+            param[0] = new SqlParameter("@C_Order_ID", C_Order_ID);
+            return DB.ExecuteQuery("UPDATE C_Order SET IsBudgetBreachApproved = 'N' WHERE C_Order_ID = @C_Order_ID AND IsBudgetBreachApproved = 'Y'",
+                param, trx);
+        }
+
         private bool EvaluateBudgetControlData()
         {
             DataSet dsRecordData;
