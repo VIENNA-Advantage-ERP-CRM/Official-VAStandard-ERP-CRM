@@ -6,6 +6,7 @@
  * Raghunandan     05-Jun-2009
  * VAI052           23-Oct-2026  CreateBPContact: unique AD_User.Value for the new contact
  * VAI052           26-Oct-2026  CreateBP: clear error messages (VAS_LeadCreateBP*), real save error reported
+ * VAI052           29-Oct-2026  CreateBP(reuseExisting): reuse existing Prospect (same company name), its User and Address instead of creating duplicates
   ******************************************************/
 using System;
 using System.Collections;
@@ -39,6 +40,23 @@ namespace VAdvantage.Model
         private MProject _project = null;
         /** Request Status		*/
         private MStatus _Status = null;
+        /** CreateBP(true): reuse existing Prospect / User / Address */
+        private bool _reuseExisting = false;
+        #endregion
+
+        #region CreateBP outcome (filled by CreateBP, read by the calling process to build its message)
+        /** Existing Prospect found (same company name) and mapped to the Lead */
+        public bool BPartnerReused { get; private set; }
+        /** New Prospect created */
+        public bool BPartnerCreated { get; private set; }
+        /** Existing User mapped to the Lead (found against the Prospect, or already linked to the Lead) */
+        public bool UserReused { get; private set; }
+        /** New User created */
+        public bool UserCreated { get; private set; }
+        /** Existing Address mapped to the Lead (found against the Prospect, or already linked to the Lead) */
+        public bool LocationReused { get; private set; }
+        /** New Address created */
+        public bool LocationCreated { get; private set; }
         #endregion
 
         /**
@@ -331,6 +349,23 @@ namespace VAdvantage.Model
          */
         public String CreateBP()
         {
+            return CreateBP(false);
+        }
+
+        /**
+         * 	Create BP, Contact, Location from Lead
+         *	@param reuseExisting if true, an existing Prospect with the same company name (and its
+         *	User and Address matching the Lead) is mapped to the Lead instead of creating a new one.
+         *	What was created / reused is available afterwards in the outcome properties.
+         *	@return error message
+         */
+        public String CreateBP(bool reuseExisting)
+        {
+            BPartnerReused = BPartnerCreated = false;
+            UserReused = UserCreated = false;
+            LocationReused = LocationCreated = false;
+            _reuseExisting = reuseExisting;
+
             if (GetC_BPartner_ID() != 0 && GetAD_User_ID() != 0 && GetC_BPartner_Location_ID() == 0)
                 return "@AlreadyExists@: @C_BPartner_ID@ (ID=" + GetC_BPartner_ID() + ")";
 
@@ -346,90 +381,115 @@ namespace VAdvantage.Model
                     {
                         SetRef_BPartner_ID(_user.GetC_BPartner_ID());
                         log.Info("Set to BPartner of User - " + _user);
+                        if (reuseExisting)
+                        {
+                            //VAI052-the location below needs the Business Partner of the User
+                            _bp = new MBPartner(GetCtx(), _user.GetC_BPartner_ID(), Get_TrxName());
+                            BPartnerReused = true;
+                            UserReused = true;
+                        }
                         return CreateBPLocation();
                     }
                 }
-                //
-                _bp = new MBPartner(GetCtx(), Get_TrxName());	//	Template
-                _bp.SetAD_Org_ID(GetAD_Org_ID());
-                //_bp.SetValue(GetBPName());
-                _bp.SetName(GetBPName());
-                _bp.SetIsCustomer(false);
-                _bp.SetIsProspect(true);
-                _bp.SetSOCreditStatus("O");
-                // Check Removed as per Surya Sir's Decision BY Lokesh
 
-                //_bp.SetC_Campaign_ID(GetC_Campaign_ID());
-                //
-                if (GetC_BP_Group_ID() == 0)
+                //VAI052-Existing Prospect with the same company name: map it instead of creating a new one
+                if (reuseExisting)
                 {
-                    // ShowMessage.Info("First Select Customer Group Then process again", true, null, null);
-                    return null;
-                }
-                else
-                {
-                    _bp.SetC_BP_Group_ID(GetC_BP_Group_ID());
-                }
-                MBPGroup gp = new MBPGroup(GetCtx(), GetC_BP_Group_ID(), Get_TrxName());
-                _bp.SetM_PriceList_ID(gp.GetM_PriceList_ID());
-                if (GetC_BP_Size_ID() != 0)
-                    _bp.SetC_BP_Size_ID(GetC_BP_Size_ID());
-                if (GetURL() != null)
-                    _bp.SetURL(GetURL());
-                if (GetC_BP_Status_ID() != 0)
-                    _bp.SetC_BP_Status_ID(GetC_BP_Status_ID());
-                if (GetC_IndustryCode_ID() != 0)
-                    _bp.SetC_IndustryCode_ID(GetC_IndustryCode_ID());
-                if (GetNAICS() != null)
-                    _bp.SetNAICS(GetNAICS());
-                if (GetDUNS() != null)
-                    _bp.SetDUNS(GetDUNS());
-                if (GetNumberEmployees() != 0)
-                    _bp.SetNumberEmployees(GetNumberEmployees());
-                if (GetSalesVolume() != 0)
-                    _bp.SetSalesVolume(GetSalesVolume());
-                if (GetSalesRep_ID() != 0)
-                    _bp.SetSalesRep_ID(GetSalesRep_ID());
-                if (GetC_Campaign_ID() != 0)
-                    _bp.SetC_Campaign_ID(GetC_Campaign_ID());
-
-                _bp.Set_Value("C_SalesRegion_ID", GetC_SalesRegion_ID());
-                _bp.SetC_Country_ID(GetC_Country_ID());
-                _bp.SetDescription(GetDescription());
-                _bp.Set_Value("C_Lead_ID", GetC_Lead_ID());
-                _bp.SetEMail(GetEMail());
-                _bp.SetMobile(GetMobile());
-                _bp.Set_Value("Phone", Get_Value("Phone"));
-                _bp.Set_Value("R_Source_ID", GetR_Source_ID());
-                _bp.Set_Value("C_BPartnerSR_ID", GetC_BPartnerSR_ID());
-                _bp.Set_Value("LeadRating", GetLeadRating());
-
-
-
-                // VIS0060: Set Next Step, Next Step By and Follow update
-                if (Env.IsModuleInstalled("VA061_"))
-                {
-                    //_bp.Set_Value("VA061_NextStep", Get_Value("VA061_NextStep"));
-                    if (Get_Value("C_Followupdate") != null)
+                    int existingBPartnerID = GetExistingProspectID(GetBPName());
+                    if (existingBPartnerID > 0)
                     {
-                        _bp.Set_Value("C_Followupdate", Util.GetValueOfDateTime(Get_Value("C_Followupdate")));
+                        _bp = new MBPartner(GetCtx(), existingBPartnerID, Get_TrxName());
+                        BPartnerReused = true;
+                        log.Info("Existing Prospect found for company name '" + GetBPName() + "' - " + _bp);
                     }
-                    _bp.Set_Value("VA061_NextStepBy", Get_Value("VA061_NextStepBy"));
-                    _bp.Set_Value("LeadRating", GetLeadRating());
-                    _bp.Set_Value("C_LeadQualification_ID", GetC_LeadQualification_ID());
-                    _bp.Set_Value("R_Status_ID", GetR_Status_ID());
-                    _bp.Set_Value("Created", GetCreated());
-                    _bp.Set_Value("VA061_ThreadID", Get_Value("VA061_ThreadID"));
-                    _bp.Set_Value("VA061_SheetURL", Get_Value("VA061_SheetURL"));
-                    _bp.Set_Value("VA061_SheetName", Get_Value("VA061_SheetName"));
-                    _bp.Set_Value("VA061_SheetID", Get_Value("VA061_SheetID"));
-                    _bp.Set_Value("VA061_SheetPDFURL", Get_Value("VA061_SheetPDFURL"));
-                    _bp.Set_Value("VA061_ProcessStage", Get_Value("VA061_ProcessStage"));
                 }
-                if (!_bp.Save())
+
+                if (!BPartnerReused)
                 {
-                    return GetSaveErrorMessage("VAS_LeadCreateBPFailed");
+                    //
+                    _bp = new MBPartner(GetCtx(), Get_TrxName());	//	Template
+                    _bp.SetAD_Org_ID(GetAD_Org_ID());
+                    //_bp.SetValue(GetBPName());
+                    _bp.SetName(GetBPName());
+                    _bp.SetIsCustomer(false);
+                    _bp.SetIsProspect(true);
+                    _bp.SetSOCreditStatus("O");
+                    // Check Removed as per Surya Sir's Decision BY Lokesh
+
+                    //_bp.SetC_Campaign_ID(GetC_Campaign_ID());
+                    //
+                    if (GetC_BP_Group_ID() == 0)
+                    {
+                        // ShowMessage.Info("First Select Customer Group Then process again", true, null, null);
+                        return null;
+                    }
+                    else
+                    {
+                        _bp.SetC_BP_Group_ID(GetC_BP_Group_ID());
+                    }
+                    MBPGroup gp = new MBPGroup(GetCtx(), GetC_BP_Group_ID(), Get_TrxName());
+                    _bp.SetM_PriceList_ID(gp.GetM_PriceList_ID());
+                    if (GetC_BP_Size_ID() != 0)
+                        _bp.SetC_BP_Size_ID(GetC_BP_Size_ID());
+                    if (GetURL() != null)
+                        _bp.SetURL(GetURL());
+                    if (GetC_BP_Status_ID() != 0)
+                        _bp.SetC_BP_Status_ID(GetC_BP_Status_ID());
+                    if (GetC_IndustryCode_ID() != 0)
+                        _bp.SetC_IndustryCode_ID(GetC_IndustryCode_ID());
+                    if (GetNAICS() != null)
+                        _bp.SetNAICS(GetNAICS());
+                    if (GetDUNS() != null)
+                        _bp.SetDUNS(GetDUNS());
+                    if (GetNumberEmployees() != 0)
+                        _bp.SetNumberEmployees(GetNumberEmployees());
+                    if (GetSalesVolume() != 0)
+                        _bp.SetSalesVolume(GetSalesVolume());
+                    if (GetSalesRep_ID() != 0)
+                        _bp.SetSalesRep_ID(GetSalesRep_ID());
+                    if (GetC_Campaign_ID() != 0)
+                        _bp.SetC_Campaign_ID(GetC_Campaign_ID());
+
+                    _bp.Set_Value("C_SalesRegion_ID", GetC_SalesRegion_ID());
+                    _bp.SetC_Country_ID(GetC_Country_ID());
+                    _bp.SetDescription(GetDescription());
+                    _bp.Set_Value("C_Lead_ID", GetC_Lead_ID());
+                    _bp.SetEMail(GetEMail());
+                    _bp.SetMobile(GetMobile());
+                    _bp.Set_Value("Phone", Get_Value("Phone"));
+                    _bp.Set_Value("R_Source_ID", GetR_Source_ID());
+                    _bp.Set_Value("C_BPartnerSR_ID", GetC_BPartnerSR_ID());
+                    _bp.Set_Value("LeadRating", GetLeadRating());
+
+
+
+                    // VIS0060: Set Next Step, Next Step By and Follow update
+                    if (Env.IsModuleInstalled("VA061_"))
+                    {
+                        //_bp.Set_Value("VA061_NextStep", Get_Value("VA061_NextStep"));
+                        if (Get_Value("C_Followupdate") != null)
+                        {
+                            _bp.Set_Value("C_Followupdate", Util.GetValueOfDateTime(Get_Value("C_Followupdate")));
+                        }
+                        _bp.Set_Value("VA061_NextStepBy", Get_Value("VA061_NextStepBy"));
+                        _bp.Set_Value("LeadRating", GetLeadRating());
+                        _bp.Set_Value("C_LeadQualification_ID", GetC_LeadQualification_ID());
+                        _bp.Set_Value("R_Status_ID", GetR_Status_ID());
+                        _bp.Set_Value("Created", GetCreated());
+                        _bp.Set_Value("VA061_ThreadID", Get_Value("VA061_ThreadID"));
+                        _bp.Set_Value("VA061_SheetURL", Get_Value("VA061_SheetURL"));
+                        _bp.Set_Value("VA061_SheetName", Get_Value("VA061_SheetName"));
+                        _bp.Set_Value("VA061_SheetID", Get_Value("VA061_SheetID"));
+                        _bp.Set_Value("VA061_SheetPDFURL", Get_Value("VA061_SheetPDFURL"));
+                        _bp.Set_Value("VA061_ProcessStage", Get_Value("VA061_ProcessStage"));
+                    }
+                    if (!_bp.Save())
+                    {
+                        return GetSaveErrorMessage("VAS_LeadCreateBPFailed");
+                    }
+                    BPartnerCreated = true;
                 }
+
                 //	Update User
                 if (_user != null && _user.GetC_BPartner_ID() == 0)
                 {
@@ -462,8 +522,10 @@ namespace VAdvantage.Model
             {
                 int id = _bp.GetC_BPartner_ID();
                 //VAI052 22-oct-26 removed part , Value='" + _bp.GetValue() + GetBPName() + "';
-                string qry = "UPDATE C_BPartner SET Description='' WHERE C_BPartner_ID=" + id;
-                int check = DB.ExecuteQuery(qry, null, Get_TrxName());
+                //VAI052 29-Oct-26 No need to set description blank.
+                //string qry = "UPDATE C_BPartner SET Description='' WHERE C_BPartner_ID=" + id;
+                //int check = DB.ExecuteQuery(qry, null, Get_TrxName());
+
 
                 if (GetR_InterestArea_ID() != 0)
                 {
@@ -496,6 +558,13 @@ namespace VAdvantage.Model
 
                         foreach (DataRow dr in ds.Tables[0].Rows)
                         {
+                            //VAI052-existing Prospect: do not add the same Interest Area again for the same contact
+                            if (BPartnerReused && Util.GetValueOfInt(DB.ExecuteScalar(
+                                "SELECT COUNT(*) FROM R_ContactInterest WHERE R_InterestArea_ID=" + Util.GetValueOfInt(dr[0])
+                                + " AND C_BPartner_ID=" + GetRef_BPartner_ID() + " AND AD_User_ID=" + UserId, null, Get_TrxName())) > 0)
+                            {
+                                continue;
+                            }
                             X_R_ContactInterest Prospect = new X_R_ContactInterest(GetCtx(), 0, Get_TrxName());
                             Prospect.SetR_InterestArea_ID(Util.GetValueOfInt(dr[0]));
                             Prospect.SetC_BPartner_ID(GetRef_BPartner_ID());
@@ -537,7 +606,12 @@ namespace VAdvantage.Model
         {
             //	Contact exists
             if (GetAD_User_ID() != 0)
+            {
+                //VAI052-the User already linked to the Lead is the one that is mapped
+                if (_reuseExisting)
+                    UserReused = true;
                 return null;
+            }
 
             //	Something to save
             if ((GetContactName() != null && GetContactName().Length > 0))
@@ -557,6 +631,19 @@ namespace VAdvantage.Model
                 else
                     _user = new MUser(_bp);
             }
+            //VAI052-existing Prospect: use the User of that Prospect with the same name instead of creating a duplicate
+            if (BPartnerReused && _bp != null)
+            {
+                int existingUserID = GetExistingUserID(_bp.GetC_BPartner_ID());
+                if (existingUserID > 0)
+                {
+                    SetAD_User_ID(existingUserID);
+                    UserReused = true;
+                    log.Info("Existing User " + existingUserID + " of Prospect " + _bp.GetC_BPartner_ID() + " mapped to the Lead");
+                    return null;
+                }
+            }
+
             // If upgrade 4 module is not updated with new columns, then set contactname on user , else set firstname and lastname
             if (Get_ColumnIndex("FirstName") < 0)
             {
@@ -602,12 +689,14 @@ namespace VAdvantage.Model
                 return GetSaveErrorMessage("VAS_LeadCreateBPContactFailed");
             }
             SetAD_User_ID(_user.GetAD_User_ID());
+            UserCreated = true;
             return null;
         }
 
         /// <summary>
         /// Returns an AD_User.Value that is not used yet: the given value, or the value followed by
-        /// 1, 2, 3 ... when it is already taken. Checked across all clients and ignoring case, so
+        /// 1, 2, 3 ... when it is already taken. All blanks are removed from the given value first
+        /// ("John Smith" becomes "JohnSmith"). Checked across all clients and ignoring case, so
         /// the result is safe whichever way the framework scopes the User ID rule. The check runs
         /// inside the current transaction, so users created earlier in the same run are seen.
         /// </summary>
@@ -616,7 +705,8 @@ namespace VAdvantage.Model
         private string GetUniqueUserValue(string baseValue)
         {
             const int maxLength = 40;   // AD_User.Value length - keeps name + number inside the column
-            string root = baseValue.Trim();
+            // VAI052: the User ID (Value) must not contain blanks - remove every whitespace character, also between words
+            string root = new string(baseValue.Where(c => !char.IsWhiteSpace(c)).ToArray());
             if (root.Length > maxLength)
                 root = root.Substring(0, maxLength);
 
@@ -640,8 +730,14 @@ namespace VAdvantage.Model
          */
         private String CreateBPLocation()
         {
-            if (GetC_BPartner_Location_ID() != 0
-                || GetC_Country_ID() == 0)	//	mandatory
+            if (GetC_BPartner_Location_ID() != 0)
+            {
+                //VAI052-the Address already linked to the Lead is the one that is mapped
+                if (_reuseExisting)
+                    LocationReused = true;
+                return null;
+            }
+            if (GetC_Country_ID() == 0)	//	mandatory
                 return null;
 
             //	Something to save
@@ -667,6 +763,20 @@ namespace VAdvantage.Model
             location.SetPostal(GetPostal());
             location.SetPostal_Add(GetPostal_Add());
             location.SetRegionName(GetRegionName());
+
+            //VAI052-existing Prospect: use its Address that matches the Lead's address instead of creating a duplicate
+            if (BPartnerReused && _bp != null)
+            {
+                int existingLocationID = GetExistingBPLocationID(location);
+                if (existingLocationID > 0)
+                {
+                    SetC_BPartner_Location_ID(existingLocationID);
+                    LocationReused = true;
+                    log.Info("Existing Address " + existingLocationID + " of Prospect " + _bp.GetC_BPartner_ID() + " mapped to the Lead");
+                    return null;
+                }
+            }
+
             if (location.Save())
             {
                 MBPartnerLocation bpl = new MBPartnerLocation(_bp);
@@ -680,12 +790,96 @@ namespace VAdvantage.Model
                     return GetSaveErrorMessage("VAS_LeadCreateBPPartnerLocationFailed");
                 }
                 SetC_BPartner_Location_ID(bpl.GetC_BPartner_Location_ID());
+                LocationCreated = true;
             }
             else
             {
                 return GetSaveErrorMessage("VAS_LeadCreateBPAddressFailed");
             }
             return null;
+        }
+
+        /// <summary>
+        /// Active Prospect that has the given company name (ignoring case and surrounding blanks),
+        /// in the Lead's client. When several have the same name the oldest one is used.
+        /// </summary>
+        /// <param name="companyName">company name of the Lead</param>
+        /// <returns>C_BPartner_ID or 0 when there is none</returns>
+        private int GetExistingProspectID(string companyName)
+        {
+            if (string.IsNullOrWhiteSpace(companyName))
+                return 0;
+
+            string sql = "SELECT C_BPartner_ID FROM C_BPartner WHERE AD_Client_ID = " + GetAD_Client_ID()
+                + " AND IsActive = 'Y' AND IsProspect = 'Y' AND UPPER(TRIM(Name)) = UPPER(@bpName)"
+                + " ORDER BY C_BPartner_ID";
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql,
+                new System.Data.SqlClient.SqlParameter[] { new System.Data.SqlClient.SqlParameter("@bpName", companyName.Trim()) },
+                Get_Trx()));
+        }
+
+        /// <summary>
+        /// Active User of the given Business Partner with the same name as the contact of the Lead.
+        /// Same rule as the Business Partner import (name within the same Business Partner); when the
+        /// Lead keeps first and last name separately both must match, as that is how the User is saved.
+        /// </summary>
+        /// <param name="C_BPartner_ID">Business Partner whose Users are searched</param>
+        /// <returns>AD_User_ID or 0 when there is none</returns>
+        private int GetExistingUserID(int C_BPartner_ID)
+        {
+            if (C_BPartner_ID <= 0)
+                return 0;
+
+            bool separateNames = Get_ColumnIndex("FirstName") >= 0;
+            string name = separateNames ? GetFirstName() : GetContactName();
+            if (string.IsNullOrWhiteSpace(name))
+                return 0;
+
+            List<System.Data.SqlClient.SqlParameter> param = new List<System.Data.SqlClient.SqlParameter>();
+            param.Add(new System.Data.SqlClient.SqlParameter("@userName", name.Trim()));
+            StringBuilder sql = new StringBuilder("SELECT AD_User_ID FROM AD_User WHERE C_BPartner_ID = " + C_BPartner_ID
+                + " AND IsActive = 'Y' AND UPPER(TRIM(Name)) = UPPER(@userName)");
+            if (separateNames)
+            {
+                string lastName = GetLastName();
+                if (string.IsNullOrWhiteSpace(lastName))
+                {
+                    //VAI052-no COALESCE/NVL with '' here: LastName is a national-character column and Oracle
+                    //rejects mixing it with a plain literal (ORA-12704). Oracle stores '' as NULL.
+                    sql.Append(" AND (LastName IS NULL OR LENGTH(TRIM(LastName)) = 0)");
+                }
+                else
+                {
+                    param.Add(new System.Data.SqlClient.SqlParameter("@lastName", lastName.Trim()));
+                    sql.Append(" AND UPPER(TRIM(LastName)) = UPPER(@lastName)");
+                }
+            }
+            sql.Append(" ORDER BY AD_User_ID");
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), param.ToArray(), Get_Trx()));
+        }
+
+        /// <summary>
+        /// Active Address of the current Business Partner that equals the (not yet saved) address built
+        /// from the Lead. Uses the existing address comparison, MLocation.Equals(country, region, postal,
+        /// postal add, city, address 1, address 2); the address is read fresh, not from the cache.
+        /// </summary>
+        /// <param name="location">address built from the Lead (not saved)</param>
+        /// <returns>C_BPartner_Location_ID or 0 when there is none</returns>
+        private int GetExistingBPLocationID(MLocation location)
+        {
+            foreach (MBPartnerLocation bpl in _bp.GetLocations(true))
+            {
+                if (!bpl.IsActive() || bpl.GetC_Location_ID() == 0)
+                    continue;
+                MLocation existing = new MLocation(GetCtx(), bpl.GetC_Location_ID(), Get_TrxName());
+                if (existing.Get_ID() != 0 && existing.Equals(location.GetC_Country_ID(), location.GetC_Region_ID(),
+                    location.GetPostal(), location.GetPostal_Add(), location.GetCity(),
+                    location.GetAddress1(), location.GetAddress2()))
+                {
+                    return bpl.GetC_BPartner_Location_ID();
+                }
+            }
+            return 0;
         }
 
         /// <summary>
@@ -980,7 +1174,7 @@ namespace VAdvantage.Model
                 }
             }
 
-            if (Get_ColumnIndex("VAS_LeadNextStep_ID") >= 0 && Util.GetValueOfInt(Get_Value("VAS_LeadNextStep_ID"))<=0)
+            if (Get_ColumnIndex("VAS_LeadNextStep_ID") >= 0 && Util.GetValueOfInt(Get_Value("VAS_LeadNextStep_ID")) <= 0)
             {
                 log.SaveWarning("VA061_NextStepMustHaveValue", "");
                 return false;
