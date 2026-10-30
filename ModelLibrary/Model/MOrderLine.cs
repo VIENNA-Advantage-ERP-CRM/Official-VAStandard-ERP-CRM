@@ -5019,6 +5019,18 @@ namespace VAdvantage.Model
                     if (!UpdateHeaderTax())
                         return false;
 
+                    // Budget breach approval was given for the old lines, so check budget again on complete
+                    if (!Ord.IsSOTrx() && !Ord.IsReturnTrx() && Env.IsModuleInstalled("FRPT_")
+                        && (newRecord || Is_ValueChanged("QtyEntered") || Is_ValueChanged("QtyOrdered") || Is_ValueChanged("PriceEntered")
+                        || Is_ValueChanged("PriceActual") || Is_ValueChanged("C_Tax_ID") || Is_ValueChanged("C_UOM_ID")
+                        || Is_ValueChanged("M_Product_ID") || Is_ValueChanged("C_Charge_ID") || Is_ValueChanged("IsActive")
+                        || Is_ValueChanged("C_Project_ID") || Is_ValueChanged("C_Activity_ID") || Is_ValueChanged("C_Campaign_ID")
+                        || Is_ValueChanged("AD_OrgTrx_ID") || Is_ValueChanged("User1_ID") || Is_ValueChanged("User2_ID")))
+                    {
+                        if (MOrder.ResetBudgetBreachApproval(GetC_Order_ID(), Get_TrxName()) < 0)
+                            return false;
+                    }
+
                     // VIS0060: Set maximum promise date from line to header tab.
                     if (Is_ValueChanged("DatePromised") && GetDatePromised() != null && Ord.GetDatePromised().Value.Date < GetDatePromised().Value.Date)
                     {
