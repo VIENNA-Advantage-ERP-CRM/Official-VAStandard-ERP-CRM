@@ -6,6 +6,7 @@
  * Chronological    Development
  * Deepak           09-Dec-2009
  * VAI052           26-Oct-2026   Clear, translatable error messages (VAS_LeadToBP*)
+ * VAI052           29-Oct-2026   Reuse existing Prospect (same company name) with its User and Address; completion message tells what was created / reused
   ******************************************************/
 using System;
 using System.Collections;
@@ -133,7 +134,8 @@ namespace ViennaAdvantage.Process
                 throw new Exception(Msg.GetMsg(GetCtx(), "VAS_LeadToBPLeadNotFound") + " ID=" + _C_Lead_ID);
             }
             //
-            String retValue = lead.CreateBP();
+            //VAI052-reuse the Prospect (and its User / Address) that already exists for this company name
+            String retValue = lead.CreateBP(true);
             if (retValue != null)
             {
                 return GetRetrievedError(lead, retValue);
@@ -371,11 +373,72 @@ namespace ViennaAdvantage.Process
 
             if (lead.GetRef_BPartner_ID() != 0)
             {
-                return Msg.GetMsg(GetCtx(), "ProspectGenerated");
+                return GetCompletionMessage(lead);
             }
             else
                 return Msg.GetMsg(GetCtx(), "ProspectNotGenerated");
 
+        }
+
+        /// <summary>
+        /// Completion message that tells which of Prospect, User and Address were created and which
+        /// already existed and were only mapped to the Lead.
+        /// </summary>
+        /// <param name="lead">lead, after CreateBP</param>
+        /// <returns>message</returns>
+        private string GetCompletionMessage(MLead lead)
+        {
+            List<string> created = new List<string>();
+            List<string> reused = new List<string>();
+            string prospect = Msg.GetMsg(GetCtx(), "VAS_LeadToBPProspect");
+            string user = Msg.GetMsg(GetCtx(), "VAS_LeadToBPUser");
+            string address = Msg.GetMsg(GetCtx(), "VAS_LeadToBPAddress");
+
+            if (lead.BPartnerCreated) created.Add(prospect);
+            else if (lead.BPartnerReused) reused.Add(prospect);
+            if (lead.UserCreated) created.Add(user);
+            else if (lead.UserReused) reused.Add(user);
+            if (lead.LocationCreated) created.Add(address);
+            else if (lead.LocationReused) reused.Add(address);
+
+            log.Info("C_Lead_ID=" + _C_Lead_ID + ", Prospect(ID=" + lead.GetRef_BPartner_ID() + ") " + (lead.BPartnerReused ? "reused" : "created")
+                + ", User(ID=" + lead.GetAD_User_ID() + ") " + (lead.UserReused ? "reused" : lead.UserCreated ? "created" : "-")
+                + ", Address(ID=" + lead.GetC_BPartner_Location_ID() + ") " + (lead.LocationReused ? "reused" : lead.LocationCreated ? "created" : "-"));
+
+            if (created.Count == 0 && reused.Count == 0)
+            {
+                return Msg.GetMsg(GetCtx(), "ProspectGenerated");
+            }
+            if (reused.Count == 0)
+            {
+                return Msg.GetMsg(GetCtx(), "VAS_LeadToBPCreatedMsg")
+                    .Replace("{0}", JoinNames(created));
+            }
+            if (created.Count == 0)
+            {
+                // Only the Prospect found: it is the only record that was looked at
+                if (reused.Count == 1 && lead.BPartnerReused)
+                {
+                    return Msg.GetMsg(GetCtx(), "VAS_LeadToBPProspectReusedMsg");
+                }
+                return Msg.GetMsg(GetCtx(), "VAS_LeadToBPReusedMsg")
+                    .Replace("{0}", JoinNames(reused));
+            }
+            return Msg.GetMsg(GetCtx(), "VAS_LeadToBPMixedMsg")
+                .Replace("{0}", JoinNames(reused)).Replace("{1}", JoinNames(created));
+        }
+
+        /// <summary>
+        /// "A", "A and B" or "A, B, and C"
+        /// </summary>
+        private string JoinNames(List<string> names)
+        {
+            string and = Msg.GetMsg(GetCtx(), "VAS_LeadToBPAnd");
+            if (names.Count == 1)
+                return names[0];
+            if (names.Count == 2)
+                return names[0] + " " + and + " " + names[1];
+            return string.Join(", ", names.Take(names.Count - 1)) + ", " + and + " " + names[names.Count - 1];
         }
 
 
