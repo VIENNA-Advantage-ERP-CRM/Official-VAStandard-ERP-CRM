@@ -1173,12 +1173,12 @@ namespace VAdvantage.Model
                     log.SaveInfo("VA047_PhoneExists", "");
                 }
             }
-
-            if (Get_ColumnIndex("VAS_LeadNextStep_ID") >= 0 && Util.GetValueOfInt(Get_Value("VAS_LeadNextStep_ID")) <= 0)
-            {
-                log.SaveWarning("VA061_NextStepMustHaveValue", "");
-                return false;
-            }
+            //VAI052 30-Oct VAS_LeadNextStep_ID validation is not required as this column is not mandetory on window as discussed with Siddharth and Atul sir.
+            //if (Get_ColumnIndex("VAS_LeadNextStep_ID") >= 0 && Util.GetValueOfInt(Get_Value("VAS_LeadNextStep_ID")) <= 0)
+            //{
+            //    log.SaveWarning("VA061_NextStepMustHaveValue", "");
+            //    return false;
+            //}
             // If NextStepBy value not provided or neither NextStepBy nor C_Followupdate has changed, no task will be created.
             if (Env.IsModuleInstalled("VA061_"))
             {
