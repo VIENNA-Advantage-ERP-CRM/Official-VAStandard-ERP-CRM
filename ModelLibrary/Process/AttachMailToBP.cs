@@ -314,27 +314,15 @@ namespace VAdvantage.Process
                     ? result.Where(m => Util.GetValueOfString(((dynamic)m).Folder).IndexOf("sent", StringComparison.OrdinalIgnoreCase) >= 0).ToList()
                     : new List<object>();
 
-                int _tableID = -1;
                 int existRec = -1;
-                StringBuilder attachmentID = new StringBuilder();
-                string userOrBp = string.Empty, value = string.Empty, name = string.Empty;
-                int record_ID = 0;
-                var emailDomains = new List<string>
-                {
-                    "gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "live.com", "msn.com", "yahoo.com", "ymail.com", "rocketmail.com",
-                    "icloud.com", "me.com", "mac.com", "protonmail.com", "pm.me", "zoho.com", "aol.com", "gmx.com", "gmx.net", "mail.com", "yandex.com",
-                    "yandex.ru", "tutanota.com", "tutanota.de", "comcast.net", "verizon.net", "cox.net", "sbcglobal.net", "bellsouth.net", "btinternet.com",
-                    "orange.fr", "mailinator.com", "10minutemail.com", "guerrillamail.com", "tempmail.net", "trashmail.com"
-                };
                 foreach (dynamic mail in inboxMails)
                 {
                     try
                     {
-                        string tableName = "AD_User";
                         string from = Util.GetValueOfString(mail.From).ToLower();
                         string subJect = mail.Subject;
                         string to = mail.To;
-                        string mailDomain = from.Contains("@") ? from.Split('@').Last().Trim().ToLower() : string.Empty;
+                        string mailDomain = GetAddresses(from).Select(a => a.Split('@').Last()).FirstOrDefault() ?? string.Empty;
                         string attachType = "I";
 
                         if (isAutoAttach == "N")
@@ -411,193 +399,64 @@ namespace VAdvantage.Process
                             {
                                 SendMailOrNotification(dsUser, GetCtx(), Msg.GetMsg(GetCtx(), "Emailrecievedwithsubject") + " = " + mail.Subject + " " + Msg.GetMsg(GetCtx(), "ANDAttachto") + " " + Msg.GetMsg(GetCtx(), "RequestID") + " = " + recordID, Util.GetValueOfInt(TableID), Util.GetValueOfInt(recordID), Convert.ToString(documentNO));
                             }
+                            continue;
                         }
 
+                        // Addresses to link: an {AttachTo: address} in the subject, otherwise every outside address of the
+                        // mail (sender, To and Cc), so a mail to several business partners is linked to each of them.
+                        List<string> addresses;
                         string pattern = @"\{AttachTo:\s*(?<email>[^}]+)\}";
-                        Match match = Regex.Match(subJect, pattern, RegexOptions.IgnoreCase);
+                        Match match = Regex.Match(Util.GetValueOfString(subJect), pattern, RegexOptions.IgnoreCase);
                         if (match.Success)
                         {
-                            from = match.Groups["email"].Value.Trim().ToLower();
-                            pattern = @"(?i)\{AttachTo:\s*[^}]+\}";
-                            subJect = Regex.Replace(subJect, pattern, "").Trim();
-                        }
-                        else if (Util.GetValueOfString(mail.Cc).ToLower().Contains(userEmail))
-                        {
-                            bool internalmail = true;
-                            string[] tomails = to.Split(';').ToArray();
-                            if (userDomain.Equals(mailDomain))
-                            {
-                                foreach (var tomail in tomails)
-                                {
-                                    if (userDomain.Equals(tomail.Contains("@") ? tomail.Split('@').Last().Trim().ToLower() : string.Empty))
-                                    {
-                                        continue;
-                                    }
-                                    else
-                                    {
-                                        from = tomail;
-                                        attachType = "M";
-                                        internalmail = false;
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                internalmail = false;
-                            }
-
-                            if (internalmail)
-                            {
-                                continue;
-                            }
-                        }
-                        else if (userDomain.Equals(mailDomain))
-                        {
-                            continue;
-                        }
-
-                        if (excludedEmails.ToLower().Contains(from))
-                        {
-                            continue;
-                        }
-
-                        StringBuilder sql = new StringBuilder();
-                        sql.Append("SELECT " + tableName + "_ID, C_BPartner_ID, Name, Value FROM " + tableName +
-                            " WHERE LOWER(Email) LIKE " + "'%" + from + "%' AND AD_Client_ID=" + AD_Client_ID);
-
-                        IDataReader idr = DB.ExecuteReader(sql.ToString());
-                        DataTable dt = new DataTable();
-                        dt.Load(idr);
-                        idr.Close();
-                        if (dt.Rows.Count <= 0)
-                        {
-                            tableName = "C_BPartner";
-                            sql.Clear();
-                            sql.Append("SELECT " + tableName + "_ID, C_BPartner_ID, Name, Value FROM " + tableName +
-                            " WHERE LOWER(Email) LIKE " + "'%" + from + "%' AND AD_Client_ID=" + AD_Client_ID);
-
-                            idr = DB.ExecuteReader(sql.ToString());
-                            dt = new DataTable();
-                            dt.Load(idr);
-                            idr.Close();
-                        }
-
-                        if (dt.Rows.Count <= 0)
-                        {
-                            tableName = "C_Lead";
-                            sql.Clear();
-                            sql.Append(@"SELECT c.C_Lead_ID, c.Name, c.DocumentNo AS Value, 
-                                c.Email FROM C_Lead c WHERE c.IsActive='Y' AND c.IsArchive='N'
-                                AND (LOWER(c.Email) LIKE " + "'%" + from + "%'");
-                            if (!emailDomains.Contains(mailDomain))
-                            {
-                                sql.Append(" OR LOWER(c.Email) LIKE " + "'%" + mailDomain + "%'");
-                            }
-                            sql.Append(") AND c.AD_Client_ID=" + AD_Client_ID + " ORDER BY c.Updated DESC");
-
-                            idr = DB.ExecuteReader(sql.ToString());
-                            dt = new DataTable();
-                            dt.Load(idr);
-                            idr.Close();
-                        }
-
-                        if (dt.Rows.Count <= 0)
-                        {
-                            existRec = GetAttachedRecord(0, 0, mail.MessageID, folderName);
-                            if (existRec > 0)// Is mail already attached
-                            {
-                                retVal.Append("MailAlreadyAttachedWithParticularRecord");
-                                continue;
-                            }
-                            AttachMail(mail, 0, 0, attachType, "", "", "");
-                            continue;
+                            addresses = GetAddresses(match.Groups["email"].Value);
                         }
                         else
                         {
-                            if (tableName == "C_Lead")
+                            string cc = Util.GetValueOfString(mail.Cc);
+                            addresses = GetOutsideAddresses(GetAddresses(from + ";" + to + ";" + cc));
+                            if (addresses.Count == 0)
                             {
-                                AttachToLead(mail, dt, attachType, from);
+                                // internal mail
                                 continue;
                             }
-                            if (dt.Rows.Count > 1)
+                            if (userDomain.Length > 0 && userDomain.Equals(mailDomain))
                             {
-                                existRec = GetAttachedRecord(0, 0, mail.MessageID, folderName);
-                                if (existRec > 0)// Is mail already attached
-                                {
-                                    retVal.Append("MailAlreadyAttachedWithParticularRecord");
-                                    continue;
-                                }
-                                AttachMail(mail, 0, 0, attachType, "", "", "");
-                                continue;
-                            }
-                            else
-                            {
-                                string sqlQuery = "SELECT IsEmployee FROM C_BPartner WHERE C_BPartner_ID=" + Util.GetValueOfInt(dt.Rows[0]["C_BPartner_ID"]);
-                                DataSet ds = DB.ExecuteDataset(sqlQuery);
-
-                                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
-                                {
-                                    if (isExcludeEmployee == "Y" && Convert.ToString(ds.Tables[0].Rows[0]["IsEmployee"]).Trim() == "Y")
-                                    {
-                                        continue;
-                                    }
-                                }
-                                if (tableName == "AD_User")
-                                {
-                                    _tableID = PO.Get_Table_ID("AD_User");
-                                    existRec = GetAttachedRecord(0, 0, mail.MessageID, folderName);
-                                    userOrBp = Msg.GetMsg(GetCtx(), "User");
-                                }
-                                if (tableName == "C_BPartner")
-                                {
-                                    _tableID = PO.Get_Table_ID("C_BPartner");
-                                    existRec = GetAttachedRecord(0, 0, mail.MessageID, folderName);
-                                    userOrBp = Msg.GetMsg(GetCtx(), "BusinessPartner");
-                                }
-                                if (existRec > 0)// Is mail already attached
-                                {
-                                    retVal.Append("MailAlreadyAttachedWithParticularRecord");
-                                    continue;
-                                }
-
-                                if (tableName == "AD_User")
-                                {
-                                    record_ID = Util.GetValueOfInt(dt.Rows[0][0]);
-                                }
-                                if (tableName == "C_BPartner")
-                                {
-                                    record_ID = Util.GetValueOfInt(dt.Rows[0][1]);
-                                }
-                                name = Util.GetValueOfString(dt.Rows[0]["Name"]);
-                                value = Util.GetValueOfString(dt.Rows[0]["Value"]);
-                                AttachMail(mail, _tableID, record_ID, attachType, userOrBp, name, value);
+                                // sent by a colleague to outside recipients
+                                attachType = "M";
                             }
                         }
+
+                        addresses = addresses.Where(a => !excludedEmails.ToLower().Contains(a)).ToList();
+                        if (addresses.Count == 0)
+                        {
+                            continue;
+                        }
+
+                        LinkMail(mail, FindTargets(addresses), attachType);
                     }
                     catch (Exception ex)
                     {
                     }
                 }
 
-                // Process Sent mails - save as unlinked items with AttachmentType "S"
+                // Sent mails (AttachmentType "M", folder Sent): linked to the business partners of the outside
+                // recipients in To and Cc; stored unlinked when none is found
                 foreach (dynamic mail in sentMails)
                 {
                     try
                     {
-                        existRec = GetAttachedRecord(0, 0, Util.GetValueOfString(mail.MessageID), "Sent");
-                        if (existRec > 0)
-                        {
-                            retVal.Append("MailAlreadyAttachedWithParticularRecord");
-                            continue;
-                        }
+                        string recipients = Util.GetValueOfString(mail.To) + ";" + Util.GetValueOfString(mail.Cc);
+                        List<string> addresses = GetOutsideAddresses(GetAddresses(recipients))
+                            .Where(a => !excludedEmails.ToLower().Contains(a)).ToList();
                         folderName = "Sent";
-                        AttachMail(mail, 0, 0, "M", "", "", "");
-                        folderName = "Inbox";
+                        LinkMail(mail, FindTargets(addresses), "M");
                     }
                     catch (Exception ex)
                     {
-                        folderName = "Inbox";
+                        log.Severe(ex.Message);
                     }
+                    folderName = "Inbox";
                 }
             }
         }
@@ -678,38 +537,193 @@ namespace VAdvantage.Process
             return false;
         }
 
-        private void AttachToLead(dynamic mail, DataTable dt, string attachType, string from)
+        /// <summary>
+        /// A record a fetched mail is linked to.
+        /// </summary>
+        private class MailTarget
         {
-            int _tableID, recordID, existRec;
-            string userOrBp;
-            DataRow[] dr = dt.Select($"Email = '{from.Replace("'", "''")}'");
-            if (dr.Length == 1)
+            public int TableID;
+            public int RecordID;
+            public string Kind;
+            public string Name;
+            public string Value;
+        }
+
+        /// <summary>
+        /// Mail addresses in a From, To or Cc value such as "a@x.de; Name &lt;b@y.de&gt;", lower case, each once.
+        /// </summary>
+        private static List<string> GetAddresses(string value)
+        {
+            List<string> list = new List<string>();
+            if (string.IsNullOrEmpty(value))
             {
-                _tableID = PO.Get_Table_ID("C_Lead");
-                recordID = Util.GetValueOfInt(dr[0]["C_Lead_ID"]);
-                userOrBp = Msg.GetMsg(GetCtx(), "Lead");
-                existRec = GetAttachedRecord(_tableID, recordID, mail.MessageID, folderName);
-                if (existRec > 0)// Is mail already attached
-                {
-                    retVal.Append("MailAlreadyAttachedWithParticularRecord");
-                    return;
-                }
-                AttachMail(mail, _tableID, recordID, attachType, userOrBp,
-                    Util.GetValueOfString(dr[0]["Name"]), Util.GetValueOfString(dr[0]["Value"]));
+                return list;
             }
-            else
+            foreach (Match m in Regex.Matches(value, @"[^\s<>;,""']+@[^\s<>;,""']+"))
             {
-                existRec = GetAttachedRecord(0, 0, mail.MessageID, folderName);
-                if (existRec > 0)// Is mail already attached
+                string address = m.Value.Trim().ToLower();
+                if (!list.Contains(address))
                 {
-                    retVal.Append("MailAlreadyAttachedWithParticularRecord");
-                    return;
+                    list.Add(address);
                 }
-                AttachMail(mail, 0, 0, attachType, "", "", "");
+            }
+            return list;
+        }
+
+        /// <summary>
+        /// The addresses outside the user's own domain, without the user's own address.
+        /// </summary>
+        private List<string> GetOutsideAddresses(List<string> addresses)
+        {
+            return addresses.Where(a => !a.Equals(userEmail)
+                && (userDomain.Length == 0 || !userDomain.Equals(a.Split('@').Last()))).ToList();
+        }
+
+        /// <summary>
+        /// SQL condition: the e-mail column holds exactly this address, alone or in a list separated by ; or ,
+        /// </summary>
+        private static string EmailMatch(string column, string address)
+        {
+            string a = address.Replace("'", "''").Replace("!", "!!").Replace("%", "!%").Replace("_", "!_");
+            return "(';' || REPLACE(REPLACE(LOWER(" + column + "), ' ', ''), ',', ';') || ';') LIKE '%;" + a + ";%' ESCAPE '!'";
+        }
+
+        /// <summary>
+        /// The records a mail with these addresses is linked to. Per address: the business partners of the
+        /// contacts with that address (a contact without business partner adds nothing); when no contact has
+        /// it, the business partners with that address; when none has it, the one lead with that address.
+        /// An address held by several contacts or business partners links to all of them.
+        /// </summary>
+        private List<MailTarget> FindTargets(List<string> addresses)
+        {
+            List<MailTarget> targets = new List<MailTarget>();
+            foreach (string address in addresses)
+            {
+                string userWhere = " WHERE u.IsActive='Y' AND u.AD_Client_ID=" + AD_Client_ID + " AND " + EmailMatch("u.Email", address);
+                if (Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(*) FROM AD_User u" + userWhere)) > 0)
+                {
+                    AddPartners(targets, "SELECT bp.C_BPartner_ID, bp.Name, bp.Value, bp.IsEmployee FROM AD_User u"
+                        + " INNER JOIN C_BPartner bp ON (bp.C_BPartner_ID = u.C_BPartner_ID)" + userWhere);
+                    continue;
+                }
+
+                if (AddPartners(targets, "SELECT bp.C_BPartner_ID, bp.Name, bp.Value, bp.IsEmployee FROM C_BPartner bp"
+                    + " WHERE bp.IsActive='Y' AND bp.AD_Client_ID=" + AD_Client_ID + " AND " + EmailMatch("bp.Email", address)))
+                {
+                    continue;
+                }
+
+                DataSet dsLead = DB.ExecuteDataset("SELECT c.C_Lead_ID, c.Name, c.DocumentNo FROM C_Lead c"
+                    + " WHERE c.IsActive='Y' AND c.IsArchive='N' AND c.AD_Client_ID=" + AD_Client_ID + " AND " + EmailMatch("c.Email", address));
+                if (dsLead != null && dsLead.Tables.Count > 0 && dsLead.Tables[0].Rows.Count == 1)
+                {
+                    DataRow dr = dsLead.Tables[0].Rows[0];
+                    AddTarget(targets, PO.Get_Table_ID("C_Lead"), Util.GetValueOfInt(dr["C_Lead_ID"]), Msg.GetMsg(GetCtx(), "Lead"),
+                        Util.GetValueOfString(dr["Name"]), Util.GetValueOfString(dr["DocumentNo"]));
+                }
+            }
+            return targets;
+        }
+
+        /// <summary>
+        /// Adds the business partners the query returns, except employees when the configuration excludes them.
+        /// </summary>
+        /// <returns>true when the query found any business partner</returns>
+        private bool AddPartners(List<MailTarget> targets, string sql)
+        {
+            DataSet dsBP = DB.ExecuteDataset(sql);
+            if (dsBP == null || dsBP.Tables.Count == 0 || dsBP.Tables[0].Rows.Count == 0)
+            {
+                return false;
+            }
+            int tableID = PO.Get_Table_ID("C_BPartner");
+            foreach (DataRow dr in dsBP.Tables[0].Rows)
+            {
+                if (isExcludeEmployee == "Y" && Util.GetValueOfString(dr["IsEmployee"]).Trim() == "Y")
+                {
+                    continue;
+                }
+                AddTarget(targets, tableID, Util.GetValueOfInt(dr["C_BPartner_ID"]), Msg.GetMsg(GetCtx(), "BusinessPartner"),
+                    Util.GetValueOfString(dr["Name"]), Util.GetValueOfString(dr["Value"]));
+            }
+            return true;
+        }
+
+        private static void AddTarget(List<MailTarget> targets, int tableID, int recordID, string kind, string name, string value)
+        {
+            if (recordID > 0 && !targets.Any(t => t.TableID == tableID && t.RecordID == recordID))
+            {
+                targets.Add(new MailTarget { TableID = tableID, RecordID = recordID, Kind = kind, Name = name, Value = value });
             }
         }
 
-        private void AttachMail(dynamic mail, int _tableID, int record_ID, string attachType, string userOrBp, string name, string value)
+        /// <summary>
+        /// Stores the mail once (MailAttachment1, current folder) and links it to every target: the first on the
+        /// mail itself, the others through MailAttachmentRelatedTo. A mail stored before (another run, or the same
+        /// mail in another user's mailbox) only gets the links it does not have yet; without targets it stays unlinked.
+        /// </summary>
+        private void LinkMail(dynamic mail, List<MailTarget> targets, string attachType)
+        {
+            string mailUID = Util.GetValueOfString((object)mail.MessageID);
+            mailUID = mailUID.Replace("'", "''");
+            string subject = Util.GetValueOfString((object)mail.Subject);
+            int mailID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT MAX(MailAttachment1_ID) FROM MailAttachment1 WHERE MailUID='"
+                + mailUID + "' AND FolderName='" + folderName + "'"));
+            bool linked = false;
+            if (mailID == 0)
+            {
+                MailTarget first = targets.FirstOrDefault();
+                mailID = first == null ? AttachMail(mail, 0, 0, attachType, "", "", "")
+                    : AttachMail(mail, first.TableID, first.RecordID, attachType, first.Kind, first.Name, first.Value);
+                if (mailID == 0)
+                {
+                    return;
+                }
+                linked = true;
+            }
+
+            foreach (MailTarget t in targets)
+            {
+                int existing = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(*) FROM MailAttachment1 WHERE MailAttachment1_ID=" + mailID
+                    + " AND AD_Table_ID=" + t.TableID + " AND Record_ID=" + t.RecordID))
+                    + Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(*) FROM MailAttachmentRelatedTo WHERE MailAttachment1_ID=" + mailID
+                    + " AND AD_Table_ID=" + t.TableID + " AND Record_ID=" + t.RecordID));
+                if (existing > 0)
+                {
+                    continue;
+                }
+
+                // a mail stored unlinked gets the link on itself, any other one through MailAttachmentRelatedTo
+                bool saved = DB.ExecuteQuery("UPDATE MailAttachment1 SET AD_Table_ID=" + t.TableID + ", Record_ID=" + t.RecordID
+                    + " WHERE MailAttachment1_ID=" + mailID + " AND (AD_Table_ID IS NULL OR AD_Table_ID=0)") > 0;
+                if (!saved)
+                {
+                    PO related = MTable.Get(GetCtx(), "MailAttachmentRelatedTo").GetPO(GetCtx(), 0, null);
+                    related.SetAD_Client_ID(AD_Client_ID);
+                    related.SetAD_Org_ID(GetAD_Org_ID());
+                    related.Set_Value("MailAttachment1_ID", mailID);
+                    related.Set_Value("AD_Table_ID", t.TableID);
+                    related.Set_Value("Record_ID", t.RecordID);
+                    saved = related.Save();
+                }
+                if (!saved)
+                {
+                    retVal.Append("SaveError");
+                    continue;
+                }
+                linked = true;
+                SendMailOrNotification(dsUser, GetCtx(), Msg.GetMsg(GetCtx(), "Emailrecievedwithsubject") + " = " + subject
+                    + Msg.GetMsg(GetCtx(), "ANDAttachto") + t.Kind + " = " + t.Name, t.TableID, t.RecordID, t.Value);
+            }
+
+            if (!linked)
+            {
+                retVal.Append("MailAlreadyAttachedWithParticularRecord");
+            }
+        }
+
+        /// <returns>MailAttachment1_ID of the stored mail, 0 when it could not be saved</returns>
+        private int AttachMail(dynamic mail, int _tableID, int record_ID, string attachType, string userOrBp, string name, string value)
         {
             MMailAttachment1 mAttachment = new MMailAttachment1(GetCtx(), 0, null);
             string textmsg = mail.Body;
@@ -751,11 +765,13 @@ namespace VAdvantage.Process
             if (!mAttachment.Save())//save into database
             {
                 retVal.Append("SaveError");
+                return 0;
             }
-            else if (record_ID > 0)
+            if (record_ID > 0)
             {
                 SendMailOrNotification(dsUser, GetCtx(), Msg.GetMsg(GetCtx(), "Emailrecievedwithsubject") + " = " + mail.Subject + Msg.GetMsg(GetCtx(), "ANDAttachto") + userOrBp + " = " + name, _tableID, record_ID, value);
             }
+            return mAttachment.Get_ID();
         }
 
         private void GetMails(UserInformation user, int AD_User_ID, int AD_Client_ID, int AD_Org_ID)
