@@ -10,33 +10,57 @@
  * fallback, subtotal/tax/total honouring the order's tax-included rule).
  * Backend - VAS_144_DeliveryOrderSearchWidget/SearchDeliveryOrders
  *           VAS_144_DeliveryOrderSearchWidget/GetDeliveryOrder
- * Summary Message Table
- *  # | Current Text                                     | Message Key
- * ---+--------------------------------------------------+------------------------
- *  1 | Search delivery orders by customer, line item... | VAS_144_SearchPlaceholder
- *  3 | Searching...                                     | VAS_144_Searching
- *  4 | No delivery orders match "..." / Try a customer... (query text appended in code) | VAS_144_NoMatchesHint / VAS_144_NoMatchesHintSuffix
- *  5 | Unable to search delivery orders. Please try...  | VAS_144_SearchError
- *  6 | Unable to load the delivery order. Please try... | VAS_144_DetailError
- *  7 | Delivery Order                                   | VAS_144_DeliveryOrder
- *  8 | Drafted                                          | VAS_144_Drafted
- *  9 | In Progress                                      | VAS_144_InProgress
- * 10 | Waiting Confirmation                             | VAS_144_WaitingConfirmation
- * 11 | Completed                                        | VAS_144_Completed
- * 12 | Overview / Line Items                            | VAS_144_Overview / VAS_144_LineItems
- * 13 | Matched                                          | VAS_144_Matched
- * 14 | DO Number / Customer / Contact / Location /      | VAS_144_FacetDONumber / VAS_144_FacetCustomer /
- *    | Sales Order / Representative / Line Item (facet) | VAS_144_FacetContact / VAS_144_FacetLocation /
- *    |                                                  | VAS_144_FacetSalesOrder / VAS_144_Representative / VAS_144_FacetLineItem
- * 15 | Total Value / Lines / Delivery Date              | VAS_144_TotalValue / VAS_144_Lines / VAS_144_DeliveryDate
- * 16 | Contact Person / Contact Phone / Delivery        | VAS_144_ContactPerson / VAS_144_ContactPhone /
- *    | Location / Representative / Warehouse / Notes    | VAS_144_DeliveryLocation / VAS_144_Representative /
- *    |                                                  | VAS_144_Warehouse / VAS_144_DeliveryNotes
- * 17 | Item / Qty / Price / Total                       | VAS_144_Item / VAS_144_Qty / VAS_144_Price / VAS_144_Total
- * 18 | Subtotal / Tax                                   | VAS_144_Subtotal / VAS_144_Tax
- * 19 | Delivery / Pickup / Shipper (via-rule labels)    | VAS_144_ViaDelivery / VAS_144_ViaPickup / VAS_144_ViaShipper
- * 20 | Showing / of                                     | VAS_Showing / VAS_Of
- * 21 | Previous page / Next page / Close / Loading      | VAS_PreviousPage / VAS_NextPage / Close / Loading
+ * Summary Message Table (Current Text is the exact message text - no notes)
+ *  #  | Current Text                                                               | Message Key
+ * ----+----------------------------------------------------------------------------+------------------------------
+ *  1  | Search delivery orders by customer, line item, location, sales order, rep or contact... | VAS_144_SearchPlaceholder
+ *  2  | Searching...                                                               | VAS_144_Searching
+ *  3  | No delivery orders match                                                   | VAS_144_NoMatchesHint
+ *  4  | Try a customer, item, sales order, location or rep.                        | VAS_144_NoMatchesHintSuffix
+ *  5  | Unable to search delivery orders. Please try again.                        | VAS_144_SearchError
+ *  6  | Unable to load the delivery order. Please try again.                       | VAS_144_DetailError
+ *  7  | Delivery Order                                                             | VAS_144_DeliveryOrder
+ *  8  | Drafted                                                                    | VAS_144_Drafted
+ *  9  | In Progress                                                                | VAS_144_InProgress
+ * 10  | Waiting Confirmation                                                       | VAS_144_WaitingConfirmation
+ * 11  | Completed                                                                  | VAS_144_Completed
+ * 12  | Overview                                                                   | VAS_144_Overview
+ * 13  | Line Items                                                                 | VAS_144_LineItems
+ * 14  | DO Number                                                                  | VAS_144_FacetDONumber
+ * 15  | Customer                                                                   | VAS_144_FacetCustomer
+ * 16  | Contact                                                                    | VAS_144_FacetContact
+ * 17  | Location                                                                   | VAS_144_FacetLocation
+ * 18  | Sales Order                                                                | VAS_144_FacetSalesOrder
+ * 19  | Representative                                                             | VAS_144_Representative
+ * 20  | Line Item                                                                  | VAS_144_FacetLineItem
+ * 21  | Total Value                                                                | VAS_144_TotalValue
+ * 22  | Lines                                                                      | VAS_144_Lines
+ * 23  | Delivery Date                                                              | VAS_144_DeliveryDate
+ * 24  | Contact Person                                                             | VAS_144_ContactPerson
+ * 25  | Contact Phone                                                              | VAS_144_ContactPhone
+ * 26  | Delivery Location                                                          | VAS_144_DeliveryLocation
+ * 27  | Warehouse                                                                  | VAS_144_Warehouse
+ * 28  | Delivery Notes                                                             | VAS_144_DeliveryNotes
+ * 29  | Item                                                                       | VAS_144_Item
+ * 30  | Qty                                                                        | VAS_144_Qty
+ * 31  | Price                                                                      | VAS_144_Price
+ * 32  | Total                                                                      | VAS_144_Total
+ * 33  | Subtotal                                                                   | VAS_144_Subtotal
+ * 34  | Tax                                                                        | VAS_144_Tax
+ * 35  | Delivery                                                                   | VAS_144_ViaDelivery
+ * 36  | Pickup                                                                     | VAS_144_ViaPickup
+ * 37  | Shipper                                                                    | VAS_144_ViaShipper
+ * 38  | DO                                                                         | VAS_144_DOLabel
+ * 39  | SO                                                                         | VAS_144_SOLabel
+ * 40  | Delivery Mode                                                              | VAS_144_DeliveryMode
+ * 41  | Attribute                                                                  | VAS_144_Attribute
+ * 42  | UOM                                                                        | VAS_144_UOM
+ * 43  | Close                                                                      | VAS_144_Close
+ * 44  | Showing                                                                    | VAS_Showing
+ * 45  | of                                                                         | VAS_Of
+ * 46  | Previous page                                                              | VAS_PreviousPage
+ * 47  | Next page                                                                  | VAS_NextPage
+ * 48  | Clear                                                                      | Clear
  */
 ; VAS = window.VAS || {};
 
@@ -155,55 +179,40 @@
             return via ? label(via.msgKey, via.fallback) : '';
         }
 
-        function formatAmount(value, order) {
+        // Indian-numbering currencies group as Lakh/Crore (1,05,500.00).
+        var INDIAN_NUMBERING_CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
+        function usesIndianNumbering(code) { return INDIAN_NUMBERING_CURRENCIES.indexOf(String(code || '').toUpperCase()) >= 0; }
+
+        function amountPrecision(order) {
             var precision = Number(order && order.currencyPrecision);
-            if (!isFinite(precision) || precision < 0) { precision = 2; }
-            var code = (order && order.currencyCode) || '';
-            try {
-                if (code) {
-                    return new Intl.NumberFormat(window.navigator.language, {
-                        style: 'currency',
-                        currency: code,
-                        minimumFractionDigits: precision,
-                        maximumFractionDigits: precision
-                    }).format(Number(value || 0));
-                }
-            } catch (ignored) { /* unknown ISO code - fall through */ }
-            return (code ? code + ' ' : '') + Number(value || 0).toLocaleString(window.navigator.language, {
+            return (!isFinite(precision) || precision < 0) ? 2 : precision;
+        }
+
+        /* Full (never K/L/M-abbreviated) grouped number at the order currency's
+           precision, WITHOUT any currency symbol/code - line Price / Total. */
+        function formatNumberFull(value, order) {
+            var precision = amountPrecision(order);
+            var locale = usesIndianNumbering(order && order.currencyCode) ? 'en-IN' : window.navigator.language;
+            return Number(value || 0).toLocaleString(locale, {
                 minimumFractionDigits: precision,
                 maximumFractionDigits: precision
             });
         }
 
-        // Same currency-compaction rule used across the dashboard (see Top 10
-        // Highest Selling Products / Shipping Method): Indian-numbering
-        // currencies compact as Lakh/Crore, every other currency (including
-        // this order's own currencyCode, e.g. IQD) compacts as K/M/B. Small
-        // amounts (below the first threshold) still go through formatAmount's
-        // exact Intl currency formatting - only large values that would
-        // otherwise overflow a tight box (stat tiles, totals, line amounts)
-        // get shortened.
-        var INDIAN_NUMBERING_CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
-        function usesIndianNumbering(code) { return INDIAN_NUMBERING_CURRENCIES.indexOf(String(code || '').toUpperCase()) >= 0; }
-        function trimZeros(text) { return text.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1'); }
+        /* Full amount with the currency symbol in front (C_Currency.CurSymbol,
+           ISO code when no symbol is defined) - Subtotal / Tax / Total. */
+        function formatAmountWithSymbol(value, order) {
+            var symbol = (order && (order.currencySymbol || order.currencyCode)) || '';
+            var number = formatNumberFull(value, order);
+            return symbol ? (symbol + ' ' + number) : number;
+        }
 
-        function formatAmountCompact(value, order) {
-            var n = Number(value || 0);
-            var abs = Math.abs(n);
+        /* Full amount with the ISO code in front ("INR 1,05,500.00") - the
+           header Total Value card (Book1 rows 6-7: no K/L/M abbreviations). */
+        function formatAmountWithCode(value, order) {
             var code = (order && order.currencyCode) || '';
-            var num;
-            if (usesIndianNumbering(code)) {
-                if (abs >= 1e7) { num = trimZeros((n / 1e7).toFixed(2)) + 'Cr'; }
-                else if (abs >= 1e5) { num = trimZeros((n / 1e5).toFixed(2)) + 'L'; }
-                else if (abs >= 1e3) { num = trimZeros((n / 1e3).toFixed(1)) + 'K'; }
-                else { return formatAmount(value, order); }
-            } else {
-                if (abs >= 1e9) { num = trimZeros((n / 1e9).toFixed(1)) + 'B'; }
-                else if (abs >= 1e6) { num = trimZeros((n / 1e6).toFixed(1)) + 'M'; }
-                else if (abs >= 1e3) { num = trimZeros((n / 1e3).toFixed(1)) + 'K'; }
-                else { return formatAmount(value, order); }
-            }
-            return code ? (code + ' ' + num) : num;
+            var number = formatNumberFull(value, order);
+            return code ? (code + ' ' + number) : number;
         }
 
         function formatQty(value) {
@@ -426,7 +435,7 @@
             $modalStatus = $modal.find('.MPC-dos-m-status');
             $modalPanel = $modal.find('.MPC-dos-panel');
 
-            var closeText = label('Close', 'Close');
+            var closeText = label('VAS_144_Close', 'Close');
             $modal.find('.MPC-dos-m-close').attr({ 'aria-label': closeText, title: closeText });
             $('body').append($modal);
 
@@ -492,17 +501,24 @@
             '</div>';
         }
 
+        function chipHtml(caption, value) {
+            return '<span class="MPC-dos-chip" title="' + escapeHtml(caption + ': ' + value) + '">' +
+                '<span class="MPC-dos-chip-lbl">' + escapeHtml(caption) + ':</span>' + escapeHtml(value) +
+            '</span>';
+        }
+
         function overviewTabHtml() {
             var order = currentOrder;
             var carrier = carrierText(order);
+            /* Each chip carries its caption: DO / SO / Delivery Mode. */
             var chips =
-                '<span class="MPC-dos-chip">' + escapeHtml(order.doNumber || '') + '</span>' +
-                (order.salesOrder ? '<span class="MPC-dos-chip">' + escapeHtml(order.salesOrder) + '</span>' : '') +
-                (carrier ? '<span class="MPC-dos-chip">' + escapeHtml(carrier) + '</span>' : '');
+                chipHtml(label('VAS_144_DOLabel', 'DO'), order.doNumber || '') +
+                (order.salesOrder ? chipHtml(label('VAS_144_SOLabel', 'SO'), order.salesOrder) : '') +
+                (carrier ? chipHtml(label('VAS_144_DeliveryMode', 'Delivery Mode'), carrier) : '');
 
             var stats =
                 '<span class="MPC-dos-stats">' +
-                    '<span class="MPC-dos-stat"><span class="MPC-dos-stat-k">' + escapeHtml(label('VAS_144_TotalValue', 'Total Value')) + '</span><span class="MPC-dos-stat-v" title="' + escapeHtml(formatAmount(order.total, order)) + '">' + escapeHtml(formatAmountCompact(order.total, order)) + '</span></span>' +
+                    '<span class="MPC-dos-stat"><span class="MPC-dos-stat-k">' + escapeHtml(label('VAS_144_TotalValue', 'Total Value')) + '</span><span class="MPC-dos-stat-v" title="' + escapeHtml(formatAmountWithCode(order.total, order)) + '">' + escapeHtml(formatAmountWithCode(order.total, order)) + '</span></span>' +
                     '<span class="MPC-dos-stat"><span class="MPC-dos-stat-k">' + escapeHtml(label('VAS_144_Lines', 'Lines')) + '</span><span class="MPC-dos-stat-v">' + ((order.lines || []).length) + '</span></span>' +
                     '<span class="MPC-dos-stat"><span class="MPC-dos-stat-k">' + escapeHtml(label('VAS_144_DeliveryDate', 'Delivery Date')) + '</span><span class="MPC-dos-stat-v">' + escapeHtml(formatDate(order.deliveryDate) || '-') + '</span></span>' +
                 '</span>';
@@ -516,10 +532,15 @@
                     stats +
                 '</div>';
 
+            /* Contact Person / Contact Phone are shown only when they have a
+               value. When just one of them is present it spans both columns
+               so the grid stays aligned. */
+            var hasContact = !!order.contactName;
+            var hasPhone = !!order.contactPhone;
             var fields =
                 '<div class="MPC-dos-fields">' +
-                    fieldHtml(label('VAS_144_ContactPerson', 'Contact Person'), order.contactName) +
-                    fieldHtml(label('VAS_144_ContactPhone', 'Contact Phone'), order.contactPhone) +
+                    (hasContact ? fieldHtml(label('VAS_144_ContactPerson', 'Contact Person'), order.contactName, !hasPhone) : '') +
+                    (hasPhone ? fieldHtml(label('VAS_144_ContactPhone', 'Contact Phone'), order.contactPhone, !hasContact) : '') +
                     fieldHtml(label('VAS_144_DeliveryLocation', 'Delivery Location'), order.location, true) +
                     fieldHtml(label('VAS_144_Representative', 'Representative'), order.representative) +
                     fieldHtml(label('VAS_144_Warehouse', 'Warehouse'), order.warehouse) +
@@ -551,16 +572,23 @@
             var start = linePage * LINE_PAGE_SIZE;
             var end = Math.min(start + LINE_PAGE_SIZE, lines.length);
 
+            /* Attribute column only when at least one line (any page) has an
+               attribute value, so the columns don't shift between pages. */
+            var hasAttribute = false;
+            for (var a = 0; a < lines.length; a++) {
+                if (lines[a].attributeValue) { hasAttribute = true; break; }
+            }
+            var gridClass = hasAttribute ? ' MPC-dos-has-attr' : '';
+
             var rows = '';
             for (var index = start; index < end; index++) {
                 var line = lines[index];
                 var imageUrl = resolveImageUrl(line.imageUrl);
-                var priceFull = line.unitPrice == null ? '-' : formatAmount(line.unitPrice, order);
-                var totalFull = line.lineDisplayTotal == null ? '-' : formatAmount(line.lineDisplayTotal, order);
-                var priceText = line.unitPrice == null ? '-' : formatAmountCompact(line.unitPrice, order);
-                var totalText = line.lineDisplayTotal == null ? '-' : formatAmountCompact(line.lineDisplayTotal, order);
+                /* Price / Total: full number, no currency symbol, no K/L/M. */
+                var priceText = line.unitPrice == null ? '-' : formatNumberFull(line.unitPrice, order);
+                var totalText = line.lineDisplayTotal == null ? '-' : formatNumberFull(line.lineDisplayTotal, order);
                 rows +=
-                    '<div class="MPC-dos-lrow">' +
+                    '<div class="MPC-dos-lrow' + gridClass + '">' +
                         '<span class="MPC-dos-li">' +
                             '<span class="MPC-dos-li-thumb">' + packageIcon() +
                                 (imageUrl ? '<img class="MPC-dos-li-img" src="' + escapeHtml(imageUrl) + '" alt="" loading="lazy" />' : '') +
@@ -570,9 +598,11 @@
                                 '<span class="MPC-dos-li-sku" title="' + escapeHtml(line.sku || '') + '">' + escapeHtml(line.sku || '') + '</span>' +
                             '</span>' +
                         '</span>' +
+                        (hasAttribute ? '<span class="MPC-dos-l-attr" title="' + escapeHtml(line.attributeValue || '') + '">' + escapeHtml(line.attributeValue || '-') + '</span>' : '') +
                         '<span class="MPC-dos-l-qty">' + escapeHtml(formatQty(line.qty)) + '</span>' +
-                        '<span class="MPC-dos-l-price" title="' + escapeHtml(priceFull) + '">' + escapeHtml(priceText) + '</span>' +
-                        '<span class="MPC-dos-l-total" title="' + escapeHtml(totalFull) + '">' + escapeHtml(totalText) + '</span>' +
+                        '<span class="MPC-dos-l-uom" title="' + escapeHtml(line.uomName || '') + '">' + escapeHtml(line.uomName || '-') + '</span>' +
+                        '<span class="MPC-dos-l-price" title="' + escapeHtml(priceText) + '">' + escapeHtml(priceText) + '</span>' +
+                        '<span class="MPC-dos-l-total" title="' + escapeHtml(totalText) + '">' + escapeHtml(totalText) + '</span>' +
                     '</div>';
             }
 
@@ -591,17 +621,24 @@
                     '</div>';
             }
 
+            /* Subtotal / Tax / Total: full value (no K/L/M) with the currency
+               symbol in front. */
+            var subtotalText = formatAmountWithSymbol(order.subtotal, order);
+            var taxText = formatAmountWithSymbol(order.tax, order);
+            var grandText = formatAmountWithSymbol(order.total, order);
             var totals =
                 '<div class="MPC-dos-totals">' +
-                    '<span class="MPC-dos-total-row"><span>' + escapeHtml(label('VAS_144_Subtotal', 'Subtotal')) + '</span><span title="' + escapeHtml(formatAmount(order.subtotal, order)) + '">' + escapeHtml(formatAmountCompact(order.subtotal, order)) + '</span></span>' +
-                    '<span class="MPC-dos-total-row"><span>' + escapeHtml(label('VAS_144_Tax', 'Tax')) + '</span><span title="' + escapeHtml(formatAmount(order.tax, order)) + '">' + escapeHtml(formatAmountCompact(order.tax, order)) + '</span></span>' +
-                    '<span class="MPC-dos-total-row MPC-dos-total-grand"><span>' + escapeHtml(label('VAS_144_Total', 'Total')) + '</span><span title="' + escapeHtml(formatAmount(order.total, order)) + '">' + escapeHtml(formatAmountCompact(order.total, order)) + '</span></span>' +
+                    '<span class="MPC-dos-total-row"><span>' + escapeHtml(label('VAS_144_Subtotal', 'Subtotal')) + '</span><span title="' + escapeHtml(subtotalText) + '">' + escapeHtml(subtotalText) + '</span></span>' +
+                    '<span class="MPC-dos-total-row"><span>' + escapeHtml(label('VAS_144_Tax', 'Tax')) + '</span><span title="' + escapeHtml(taxText) + '">' + escapeHtml(taxText) + '</span></span>' +
+                    '<span class="MPC-dos-total-row MPC-dos-total-grand"><span>' + escapeHtml(label('VAS_144_Total', 'Total')) + '</span><span title="' + escapeHtml(grandText) + '">' + escapeHtml(grandText) + '</span></span>' +
                 '</div>';
 
             return '' +
-                '<div class="MPC-dos-lhead">' +
+                '<div class="MPC-dos-lhead' + gridClass + '">' +
                     '<span>' + escapeHtml(label('VAS_144_Item', 'Item')) + '</span>' +
+                    (hasAttribute ? '<span>' + escapeHtml(label('VAS_144_Attribute', 'Attribute')) + '</span>' : '') +
                     '<span class="MPC-dos-ta-r">' + escapeHtml(label('VAS_144_Qty', 'Qty')) + '</span>' +
+                    '<span>' + escapeHtml(label('VAS_144_UOM', 'UOM')) + '</span>' +
                     '<span class="MPC-dos-ta-r MPC-dos-l-price">' + escapeHtml(label('VAS_144_Price', 'Price')) + '</span>' +
                     '<span class="MPC-dos-ta-r">' + escapeHtml(label('VAS_144_Total', 'Total')) + '</span>' +
                 '</div>' +

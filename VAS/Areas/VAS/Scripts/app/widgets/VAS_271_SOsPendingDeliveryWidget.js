@@ -21,7 +21,8 @@
  *           self-contained copy, matching how every widget controller/JS pair in
  *           this codebase owns its own modal implementation.
  *
- * Modal   - Documents (top-level) -> Record / Lines (child, back-navigable), same
+ * Modal   - Documents (top-level) -> Lines (child, back-navigable; SO number and
+ *           lines icon open the same pop-up, Sr 8.11), same
  *           { title, subtitle, size, render } config-stack engine as VAS_270 -
  *           "back" pops the stack and re-runs the popped config's render() from its
  *           own already-fetched state, never stale HTML.
@@ -162,7 +163,7 @@
                 if ($root.css('position') === 'static') { $root.css('position', 'relative'); }
                 var text = '';
                 try { text = VIS.Msg.getMsg('VAS_SO_Retry'); } catch (e) { text = ''; }
-                if (!text || text === 'VAS_SO_Retry') { text = 'Retry'; }
+                if (!text || text === 'VAS_SO_Retry' || text === '[VAS_SO_Retry]') { text = 'Retry'; }
                 $('<button type="button" class="vasso-retry"></button>').text(text)
                     .attr('title', text)
                     .on('click', function (e) {
@@ -211,6 +212,9 @@
         var $mask, $modal, $mHead, $mTitle, $mSub, $mBack, $mBody, $mFoot;
 
         var SELF_ENDPOINT = 'VAS_271_SOsPendingDeliveryWidget/';
+        // Per-instance event-namespace suffix (Sr 8.28): disposing an old instance must
+        // not unbind the window handlers of a re-created one with the same widget id.
+        var instanceTag = 'i' + Math.random().toString(36).slice(2, 9);
 
         var summary = null;           // last fetched GetSummary payload
         var summaryState = 'loading'; // 'loading' | 'ready' | 'error'
@@ -262,6 +266,23 @@
 
         function formatNum(value) {
             return Math.round(Number(value || 0)).toLocaleString('en-IN');
+        }
+
+        // Amounts in the order's (price list's) own currency and precision.
+        function formatMoney(value, symbol, precision) {
+            var prec = (typeof precision === 'number' && precision >= 0) ? precision : 2;
+            var text = Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: prec, maximumFractionDigits: prec });
+            return symbol ? symbol + ' ' + text : text;
+        }
+
+        // Sr 8.13: quantities are in the selected UOM and can be fractional.
+        function formatQty(value) {
+            return Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+        }
+
+        // Sr 8.17: a description made only of blanks / separators is not an attribute value (VAS_203 rule).
+        function hasAttributeValue(text) {
+            return !!text && /[^\s\-‐-―_.,:;()\[\]\/\\|]/.test(String(text));
         }
 
         function parseIso(iso) {
@@ -316,8 +337,17 @@
                     '</div>' +
                 '</button>'
             );
-            $tile.on('click', function () { openDocumentsModal(); });
             $root.append($tile);
+            bindTile();
+        }
+
+        /* Sr 8.28: (re)binds the tile click. Run on init AND on every refresh - after a
+           "refresh all" from the mosaic panel the host can strip jQuery handlers from
+           the widget's DOM (re-attaching the same nodes), which left a tile that
+           rendered fine but opened nothing. off() first keeps it to one handler. */
+        function bindTile() {
+            if (!$tile) { return; }
+            $tile.off('click.vas271').on('click.vas271', function () { openDocumentsModal(); });
         }
 
         function sideLabelHtml() {
@@ -419,15 +449,16 @@
             $mBody.on('click', function (event) {
                 var pageBtn = event.target.closest ? event.target.closest('[data-dir]') : null;
                 if (pageBtn) { turnPage(pageBtn.getAttribute('data-table'), Number(pageBtn.getAttribute('data-dir'))); return; }
+                // Sr 8.11: the document number and the Line Details icon open the SAME pop-up.
                 var soBtn = event.target.closest ? event.target.closest('[data-so]') : null;
-                if (soBtn) { openRecordModal(Number(soBtn.getAttribute('data-so'))); return; }
+                if (soBtn) { openLinesModal(Number(soBtn.getAttribute('data-so'))); return; }
                 var linesBtn = event.target.closest ? event.target.closest('[data-lines]') : null;
                 if (linesBtn) { openLinesModal(Number(linesBtn.getAttribute('data-lines'))); return; }
             });
         }
 
         function bindDocumentLevelEvents() {
-            var ns = '.vas271-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget');
+            var ns = '.vas271-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '-' + instanceTag;
 
             $(window).on('resize' + ns, function () {
                 if ($mask.hasClass('is-open')) { fitAllTables(); }
@@ -488,7 +519,9 @@
         }
 
         function openDocumentsModal() {
-            if (summaryState === 'error') { return; }
+            // Sr 8.28: never swallow the click - when the tile's last load failed
+            // (e.g. the request burst of a "refresh all"), the modal opens and loads
+            // the figures again instead of doing nothing.
             showLoading(label('VAS_271_Title', 'SOs Pending Delivery'));
 
             function loadAndShow() {
@@ -606,8 +639,8 @@
                     cellHtml(formatDateFull(row.SalesOrderDate), 'vas271-c-std'),
                     cellHtml(row.CustomerName, 'vas271-c-prim'),
                     cellHtml(row.WarehouseName, 'vas271-c-std'),
-                    cellHtml(formatNum(row.OrderedQty), 'vas271-c-std', 'right'),
-                    cellHtml(formatNum(row.PendingQty), 'vas271-c-prim', 'right'),
+                    cellHtml(formatQty(row.OrderedQty), 'vas271-c-std', 'right'),
+                    cellHtml(formatQty(row.PendingQty), 'vas271-c-prim', 'right'),
                     cellHtml(formatINR(row.PendingValue), 'vas271-c-emph', 'right'),
                     cellHtml(row.PromisedDate ? formatDateFull(row.PromisedDate) : '—', 'vas271-c-std'),
                     stockCellHtml(row),
@@ -671,60 +704,23 @@
             });
         }
 
-        function openRecordModal(orderId) {
-            showLoading(label('VAS_271_Title', 'SOs Pending Delivery') + '…');
-            fetchOrderDetail(orderId, function (detail) {
-                if (!detail) { showLoadError(); return; }
-                showScreen(buildRecordCfg(detail.order, detail.lines), true);
-            });
-        }
-
-        function buildRecordCfg(order, lines) {
-            return {
-                title: order.SalesOrderNumber,
-                subtitle: [order.CustomerName, formatDateShort(order.SalesOrderDate), order.DocumentStatus].filter(function (p) { return p; }).join(' · '),
-                size: '',
-                render: function () { renderRecordBody(order, lines); }
-            };
-        }
-
-        function soHeaderStats(order) {
-            return '<div class="vas271-mstats">' +
-                statTile(label('VAS_271_Customer', 'Customer'), order.CustomerName) +
-                statTile(label('VAS_271_SoDate', 'SO date'), formatDateFull(order.SalesOrderDate)) +
-                statTile(label('VAS_271_DatePromised', 'Date promised'), formatDateFull(order.DatePromised)) +
-                statTile(label('VAS_271_SoValue', 'SO value'), formatINR(order.OrderValue)) +
-                statTile(label('VAS_271_ShipFrom', 'Ship from'), order.WarehouseName) +
-                statTile(label('VAS_271_DeliveryMode', 'Delivery mode'), order.DeliveryMode) +
-                statTile(label('VAS_271_DocumentStatus', 'Document status'), order.DocumentStatus) +
-                statTile(label('VAS_271_DeliveryStatus', 'Delivery status'), order.DeliveryStatus) +
-            '</div>';
-        }
-
-        function renderRecordBody(order, lines) {
-            var secHtml = '<div class="vas271-msec">' + escapeHtml(label('VAS_271_SalesOrderLines', 'Sales order lines')) + '</div>';
-            $mBody.html(soHeaderStats(order) + secHtml + '<div class="vas271-mtwrap"><div class="vas271-mtbl" id="vas271-linetbl-record"></div></div>');
-
-            lineState = { order: order, lines: lines, page: 0, size: MAX_ROWS_PER_PAGE, tableId: 'vas271-linetbl-record' };
-            drawLineTable('vas271-linetbl-record');
-
-            $mFoot.html(lineFootHtml(order, lines));
-            $mFoot.find('#vas271-mback').on('click', backModal);
-            $mFoot.find('#vas271-mclose').on('click', closeModal);
-        }
-
+        /* Sr 8.11: the document number and the Line Details icon both open this one
+           "Sales order lines" pop-up (the separate record-preview screen is retired). */
         function lineFootHtml(order, lines) {
+            // Ordered / shortage count Item-type product lines only (Sr 8.15);
+            // shortage = pending - on hand, never negative.
             var qtyOrdered = 0, qtyShort = 0;
             lines.forEach(function (line) {
+                if (!line.IsItem) { return; }
                 qtyOrdered += Number(line.QtyOrdered) || 0;
                 var pending = Number(line.QtyPending) || 0;
-                var freeStock = Number(line.FreeStock) || 0;
-                if (pending > freeStock) { qtyShort += (pending - freeStock); }
+                var onHand = Math.max(0, Number(line.FreeStock) || 0);
+                if (pending > onHand) { qtyShort += (pending - onHand); }
             });
             var footNote = lines.length + ' ' + label('VAS_271_LinesSuffix', 'lines') +
-                ' · ' + formatNum(qtyOrdered) + ' ' + label('VAS_271_QtyOrderedSuffix', 'qty ordered') +
+                ' · ' + formatQty(qtyOrdered) + ' ' + label('VAS_271_QtyOrderedSuffix', 'qty ordered') +
                 ' · ' + order.DeliveryStatus +
-                (qtyShort > 0 ? ' · ' + formatNum(qtyShort) + ' ' + label('VAS_271_QtyShortSuffix', 'qty short of stock') : '');
+                (qtyShort > 0 ? ' · ' + formatQty(qtyShort) + ' ' + label('VAS_271_QtyShortSuffix', 'qty short of stock') : '');
 
             return '<span class="vas271-foot-note">' + escapeHtml(footNote) + '</span>' +
                 '<span><button type="button" class="vas271-btn" id="vas271-mback">' + escapeHtml(label('VAS_271_Back', 'Back')) + '</button> ' +
@@ -743,30 +739,36 @@
             return {
                 title: label('VAS_271_SalesOrderLines', 'Sales order lines') + ' · ' + order.SalesOrderNumber,
                 subtitle: [order.CustomerName, formatDateShort(order.SalesOrderDate), order.DeliveryStatus].filter(function (p) { return p; }).join(' · '),
-                size: 'md',
+                size: '',   // Sr 8.18: same modal size as the documents list
                 render: function () { renderLinesBody(order, lines); }
             };
         }
 
         function renderLinesBody(order, lines) {
+            // "Ordered" / "Pending" cards: Item-type product lines only (Sr 8.15).
             var qtyOrdered = 0, qtyPending = 0;
-            lines.forEach(function (l) { qtyOrdered += Number(l.QtyOrdered) || 0; qtyPending += Number(l.QtyPending) || 0; });
+            lines.forEach(function (l) {
+                if (!l.IsItem) { return; }
+                qtyOrdered += Number(l.QtyOrdered) || 0;
+                qtyPending += Number(l.QtyPending) || 0;
+            });
 
             var breadcrumb = '<div class="vas271-polink">' + escapeHtml(label('VAS_271_SalesOrderPrefix', 'Sales order')) +
-                ' <button type="button" class="vas271-lnk" data-so="' + order.SalesOrderId + '">' + escapeHtml(order.SalesOrderNumber) + '</button>' +
+                ' <strong>' + escapeHtml(order.SalesOrderNumber) + '</strong>' +
                 ' · ' + escapeHtml(formatDateFull(order.SalesOrderDate)) + ' · ' + escapeHtml(order.DocumentStatus) + '</div>';
 
             var stats = '<div class="vas271-mstats">' +
                 statTile(label('VAS_271_ColLine', 'Line') + 's', String(lines.length)) +
-                statTile(label('VAS_271_SoValue', 'SO value'), formatINR(order.OrderValue)) +
-                statTile(label('VAS_271_ColOrdered', 'Ordered'), formatNum(qtyOrdered)) +
-                statTile(label('VAS_271_ColPending', 'Pending'), formatNum(qtyPending)) +
+                statTile(label('VAS_271_SoValue', 'SO value'), formatMoney(order.OrderValue, order.CurrencySymbol, order.CurrencyPrecision)) +
+                statTile(label('VAS_271_ColOrdered', 'Ordered'), formatQty(qtyOrdered)) +
+                statTile(label('VAS_271_ColPending', 'Pending'), formatQty(qtyPending)) +
             '</div>';
 
             var secHtml = '<div class="vas271-msec">' + escapeHtml(label('VAS_271_SalesOrderLines', 'Sales order lines')) + '</div>';
             $mBody.html(breadcrumb + stats + secHtml + '<div class="vas271-mtwrap"><div class="vas271-mtbl" id="vas271-linetbl-lines"></div></div>');
 
-            lineState = { order: order, lines: lines, page: 0, size: MAX_ROWS_PER_PAGE, tableId: 'vas271-linetbl-lines' };
+            var showAttribute = lines.some(function (l) { return hasAttributeValue(l.AttributeText); });
+            lineState = { order: order, lines: lines, page: 0, size: MAX_ROWS_PER_PAGE, tableId: 'vas271-linetbl-lines', showAttribute: showAttribute };
             drawLineTable('vas271-linetbl-lines');
 
             $mFoot.html(lineFootHtml(order, lines));
@@ -783,7 +785,7 @@
             { key: 'delivered', label: label('VAS_271_ColDelivered', 'Delivered'), w: .7, align: 'right' },
             { key: 'pending', label: label('VAS_271_ColPending', 'Pending'), w: .7, align: 'right' },
             { key: 'instock', label: label('VAS_271_ColInStock', 'In stock'), w: .7, align: 'right' },
-            { key: 'rate', label: label('VAS_271_ColRate', 'Rate'), w: .7, align: 'right' },
+            { key: 'rate', label: label('VAS_271_ColRate', 'Rate'), w: .8, align: 'right' },
             { key: 'amount', label: label('VAS_271_ColAmount', 'Amount'), w: .9, align: 'right' },
             { key: 'status', label: label('VAS_271_ColLineStatus', 'Line status'), w: 1 }
         ];
@@ -792,29 +794,39 @@
             var el = document.getElementById(tableId);
             if (!el || !lineState) { return; }
 
-            var tpl = LINE_COLS.map(function (c) { return 'minmax(0,' + c.w + 'fr)'; }).join(' ');
+            // Sr 8.17: the Attribute column is shown only when some line of the order has
+            // an attribute value (decided over all lines, so it does not flicker per page).
+            var showAttribute = !!lineState.showAttribute;
+            var cols = LINE_COLS.filter(function (c) { return showAttribute || c.key !== 'attr'; });
+            var cur = lineState.order.CurrencySymbol;
+            var prec = lineState.order.CurrencyPrecision;
+
+            var tpl = cols.map(function (c) { return 'minmax(0,' + c.w + 'fr)'; }).join(' ');
             var pages = Math.max(1, Math.ceil(lineState.lines.length / lineState.size));
             if (lineState.page > pages - 1) { lineState.page = pages - 1; }
             var start = lineState.page * lineState.size;
             var slice = lineState.lines.slice(start, start + lineState.size);
 
             var head = '<div class="vas271-mrow vas271-mhead-row" style="grid-template-columns:' + tpl + '">' +
-                LINE_COLS.map(function (c) { return '<span class="vas271-cell' + (c.align === 'right' ? ' right' : '') + '" title="' + escapeHtml(c.label) + '">' + escapeHtml(c.label) + '</span>'; }).join('') +
+                cols.map(function (c) { return '<span class="vas271-cell' + (c.align === 'right' ? ' right' : '') + '" title="' + escapeHtml(c.label) + '">' + escapeHtml(c.label) + '</span>'; }).join('') +
             '</div>';
 
             var body = slice.map(function (line) {
                 var st = lineStatus(line);
+                // Delivered / pending / in stock only for Item-type products (Sr 8.15);
+                // charges and other product types show a dash.
+                var isItem = !!line.IsItem;
                 var cells = [
                     cellHtml(String(line.LineNo), 'vas271-c-std', 'right'),
                     cellHtml(line.ProductName, 'vas271-c-prim'),
-                    cellHtml(line.AttributeText, 'vas271-c-std'),
+                    showAttribute ? cellHtml(hasAttributeValue(line.AttributeText) ? line.AttributeText : '', 'vas271-c-std') : '',
                     cellHtml(line.UomName, 'vas271-c-std'),
-                    cellHtml(formatNum(line.QtyOrdered), 'vas271-c-std', 'right'),
-                    cellHtml(formatNum(line.QtyDelivered), 'vas271-c-std', 'right'),
-                    cellHtml(formatNum(line.QtyPending), 'vas271-c-prim', 'right'),
-                    cellHtml(formatNum(line.FreeStock), (line.FreeStock < line.QtyPending ? 'vas271-c-short' : 'vas271-c-ok'), 'right'),
-                    cellHtml('₹ ' + formatNum(line.Rate), 'vas271-c-std', 'right'),
-                    cellHtml(formatINR(line.Amount), 'vas271-c-emph', 'right')
+                    cellHtml(formatQty(line.QtyOrdered), 'vas271-c-std', 'right'),
+                    cellHtml(isItem ? formatQty(line.QtyDelivered) : '—', 'vas271-c-std', 'right'),
+                    cellHtml(isItem ? formatQty(line.QtyPending) : '—', 'vas271-c-prim', 'right'),
+                    cellHtml(isItem ? formatQty(line.FreeStock) : '—', (isItem && line.FreeStock < line.QtyPending ? 'vas271-c-short' : 'vas271-c-ok'), 'right'),
+                    cellHtml(formatMoney(line.Rate, cur, 2), 'vas271-c-std', 'right'),
+                    cellHtml(formatMoney(line.Amount, cur, prec), 'vas271-c-emph', 'right')
                 ].join('') + '<span class="vas271-cell"><span class="vas271-chip ' + st.cls + '" title="' + escapeHtml(st.text) + '">' + escapeHtml(st.text) + '</span></span>';
                 return '<div class="vas271-mrow" style="grid-template-columns:' + tpl + '">' + cells + '</div>';
             }).join('');
@@ -881,14 +893,21 @@
         this.getRoot = function () { return $root; };
 
         this.disposeComponent = function () {
-            var ns = '.vas271-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget');
+            var ns = '.vas271-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '-' + instanceTag;
             $(document).off(ns);
             $(window).off(ns);
             if ($mask) { $mask.remove(); }
             $root.remove();
         };
 
-        this.refreshWidget = function () { loadSummary(); };
+        // Sr 8.28: a refresh also re-arms the tile and re-creates the modal shell if
+        // the host removed it, so the widget stays clickable after "refresh all".
+        this.refreshWidget = function () {
+            if (!$mask || !$.contains(document.body, $mask[0])) { createModal(); }
+            if ($tile && !$.contains($root[0], $tile[0])) { $root.append($tile); }
+            bindTile();
+            loadSummary();
+        };
     };
 
     VAS.VAS_271_SOsPendingDeliveryWidget.prototype.widgetFirevalueChanged = function (value) {

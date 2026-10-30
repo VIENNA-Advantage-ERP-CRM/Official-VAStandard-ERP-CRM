@@ -22,6 +22,9 @@ namespace VIS.Controllers
     ///   &lt;EmpCode&gt;   2026-06-18 Created
     ///   2026-09-15 QA sheet GRN #4/#5: month of the PO instead of a financial year-to-date window,
     ///              Item lines only, received capped at ordered, one-decimal result
+    ///   VAI163     2026-10-29 Closed POs measured against the quantity originally ordered
+    ///              (QtyOrdered + QtyLostSales) instead of the post-close QtyOrdered, which
+    ///              CloseIt sets equal to QtyDelivered and so showed every closed PO as 100%
     /// </summary>
     public class VAS_085_POFulfilmentWidgetController : Controller
     {
@@ -53,15 +56,21 @@ namespace VIS.Controllers
             DateTime previousStart = currentStart.AddMonths(-1);
             DateTime previousEndNext = currentStart;
 
+            /* Closing a PO (MOrder.CloseIt) rewrites QtyOrdered to QtyDelivered and parks the
+               short-received rest in QtyLostSales, so a closed PO read as 100% fulfilled whatever
+               was actually received. The quantity originally ordered is QtyOrdered + QtyLostSales
+               on a closed PO (void is excluded by the DocStatus filter). */
+            string orderedQty = "(COALESCE(OrdLine.QtyOrdered, 0) + CASE WHEN Ord.DocStatus = 'CL' THEN COALESCE(OrdLine.QtyLostSales, 0) ELSE 0 END)";
+
             string sql = @"
                 SELECT SUM(CASE WHEN Ord.DateOrdered >= @CurrentStart1 AND Ord.DateOrdered < @CurrentEndNext1
-                                THEN COALESCE(OrdLine.QtyOrdered, 0) ELSE 0 END) AS Current_Ordered,
+                                THEN " + orderedQty + @" ELSE 0 END) AS Current_Ordered,
                        SUM(CASE WHEN Ord.DateOrdered >= @CurrentStart2 AND Ord.DateOrdered < @CurrentEndNext2
-                                THEN LEAST(COALESCE(OrdLine.QtyDelivered, 0), COALESCE(OrdLine.QtyOrdered, 0)) ELSE 0 END) AS Current_Delivered,
+                                THEN LEAST(COALESCE(OrdLine.QtyDelivered, 0), " + orderedQty + @") ELSE 0 END) AS Current_Delivered,
                        SUM(CASE WHEN Ord.DateOrdered >= @PreviousStart1 AND Ord.DateOrdered < @PreviousEndNext1
-                                THEN COALESCE(OrdLine.QtyOrdered, 0) ELSE 0 END) AS Previous_Ordered,
+                                THEN " + orderedQty + @" ELSE 0 END) AS Previous_Ordered,
                        SUM(CASE WHEN Ord.DateOrdered >= @PreviousStart2 AND Ord.DateOrdered < @PreviousEndNext2
-                                THEN LEAST(COALESCE(OrdLine.QtyDelivered, 0), COALESCE(OrdLine.QtyOrdered, 0)) ELSE 0 END) AS Previous_Delivered
+                                THEN LEAST(COALESCE(OrdLine.QtyDelivered, 0), " + orderedQty + @") ELSE 0 END) AS Previous_Delivered
                 FROM C_Order Ord
                 INNER JOIN C_OrderLine OrdLine ON (OrdLine.C_Order_ID=Ord.C_Order_ID)
                 INNER JOIN M_Product Product ON (Product.M_Product_ID=OrdLine.M_Product_ID)

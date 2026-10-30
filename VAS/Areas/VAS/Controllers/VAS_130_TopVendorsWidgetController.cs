@@ -295,9 +295,13 @@ namespace VAS.Controllers
                            a.Name AS AttributeName,
                            av.Name AS AttributeListValue,
                            ai.Value AS AttributeTextValue,
-                           ai.ValueNumber AS AttributeNumberValue
+                           ai.ValueNumber AS AttributeNumberValue,
+                           asi.Lot AS AsiLot,
+                           asi.SerNo AS AsiSerNo,
+                           asi.Description AS AsiDescription
                     FROM ProdQty q
                     LEFT JOIN C_UOM u ON (u.C_UOM_ID = q.UomId)
+                    LEFT JOIN M_AttributeSetInstance asi ON (asi.M_AttributeSetInstance_ID = q.AttributeSetInstanceId AND q.AttributeSetInstanceId > 0)
                     LEFT JOIN M_AttributeInstance ai ON (ai.M_AttributeSetInstance_ID = q.AttributeSetInstanceId AND ai.IsActive = 'Y')
                     LEFT JOIN M_Attribute a ON (a.M_Attribute_ID = ai.M_Attribute_ID AND a.IsActive = 'Y')
                     LEFT JOIN M_AttributeValue av ON (av.M_AttributeValue_ID = ai.M_AttributeValue_ID AND av.M_Attribute_ID = ai.M_Attribute_ID AND av.IsActive = 'Y')
@@ -339,10 +343,15 @@ namespace VAS.Controllers
                                 // Full UOM name ("Each"), not the symbol ("Ea") - Widget_Bug_Fix Sr 51.
                                 uom = !string.IsNullOrEmpty(uomName) ? uomName : uomSymbol,
                                 attributes = new List<Attr>(),
-                                seenChips = new HashSet<string>()
+                                seenChips = new HashSet<string>(),
+                                asiDescription = Util.GetValueOfString(dr["AsiDescription"])
                             };
                             byId[rowKey] = row;
                             order.Add(rowKey);
+
+                            // Lot and serial no. sit on the instance itself, not in M_AttributeInstance.
+                            row.AddChip(Msg.Translate(ctx, "Lot"), Util.GetValueOfString(dr["AsiLot"]));
+                            row.AddChip(Msg.Translate(ctx, "SerNo"), Util.GetValueOfString(dr["AsiSerNo"]));
 
                             DateTime? rowLastDate = Util.GetValueOfDateTime(dr["LastDate"]);
                             if (rowLastDate.HasValue && (!overallLastDate.HasValue || rowLastDate.Value > overallLastDate.Value))
@@ -360,12 +369,7 @@ namespace VAS.Controllers
                         {
                             value = Util.GetValueOfDecimal(dr["AttributeNumberValue"]).ToString("0.####", CultureInfo.InvariantCulture);
                         }
-                        if (string.IsNullOrEmpty(value)) { continue; }
-
-                        string chipKey = label + ":" + value;
-                        if (row.seenChips.Contains(chipKey)) { continue; }
-                        row.seenChips.Add(chipKey);
-                        row.attributes.Add(new Attr { label = label, value = value });
+                        row.AddChip(label, value);
                     }
                 }
                 finally
@@ -376,6 +380,11 @@ namespace VAS.Controllers
                 List<object> items = order.Select(id =>
                 {
                     DetailRow row = byId[id];
+                    // An instance with no readable attribute rows still names itself by its description.
+                    if (row.attributes.Count == 0)
+                    {
+                        row.AddChip(Msg.Translate(ctx, "M_Attribute_ID"), row.asiDescription);
+                    }
                     return (object)new
                     {
                         productId = row.productId,
@@ -560,6 +569,16 @@ namespace VAS.Controllers
             public string uom;
             public List<Attr> attributes;
             public HashSet<string> seenChips;
+            public string asiDescription;
+
+            /// <summary>Adds one "label: value" chip, skipping blanks and duplicates.</summary>
+            public void AddChip(string label, string value)
+            {
+                if (string.IsNullOrWhiteSpace(label) || string.IsNullOrWhiteSpace(value)) { return; }
+                string chipKey = label + ":" + value;
+                if (!seenChips.Add(chipKey)) { return; }
+                attributes.Add(new Attr { label = label, value = value });
+            }
         }
 
         /// <summary>One resolved attribute chip.</summary>

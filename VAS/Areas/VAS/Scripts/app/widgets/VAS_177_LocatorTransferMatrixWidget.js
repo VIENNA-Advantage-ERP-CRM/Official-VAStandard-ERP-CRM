@@ -64,7 +64,6 @@
         var maxCols = 3;
         var page = 1;
         var MAX_COLS_CAP = 10;
-        var openMenu = '';
 
         function build() {
             $root.html(
@@ -76,9 +75,11 @@
                             '<div class="vas-177-subtitle">' + escapeHtml(lbl('VAS_177_Subtitle', 'Quantity moved from locator to locator')) + '</div>' +
                         '</div>' +
                     '</div>' +
+                    /* Native month / year selects, same as the standard widgets (VAS_145): the browser
+                       list is never clipped by the card, so the months show without a scroller. */
                     '<div class="vas-177-filters">' +
-                        '<div class="vas-177-dropdown" data-dd="m"><button type="button" class="vas-177-dropdown-btn"><span class="vas-177-dd-lbl">' + MONTHS[selMonth - 1] + '</span></button></div>' +
-                        '<div class="vas-177-dropdown" data-dd="y"><button type="button" class="vas-177-dropdown-btn"><span class="vas-177-dd-lbl">' + selYear + '</span></button></div>' +
+                        '<select class="vas-177-select vas-177-select--month" aria-label="' + escapeHtml(lbl('VAS_177_FilterByMonth', 'Filter by month')) + '"></select>' +
+                        '<select class="vas-177-select vas-177-select--year" aria-label="' + escapeHtml(lbl('VAS_177_FilterByYear', 'Filter by year')) + '"></select>' +
                     '</div>' +
                 '</div>' +
                 '<div class="vas-177-table-wrap"><div class="vas-177-table-body"></div></div>' +
@@ -86,20 +87,16 @@
             );
             $wrapper.empty().append($root);
 
-            $root.on('click', '.vas-177-dropdown-btn', function (e) {
-                e.stopPropagation();
-                toggleMenu($(this).closest('.vas-177-dropdown').attr('data-dd'));
-            });
-            $root.on('click', '.vas-177-dd-option', function (e) {
-                e.stopPropagation();
-                var key = $(this).closest('.vas-177-dropdown').attr('data-dd');
-                var val = parseInt($(this).attr('data-v'), 10);
-                if (key === 'm') { selMonth = val; } else { selYear = val; }
-                $(this).closest('.vas-177-dropdown').find('.vas-177-dd-lbl').text($(this).text());
-                closeMenus();
+            renderFilterOptions();
+            $root.on('change', '.vas-177-select--month', function () {
+                selMonth = parseInt($(this).val(), 10) || selMonth;
                 load();
             });
-            $(document).on('click.vas177', closeMenus);
+            $root.on('change', '.vas-177-select--year', function () {
+                selYear = parseInt($(this).val(), 10) || selYear;
+                renderMonthOptions();
+                load();
+            });
             $root.on('click', '.vas-177-pager-btn', function () {
                 page = Math.max(1, page + parseInt($(this).attr('data-dir'), 10));
                 render();
@@ -108,29 +105,32 @@
             setupObservers();
         }
 
-        function closeMenus() {
-            openMenu = '';
-            $root.find('.vas-177-dropdown-menu').remove();
+        function monthName(m) {
+            return new Date(2000, m - 1, 1).toLocaleDateString(window.navigator.language, { month: 'long' });
         }
 
-        function toggleMenu(key) {
-            var wasOpen = (openMenu === key);
-            closeMenus();
-            if (wasOpen) { return; }
-            openMenu = key;
-            var html = '<div class="vas-177-dropdown-menu">';
-            if (key === 'm') {
-                html += '<div class="vas-177-dd-option' + (selMonth === 0 ? ' vas-177-dd-option--sel' : '') + '" data-v="0">' + escapeHtml(lbl('VAS_177_AllMonths', 'All Months')) + '</div>';
-                MONTHS.forEach(function (m, i) {
-                    html += '<div class="vas-177-dd-option' + (selMonth === i + 1 ? ' vas-177-dd-option--sel' : '') + '" data-v="' + (i + 1) + '">' + m + '</div>';
-                });
-            } else {
-                for (var y = now.getFullYear(); y >= now.getFullYear() - 4; y--) {
-                    html += '<div class="vas-177-dd-option' + (selYear === y ? ' vas-177-dd-option--sel' : '') + '" data-v="' + y + '">' + y + '</div>';
-                }
+        /* Years: the current year and the four before it. Months: see renderMonthOptions. */
+        function renderFilterOptions() {
+            var yHtml = '';
+            for (var y = now.getFullYear(); y >= now.getFullYear() - 4; y--) {
+                yHtml += '<option value="' + y + '">' + y + '</option>';
             }
-            html += '</div>';
-            $root.find('.vas-177-dropdown[data-dd="' + key + '"]').append(html);
+            $root.find('.vas-177-select--year').html(yHtml).val(String(selYear));
+            renderMonthOptions();
+        }
+
+        /* Book1 rows 52/59 (Sr. 37/48, default pending confirmation): the current year lists
+           January to the current month only - months that have not happened are not offered -
+           and a past year lists all twelve. No "All Months" entry (the matrix is always one
+           month). The list is short enough to open without a scroller. */
+        function renderMonthOptions() {
+            var lastMonth = selYear === now.getFullYear() ? now.getMonth() + 1 : 12;
+            if (selMonth > lastMonth) { selMonth = lastMonth; }
+            var mHtml = '';
+            for (var m = 1; m <= lastMonth; m++) {
+                mHtml += '<option value="' + m + '">' + escapeHtml(monthName(m)) + '</option>';
+            }
+            $root.find('.vas-177-select--month').html(mHtml).val(String(selMonth));
         }
 
         function setupObservers() {
@@ -297,7 +297,6 @@
         this.getRoot = function () { return $wrapper; };
 
         this.disposeComponent = function () {
-            $(document).off('click.vas177');
             if (widgetObserver && $wrapper[0]) {
                 widgetObserver.unobserve($wrapper[0]);
                 widgetObserver = null;

@@ -341,6 +341,10 @@
                 '</div>'
             );
             $dialog.find('.vas-shm-mclose').on('click', closeModal);
+            $dialog.on('click', '.vas-shm-dolink', function (e) {
+                e.preventDefault();
+                zoomDeliveryOrder($(this).attr('data-id'));
+            });
             $('body').append($dialog);
         }
 
@@ -415,7 +419,7 @@
                 var d = slice[i];
                 body +=
                     '<div class="vas-shm-dorow">' +
-                    '<div class="vas-shm-doid">' + escapeHtml(d.doNumber) + '</div>' +
+                    '<div class="vas-shm-doid"><a href="javascript:void(0)" class="vas-shm-dolink" data-id="' + Number(d.doId || 0) + '" title="' + escapeHtml(d.doNumber) + '">' + escapeHtml(d.doNumber) + '</a></div>' +
                     '<div class="vas-shm-docell">' + escapeHtml(d.soNumber || '-') + '</div>' +
                     '<div class="vas-shm-docell" title="' + escapeHtml(d.customerName) + '">' + escapeHtml(d.customerName || '-') + '</div>' +
                     '<div class="vas-shm-docell">' + escapeHtml(formatDate(d.doDate)) + '</div>' +
@@ -435,6 +439,37 @@
             $dialog.find('.vas-shm-mfoot').html(footHtml);
             $dialog.find('.vas-shm-mprev').on('click', function () { if (modalPage > 0) { modalPage--; renderModalPage(); } });
             $dialog.find('.vas-shm-mnext').on('click', function () { if (modalPage < pageCount - 1) { modalPage++; renderModalPage(); } });
+        }
+
+        /* Navigate to the Delivery Order record WITHOUT spawning a second window
+           (same two paths as VAS_078_ProductSearchWidget.zoomProductRecord):
+             - Hosted inside a window (windowNo >= 0): fire the host's value-changed
+               channel with a TabWhereClause; the host re-queries in place.
+             - Standalone (Home / landing dashboard): VAS.ZoomUtil opens the standard
+               Delivery Order window (VAS_DeliveryOrder, else Shipment (Customer)).
+           The resolved AD_Window_ID is cached so later clicks skip the lookup. */
+        var ZOOM_WINDOW_NAME_NEW = 'VAS_DeliveryOrder';
+        var ZOOM_WINDOW_NAME_OLD = 'Shipment (Customer)';
+        var doWindowId = 0;
+        function zoomDeliveryOrder(doId) {
+            var recordId = Number(doId || 0);
+            if (recordId <= 0) { return; }
+            try {
+                if ($self.windowNo >= 0) {
+                    $self.widgetFirevalueChanged({
+                        "TabWhereClause": "M_InOut.M_InOut_ID=" + recordId,
+                        "TabLayout": "Y",   /* 'N' Grid, 'Y' Single, 'C' Card */
+                        "TabIndex": "0"
+                    });
+                    closeModal();
+                    return;
+                }
+                if (!VAS.ZoomUtil || typeof VAS.ZoomUtil.zoomToRecord !== 'function') { return; }
+                VAS.ZoomUtil.zoomToRecord("M_InOut_ID", recordId, doWindowId, ZOOM_WINDOW_NAME_NEW, ZOOM_WINDOW_NAME_OLD)
+                    .done(function (id) {
+                        if (id > 0) { doWindowId = id; closeModal(); }
+                    });
+            } catch (e) { /* best-effort */ }
         }
 
         function closeModal() {

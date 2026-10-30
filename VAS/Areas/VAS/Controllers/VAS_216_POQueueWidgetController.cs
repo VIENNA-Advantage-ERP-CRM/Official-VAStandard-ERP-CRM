@@ -11,6 +11,8 @@
  *                     no longer queued; the order-level IsBlanketTrx flag alone did not catch them.
  *   Claude 2026-10-21 Release Purchase Orders (Ref_Order_ID set) are queued even when their document
  *                     type is the blanket one; only the blanket order itself stays out.
+ *   Claude 2026-10-29 Release Purchase Orders are also recognised by their document type
+ *                     (C_DocType.IsReleaseDocument = 'Y'); most releases carry no Ref_Order_ID.
  ***********************************************************/
 
 using Newtonsoft.Json;
@@ -133,6 +135,10 @@ namespace VIS.Controllers
                       -- Blanket Purchase Orders are not queued (order flag, or document type IsBlanketTrx / Blanket Order sub-type),
                       -- but Release Purchase Orders (Ref_Order_ID points to the blanket order) are queued.
                       AND (o.Ref_Order_ID > 0
+                           -- Release Purchase Orders: their document type IsReleaseDocument = 'Y' (the blanket link is kept on
+                           -- the lines, C_OrderLine_Blanket_ID, so Ref_Order_ID alone did not catch them).
+                           OR EXISTS (SELECT 1 FROM C_DocType rdt WHERE rdt.C_DocType_ID IN (o.C_DocTypeTarget_ID, o.C_DocType_ID)
+                                      AND COALESCE(rdt.IsReleaseDocument, 'N') = 'Y')
                            OR (COALESCE(o.IsBlanketTrx, 'N') = 'N'
                                AND NOT EXISTS (SELECT 1 FROM C_DocType dt WHERE dt.C_DocType_ID = o.C_DocTypeTarget_ID
                                              AND (COALESCE(dt.IsBlanketTrx, 'N') = 'Y' OR COALESCE(dt.DocSubTypeSO, ' ') = 'BO'))))
@@ -216,6 +222,10 @@ namespace VIS.Controllers
                       -- Blanket Purchase Orders are not queued (order flag, or document type IsBlanketTrx / Blanket Order sub-type),
                       -- but Release Purchase Orders (Ref_Order_ID points to the blanket order) are queued.
                       AND (o.Ref_Order_ID > 0
+                           -- Release Purchase Orders: their document type IsReleaseDocument = 'Y' (the blanket link is kept on
+                           -- the lines, C_OrderLine_Blanket_ID, so Ref_Order_ID alone did not catch them).
+                           OR EXISTS (SELECT 1 FROM C_DocType rdt WHERE rdt.C_DocType_ID IN (o.C_DocTypeTarget_ID, o.C_DocType_ID)
+                                      AND COALESCE(rdt.IsReleaseDocument, 'N') = 'Y')
                            OR (COALESCE(o.IsBlanketTrx, 'N') = 'N'
                                AND NOT EXISTS (SELECT 1 FROM C_DocType dt WHERE dt.C_DocType_ID = o.C_DocTypeTarget_ID
                                              AND (COALESCE(dt.IsBlanketTrx, 'N') = 'Y' OR COALESCE(dt.DocSubTypeSO, ' ') = 'BO'))))

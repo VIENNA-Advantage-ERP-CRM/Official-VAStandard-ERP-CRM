@@ -610,10 +610,12 @@
                names. Order: Item | Attribute | PO Qty | Received | UOM (QA sheet GRN #180: attribute beside the
                product). The layout classes are
                Expected-GRN-only - Pending GRN shares the base .vas-egrn-rcv-line grid. */
-            /* QA sheet GRN #21: the column is hidden as soon as any line has no attribute value. */
-            var showAttr = currentLines.length > 0;
+            /* 29-Oct 4.12 (replaces QA sheet GRN #21's "hide when any line has none"): with several
+               product lines the column is shown when ANY line has an attribute value, and every line
+               shows its own product's values (a line without one shows "-"). */
+            var showAttr = false;
             for (var a = 0; a < currentLines.length; a++) {
-                if (!hasAttributeText(currentLines[a].attributeName)) { showAttr = false; break; }
+                if (hasAttributeText(currentLines[a].attributeName)) { showAttr = true; break; }
             }
             var layoutCls = ' vas-egrn-qtyfirst' + (showAttr ? '' : ' vas-egrn-noattr');
 

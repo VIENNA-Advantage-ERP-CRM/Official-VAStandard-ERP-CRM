@@ -338,6 +338,9 @@
 }
 
 .vas286-btn:hover { background: #EEF8FF; }
+/* Sr 8.36: "Open Record" - primary action, same look as VAS_268's. */
+.vas286-btn-primary { background: #0083DA; color: #fff; }
+.vas286-btn-primary:hover { background: #0069AE; }
 
 .vas286-mstats {
     display: grid;

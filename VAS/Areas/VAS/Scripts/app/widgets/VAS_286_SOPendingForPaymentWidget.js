@@ -45,7 +45,8 @@
  *  7  | SO No                                                                 | VAS_286_ColSoNo
  *  8  | SO date                                                               | VAS_286_ColSoDate
  *  9  | Customer                                                              | VAS_286_ColCustomer
- * 10  | Ship from                                                             | VAS_286_ColShipFrom
+ * 10  | Warehouse (Sr 8.35; was VAS_286_ColShipFrom "Ship from")               | VAS_286_ColWarehouse
+ * --  | Open Record (Sr 8.36)                                                 | VAS_286_OpenRecord
  * 11  | Payment type                                                          | VAS_286_ColPaymentType
  * 12  | Payment due                                                           | VAS_286_ColPaymentDue
  * 13  | Amount                                                                | VAS_286_ColAmount
@@ -57,7 +58,7 @@
  * 19  | SO date                                                               | VAS_286_SoDate
  * 20  | Date promised                                                         | VAS_286_DatePromised
  * 21  | SO value                                                              | VAS_286_SoValue
- * 22  | Ship from                                                             | VAS_286_ShipFrom
+ * 22  | (modal card now uses VAS_286_ColWarehouse "Warehouse")                 | VAS_286_ShipFrom
  * 23  | Delivery mode                                                         | VAS_286_DeliveryMode
  * 24  | Document status                                                       | VAS_286_DocumentStatus
  * 25  | Delivery status                                                       | VAS_286_DeliveryStatus
@@ -154,7 +155,7 @@
                 if ($root.css('position') === 'static') { $root.css('position', 'relative'); }
                 var text = '';
                 try { text = VIS.Msg.getMsg('VAS_SO_Retry'); } catch (e) { text = ''; }
-                if (!text || text === 'VAS_SO_Retry') { text = 'Retry'; }
+                if (!text || text === 'VAS_SO_Retry' || text === '[VAS_SO_Retry]') { text = 'Retry'; }
                 $('<button type="button" class="vasso-retry"></button>').text(text)
                     .attr('title', text)
                     .on('click', function (e) {
@@ -210,6 +211,11 @@
         var $mask, $modal, $mHead, $mTitle, $mSub, $mBack, $mBody, $mFoot;
 
         var SELF_ENDPOINT = 'VAS_286_SOPendingForPaymentWidget/';
+        var ZOOM_WINDOW_NAME = 'VAS_SalesOrder';   // same Sales Order window VAS_268 opens
+        var zoomWindowId = 0;
+        // Per-instance event-namespace suffix (Sr 8.28): disposing an old instance must
+        // not unbind the window handlers of a re-created one with the same widget id.
+        var instanceTag = 'i' + Math.random().toString(36).slice(2, 9);
 
         var listState = 'loading'; // 'loading' | 'ready' | 'error'
         var docsState = { page: 0, size: WIDGET_PAGE_SIZE, total: 0, rows: [], totalDue: 0 };
@@ -310,7 +316,7 @@
                 { l: label('VAS_286_ColSoNo', 'SO No'), right: false },
                 { l: label('VAS_286_ColSoDate', 'SO date'), right: false },
                 { l: label('VAS_286_ColCustomer', 'Customer'), right: false },
-                { l: label('VAS_286_ColShipFrom', 'Ship from'), right: false },
+                { l: label('VAS_286_ColWarehouse', 'Warehouse'), right: false },   // Sr 8.35 (was "Ship from")
                 { l: label('VAS_286_ColPaymentType', 'Payment type'), right: false },
                 { l: label('VAS_286_ColPaymentDue', 'Payment due'), right: false },
                 { l: label('VAS_286_ColAmount', 'Amount'), right: true }
@@ -333,10 +339,18 @@
             $shell.append($head, $tbl, $foot);
             $root.append($shell);
 
-            $prevBtn.on('click', function () { turnWidgetPage(-1); });
-            $nextBtn.on('click', function () { turnWidgetPage(1); });
+            bindWidgetEvents();
+        }
 
-            $tbody.on('click', function (event) {
+        /* Sr 8.28: (re)binds the widget's own handlers. Run on init AND on every refresh -
+           after a "refresh all" from the mosaic panel the host can strip jQuery handlers
+           from the widget's DOM (re-attaching the same nodes), which left rows that
+           rendered fine but opened nothing. off() first keeps it to one handler each. */
+        function bindWidgetEvents() {
+            $prevBtn.off('click.vas286').on('click.vas286', function () { turnWidgetPage(-1); });
+            $nextBtn.off('click.vas286').on('click.vas286', function () { turnWidgetPage(1); });
+
+            $tbody.off('click.vas286').on('click.vas286', function (event) {
                 var row = event.target.closest ? event.target.closest('[data-so]') : null;
                 if (row) { openRecordModal(Number(row.getAttribute('data-so'))); }
             });
@@ -428,7 +442,7 @@
                     var overdueText = label('VAS_286_OverduePrefix', 'Overdue') + ' ' + row.DaysOverdue + 'd';
                     dueCell = '<span class="vas286-cell" title="' + escapeHtml(overdueText) + '"><span class="vas286-chip vas286-chip-risk">' + escapeHtml(overdueText) + '</span></span>';
                 } else {
-                    dueCell = cellHtml(formatDateShort(row.PaymentDueDate), 'vas286-c-std');
+                    dueCell = cellHtml(formatDateShort(row.PaymentDueDate) || '—', 'vas286-c-std');
                 }
                 return '<button type="button" class="vas286-trow" style="grid-template-columns:' + tpl + '" data-so="' + row.SalesOrderId + '">' +
                     '<span class="vas286-cell vas286-c-link" title="' + escapeHtml(row.SalesOrderNumber) + '">' + escapeHtml(row.SalesOrderNumber) + '</span>' +
@@ -491,7 +505,7 @@
         }
 
         function bindDocumentLevelEvents() {
-            var ns = '.vas286-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget');
+            var ns = '.vas286-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '-' + instanceTag;
 
             $(window).on('resize' + ns, function () {
                 if ($mask.hasClass('is-open')) { fitLineTable(); }
@@ -521,6 +535,27 @@
             return { text: label('VAS_286_LineInProcess', 'In process'), cls: 'vas286-chip-neutral' };
         }
 
+        /* Sr 8.36: navigates to the Sales Order record in the SAME tab. Hosted inside the
+           Sales Order window (windowNo >= 0) the host's value-changed channel re-queries
+           the window it is already in (TabWhereClause) - same pattern as VAS_268 /
+           VAS_078 / VAS_203. On the Home page (no host window) the shared cross-window
+           zoom helper opens the Sales Order window on that record. */
+        function openRecordInWindow(orderId) {
+            closeModal();
+            if (!orderId) { return; }
+            if ($self.windowNo >= 0) {
+                $self.widgetFirevalueChanged({
+                    "TabWhereClause": "C_Order.C_Order_ID=" + Number(orderId),
+                    "TabLayout": "Y",
+                    "TabIndex": "0"
+                });
+                return;
+            }
+            if (!window.VAS || !VAS.ZoomUtil) { return; }
+            VAS.ZoomUtil.zoomToRecord('C_Order_ID', orderId, zoomWindowId, ZOOM_WINDOW_NAME, ZOOM_WINDOW_NAME)
+                .done(function (id) { if (id > 0) { zoomWindowId = id; } });
+        }
+
         function openRecordModal(orderId) {
             showLoading();
 
@@ -547,7 +582,7 @@
                 statTile(label('VAS_286_SoDate', 'SO date'), formatDateFull(order.SalesOrderDate)) +
                 statTile(label('VAS_286_DatePromised', 'Date promised'), formatDateFull(order.DatePromised)) +
                 statTile(label('VAS_286_SoValue', 'SO value'), formatINR(order.OrderValue)) +
-                statTile(label('VAS_286_ShipFrom', 'Ship from'), order.WarehouseName) +
+                statTile(label('VAS_286_ColWarehouse', 'Warehouse'), order.WarehouseName) +
                 statTile(label('VAS_286_DeliveryMode', 'Delivery mode'), order.DeliveryMode) +
                 statTile(label('VAS_286_DocumentStatus', 'Document status'), order.DocumentStatus) +
                 statTile(label('VAS_286_DeliveryStatus', 'Delivery status'), order.DeliveryStatus) +
@@ -571,9 +606,12 @@
                 ' · ' + order.DeliveryStatus +
                 (qtyShort > 0 ? ' · ' + formatNum(qtyShort) + ' ' + label('VAS_286_QtyShortSuffix', 'qty short of stock') : '');
 
+            // Sr 8.36: "Open Record" opens this SO on the Sales Order screen.
             $mFoot.html('<span class="vas286-foot-note">' + escapeHtml(footNote) + '</span>' +
-                '<span><button type="button" class="vas286-btn" id="vas286-mclose">' + escapeHtml(label('VAS_286_Close', 'Close')) + '</button></span>');
+                '<span><button type="button" class="vas286-btn" id="vas286-mclose">' + escapeHtml(label('VAS_286_Close', 'Close')) + '</button> ' +
+                '<button type="button" class="vas286-btn vas286-btn-primary" id="vas286-mopen">' + escapeHtml(label('VAS_286_OpenRecord', 'Open Record')) + '</button></span>');
             $mFoot.find('#vas286-mclose').on('click', closeModal);
+            $mFoot.find('#vas286-mopen').on('click', function () { openRecordInWindow(order.SalesOrderId); });
 
             requestAnimationFrame(function () { fitLineTable(); requestAnimationFrame(fitLineTable); });
         }
@@ -677,14 +715,21 @@
         this.getRoot = function () { return $root; };
 
         this.disposeComponent = function () {
-            var ns = '.vas286-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget');
+            var ns = '.vas286-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '-' + instanceTag;
             $(document).off(ns);
             $(window).off(ns);
             if ($mask) { $mask.remove(); }
             $root.remove();
         };
 
-        this.refreshWidget = function () { loadPendingPayment(docsState.page); };
+        // Sr 8.28: a refresh also re-arms the widget's handlers and re-creates the modal
+        // shell if the host removed it, so the widget stays clickable after "refresh all".
+        this.refreshWidget = function () {
+            if (!$mask || !$.contains(document.body, $mask[0])) { createModal(); }
+            if ($shell && !$.contains($root[0], $shell[0])) { $root.append($shell); }
+            bindWidgetEvents();
+            loadPendingPayment(docsState.page);
+        };
     };
 
     VAS.VAS_286_SOPendingForPaymentWidget.prototype.widgetFirevalueChanged = function (value) {

@@ -482,7 +482,8 @@ namespace VASLogic.Models
                               (SELECT COUNT(*)
                                  FROM M_RequisitionLine rl
                                  INNER JOIN C_OrderLine ol2
-                                    ON (rl.C_OrderLine_ID = ol2.C_OrderLine_ID)
+                                    ON (rl.C_OrderLine_ID = ol2.C_OrderLine_ID
+                                        OR rl.M_RequisitionLine_ID = ol2.M_RequisitionLine_ID)
                                 WHERE ol2.C_Order_ID = o.C_Order_ID)             AS RequisitionLineCount,
                               (SELECT COUNT(*)
                                  FROM C_Invoice ci
@@ -941,28 +942,37 @@ namespace VASLogic.Models
                 //  MIN / MAX of the UOM symbol tell the caller whether the whole
                 //  order shares one unit (they match) or mixes several (they do
                 //  not) — a mixed order shows no unit label.
+                //  A line counts when it is an Item product (stocked or not - the
+                //  Stocked flag no longer drops it) or a charge line; every other
+                //  product type is left out. Item lines are received through the
+                //  GRN (QtyDelivered); a non-stocked item or a charge line may
+                //  instead be fulfilled by invoicing, so for those the larger of
+                //  delivered / invoiced is the received figure.
+                string inc = "(p.ProductType = 'I' OR (ol.M_Product_ID IS NULL AND COALESCE(ol.C_Charge_ID, 0) > 0))";
+                string recv = "CASE WHEN p.ProductType = 'I' AND p.IsStocked = 'Y' THEN ol.QtyDelivered "
+                            + "WHEN ol.QtyDelivered >= ol.QtyInvoiced THEN ol.QtyDelivered ELSE ol.QtyInvoiced END";
                 string sql = @"SELECT
-                                  COALESCE(SUM(CASE WHEN p.ProductType = 'I'
+                                  COALESCE(SUM(CASE WHEN " + inc + @"
                                                THEN ol.QtyEntered   ELSE 0 END), 0) AS TotalQtyOrdered,
-                                  COALESCE(SUM(CASE WHEN p.ProductType = 'I'
-                                               THEN ol.QtyDelivered *
+                                  COALESCE(SUM(CASE WHEN " + inc + @"
+                                               THEN (" + recv + @") *
                                                     CASE WHEN ol.QtyOrdered <> 0
                                                          THEN ol.QtyEntered / ol.QtyOrdered
                                                          ELSE 1 END
                                                ELSE 0 END), 0) AS TotalQtyDelivered,
-                                  SUM(CASE WHEN p.ProductType = 'I' AND p.IsStocked = 'Y'
+                                  SUM(CASE WHEN " + inc + @"
                                            THEN 1 ELSE 0 END)  AS DeliverableLineCount,
-                                  SUM(CASE WHEN p.ProductType = 'I' AND p.IsStocked = 'Y'
-                                                AND ol.QtyDelivered >= ol.QtyOrdered
+                                  SUM(CASE WHEN " + inc + @"
+                                                AND (" + recv + @") >= ol.QtyOrdered
                                            THEN 1 ELSE 0 END)  AS FullyReceivedLineCount,
-                                  MIN(CASE WHEN p.ProductType = 'I'
+                                  MIN(CASE WHEN " + inc + @"
                                            THEN " + UomLabelExpr + @" END) AS MinUOMSymbol,
-                                  MAX(CASE WHEN p.ProductType = 'I'
+                                  MAX(CASE WHEN " + inc + @"
                                            THEN " + UomLabelExpr + @" END) AS MaxUOMSymbol,
-                                  MAX(CASE WHEN p.ProductType = 'I'
+                                  MAX(CASE WHEN " + inc + @"
                                            THEN uom.StdPrecision ELSE 0 END) AS QtyPrecision
                                FROM C_OrderLine ol
-                               INNER JOIN M_Product p ON (p.M_Product_ID = ol.M_Product_ID)
+                               LEFT OUTER JOIN M_Product p ON (p.M_Product_ID = ol.M_Product_ID)
                                LEFT OUTER JOIN C_UOM uom ON (uom.C_UOM_ID = ol.C_UOM_ID)
                               WHERE ol.C_Order_ID  = @C_Order_ID
                                 AND ol.IsActive    = 'Y'
@@ -1132,10 +1142,17 @@ namespace VASLogic.Models
             // --- Requisition(s): first requisition + distinct requisition count. ---
             try
             {
+                //  The link is written from either side: Create PO from
+                //  Requisition sets M_RequisitionLine.C_OrderLine_ID, while the
+                //  New Purchase Order (VAS_204) and Open Requisitions (VAS_217)
+                //  widgets set C_OrderLine.M_RequisitionLine_ID only — accept both.
+                //  (29-Oct-2026) The Open Requisitions widget now writes both sides.
                 string sql = @"SELECT r.M_Requisition_ID, r.DocumentNo
-                                 FROM M_RequisitionLine rl
+                                 FROM C_OrderLine ol
+                                 INNER JOIN M_RequisitionLine rl
+                                    ON (rl.C_OrderLine_ID = ol.C_OrderLine_ID
+                                        OR rl.M_RequisitionLine_ID = ol.M_RequisitionLine_ID)
                                  INNER JOIN M_Requisition r ON (rl.M_Requisition_ID = r.M_Requisition_ID)
-                                 INNER JOIN C_OrderLine ol  ON (rl.C_OrderLine_ID   = ol.C_OrderLine_ID)
                                 WHERE ol.C_Order_ID = @C_Order_ID
                                   AND r.IsActive    = 'Y'
                                 GROUP BY r.M_Requisition_ID, r.DocumentNo

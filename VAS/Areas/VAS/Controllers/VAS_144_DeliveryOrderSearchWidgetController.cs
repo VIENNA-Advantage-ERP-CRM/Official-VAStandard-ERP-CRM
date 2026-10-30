@@ -283,6 +283,7 @@ namespace VAS.Controllers
                        io.VAS_VehicleName AS vehicle_name,
                        io.VAS_VehicleRegistrationNo AS vehicle_registration_no,
                        currency.ISO_Code AS currency_code,
+                       currency.CurSymbol AS currency_symbol,
                        currency.StdPrecision AS currency_precision,
                        so.IsTaxIncluded AS is_tax_included,
                        iol.M_InOutLine_ID AS line_id,
@@ -290,6 +291,8 @@ namespace VAS.Controllers
                        product.Name AS product_name,
                        product.Value AS sku,
                        COALESCE(iol.QtyEntered, iol.MovementQty) AS quantity,
+                       uom.Name AS uom_name,
+                       asi.Description AS attribute_value,
                        order_line.PriceActual AS unit_price,
                        tax.Rate AS tax_rate,
                        product.ImageURL AS product_image_url,
@@ -312,6 +315,8 @@ namespace VAS.Controllers
                 LEFT JOIN M_InOutLine iol ON (iol.M_InOut_ID = io.M_InOut_ID AND iol.IsActive = 'Y')
                 LEFT JOIN M_Product product ON (product.M_Product_ID = iol.M_Product_ID)
                 LEFT JOIN AD_Image image ON (image.AD_Image_ID = product.AD_Image_ID)
+                LEFT JOIN C_UOM uom ON (uom.C_UOM_ID = iol.C_UOM_ID)
+                LEFT JOIN M_AttributeSetInstance asi ON (asi.M_AttributeSetInstance_ID = iol.M_AttributeSetInstance_ID AND iol.M_AttributeSetInstance_ID > 0)
                 LEFT JOIN C_OrderLine order_line ON (order_line.C_OrderLine_ID = iol.C_OrderLine_ID)
                 LEFT JOIN C_Tax tax ON (tax.C_Tax_ID = order_line.C_Tax_ID)
                 WHERE io.M_InOut_ID = @DO_ID
@@ -336,7 +341,7 @@ namespace VAS.Controllers
             string doNumber = "", statusCode = "", customerName = "", contactName = "", contactPhone = "";
             string locationText = "", salesOrderNo = "", representativeName = "", warehouseName = "";
             string shipperName = "", deliveryViaRule = "", vehicleName = "", vehicleRegistrationNo = "";
-            string deliveryNotes = "", currencyCode = "", isTaxIncluded = "N";
+            string deliveryNotes = "", currencyCode = "", currencySymbol = "", isTaxIncluded = "N";
             int currencyPrecision = -1;
             DateTime? deliveryDate = null;
 
@@ -374,6 +379,7 @@ namespace VAS.Controllers
                         vehicleName = Util.GetValueOfString(dr["vehicle_name"]);
                         vehicleRegistrationNo = Util.GetValueOfString(dr["vehicle_registration_no"]);
                         currencyCode = Util.GetValueOfString(dr["currency_code"]);
+                        currencySymbol = Util.GetValueOfString(dr["currency_symbol"]);
                         currencyPrecision = dr["currency_precision"] == DBNull.Value ? -1 : Util.GetValueOfInt(dr["currency_precision"]);
                         isTaxIncluded = Util.GetValueOfString(dr["is_tax_included"]);
                         taxIncluded = "Y".Equals(isTaxIncluded, StringComparison.OrdinalIgnoreCase);
@@ -421,7 +427,10 @@ namespace VAS.Controllers
                         lineNo = Util.GetValueOfInt(dr["line_no"]),
                         productName = Util.GetValueOfString(dr["product_name"]),
                         sku = Util.GetValueOfString(dr["sku"]),
+                        // Quantity is QtyEntered, i.e. in the line's own UOM.
                         qty = quantity,
+                        uomName = Util.GetValueOfString(dr["uom_name"]),
+                        attributeValue = (Util.GetValueOfString(dr["attribute_value"]) ?? "").Trim(),
                         unitPrice = hasPrice ? (decimal?)unitPrice : null,
                         lineDisplayTotal = lineTotal,
                         taxRate = taxRate,
@@ -451,11 +460,15 @@ namespace VAS.Controllers
                 try
                 {
                     curReader = DB.ExecuteReader(
-                        @"SELECT ISO_Code, StdPrecision FROM C_Currency WHERE C_Currency_ID=@Currency_ID",
+                        @"SELECT ISO_Code, CurSymbol, StdPrecision FROM C_Currency WHERE C_Currency_ID=@Currency_ID",
                         new SqlParameter[] { new SqlParameter("@Currency_ID", ctx.GetContextAsInt("$C_Currency_ID")) });
                     if (curReader != null && curReader.Read())
                     {
-                        if (string.IsNullOrEmpty(currencyCode)) { currencyCode = Util.GetValueOfString(curReader["ISO_Code"]); }
+                        if (string.IsNullOrEmpty(currencyCode))
+                        {
+                            currencyCode = Util.GetValueOfString(curReader["ISO_Code"]);
+                            currencySymbol = Util.GetValueOfString(curReader["CurSymbol"]);
+                        }
                         if (currencyPrecision < 0) { currencyPrecision = Util.GetValueOfInt(curReader["StdPrecision"]); }
                     }
                 }
@@ -497,6 +510,7 @@ namespace VAS.Controllers
                 deliveryDate = deliveryDate.HasValue ? deliveryDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                 notes = deliveryNotes,
                 currencyCode = currencyCode,
+                currencySymbol = currencySymbol,
                 currencyPrecision = currencyPrecision,
                 subtotal = subtotal,
                 tax = taxTotal,

@@ -41,6 +41,7 @@
  * 21  | UOM (Receive Against PO column) | VAS_090_UOM
  * 22  | Enter a whole number as the received quantity for | VAS_QtyWholeNumberOnly
  * 23  | Decimal places allowed in the received quantity for | VAS_QtyDecimalPlacesAllowed
+ * 24  | GRN confirmation is created successfully | VAS_090_GRNConfirmationCreated
  *
  * QA sheet 2026-10-15 (GRN widgets): Supplier -> Vendor (VAS_090_Vendor), From PO -> Linked PO
  * (VAS_090_LinkedPO), Received Lines -> Receipt Lines (VAS_090_ReceiptLines), Date -> Movement Date
@@ -369,14 +370,47 @@
             return d.getFullYear() + '-' + (month < 10 ? '0' + month : month) + '-' + (day < 10 ? '0' + day : day);
         }
 
-        /* QA #107: open the GRN in the Material Receipt window (new tab) - same helper the other
-           GRN widgets use; window ids differ per environment, so they are resolved by name. */
+        /* The framework navigates IN-PLACE (no new window) only when the payload's ActionName
+           equals the name of the window currently HOSTING this widget; resolve it from the
+           listener chain (same as VAS_091_MaterialReceiptSearchWidget's zoomTo). */
+        function hostWindowName() {
+            try {
+                var l = widgetSelf.listener;
+                for (var i = 0; i < 6 && l; i++) {
+                    if (l.apanel && l.apanel.gridWindow && l.apanel.gridWindow.getName) {
+                        return l.apanel.gridWindow.getName();
+                    }
+                    if (l.gridWindow && l.gridWindow.getName) {
+                        return l.gridWindow.getName();
+                    }
+                    l = l.listener;
+                }
+            } catch (e) { }
+            return '';
+        }
+
+        /* QA #107 / 29-Oct 4.4 / 4.7: open the GRN on the Goods Receipt Note screen in the SAME tab -
+           hosted in a window, the host grid navigates to the record (no new window); only on the Home
+           page, where there is no host window, the Material Receipt window is opened by name. */
         var grnZoomWindowId = 0;
         function zoomToGRN(grnId) {
             grnId = Number(grnId || 0);
-            if (!grnId || !VAS.ZoomUtil) { return; }
-            VAS.ZoomUtil.zoomToRecord("M_InOut_ID", grnId, grnZoomWindowId, "VAS_MaterialReceipt", "Material Receipt")
-                .done(function (id) { if (id > 0) { grnZoomWindowId = id; } });
+            if (!grnId) { return; }
+            try {
+                if (widgetSelf.listener && widgetSelf.windowNo >= 0) {
+                    widgetSelf.widgetFirevalueChanged({
+                        "TabWhereClause": "M_InOut.M_InOut_ID=" + grnId,
+                        "TabLayout": "Y",
+                        "TabIndex": "0",
+                        "ActionName": hostWindowName() || "VAS_MaterialReceipt",
+                        "ActionType": "W"
+                    });
+                    return;
+                }
+                if (!VAS.ZoomUtil) { return; }
+                VAS.ZoomUtil.zoomToRecord("M_InOut_ID", grnId, grnZoomWindowId, "VAS_MaterialReceipt", "Material Receipt")
+                    .done(function (id) { if (id > 0) { grnZoomWindowId = id; } });
+            } catch (e) { /* zoom is best-effort */ }
         }
 
         function notify(message) {
@@ -395,7 +429,7 @@
 
         function disabledQAField(iconName, label, value, right) {
             var shown = value == null || value === "" ? "-" : value;
-            return '<div class="vas-ra-qc-field disabled">' +
+            return '<div class="vas-ra-qc-field vas-ra-qc-ro">' +
                 '<div class="vas-ra-qc-ico">' + icon(iconName) + '</div>' +
                 '<div class="vas-ra-qc-main">' +
                 '<div class="vas-ra-qc-label">' + escapeHtml(label) + '</div>' +
@@ -1506,7 +1540,7 @@
                 disabledQAField("file", lbl("VAS_090_GRNLine", "GRN Line"), lineRefText) +
                 disabledQAField("package", lbl("VAS_090_AttributeSetInstance", "Attribute Set Instance"), line.attributeSetInstance || "-") +
                 inputField("scale", lbl("VAS_090_TargetQuantity", "Target Quantity"), line.targetQty, "target", false, true) +
-                '<div class="vas-ra-qc-field disabled">' +
+                '<div class="vas-ra-qc-field vas-ra-qc-ro">' +
                 '<div class="vas-ra-qc-ico">' + icon("clipboard") + '</div>' +
                 '<div class="vas-ra-qc-main">' +
                 '<div class="vas-ra-qc-label">' + escapeHtml(lbl("VAS_090_Difference", "Difference")) + '</div>' +
@@ -1930,6 +1964,12 @@
                     }
 
                     $(document).trigger('vas-receiving-actions-updated');
+                    /* 29-Oct 4.14: a completed confirmation closes the pop-up on its own and says so. */
+                    if (action === 'CompleteGRNConfirmation') {
+                        closeDialog();
+                        notify(lbl("VAS_090_GRNConfirmationCreated", "GRN confirmation is created successfully"));
+                        return;
+                    }
                     // Re-open the detail state so status, badge, and the action
                     // row reflect the confirmation's new state.
                     openGRNConfirmationDetail(gcDetail.header.confirmId);
@@ -2154,6 +2194,14 @@
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
         ensureDashInlineSizeVar(this.getRoot());
+    };
+
+    VAS.VAS_090_ReceivingActionsWidget.prototype.addChangeListener = function (listener) {
+        this.listener = listener;
+    };
+
+    VAS.VAS_090_ReceivingActionsWidget.prototype.widgetFirevalueChanged = function (value) {
+        if (this.listener) { this.listener.widgetFirevalueChanged(value); }
     };
 
     VAS.VAS_090_ReceivingActionsWidget.prototype.widgetSizeChange = function (height, width) { };

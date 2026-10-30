@@ -255,13 +255,17 @@ namespace VAS.Controllers
                 SELECT Line.M_InOutLine_ID AS Line_ID,
                        Line.Line AS Line_No,
                        COALESCE(Product.Name, Charge.Name, Line.Description) AS Item_Name,
-                       COALESCE(Line.MovementQty, Line.QtyEntered, 0) AS Quantity,
+                       COALESCE(Line.QtyEntered, Line.MovementQty, 0) AS Quantity,
+                       Uom.Name AS Uom_Name,
+                       Asi.Description AS Attribute_Value,
                        " + locatorSql + @" AS Locator_Name
                 FROM M_InOut DeliveryOrder
                 INNER JOIN M_InOutLine Line ON (Line.M_InOut_ID=DeliveryOrder.M_InOut_ID AND Line.IsActive='Y')
                 LEFT OUTER JOIN M_Product Product ON (Product.M_Product_ID=Line.M_Product_ID)
                 LEFT OUTER JOIN C_Charge Charge ON (Charge.C_Charge_ID=Line.C_Charge_ID)
                 LEFT OUTER JOIN M_Locator Locator ON (Locator.M_Locator_ID=Line.M_Locator_ID)
+                LEFT OUTER JOIN C_UOM Uom ON (Uom.C_UOM_ID=Line.C_UOM_ID)
+                LEFT OUTER JOIN M_AttributeSetInstance Asi ON (Asi.M_AttributeSetInstance_ID=Line.M_AttributeSetInstance_ID AND Line.M_AttributeSetInstance_ID > 0)
                 WHERE DeliveryOrder.IsActive='Y'
                   AND DeliveryOrder.IsSOTrx='Y'
                   AND DeliveryOrder.MovementType='C-'
@@ -296,7 +300,11 @@ namespace VAS.Controllers
                         lineId = Util.GetValueOfInt(dr["Line_ID"]),
                         lineNo = Util.GetValueOfInt(dr["Line_No"]),
                         itemName = Util.GetValueOfString(dr["Item_Name"]),
+                        // Quantity in the line's selected UOM (QtyEntered), not
+                        // the base-UOM MovementQty.
                         quantity = Util.GetValueOfDecimal(dr["Quantity"]),
+                        uomName = Util.GetValueOfString(dr["Uom_Name"]),
+                        attributeValue = (Util.GetValueOfString(dr["Attribute_Value"]) ?? "").Trim(),
                         locatorName = Util.GetValueOfString(dr["Locator_Name"])
                     });
                 }

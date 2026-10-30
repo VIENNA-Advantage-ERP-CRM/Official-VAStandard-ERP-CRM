@@ -108,7 +108,8 @@
     color: #102C3F;
     line-height: 1.2;
     margin: 0;
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    /* Reduced heading size (was clamp(16px, ..., 17px)): the long title fits the 2-wide tile. */
+    font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * 0.0095), 15px);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -246,7 +247,8 @@
 
 .vas-w205-modal-header h2 {
     margin: 0;
-    font-size: 1em;
+    /* Reduced heading size (was 1em) */
+    font-size: 0.875em;
     font-weight: 400;
     color: #141414;
     line-height: 1.2;
@@ -387,7 +389,8 @@
 
 /* Section Divider */
 .vas-w205-msec {
-    font-size: 0.9375em;
+    /* Reduced heading size (was 0.9375em) */
+    font-size: 0.8125em;
     font-weight: 500;
     color: #102C3F;
     margin: 0.25em 0 0.35em;
@@ -430,7 +433,8 @@
 
 .vas-w205-mhead,
 .vas-w205-thead {
-    font-size: 0.6875em;
+    /* Reduced column heading size (was 0.6875em) */
+    font-size: 0.625em;
     font-weight: 500;
     color: #41576A;
     text-transform: capitalize;
@@ -448,7 +452,8 @@
     flex-direction: column;
     flex: 1;
     min-height: 0;
-    overflow-y: auto;
+    /* Paged (8 rows per page) - the table never scrolls */
+    overflow: hidden;
 }
 
 .vas-w205-tbody .vas-w205-trow {

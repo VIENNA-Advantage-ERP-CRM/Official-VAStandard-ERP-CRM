@@ -77,7 +77,6 @@
         var selMonth = HAS_FILTERS ? now.getMonth() + 1 : 0;
         var selYear = HAS_FILTERS ? now.getFullYear() : 0;
         var loaded = false;
-        var openMenu = '';
         var DATE_FIELD = 'MovementDate';
 
         /* Single column template shared by the header row and every body row. */
@@ -110,9 +109,11 @@
                     '</div>' +
                     '<span class="vas-176-pills"></span>' +
                     (HAS_FILTERS ?
+                    /* Native month / year selects, same as the standard widgets (VAS_145): the browser
+                       list is never clipped by the card, so every month shows without a scroller. */
                     '<div class="vas-176-filters">' +
-                        '<div class="vas-176-dropdown" data-dd="m"><button type="button" class="vas-176-dropdown-btn"><span class="vas-176-dd-lbl">' + escapeHtml(MONTHS[selMonth - 1]) + '</span></button></div>' +
-                        '<div class="vas-176-dropdown" data-dd="y"><button type="button" class="vas-176-dropdown-btn"><span class="vas-176-dd-lbl">' + escapeHtml(String(selYear)) + '</span></button></div>' +
+                        '<select class="vas-176-select vas-176-select--month" aria-label="' + escapeHtml(lbl('VAS_176_FilterByMonth', 'Filter by month')) + '"></select>' +
+                        '<select class="vas-176-select vas-176-select--year" aria-label="' + escapeHtml(lbl('VAS_176_FilterByYear', 'Filter by year')) + '"></select>' +
                     '</div>' : '') +
                 '</div>' +
                 '<div class="vas-176-table-wrap">' +
@@ -130,22 +131,18 @@
             });
             $root.find('.vas-176-table-header').css('grid-template-columns', GRID).html(hdr);
 
-            $root.on('click', '.vas-176-dropdown-btn', function (e) {
-                e.stopPropagation();
-                var key = $(this).closest('.vas-176-dropdown').attr('data-dd');
-                toggleMenu(key);
-            });
-            $root.on('click', '.vas-176-dd-option', function (e) {
-                e.stopPropagation();
-                var key = $(this).closest('.vas-176-dropdown').attr('data-dd');
-                var val = parseInt($(this).attr('data-v'), 10);
-                if (key === 'm') { selMonth = val; } else { selYear = val; }
-                $(this).closest('.vas-176-dropdown').find('.vas-176-dd-lbl').text($(this).text());
-                closeMenus();
+            renderFilterOptions();
+            $root.on('change', '.vas-176-select--month', function () {
+                selMonth = parseInt($(this).val(), 10) || selMonth;
                 page = 1;
                 applyFilter();
             });
-            $(document).on('click.vas176', closeMenus);
+            $root.on('change', '.vas-176-select--year', function () {
+                selYear = parseInt($(this).val(), 10) || selYear;
+                clampFutureMonths();
+                page = 1;
+                applyFilter();
+            });
             $root.on('click', '.vas-176-doc-link', function (e) {
                 e.preventDefault();
                 e.stopPropagation();
@@ -169,35 +166,57 @@
             if (el.scrollWidth > el.clientWidth) { el.setAttribute('title', full); } else { el.removeAttribute('title'); }
         }
 
+        /* Opens the transfer. Hosted on the Material Transfer window (windowNo >= 0) the window's own
+           grid is navigated to the record (same pattern as InvoicesWidget / VAS_227); on a home
+           dashboard the Material Transfer window is opened on it. */
         function openTransfer(id) {
+            id = Number(id);
             if (!id) { return; }
             try {
-                VAS.ZoomUtil.zoomToRecord('M_Movement_ID', Number(id), 0, 'VAS_MaterialTransfer', 'Material Transfer');
+                if ($self.windowNo >= 0) {
+                    $self.widgetFirevalueChanged({
+                        "TabWhereClause": "M_Movement.M_Movement_ID=" + id,
+                        "TabLayout": "Y",
+                        "TabIndex": "0"
+                    });
+                } else {
+                    VAS.ZoomUtil.zoomToRecord('M_Movement_ID', id, 0, 'VAS_MaterialTransfer', 'Material Transfer');
+                }
             } catch (e) { }
         }
 
-        function closeMenus() {
-            openMenu = '';
-            $root.find('.vas-176-dropdown-menu').remove();
+        function monthName(m) {
+            return new Date(2000, m - 1, 1).toLocaleDateString(window.navigator.language, { month: 'long' });
         }
 
-        function toggleMenu(key) {
-            var wasOpen = (openMenu === key);
-            closeMenus();
-            if (wasOpen) { return; }
-            openMenu = key;
-            var html = '<div class="vas-176-dropdown-menu">';
-            if (key === 'm') {
-                MONTHS.forEach(function (m, i) {
-                    html += '<div class="vas-176-dd-option' + (selMonth === i + 1 ? ' vas-176-dd-option--sel' : '') + '" data-v="' + (i + 1) + '">' + m + '</div>';
-                });
-            } else {
-                years().forEach(function (y) {
-                    html += '<div class="vas-176-dd-option' + (selYear === y ? ' vas-176-dd-option--sel' : '') + '" data-v="' + y + '">' + y + '</div>';
-                });
+        /* Fills the month / year selects (years = current year + the years present in the data). */
+        function renderFilterOptions() {
+            if (!HAS_FILTERS) { return; }
+            var mHtml = '';
+            for (var m = 1; m <= 12; m++) {
+                mHtml += '<option value="' + m + '">' + escapeHtml(monthName(m)) + '</option>';
             }
-            html += '</div>';
-            $root.find('.vas-176-dropdown[data-dd="' + key + '"]').append(html);
+            $root.find('.vas-176-select--month').html(mHtml).val(String(selMonth));
+
+            var yHtml = '';
+            years().forEach(function (y) { yHtml += '<option value="' + y + '">' + y + '</option>'; });
+            $root.find('.vas-176-select--year').html(yHtml).val(String(selYear));
+            clampFutureMonths();
+        }
+
+        /* Future months are unselectable while the current year is chosen (as in VAS_145). */
+        function clampFutureMonths() {
+            var curYear = new Date().getFullYear();
+            var curMonth = new Date().getMonth() + 1;
+            var isCurrentYear = selYear === curYear;
+            var $m = $root.find('.vas-176-select--month');
+            $m.find('option').each(function () {
+                $(this).prop('disabled', isCurrentYear && Number($(this).val()) > curMonth);
+            });
+            if (isCurrentYear && selMonth > curMonth) {
+                selMonth = curMonth;
+                $m.val(String(selMonth));
+            }
         }
 
         function years() {
@@ -314,6 +333,7 @@
                     if (!data || data.error) { showLoadError(); return; }
                     loaded = true;
                     allRecords = data.records || [];
+                    renderFilterOptions();
                     applyFilter();
                     recalcRows();
                 },
@@ -332,7 +352,6 @@
         this.getRoot = function () { return $wrapper; };
 
         this.disposeComponent = function () {
-            $(document).off('click.vas176');
             if (widgetObserver && $wrapper[0]) {
                 widgetObserver.unobserve($wrapper[0]);
                 widgetObserver = null;

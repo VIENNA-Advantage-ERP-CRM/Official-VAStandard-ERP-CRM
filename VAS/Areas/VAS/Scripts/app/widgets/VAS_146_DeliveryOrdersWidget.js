@@ -30,6 +30,8 @@
  * 16 | Item                                             | VAS_146_Item
  * 17 | Qty                                              | VAS_146_Qty
  * 18 | Locator                                          | VAS_146_Locator
+ * 18a| Attribute                                        | VAS_146_Attribute
+ * 18b| UOM                                              | VAS_146_UOM
  * 19 | No line items on this delivery order.            | VAS_146_NoLineItems
  * 20 | Retry                                            | VAS_146_Retry
  * 21 | Filter delivery orders by month                  | VAS_146_FilterByMonth
@@ -38,7 +40,7 @@
  * 24 | Showing / of                                     | VAS_Showing / VAS_Of
  * 25 | Couldn't load                                    | VAS_CouldntLoad
  * 26 | Previous / Next                                  | VAS_Previous / VAS_Next
- * 27 | Close                                            | Close
+ * 27 | Close                                            | VAS_146_Close
  */
 ; VAS = window.VAS || {};
 
@@ -358,9 +360,14 @@
                         '</div>' +
                         '<div class="MPC-dow-m-summary"></div>' +
                         '<div class="MPC-dow-m-lines">' +
+                            /* Attribute column is shown only when at least one
+                               line carries an attribute value (MPC-dow-has-attr
+                               on .MPC-dow-m-lines). */
                             '<div class="MPC-dow-lrow MPC-dow-lhead">' +
                                 '<span>' + escapeHtml(label('VAS_146_Item', 'Item')) + '</span>' +
+                                '<span class="MPC-dow-l-attrcol">' + escapeHtml(label('VAS_146_Attribute', 'Attribute')) + '</span>' +
                                 '<span class="MPC-dow-ta-r">' + escapeHtml(label('VAS_146_Qty', 'Qty')) + '</span>' +
+                                '<span>' + escapeHtml(label('VAS_146_UOM', 'UOM')) + '</span>' +
                                 '<span>' + escapeHtml(label('VAS_146_Locator', 'Locator')) + '</span>' +
                             '</div>' +
                             '<div class="MPC-dow-m-lines-body"></div>' +
@@ -375,7 +382,7 @@
             $modalSummary = $modal.find('.MPC-dow-m-summary');
             $modalLines = $modal.find('.MPC-dow-m-lines-body');
 
-            var closeText = label('Close', 'Close');
+            var closeText = label('VAS_146_Close', 'Close');
             $modal.find('.MPC-dow-m-close').attr({ 'aria-label': closeText, title: closeText });
             $('body').append($modal);
 
@@ -408,6 +415,7 @@
         function loadOrderLines(deliveryOrderId) {
             if (linesRequest && linesRequest.readyState !== 4) { linesRequest.abort(); }
 
+            $modal.find('.MPC-dow-m-lines').removeClass('MPC-dow-has-attr');
             $modalLines.html('<div class="MPC-dow-m-state">' + escapeHtml(label('Loading', 'Loading...')) + '</div>');
 
             linesRequest = $.ajax({
@@ -432,10 +440,19 @@
         }
 
         function renderModalLines(lines) {
+            var $linesWrap = $modal.find('.MPC-dow-m-lines');
+            $linesWrap.removeClass('MPC-dow-has-attr');
+
             if (!lines.length) {
                 $modalLines.html('<div class="MPC-dow-m-state">' + escapeHtml(label('VAS_146_NoLineItems', 'No line items on this delivery order.')) + '</div>');
                 return;
             }
+
+            var hasAttribute = false;
+            for (var a = 0; a < lines.length; a++) {
+                if (lines[a].attributeValue) { hasAttribute = true; break; }
+            }
+            $linesWrap.toggleClass('MPC-dow-has-attr', hasAttribute);
 
             var html = '';
             for (var index = 0; index < lines.length; index++) {
@@ -443,7 +460,9 @@
                 html +=
                     '<div class="MPC-dow-lrow MPC-dow-lbody">' +
                         '<span class="MPC-dow-l-item" title="' + escapeHtml(line.itemName) + '">' + escapeHtml(line.itemName) + '</span>' +
+                        '<span class="MPC-dow-l-attr MPC-dow-l-attrcol" title="' + escapeHtml(line.attributeValue || '') + '">' + escapeHtml(line.attributeValue || '-') + '</span>' +
                         '<span class="MPC-dow-l-qty">' + escapeHtml(formatNumber(line.quantity)) + '</span>' +
+                        '<span class="MPC-dow-l-uom" title="' + escapeHtml(line.uomName || '') + '">' + escapeHtml(line.uomName || '-') + '</span>' +
                         '<span>' + (line.locatorName ? '<span class="MPC-dow-l-loc">' + escapeHtml(line.locatorName) + '</span>' : '-') + '</span>' +
                     '</div>';
             }

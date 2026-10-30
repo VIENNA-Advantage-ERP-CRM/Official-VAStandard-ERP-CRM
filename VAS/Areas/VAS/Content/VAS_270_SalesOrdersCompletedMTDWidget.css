@@ -127,6 +127,9 @@
 
 .vas270-modal {
     width: min(1240px, 94vw);
+    /* Fixed height: the pop-up keeps one size whether it shows the documents list
+       or the line details, and when navigating back (same as VAS_271 Sr 8.18). */
+    height: min(880px, 90dvh);
     max-height: min(880px, 90dvh);
     background: #FFFFFF;
     border: 1px solid #D9E2EB;

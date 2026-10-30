@@ -208,6 +208,9 @@
 }
 .vas289-modal.sm { width: min(760px, 94vw); }
 .vas289-modal.md { width: min(1000px, 94vw); }
+/* QA 8.39: table steps take the full modal height so rows-per-page is measured from the
+   real available space and the "x–y of n" range equals the rows actually visible. */
+.vas289-modal.vas289-fixedh { height: min(880px, 90dvh); }
 
 .vas289-mhead {
     height: 56px; flex: none; padding: 0 16px; border-bottom: 1px solid #1F83FF;
@@ -239,7 +242,7 @@
    laptop viewport, and unlike a table it has no "reduce rows per page" fit strategy -
    so it is the one screen allowed to scroll vertically instead of silently clipping
    fields beneath the footer. */
-.vas289-mbody.vas289-scrollable { overflow-y: auto; overflow-x: hidden; }
+.vas289-mbody.vas289-scrollable { overflow-y: auto; overflow-x: hidden; gap: .35em; padding-top: .75em; padding-bottom: .75em; }
 .vas289-mbody button, .vas289-mbody input, .vas289-mbody select, .vas289-mbody textarea {
     font-family: inherit; font-size: inherit; line-height: inherit; color: inherit;
 }
@@ -264,7 +267,7 @@
 .vas289-btn-primary:disabled { background: #CBD8E2; border-color: #CBD8E2; color: #fff; }
 
 .vas289-mstats {
-    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .5em; flex: none;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(8em, 1fr)); gap: .5em; flex: none;
 }
 @container (max-width: 700px) {
     .vas289-mstats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -308,22 +311,25 @@
 .vas289-mstate { padding: 1em; font-size: .8125em; color: #5F7283; text-align: center; }
 
 /* ---------- form (Step 3 order details) ---------- */
+/* QA 8.45: tighter spacing between sections and fields. */
 .vas289-formsec {
     font-size: .8125em; font-weight: 500; color: #41576A; text-transform: capitalize;
-    margin: .35em 0 .3em; padding-bottom: .25em; border-bottom: 1px solid #E2EAF1; flex: none;
+    margin: .2em 0 .1em; padding-bottom: .15em; border-bottom: 1px solid #E2EAF1; flex: none;
 }
-.vas289-form-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .55em .7em; flex: none; }
+.vas289-form-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: .3em .6em; flex: none; }
 @container (max-width: 760px) {
     .vas289-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-.vas289-field { display: flex; flex-direction: column; gap: .2em; min-width: 0; }
+.vas289-field { display: flex; flex-direction: column; gap: .1em; min-width: 0; }
 .vas289-field-span-all { grid-column: 1 / -1; }
 .vas289-field label { font-size: .6875em; color: #5F7283; line-height: 1.2; }
 .vas289-req { color: #D14545; }
+/* QA 8.64: mandatory field left empty on Continue. */
+.vas289-field.vas289-invalid .vas289-fctl { border-color: #D14545; background-color: #FFF6F6; }
 
 .vas289-fctl {
     border: 1px solid #D9E2EB; border-radius: 8px; background: #fff; color: #102C3F;
-    font-family: inherit; font-size: .8125em; padding: .42em .55em; min-width: 0; width: 100%;
+    font-family: inherit; font-size: .8125em; padding: .35em .55em; min-width: 0; width: 100%;
 }
 .vas289-readonly { background: #F5F7F9; color: #5F7283; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 select.vas289-fctl {
