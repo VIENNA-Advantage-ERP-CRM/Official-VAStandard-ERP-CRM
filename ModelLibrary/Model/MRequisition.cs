@@ -263,6 +263,14 @@ namespace VAdvantage.Model
                 SetM_PriceList_ID();
             }
 
+            // Budget breach approval was given for the old period / org, so ask for it again
+            if (!newRecord && !IsProcessed() && IsBudgetBreachApproved() && !Is_ValueChanged("IsBudgetBreachApproved")
+                && Env.IsModuleInstalled("FRPT_")
+                && (Is_ValueChanged("DateDoc") || Is_ValueChanged("AD_Org_ID") || Is_ValueChanged("C_DocType_ID")))
+            {
+                SetIsBudgetBreachApproved(false);
+            }
+
             // VIS0060: Show message if Default Price List is not found.
             if (GetM_PriceList_ID() == 0)
             {
@@ -612,6 +620,20 @@ namespace VAdvantage.Model
                     SetDocumentNo(value);
                 }
             }
+        }
+
+        /// <summary>
+        /// Clear Budget Breach Approved on the requisition so that budget is checked again on complete
+        /// </summary>
+        /// <param name="M_Requisition_ID">Requisition</param>
+        /// <param name="trx">Transaction</param>
+        /// <returns>no of records updated</returns>
+        public static int ResetBudgetBreachApproval(int M_Requisition_ID, Trx trx)
+        {
+            System.Data.SqlClient.SqlParameter[] param = new System.Data.SqlClient.SqlParameter[1];
+            param[0] = new System.Data.SqlClient.SqlParameter("@M_Requisition_ID", M_Requisition_ID);
+            return DB.ExecuteQuery("UPDATE M_Requisition SET IsBudgetBreachApproved = 'N' WHERE M_Requisition_ID = @M_Requisition_ID AND IsBudgetBreachApproved = 'Y'",
+                param, trx);
         }
 
         /// <summary>

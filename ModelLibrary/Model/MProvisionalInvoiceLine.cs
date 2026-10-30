@@ -120,8 +120,10 @@ namespace VAdvantage.Model
             // Set Line Net Amount
             SetLineNetAmt();
 
-            // Set tax amount
-            if (((Decimal)GetTaxAmt()).CompareTo(Env.ZERO) == 0 || GetSurchargeAmt().CompareTo(Env.ZERO) == 0)
+            // Set tax amount - tax is calculated by the system (field is read-only, no manual tax).
+            // A reversal line keeps the negated amounts of its original line, so it mirrors it exactly.
+            if (GetReversalDoc_ID() == 0
+                && (newRecord || GetTaxAmt() == 0 || Is_ValueChanged("LineNetAmt") || Is_ValueChanged("C_Tax_ID")))
                 SetTaxAmt();
 
             // set Taxable Amount -- (Line Total-Tax Amount)

@@ -482,8 +482,11 @@ namespace ModelLibrary.Classes
         /// <returns>Error Message (if any)</returns>
         public string InsertCostClosing(string ProductCategoryID, string Product_ID, Trx trx)
         {
+            // one filter for both delete and insert, so a run replaces only the snapshot it re-creates
+            string filter = GetCostClosingFilter(ProductCategoryID, Product_ID);
+
             query.Clear();
-            query.Append($@"DELETE FROM M_COSTClosing WHERE TRUNC(created) = TRUNC(current_Date)");
+            query.Append($@"DELETE FROM M_COSTClosing WHERE TRUNC(created) = TRUNC(current_Date) AND {filter}");
             DB.ExecuteQuery(query.ToString(), null, trx);
 
             query.Clear();
@@ -498,21 +501,51 @@ namespace ModelLibrary.Classes
                 CASE WHEN NVL(A_ASSET_ID, 0) = 0 THEN NULL ELSE A_ASSET_ID END AS A_ASSET_ID, ISASSETCOST, 
                  CASE WHEN NVL(M_WAREHOUSE_ID, 0) = 0 THEN NULL ELSE M_WAREHOUSE_ID END AS M_WAREHOUSE_ID           
             FROM M_Cost");
-            query.Append($@" WHERE AD_Client_ID = {_ctx.GetAD_Client_ID()} ");
-            if (!string.IsNullOrEmpty(Product_ID))
-            {
-                query.Append($@" AND M_Product_ID IN ({Product_ID}) ");
-            }
-            if (!string.IsNullOrEmpty(ProductCategoryID))
-            {
-                query.Append($@" AND M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN ({ProductCategoryID}))");
-            }
+            query.Append($@" WHERE {filter}");
             int no = DB.ExecuteQuery(query.ToString(), null, trx);
             if (no <= 0)
             {
                 return Msg.GetMsg(_ctx, "VAS_CostClosingNotInserted");
             }
             return "";
+        }
+
+        /// <summary>
+        /// Tenant, Product and Product Category condition for M_Cost / M_CostClosing
+        /// </summary>
+        /// <param name="ProductCategoryID">comma separated Product Category IDs (optional)</param>
+        /// <param name="Product_ID">comma separated Product IDs (optional)</param>
+        /// <returns>where condition without WHERE keyword</returns>
+        private string GetCostClosingFilter(string ProductCategoryID, string Product_ID)
+        {
+            StringBuilder filter = new StringBuilder($"AD_Client_ID = {_ctx.GetAD_Client_ID()}");
+            string productIDs = ToIDList(Product_ID);
+            if (!string.IsNullOrEmpty(productIDs))
+            {
+                filter.Append($" AND M_Product_ID IN ({productIDs})");
+            }
+            string categoryIDs = ToIDList(ProductCategoryID);
+            if (!string.IsNullOrEmpty(categoryIDs))
+            {
+                filter.Append($" AND M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN ({categoryIDs}))");
+            }
+            return filter.ToString();
+        }
+
+        /// <summary>
+        /// Keep only numeric IDs of a comma separated parameter value
+        /// </summary>
+        /// <param name="ids">comma separated IDs</param>
+        /// <returns>cleaned comma separated IDs, empty when none</returns>
+        private static string ToIDList(string ids)
+        {
+            if (string.IsNullOrEmpty(ids))
+            {
+                return string.Empty;
+            }
+            return string.Join(",", ids.Split(',')
+                .Select(id => Util.GetValueOfInt(id.Trim()))
+                .Where(id => id > 0));
         }
 
     }
