@@ -48,6 +48,8 @@ using ViennaAdvantage.Model;
 *     translatable VAS_LeadToOpp* messages; added lead-not-found and
 *     prospect-not-created guards (the latter also prevents endless DoIt recursion);
 *     every lead save is checked and a failure is returned with its error message.
+* VAI052 29-Oct-26 : Completion message (GetCompletionMessage) tells whether the Prospect / User / Address
+*     were created or an existing Customer / Prospect was used, with the Opportunity, Lead and Prospect IDs.
 */
 namespace ModelLibrary.Process
 {
@@ -201,7 +203,7 @@ namespace ModelLibrary.Process
                 // Send Lead Data to Knowledge Base
                 VAS_CommonMethod.SendInfoToAI(FromTableID, lead.Get_ID(), Get_Trx(), GetCtx());
 
-                return Msg.GetMsg(GetCtx(), "OpprtunityGenerateDone");
+                return GetCompletionMessage(opp, bp, ExCustomer != 0);
 
             }
             else
@@ -210,6 +212,65 @@ namespace ModelLibrary.Process
                 //return Msg.GetMsg(GetCtx(), "OpprtunityGenerateNotDone");
 
             }
+        }
+
+        /// <summary>
+        /// Completion message that tells whether the Opportunity was created from a Lead that already had a
+        /// Customer / Prospect, or whether the Prospect (with its User and Address) was created first.
+        /// </summary>
+        /// <param name="opp">saved Opportunity</param>
+        /// <param name="bp">Customer or Prospect the Opportunity belongs to</param>
+        /// <param name="isCustomer">true when the Lead already had a Customer</param>
+        /// <returns>message</returns>
+        private string GetCompletionMessage(X_VAS_Opportunity opp, VAdvantage.Model.X_C_BPartner bp, bool isCustomer)
+        {
+            int bpartnerID = bp.GetC_BPartner_ID();
+            List<string> created = new List<string>();
+            // lead.CreateBP() ran in this run only when IsProspectCreated; its outcome flags describe that run
+            if (IsProspectCreated && lead.BPartnerCreated)
+            {
+                created.Add(Msg.GetMsg(GetCtx(), "VAS_LeadToBPProspect"));
+                if (lead.UserCreated) created.Add(Msg.GetMsg(GetCtx(), "VAS_LeadToBPUser"));
+                if (lead.LocationCreated) created.Add(Msg.GetMsg(GetCtx(), "VAS_LeadToBPAddress"));
+            }
+
+            // The user sees the number / value of the records, not their database IDs.
+            // Message placeholders: {1} Opportunity No, {2} Lead No, {3} Customer / Prospect Value ({0} is the record type text)
+            string oppNo = GetRecordNo(opp.GetValue(), opp.GetVAS_Opportunity_ID());
+            string leadNo = GetRecordNo(lead.GetDocumentNo(), lead.GetC_Lead_ID());
+            string bpNo = GetRecordNo(bp.GetValue(), bpartnerID);
+            log.Info("C_Lead_ID=" + lead.GetC_Lead_ID() + ", Opportunity ID=" + opp.GetVAS_Opportunity_ID()
+                + ", BPartner ID=" + bpartnerID + (created.Count > 0 ? ", created: " + string.Join(", ", created) : ", existing BPartner used"));
+
+            if (created.Count > 0)
+            {
+                return Msg.GetMsg(GetCtx(), "VAS_LeadToOppProspectCreatedMsg")
+                    .Replace("{0}", JoinNames(created)).Replace("{1}", oppNo).Replace("{2}", leadNo).Replace("{3}", bpNo);
+            }
+            string bpType = isCustomer ? Msg.GetMsg(GetCtx(), "VAS_LeadToOppCustomer") : Msg.GetMsg(GetCtx(), "VAS_LeadToBPProspect");
+            return Msg.GetMsg(GetCtx(), "VAS_LeadToOppExistingMsg")
+                .Replace("{0}", bpType).Replace("{1}", oppNo).Replace("{2}", leadNo).Replace("{3}", bpNo);
+        }
+
+        /// <summary>
+        /// Document number / value of a record; its ID only when it has none.
+        /// </summary>
+        private string GetRecordNo(string documentNoOrValue, int recordID)
+        {
+            return string.IsNullOrWhiteSpace(documentNoOrValue) ? recordID.ToString() : documentNoOrValue;
+        }
+
+        /// <summary>
+        /// "A", "A and B" or "A, B, and C"
+        /// </summary>
+        private string JoinNames(List<string> names)
+        {
+            string and = Msg.GetMsg(GetCtx(), "VAS_LeadToBPAnd");
+            if (names.Count == 1)
+                return names[0];
+            if (names.Count == 2)
+                return names[0] + " " + and + " " + names[1];
+            return string.Join(", ", names.Take(names.Count - 1)) + ", " + and + " " + names[names.Count - 1];
         }
         private void CallProcess(int lead_id)
         {
