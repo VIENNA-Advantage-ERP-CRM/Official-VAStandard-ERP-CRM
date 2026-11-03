@@ -128,6 +128,9 @@
 }
 
 .vas280-tbody .vas280-trow:last-child { border-bottom: 0; }
+/* Sr 8.32: rows keep their natural height (never squeezed) - the page size is
+   computed from the body height so every row on the page is fully visible. */
+.vas280-tbody .vas280-trow { flex: none; }
 .vas280-tbody .vas280-trow:hover { background: #F4FAFF; border-radius: 6px; }
 
 .vas280-cell {

@@ -65,7 +65,8 @@
     white-space: nowrap;
 }
 
-.vas-duf-body { flex: 1; min-height: 0; display: grid; grid-template-rows: repeat(5, minmax(0, 1fr)); overflow: hidden; }
+/* 4 rows per page with at least 8px between records (Book1 row 20, Sr. 26 - default pending confirmation). */
+.vas-duf-body { flex: 1; min-height: 0; display: grid; grid-template-rows: repeat(4, minmax(0, 1fr)); row-gap: max(8px, .5em); overflow: hidden; }
 .vas-duf-empty { grid-row: 1 / -1; display: flex; align-items: center; justify-content: center; color: #748494; font-size: .8125em; }
 
 .vas-duf-row {
@@ -74,7 +75,7 @@
     gap: .6em;
     width: 100%;
     text-align: left;
-    padding: .1em .3em;
+    padding: .35em .3em;
     border-bottom: 1px solid #EDF2F6;
     cursor: pointer;
     border-radius: 8px;
@@ -92,7 +93,7 @@
 }
 .vas-duf-fi svg { width: .85em; height: .85em; }
 
-.vas-duf-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .05em; }
+.vas-duf-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .3em; }
 
 .vas-duf-r1 { display: flex; align-items: baseline; gap: .5em; line-height: 1.08; }
 .vas-duf-no { font-size: .8em; font-weight: 700; color: #102C3F; white-space: nowrap; flex: 0 0 auto; }
@@ -167,8 +168,8 @@ select.vas-duf-f {
     background-image: none !important;
     cursor: pointer;
     padding-right: 0.5em;
-    text-align: center;
-    text-align-last: center;
+    text-align: left;
+    text-align-last: left;
 }
 .vas-duf-f:hover, .vas-duf-f:focus { border-bottom-color: #0083DA; }
 
@@ -202,7 +203,7 @@ select.vas-duf-f {
     font-family: inherit; font-size: .78em; color: #102C3F; border: 1px solid #E4EDF4; border-radius: 0.5em;
     background: #fff; padding: 0.3em 0.5em; outline: none; max-width: 11em; cursor: pointer;
     appearance: none !important; -webkit-appearance: none !important; -moz-appearance: none !important; background-image: none !important;
-    text-align: center; text-align-last: center;
+    text-align: left; text-align-last: left;
 }
 .vas-duf-loc:hover, .vas-duf-loc:focus { border-color: #0083DA; }
 .vas-duf-loc:disabled { opacity: .5; cursor: default; }

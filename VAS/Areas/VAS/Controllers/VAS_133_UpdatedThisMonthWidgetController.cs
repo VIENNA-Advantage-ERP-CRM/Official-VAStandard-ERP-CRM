@@ -39,18 +39,15 @@ namespace VAS.Controllers
     /// Widget number 133.
     /// Chronological development:
     ///   &lt;EmpCode&gt;   2026-07-21 Created
+    ///   VAI163      2026-10-29 Field changes on every editable Product Master
+    ///               tab are reported (LoadTrackedTables), and the list order
+    ///               includes the column so no field of a multi-field save is
+    ///               skipped between pages (e.g. Guarantee Days).
     /// </summary>
     public class VAS_133_UpdatedThisMonthWidgetController : Controller
     {
         private const int MinPageSize = 2;
         private const int MaxPageSize = 8;
-
-        /// <summary>
-        /// Number of numbered placeholder sets (AD_Client_ID/MonthStart/
-        /// NextMonthStart) the branches consume: the five tracked tables, then the
-        /// "no field log" product fallback (6) and its NOT EXISTS probe (7).
-        /// </summary>
-        private const int BranchSets = 7;
 
         /// <summary>One change-logged table feeding the widget.</summary>
         private class Tracked
@@ -85,6 +82,84 @@ namespace VAS.Controllers
         };
 
         /// <summary>
+        /// The fixed tables above plus every other editable first-level tab of a
+        /// window whose header tab is M_Product (Replenish, Substitute, UOM
+        /// Conversion, ...), so a field changed on any Product Master tab is
+        /// reported. A discovered table needs an M_Product_ID column (its link to
+        /// the header) and a single key column (AD_ChangeLog.Record_ID); read-only
+        /// tabs (storage, transactions) are left out.
+        /// </summary>
+        private List<Tracked> LoadTrackedTables()
+        {
+            List<Tracked> list = new List<Tracked>(TrackedTables);
+            HashSet<string> known = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (Tracked t in TrackedTables) { known.Add(t.TableName); }
+
+            string sql = @"
+                SELECT tbl.TableName, k.ColumnName AS KeyColumn, MIN(ct.Name) AS TabName
+                  FROM AD_Tab pt
+                  JOIN AD_Table ptbl ON (ptbl.AD_Table_ID = pt.AD_Table_ID AND ptbl.TableName = 'M_Product')
+                  JOIN AD_Tab ct ON (ct.AD_Window_ID = pt.AD_Window_ID)
+                  JOIN AD_Table tbl ON (tbl.AD_Table_ID = ct.AD_Table_ID)
+                  JOIN AD_Column pc ON (pc.AD_Table_ID = tbl.AD_Table_ID AND pc.ColumnName = 'M_Product_ID' AND pc.IsActive = 'Y')
+                  JOIN AD_Column k ON (k.AD_Table_ID = tbl.AD_Table_ID AND k.IsKey = 'Y' AND k.IsActive = 'Y')
+                 WHERE pt.TabLevel = 0
+                   AND pt.IsActive = 'Y'
+                   AND ct.TabLevel = 1
+                   AND ct.IsActive = 'Y'
+                   AND ct.IsReadOnly = 'N'
+                   AND tbl.IsView = 'N'
+                   AND tbl.IsActive = 'Y'
+                 GROUP BY tbl.TableName, k.ColumnName
+                 ORDER BY tbl.TableName";
+
+            IDataReader dr = null;
+            try
+            {
+                dr = DB.ExecuteReader(sql, new SqlParameter[0], null);
+                int n = 0;
+                while (dr != null && dr.Read())
+                {
+                    string tableName = Util.GetValueOfString(dr["TableName"]);
+                    string keyColumn = Util.GetValueOfString(dr["KeyColumn"]);
+                    // Names are spliced into SQL: identifiers only, and the key must be <Table>_ID.
+                    if (known.Contains(tableName) || !IsIdentifier(tableName)
+                        || !keyColumn.Equals(tableName + "_ID", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+                    known.Add(tableName);
+                    string alias = "x" + (++n);
+                    string tabName = Util.GetValueOfString(dr["TabName"]);
+                    list.Add(new Tracked
+                    {
+                        SourceType = tableName.ToUpperInvariant(),
+                        TableName = tableName,
+                        Alias = alias,
+                        KeyColumn = keyColumn,
+                        ProductJoin = "JOIN M_Product p ON (p.M_Product_ID = " + alias + ".M_Product_ID AND p.AD_Client_ID = " + alias + ".AD_Client_ID)",
+                        ProductIdExpr = alias + ".M_Product_ID",
+                        FallbackTab = string.IsNullOrEmpty(tabName) ? tableName : tabName
+                    });
+                }
+            }
+            catch (Exception)
+            {
+                // Discovery is best effort: the fixed tables still report.
+            }
+            finally
+            {
+                if (dr != null) { dr.Close(); dr.Dispose(); }
+            }
+            return list;
+        }
+
+        private static bool IsIdentifier(string name)
+        {
+            return !string.IsNullOrEmpty(name) && System.Text.RegularExpressions.Regex.IsMatch(name, "^[A-Za-z][A-Za-z0-9_]*$");
+        }
+
+        /// <summary>
         /// Returns the current-month update count, distinct updater count,
         /// today's update count, and distinct product count - all from one
         /// query pass so they stay consistent with the modal's totals.
@@ -107,10 +182,11 @@ namespace VAS.Controllers
             try
             {
                 DateBounds bounds = ResolveDateBounds(clientTzOffsetMinutes);
+                List<Tracked> tracked = LoadTrackedTables();
 
                 string sql = @"
                     WITH updated_records AS (
-                        " + BuildUnion(ctx, false) + @"
+                        " + BuildUnion(ctx, tracked, false) + @"
                     )
                     SELECT
                         COUNT(*) AS UpdateCount,
@@ -124,7 +200,7 @@ namespace VAS.Controllers
                 IDataReader dr = null;
                 try
                 {
-                    dr = DB.ExecuteReader(sql, BuildDateParams(ctx, bounds, true));
+                    dr = DB.ExecuteReader(sql, BuildDateParams(ctx, tracked.Count, bounds, true));
                     if (dr != null && dr.Read())
                     {
                         updateCount = Util.GetValueOfInt(dr["UpdateCount"]);
@@ -182,10 +258,14 @@ namespace VAS.Controllers
             try
             {
                 DateBounds bounds = ResolveDateBounds(clientTzOffsetMinutes);
+                List<Tracked> tracked = LoadTrackedTables();
 
+                // Every column of one save shares its AD_ChangeLog_ID and Created,
+                // so column_id is part of the key: without it the order among those
+                // rows is arbitrary per query and a field could be skipped between pages.
                 string sql = @"
                     WITH updated_records AS (
-                        " + BuildUnion(ctx, true) + @"
+                        " + BuildUnion(ctx, tracked, true) + @"
                     ),
                     ranked_updates AS (
                         SELECT
@@ -195,7 +275,7 @@ namespace VAS.Controllers
                             u.Name AS updated_by_name, ur.updated_at,
                             COUNT(*) OVER () AS total_count,
                             ROW_NUMBER() OVER (
-                                ORDER BY ur.updated_at DESC, ur.source_type ASC, ur.source_record_id DESC
+                                ORDER BY ur.updated_at DESC, ur.source_type ASC, ur.source_record_id DESC, ur.column_id ASC
                             ) AS row_num
                         FROM updated_records ur
                         LEFT JOIN AD_User u ON (u.AD_User_ID = ur.updated_by_id)
@@ -209,7 +289,7 @@ namespace VAS.Controllers
                       AND row_num <= (@Offset2 + @PageSize)
                     ORDER BY row_num";
 
-                List<SqlParameter> parms = new List<SqlParameter>(BuildDateParams(ctx, bounds, false));
+                List<SqlParameter> parms = new List<SqlParameter>(BuildDateParams(ctx, tracked.Count, bounds, false));
                 parms.Add(new SqlParameter("@Offset1", offset));
                 parms.Add(new SqlParameter("@Offset2", offset));
                 parms.Add(new SqlParameter("@PageSize", pageSize));
@@ -286,14 +366,14 @@ namespace VAS.Controllers
         /// Branch n consumes placeholder set n (see BuildDateParams), in textual
         /// order, because DB.ExecuteReader binds positionally.
         /// </summary>
-        private string BuildUnion(Ctx ctx, bool full)
+        private string BuildUnion(Ctx ctx, List<Tracked> tracked, bool full)
         {
             List<string> branches = new List<string>();
-            for (int i = 0; i < TrackedTables.Length; i++)
+            for (int i = 0; i < tracked.Count; i++)
             {
-                branches.Add(ChangeBranch(ctx, TrackedTables[i], i + 1, full));
+                branches.Add(ChangeBranch(ctx, tracked[i], i + 1, full));
             }
-            branches.Add(FallbackBranch(ctx, TrackedTables.Length + 1, full));
+            branches.Add(FallbackBranch(ctx, tracked.Count + 1, full));
             return string.Join(" UNION ALL ", branches);
         }
 
@@ -315,6 +395,7 @@ namespace VAS.Controllers
                         p.Name AS product_name,
                         COALESCE(col.Name, col.ColumnName) AS field_name,
                         col.ColumnName AS column_name,
+                        cl.AD_Column_ID AS column_id,
                         col.AD_Reference_ID AS ref_id,
                         col.AD_Reference_Value_ID AS ref_value_id,
                         cl.OldValue AS old_value,
@@ -325,7 +406,7 @@ namespace VAS.Controllers
                                    WHERE f.AD_Column_ID = cl.AD_Column_ID
                                      AND tb.AD_Table_ID = cl.AD_Table_ID
                                      AND f.IsActive = 'Y'
-                                     AND tb.IsActive = 'Y'), " + NLiteral(ctx, t.FallbackTab) + @") AS tab_name,
+                                     AND tb.IsActive = 'Y'), " + NLiteral(ctx, t.FallbackTab.Replace("'", "''")) + @") AS tab_name,
                         cl.CreatedBy AS updated_by_id,
                         cl.Created AS updated_at"
                 : @"SELECT " + t.ProductIdExpr + @" AS product_id, cl.CreatedBy AS updated_by_id, cl.Created AS updated_at";
@@ -360,6 +441,7 @@ namespace VAS.Controllers
                         p.Name AS product_name,
                         " + NLiteral(ctx, "Product details updated") + @" AS field_name,
                         NULL AS column_name,
+                        0 AS column_id,
                         0 AS ref_id,
                         0 AS ref_value_id,
                         NULL AS old_value,
@@ -389,15 +471,17 @@ namespace VAS.Controllers
         /// <summary>
         /// Positional parameter set: DB.ExecuteReader matches this array to the
         /// left-to-right order the @placeholders appear in the final SQL, so every
-        /// numbered set below is supplied in the order BuildUnion emits it. The
-        /// fallback's NOT EXISTS probe (set 7) carries no client id.
+        /// numbered set below is supplied in the order BuildUnion emits it: one per
+        /// tracked table, then the product fallback, then its NOT EXISTS probe
+        /// (the last set), which carries no client id.
         /// </summary>
-        private SqlParameter[] BuildDateParams(Ctx ctx, DateBounds bounds, bool withToday)
+        private SqlParameter[] BuildDateParams(Ctx ctx, int trackedCount, DateBounds bounds, bool withToday)
         {
+            int branchSets = trackedCount + 2;
             List<SqlParameter> list = new List<SqlParameter>();
-            for (int n = 1; n <= BranchSets; n++)
+            for (int n = 1; n <= branchSets; n++)
             {
-                if (n != BranchSets)
+                if (n != branchSets)
                 {
                     list.Add(new SqlParameter("@AD_Client_ID" + n, ctx.GetAD_Client_ID()));
                 }

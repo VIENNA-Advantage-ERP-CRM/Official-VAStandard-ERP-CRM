@@ -39,7 +39,11 @@ namespace VAS.Controllers
     ///     A. INVOICED OUTSTANDING - one or more completed/closed ('CO'/'CL') sales
     ///        invoices linked to the order have C_Invoice.VA009_OpenAmount > 0. Amount
     ///        = SUM(VA009_OpenAmount) across those open invoices; due date = the
-    ///        earliest DueDate among them.
+    ///        earliest DueDate of their UNPAID payment schedules
+    ///        (C_InvoicePaySchedule, VA009_IsPaid = 'N' - where the due date really
+    ///        lives; C_Invoice.DueDate is usually empty, which left the "Payment due"
+    ///        column blank, Sr 8.34), falling back to C_Invoice.DueDate and then the
+    ///        invoice date when an invoice has no schedule.
     ///     B. ADVANCE OUTSTANDING - only when path A does not apply (an order with a
     ///        qualifying open invoice never also gets an Advance row - one SO appears
     ///        once only): the order's payment term has C_PaymentTerm.VA009_Advance =
@@ -170,10 +174,24 @@ namespace VAS.Controllers
                 invoice_due AS (
                     SELECT
                         i.C_Order_ID AS C_Order_ID,
-                        MIN(i.DueDate) AS Payment_Due_Date,
+                        MIN(COALESCE(i.DueDate, i.DateInvoiced)) AS Payment_Due_Date,
                         SUM(COALESCE(i.VA009_OpenAmount, 0)) AS Open_Amount
                       FROM C_Invoice i
                       INNER JOIN base_orders bo ON ( bo.C_Order_ID = i.C_Order_ID )
+                     WHERE i.IsActive = 'Y'
+                       AND i.IsSOTrx = 'Y'
+                       AND COALESCE(i.IsReturnTrx, 'N') = 'N'
+                       AND i.DocStatus IN ('CO', 'CL')
+                       AND COALESCE(i.VA009_OpenAmount, 0) > 0
+                     GROUP BY i.C_Order_ID
+                ),
+                schedule_due AS (
+                    SELECT
+                        i.C_Order_ID AS C_Order_ID,
+                        MIN(ips.DueDate) AS Schedule_Due_Date
+                      FROM C_Invoice i
+                      INNER JOIN base_orders bo ON ( bo.C_Order_ID = i.C_Order_ID )
+                      INNER JOIN C_InvoicePaySchedule ips ON ( ips.C_Invoice_ID = i.C_Invoice_ID AND ips.IsActive = 'Y' AND ips.VA009_IsPaid = 'N' )
                      WHERE i.IsActive = 'Y'
                        AND i.IsSOTrx = 'Y'
                        AND COALESCE(i.IsReturnTrx, 'N') = 'N'
@@ -203,12 +221,13 @@ namespace VAS.Controllers
                         bo.Grand_Total AS Grand_Total,
                         pt.VA009_Advance AS Advance_Flag,
                         inv.C_Order_ID AS Invoice_Order_Id,
-                        inv.Payment_Due_Date AS Invoice_Due_Date,
+                        COALESCE(sd.Schedule_Due_Date, inv.Payment_Due_Date) AS Invoice_Due_Date,
                         inv.Open_Amount AS Invoice_Open_Amount,
                         COALESCE(r.Received_Amount, 0) AS Received_Amount
                       FROM base_orders bo
                       LEFT OUTER JOIN C_PaymentTerm pt ON ( pt.C_PaymentTerm_ID = bo.Payment_Term_Id )
                       LEFT OUTER JOIN invoice_due inv ON ( inv.C_Order_ID = bo.C_Order_ID )
+                      LEFT OUTER JOIN schedule_due sd ON ( sd.C_Order_ID = bo.C_Order_ID )
                       LEFT OUTER JOIN received r ON ( r.C_Order_ID = bo.C_Order_ID )
                 )
                 SELECT

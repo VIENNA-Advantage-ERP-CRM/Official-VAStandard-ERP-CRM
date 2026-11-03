@@ -84,7 +84,7 @@
 
         // widget list state
         var pageNo = 1;
-        var pageSize = 5;
+        var pageSize = 4;   // 4 roomier rows per page (CSS grid reserves 4 tracks)
         var totalPages = 0;
         var totalRecords = 0;
         var fulfilments = [];

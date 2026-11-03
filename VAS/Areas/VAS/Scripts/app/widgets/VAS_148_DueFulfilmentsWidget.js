@@ -83,7 +83,7 @@
 
         // widget list state
         var pageNo = 1;
-        var pageSize = 5;
+        var pageSize = 4;   // 4 roomier rows per page (CSS grid reserves 4 tracks)
         var totalPages = 0;
         var totalRecords = 0;
         var fulfilments = [];
@@ -120,6 +120,28 @@
 
         function formatQty(value) {
             return Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+        }
+
+        /* UOM precision (C_UOM.StdPrecision) of a line: 0 -> whole numbers only,
+           2 -> up to two decimals (e.g. 1.25). */
+        function uomPrecisionOf(line) {
+            var p = Number(line && line.uomPrecision);
+            return (isFinite(p) && p >= 0) ? Math.floor(p) : 0;
+        }
+
+        /* Truncates a quantity to the given number of decimals. */
+        function truncateToPrecision(value, precision) {
+            var n = Number(value);
+            if (!isFinite(n)) { return 0; }
+            var factor = Math.pow(10, precision);
+            return Math.floor(n * factor + 1e-9) / factor;
+        }
+
+        /* Number of decimals typed in a raw input value. */
+        function decimalsIn(raw) {
+            var text = String(raw == null ? '' : raw);
+            var dot = text.indexOf('.');
+            return dot < 0 ? 0 : text.length - dot - 1;
         }
 
         var currency = {};
@@ -261,16 +283,18 @@
                 var id = ln.orderLineId;
                 lineOrder.push(id);
                 var prev = lineState[id];
+                var precision = uomPrecisionOf(ln);
                 kept[id] = {
                     orderLineId: id,
                     productId: ln.productId,
                     productName: ln.productName,
                     uomName: ln.uomName || 'Each',
+                    uomPrecision: precision,
                     requiredQty: Number(ln.requiredQty || 0),
                     onHandQty: Number(ln.onHandQty || 0),
                     locatorId: Number(ln.defaultLocatorId || 0),
                     // preserve a user-typed qty across warehouse switches when possible
-                    qty: prev && prev.qtyTouched ? prev.qty : Number(ln.requiredQty || 0),
+                    qty: prev && prev.qtyTouched ? prev.qty : truncateToPrecision(Number(ln.requiredQty || 0), precision),
                     qtyTouched: prev ? prev.qtyTouched : false,
                     stockStatus: ln.stockStatus
                 };
@@ -300,7 +324,8 @@
             $c.on('change', '.vas-duf-f-wh', onWarehouseChange);
             $c.on('click', '.vas-duf-chk', function () { onToggleLine(Number($(this).data('id'))); });
             $c.on('change', '.vas-duf-loc', function () { onLocatorChange(Number($(this).data('id')), Number($(this).val())); });
-            $c.on('input', '.vas-duf-qty', function () { onQtyChange(Number($(this).data('id')), $(this).val()); });
+            $c.on('keydown', '.vas-duf-qty', onQtyKeyDown);
+            $c.on('input', '.vas-duf-qty', function () { onQtyChange(Number($(this).data('id')), $(this).val(), this); });
             $c.on('click', '.vas-duf-lprev', function () { if (linePage > 1) { linePage--; renderLineList(); } });
             $c.on('click', '.vas-duf-lnext', function () { if (linePage < lineTotalPages()) { linePage++; renderLineList(); } });
             $c.on('click', '.vas-duf-gen', onGenerate);
@@ -412,7 +437,7 @@
                                 '<span class="vas-duf-lname" title="' + escapeHtml(line.productName) + '">' + escapeHtml(line.productName) + '</span>' +
                 badgeFor(line) +
                 '<select class="vas-duf-loc" data-id="' + escapeHtml(line.orderLineId) + '" aria-label="' + escapeHtml(lbl('VAS_148_DUF_LocatorFor') + ' ' + line.productName) + '"' + disabled + '>' + locOpts + '</select>' +
-                '<span class="vas-duf-qtywrap"><input type="number" min="1" class="vas-duf-qty" data-id="' + escapeHtml(line.orderLineId) + '" value="' + escapeHtml(line.qty) + '" aria-label="' + escapeHtml(lbl('VAS_148_DUF_QuantityFor') + ' ' + line.productName) + '"' + disabled + ' />' +
+                '<span class="vas-duf-qtywrap"><input type="number" min="0" step="' + (line.uomPrecision > 0 ? Math.pow(10, -line.uomPrecision).toFixed(line.uomPrecision) : '1') + '" inputmode="' + (line.uomPrecision > 0 ? 'decimal' : 'numeric') + '" class="vas-duf-qty" data-id="' + escapeHtml(line.orderLineId) + '" data-precision="' + line.uomPrecision + '" value="' + escapeHtml(line.qty) + '" aria-label="' + escapeHtml(lbl('VAS_148_DUF_QuantityFor') + ' ' + line.productName) + '"' + disabled + ' />' +
                 '<span class="vas-duf-uom">' + escapeHtml(line.uomName) + '</span></span>' +
                 '</div>';
         }
@@ -424,11 +449,29 @@
             renderLineList();
         }
 
-        function onQtyChange(id, val) {
+        /* Blocks keys that cannot produce a valid quantity for the line's UOM:
+           the decimal separator when the UOM precision is 0, and exponent/sign
+           characters always. */
+        function onQtyKeyDown(e) {
+            var precision = Number($(this).attr('data-precision')) || 0;
+            var key = e.key;
+            if (key === 'e' || key === 'E' || key === '+' || key === '-') { e.preventDefault(); return; }
+            if (precision <= 0 && (key === '.' || key === ',' || key === 'Decimal')) { e.preventDefault(); }
+        }
+
+        function onQtyChange(id, val, input) {
             var line = lineState[id];
             if (!line) { return; }
+            var precision = uomPrecisionOf(line);
+            // More decimals than the UOM allows (typed or pasted): cut them off
+            // and write the corrected value back into the box.
+            if (val !== '' && decimalsIn(val) > precision) {
+                var fixed = truncateToPrecision(val, precision);
+                val = String(fixed);
+                if (input) { $(input).val(fixed); }
+            }
             var n = Number(val);
-            line.qty = isFinite(n) && n > 0 ? n : 0;
+            line.qty = isFinite(n) && n > 0 ? truncateToPrecision(n, precision) : 0;
             line.qtyTouched = true;
             // update just this row's badge + row tint + summary without full re-render
             refreshLineRow(id);

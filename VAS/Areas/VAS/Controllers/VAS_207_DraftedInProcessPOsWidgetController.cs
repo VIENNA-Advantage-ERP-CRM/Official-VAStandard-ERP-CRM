@@ -15,6 +15,11 @@
  *                    AccessSqlParser cannot reliably parse (same documented issue as
  *                    VAS_216_POQueueWidget / this file's own GetDraftedInProcessPOsData). Switched
  *                    to the same safe sub-query access pattern used elsewhere in this file.
+ * Claude 2026-10-29: The Item-only filter is reverted for line_count / po_value: the PO lines pop-up
+ *                    lists every active line (charges and non-Item products too), so the count and
+ *                    value it is compared with left lines out (6 lines shown, 4 counted) and a PO
+ *                    with no Item line disappeared from the widget. Both now cover every active
+ *                    line; po_value is the sum of the pop-up's Amount column (LineNetAmt).
  ***********************************************************/
 
 using Newtonsoft.Json;
@@ -87,13 +92,11 @@ namespace VIS.Controllers
                         bp.Name                 AS vendor_name,
                         rep.Name                AS representative_name,
                         COUNT(ol.C_OrderLine_ID) AS line_count,
-                        SUM(COALESCE(ol.LineNetAmt, 0)) AS po_value_document_currency
+                        COALESCE(SUM(ol.LineNetAmt), 0) AS po_value_document_currency
                     FROM C_Order o
                     LEFT JOIN C_OrderLine ol
                         ON ol.C_Order_ID = o.C_Order_ID
                        AND ol.IsActive = 'Y'
-                    LEFT JOIN M_Product prod
-                        ON prod.M_Product_ID = ol.M_Product_ID
                     INNER JOIN C_BPartner bp
                         ON bp.C_BPartner_ID = o.C_BPartner_ID
                     LEFT JOIN AD_User rep
@@ -111,7 +114,6 @@ namespace VIS.Controllers
                           WHERE dt.C_DocType_ID = o.C_DocTypeTarget_ID
                             AND COALESCE(dt.IsBlanketTrx, 'N') = 'Y')
                       AND o.C_Order_ID IN (@P_ORDER_ACCESS@)
-                      AND prod.ProductType = 'I'
                     GROUP BY
                         o.C_Order_ID,
                         o.DocumentNo,

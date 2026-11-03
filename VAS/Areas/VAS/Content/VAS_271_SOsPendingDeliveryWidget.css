@@ -163,6 +163,9 @@
 
 .vas271-modal {
     width: min(1240px, 94vw);
+    /* Sr 8.18: fixed height - the pop-up keeps the same size every time it opens,
+       whether it shows the documents list or the line details, and on "Back". */
+    height: min(880px, 90dvh);
     max-height: min(880px, 90dvh);
     background: #FFFFFF;
     border: 1px solid #D9E2EB;

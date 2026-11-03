@@ -38,8 +38,10 @@ namespace VAS.Controllers
     ///   Completed/Closed split, write-off note and period selector are NOT implemented):
     ///     - Headline = C_Order.DocStatus = 'CO' only (Closed 'CL' excluded), date-filtered
     ///       on DateOrdered, regardless of delivery state.
-    ///     - Delivered value = SUM(QtyDelivered * PriceActual) over active lines with
-    ///       QtyDelivered > 0, for that same CO/MTD cohort only (never TotalLines).
+    ///     - Delivered value (Sr 8.12) = SUM of the SO value (TotalLines without tax)
+    ///       of only those cohort orders whose delivery status is "Delivered" (every
+    ///       Item-type line fully delivered); pending / partially delivered orders
+    ///       are excluded. Delivery state counts Item-type product lines only (Sr 8.15).
     ///     - On-time shipment = last completed outbound M_InOut (IsSOTrx='Y',
     ///       IsReturnTrx='N', DocStatus='CO') MovementDate <= C_Order.DatePromised, over
     ///       the subset of the cohort that has both a completed shipment and a
@@ -180,7 +182,7 @@ namespace VAS.Controllers
                        o.DateOrdered AS Date_Ordered,
                        o.DatePromised AS Date_Promised,
                        o.DocStatus AS Doc_Status_Code,
-                       o.TotalLines AS Order_Value,
+                       " + OrderValueExclTaxSql + @" AS Order_Value,
                        o.C_BPartner_ID AS Bpartner_Id,
                        o.M_Warehouse_ID AS Warehouse_Id,
                        o.SalesRep_ID AS Sales_Rep_Id
@@ -194,6 +196,17 @@ namespace VAS.Controllers
                    AND o.DateOrdered >= @Period_Start
                    AND o.DateOrdered < @Period_End";
         }
+
+        /// <summary>
+        /// SO value WITHOUT taxes: on a tax-inclusive price list C_Order.TotalLines
+        /// holds the gross, so the lines' tax is taken off (same expression as
+        /// VAS_203 / VAS_268). Scalar sub-selects in the SELECT list leave the main
+        /// WHERE untouched for AddAccessSQL.
+        /// </summary>
+        private const string OrderValueExclTaxSql =
+            "CASE WHEN COALESCE((SELECT pl.IsTaxIncluded FROM M_PriceList pl WHERE pl.M_PriceList_ID = o.M_PriceList_ID), 'N') = 'Y' " +
+            "THEN COALESCE(o.TotalLines, 0) - (SELECT COALESCE(SUM(COALESCE(tl.TaxAmt, 0)), 0) FROM C_OrderLine tl WHERE tl.C_Order_ID = o.C_Order_ID AND tl.IsActive = 'Y') " +
+            "ELSE COALESCE(o.TotalLines, 0) END";
 
         private SummaryResult GetSummaryData(Ctx ctx)
         {
@@ -217,17 +230,13 @@ namespace VAS.Controllers
                 line_delivery AS (
                     SELECT
                         ol.C_Order_ID AS C_Order_ID,
-                        SUM(
-                            CASE
-                                WHEN COALESCE(ol.QtyDelivered, 0) > 0
-                                THEN COALESCE(ol.QtyDelivered, 0) * COALESCE(ol.PriceActual, 0)
-                                ELSE 0
-                            END
-                        ) AS Delivered_Value,
+                        SUM(COALESCE(ol.QtyOrdered, 0)) AS Ordered_Qty,
+                        SUM(COALESCE(ol.QtyDelivered, 0)) AS Delivered_Qty,
                         MAX(
                             CASE WHEN COALESCE(ol.QtyDelivered, 0) > 0 THEN 1 ELSE 0 END
                         ) AS Has_Delivery
                       FROM C_OrderLine ol
+                     INNER JOIN M_Product p ON ( p.M_Product_ID = ol.M_Product_ID AND p.ProductType = 'I' )
                      WHERE ol.IsActive = 'Y'
                      GROUP BY ol.C_Order_ID
                 ),
@@ -245,7 +254,13 @@ namespace VAS.Controllers
                 SELECT
                     COUNT(1) AS Completed_Count,
                     SUM(COALESCE(ld.Has_Delivery, 0)) AS Delivered_Order_Count,
-                    SUM(COALESCE(ld.Delivered_Value, 0)) AS Delivered_Value,
+                    SUM(
+                        CASE
+                            WHEN COALESCE(ld.Ordered_Qty, 0) > 0
+                             AND COALESCE(ld.Delivered_Qty, 0) >= ld.Ordered_Qty
+                            THEN COALESCE(o.Order_Value, 0) ELSE 0
+                        END
+                    ) AS Delivered_Value,
                     SUM(
                         CASE
                             WHEN ls.Last_Shipment_Date IS NOT NULL
@@ -321,6 +336,7 @@ namespace VAS.Controllers
                         SUM(COALESCE(ol.QtyOrdered, 0)) AS Ordered_Qty,
                         SUM(COALESCE(ol.QtyDelivered, 0)) AS Delivered_Qty
                       FROM C_OrderLine ol
+                     INNER JOIN M_Product p ON ( p.M_Product_ID = ol.M_Product_ID AND p.ProductType = 'I' )
                      WHERE ol.IsActive = 'Y'
                      GROUP BY ol.C_Order_ID
                 )
@@ -416,7 +432,11 @@ namespace VAS.Controllers
                        o.DateOrdered AS Date_Ordered,
                        o.DatePromised AS Date_Promised,
                        o.DocStatus AS Doc_Status_Code,
-                       o.TotalLines AS Order_Value,
+                       " + OrderValueExclTaxSql + @" AS Order_Value,
+                       COALESCE((SELECT pl.IsTaxIncluded FROM M_PriceList pl WHERE pl.M_PriceList_ID = o.M_PriceList_ID), 'N') AS Price_List_Tax_Included,
+                       curr.CurSymbol AS Currency_Symbol,
+                       curr.ISO_Code AS Currency_Code,
+                       curr.StdPrecision AS Currency_Precision,
                        o.DeliveryViaRule AS Delivery_Via_Rule,
                        o.M_Warehouse_ID AS Warehouse_Id,
                        COALESCE(bp.Name, N'') AS Customer_Name,
@@ -424,6 +444,7 @@ namespace VAS.Controllers
                   FROM C_Order o
                   INNER JOIN C_BPartner bp ON ( bp.C_BPartner_ID = o.C_BPartner_ID )
                   LEFT OUTER JOIN M_Warehouse w ON ( w.M_Warehouse_ID = o.M_Warehouse_ID )
+                  LEFT OUTER JOIN C_Currency curr ON ( curr.C_Currency_ID = o.C_Currency_ID )
                  WHERE o.C_Order_ID = @Order_Id
                    AND o.AD_Client_ID = @AD_Client_ID
                    AND o.IsActive = 'Y'";
@@ -432,6 +453,8 @@ namespace VAS.Controllers
 
             string docStatusCode = "";
             int warehouseId = 0;
+            bool priceListTaxIncluded = false;
+            int stdPrecision = 2;
 
             IDataReader dr = null;
             try
@@ -446,6 +469,10 @@ namespace VAS.Controllers
 
                 docStatusCode = Util.GetValueOfString(dr["Doc_Status_Code"]);
                 warehouseId = dr["Warehouse_Id"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr["Warehouse_Id"]);
+                priceListTaxIncluded = Util.GetValueOfString(dr["Price_List_Tax_Included"]) == "Y";
+                stdPrecision = dr["Currency_Precision"] == DBNull.Value ? 2 : Util.GetValueOfInt(dr["Currency_Precision"]);
+                string currencySymbol = Util.GetValueOfString(dr["Currency_Symbol"]);
+                if (string.IsNullOrWhiteSpace(currencySymbol)) { currencySymbol = Util.GetValueOfString(dr["Currency_Code"]); }
                 DateTime? dateOrdered = dr["Date_Ordered"] == DBNull.Value ? (DateTime?)null : Util.GetValueOfDateTime(dr["Date_Ordered"]);
                 DateTime? datePromised = dr["Date_Promised"] == DBNull.Value ? (DateTime?)null : Util.GetValueOfDateTime(dr["Date_Promised"]);
 
@@ -459,6 +486,8 @@ namespace VAS.Controllers
                     DocumentStatus = DecodeLabel(docStatusMap, docStatusCode),
                     DocumentStatusCode = docStatusCode,
                     OrderValue = dr["Order_Value"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Order_Value"]),
+                    CurrencySymbol = (currencySymbol ?? "").Trim(),
+                    CurrencyPrecision = stdPrecision,
                     WarehouseName = Util.GetValueOfString(dr["Warehouse_Name"]),
                     DeliveryMode = DecodeLabel(GetDecodeMap("C_Order", "DeliveryViaRule", language), Util.GetValueOfString(dr["Delivery_Via_Rule"]))
                 };
@@ -470,12 +499,15 @@ namespace VAS.Controllers
 
             if (result.Order == null) { return result; }
 
-            LoadOrderLines(ctx, result, orderId, warehouseId);
+            LoadOrderLines(ctx, result, orderId, warehouseId, priceListTaxIncluded, stdPrecision);
 
+            // Delivery state counts Item-type product lines only (Sr 8.15).
             bool anyDelivered = false, allDelivered = true;
-            bool hasLines = result.Lines.Count > 0;
+            bool hasLines = false;
             foreach (OrderLineRow line in result.Lines)
             {
+                if (!line.IsItem) { continue; }
+                hasLines = true;
                 if (line.QtyDelivered > 0) { anyDelivered = true; }
                 if (line.QtyDelivered < line.QtyOrdered) { allDelivered = false; }
             }
@@ -500,29 +532,41 @@ namespace VAS.Controllers
 
         /// <summary>
         /// Every active line of the order, each carrying its own free-stock figure
-        /// (per <see cref="ResolveFreeStock"/>) and a derived line-status chip. This
+        /// (per <see cref="ResolveOnHand"/>) and a derived line-status chip. This
         /// widget's cohort is always DocStatus='CO', so line status only ever
         /// distinguishes fully/partly delivered from still-in-process - no
         /// drafted/voided branch is needed here.
         /// </summary>
-        private void LoadOrderLines(Ctx ctx, OrderDetailResult result, int orderId, int headerWarehouseId)
+        private void LoadOrderLines(Ctx ctx, OrderDetailResult result, int orderId, int headerWarehouseId, bool priceListTaxIncluded, int stdPrecision)
         {
+            // ProductType is a CHAR column and the charge / product names are NVARCHAR -
+            // all selected raw and resolved in C# (no COALESCE against a literal, see VAS_203).
             string sql = @"
                 SELECT ol.C_OrderLine_ID AS Line_Id,
                        ol.Line AS Line_No,
                        ol.M_Product_ID AS Product_Id,
+                       ol.C_Charge_ID AS Charge_Id,
+                       ol.Description AS Description,
                        ol.QtyOrdered AS Qty_Ordered,
+                       ol.QtyEntered AS Qty_Entered,
                        ol.QtyDelivered AS Qty_Delivered,
                        ol.PriceActual AS Price_Actual,
+                       ol.PriceEntered AS Price_Entered,
                        ol.LineNetAmt AS Line_Net_Amt,
+                       ol.TaxAmt AS Line_Tax_Amt,
+                       tx.Rate AS Tax_Rate,
                        ol.M_AttributeSetInstance_ID AS Asi_Id,
                        ol.C_UOM_ID AS Uom_Id,
                        ol.M_Warehouse_ID AS Line_Warehouse_Id,
                        COALESCE(p.Name, p.Value) AS Product_Name,
+                       p.ProductType AS Product_Type,
+                       ch.Name AS Charge_Name,
                        COALESCE(asi.Description, N'') AS Attribute_Text,
                        COALESCE(u.Name, N'') AS Uom_Name
                   FROM C_OrderLine ol
                   LEFT OUTER JOIN M_Product p ON ( p.M_Product_ID = ol.M_Product_ID )
+                  LEFT OUTER JOIN C_Charge ch ON ( ch.C_Charge_ID = ol.C_Charge_ID )
+                  LEFT OUTER JOIN C_Tax tx ON ( tx.C_Tax_ID = ol.C_Tax_ID )
                   LEFT OUTER JOIN M_AttributeSetInstance asi ON ( asi.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID )
                   LEFT OUTER JOIN C_UOM u ON ( u.C_UOM_ID = ol.C_UOM_ID )
                  WHERE ol.C_Order_ID = @Order_Id
@@ -541,24 +585,62 @@ namespace VAS.Controllers
 
                 while (dr != null && dr.Read())
                 {
-                    decimal qtyOrdered = dr["Qty_Ordered"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Qty_Ordered"]);
-                    decimal qtyDelivered = dr["Qty_Delivered"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Qty_Delivered"]);
+                    decimal qtyOrderedBase = dr["Qty_Ordered"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Qty_Ordered"]);
+                    decimal qtyEntered = dr["Qty_Entered"] == DBNull.Value ? qtyOrderedBase : Util.GetValueOfDecimal(dr["Qty_Entered"]);
+                    decimal qtyDeliveredBase = dr["Qty_Delivered"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Qty_Delivered"]);
                     int productId = dr["Product_Id"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr["Product_Id"]);
                     int lineWarehouseId = dr["Line_Warehouse_Id"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr["Line_Warehouse_Id"]);
                     int warehouseId = lineWarehouseId > 0 ? lineWarehouseId : headerWarehouseId;
 
+                    // Sr 8.13: quantities in the line's selected UOM. QtyEntered is in the
+                    // line's C_UOM_ID; QtyOrdered / QtyDelivered / storage are in the base
+                    // UOM, so they are scaled by the line's entered/ordered ratio (VAS_203).
+                    decimal uomRatio = qtyOrderedBase != 0m ? (qtyEntered / qtyOrderedBase) : 1m;
+                    decimal qtyOrdered = qtyEntered;
+                    decimal qtyDelivered = qtyDeliveredBase * uomRatio;
+
+                    // Sr 8.15: pending / delivered / stock only for Item-type products.
+                    bool isItem = productId > 0
+                        && string.Equals((Util.GetValueOfString(dr["Product_Type"]) ?? "").Trim(), "I", StringComparison.OrdinalIgnoreCase);
+
+                    // Sr 8.16: a charge line shows the charge's name instead of a blank.
+                    string productName = Util.GetValueOfString(dr["Product_Name"]);
+                    if (string.IsNullOrEmpty(productName)) { productName = Util.GetValueOfString(dr["Charge_Name"]); }
+                    if (string.IsNullOrEmpty(productName)) { productName = Util.GetValueOfString(dr["Description"]); }
+
+                    // Line amount without tax (tax-inclusive price list: line tax taken off).
+                    decimal lineAmt = dr["Line_Net_Amt"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Line_Net_Amt"]);
+                    if (priceListTaxIncluded)
+                    {
+                        decimal lineTax = dr["Line_Tax_Amt"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Line_Tax_Amt"]);
+                        decimal taxRate = dr["Tax_Rate"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Tax_Rate"]);
+                        if (lineTax == 0m && taxRate > 0m)
+                        {
+                            lineTax = Math.Round(lineAmt * taxRate / (100m + taxRate), stdPrecision, MidpointRounding.AwayFromZero);
+                        }
+                        lineAmt -= lineTax;
+                    }
+
+                    // Sr 8.14: the rate per selected UOM (PriceEntered), falling back to PriceActual.
+                    decimal rate = dr["Price_Entered"] == DBNull.Value
+                        ? (dr["Price_Actual"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Price_Actual"]))
+                        : Util.GetValueOfDecimal(dr["Price_Entered"]);
+
                     result.Lines.Add(new OrderLineRow
                     {
                         LineNo = Util.GetValueOfInt(dr["Line_No"]),
-                        ProductName = Util.GetValueOfString(dr["Product_Name"]),
+                        ProductName = productName,
                         AttributeText = Util.GetValueOfString(dr["Attribute_Text"]),
                         UomName = Util.GetValueOfString(dr["Uom_Name"]),
+                        IsItem = isItem,
                         QtyOrdered = qtyOrdered,
                         QtyDelivered = qtyDelivered,
-                        QtyPending = qtyOrdered - qtyDelivered,
-                        FreeStock = ResolveFreeStock(ctx, productId, warehouseId),
-                        Rate = dr["Price_Actual"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Price_Actual"]),
-                        Amount = dr["Line_Net_Amt"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Line_Net_Amt"])
+                        QtyPending = isItem ? Math.Max(0m, qtyOrdered - qtyDelivered) : 0m,
+                        // On-hand stock in the line's UOM (not free stock - its reservation
+                        // already holds this order and double-counted the shortage).
+                        FreeStock = isItem ? ResolveOnHand(ctx, productId, warehouseId) * uomRatio : 0m,
+                        Rate = rate,
+                        Amount = lineAmt
                     });
                 }
             }
@@ -569,18 +651,17 @@ namespace VAS.Controllers
         }
 
         /// <summary>
-        /// Warehouse-level free stock for one product: QtyOnHand - QtyReserved -
-        /// QtyDedicated - QtyAllocated, summed across the warehouse's active
-        /// locators (M_Storage joined to M_Locator). A product/warehouse with no
-        /// M_Storage rows reads as zero, never null.
+        /// Warehouse-level on-hand stock for one product (base UOM), summed across the
+        /// warehouse's active locators (M_Storage joined to M_Locator). Reserved qty is
+        /// not subtracted - it already contains the order being shown. A
+        /// product/warehouse with no M_Storage rows reads as zero, never null.
         /// </summary>
-        private decimal ResolveFreeStock(Ctx ctx, int productId, int warehouseId)
+        private decimal ResolveOnHand(Ctx ctx, int productId, int warehouseId)
         {
             if (productId <= 0 || warehouseId <= 0) { return 0m; }
 
             string sql = @"
-                SELECT COALESCE(SUM(COALESCE(s.QtyOnHand, 0) - COALESCE(s.QtyReserved, 0)
-                              - COALESCE(s.QtyDedicated, 0) - COALESCE(s.QtyAllocated, 0)), 0) AS Free_Stock
+                SELECT COALESCE(SUM(COALESCE(s.QtyOnHand, 0)), 0) AS On_Hand
                   FROM M_Storage s
                   INNER JOIN M_Locator loc ON ( loc.M_Locator_ID = s.M_Locator_ID )
                  WHERE s.M_Product_ID = @M_Product_ID
@@ -757,6 +838,8 @@ namespace VAS.Controllers
             public string DocumentStatus { get; set; }
             public string DocumentStatusCode { get; set; }
             public decimal OrderValue { get; set; }
+            public string CurrencySymbol { get; set; }
+            public int CurrencyPrecision { get; set; }
             public string WarehouseName { get; set; }
             public string DeliveryMode { get; set; }
             public string DeliveryStatus { get; set; }
@@ -768,6 +851,7 @@ namespace VAS.Controllers
             public string ProductName { get; set; }
             public string AttributeText { get; set; }
             public string UomName { get; set; }
+            public bool IsItem { get; set; }
             public decimal QtyOrdered { get; set; }
             public decimal QtyDelivered { get; set; }
             public decimal QtyPending { get; set; }

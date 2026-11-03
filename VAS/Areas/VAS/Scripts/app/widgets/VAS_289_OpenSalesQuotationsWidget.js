@@ -33,11 +33,13 @@
  *           surfaces as a conflict that names the affected line(s), never a
  *           silently reduced quantity.
  *
- *           KNOWN SIMPLIFICATIONS (disclosed, not silent): Business Partner and
- *           Sales Rep are shown read-only in Step 3 - the data model and API both
- *           accept a change (per the confirmed field mapping), but a full
- *           customer-search combobox is a separate, larger feature and out of
- *           scope for this build. Target Document Type, SO Date, Date Promised,
+ *           QA 2026-10-29 (8.37-8.75): only Completed quotations are listed; Customer
+ *           (as-you-type search, auto-fills Price List / Payment Term / Payment
+ *           Method / Sales Rep from the customer) and Sales Rep are editable;
+ *           Currency is read-only from the Price List; quantities and rates are in
+ *           the line UOM (qty at the UOM's StdPrecision, rate 2 decimals, editable);
+ *           the new order is saved Drafted or Completed (document workflow).
+ *           Target Document Type, Date Ordered, Date Promised,
  *           Location, Contact, Payment Term, Payment Method, Shipping Rule,
  *           Shipping Method, Price List, Currency, Currency Rate Type, Inco Term,
  *           Warehouse, Priority, Order Reference and Description are all genuinely
@@ -156,6 +158,15 @@
  * 84  | Rate                                                                | VAS_289_ColRate
  * 85  | Print Description                                                   | VAS_289_FieldPrintDescription
  * 86  | line(s) affected                                                    | VAS_289_ConflictLinesAffected
+ * 87  | Stock Qty (In Base UOM)                                             | VAS_289_ColStockQtyBaseUom
+ * 88  | Date Ordered                                                        | VAS_289_DateOrdered
+ * 89  | Location                                                            | VAS_289_Location
+ * 90  | Document Status                                                     | VAS_289_FieldDocStatus
+ * 91  | Search customer                                                     | VAS_289_SearchCustomer
+ * 92  | Please fill the mandatory fields:                                   | VAS_289_FillMandatory
+ * 93  | Error: Date Promised should be greater than or equal to Date Ordered | VAS_289_DatePromisedBeforeOrdered
+ * 94  | Sales Order created successfully with document number:              | VAS_289_SOCreatedDocNo
+ * 95  | It was saved as Drafted because it could not be completed:          | VAS_289_SOCompleteFailed
  */
 ; VAS = window.VAS || {};
 
@@ -238,7 +249,8 @@
 
 
     var WIDGET_PAGE_SIZE = 6;
-    var MODAL_MAX_ROWS = 10;
+    var MODAL_MAX_ROWS = 50;    // upper safety cap only - the real page size is measured from the available height (QA 8.39)
+    var MODAL_INITIAL_ROWS = 10;
     var MODAL_MIN_ROWS = 2;
     var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -285,7 +297,55 @@
         var currentCfg = null;
 
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            var text = '';
+            try { text = VIS.Msg.getMsg(key); } catch (e) { text = ''; }
+            // VIS.Msg echoes the key back when no message is defined - show the English text then.
+            return (!text || text === key) && fallback !== undefined ? fallback : text;
+        }
+
+        /* QA 8.49/8.68 and other blocking validations - the framework's info dialog when
+           available, the widget toast otherwise. */
+        function infoMsg(text) {
+            if (window.VIS && VIS.ADialog && VIS.ADialog.info) { VIS.ADialog.info(null, null, text); }
+            else { toast(text); }
+        }
+
+        /* QA 8.38: an attribute that is missing/only placeholder punctuation shows blank. */
+        function cleanAttr(text) {
+            var t = String(text == null ? '' : text).trim();
+            return /^[\s\-_–—·.#|]*$/.test(t) ? '' : t;
+        }
+
+        /* QA 8.42: quantities follow the line UOM's StdPrecision. */
+        function roundTo(value, precision) {
+            var p = Math.max(0, Math.min(10, Number(precision) || 0));
+            var f = Math.pow(10, p);
+            return Math.round((Number(value) || 0) * f) / f;
+        }
+
+        function formatQty(value, precision) {
+            var p = Math.max(0, Math.min(10, Number(precision) || 0));
+            return roundTo(value, p).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: p });
+        }
+
+        /* QA 8.75: rate with exactly two decimals. */
+        function formatRate(value) {
+            return (Number(value) || 0).toFixed(2);
+        }
+
+        function qtyStep(precision) {
+            var p = Math.max(0, Number(precision) || 0);
+            return p === 0 ? '1' : (1 / Math.pow(10, p)).toFixed(p);
+        }
+
+        /* Free stock is in the product's base UOM - the ordered qty is in the line UOM. */
+        function qtyInBase(line) {
+            var r = Number(line.enteredPerBase) || 1;
+            return (Number(line.qtyToOrder) || 0) / r;
+        }
+
+        function isShort(line) {
+            return line.isStocked && (Number(line.freeStock) || 0) < qtyInBase(line);
         }
 
         function escapeHtml(value) {
@@ -348,7 +408,8 @@
         }
 
         function cellHtml(value, cls, align) {
-            var display = (value === null || value === undefined || value === '') ? '—' : value;
+            // QA 8.38/8.62: a missing value shows blank, never a hyphen placeholder.
+            var display = (value === null || value === undefined) ? '' : value;
             return '<span class="vas289-cell' + (align === 'right' ? ' right' : '') + ' ' + cls + '" title="' + escapeHtml(value == null ? '' : value) + '">' + escapeHtml(display) + '</span>';
         }
 
@@ -565,7 +626,10 @@
 
         function paintChrome(cfg) {
             $mBack.prop('hidden', !cfgStack.length);
-            $modal.removeClass('sm md').addClass(cfg.size || '');
+            $modal.removeClass('sm md vas289-fixedh').addClass(cfg.size || '');
+            // QA 8.39: table steps use the full modal height so rows-per-page is measured from
+            // the real available space (and grows/shrinks with the window), not from content.
+            if (cfg.fixedHeight) { $modal.addClass('vas289-fixedh'); }
             $mTitle.text(cfg.title || '');
             $mSub.text(cfg.subtitle || '');
             $mBody.removeClass('vas289-scrollable');
@@ -628,18 +692,19 @@
             if (currentCfg && currentCfg.step === 4) { fitLineReviewTable(); }
         }
 
+        /* QA 8.39: rows per page = how many rows really fit in the rows area (the flex:1
+           region between the table header and the pager, inside a fixed-height modal), so
+           the "x–y of n" range always equals the visible rows. Re-run on window resize. */
         function fitTableGeneric(id, sizeRef, onResize) {
             var el = document.getElementById(id);
             if (!el) { return; }
-            var avail = el.clientHeight;
-            if (avail < 40) { return; }
-            var head = el.querySelector('.vas289-mhead-row');
-            var foot = el.querySelector('.vas289-mtfoot');
-            var row = el.querySelector('.vas289-mbody-rows .vas289-mrow');
-            if (!head || !row) { return; }
+            var rowsEl = el.querySelector('.vas289-mbody-rows');
+            var row = rowsEl ? rowsEl.querySelector('.vas289-mrow') : null;
+            if (!rowsEl || !row) { return; }
+            var avail = rowsEl.clientHeight;
+            if (avail < 20) { return; }
             var rowHeight = row.getBoundingClientRect().height || 34;
-            var used = head.getBoundingClientRect().height + (foot ? foot.getBoundingClientRect().height + 8 : 0);
-            var n = Math.floor((avail - used) / rowHeight);
+            var n = Math.floor((avail + 0.5) / rowHeight);
             n = Math.max(MODAL_MIN_ROWS, Math.min(MODAL_MAX_ROWS, n));
             if (n !== sizeRef.size) { sizeRef.size = n; onResize(); }
         }
@@ -686,15 +751,21 @@
                                 productId: l.ProductId,
                                 productName: l.ProductName,
                                 isStocked: l.IsStocked,
-                                attributeText: l.AttributeText,
+                                asiId: l.AttributeSetInstanceId || 0,
+                                attributeText: cleanAttr(l.AttributeText),
                                 uomId: l.UomId,
                                 uomName: l.UomName,
+                                // QA 8.42/8.73: quantities are in the line UOM, at its StdPrecision.
+                                precision: Number(l.UomPrecision) || 0,
+                                enteredPerBase: Number(l.EnteredPerBase) || 1,
                                 quotedQty: Number(l.QuotedQty) || 0,
                                 alreadyOrderedQty: Number(l.AlreadyOrderedQty) || 0,
                                 pendingQty: Number(l.PendingQty) || 0,
-                                rate: Number(l.Rate) || 0,
+                                rate: roundTo(Number(l.Rate) || 0, 2),
                                 taxId: l.TaxId || 0,
-                                datePromised: l.DatePromised,
+                                // QA 8.67: follows the Details step's Date Promised until edited on the lines step.
+                                datePromised: null,
+                                datePromisedEdited: false,
                                 description: l.Description || '',
                                 printDescription: l.PrintDescription || '',
                                 warehouseId: l.WarehouseId,
@@ -727,24 +798,23 @@
                 title: q.DocumentNo,
                 subtitle: [q.BusinessPartner, label('VAS_289_ValidTillLabel', 'valid till') + ' ' + formatDateShort(q.ValidTillDate), label('VAS_289_Step2SubtitleSuffix', 'select the lines to raise a sales order against')].filter(function (p) { return p; }).join(' · '),
                 size: '',
+                fixedHeight: true,
                 render: renderStep2
             };
         }
 
         function renderStep2() {
             var q = wizard.quotation;
+            // QA 8.46: Customer / Segment / Lines summary cards removed from the pop-up.
             var statsHtml = '<div class="vas289-mstats">' +
                 statTile(label('VAS_289_StatQuotation', 'Quotation'), q.DocumentNo) +
-                statTile(label('VAS_289_StatBusinessPartner', 'Customer'), q.BusinessPartner) +
-                statTile(label('VAS_289_StatBPGroup', 'Segment'), q.BusinessPartnerGroup || '—') +
-                statTile(label('VAS_289_StatLines', 'Lines'), String(q.LineCount)) +
                 statTile(label('VAS_289_StatQuotedQty', 'Quoted qty'), formatNumDisplay(q.QuotedQty)) +
                 statTile(label('VAS_289_StatAlreadyOrdered', 'Already ordered'), formatNumDisplay(q.AlreadyOrderedQty)) +
                 statTile(label('VAS_289_StatPendingQty', 'Pending qty'), formatNumDisplay(q.PendingQty)) +
                 statTile(label('VAS_289_StatStatus', 'Status'), q.StatusLabel) +
             '</div>';
 
-            lineSelState = lineSelState || { size: MODAL_MAX_ROWS };
+            lineSelState = lineSelState || { size: MODAL_INITIAL_ROWS };
             $mBody.html(statsHtml + '<div class="vas289-mtwrap"><div class="vas289-mtbl" id="vas289-linesel-tbl"></div></div>');
             drawLineSelTable();
             renderStep2Footer();
@@ -756,9 +826,25 @@
             { key: 'uom', label: label('VAS_289_ColUom', 'UoM'), w: .55 },
             { key: 'pending', label: label('VAS_289_ColPendingQty', 'Pending qty'), w: .8, align: 'right' },
             { key: 'qty', label: label('VAS_289_ColQtyToOrder', 'Qty to order'), w: .95 },
-            { key: 'wh', label: label('VAS_289_ColShipFrom', 'Ship from'), w: 1.1 },
-            { key: 'stock', label: label('VAS_289_ColFreeStock', 'Free stock'), w: .85, align: 'right' }
+            // QA 8.41: "Ship from" column renamed to "Warehouse".
+            { key: 'wh', label: label('VAS_289_FieldWarehouse', 'Warehouse'), w: 1.1 },
+            // QA 8.74: free stock is the base-UOM stock quantity.
+            { key: 'stock', label: label('VAS_289_ColStockQtyBaseUom', 'Stock Qty (In Base UOM)'), w: .95, align: 'right' }
         ];
+
+        /* QA 8.41b: the per-line warehouse list is the Sales Order window's list (warehouses of
+           the order's organization). A line whose quotation warehouse is not in it falls back
+           to the quotation header warehouse, else the first listed warehouse. */
+        function normalizeLineWarehouses() {
+            var list = wizard.formOptionsWarehouses || [];
+            var inList = function (id) { return list.some(function (w) { return w.Id === id; }); };
+            var headerWh = wizard.quotation.WarehouseId;
+            wizard.lines.forEach(function (line) {
+                if (inList(line.warehouseId)) { return; }
+                line.warehouseId = inList(headerWh) ? headerWh : (list.length ? list[0].Id : 0);
+                line.freeStockStale = true;
+            });
+        }
 
         function warehouseOptionsHtml(selectedId) {
             var options = (wizard.formOptionsWarehouses || []).slice();
@@ -775,14 +861,29 @@
                 data: { quotationId: wizard.quotationId },
                 success: function (res) {
                     var parsed = parseResponse(res);
+                    if (!wizard) { return; }
                     if (!parsed.Error) {
                         wizard.formDefaults = parsed.Defaults;
                         wizard.formOptions = parsed.Options;
                         wizard.formOptionsWarehouses = (parsed.Options && parsed.Options.Warehouses) || [];
+                    } else {
+                        wizard.formOptionsWarehouses = [];
                     }
+                    normalizeLineWarehouses();
+                    refreshStaleFreeStock();
                     cb();
                 },
-                error: function () { cb(); }
+                error: function () { if (wizard) { wizard.formOptionsWarehouses = []; cb(); } }
+            });
+        }
+
+        function refreshStaleFreeStock() {
+            wizard.lines.forEach(function (line) {
+                if (!line.freeStockStale) { return; }
+                line.freeStockStale = false;
+                fetchLineFreeStock(line, function () {
+                    if (currentCfg && currentCfg.step === 2) { drawLineSelTable(); renderStep2Footer(); }
+                });
             });
         }
 
@@ -810,17 +911,16 @@
             var body = slice.map(function (line, i) {
                 var idx = start + i;
                 var stockCell;
-                if (!line.isStocked) { stockCell = cellHtml('—', 'vas289-c-std', 'right'); }
+                if (!line.isStocked) { stockCell = cellHtml('', 'vas289-c-std', 'right'); }
                 else {
-                    var short = (line.freeStock || 0) < line.qtyToOrder;
-                    stockCell = cellHtml(formatNumDisplay(line.freeStock || 0), short ? 'vas289-c-short' : 'vas289-c-ok', 'right');
+                    stockCell = cellHtml(formatNumDisplay(line.freeStock || 0), isShort(line) ? 'vas289-c-short' : 'vas289-c-ok', 'right');
                 }
                 return '<div class="vas289-mrow vas289-mrow-pick" data-line-idx="' + idx + '" style="grid-template-columns:' + tpl + '">' +
                     '<span class="vas289-cell center"><input type="checkbox" class="vas289-chk" data-line-idx="' + idx + '"' + (line.selected ? ' checked' : '') + ' aria-label="' + escapeHtml(line.productName) + '"></span>' +
                     cellHtml(line.productName + (line.attributeText ? ' · ' + line.attributeText : ''), 'vas289-c-prim') +
                     cellHtml(line.uomName, 'vas289-c-std') +
-                    cellHtml(formatNumDisplay(line.pendingQty), 'vas289-c-dark', 'right') +
-                    '<span class="vas289-cell"><input type="number" class="vas289-qty-input" data-line-idx="' + idx + '" min="0" max="' + line.pendingQty + '" step="any" value="' + line.qtyToOrder + '"></span>' +
+                    cellHtml(formatQty(line.pendingQty, line.precision), 'vas289-c-dark', 'right') +
+                    '<span class="vas289-cell"><input type="number" class="vas289-qty-input" data-line-idx="' + idx + '" min="0" max="' + line.pendingQty + '" step="' + qtyStep(line.precision) + '" value="' + roundTo(line.qtyToOrder, line.precision) + '"></span>' +
                     '<span class="vas289-cell"><select class="vas289-wh-select" data-line-idx="' + idx + '">' + warehouseOptionsHtml(line.warehouseId) + '</select></span>' +
                     stockCell +
                 '</div>';
@@ -852,11 +952,24 @@
                 chk.addEventListener('click', function (event) { event.stopPropagation(); toggleLineSelected(Number(chk.getAttribute('data-line-idx'))); });
             });
             el.querySelectorAll('.vas289-qty-input').forEach(function (inp) {
+                var precisionOf = function () { return wizard.lines[Number(inp.getAttribute('data-line-idx'))].precision; };
                 inp.addEventListener('click', function (event) { event.stopPropagation(); });
+                // QA 8.42: a whole-number UOM (precision 0) never accepts a decimal separator,
+                // and no UOM accepts more decimals than its StdPrecision.
+                inp.addEventListener('keydown', function (event) {
+                    if (precisionOf() === 0 && (event.key === '.' || event.key === ',' || event.key === 'Decimal')) { event.preventDefault(); }
+                    if (event.key === '-' || event.key === 'e' || event.key === 'E') { event.preventDefault(); }
+                });
+                inp.addEventListener('input', function () {
+                    var p = precisionOf();
+                    var v = String(inp.value || '');
+                    var dot = v.indexOf('.');
+                    if (dot >= 0 && v.length - dot - 1 > p) { inp.value = p === 0 ? v.substring(0, dot) : v.substring(0, dot + 1 + p); }
+                });
                 inp.addEventListener('change', function () {
                     var idx = Number(inp.getAttribute('data-line-idx'));
                     var line = wizard.lines[idx];
-                    var val = Number(inp.value) || 0;
+                    var val = roundTo(Number(inp.value) || 0, line.precision);
                     val = Math.max(0, Math.min(line.pendingQty, val));
                     line.qtyToOrder = val;
                     inp.value = val;
@@ -904,7 +1017,7 @@
             VASSONet.ajax({
                 url: VIS.Application.contextUrl + SELF_ENDPOINT + 'GetFreeStock',
                 type: 'GET', dataType: 'json', cache: false,
-                data: { productId: line.productId, warehouseId: line.warehouseId, attributeSetInstanceId: 0 },
+                data: { productId: line.productId, warehouseId: line.warehouseId, attributeSetInstanceId: line.asiId || 0 },
                 success: function (res) {
                     var parsed = parseResponse(res);
                     line.freeStock = parsed.FreeStock === undefined ? line.freeStock : Number(parsed.FreeStock);
@@ -926,7 +1039,7 @@
                 var warehouses = {};
                 selected.forEach(function (l) { warehouses[l.warehouseId] = true; });
                 var whCount = Object.keys(warehouses).length;
-                var whName = (wizard.formOptionsWarehouses.filter(function (w) { return w.Id === selected[0].warehouseId; })[0] || {}).Name || '';
+                var whName = ((wizard.formOptionsWarehouses || []).filter(function (w) { return w.Id === selected[0].warehouseId; })[0] || {}).Name || '';
                 var value = selected.reduce(function (s, l) { return s + (l.qtyToOrder * l.rate); }, 0);
 
                 if (whCount > 1) {
@@ -934,7 +1047,7 @@
                     cls = 'vas289-warnnote';
                     continueEnabled = false;
                 } else {
-                    var shortCount = selected.filter(function (l) { return l.isStocked && (l.freeStock || 0) < l.qtyToOrder; }).length;
+                    var shortCount = selected.filter(isShort).length;
                     if (shortCount > 0) {
                         noteHtml = escapeHtml(selected.length + ' ' + label('VAS_289_LinesSelectedSuffix', 'lines selected') + ' · ' + escapeHtml(whName) + ' · ' + formatINR(value) + ' · ' + shortCount + ' ' + label('VAS_289_ShortStockWarning', 'lines short of free stock — will backorder'));
                         cls = 'vas289-warnnote';
@@ -968,6 +1081,7 @@
             // renderStep3() crashes on wizard.header being null.
             if (wizard.formDefaults) {
                 if (!wizard.header) { wizard.header = buildInitialHeader(wizard.formDefaults); }
+                else if (wizard.orderWarehouseId) { wizard.header.warehouseId = wizard.orderWarehouseId; }
                 showScreen(buildStep3Cfg(), true);
                 return;
             }
@@ -990,25 +1104,44 @@
         }
 
         function buildInitialHeader(defaults) {
-            return {
+            var o = wizard.formOptions || {};
+            var payMethods = o.PaymentMethods || [];
+            var payMethodId = defaults.PaymentMethodId || 0;
+            if (payMethods.length && !payMethods.some(function (m) { return m.Id === payMethodId; })) { payMethodId = payMethods[0].Id; }
+            var h = {
                 docTypeId: defaults.DocTypeTargetId,
+                docStatus: 'DR',
                 dateOrdered: defaults.DateOrdered,
-                poReference: defaults.POReference || '',
+                poReference: (defaults.POReference || '').substring(0, 20),
                 datePromised: defaults.DatePromised,
                 priorityRule: defaults.PriorityRule || '',
+                bpartnerId: defaults.BusinessPartnerId,
+                bpartnerName: defaults.BusinessPartnerName || '',
                 locationId: defaults.LocationId,
                 contactId: defaults.ContactId,
+                salesRepId: defaults.SalesRepId || 0,
                 paymentTermId: defaults.PaymentTermId,
-                paymentMethodId: 0,
+                // QA 8.57: never blank - quotation's / customer's method, else the first one.
+                paymentMethodId: payMethodId,
                 warehouseId: wizard.orderWarehouseId || defaults.WarehouseId,
                 deliveryRule: defaults.DeliveryRule || '',
                 deliveryViaRule: defaults.DeliveryViaRule || '',
                 priceListId: defaults.PriceListId,
                 currencyId: defaults.CurrencyId,
                 conversionTypeId: defaults.ConversionTypeId,
-                incoTermId: defaults.IncoTermId,
-                description: defaults.Description || ''
+                // QA 8.61: Incoterm is blank by default.
+                incoTermId: 0,
+                description: (defaults.Description || '').substring(0, 255)
             };
+            if (h.dateOrdered && h.datePromised && h.datePromised < h.dateOrdered) { h.datePromised = h.dateOrdered; }
+            syncCurrencyFromPriceList(h);
+            return h;
+        }
+
+        /* QA 8.59: Currency is read-only and always the selected price list's currency. */
+        function syncCurrencyFromPriceList(h) {
+            var pl = ((wizard.formOptions && wizard.formOptions.PriceLists) || []).filter(function (p) { return p.Id === h.priceListId; })[0];
+            if (pl && pl.CurrencyId) { h.currencyId = pl.CurrencyId; }
         }
 
         function buildStep3Cfg() {
@@ -1027,110 +1160,254 @@
             selected.forEach(function (l) {
                 orderQty += Number(l.qtyToOrder) || 0;
                 orderValue += (Number(l.qtyToOrder) || 0) * (Number(l.rate) || 0);
-                if (l.isStocked && (Number(l.freeStock) || 0) < (Number(l.qtyToOrder) || 0)) { shortCount++; }
+                if (isShort(l)) { shortCount++; }
             });
             var stockCover = shortCount > 0
                 ? (shortCount + ' ' + label('VAS_289_LinesShortSuffix', 'line' + (shortCount > 1 ? 's' : '') + ' short of stock'))
                 : label('VAS_289_AllLinesCovered', 'All lines covered');
 
+            // QA 8.46: Customer / Segment / Lines summary cards removed from the pop-up.
             return '<div class="vas289-mstats">' +
                 statTile(label('VAS_289_StatQuotation', 'Quotation'), wizard.quotation.DocumentNo) +
-                statTile(label('VAS_289_StatBusinessPartner', 'Customer'), wizard.quotation.BusinessPartner) +
-                statTile(label('VAS_289_StatBPGroup', 'Segment'), wizard.quotation.BusinessPartnerGroup || '—') +
-                statTile(label('VAS_289_StatLines', 'Lines'), String(selected.length)) +
                 statTile(label('VAS_289_StatOrderQty', 'Order qty'), formatNumDisplay(orderQty)) +
                 statTile(label('VAS_289_StatOrderValue', 'Order value'), formatINR(orderValue)) +
                 statTile(label('VAS_289_StatStockCover', 'Stock cover'), stockCover) +
             '</div>';
         }
 
-        function selectHtml(cssClass, name, options, valueKey, labelKey, selectedValue, placeholder) {
+        /* placeholder: undefined/null = no blank option; a string (also '') = a blank first option.
+           blankIfUnset: add the blank option only while the current value is not in the list, so
+           a mandatory field is never shown silently pre-picked with a value it does not hold. */
+        function selectHtml(cssClass, name, options, valueKey, labelKey, selectedValue, placeholder, blankIfUnset) {
+            var found = false;
             var opts = (options || []).map(function (o) {
                 var val = o[valueKey];
-                var sel = String(val) === String(selectedValue) ? ' selected' : '';
-                return '<option value="' + escapeHtml(val) + '"' + sel + '>' + escapeHtml(o[labelKey]) + '</option>';
+                var isSel = String(val) === String(selectedValue);
+                if (isSel) { found = true; }
+                return '<option value="' + escapeHtml(val) + '"' + (isSel ? ' selected' : '') + '>' + escapeHtml(o[labelKey]) + '</option>';
             }).join('');
+            var blank = (placeholder !== undefined && placeholder !== null) || (blankIfUnset && !found);
             return '<select class="vas289-fctl ' + cssClass + '" data-field="' + name + '">' +
-                (placeholder ? '<option value="">' + escapeHtml(placeholder) + '</option>' : '') + opts + '</select>';
+                (blank ? '<option value=""' + (found ? '' : ' selected') + '>' + escapeHtml(placeholder || '') + '</option>' : '') + opts + '</select>';
         }
 
-        function fieldBlock(labelText, controlHtml, required) {
-            return '<div class="vas289-field"><label>' + escapeHtml(labelText) + (required ? ' <span class="vas289-req">*</span>' : '') + '</label>' + controlHtml + '</div>';
+        function fieldBlock(labelText, controlHtml, required, fieldName) {
+            return '<div class="vas289-field"' + (fieldName ? ' data-field-wrap="' + fieldName + '"' : '') + '><label>' + escapeHtml(labelText) + (required ? ' <span class="vas289-req">*</span>' : '') + '</label>' + controlHtml + '</div>';
+        }
+
+        var NUMERIC_FIELDS = ['docTypeId', 'locationId', 'contactId', 'salesRepId', 'paymentTermId', 'paymentMethodId', 'warehouseId', 'priceListId', 'currencyId', 'conversionTypeId', 'incoTermId'];
+
+        function currencyCode(currencyId) {
+            var c = ((wizard.formOptions && wizard.formOptions.Currencies) || []).filter(function (x) { return x.Id === currencyId; })[0];
+            return c ? c.Code : '';
+        }
+
+        function datePromisedError() {
+            return label('VAS_289_DatePromisedBeforeOrdered', 'Error: Date Promised should be greater than or equal to Date Ordered');
         }
 
         function renderStep3() {
             var d = wizard.formDefaults, o = wizard.formOptions, h = wizard.header;
-            var currencyOptsHtml = (o.Currencies || []).map(function (c) {
-                return '<option value="' + c.Id + '"' + (c.Id === h.currencyId ? ' selected' : '') + '>' + escapeHtml(c.Code) + '</option>';
-            }).join('');
 
+            // QA 8.53: Sales Rep is an editable dropdown of sales representatives; the quotation's
+            // own rep stays selectable even when it is no longer in that list.
+            var salesReps = (o.SalesReps || []).slice();
+            if (h.salesRepId > 0 && h.salesRepId === d.SalesRepId && d.SalesRepName && !salesReps.some(function (r) { return r.Id === h.salesRepId; })) {
+                salesReps.unshift({ Id: d.SalesRepId, Name: d.SalesRepName });
+            }
+
+            // QA 8.64: mandatory fields carry the "*" marker and are validated before continuing.
+            // QA 8.45: tighter form spacing (CSS). QA 8.46: Customer/Segment/Lines cards removed.
             var body =
                 step3Stats() +
                 '<div class="vas289-formsec">' + escapeHtml(label('VAS_289_GroupDocument', 'Document')) + '</div>' +
                 '<div class="vas289-form-grid">' +
-                    fieldBlock(label('VAS_289_FieldDocType', 'Target Document Type'), selectHtml('', 'docTypeId', o.DocTypes, 'Id', 'Name', h.docTypeId), true) +
-                    fieldBlock(label('VAS_289_FieldPOReference', 'Order Reference'), '<input type="text" class="vas289-fctl" data-field="poReference" value="' + escapeHtml(h.poReference) + '">') +
-                    fieldBlock(label('VAS_289_FieldDateOrdered', 'SO Date'), '<input type="date" max="9999-12-31" class="vas289-fctl" data-field="dateOrdered" value="' + escapeHtml(h.dateOrdered) + '">', true) +
-                    fieldBlock(label('VAS_289_FieldDatePromised', 'Date Promised'), '<input type="date" max="9999-12-31" class="vas289-fctl" data-field="datePromised" value="' + escapeHtml(h.datePromised) + '">', true) +
-                    fieldBlock(label('VAS_289_FieldPriority', 'Priority'), selectHtml('', 'priorityRule', o.PriorityRules, 'Code', 'Name', h.priorityRule)) +
+                    fieldBlock(label('VAS_289_FieldDocType', 'Target Document Type'), selectHtml('', 'docTypeId', o.DocTypes, 'Id', 'Name', h.docTypeId, null, true), true, 'docTypeId') +
+                    fieldBlock(label('VAS_289_FieldDocStatus', 'Document Status'), selectHtml('', 'docStatus', o.DocStatuses, 'Code', 'Name', h.docStatus), false, 'docStatus') +
+                    fieldBlock(label('VAS_289_FieldPOReference', 'Order Reference'), '<input type="text" maxlength="20" class="vas289-fctl" data-field="poReference" value="' + escapeHtml(h.poReference) + '">') +
+                    fieldBlock(label('VAS_289_DateOrdered', 'Date Ordered'), '<input type="date" max="9999-12-31" class="vas289-fctl" data-field="dateOrdered" value="' + escapeHtml(h.dateOrdered) + '">', true, 'dateOrdered') +
+                    fieldBlock(label('VAS_289_FieldDatePromised', 'Date Promised'), '<input type="date" max="9999-12-31" class="vas289-fctl" data-field="datePromised" value="' + escapeHtml(h.datePromised) + '">', true, 'datePromised') +
+                    fieldBlock(label('VAS_289_FieldPriority', 'Priority'), selectHtml('', 'priorityRule', o.PriorityRules, 'Code', 'Name', h.priorityRule, null, true), true, 'priorityRule') +
                 '</div>' +
                 '<div class="vas289-formsec">' + escapeHtml(label('VAS_289_GroupBPartner', 'Customer And Payment')) + '</div>' +
                 '<div class="vas289-form-grid">' +
-                    fieldBlock(label('VAS_289_FieldBusinessPartner', 'Customer'), '<div class="vas289-fctl vas289-readonly" title="' + escapeHtml(d.BusinessPartnerName) + '">' + escapeHtml(d.BusinessPartnerName) + '</div>', true) +
-                    fieldBlock(label('VAS_289_FieldLocation', 'Ship-to Location'), selectHtml('', 'locationId', o.Locations, 'Id', 'Name', h.locationId), true) +
-                    fieldBlock(label('VAS_289_FieldContact', 'Customer Contact'), selectHtml('', 'contactId', o.Contacts, 'Id', 'Name', h.contactId, '—')) +
-                    fieldBlock(label('VAS_289_FieldSalesRep', 'Sales Rep'), '<div class="vas289-fctl vas289-readonly">' + escapeHtml(d.SalesRepName || '—') + '</div>') +
-                    fieldBlock(label('VAS_289_FieldPaymentTerm', 'Payment Term'), selectHtml('', 'paymentTermId', o.PaymentTerms, 'Id', 'Name', h.paymentTermId), true) +
-                    (o.PaymentMethods && o.PaymentMethods.length ? fieldBlock(label('VAS_289_FieldPaymentMethod', 'Payment Method'), selectHtml('', 'paymentMethodId', o.PaymentMethods, 'Id', 'Name', h.paymentMethodId, '—')) : '') +
+                    fieldBlock(label('VAS_289_FieldBusinessPartner', 'Customer'),
+                        '<input type="text" class="vas289-fctl" data-cust-input list="vas289-cust-list" autocomplete="off" placeholder="' + escapeHtml(label('VAS_289_SearchCustomer', 'Search customer')) + '" title="' + escapeHtml(h.bpartnerName) + '" value="' + escapeHtml(h.bpartnerName) + '">' +
+                        '<datalist id="vas289-cust-list"></datalist>', true, 'bpartnerId') +
+                    fieldBlock(label('VAS_289_Location', 'Location'), selectHtml('', 'locationId', o.Locations, 'Id', 'Name', h.locationId, null, true), true, 'locationId') +
+                    fieldBlock(label('VAS_289_FieldContact', 'Customer Contact'), selectHtml('', 'contactId', o.Contacts, 'Id', 'Name', h.contactId, '')) +
+                    fieldBlock(label('VAS_289_FieldSalesRep', 'Sales Rep'), selectHtml('', 'salesRepId', salesReps, 'Id', 'Name', h.salesRepId, null, true), true, 'salesRepId') +
+                    fieldBlock(label('VAS_289_FieldPaymentTerm', 'Payment Term'), selectHtml('', 'paymentTermId', o.PaymentTerms, 'Id', 'Name', h.paymentTermId, null, true), true, 'paymentTermId') +
+                    (o.PaymentMethods && o.PaymentMethods.length ? fieldBlock(label('VAS_289_FieldPaymentMethod', 'Payment Method'), selectHtml('', 'paymentMethodId', o.PaymentMethods, 'Id', 'Name', h.paymentMethodId), true, 'paymentMethodId') : '') +
                 '</div>' +
                 '<div class="vas289-formsec">' + escapeHtml(label('VAS_289_GroupShipping', 'Delivery And Pricing')) + '</div>' +
                 '<div class="vas289-form-grid">' +
-                    fieldBlock(label('VAS_289_FieldWarehouse', 'Warehouse'), selectHtml('', 'warehouseId', o.Warehouses, 'Id', 'Name', h.warehouseId), true) +
-                    fieldBlock(label('VAS_289_FieldShippingRule', 'Shipping Rule'), selectHtml('', 'deliveryRule', o.DeliveryRules, 'Code', 'Name', h.deliveryRule)) +
-                    fieldBlock(label('VAS_289_FieldShippingMethod', 'Shipping Method'), selectHtml('', 'deliveryViaRule', o.DeliveryViaRules, 'Code', 'Name', h.deliveryViaRule)) +
-                    fieldBlock(label('VAS_289_FieldPriceList', 'Price List'), selectHtml('', 'priceListId', o.PriceLists, 'Id', 'Name', h.priceListId)) +
-                    fieldBlock(label('VAS_289_FieldCurrency', 'Currency'), '<select class="vas289-fctl" data-field="currencyId">' + currencyOptsHtml + '</select>') +
+                    fieldBlock(label('VAS_289_FieldWarehouse', 'Warehouse'), selectHtml('', 'warehouseId', o.Warehouses, 'Id', 'Name', h.warehouseId, null, true), true, 'warehouseId') +
+                    fieldBlock(label('VAS_289_FieldShippingRule', 'Shipping Rule'), selectHtml('', 'deliveryRule', o.DeliveryRules, 'Code', 'Name', h.deliveryRule, null, true), true, 'deliveryRule') +
+                    fieldBlock(label('VAS_289_FieldShippingMethod', 'Shipping Method'), selectHtml('', 'deliveryViaRule', o.DeliveryViaRules, 'Code', 'Name', h.deliveryViaRule, null, true), true, 'deliveryViaRule') +
+                    fieldBlock(label('VAS_289_FieldPriceList', 'Price List'), selectHtml('', 'priceListId', o.PriceLists, 'Id', 'Name', h.priceListId, null, true), true, 'priceListId') +
+                    fieldBlock(label('VAS_289_FieldCurrency', 'Currency'), '<div class="vas289-fctl vas289-readonly" data-currency-display>' + escapeHtml(currencyCode(h.currencyId)) + '&nbsp;</div>', true, 'currencyId') +
                     fieldBlock(label('VAS_289_FieldRateType', 'Currency Rate Type'), selectHtml('', 'conversionTypeId', o.ConversionTypes, 'Id', 'Name', h.conversionTypeId)) +
-                    fieldBlock(label('VAS_289_FieldIncoTerm', 'Inco Term'), selectHtml('', 'incoTermId', o.IncoTerms, 'Id', 'Name', h.incoTermId, '—')) +
+                    fieldBlock(label('VAS_289_FieldIncoTerm', 'Inco Term'), selectHtml('', 'incoTermId', o.IncoTerms, 'Id', 'Name', h.incoTermId, '')) +
                 '</div>' +
                 '<div class="vas289-formsec">' + escapeHtml(label('VAS_289_GroupDescription', 'Description')) + '</div>' +
                 '<div class="vas289-form-grid">' +
-                    '<div class="vas289-field vas289-field-span-all"><label>' + escapeHtml(label('VAS_289_FieldDescription', 'Description')) + '</label><input type="text" class="vas289-fctl" data-field="description" value="' + escapeHtml(h.description) + '"></div>' +
+                    '<div class="vas289-field vas289-field-span-all"><label>' + escapeHtml(label('VAS_289_FieldDescription', 'Description')) + '</label><input type="text" maxlength="255" class="vas289-fctl" data-field="description" value="' + escapeHtml(h.description) + '"></div>' +
                 '</div>';
 
             $mBody.addClass('vas289-scrollable').html(body);
             $mBody.find('[data-field]').on('change', function () {
                 var $f = $(this);
                 var name = $f.attr('data-field');
-                h[name] = $f.val();
-                if (name === 'docTypeId') { h.docTypeId = Number($f.val()) || 0; }
-                if (name === 'locationId') { h.locationId = Number($f.val()) || 0; }
-                if (name === 'contactId') { h.contactId = Number($f.val()) || 0; }
-                if (name === 'paymentTermId') { h.paymentTermId = Number($f.val()) || 0; }
-                if (name === 'paymentMethodId') { h.paymentMethodId = Number($f.val()) || 0; }
-                if (name === 'warehouseId') { h.warehouseId = Number($f.val()) || 0; }
-                if (name === 'priceListId') { h.priceListId = Number($f.val()) || 0; }
-                if (name === 'currencyId') { h.currencyId = Number($f.val()) || 0; }
-                if (name === 'conversionTypeId') { h.conversionTypeId = Number($f.val()) || 0; }
-                if (name === 'incoTermId') { h.incoTermId = Number($f.val()) || 0; }
+                var prev = h[name];
+                h[name] = NUMERIC_FIELDS.indexOf(name) >= 0 ? (Number($f.val()) || 0) : $f.val();
+                $f.closest('.vas289-field').removeClass('vas289-invalid');
+
+                // QA 8.49: Date Promised may not be before Date Ordered.
+                if ((name === 'dateOrdered' || name === 'datePromised') && h.dateOrdered && h.datePromised && h.datePromised < h.dateOrdered) {
+                    infoMsg(datePromisedError());
+                    h[name] = prev;
+                    $f.val(prev || '');
+                    return;
+                }
+                if (name === 'priceListId') {
+                    syncCurrencyFromPriceList(h);
+                    $mBody.find('[data-currency-display]').html(escapeHtml(currencyCode(h.currencyId)) + '&nbsp;');
+                }
             });
+            wireCustomerSearch();
 
             renderStep3Footer();
         }
 
-        function step3Valid() {
+        /* QA 8.54: customer search (as-you-type list from the customers the Sales Order window
+           offers); choosing a customer reloads its locations/contacts and auto-fills Price List,
+           Payment Term, Payment Method and Sales Rep from the customer's configuration. */
+        function wireCustomerSearch() {
+            var $inp = $mBody.find('[data-cust-input]');
+            var $list = $mBody.find('#vas289-cust-list');
+            var results = [];
+            var timer = null, seq = 0;
+
+            function optionLabel(c) { return c.Name + (c.Code ? ' (' + c.Code + ')' : ''); }
+
+            $inp.on('input', function () {
+                clearTimeout(timer);
+                var text = String($inp.val() || '').trim();
+                if (text.length < 2) { return; }
+                timer = setTimeout(function () {
+                    var mySeq = ++seq;
+                    VASSONet.ajax({
+                        url: VIS.Application.contextUrl + SELF_ENDPOINT + 'SearchCustomers',
+                        type: 'GET', dataType: 'json', cache: false,
+                        data: { searchText: text },
+                        success: function (res) {
+                            if (mySeq !== seq) { return; }
+                            var parsed = parseResponse(res);
+                            results = $.isArray(parsed) ? parsed : [];
+                            $list.html(results.map(function (c) { return '<option value="' + escapeHtml(optionLabel(c)) + '"></option>'; }).join(''));
+                        }
+                    });
+                }, 300);
+            });
+
+            $inp.on('change', function () {
+                var h = wizard.header;
+                var text = String($inp.val() || '').trim();
+                var match = results.filter(function (c) { return optionLabel(c) === text; })[0] ||
+                    (results.filter(function (c) { return c.Name === text; }).length === 1 ? results.filter(function (c) { return c.Name === text; })[0] : null);
+                if (!match) { $inp.val(h.bpartnerName); return; }
+                $inp.closest('.vas289-field').removeClass('vas289-invalid');
+                if (match.Id === h.bpartnerId) { $inp.val(h.bpartnerName); return; }
+                applyCustomer(match);
+            });
+        }
+
+        function applyCustomer(customer) {
+            var h = wizard.header, o = wizard.formOptions;
+            h.bpartnerId = customer.Id;
+            h.bpartnerName = customer.Name;
+            VASSONet.ajax({
+                url: VIS.Application.contextUrl + SELF_ENDPOINT + 'GetBPartnerOptions',
+                type: 'GET', dataType: 'json', cache: false,
+                data: { bpartnerId: customer.Id },
+                success: function (res) {
+                    if (!wizard || wizard.header !== h) { return; }
+                    var p = parseResponse(res);
+                    var inList = function (list, id) { return (list || []).some(function (x) { return x.Id === id; }); };
+                    o.Locations = p.Locations || [];
+                    o.Contacts = p.Contacts || [];
+                    h.locationId = o.Locations.length ? o.Locations[0].Id : 0;
+                    h.contactId = 0;
+                    if (p.PriceListId > 0 && inList(o.PriceLists, p.PriceListId)) { h.priceListId = p.PriceListId; syncCurrencyFromPriceList(h); }
+                    if (p.PaymentTermId > 0 && inList(o.PaymentTerms, p.PaymentTermId)) { h.paymentTermId = p.PaymentTermId; }
+                    if (p.PaymentMethodId > 0 && inList(o.PaymentMethods, p.PaymentMethodId)) { h.paymentMethodId = p.PaymentMethodId; }
+                    if (p.SalesRepId > 0 && inList(o.SalesReps, p.SalesRepId)) { h.salesRepId = p.SalesRepId; }
+                    if (currentCfg && currentCfg.step === 3) {
+                        var scrollTop = $mBody.scrollTop();
+                        renderStep3();
+                        $mBody.scrollTop(scrollTop);
+                    }
+                },
+                error: function () { showLoadError(); }
+            });
+        }
+
+        /* QA 8.64: names of the mandatory fields that are still empty. */
+        function step3MissingFields() {
+            var h = wizard.header, o = wizard.formOptions || {};
+            var checks = [
+                ['docTypeId', h.docTypeId > 0, label('VAS_289_FieldDocType', 'Target Document Type')],
+                ['dateOrdered', !!h.dateOrdered, label('VAS_289_DateOrdered', 'Date Ordered')],
+                ['datePromised', !!h.datePromised, label('VAS_289_FieldDatePromised', 'Date Promised')],
+                ['priorityRule', !!h.priorityRule, label('VAS_289_FieldPriority', 'Priority')],
+                ['bpartnerId', h.bpartnerId > 0, label('VAS_289_FieldBusinessPartner', 'Customer')],
+                ['locationId', h.locationId > 0, label('VAS_289_Location', 'Location')],
+                ['salesRepId', h.salesRepId > 0, label('VAS_289_FieldSalesRep', 'Sales Rep')],
+                ['paymentTermId', h.paymentTermId > 0, label('VAS_289_FieldPaymentTerm', 'Payment Term')],
+                ['paymentMethodId', !(o.PaymentMethods && o.PaymentMethods.length) || h.paymentMethodId > 0, label('VAS_289_FieldPaymentMethod', 'Payment Method')],
+                ['warehouseId', h.warehouseId > 0, label('VAS_289_FieldWarehouse', 'Warehouse')],
+                ['deliveryRule', !!h.deliveryRule, label('VAS_289_FieldShippingRule', 'Shipping Rule')],
+                ['deliveryViaRule', !!h.deliveryViaRule, label('VAS_289_FieldShippingMethod', 'Shipping Method')],
+                ['priceListId', h.priceListId > 0, label('VAS_289_FieldPriceList', 'Price List')],
+                ['currencyId', h.currencyId > 0, label('VAS_289_FieldCurrency', 'Currency')]
+            ];
+            return checks.filter(function (c) { return !c[1]; });
+        }
+
+        function validateStep3() {
+            var missing = step3MissingFields();
+            $mBody.find('.vas289-invalid').removeClass('vas289-invalid');
+            if (missing.length) {
+                missing.forEach(function (m) { $mBody.find('[data-field-wrap="' + m[0] + '"]').addClass('vas289-invalid'); });
+                infoMsg(label('VAS_289_FillMandatory', 'Please fill the mandatory fields:') + ' ' + missing.map(function (m) { return m[2]; }).join(', '));
+                return false;
+            }
             var h = wizard.header;
-            return !!(h.docTypeId > 0 && h.dateOrdered && h.datePromised && h.locationId > 0 && h.paymentTermId > 0 && h.warehouseId > 0);
+            if (h.datePromised < h.dateOrdered) {
+                $mBody.find('[data-field-wrap="datePromised"]').addClass('vas289-invalid');
+                infoMsg(datePromisedError());
+                return false;
+            }
+            return true;
         }
 
         function renderStep3Footer() {
-            var valid = step3Valid();
             $mFoot.html('<span class="vas289-foot-note"></span>' +
                 '<span><button type="button" class="vas289-btn" id="vas289-step3-back">' + escapeHtml(label('VAS_289_Back', 'Back')) + '</button> ' +
-                '<button type="button" class="vas289-btn vas289-btn-primary" id="vas289-step3-continue"' + (valid ? '' : ' disabled') + '>' + escapeHtml(label('VAS_289_ContinueToLines', 'Continue to lines')) + '</button></span>');
+                '<button type="button" class="vas289-btn vas289-btn-primary" id="vas289-step3-continue">' + escapeHtml(label('VAS_289_ContinueToLines', 'Continue to lines')) + '</button></span>');
             $mFoot.find('#vas289-step3-back').on('click', backModal);
             $mFoot.find('#vas289-step3-continue').on('click', function () {
-                if (!step3Valid()) { return; }
+                if (!validateStep3()) { return; }
+                // QA 8.67: lines take exactly the Date Promised chosen here unless edited on the lines step
+                // (or no longer valid against a changed Date Ordered).
+                var h = wizard.header;
+                wizard.selectedLines().forEach(function (l) {
+                    if (!l.datePromisedEdited || !l.datePromised || l.datePromised < h.dateOrdered) {
+                        l.datePromised = h.datePromised;
+                        l.datePromisedEdited = false;
+                    }
+                });
                 showScreen(buildStep4Cfg(), true);
             });
         }
@@ -1145,22 +1422,23 @@
                 title: label('VAS_289_Step4Title', 'New Sales Order · Lines'),
                 subtitle: label('VAS_289_Page2Of2', 'Page 2 of 2') + ' · ' + wizard.quotation.BusinessPartner + ' · ' + n + ' ' + label('VAS_289_LineWordSuffix', n === 1 ? 'line' : 'lines'),
                 size: 'md',
+                fixedHeight: true,
                 render: renderStep4
             };
         }
 
         function renderStep4() {
-            var selected = wizard.selectedLines();
-            var wh = (wizard.formOptionsWarehouses.filter(function (w) { return w.Id === wizard.header.warehouseId; })[0] || {}).Name || '';
+            var wh = ((wizard.formOptions && wizard.formOptions.Warehouses) || []).filter(function (w) { return w.Id === wizard.header.warehouseId; })[0];
+            wh = (wh || {}).Name || '';
 
+            // QA 8.46: no Lines summary card.
             var statsHtml = '<div class="vas289-mstats">' +
-                statTile(label('VAS_289_ColLines', 'Lines'), String(selected.length)) +
                 statTile(label('VAS_289_FieldWarehouse', 'Warehouse'), wh) +
                 statTile(label('VAS_289_FieldDatePromised', 'Date Promised'), formatDateFull(wizard.header.datePromised)) +
                 statTile(label('VAS_289_StatQuotation', 'Quotation'), wizard.quotation.DocumentNo) +
             '</div>';
 
-            lineReviewState = lineReviewState || { size: MODAL_MAX_ROWS };
+            lineReviewState = lineReviewState || { size: MODAL_INITIAL_ROWS };
             $mBody.html(statsHtml + '<div class="vas289-mtwrap"><div class="vas289-mtbl" id="vas289-linerev-tbl"></div></div>' + '<div class="vas289-totline" id="vas289-totline"></div>');
             drawLineReviewTable();
             renderTotals();
@@ -1174,7 +1452,7 @@
             { key: 'rate', label: label('VAS_289_ColRate', 'Rate'), w: .8, align: 'right' },
             { key: 'tax', label: label('VAS_289_ColTax', 'Tax'), w: 1 },
             { key: 'promised', label: label('VAS_289_FieldDatePromised', 'Date Promised'), w: 1 },
-            { key: 'stock', label: label('VAS_289_ColFreeStock', 'Free stock'), w: .8, align: 'right' },
+            { key: 'stock', label: label('VAS_289_ColStockQtyBaseUom', 'Stock Qty (In Base UOM)'), w: .95, align: 'right' },
             { key: 'desc', label: '', w: .4 }
         ];
 
@@ -1197,21 +1475,26 @@
 
             var body = slice.map(function (line) {
                 var idx = wizard.lines.indexOf(line);
-                var stockCell = line.isStocked ? cellHtml(formatNumDisplay(line.freeStock || 0), (line.freeStock || 0) < line.qtyToOrder ? 'vas289-c-short' : 'vas289-c-ok', 'right') : cellHtml('—', 'vas289-c-std', 'right');
-                var taxOptions = taxes.map(function (t) { return '<option value="' + t.Id + '"' + (t.Id === line.taxId ? ' selected' : '') + '>' + escapeHtml(t.Name) + '</option>'; }).join('');
+                var stockCell = line.isStocked ? cellHtml(formatNumDisplay(line.freeStock || 0), isShort(line) ? 'vas289-c-short' : 'vas289-c-ok', 'right') : cellHtml('', 'vas289-c-std', 'right');
+                // QA 8.66: the SO tax list; a quotation tax outside it stays blank until chosen.
+                var taxKnown = taxes.some(function (t) { return t.Id === line.taxId; });
+                var taxOptions = (taxKnown ? '' : '<option value="" selected></option>') +
+                    taxes.map(function (t) { return '<option value="' + t.Id + '"' + (t.Id === line.taxId ? ' selected' : '') + '>' + escapeHtml(t.Name) + '</option>'; }).join('');
+                // QA 8.69: Description / Print Description max 255 characters.
                 var descRow = wizard.descOpen[idx] ? (
                     '<div class="vas289-linedesc" style="grid-column:1/-1">' +
-                        '<div class="vas289-field"><label>' + escapeHtml(label('VAS_289_GroupDescription', 'Description')) + '</label><input type="text" class="vas289-fctl vas289-line-desc" data-line-idx="' + idx + '" value="' + escapeHtml(line.description) + '"></div>' +
-                        '<div class="vas289-field"><label>' + escapeHtml(label('VAS_289_FieldPrintDescription', 'Print Description')) + '</label><input type="text" class="vas289-fctl vas289-line-printdesc" data-line-idx="' + idx + '" value="' + escapeHtml(line.printDescription) + '"></div>' +
+                        '<div class="vas289-field"><label>' + escapeHtml(label('VAS_289_GroupDescription', 'Description')) + '</label><input type="text" maxlength="255" class="vas289-fctl vas289-line-desc" data-line-idx="' + idx + '" value="' + escapeHtml(line.description) + '"></div>' +
+                        '<div class="vas289-field"><label>' + escapeHtml(label('VAS_289_FieldPrintDescription', 'Print Description')) + '</label><input type="text" maxlength="255" class="vas289-fctl vas289-line-printdesc" data-line-idx="' + idx + '" value="' + escapeHtml(line.printDescription) + '"></div>' +
                     '</div>'
                 ) : '';
                 return '<div class="vas289-mrow" style="grid-template-columns:' + tpl + '">' +
                     cellHtml(line.productName + (line.attributeText ? ' · ' + line.attributeText : ''), 'vas289-c-prim') +
                     cellHtml(line.uomName, 'vas289-c-std') +
-                    cellHtml(formatNumDisplay(line.qtyToOrder), 'vas289-c-dark', 'right') +
-                    cellHtml(formatINR(line.rate), 'vas289-c-std', 'right') +
+                    cellHtml(formatQty(line.qtyToOrder, line.precision), 'vas289-c-dark', 'right') +
+                    // QA 8.65/8.75: editable rate, two decimals.
+                    '<span class="vas289-cell"><input type="number" min="0" step="0.01" class="vas289-qty-input vas289-line-rate" data-line-idx="' + idx + '" value="' + formatRate(line.rate) + '"></span>' +
                     '<span class="vas289-cell"><select class="vas289-fctl vas289-line-tax" data-line-idx="' + idx + '">' + taxOptions + '</select></span>' +
-                    '<span class="vas289-cell"><input type="date" max="9999-12-31" class="vas289-fctl vas289-line-promised" data-line-idx="' + idx + '" value="' + escapeHtml(line.datePromised || wizard.header.datePromised) + '"></span>' +
+                    '<span class="vas289-cell"><input type="date" max="9999-12-31" min="' + escapeHtml(wizard.header.dateOrdered || '') + '" class="vas289-fctl vas289-line-promised" data-line-idx="' + idx + '" value="' + escapeHtml(line.datePromised || wizard.header.datePromised) + '"></span>' +
                     stockCell +
                     '<span class="vas289-cell center"><button type="button" class="vas289-iconbtn vas289-line-desc-toggle" data-line-idx="' + idx + '" title="' + escapeHtml(label('VAS_289_FieldDescription', 'Description')) + '">' + icon('desc') + '</button></span>' +
                 '</div>' + descRow;
@@ -1238,9 +1521,28 @@
                     renderTotals();
                 });
             });
+            el.querySelectorAll('.vas289-line-rate').forEach(function (inp) {
+                inp.addEventListener('keydown', function (event) {
+                    if (event.key === '-' || event.key === 'e' || event.key === 'E') { event.preventDefault(); }
+                });
+                inp.addEventListener('change', function () {
+                    var line = wizard.lines[Number(inp.getAttribute('data-line-idx'))];
+                    line.rate = Math.max(0, roundTo(Number(inp.value) || 0, 2));
+                    inp.value = formatRate(line.rate);
+                    renderTotals();
+                });
+            });
             el.querySelectorAll('.vas289-line-promised').forEach(function (inp) {
                 inp.addEventListener('change', function () {
-                    wizard.lines[Number(inp.getAttribute('data-line-idx'))].datePromised = inp.value;
+                    var line = wizard.lines[Number(inp.getAttribute('data-line-idx'))];
+                    // QA 8.68: same rule as the Details step - never before Date Ordered.
+                    if (inp.value && wizard.header.dateOrdered && inp.value < wizard.header.dateOrdered) {
+                        infoMsg(datePromisedError());
+                        inp.value = line.datePromised || wizard.header.datePromised;
+                        return;
+                    }
+                    line.datePromised = inp.value;
+                    line.datePromisedEdited = true;
                 });
             });
             el.querySelectorAll('.vas289-line-desc-toggle').forEach(function (btn) {
@@ -1270,18 +1572,25 @@
             var selected = wizard.selectedLines();
             var subtotal = 0, tax = 0;
             selected.forEach(function (l) {
-                var lineNet = l.qtyToOrder * l.rate;
+                var lineNet = roundTo(l.qtyToOrder * l.rate, 2);
                 subtotal += lineNet;
+                // QA 8.70: total tax of the order = sum of line net x the line tax's rate. Display
+                // estimate only - the document model stays authoritative for the persisted amounts.
                 var t = taxes.filter(function (x) { return x.Id === l.taxId; })[0];
-                // Tax rate is not carried on the OptionItem shape - display-only estimate
-                // recalculated client-side for responsiveness; the backend/document model
-                // remains authoritative for the final persisted amounts.
+                if (t) { tax += roundTo(lineNet * (Number(t.Rate) || 0) / 100, 2); }
             });
             var $t = document.getElementById('vas289-totline');
             if (!$t) { return; }
             $t.innerHTML =
-                '<span>' + escapeHtml(label('VAS_289_TotalsSubtotal', 'Subtotal')) + '</span><b>' + escapeHtml(formatINR(subtotal)) + '</b>' +
-                '<span>' + escapeHtml(label('VAS_289_TotalsOrderTotal', 'Order total')) + '</span><b>' + escapeHtml(formatINR(subtotal + tax)) + '</b>';
+                '<span>' + escapeHtml(label('VAS_289_TotalsSubtotal', 'Subtotal')) + '</span><b>' + escapeHtml(formatAmount(subtotal)) + '</b>' +
+                '<span>' + escapeHtml(label('VAS_289_TotalsTax', 'Tax')) + '</span><b>' + escapeHtml(formatAmount(tax)) + '</b>' +
+                '<span>' + escapeHtml(label('VAS_289_TotalsOrderTotal', 'Order total')) + '</span><b>' + escapeHtml(formatAmount(subtotal + tax)) + '</b>';
+        }
+
+        function formatAmount(value) {
+            var code = currencyCode(wizard.header.currencyId);
+            var text = (Number(value) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            return code ? code + ' ' + text : text;
         }
 
         function renderStep4Footer() {
@@ -1297,16 +1606,20 @@
          * ============================================================ */
         function submitCreate() {
             var $btn = $mFoot.find('#vas289-step4-create');
-            $btn.prop('disabled', true);
-
             var selected = wizard.selectedLines();
+
+            // QA 8.68: every line's Date Promised must be on/after Date Ordered.
+            var badDate = selected.some(function (l) { return l.datePromised && l.datePromised < wizard.header.dateOrdered; });
+            if (badDate || wizard.header.datePromised < wizard.header.dateOrdered) { infoMsg(datePromisedError()); return; }
+
+            $btn.prop('disabled', true);
             var payload = {
                 QuotationId: wizard.quotationId,
-                BusinessPartnerId: wizard.formDefaults.BusinessPartnerId,
-                BusinessPartnerName: wizard.formDefaults.BusinessPartnerName,
+                BusinessPartnerId: wizard.header.bpartnerId,
+                BusinessPartnerName: wizard.header.bpartnerName,
                 LocationId: wizard.header.locationId,
                 ContactId: wizard.header.contactId,
-                SalesRepId: wizard.formDefaults.SalesRepId,
+                SalesRepId: wizard.header.salesRepId,
                 WarehouseId: wizard.header.warehouseId,
                 PriorityRule: wizard.header.priorityRule,
                 DatePromised: wizard.header.datePromised,
@@ -1322,8 +1635,17 @@
                 Description: wizard.header.description,
                 DocTypeId: wizard.header.docTypeId,
                 DateOrdered: wizard.header.dateOrdered,
+                DocStatus: wizard.header.docStatus || 'DR',
                 Lines: selected.map(function (l) {
-                    return { QuotationLineId: l.lineId, Qty: l.qtyToOrder, TaxId: l.taxId, DatePromised: l.datePromised || wizard.header.datePromised };
+                    return {
+                        QuotationLineId: l.lineId,
+                        Qty: roundTo(l.qtyToOrder, l.precision),
+                        Rate: roundTo(l.rate, 2),
+                        TaxId: l.taxId,
+                        DatePromised: l.datePromised || wizard.header.datePromised,
+                        Description: l.description || '',
+                        PrintDescription: l.printDescription || ''
+                    };
                 })
             };
 
@@ -1350,7 +1672,14 @@
                     }
 
                     closeModal();
-                    toast(label('VAS_289_ToastPrefix', 'Sales order created for') + ' ' + parsed.BusinessPartnerName + ' · ' + parsed.LineCount + ' ' + label('VAS_289_LinesSuffix', 'lines') + ' · ' + formatINR(parsed.OrderTotal));
+                    // QA 8.72: success message with the new document number; QA 8.71: when "Completed"
+                    // was chosen but the document workflow refused, the order stays Drafted and the
+                    // reason is shown.
+                    var msg = label('VAS_289_SOCreatedDocNo', 'Sales Order created successfully with document number:') + ' ' + (parsed.SalesOrderNumber || '');
+                    if (parsed.CompleteError) {
+                        msg += '. ' + label('VAS_289_SOCompleteFailed', 'It was saved as Drafted because it could not be completed:') + ' ' + parsed.CompleteError;
+                    }
+                    infoMsg(msg);
                     loadOpenQuotations(0);
                 },
                 error: function () {

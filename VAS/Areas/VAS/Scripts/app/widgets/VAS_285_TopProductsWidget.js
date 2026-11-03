@@ -157,7 +157,7 @@
                 if ($root.css('position') === 'static') { $root.css('position', 'relative'); }
                 var text = '';
                 try { text = VIS.Msg.getMsg('VAS_SO_Retry'); } catch (e) { text = ''; }
-                if (!text || text === 'VAS_SO_Retry') { text = 'Retry'; }
+                if (!text || text === 'VAS_SO_Retry' || text === '[VAS_SO_Retry]') { text = 'Retry'; }
                 $('<button type="button" class="vasso-retry"></button>').text(text)
                     .attr('title', text)
                     .on('click', function (e) {
@@ -216,6 +216,9 @@
         var $mask, $modal, $mHead, $mTitle, $mSub, $mBack, $mBody, $mFoot;
 
         var SELF_ENDPOINT = 'VAS_285_TopProductsWidget/';
+        // Per-instance event-namespace suffix (Sr 8.28): disposing an old instance must
+        // not unbind the window handlers of a re-created one with the same widget id.
+        var instanceTag = 'i' + Math.random().toString(36).slice(2, 9);
 
         var rankState = 'loading'; // 'loading' | 'ready' | 'error'
         var products = [];         // up to 4 rows for the current period
@@ -350,13 +353,20 @@
 
             $shell.append($head, $list);
             $root.append($shell);
+            bindWidgetEvents();
+        }
 
-            $monthSel.on('click', function (event) { event.stopPropagation(); });
-            $yearSel.on('click', function (event) { event.stopPropagation(); });
-            $monthSel.on('change', function () { loadTopProducts(); });
-            $yearSel.on('change', function () { loadTopProducts(); });
+        /* Sr 8.28: (re)binds the widget's own handlers. Run on init AND on every refresh -
+           after a "refresh all" from the mosaic panel the host can strip jQuery handlers
+           from the widget's DOM (re-attaching the same nodes), which left rows that
+           rendered fine but opened nothing. off() first keeps it to one handler each. */
+        function bindWidgetEvents() {
+            $monthSel.off('.vas285').on('click.vas285', function (event) { event.stopPropagation(); })
+                .on('change.vas285', function () { loadTopProducts(); });
+            $yearSel.off('.vas285').on('click.vas285', function (event) { event.stopPropagation(); })
+                .on('change.vas285', function () { loadTopProducts(); });
 
-            $list.on('click', function (event) {
+            $list.off('click.vas285').on('click.vas285', function (event) {
                 var row = event.target.closest ? event.target.closest('[data-pid]') : null;
                 if (row) { openProductModal(Number(row.getAttribute('data-pid')), row.getAttribute('data-pname'), row.getAttribute('data-psku')); }
             });
@@ -467,7 +477,7 @@
         }
 
         function bindDocumentLevelEvents() {
-            var ns = '.vas285-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget');
+            var ns = '.vas285-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '-' + instanceTag;
 
             $(window).on('resize' + ns, function () {
                 if ($mask.hasClass('is-open')) { fitAllTables(); }
@@ -930,14 +940,21 @@
         this.getRoot = function () { return $root; };
 
         this.disposeComponent = function () {
-            var ns = '.vas285-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget');
+            var ns = '.vas285-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '-' + instanceTag;
             $(document).off(ns);
             $(window).off(ns);
             if ($mask) { $mask.remove(); }
             $root.remove();
         };
 
-        this.refreshWidget = function () { loadTopProducts(); };
+        // Sr 8.28: a refresh also re-arms the widget's handlers and re-creates the modal
+        // shell if the host removed it, so the widget stays clickable after "refresh all".
+        this.refreshWidget = function () {
+            if (!$mask || !$.contains(document.body, $mask[0])) { createModal(); }
+            if ($shell && !$.contains($root[0], $shell[0])) { $root.append($shell); }
+            bindWidgetEvents();
+            loadTopProducts();
+        };
     };
 
     VAS.VAS_285_TopProductsWidget.prototype.widgetFirevalueChanged = function (value) {

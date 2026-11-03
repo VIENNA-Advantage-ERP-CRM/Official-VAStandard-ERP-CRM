@@ -136,7 +136,7 @@
                 if ($root.css('position') === 'static') { $root.css('position', 'relative'); }
                 var text = '';
                 try { text = VIS.Msg.getMsg('VAS_SO_Retry'); } catch (e) { text = ''; }
-                if (!text || text === 'VAS_SO_Retry') { text = 'Retry'; }
+                if (!text || text === 'VAS_SO_Retry' || text === '[VAS_SO_Retry]') { text = 'Retry'; }
                 $('<button type="button" class="vasso-retry"></button>').text(text)
                     .attr('title', text)
                     .on('click', function (e) {
@@ -186,6 +186,9 @@
         var $mask, $modal, $mTitle, $mSub, $mBody, $mFoot;
 
         var SELF_ENDPOINT = 'VAS_276_QuotationConversionWidget/';
+        // Per-instance event-namespace suffix (Sr 8.28): disposing an old instance must
+        // not unbind the window handlers of a re-created one with the same widget id.
+        var instanceTag = 'i' + Math.random().toString(36).slice(2, 9);
 
         var summary = null;           // last fetched GetSummary payload
         var summaryState = 'loading'; // 'loading' | 'ready' | 'error'
@@ -290,8 +293,17 @@
                     '</div>' +
                 '</button>'
             );
-            $tile.on('click', function () { openDocumentsModal(); });
             $root.append($tile);
+            bindTile();
+        }
+
+        /* Sr 8.28: (re)binds the tile click. Run on init AND on every refresh - after a
+           "refresh all" from the mosaic panel the host can strip jQuery handlers from
+           the widget's DOM (re-attaching the same nodes), which left a tile that
+           rendered fine but opened nothing. off() first keeps it to one handler. */
+        function bindTile() {
+            if (!$tile) { return; }
+            $tile.off('click.vas276').on('click.vas276', function () { openDocumentsModal(); });
         }
 
         function sideLabelHtml() {
@@ -395,7 +407,7 @@
         }
 
         function bindDocumentLevelEvents() {
-            var ns = '.vas276-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget');
+            var ns = '.vas276-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '-' + instanceTag;
 
             $(window).on('resize' + ns, function () {
                 if ($mask.hasClass('is-open')) { fitDocumentsTable(); }
@@ -423,7 +435,11 @@
         // ZoomUtil resolves the window by name and lands on the correct tab) via the
         // shared cross-window zoom helper (Prompt_Instructions "Scenario 2"). No
         // preview step - the confirmed behaviour is direct navigation on click.
+        // Sr 8.29: the pop-up is closed first, so the Sales Quotation record is what
+        // the user sees (the modal no longer stays open over the opened window).
         function openQuotationInWindow(quotationId) {
+            if (!quotationId) { return; }
+            closeModal();
             if (!window.VAS || !VAS.ZoomUtil) { return; }
             VAS.ZoomUtil.zoomToRecord('C_Order_ID', quotationId, zoomWindowId, ZOOM_WINDOW_NAME, ZOOM_WINDOW_NAME)
                 .done(function (id) { if (id > 0) { zoomWindowId = id; } });
@@ -433,7 +449,9 @@
          * Documents list (the only modal screen)
          * ============================================================ */
         function openDocumentsModal() {
-            if (summaryState === 'error') { return; }
+            // Sr 8.28: never swallow the click - when the tile's last load failed
+            // (e.g. the request burst of a "refresh all"), the modal opens and loads
+            // the figures again instead of doing nothing.
             showLoading();
 
             function loadAndShow() {
@@ -607,14 +625,21 @@
         this.getRoot = function () { return $root; };
 
         this.disposeComponent = function () {
-            var ns = '.vas276-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget');
+            var ns = '.vas276-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '-' + instanceTag;
             $(document).off(ns);
             $(window).off(ns);
             if ($mask) { $mask.remove(); }
             $root.remove();
         };
 
-        this.refreshWidget = function () { loadSummary(); };
+        // Sr 8.28: a refresh also re-arms the tile and re-creates the modal shell if
+        // the host removed it, so the widget stays clickable after "refresh all".
+        this.refreshWidget = function () {
+            if (!$mask || !$.contains(document.body, $mask[0])) { createModal(); }
+            if ($tile && !$.contains($root[0], $tile[0])) { $root.append($tile); }
+            bindTile();
+            loadSummary();
+        };
     };
 
     VAS.VAS_276_QuotationConversionWidget.prototype.widgetFirevalueChanged = function (value) {

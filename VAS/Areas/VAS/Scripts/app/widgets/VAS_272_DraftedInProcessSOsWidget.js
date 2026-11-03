@@ -41,7 +41,7 @@
  *  5  | Figures unavailable                                                   | VAS_272_ErrorState
  *  6  | Total documents                                                       | VAS_272_StatTotalDocuments
  *  7  | Drafted                                                               | VAS_272_StatDrafted
- *  8  | In process                                                            | VAS_272_StatInProcess
+ *  8  | In Progress (Sr 8.22; was VAS_272_StatInProcess)                       | VAS_272_StatInProgress
  *  9  | Value                                                                 | VAS_272_StatValue
  * 10  | Documents                                                             | VAS_272_SectionHeading
  * 11  | newest first                                                          | VAS_272_NewestFirst
@@ -53,7 +53,7 @@
  * 17  | Value                                                                 | VAS_272_ColValue
  * 18  | Stage                                                                 | VAS_272_ColStage
  * 19  | Drafted                                                               | VAS_272_StageDrafted
- * 20  | In process                                                            | VAS_272_StageInProcess
+ * 20  | In Progress (Sr 8.22; was VAS_272_StageInProcess)                      | VAS_272_StageInProgress
  * 21  | Back                                                                  | VAS_272_Back
  * 22  | Close                                                                 | VAS_272_Close
  * 23  | Date promised                                                         | VAS_272_DatePromised
@@ -77,9 +77,10 @@
  * 41  | Delivered                                                             | VAS_272_DeliveryFull
  * 42  | Partially delivered                                                   | VAS_272_DeliveryPartial
  * 43  | Not delivered                                                         | VAS_272_DeliveryNone
- * 44  | Not applicable                                                        | VAS_272_DeliveryNA
+ * 44  | (retired - a Drafted order's delivery status is shown blank, Sr 8.27)  | VAS_272_DeliveryNA
  * 45  | Partly delivered                                                      | VAS_272_LinePartial
- * 46  | In process                                                            | VAS_272_LineInProcess
+ * 46  | In Progress (Sr 8.22; was VAS_272_LineInProcess)                       | VAS_272_LineInProgress
+ * --  | in progress (tile side label, was VAS_272_SideLabelLine2)             | VAS_272_SideLabelInProgress
  * 47  | Drafted                                                               | VAS_272_LineDrafted
  * 48  | Sales order                                                           | VAS_272_SalesOrderPrefix
  * 49  | lines                                                                 | VAS_272_LinesSuffix
@@ -157,7 +158,7 @@
                 if ($root.css('position') === 'static') { $root.css('position', 'relative'); }
                 var text = '';
                 try { text = VIS.Msg.getMsg('VAS_SO_Retry'); } catch (e) { text = ''; }
-                if (!text || text === 'VAS_SO_Retry') { text = 'Retry'; }
+                if (!text || text === 'VAS_SO_Retry' || text === '[VAS_SO_Retry]') { text = 'Retry'; }
                 $('<button type="button" class="vasso-retry"></button>').text(text)
                     .attr('title', text)
                     .on('click', function (e) {
@@ -206,6 +207,9 @@
         var $mask, $modal, $mHead, $mTitle, $mSub, $mBack, $mBody, $mFoot;
 
         var SELF_ENDPOINT = 'VAS_272_DraftedInProcessSOsWidget/';
+        // Per-instance event-namespace suffix (Sr 8.28): disposing an old instance must
+        // not unbind the window handlers of a re-created one with the same widget id.
+        var instanceTag = 'i' + Math.random().toString(36).slice(2, 9);
 
         var summary = null;           // last fetched GetSummary payload
         var summaryState = 'loading'; // 'loading' | 'ready' | 'error'
@@ -257,6 +261,23 @@
 
         function formatNum(value) {
             return Math.round(Number(value || 0)).toLocaleString('en-IN');
+        }
+
+        // Sr 8.26: amounts in the order's (price list's) own currency and precision.
+        function formatMoney(value, symbol, precision) {
+            var prec = (typeof precision === 'number' && precision >= 0) ? precision : 2;
+            var text = Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: prec, maximumFractionDigits: prec });
+            return symbol ? symbol + ' ' + text : text;
+        }
+
+        // Line quantities are in the selected UOM and can be fractional.
+        function formatQty(value) {
+            return Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+        }
+
+        // A description made only of blanks / separators is not an attribute value (VAS_203 rule).
+        function hasAttributeValue(text) {
+            return !!text && /[^\s\-‐-―_.,:;()\[\]\/\\|]/.test(String(text));
         }
 
         function parseIso(iso) {
@@ -311,12 +332,21 @@
                     '</div>' +
                 '</button>'
             );
-            $tile.on('click', function () { openDocumentsModal(); });
             $root.append($tile);
+            bindTile();
+        }
+
+        /* Sr 8.28: (re)binds the tile click. Run on init AND on every refresh - after a
+           "refresh all" from the mosaic panel the host can strip jQuery handlers from
+           the widget's DOM (re-attaching the same nodes), which left a tile that
+           rendered fine but opened nothing. off() first keeps it to one handler. */
+        function bindTile() {
+            if (!$tile) { return; }
+            $tile.off('click.vas272').on('click.vas272', function () { openDocumentsModal(); });
         }
 
         function sideLabelHtml() {
-            return escapeHtml(label('VAS_272_SideLabelLine1', 'drafted ·')) + '<br/>' + escapeHtml(label('VAS_272_SideLabelLine2', 'in process'));
+            return escapeHtml(label('VAS_272_SideLabelLine1', 'drafted ·')) + '<br/>' + escapeHtml(label('VAS_272_SideLabelInProgress', 'in progress'));
         }
 
         function renderTile() {
@@ -420,7 +450,7 @@
         }
 
         function bindDocumentLevelEvents() {
-            var ns = '.vas272-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget');
+            var ns = '.vas272-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '-' + instanceTag;
 
             $(window).on('resize' + ns, function () {
                 if ($mask.hasClass('is-open')) { fitAllTables(); }
@@ -481,7 +511,9 @@
         }
 
         function openDocumentsModal() {
-            if (summaryState === 'error') { return; }
+            // Sr 8.28: never swallow the click - when the tile's last load failed
+            // (e.g. the request burst of a "refresh all"), the modal opens and loads
+            // the figures again instead of doing nothing.
             showLoading(label('VAS_272_Title', 'Drafted / In-Process SOs'));
 
             function loadAndShow() {
@@ -523,20 +555,23 @@
                 RepresentativeName: row.RepresentativeName || '',
                 LineCount: Number(row.LineCount) || 0,
                 OrderValue: Number(row.OrderValue) || 0,
+                CurrencySymbol: row.CurrencySymbol || '',
+                CurrencyPrecision: (row.CurrencyPrecision === null || row.CurrencyPrecision === undefined) ? 2 : Number(row.CurrencyPrecision),
                 StageCode: row.StageCode || '',
                 Stage: row.Stage || ''
             };
         }
 
+        // Sr 8.23: the Drafted badge is orange (was grey); In Progress keeps its tint.
         function stageChipClass(stageCode) {
-            return stageCode === 'IP' ? 'vas272-chip-prop' : 'vas272-chip-neutral';
+            return stageCode === 'IP' ? 'vas272-chip-prop' : 'vas272-chip-drafted';
         }
 
         function renderDocumentsBody() {
             var statsHtml = '<div class="vas272-mstats">' +
                 statTile(label('VAS_272_StatTotalDocuments', 'Total documents'), formatNum(summary.TotalCount)) +
                 statTile(label('VAS_272_StatDrafted', 'Drafted'), formatNum(summary.DraftedCount)) +
-                statTile(label('VAS_272_StatInProcess', 'In process'), formatNum(summary.InProcessCount)) +
+                statTile(label('VAS_272_StatInProgress', 'In Progress'), formatNum(summary.InProcessCount)) +
                 statTile(label('VAS_272_StatValue', 'Value'), formatINR(summary.TotalValue)) +
             '</div>';
 
@@ -581,7 +616,7 @@
                     cellHtml(row.CustomerName, 'vas272-c-prim'),
                     cellHtml(row.RepresentativeName || '—', 'vas272-c-std'),
                     cellHtml(formatNum(row.LineCount), 'vas272-c-std', 'right'),
-                    cellHtml(formatINR(row.OrderValue), 'vas272-c-emph', 'right'),
+                    cellHtml(formatMoney(row.OrderValue, row.CurrencySymbol, row.CurrencyPrecision), 'vas272-c-emph', 'right'),
                     '<span class="vas272-cell" title="' + escapeHtml(row.Stage) + '"><span class="vas272-chip ' + stageChipClass(row.StageCode) + '">' + escapeHtml(row.Stage) + '</span></span>'
                 ];
                 return '<div class="vas272-mrow" style="grid-template-columns:' + tpl + '">' + cells.join('') + '</div>';
@@ -622,10 +657,10 @@
          * GetSalesOrderDetail fetch (order header + full line list).
          * ============================================================ */
         function lineStatus(order, line) {
-            if (order.DocumentStatusCode === 'DR') { return { text: label('VAS_272_LineDrafted', 'Drafted'), cls: 'vas272-chip-neutral' }; }
+            if (order.DocumentStatusCode === 'DR') { return { text: label('VAS_272_LineDrafted', 'Drafted'), cls: 'vas272-chip-drafted' }; }
             if (line.QtyDelivered >= line.QtyOrdered && line.QtyOrdered > 0) { return { text: label('VAS_272_DeliveryFull', 'Delivered'), cls: 'vas272-chip-info' }; }
             if (line.QtyDelivered > 0) { return { text: label('VAS_272_LinePartial', 'Partly delivered'), cls: 'vas272-chip-warn' }; }
-            return { text: label('VAS_272_LineInProcess', 'In process'), cls: 'vas272-chip-prop' };
+            return { text: label('VAS_272_LineInProgress', 'In Progress'), cls: 'vas272-chip-prop' };
         }
 
         function fetchOrderDetail(orderId, cb) {
@@ -665,7 +700,7 @@
                 statTile(label('VAS_272_Customer', 'Customer'), order.CustomerName) +
                 statTile(label('VAS_272_SoDate', 'SO date'), formatDateFull(order.SalesOrderDate)) +
                 statTile(label('VAS_272_DatePromised', 'Date promised'), formatDateFull(order.DatePromised)) +
-                statTile(label('VAS_272_SoValue', 'SO value'), formatINR(order.OrderValue)) +
+                statTile(label('VAS_272_SoValue', 'SO value'), formatMoney(order.OrderValue, order.CurrencySymbol, order.CurrencyPrecision)) +
                 statTile(label('VAS_272_ShipFrom', 'Ship from'), order.WarehouseName) +
                 statTile(label('VAS_272_DeliveryMode', 'Delivery mode'), order.DeliveryMode) +
                 statTile(label('VAS_272_DocumentStatus', 'Document status'), order.DocumentStatus) +
@@ -677,7 +712,7 @@
             var secHtml = '<div class="vas272-msec">' + escapeHtml(label('VAS_272_SalesOrderLines', 'Sales order lines')) + '</div>';
             $mBody.html(soHeaderStats(order) + secHtml + '<div class="vas272-mtwrap"><div class="vas272-mtbl" id="vas272-linetbl-record"></div></div>');
 
-            lineState = { order: order, lines: lines, page: 0, size: MAX_ROWS_PER_PAGE, tableId: 'vas272-linetbl-record' };
+            lineState = { order: order, lines: lines, page: 0, size: MAX_ROWS_PER_PAGE, tableId: 'vas272-linetbl-record', showAttribute: lines.some(function (l) { return hasAttributeValue(l.AttributeText); }) };
             drawLineTable('vas272-linetbl-record');
 
             $mFoot.html(lineFootHtml(order, lines));
@@ -686,17 +721,22 @@
         }
 
         function lineFootHtml(order, lines) {
+            // Item-type product lines only (Sr 8.25); shortage = pending - on hand.
             var qtyOrdered = 0, qtyShort = 0;
             lines.forEach(function (line) {
+                if (!line.IsItem) { return; }
                 qtyOrdered += Number(line.QtyOrdered) || 0;
                 var pending = Number(line.QtyPending) || 0;
-                var freeStock = Number(line.FreeStock) || 0;
-                if (pending > freeStock) { qtyShort += (pending - freeStock); }
+                var onHand = Math.max(0, Number(line.FreeStock) || 0);
+                if (pending > onHand) { qtyShort += (pending - onHand); }
             });
-            var footNote = lines.length + ' ' + label('VAS_272_LinesSuffix', 'lines') +
-                ' · ' + formatNum(qtyOrdered) + ' ' + label('VAS_272_QtyOrderedSuffix', 'qty ordered') +
-                ' · ' + order.DeliveryStatus +
-                (qtyShort > 0 ? ' · ' + formatNum(qtyShort) + ' ' + label('VAS_272_QtyShortSuffix', 'qty short of stock') : '');
+            // Sr 8.27: no delivery status (Drafted) -> nothing shown, never "Not applicable".
+            var footNote = [
+                lines.length + ' ' + label('VAS_272_LinesSuffix', 'lines'),
+                formatQty(qtyOrdered) + ' ' + label('VAS_272_QtyOrderedSuffix', 'qty ordered'),
+                order.DeliveryStatus,
+                qtyShort > 0 ? formatQty(qtyShort) + ' ' + label('VAS_272_QtyShortSuffix', 'qty short of stock') : ''
+            ].filter(function (p) { return p; }).join(' · ');
 
             return '<span class="vas272-foot-note">' + escapeHtml(footNote) + '</span>' +
                 '<span><button type="button" class="vas272-btn" id="vas272-mback">' + escapeHtml(label('VAS_272_Back', 'Back')) + '</button> ' +
@@ -721,8 +761,13 @@
         }
 
         function renderLinesBody(order, lines) {
+            // Sr 8.25: "Qty Ordered" / "Qty Pending" cards count Item-type product lines only.
             var qtyOrdered = 0, qtyPending = 0;
-            lines.forEach(function (l) { qtyOrdered += Number(l.QtyOrdered) || 0; qtyPending += Number(l.QtyPending) || 0; });
+            lines.forEach(function (l) {
+                if (!l.IsItem) { return; }
+                qtyOrdered += Number(l.QtyOrdered) || 0;
+                qtyPending += Number(l.QtyPending) || 0;
+            });
 
             var breadcrumb = '<div class="vas272-polink">' + escapeHtml(label('VAS_272_SalesOrderPrefix', 'Sales order')) +
                 ' <button type="button" class="vas272-lnk" data-so="' + order.SalesOrderId + '">' + escapeHtml(order.SalesOrderNumber) + '</button>' +
@@ -730,15 +775,15 @@
 
             var stats = '<div class="vas272-mstats">' +
                 statTile(label('VAS_272_ColLine', 'Line') + 's', String(lines.length)) +
-                statTile(label('VAS_272_SoValue', 'SO value'), formatINR(order.OrderValue)) +
-                statTile(label('VAS_272_ColOrdered', 'Ordered'), formatNum(qtyOrdered)) +
-                statTile(label('VAS_272_ColPending', 'Pending'), formatNum(qtyPending)) +
+                statTile(label('VAS_272_SoValue', 'SO value'), formatMoney(order.OrderValue, order.CurrencySymbol, order.CurrencyPrecision)) +
+                statTile(label('VAS_272_ColOrdered', 'Ordered'), formatQty(qtyOrdered)) +
+                statTile(label('VAS_272_ColPending', 'Pending'), formatQty(qtyPending)) +
             '</div>';
 
             var secHtml = '<div class="vas272-msec">' + escapeHtml(label('VAS_272_SalesOrderLines', 'Sales order lines')) + '</div>';
             $mBody.html(breadcrumb + stats + secHtml + '<div class="vas272-mtwrap"><div class="vas272-mtbl" id="vas272-linetbl-lines"></div></div>');
 
-            lineState = { order: order, lines: lines, page: 0, size: MAX_ROWS_PER_PAGE, tableId: 'vas272-linetbl-lines' };
+            lineState = { order: order, lines: lines, page: 0, size: MAX_ROWS_PER_PAGE, tableId: 'vas272-linetbl-lines', showAttribute: lines.some(function (l) { return hasAttributeValue(l.AttributeText); }) };
             drawLineTable('vas272-linetbl-lines');
 
             $mFoot.html(lineFootHtml(order, lines));
@@ -764,29 +809,37 @@
             var el = document.getElementById(tableId);
             if (!el || !lineState) { return; }
 
-            var tpl = LINE_COLS.map(function (c) { return 'minmax(0,' + c.w + 'fr)'; }).join(' ');
+            // The Attribute column is shown only when some line has an attribute value.
+            var showAttribute = !!lineState.showAttribute;
+            var cols = LINE_COLS.filter(function (c) { return showAttribute || c.key !== 'attr'; });
+            var cur = lineState.order.CurrencySymbol;
+            var prec = lineState.order.CurrencyPrecision;
+
+            var tpl = cols.map(function (c) { return 'minmax(0,' + c.w + 'fr)'; }).join(' ');
             var pages = Math.max(1, Math.ceil(lineState.lines.length / lineState.size));
             if (lineState.page > pages - 1) { lineState.page = pages - 1; }
             var start = lineState.page * lineState.size;
             var slice = lineState.lines.slice(start, start + lineState.size);
 
             var head = '<div class="vas272-mrow vas272-mhead-row" style="grid-template-columns:' + tpl + '">' +
-                LINE_COLS.map(function (c) { return '<span class="vas272-cell' + (c.align === 'right' ? ' right' : '') + '" title="' + escapeHtml(c.label) + '">' + escapeHtml(c.label) + '</span>'; }).join('') +
+                cols.map(function (c) { return '<span class="vas272-cell' + (c.align === 'right' ? ' right' : '') + '" title="' + escapeHtml(c.label) + '">' + escapeHtml(c.label) + '</span>'; }).join('') +
             '</div>';
 
             var body = slice.map(function (line) {
                 var st = lineStatus(lineState.order, line);
+                // Delivered / pending / in stock only for Item-type products (Sr 8.25).
+                var isItem = !!line.IsItem;
                 var cells = [
                     cellHtml(String(line.LineNo), 'vas272-c-std', 'right'),
                     cellHtml(line.ProductName, 'vas272-c-prim'),
-                    cellHtml(line.AttributeText, 'vas272-c-std'),
+                    showAttribute ? cellHtml(hasAttributeValue(line.AttributeText) ? line.AttributeText : '', 'vas272-c-std') : '',
                     cellHtml(line.UomName, 'vas272-c-std'),
-                    cellHtml(formatNum(line.QtyOrdered), 'vas272-c-std', 'right'),
-                    cellHtml(formatNum(line.QtyDelivered), 'vas272-c-std', 'right'),
-                    cellHtml(formatNum(line.QtyPending), 'vas272-c-prim', 'right'),
-                    cellHtml(formatNum(line.FreeStock), (line.FreeStock < line.QtyPending ? 'vas272-c-short' : 'vas272-c-ok'), 'right'),
-                    cellHtml('₹ ' + formatNum(line.Rate), 'vas272-c-std', 'right'),
-                    cellHtml(formatINR(line.Amount), 'vas272-c-emph', 'right')
+                    cellHtml(formatQty(line.QtyOrdered), 'vas272-c-std', 'right'),
+                    cellHtml(isItem ? formatQty(line.QtyDelivered) : '—', 'vas272-c-std', 'right'),
+                    cellHtml(isItem ? formatQty(line.QtyPending) : '—', 'vas272-c-prim', 'right'),
+                    cellHtml(isItem ? formatQty(line.FreeStock) : '—', (isItem && line.FreeStock < line.QtyPending ? 'vas272-c-short' : 'vas272-c-ok'), 'right'),
+                    cellHtml(formatMoney(line.Rate, cur, 2), 'vas272-c-std', 'right'),
+                    cellHtml(formatMoney(line.Amount, cur, prec), 'vas272-c-emph', 'right')
                 ].join('') + '<span class="vas272-cell"><span class="vas272-chip ' + st.cls + '" title="' + escapeHtml(st.text) + '">' + escapeHtml(st.text) + '</span></span>';
                 return '<div class="vas272-mrow" style="grid-template-columns:' + tpl + '">' + cells + '</div>';
             }).join('');
@@ -853,14 +906,21 @@
         this.getRoot = function () { return $root; };
 
         this.disposeComponent = function () {
-            var ns = '.vas272-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget');
+            var ns = '.vas272-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '-' + instanceTag;
             $(document).off(ns);
             $(window).off(ns);
             if ($mask) { $mask.remove(); }
             $root.remove();
         };
 
-        this.refreshWidget = function () { loadSummary(); };
+        // Sr 8.28: a refresh also re-arms the tile and re-creates the modal shell if
+        // the host removed it, so the widget stays clickable after "refresh all".
+        this.refreshWidget = function () {
+            if (!$mask || !$.contains(document.body, $mask[0])) { createModal(); }
+            if ($tile && !$.contains($root[0], $tile[0])) { $root.append($tile); }
+            bindTile();
+            loadSummary();
+        };
     };
 
     VAS.VAS_272_DraftedInProcessSOsWidget.prototype.widgetFirevalueChanged = function (value) {

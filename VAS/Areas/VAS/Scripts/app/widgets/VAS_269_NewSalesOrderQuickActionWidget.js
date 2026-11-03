@@ -67,6 +67,7 @@
         var $self = this;
         var $root = $('<div class="vas269-root">');
         var zoomWindowId = 0;
+        var $card = null;
 
         function lbl(key, fallback) {
             return VIS.Msg.getMsg(key);
@@ -143,10 +144,14 @@
 
         function createWidget() {
             var title = lbl('VAS_269_NewSalesOrder', 'New Sales Order');
-            var $card = $(
+            // Layout follows VAS_204 New Purchase Order: the "+" well sits top-right
+            // and the title/subtitle are left aligned at the bottom of the tile.
+            $card = $(
                 '<button type="button" class="vas269-card" aria-label="' + escapeHtml(title) + '">' +
-                    '<span class="vas269-well">' +
-                        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>' +
+                    '<span class="vas269-iconrow">' +
+                        '<span class="vas269-well">' +
+                            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>' +
+                        '</span>' +
                     '</span>' +
                     '<span class="vas269-text">' +
                         '<span class="vas269-title">' + escapeHtml(title) + '</span>' +
@@ -155,24 +160,36 @@
                 '</button>'
             );
 
-            // The Sales Order window takes a few seconds to open a new record. Show a busy state at once and
-            // ignore repeat clicks so users do not open duplicate windows / draft documents.
-            var busy = false;
-            $card.on('click', function () {
+            $root.append($card);
+            bindCard();
+        }
+
+        /* Sr 8.28: (re)binds the tile click. Run on init AND on refresh - after a
+           "refresh all" from the mosaic panel the host can strip jQuery handlers from
+           the widget's DOM (re-attaching the same nodes), leaving a dead tile.
+           The Sales Order window takes a few seconds to open a new record. Show a busy
+           state at once and ignore repeat clicks so users do not open duplicate windows /
+           draft documents. */
+        var busy = false;
+        function bindCard() {
+            if (!$card) { return; }
+            $card.off('click.vas269').on('click.vas269', function () {
                 if (busy) { return; }
                 busy = true;
                 $card.addClass('is-busy').attr('aria-busy', 'true');
                 setTimeout(function () { busy = false; $card.removeClass('is-busy').removeAttr('aria-busy'); }, 8000);
                 openNewSalesOrder();
             });
-            $root.append($card);
         }
 
         this.Initalize = function () {
             createWidget();
         };
 
-        this.refreshWidget = function () { };
+        this.refreshWidget = function () {
+            if ($card && !$.contains($root[0], $card[0])) { $root.append($card); }
+            bindCard();
+        };
 
         this.getRoot = function () { return $root; };
 
