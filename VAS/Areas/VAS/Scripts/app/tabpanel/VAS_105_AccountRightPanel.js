@@ -809,7 +809,11 @@
                 html +=
                     '<div class="vas_105_acct-clickrow" style="grid-template-columns:2.25em 1.7fr 1fr 0.9fr 1fr;gap:0.75em;" data-opp-idx="' + i + '">' +
                       '<span class="vas_105_acct-wicon vas_105_acct-wicon--blue">' + SVG_OPP + '</span>' +
-                      '<span style="font-size:0.875em;font-weight:700;color:var(--acct-text);">' + esc(o.name || '') + '</span>' +
+                      // Name: at most two lines, "…" after that; hover shows the full name. The outer span
+                      // hosts the ::after tooltip (it must not clip); the inner span does the clamping.
+                      '<span class="vas_105_acct-tip" data-tip="' + esc(o.name || '') + '" style="font-size:0.875em;font-weight:700;color:var(--acct-text);">' +
+                        '<span class="vas_105_acct-clamp2">' + esc(o.name || '') + '</span>' +
+                      '</span>' +
                       '<span><span class="vas_105_acct-stage ' + stageClass(o.stageCode, o.stageName) + '">' + esc(o.stageName || stageLabel(o.stageCode)) + '</span></span>' +
                       '<span style="font-size:0.875em;font-weight:700;color:var(--acct-text);text-align:right;">' + esc(fmtFull(toNum(o.value), iSym, iPrec)) + '</span>' +
                       '<span style="font-size:0.8125em;color:var(--acct-text-2);text-align:right;">' + esc(fmtDate(o.closeDate)) + '</span>' +
@@ -952,21 +956,36 @@
         }
 
         // ── renderTickets ─────────────────────────────────────────────────────
-        function prioClass(code) {
-            var c = String(code||'').toLowerCase();
-            if (c === '1' || c === 'high')   return 'vas_105_acct-prio--high';
-            if (c === '2' || c === 'medium') return 'vas_105_acct-prio--medium';
-            return 'vas_105_acct-prio--low';
-        }
         function prioLabel(code) {
             var map = {'1':'High','2':'Medium','3':'Low','High':'High','Medium':'Medium','Low':'Low'};
             return map[code] || code || '—';
         }
-        function prioColor(code) {
-            var c = String(code||'').toLowerCase();
-            if (c === '1' || c === 'high')   return '#ED1C24';
-            if (c === '2' || c === 'medium') return '#D78B10';
-            return '#0083DA';
+        // Priority colour tone — one palette shared by the ticket list pill and the
+        // ticket detail badge so a priority looks the same in both.
+        // R_Request.Priority: 1 Urgent, 3 High, 5 Medium, 7 Low, 9 Minor.
+        function prioTone(code, name) {
+            var c = String(code || '').toLowerCase();
+            var n = String(name || '').toLowerCase();
+            if (c === '1' || n.indexOf('urgent') >= 0) return { bg: '#FCEFEF', color: '#A33F3F', border: '#EDC8C8' };
+            if (c === '3' || n.indexOf('high') >= 0)   return { bg: '#FFF8E8', color: '#9A6500', border: '#EBD7A6' };
+            if (c === '5' || c === '2' || n.indexOf('medium') >= 0) return { bg: '#EEF8FF', color: '#005FA3', border: '#CFE0ED' };
+            if (c === '7' || c === '9' || n.indexOf('low') >= 0 || n.indexOf('minor') >= 0) return { bg: '#EFF8F0', color: '#0B6B45', border: '#CFEAD9' };
+            return { bg: '#F1F4F8', color: '#5F7283', border: '#D9E2EB' };
+        }
+
+        // SLA state from DateNextAction — the same rule the ticket detail's SLA cell
+        // uses: past = overdue (red), today = due today (amber), later = on track (green).
+        // No SLA date = neutral grey.
+        function slaDotColor(dateNextAction) {
+            if (!dateNextAction) return '#94A3B8';
+            var d = new Date(dateNextAction);
+            if (isNaN(d.getTime())) return '#94A3B8';
+            d.setHours(0, 0, 0, 0);
+            var today = new Date(); today.setHours(0, 0, 0, 0);
+            var diff = Math.round((d - today) / 86400000);
+            if (diff < 0)   return '#D14545';
+            if (diff === 0) return '#9A6500';
+            return '#0B6B45';
         }
 
         function renderTickets(el, data) {
@@ -978,9 +997,11 @@
             var html = '';
             for (var i = 0; i < items.length; i++) {
                 var t = items[i];
-                var age = (t.ageDays != null) ? (String(t.ageDays) + 'd ' + msg('Open')) : '';
+                // Age + the ticket's real status (R_Status), not a hard-coded "Open".
+                var age = (t.ageDays != null ? String(t.ageDays) + 'd' : '') + (t.status ? ' ' + t.status : '');
                 var isAlert = t.isOverdue || t.isInactive;
-                var dotColor = isAlert ? '#ED1C24' : prioColor(t.priorityCode);
+                var dotColor = slaDotColor(t.dateNextAction);
+                var pt = prioTone(t.priorityCode, t.priorityName);
                 html +=
                     '<div class="vas_105_acct-tickrow' + (isAlert ? ' vas_105_acct-tickrow--alert' : '') + '" data-tick-idx="' + i + '">' +
                       '<span class="vas_105_acct-dot" style="background:' + dotColor + ';"></span>' +
@@ -989,8 +1010,8 @@
                       '<span class="vas_105_acct-tip" data-tip="' + esc(t.subject || '') + '" style="flex:1;min-width:0;">' +
                         '<span style="display:block;font-size:0.8125em;color:var(--acct-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(t.subject || '') + '</span>' +
                       '</span>' +
-                      '<span class="vas_105_acct-prio ' + prioClass(t.priorityCode) + '">' + esc(t.priorityName || prioLabel(t.priorityCode)) + '</span>' +
-                      '<span style="font-size:0.75em;color:var(--acct-text-2);width:4.375em;text-align:right;flex-shrink:0;">' + esc(age) + '</span>' +
+                      '<span class="vas_105_acct-prio" style="background:' + pt.bg + ';color:' + pt.color + ';">' + esc(t.priorityName || prioLabel(t.priorityCode)) + '</span>' +
+                      '<span title="' + esc(age) + '" style="font-size:0.75em;color:var(--acct-text-2);width:8em;text-align:right;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(age) + '</span>' +
                     '</div>';
             }
 
@@ -1514,7 +1535,10 @@
                         var dh = Math.floor(item.durationMins / 60), dm = item.durationMins % 60;
                         durStr = dh > 0 ? (dh + 'h' + (dm > 0 ? ' ' + dm + 'm' : '')) : (dm + 'm');
                     }
+                    // Meeting time sits beside the heading; the card's top-right
+                    // timestamp is the appointment's created time.
                     titleText = (item.title || '')
+                        + (item.meetingTs ? ' · ' + fmtEngTs(item.meetingTs) : '')
                         + (item.location ? ' · ' + item.location : '')
                         + (durStr        ? ' · ' + durStr        : '');
                 }
@@ -1932,20 +1956,8 @@
         function openTicketDetail(t) {
             // Priority badge — colored pill using semantic tone palette
             function prioBadge(code, name) {
-                var c = String(code || '').toLowerCase();
-                var n = String(name || '').toLowerCase();
-                var bg, color, border;
-                if (c === '1' || n.indexOf('urgent') >= 0) {
-                    bg = '#FCEFEF'; color = '#A33F3F'; border = '#EDC8C8';
-                } else if (c === '3' || n.indexOf('high') >= 0) {
-                    bg = '#FFF8E8'; color = '#9A6500'; border = '#EBD7A6';
-                } else if (c === '5' || c === '2' || n.indexOf('medium') >= 0) {
-                    bg = '#EEF8FF'; color = '#005FA3'; border = '#CFE0ED';
-                } else if (n.indexOf('low') >= 0 || n.indexOf('minor') >= 0) {
-                    bg = '#EFF8F0'; color = '#0B6B45'; border = '#CFEAD9';
-                } else {
-                    bg = '#F1F4F8'; color = '#5F7283'; border = '#D9E2EB';
-                }
+                var tone = prioTone(code, name);
+                var bg = tone.bg, color = tone.color, border = tone.border;
                 var label = name || prioLabel(code) || code;
                 return '<span style="display:inline-block;border-radius:999px;padding:0.1875em 0.625em;' +
                        'font-size:0.75em;font-weight:700;background:' + bg + ';color:' + color +
@@ -2238,11 +2250,18 @@
                     var h = '';
                     for (var i = 0; i < items.length; i++) {
                         var t = items[i];
+                        // Show the ticket's actual R_Status (Resolved, Closed, …) instead of a
+                        // fixed "Resolved". Closed-type statuses get a neutral slate tone;
+                        // everything else keeps the green resolved tone.
+                        var pStatus  = t.status || 'Resolved';
+                        var isClosed = /clos/i.test(pStatus);
+                        var pDot     = isClosed ? '#5F7283' : '#0B6B45';
+                        var pPill    = isClosed ? ' style="background:#E8EDF2;color:#46586A;"' : '';
                         h += '<div class="vas_105_acct-tickrow">' +
-                             '<span class="vas_105_acct-dot" style="background:#0B6B45;"></span>' +
+                             '<span class="vas_105_acct-dot" style="background:' + pDot + ';"></span>' +
                              '<span style="font-size:0.8125em;color:var(--acct-muted);width:4.875em;flex-shrink:0;">' + esc(t.ticketNo||'') + '</span>' +
                              '<span style="flex:1;min-width:0;font-size:0.8125em;color:var(--acct-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(t.subject||'') + '</span>' +
-                             '<span class="vas_105_acct-prio vas_105_acct-prio--resolved">Resolved</span>' +
+                             '<span class="vas_105_acct-prio vas_105_acct-prio--resolved"' + pPill + '>' + esc(pStatus) + '</span>' +
                              '</div>';
                     }
                     listEl.innerHTML = h;
@@ -2888,20 +2907,28 @@
                     return html;
                 }
 
-                // Details: direction-based primary address + any CC addresses, deduplicated, up to 5.
-                var primaryAddr = data.direction === 'in' ? (data.fromEmail || '') : (data.toEmail || '');
-                var detailAddrs = splitAddrs(primaryAddr).concat(splitAddrs(data.ccEmail || ''));
-                var seenD = {};
-                detailAddrs = detailAddrs.filter(function(a) {
-                    var k = a.toLowerCase();
-                    if (seenD[k]) return false; seenD[k] = true; return true;
-                });
-                var detailHtml = renderAddrList(detailAddrs, 5);
+                // From / To / CC — every address, in full. BCC is deliberately not shown.
+                // From shows the SENDER'S NAME (server-resolved); the raw address is only a fallback.
+                var fromHtml = data.fromName ? esc(data.fromName)
+                             : renderAddrList(splitAddrs(data.fromEmail || ''), 50);
+                var toHtml   = renderAddrList(splitAddrs(data.toEmail   || ''), 50);
+                var ccHtml   = renderAddrList(splitAddrs(data.ccEmail   || ''), 50);
 
-                // People: server-resolved recipient names (To + CC); fall back to who field.
-                var peopleItems = splitAddrs(data.peopleNames || '');
+                // People: the To + CC recipients (name, or full e-mail when no user matches).
+                // `people` is an array so a name containing "," or ";" stays whole.
+                var peopleItems = (data.people && data.people.length) ? data.people.slice()
+                                : splitAddrs(data.peopleNames || '');
                 if (peopleItems.length === 0 && data.who) peopleItems = [data.who];
-                var peopleHtml  = renderAddrList(peopleItems, 5);
+                var peopleHtml  = esc(peopleItems.join(', '));
+
+                function addrRow(label, html) {
+                    return html ? [
+                        '  <tr>',
+                        '    <td class="vas_105_emd-meta-label">', esc(label), '</td>',
+                        '    <td class="vas_105_emd-meta-value" colspan="3">', html, '</td>',
+                        '  </tr>'
+                    ].join('') : '';
+                }
 
                 var bodyHtml = [
                     '<div class="vas_105_emd-top">',
@@ -2920,15 +2947,12 @@
                     '  <tr>',
                     '    <td class="vas_105_emd-meta-label">', esc(msg('VAS_105_When')), '</td>',
                     '    <td class="vas_105_emd-meta-value">', esc(fmtEngTs(data.whenTs || '')), '</td>',
-                    '    <td class="vas_105_emd-meta-label">', esc(msg('Details')), '</td>',
-                    '    <td class="vas_105_emd-meta-value">', detailHtml, '</td>',
+                    '    <td class="vas_105_emd-meta-label">', esc(msg('VAS_105_People')), '</td>',
+                    '    <td class="vas_105_emd-meta-value">', peopleHtml, '</td>',
                     '  </tr>',
-                    peopleItems.length > 0 ? [
-                        '  <tr>',
-                        '    <td class="vas_105_emd-meta-label">', esc(msg('VAS_105_People')), '</td>',
-                        '    <td class="vas_105_emd-meta-value" colspan="3">', peopleHtml, '</td>',
-                        '  </tr>'
-                    ].join('') : '',
+                    addrRow(msg('From'), fromHtml),
+                    addrRow(msg('To'),   toHtml),
+                    addrRow(msg('CC'),   ccHtml),
                     '</table>',
                     data.body ? '<div class="vas_105_emd-body">' + data.body + '</div>' : ''
                 ].join('');

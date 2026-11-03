@@ -30,6 +30,7 @@
             // Part 2 — Details Section
             generatedOrders:         null,
             generatedOrdersLoading:  false,
+            ordersPage:              0,
             opportunity:             null,
             opportunityLoading:      false,
             lines:                   null,
@@ -63,6 +64,23 @@
                 .replace(/&/g, '&amp;').replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
                 .replace(/'/g, '&#039;');
+        }
+
+        // ── Helper: per-value hover tooltip ──────────────────────────────────
+        // The header and the customer / contact cards clip long values with an
+        // ellipsis, so EACH value carries its own native `title` holding its full text.
+        // ttl(text)        → ' title="…"' attribute ('' when text is empty)
+        // vspan(text,html) → <span title="text">html</span>; html defaults to esc(text)
+        function ttl(text) {
+            return (text == null || String(text).trim() === '') ? '' : ' title="' + esc(text) + '"';
+        }
+        function vspan(text, html) {
+            return '<span' + ttl(text) + '>' + (html != null ? html : esc(text)) + '</span>';
+        }
+        // msg() with a readable fallback when the AD_Message key does not exist.
+        function lbl(key, fallback) {
+            var m = msg(key);
+            return (m === key) ? fallback : m;
         }
 
         // ── Helper: AD_Message lookup with key fallback ──────────────────────
@@ -297,12 +315,20 @@
             var fEl     = document.getElementById('vas_123_mfoot_'  + widgetID);
             if (!overlay) return;
             if (tEl) tEl.textContent = title || '';
-            if (mEl) mEl.textContent = meta  || '';
+            if (mEl) {
+                // textContent, so callers pass PLAIN text (never esc()'d). The full text rides on a
+                // tooltip because a long subtitle is clamped to two lines by the stylesheet.
+                mEl.textContent = meta || '';
+                if (meta) mEl.setAttribute('title', meta); else mEl.removeAttribute('title');
+            }
             if (bEl) bEl.innerHTML   = bodyHtml || '';
             if (fEl) fEl.innerHTML   = footHtml || '';
             if (modal) {
-                if (wide) modal.classList.add('vas_123_qrp-modal--wide');
-                else       modal.classList.remove('vas_123_qrp-modal--wide');
+                // wide === 'email' → the Customer Master-style e-mail dialog chrome.
+                if (wide === true) modal.classList.add('vas_123_qrp-modal--wide');
+                else               modal.classList.remove('vas_123_qrp-modal--wide');
+                if (wide === 'email') modal.classList.add('vas_123_qrp-modal--email');
+                else                  modal.classList.remove('vas_123_qrp-modal--email');
             }
             overlay.classList.add('vas_123_qrp-overlay--open');
         }
@@ -376,6 +402,7 @@
             if (!orderId || orderId <= 0) return;
             state.generatedOrdersLoading = true;
             state.generatedOrders        = null;
+            state.ordersPage             = 0;   // back to the first page on a fresh load
 
             postJSON('GetGeneratedOrders', { C_Order_ID: orderId }, function (err, data) {
                 state.generatedOrdersLoading = false;
@@ -572,11 +599,12 @@
             var statusLbl  = resolveStatusLabel(statusCode);
 
             // Build chip row
-            var chips = '<span class="vas_123_qrp-chip vas_123_qrp-chip' + esc(tone) + '">' + esc(statusLbl) + '</span>';
+            var chips = '<span class="vas_123_qrp-chip vas_123_qrp-chip' + esc(tone) + '"' + ttl(statusLbl) + '>' + esc(statusLbl) + '</span>';
 
             // Converted chip — shown whenever the quotation has been converted
             if (ds.converted) {
-                chips += '<span class="vas_123_qrp-chip vas_123_qrp-chip--success">' + esc(msg('VAS_123_Converted')) + '</span>';
+                var _convTip = msg('VAS_123_Converted') + (h.convertedOrderNo ? ': ' + h.convertedOrderNo : '');
+                chips += '<span class="vas_123_qrp-chip vas_123_qrp-chip--success"' + ttl(_convTip) + '>' + esc(msg('VAS_123_Converted')) + '</span>';
             }
 
             // Credit status chip — only shown for non-OK statuses (O/X suppressed).
@@ -585,15 +613,14 @@
             var _hcsName = h.creditStatusName || '';
             if (_hcs && _hcs !== 'O' && _hcs !== 'X') {
                 var _hcsTone = (_hcs === 'W') ? 'vas_123_qrp-chip--warn' : 'vas_123_qrp-chip--risk';
-                chips += '<span class="vas_123_qrp-chip ' + _hcsTone + '">' + esc(_hcsName || _hcs) + '</span>';
+                chips += '<span class="vas_123_qrp-chip ' + _hcsTone + '"' + ttl(_hcsName || _hcs) + '>' + esc(_hcsName || _hcs) + '</span>';
             }
 
-            // Sub-line: partner · quoted date · sales rep
+            // Sub-line: partner · quoted date · sales rep — each value hoverable on its own
             var subParts = [];
-            if (h.bPartnerName) subParts.push(esc(h.bPartnerName));
-            if (h.dateOrdered)  subParts.push('quoted ' + esc(fmtDate(h.dateOrdered)));
-            if (h.salesRepName) subParts.push(esc(h.salesRepName));
-
+            if (h.bPartnerName) subParts.push(vspan(h.bPartnerName));
+            if (h.dateOrdered)  { var _q = 'quoted ' + fmtDate(h.dateOrdered); subParts.push(vspan(_q)); }
+            if (h.salesRepName) subParts.push(vspan(h.salesRepName));
 
             container.innerHTML =
                 '<div class="vas_123_qrp-identity">' +
@@ -601,7 +628,7 @@
                         '<div class="vas_123_qrp-id-tile">' + SVG_QUOTE + '</div>' +
                         '<div class="vas_123_qrp-id-main">' +
                             '<div class="vas_123_qrp-id-namerow">' +
-                                '<span class="vas_123_qrp-id-name">' + esc(h.documentNo || '') + '</span>' +
+                                '<span class="vas_123_qrp-id-name"' + ttl(h.documentNo) + '>' + esc(h.documentNo || '') + '</span>' +
                                 chips +
                             '</div>' +
                             '<p class="vas_123_qrp-id-sub">' + subParts.join(' · ') + '</p>' +
@@ -745,7 +772,9 @@
 
             var location     = m.location || '';
             var channel      = resolveChannel(meetingUrl, location);
-            var attendees    = parseAttendees(m.attendeeInfo);
+            // Server-resolved names (AttendeeInfo stores user IDs); parse the raw value only as a fallback.
+            var attendees    = (m.attendeeNames && m.attendeeNames.length) ? m.attendeeNames
+                             : parseAttendees(m.attendeeInfo).filter(function (a) { return !/^\d+$/.test(a); });
 
             // Build attendee avatar stack (show up to 4)
             var avatarsHtml = '';
@@ -980,30 +1009,47 @@
             } else {
                 var rowsHtml = '';
                 var grandSum = 0;
-                for (var i = 0; i < orders.length; i++) {
+
+                // The converted total always covers EVERY order; only the rows are paged.
+                for (var gi = 0; gi < orders.length; gi++) {
+                    grandSum += toNum(orders[gi].grandTotal || orders[gi].GrandTotal);
+                }
+
+                // Pagination — 5 orders per page
+                var ORDER_PAGE_SIZE = 5;
+                var orderTotalPages = Math.ceil(orders.length / ORDER_PAGE_SIZE) || 1;
+                if (state.ordersPage >= orderTotalPages) state.ordersPage = orderTotalPages - 1;
+                if (state.ordersPage < 0)                state.ordersPage = 0;
+                var orderPageStart = state.ordersPage * ORDER_PAGE_SIZE;
+                var orderPageEnd   = Math.min(orderPageStart + ORDER_PAGE_SIZE, orders.length);
+
+                for (var i = orderPageStart; i < orderPageEnd; i++) {
                     var o       = orders[i];
                     var oId     = o.c_Order_ID    || o.C_Order_ID    || 0;
                     var oStatus = resolveStatusLabel(o.docStatus || o.DocStatus || '');
                     var oTone   = statusTone(o.docStatus || o.DocStatus || '');
                     var oTotal  = toNum(o.grandTotal || o.GrandTotal);
-                    grandSum   += oTotal;
+                    var oTotalTxt = fmtCurrency(oTotal, sym, prec);
+                    var oOrdered  = msg('VAS_123_Ordered')  + ' ' + fmtDate(o.dateOrdered  || o.DateOrdered  || '');
+                    var oPromised = msg('VAS_123_Promised') + ' ' + fmtDate(o.datePromised || o.DatePromised || '');
 
                     rowsHtml +=
                         '<div class="vas_123_qrp-erow" data-action="openOrder" data-order-id="' + esc(oId) + '">' +
                             '<div class="vas_123_qrp-etile vas_123_qrp-etile--info vas_123_qrp-etile--rect">' + SVG_CART + '</div>' +
                             '<div class="vas_123_qrp-emain">' +
                                 '<div class="vas_123_qrp-e-titlerow">' +
-                                    '<span class="vas_123_qrp-e-primary" title="' + esc(o.documentNo || o.DocumentNo || '') + '">' + esc(o.documentNo || o.DocumentNo || '') + '</span>' +
-                                    '<span class="vas_123_qrp-chip vas_123_qrp-chip' + esc(oTone) + '">' + esc(oStatus) + '</span>' +
+                                    '<span class="vas_123_qrp-e-primary"' + ttl(o.documentNo || o.DocumentNo || '') + '>' + esc(o.documentNo || o.DocumentNo || '') + '</span>' +
+                                    '<span class="vas_123_qrp-chip vas_123_qrp-chip' + esc(oTone) + '"' + ttl(oStatus) + '>' + esc(oStatus) + '</span>' +
                                 '</div>' +
+                                // Each date is its own hover target.
                                 '<p class="vas_123_qrp-e-meta">' +
-                                    esc(msg('VAS_123_Ordered'))  + ' ' + esc(fmtDate(o.dateOrdered  || o.DateOrdered  || '')) +
+                                    vspan(oOrdered) +
                                     ' · ' +
-                                    esc(msg('VAS_123_Promised')) + ' ' + esc(fmtDate(o.datePromised || o.DatePromised || '')) +
+                                    vspan(oPromised) +
                                 '</p>' +
                             '</div>' +
                             '<div class="vas_123_qrp-etrail">' +
-                                '<p class="vas_123_qrp-e-value">' + esc(fmtCurrency(oTotal, sym, prec)) + '</p>' +
+                                '<p class="vas_123_qrp-e-value"' + ttl(oTotalTxt) + '>' + esc(oTotalTxt) + '</p>' +
                                 '<p class="vas_123_qrp-e-sub">'   + esc(msg('VAS_123_OrderTotal'))      + '</p>' +
                             '</div>' +
                         '</div>';
@@ -1019,7 +1065,27 @@
                             '<span class="vas_123_qrp-es-total">' + esc(fmtCurrency(grandSum, sym, prec)) + '</span>' +
                         '</div>';
                 }
-                bodyHtml = '<div class="vas_123_qrp-elist">' + rowsHtml + '</div>' + summaryHtml;
+                // Pager — only when there is more than one page; same markup as Lines / Tasks.
+                var ordersPagerHtml = '';
+                if (orderTotalPages > 1) {
+                    var oPrevDisabled = state.ordersPage <= 0;
+                    var oNextDisabled = state.ordersPage >= orderTotalPages - 1;
+                    var oChevL = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>';
+                    var oChevR = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+                    ordersPagerHtml =
+                        '<div class="vas_123_qrp-secpager">' +
+                          '<span class="vas_123_qrp-secpager__info">' +
+                            esc(msg('VAS_040_Showing')) + ' <b>' + (orderPageStart + 1) + ' &ndash; ' + orderPageEnd + '</b> ' + esc(msg('of')) + ' <b>' + orders.length + '</b>' +
+                          '</span>' +
+                          '<nav class="vas_123_qrp-secpager__nav" role="navigation">' +
+                            '<button type="button" class="vas_123_qrp-secpager__btn" data-action="ordersPagePrev"' + (oPrevDisabled ? ' disabled' : '') + '>' + oChevL + '</button>' +
+                            '<span class="vas_123_qrp-secpager__page"><b>' + (state.ordersPage + 1) + '</b>&nbsp;' + esc(msg('of')) + '&nbsp;' + orderTotalPages + '</span>' +
+                            '<button type="button" class="vas_123_qrp-secpager__btn" data-action="ordersPageNext"' + (oNextDisabled ? ' disabled' : '') + '>' + oChevR + '</button>' +
+                          '</nav>' +
+                        '</div>';
+                }
+
+                bodyHtml = '<div class="vas_123_qrp-elist">' + rowsHtml + '</div>' + ordersPagerHtml + summaryHtml;
             }
 
             var countHtml = orders.length
@@ -1097,7 +1163,7 @@
 
                 bodyHtml =
                     '<div class="vas_123_qrp-elist">' +
-                        '<div class="vas_123_qrp-erow" data-action="openLinkedQuotations" data-opportunity-id="' + esc(oppId) + '" data-opportunity-name="' + esc(primaryText) + '">' +
+                        '<div class="vas_123_qrp-erow" data-action="openOpportunityRecord" data-opportunity-id="' + esc(oppId) + '">' +
                             '<div class="vas_123_qrp-etile vas_123_qrp-etile--success vas_123_qrp-etile--rect">' + SVG_TARGET + '</div>' +
                             '<div class="vas_123_qrp-emain">' +
                                 '<div class="vas_123_qrp-e-titlerow">' +
@@ -1369,11 +1435,11 @@
             if (!_chipLabel) {
                 creditChip = '';
             } else if (creditStatus === 'W') {
-                creditChip = '<span class="vas_123_qrp-chip vas_123_qrp-chip--warn">'    + esc(_chipLabel) + '</span>';
+                creditChip = '<span class="vas_123_qrp-chip vas_123_qrp-chip--warn"'    + ttl(_chipLabel) + '>' + esc(_chipLabel) + '</span>';
             } else if (creditStatus === 'H' || creditStatus === 'C' || creditStatus === 'S') {
-                creditChip = '<span class="vas_123_qrp-chip vas_123_qrp-chip--risk">'    + esc(_chipLabel) + '</span>';
+                creditChip = '<span class="vas_123_qrp-chip vas_123_qrp-chip--risk"'    + ttl(_chipLabel) + '>' + esc(_chipLabel) + '</span>';
             } else {
-                creditChip = '<span class="vas_123_qrp-chip vas_123_qrp-chip--success">' + esc(_chipLabel) + '</span>';
+                creditChip = '<span class="vas_123_qrp-chip vas_123_qrp-chip--success"' + ttl(_chipLabel) + '>' + esc(_chipLabel) + '</span>';
             }
 
             // ── Open balance — comes from state.addresses (fetched separately) ──
@@ -1386,7 +1452,8 @@
                             : (h.customerOpenBalance != null) ? h.customerOpenBalance : null;
             var balSym  = (addr && addr.baseCurrSymbol) ? addr.baseCurrSymbol : sym;
             var balPrec = (addr && addr.baseCurrPrec  != null) ? parseInt(addr.baseCurrPrec, 10) : prec;
-            var balHtml = (openBalance != null) ? esc(fmtCurrency(openBalance, balSym, balPrec)) : '—';
+            var balText = (openBalance != null) ? fmtCurrency(openBalance, balSym, balPrec) : '';
+            var balHtml = balText ? esc(balText) : '—';
 
             // ── Bill-to / Ship-to from the separately loaded address record ──
             var billTo = addr ? (addr.billingLocationName  || addr.BillingLocationName  || '') : '';
@@ -1394,8 +1461,9 @@
             var addrMeta = '';
             if (billTo || shipTo) {
                 var addrParts = [];
-                if (billTo) { addrParts.push(esc(msg('VAS_123_BillTo')) + ' ' + esc(billTo)); }
-                if (shipTo) { addrParts.push(esc(msg('VAS_123_ShipTo')) + ' ' + esc(shipTo)); }
+                // Each address is its own hover target (full text of that one value).
+                if (billTo) { var _bt = msg('VAS_123_BillTo') + ' ' + billTo; addrParts.push(vspan(_bt)); }
+                if (shipTo) { var _st = msg('VAS_123_ShipTo') + ' ' + shipTo; addrParts.push(vspan(_st)); }
                 addrMeta = '<p class="vas_123_qrp-pc-meta">' + addrParts.join(' · ') + '</p>';
             }
 
@@ -1407,13 +1475,13 @@
                         '<div class="vas_123_qrp-etile vas_123_qrp-etile--info" style="border-radius:999px">' + SVG_USERS + '</div>' +
                         '<div class="vas_123_qrp-pc-main">' +
                             '<div class="vas_123_qrp-e-titlerow">' +
-                                '<span class="vas_123_qrp-pc-name">' + esc(bpName) + '</span>' +
+                                '<span class="vas_123_qrp-pc-name"' + ttl(bpName) + '>' + esc(bpName) + '</span>' +
                                 creditChip +
                             '</div>' +
                             addrMeta +
                         '</div>' +
                         '<div class="vas_123_qrp-etrail">' +
-                            '<p class="vas_123_qrp-e-value">' + balHtml + '</p>' +
+                            '<p class="vas_123_qrp-e-value"' + ttl(balText) + '>' + balHtml + '</p>' +
                             '<p class="vas_123_qrp-e-sub">' + esc(msg('VAS_123_OpenBalance')) + '</p>' +
                         '</div>' +
                     '</div>' +
@@ -1430,16 +1498,17 @@
                 contactHtml = '<p class="vas_123_qrp-emptyline">' + esc(msg('VAS_123_ContactEmpty')) + '</p>';
             } else {
                 var contactMetaParts = [];
-                if (contactEmail)  { contactMetaParts.push(esc(contactEmail));  }
-                if (contactMobile) { contactMetaParts.push(esc(contactMobile)); }
+                // Each value (e-mail, mobile) is its own hover target.
+                if (contactEmail)  { contactMetaParts.push(vspan(contactEmail));  }
+                if (contactMobile) { contactMetaParts.push(vspan(contactMobile)); }
 
                 contactHtml =
                     '<div class="vas_123_qrp-pcard">' +
                         '<div class="vas_123_qrp-pcard-row">' +
                             '<span class="vas_123_qrp-contact-avatar">' + esc(initials(contactName)) + '</span>' +
                             '<div class="vas_123_qrp-pc-main">' +
-                                '<p class="vas_123_qrp-pc-name">'  + esc(contactName) + '</p>' +
-                                (contactTitle ? '<p class="vas_123_qrp-pc-meta">' + esc(contactTitle) + '</p>' : '') +
+                                '<p class="vas_123_qrp-pc-name"' + ttl(contactName) + '>' + esc(contactName) + '</p>' +
+                                (contactTitle ? '<p class="vas_123_qrp-pc-meta"' + ttl(contactTitle) + '>' + esc(contactTitle) + '</p>' : '') +
                                 (contactMetaParts.length ? '<p class="vas_123_qrp-pc-meta">' + contactMetaParts.join(' · ') + '</p>' : '') +
                             '</div>' +
                             '<div class="vas_123_qrp-pc-actions">' +
@@ -2000,71 +2069,6 @@
             );
         }
 
-        // ── Action: Show all quotations linked to an opportunity ──────────────
-        function openLinkedQuotations(oppId, oppName) {
-            var h    = state.header;
-            var sym  = h ? (h.currencySymbol || '') : '';
-            var prec = h && h.currencyPrecision != null ? parseInt(h.currencyPrecision, 10) : 2;
-
-            showModal(
-                msg('VAS_123_LinkedQuotations'),
-                esc(oppName || ''),
-                '<div class="vas_123_qrp-emptyline">' + esc(msg('VAS_123_Loading')) + '</div>',
-                '<button class="vas_123_qrp-btn vas_123_qrp-btn--ghost" data-action="closeModal">' + esc(msg('VIS_Close')) + '</button>',
-                false
-            );
-
-            postJSON('GetLinkedQuotations', { VAS_Opportunity_ID: oppId }, function (err, data) {
-                var bEl = document.getElementById('vas_123_mbody_' + widgetID);
-                if (!bEl) return;
-
-                var list = (!err && Array.isArray(data)) ? data : [];
-                if (!list.length) {
-                    bEl.innerHTML = '<p class="vas_123_qrp-emptyline">' + esc(msg('VAS_123_NoLinkedQuotations')) + '</p>';
-                    return;
-                }
-
-                var rows = '';
-                for (var i = 0; i < list.length; i++) {
-                    var q          = list[i];
-                    var qId        = q.c_Order_ID      || q.C_Order_ID      || 0;
-                    // Skip the quotation that is currently open in the panel
-                    if (qId && qId === currentOrderId) continue;
-                    var docNo      = q.documentNo      || q.DocumentNo      || '';
-                    var bp         = q.bPartnerName    || q.BPartnerName    || '';
-                    var status     = q.docStatusName   || q.DocStatusName   || q.docStatus || '';
-                    var docStatus  = q.docStatus       || q.DocStatus       || '';
-                    var date       = q.dateOrdered     || q.DateOrdered     || '';
-                    var total      = q.grandTotal      != null ? q.grandTotal : (q.GrandTotal != null ? q.GrandTotal : 0);
-                    var qSym       = q.currencySymbol  || q.CurrencySymbol  || q.currencyISO || q.CurrencyISO || sym;
-                    var qPrec      = q.currencyPrecision != null ? parseInt(q.currencyPrecision, 10) : prec;
-
-                    // Choose status chip colour: CO/CL = success, VO = risk, DR/IP = info
-                    var tone = '--info';
-                    if (docStatus === 'CO' || docStatus === 'CL') { tone = '--success'; }
-                    if (docStatus === 'VO')                        { tone = '--risk';    }
-
-                    var statusChip = status
-                        ? '<span class="vas_123_qrp-chip vas_123_qrp-chip' + esc(tone) + '">' + esc(status) + '</span>'
-                        : '';
-
-                    var meta = (bp ? esc(bp) : '') + (date ? ' · ' + esc(fmtDate(date)) : '');
-
-                    rows +=
-                        '<div class="vas_123_qrp-crow">' +
-                            '<div class="vas_123_qrp-cl-left">' +
-                                '<span class="vas_123_qrp-cl-primary">' + esc(docNo) + ' ' + statusChip + '</span>' +
-                                (meta ? '<span class="vas_123_qrp-cl-meta">' + meta + '</span>' : '') +
-                            '</div>' +
-                            '<div class="vas_123_qrp-cl-right">' +
-                                '<span class="vas_123_qrp-cl-primary">' + esc(fmtCurrency(total, qSym, qPrec)) + '</span>' +
-                            '</div>' +
-                        '</div>';
-                }
-                bEl.innerHTML = '<div class="vas_123_qrp-clist">' + rows + '</div>';
-            });
-        }
-
         // ── Action: Open link-opportunity modal (D2) ──────────────────────────
         function openLinkOpportunity() {
             var h = state.header;
@@ -2362,7 +2366,7 @@
         function openEmailDetailModal(emailId) {
             var SVG_MAIL2  = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>';
             var SVG_REPLY2 = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>';
-            showModal(msg('VAS_123_TouchPoint'), '', '<div class="vas_123_qrp-emptyline">' + esc(msg('VAS_123_Loading')) + '</div>', '', false);
+            showModal(msg('VAS_123_TouchPoint'), '', '<div class="vas_123_qrp-emptyline">' + esc(msg('VAS_123_Loading')) + '</div>', '', 'email');
             postJSON('GetEmailDetail', { emailId: emailId }, function (err, data) {
                 var bodyEl = document.getElementById('vas_123_mbody_' + widgetID);
                 var footEl = document.getElementById('vas_123_mfoot_' + widgetID);
@@ -2395,28 +2399,29 @@
                     return h;
                 }
 
-                // Details: direction-based primary address + CC addresses, deduplicated, up to 5.
-                var primaryAddr = data.direction === 'in' ? (data.fromEmail || '') : (data.toEmail || '');
-                var detailAddrs = splitAddrs(primaryAddr).concat(splitAddrs(data.ccEmail || ''));
-                var seenD = {};
-                detailAddrs = detailAddrs.filter(function(a) {
-                    var k = a.toLowerCase();
-                    if (seenD[k]) return false; seenD[k] = true; return true;
-                });
-                var detailHtml = renderAddrList(detailAddrs, 5);
+                // Same layout as the Customer Master e-mail dialog.
+                // From / To / CC — every address, in full. BCC is deliberately not shown.
+                // From shows the SENDER'S NAME (server-resolved); the raw address is only a fallback.
+                var fromHtml = data.fromName ? esc(data.fromName)
+                             : renderAddrList(splitAddrs(data.fromEmail || ''), 50);
+                var toHtml   = renderAddrList(splitAddrs(data.toEmail   || ''), 50);
+                var ccHtml   = renderAddrList(splitAddrs(data.ccEmail   || ''), 50);
 
-                // People: direction-aware.
-                // Outgoing → show To+CC recipient names (peopleNames).
-                // Incoming → show who sent it (fromName resolved from MailAddressFrom, else raw email).
-                var peopleItems;
-                if (data.direction === 'in') {
-                    var fromDisplay = data.fromName || data.fromEmail || '';
-                    peopleItems = fromDisplay ? [fromDisplay] : [];
-                } else {
-                    peopleItems = splitAddrs(data.peopleNames || '');
-                    if (peopleItems.length === 0 && data.who) peopleItems = [data.who];
+                // People: the To + CC recipients (name, or full e-mail when no user matches).
+                // `people` is an array so a name containing "," or ";" stays whole.
+                var peopleItems = (data.people && data.people.length) ? data.people.slice()
+                                : splitAddrs(data.peopleNames || '');
+                if (peopleItems.length === 0 && data.who) peopleItems = [data.who];
+                var peopleHtml  = esc(peopleItems.join(', '));
+
+                function addrRow(label, html) {
+                    return html ? [
+                        '  <tr>',
+                        '    <td class="vas_123_qrp-emd-meta-label">', esc(label), '</td>',
+                        '    <td class="vas_123_qrp-emd-meta-value" colspan="3">', html, '</td>',
+                        '  </tr>'
+                    ].join('') : '';
                 }
-                var peopleHtml  = renderAddrList(peopleItems, 5);
 
                 var bodyHtml = [
                     '<div class="vas_123_qrp-emd-top">',
@@ -2435,21 +2440,18 @@
                     '  <tr>',
                     '    <td class="vas_123_qrp-emd-meta-label">', esc(msg('VAS_123_When')), '</td>',
                     '    <td class="vas_123_qrp-emd-meta-value">', esc(fmtEngTs(data.whenTs || '')), '</td>',
-                    '    <td class="vas_123_qrp-emd-meta-label">', esc(msg('Details')), '</td>',
-                    '    <td class="vas_123_qrp-emd-meta-value">', detailHtml || '&mdash;', '</td>',
+                    '    <td class="vas_123_qrp-emd-meta-label">', esc(msg('VAS_123_People')), '</td>',
+                    '    <td class="vas_123_qrp-emd-meta-value">', peopleHtml, '</td>',
                     '  </tr>',
-                    peopleItems.length > 0 ? [
-                        '  <tr>',
-                        '    <td class="vas_123_qrp-emd-meta-label">', esc(msg('VAS_123_People')), '</td>',
-                        '    <td class="vas_123_qrp-emd-meta-value" colspan="3">', peopleHtml, '</td>',
-                        '  </tr>'
-                    ].join('') : '',
+                    addrRow(msg('From'), fromHtml),
+                    addrRow(msg('To'),   toHtml),
+                    addrRow(msg('CC'),   ccHtml),
                     '</table>',
                     data.body ? '<div class="vas_123_qrp-emd-body">' + data.body + '</div>' : ''
                 ].join('');
 
                 var footHtml = [
-                    '<button class="vas_123_qrp-btn vas_123_qrp-btn--ghost" id="', widgetID, '_emdClose">', esc(msg('VIS_Close')), '</button>',
+                    '<button class="vas_123_qrp-btn vas_123_qrp-btn--secondary" id="', widgetID, '_emdClose">', esc(msg('Close')), '</button>',
                     '<button class="vas_123_qrp-btn vas_123_qrp-btn--primary" id="', widgetID, '_emdReply">', SVG_REPLY2, ' ', esc(msg('VAS_123_Reply')), '</button>'
                 ].join('');
 
@@ -3087,13 +3089,23 @@
                 }
             });
 
-            // Click on linked opportunity row — show all quotations sharing that opportunity
-            $root.on('click', '[data-action="openLinkedQuotations"]', function (e) {
-                var oppId   = $(this).data('opportunityId');
-                var oppName = $(this).data('opportunityName') || '';
-                if (!oppId) return;
-                openLinkedQuotations(oppId, oppName);
+            // Click on the linked opportunity row — zoom straight to the VAS_Opportunity record
+            $root.on('click', '[data-action="openOpportunityRecord"]', function (e) {
                 e.stopPropagation();
+                var oppRecId = parseInt($(this).data('opportunityId') || 0, 10);
+                if (!oppRecId || !window.VIS) return;
+                try {
+                    var wid = 0;
+                    if (VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === 'function') {
+                        wid = VIS.ZoomTarget.getZoomAD_Window_ID('VAS_Opportunity', 0, null, false) || 0;
+                    }
+                    if (wid > 0 && VIS.viewManager && typeof VIS.viewManager.startWindow === 'function') {
+                        var q = (VIS.Query && VIS.Query.prototype && typeof VIS.Query.prototype.getEqualQuery === 'function')
+                            ? VIS.Query.prototype.getEqualQuery('VAS_Opportunity_ID', oppRecId)
+                            : null;
+                        VIS.viewManager.startWindow(wid, q);
+                    }
+                } catch (ex) { }
             });
 
             // Add line — directs user to line entry on the main window form
@@ -3145,6 +3157,17 @@
                 state.taskTab   = $(this).data('tab') || 'up';
                 state.tasksPage = 0;   // reset to first page when switching tabs
                 renderTasks();
+            });
+
+            // Orders pagination — previous / next page (5 per page)
+            $root.on('click', '[data-action="ordersPagePrev"]', function (e) {
+                e.stopPropagation();
+                if (state.ordersPage > 0) { state.ordersPage--; renderOrders(); }
+            });
+            $root.on('click', '[data-action="ordersPageNext"]', function (e) {
+                e.stopPropagation();
+                var maxPage = Math.ceil((state.generatedOrders || []).length / 5) - 1;
+                if (state.ordersPage < maxPage) { state.ordersPage++; renderOrders(); }
             });
 
             // Tasks pagination — previous page
@@ -3500,6 +3523,7 @@
             // Reset Part 2 state
             state.generatedOrders        = null;
             state.generatedOrdersLoading = false;
+            state.ordersPage             = 0;
             state.opportunity            = null;
             state.opportunityLoading     = false;
             state.lines                  = null;
