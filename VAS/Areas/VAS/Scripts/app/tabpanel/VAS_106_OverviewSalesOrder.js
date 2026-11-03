@@ -872,14 +872,14 @@
             };
         }
 
-        // Invoiced: Σ invoice grand totals vs order grand total + payment state.
+        // Invoiced: Σ invoice subtotals (before tax) vs the order subtotal + payment state.
         function invoiced() {
             var inv = data.Invoices || [], amt = 0, allPaid = inv.length > 0;
             for (var i = 0; i < inv.length; i++) {
-                amt += (+inv[i].GrandTotal || 0);
+                amt += (+inv[i].SubTotal || 0);
                 if (!inv[i].IsPaid) allPaid = false;
             }
-            var gt = +data.GrandTotal || 0;
+            var gt = +data.TotalLines || 0;
             return {
                 amount: amt,
                 pct: gt > 0 ? Math.round(amt / gt * 100) : 0,
@@ -900,7 +900,10 @@
             }
             return {
                 pending: pending, available: avail, shortCount: shortCount,
-                pct: pending > 0 ? Math.round(avail / pending * 100) : 100
+                // No lines yet reads 0%, not "nothing pending, so ready". Lines that
+                // are all delivered (none pending) still read 100%.
+                pct: pending > 0 ? Math.round(avail / pending * 100)
+                    : ((data.Lines || []).length > 0 ? 100 : 0)
             };
         }
 

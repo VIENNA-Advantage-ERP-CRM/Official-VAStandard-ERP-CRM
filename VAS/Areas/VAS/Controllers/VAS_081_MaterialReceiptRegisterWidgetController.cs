@@ -26,6 +26,8 @@ namespace VIS.Controllers
     ///               receipt-line detail query.
     /// Chronological development:
     ///   &lt;EmpCode&gt;   2026-06-18 Created
+    ///   VAI163      2026-10-29 Receipt lines also carry the instance's Lot / Serial No. (and its
+    ///               description when it has no attribute rows) for the modal's Attribute column
     /// </summary>
     public class VAS_081_MaterialReceiptRegisterWidgetController : Controller
     {
@@ -251,12 +253,16 @@ namespace VIS.Controllers
                        COALESCE(InOutLine.QtyEntered, InOutLine.MovementQty, 0) AS Received_Qty,
                        COALESCE(UOM.Name, UOM.UOMSymbol) AS Uom,
                        InOutLine.Line AS Line_No,
-                       InOutLine.M_InOutLine_ID AS InOutLine_Id
+                       InOutLine.M_InOutLine_ID AS InOutLine_Id,
+                       ASI.Lot AS Asi_Lot,
+                       ASI.SerNo AS Asi_SerNo,
+                       ASI.Description AS Asi_Description
                 FROM M_InOutLine InOutLine
                 INNER JOIN M_InOut InOut ON (InOut.M_InOut_ID=InOutLine.M_InOut_ID AND InOut.IsActive='Y')
                 INNER JOIN M_Product Product ON (Product.M_Product_ID=InOutLine.M_Product_ID AND Product.IsActive='Y')
                 LEFT OUTER JOIN C_OrderLine OrderLine ON (OrderLine.C_OrderLine_ID=InOutLine.C_OrderLine_ID AND OrderLine.IsActive='Y')
                 LEFT OUTER JOIN C_UOM UOM ON (UOM.C_UOM_ID=InOutLine.C_UOM_ID AND UOM.IsActive='Y')
+                LEFT OUTER JOIN M_AttributeSetInstance ASI ON (ASI.M_AttributeSetInstance_ID=InOutLine.M_AttributeSetInstance_ID AND InOutLine.M_AttributeSetInstance_ID>0)
                 WHERE InOutLine.IsActive='Y'
                   AND InOut.IsSOTrx='N'
                   AND InOut.MovementType='V+'
@@ -280,6 +286,9 @@ namespace VIS.Controllers
 
             List<object> rows = new List<object>();
             Dictionary<int, List<object>> attributesByLine = new Dictionary<int, List<object>>();
+            // 29-Oct 4.11: Lot / Serial No. sit on the instance itself (not in M_AttributeInstance), and an
+            // instance with no readable attribute rows still names itself by its description.
+            Dictionary<int, string[]> instanceByLine = new Dictionary<int, string[]>();
             IDataReader dr = null;
 
             try
@@ -289,7 +298,14 @@ namespace VIS.Controllers
                 while (dr != null && dr.Read())
                 {
                     List<object> lineAttributes = new List<object>();
-                    attributesByLine[Util.GetValueOfInt(dr["InOutLine_Id"])] = lineAttributes;
+                    int inOutLineId = Util.GetValueOfInt(dr["InOutLine_Id"]);
+                    attributesByLine[inOutLineId] = lineAttributes;
+                    instanceByLine[inOutLineId] = new string[]
+                    {
+                        Util.GetValueOfString(dr["Asi_Lot"]),
+                        Util.GetValueOfString(dr["Asi_SerNo"]),
+                        Util.GetValueOfString(dr["Asi_Description"])
+                    };
                     rows.Add(new
                     {
                         itemName = Util.GetValueOfString(dr["Item_Name"]),
@@ -344,6 +360,29 @@ namespace VIS.Controllers
                         if (string.IsNullOrEmpty(label) || string.IsNullOrEmpty(value)) { continue; }
 
                         target.Add(new { label = label, value = value });
+                    }
+                    if (dr != null)
+                    {
+                        dr.Close();
+                        dr.Dispose();
+                        dr = null;
+                    }
+
+                    string lotLabel = Msg.Translate(ctx, "Lot");
+                    string serNoLabel = Msg.Translate(ctx, "SerNo");
+                    string attributeLabel = Msg.Translate(ctx, "M_Attribute_ID");
+                    foreach (KeyValuePair<int, string[]> instance in instanceByLine)
+                    {
+                        List<object> target = attributesByLine[instance.Key];
+                        bool hadAttributes = target.Count > 0;
+                        if (!string.IsNullOrWhiteSpace(instance.Value[0])) { target.Add(new { label = lotLabel, value = instance.Value[0].Trim() }); }
+                        if (!string.IsNullOrWhiteSpace(instance.Value[1])) { target.Add(new { label = serNoLabel, value = instance.Value[1].Trim() }); }
+                        // Empty instances carry dash-only descriptions ("-", "---"): those are no attribute.
+                        string description = (instance.Value[2] ?? "").Trim();
+                        if (!hadAttributes && target.Count == 0 && description.Trim('-').Length > 0)
+                        {
+                            target.Add(new { label = attributeLabel, value = description });
+                        }
                     }
                 }
 

@@ -152,11 +152,24 @@
     flex-direction: column;
     flex: 1;
     min-height: 0;
-    overflow-x: hidden;
-    overflow-y: auto;
+    /* Three rows per page with a pager below - the list never scrolls */
+    overflow: hidden;
     border-top: 1px solid #E2EAF1;
     padding-top: 0.47em;
     justify-content: flex-start;
+}
+
+/* Widget list pager (shown only when there is more than one page) */
+.vas-213-wfoot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex: none;
+    padding-top: 0.3em;
+}
+
+.vas-213-wfoot.vas-213-hidden {
+    display: none;
 }
 
 .vas-213-hrow {

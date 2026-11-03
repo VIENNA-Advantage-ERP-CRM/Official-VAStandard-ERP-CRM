@@ -173,6 +173,10 @@
     font-size: var(--panel-anchor);
 
     width: min(1240px, 94vw);
+    /* A fixed height (not just a cap): the pop-up keeps the same size while moving between the
+       documents list, the PO line details, their pages and Back - a content-sized dialog
+       shrank and grew with the number of rows on each page. */
+    height: min(880px, 90dvh);
     max-height: min(880px, 90dvh);
     background: #FFFFFF;
     border: 1px solid #D9E2EB;

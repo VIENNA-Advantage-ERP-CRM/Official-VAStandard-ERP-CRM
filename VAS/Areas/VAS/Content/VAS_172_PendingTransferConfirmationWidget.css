@@ -480,6 +480,21 @@
 
 .vas-172-v2-span2 { grid-column: span 2; }
 
+/* Quantity-rule message shown inside the pop-up (info tone). */
+.vas-172-v2-msg {
+    margin-top: .5rem;
+    padding: .45rem .75rem;
+    border-radius: 8px;
+    background: #EEF6FF;
+    border: 1px solid #CFE3F7;
+    color: #0F69AC;
+    font-size: .8125rem;
+    font-weight: 500;
+    line-height: 1.35;
+}
+
+.vas-172-v2-msg[hidden] { display: none; }
+
 /* Read-only fields stay white - no blue fill. */
 .vas-172-v2-readonly {
     background: #fff;

@@ -53,10 +53,9 @@ namespace VAS.Controllers
     ///       (exclusive upper bound Today+8), counted only among rows that are not
     ///       already overdue (DatePromised &gt;= Today) - Today/Next7End are computed
     ///       in C# and bound as parameters, never a DB-specific date function.
-    ///     - Preview = the 3 rows with the earliest DatePromised (ties broken by
-    ///       DocumentNo), giving a genuine "next up" list rather than an arbitrary
-    ///       sample. No pager on this widget - the full set lives in the SO Queue
-    ///       widget or is reached via a row click.
+    ///     - Preview = every row of the counted cohort (Sr 8.31 - count and list must
+    ///       agree), earliest DatePromised first (ties broken by DocumentNo); the
+    ///       widget's list scrolls when they do not all fit.
     ///
     ///   Per the CTE/MRole rule (Prompt_Instructions.txt "Case 1"): both the summary
     ///   and preview queries isolate a single "FROM C_Order o" fragment
@@ -73,7 +72,10 @@ namespace VAS.Controllers
     {
         private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_279_DueForDeliveryWidgetController).FullName);
 
-        private const int PreviewCount = 3;
+        // Sr 8.31: the list must show every order the headline counts (it showed a fixed 3
+        // while the count said 4). All due orders are returned - earliest promised first -
+        // and the widget's list scrolls; the cap only guards against a runaway month.
+        private const int PreviewCount = 200;
         private const int MaxLineRows = 200;
 
         /// <summary>

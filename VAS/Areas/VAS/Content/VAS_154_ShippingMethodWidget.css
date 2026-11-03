@@ -112,6 +112,8 @@
 .vas-shm-dorow { border-bottom: 0.0625em solid #EDF2F6; }
 .vas-shm-dorow:last-child { border-bottom: none; }
 .vas-shm-doid { font-weight: 700; font-size: .8em; color: #0083DA; white-space: nowrap; }
+.vas-shm-dolink { color: inherit; text-decoration: none; cursor: pointer; }
+.vas-shm-dolink:hover, .vas-shm-dolink:focus { text-decoration: underline; }
 .vas-shm-docell { font-weight: 400; font-size: .8em; color: #5F7283; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vas-shm-doamount { font-weight: 700; font-size: .8em; color: #102C3F; text-align: right; white-space: nowrap; }
 

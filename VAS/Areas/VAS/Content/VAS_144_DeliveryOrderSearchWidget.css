@@ -419,6 +419,13 @@
     white-space: nowrap;
 }
 
+/* "DO: / SO: / Delivery Mode:" caption inside a hero chip. */
+.MPC-dos-chip-lbl {
+    font-weight: 400;
+    color: #748494;
+    margin-right: .25em;
+}
+
 .MPC-dos-stats {
     display: flex;
     gap: .625em;
@@ -533,23 +540,47 @@
    with the numbers "squashed" into columns too narrow for their now-larger
    text. Converting the numeric columns to em (scaling with the same font-size
    as the text inside them) fixes both symptoms at once. */
+/* Columns: Item | [Attribute] | Qty | UOM | Price | Total. The Attribute
+   column is rendered only when some line has an attribute value
+   (.MPC-dos-has-attr on the header and rows). Price/Total show full
+   (unabbreviated) numbers, so they are wider than before. */
 .MPC-dos-lhead,
 .MPC-dos-lrow {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 3.25em 6.25em 6.5em;
+    grid-template-columns: minmax(0, 1fr) 3.25em 4em 7em 7.5em;
     column-gap: .75em;
     align-items: center;
+}
+
+.MPC-dos-lhead.MPC-dos-has-attr,
+.MPC-dos-lrow.MPC-dos-has-attr {
+    grid-template-columns: minmax(0, 1fr) minmax(0, .7fr) 3.25em 4em 7em 7.5em;
 }
 
 @media (max-width: 560px) {
     .MPC-dos-lhead,
     .MPC-dos-lrow {
-        grid-template-columns: minmax(0, 1fr) 3.25em 6.5em;
+        grid-template-columns: minmax(0, 1fr) 3.25em 4em 7.5em;
+    }
+
+    .MPC-dos-lhead.MPC-dos-has-attr,
+    .MPC-dos-lrow.MPC-dos-has-attr {
+        grid-template-columns: minmax(0, 1fr) minmax(0, .7fr) 3.25em 4em 7.5em;
     }
 
     .MPC-dos-l-price {
         display: none;
     }
+}
+
+.MPC-dos-l-attr,
+.MPC-dos-l-uom {
+    font-size: 0.8125em;
+    color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
 }
 
 .MPC-dos-lhead {
@@ -615,7 +646,8 @@
     inset: 0;
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
+    background: #FFFFFF;
 }
 
 .MPC-dos-li-main {

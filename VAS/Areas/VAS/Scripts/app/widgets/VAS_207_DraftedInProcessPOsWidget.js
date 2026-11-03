@@ -580,7 +580,8 @@
 
             $header.find('.vas-207-mback').show();
             $foot.find('.vas-207-back-btn').show();
-            $dialog.addClass('vas-207-modal-md');
+            // The pop-up keeps one size across the documents list, the line details, their
+            // pages and Back (no narrower "md" dialog for the lines view).
 
             var sym = cachedData.currencySymbol || '₹';
             var iso = cachedData.currencyIso || 'INR';
@@ -634,9 +635,15 @@
                 totalPendingQty += Number(lines[i].QtyPending || 0);
             }
 
-            var sym = cachedData.currencySymbol || '₹';
-            var iso = cachedData.currencyIso || 'INR';
-            var formattedVal = formatCurrency(poRec.ConvertedValue, sym, iso);
+            // The value card is the sum of the Amount column below (every line, in the
+            // order's own currency), so the card and the lines always agree.
+            var linesAmount = 0;
+            for (var a = 0; a < lines.length; a++) {
+                linesAmount += Number(lines[a].LineNetAmt || 0);
+            }
+            var sym = (lines[0] && lines[0].CurrencySymbol) || cachedData.currencySymbol || '₹';
+            var iso = (lines[0] && lines[0].CurrencyIso) || cachedData.currencyIso || 'INR';
+            var formattedVal = formatCurrency(linesAmount, sym, iso);
 
             // The "Purchase order 800080 · date · status" link row that used to sit here
             // (2026-09-30 removed, user request: "Remove the highlighted details from the
@@ -722,8 +729,9 @@
             $table.append($thead);
 
             var $mbody = $('<div class="vas-207-mbody vas-207-lines-body"></div>');
-            var sym = cachedData.currencySymbol || '₹';
-            var iso = cachedData.currencyIso || 'INR';
+            // Line rates / amounts are in the order's own currency
+            var sym = (lines[0] && lines[0].CurrencySymbol) || cachedData.currencySymbol || '₹';
+            var iso = (lines[0] && lines[0].CurrencyIso) || cachedData.currencyIso || 'INR';
 
             for (var i = 0; i < pageRows.length; i++) {
                 var l = pageRows[i];

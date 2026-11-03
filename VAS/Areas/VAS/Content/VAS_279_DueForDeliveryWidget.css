@@ -118,7 +118,15 @@
     min-height: 0;
     border-top: 1px solid #E2EAF1;
     padding-top: .35em;
+    /* Sr 8.31: every order in the headline count is reachable, paged by the footer pager -
+       widgets never scroll (dashboard-widgets.md, No Inner Scrollbars). */
+    overflow: hidden;
 }
+
+/* Tile footer pager: rows per page come from the list height (fitTileRows). */
+.vas279-shell > .vas279-mtfoot { margin-top: .35em; padding-top: .35em; }
+
+.vas279-mini > .vas279-mrow2 { flex: none; }
 
 .vas279-mrow2 {
     display: flex;

@@ -448,14 +448,13 @@
                                     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>' +
                                 '</button>' +
                             '</span>' +
-                            '<button type="button" class="vas-elc-mbtn">' + escapeHtml(label('VAS_Close', 'Close')) + '</button>' +
                         '</div>' +
                     '</div>' +
                 '</div>'
             );
 
             $('body').append($elcMask);
-            $elcMask.find('.vas-elc-mclose, .vas-elc-mbtn').on('click', closeCostModal);
+            $elcMask.find('.vas-elc-mclose').on('click', closeCostModal);
             $elcMask.find('.vas-elc-mprev').on('click', function () {
                 if (modalPageNo > 1) { modalPageNo--; renderCostModalPage(); }
             });
@@ -590,15 +589,12 @@
                 label('VAS_Showing', 'Showing') + ' ' + (startIdx + 1) + '-' + endIdx + ' ' + label('VAS_Of', 'of') + ' ' + rows.length + ' ' +
                 label('VAS_PurchaseOrders', 'purchase orders'));
 
-            // Pager only appears once there is more than one page.
-            if (rows.length > MODAL_PAGE_SIZE) {
-                $elcMask.find('.vas-elc-mptxt').text(modalPageNo + ' ' + label('VAS_Of', 'of') + ' ' + totalModalPages);
-                $elcMask.find('.vas-elc-mprev').prop('disabled', modalPageNo <= 1);
-                $elcMask.find('.vas-elc-mnext').prop('disabled', modalPageNo >= totalModalPages);
-                $elcMask.find('.vas-elc-mpager').css('display', 'flex');
-            } else {
-                $elcMask.find('.vas-elc-mpager').hide();
-            }
+            // The footer carries the page navigation in place of a Close button (the header X closes the
+            // popup), so it is always shown; on a single page both arrows are disabled.
+            $elcMask.find('.vas-elc-mptxt').text(modalPageNo + ' ' + label('VAS_Of', 'of') + ' ' + totalModalPages);
+            $elcMask.find('.vas-elc-mprev').prop('disabled', modalPageNo <= 1);
+            $elcMask.find('.vas-elc-mnext').prop('disabled', modalPageNo >= totalModalPages);
+            $elcMask.find('.vas-elc-mpager').css('display', 'flex');
         }
 
         function docStatusText(code) {

@@ -315,6 +315,49 @@ namespace VIS.Controllers
                 ? "rl.C_BPartner_ID"
                 : "NULL";
 
+            // The line's partner is often the requestor's own business partner (an employee partner can
+            // also be flagged as vendor); the requestor is never defaulted as the vendor - the line is left
+            // with "Select vendor" for the user to choose.
+            // Resolved up front (plain ids) so the outer join carries no sub-query.
+            string requestorExclusion = "";
+            List<int> requestorBpIds = new List<int>();
+            try
+            {
+                List<string> requestorCols = new List<string>();
+                if (HasColumn("M_Requisition", "C_BPartner_ID"))
+                {
+                    requestorCols.Add("COALESCE(r.C_BPartner_ID, 0) AS HeaderBPartner");
+                }
+                if (HasColumn("M_Requisition", "AD_User_ID"))
+                {
+                    requestorCols.Add("COALESCE(ru.C_BPartner_ID, 0) AS RequestorBPartner");
+                }
+                if (requestorCols.Count > 0)
+                {
+                    string requestorSql = "SELECT " + string.Join(", ", requestorCols) + @"
+                        FROM M_Requisition r"
+                        + (HasColumn("M_Requisition", "AD_User_ID") ? " LEFT JOIN AD_User ru ON ru.AD_User_ID = r.AD_User_ID" : "") + @"
+                        WHERE r.M_Requisition_ID = @M_Requisition_ID";
+                    DataSet reqDs = DB.ExecuteDataset(requestorSql, new SqlParameter[] { new SqlParameter("@M_Requisition_ID", requisitionId) }, null);
+                    if (reqDs != null && reqDs.Tables.Count > 0 && reqDs.Tables[0].Rows.Count > 0)
+                    {
+                        foreach (DataColumn col in reqDs.Tables[0].Columns)
+                        {
+                            int requestorBpId = Util.GetValueOfInt(reqDs.Tables[0].Rows[0][col]);
+                            if (requestorBpId > 0)
+                            {
+                                requestorBpIds.Add(requestorBpId);
+                                requestorExclusion += " AND bp.C_BPartner_ID <> " + requestorBpId;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Log(Level.SEVERE, "VAS_217_OpenRequisitionsWidget.GetRequisitionLines (requestor)", ex);
+            }
+
             // QtyEntered is the quantity in the line's selected unit; not every database carries the column.
             string enteredQtyExpr = HasColumn("M_RequisitionLine", "QtyEntered")
                 ? "COALESCE(rl.QtyEntered, 0)"
@@ -363,7 +406,7 @@ namespace VIS.Controllers
                 LEFT JOIN C_BPartner bp
                     ON bp.C_BPartner_ID = " + lineVendorExpr + @"
                    AND bp.IsVendor = 'Y'
-                   AND bp.IsActive = 'Y'
+                   AND bp.IsActive = 'Y'" + requestorExclusion + @"
                 WHERE rl.M_Requisition_ID = @M_Requisition_ID
                   AND rl.IsActive = 'Y'
                   AND r.IsActive = 'Y'
@@ -457,7 +500,7 @@ namespace VIS.Controllers
                 if (preferredVendors.ContainsKey(l.productId))
                 {
                     ProductPoVendorDto poVendor = preferredVendors[l.productId];
-                    if (effectiveVendorId <= 0)
+                    if (effectiveVendorId <= 0 && !requestorBpIds.Contains(poVendor.vendorId))
                     {
                         effectiveVendorId = poVendor.vendorId;
                         effectiveVendorName = poVendor.vendorName;
@@ -1450,20 +1493,35 @@ namespace VIS.Controllers
                     // Update QtyOrdered on M_RequisitionLine inside same transaction
                     if (item.RequisitionLineId > 0)
                     {
+                        // The requisition line is also linked to the order line from its own side
+                        // (M_RequisitionLine.C_OrderLine_ID), the link the platform's Create PO from
+                        // Requisition writes, so the PO's "Generated from" shows the requisition rather
+                        // than a manual PO. A line already linked to an earlier order keeps that link.
+                        string orderLineLinkSql = HasColumn("M_RequisitionLine", "C_OrderLine_ID")
+                            ? @"C_OrderLine_ID = CASE WHEN COALESCE(C_OrderLine_ID, 0) = 0 THEN @C_OrderLine_ID ELSE C_OrderLine_ID END,"
+                            : "";
                         string updateReqLineSql = @"
                             UPDATE M_RequisitionLine
                             SET QtyOrdered = COALESCE(QtyOrdered, 0) + @OrderQty,
+                                " + orderLineLinkSql + @"
                                 Updated = @Updated,
                                 UpdatedBy = @UpdatedBy
                             WHERE M_RequisitionLine_ID = @M_RequisitionLine_ID";
 
-                        DB.ExecuteQuery(updateReqLineSql, new SqlParameter[]
+                        // Parameters in the order they appear in the statement
+                        List<SqlParameter> updateReqLineParams = new List<SqlParameter>
                         {
-                            new SqlParameter("@OrderQty", orderBaseQty),
-                            new SqlParameter("@Updated", DateTime.Now),
-                            new SqlParameter("@UpdatedBy", ctx.GetAD_User_ID()),
-                            new SqlParameter("@M_RequisitionLine_ID", item.RequisitionLineId)
-                        }, trx);
+                            new SqlParameter("@OrderQty", orderBaseQty)
+                        };
+                        if (orderLineLinkSql.Length > 0)
+                        {
+                            updateReqLineParams.Add(new SqlParameter("@C_OrderLine_ID", ol.GetC_OrderLine_ID()));
+                        }
+                        updateReqLineParams.Add(new SqlParameter("@Updated", DateTime.Now));
+                        updateReqLineParams.Add(new SqlParameter("@UpdatedBy", ctx.GetAD_User_ID()));
+                        updateReqLineParams.Add(new SqlParameter("@M_RequisitionLine_ID", item.RequisitionLineId));
+
+                        DB.ExecuteQuery(updateReqLineSql, updateReqLineParams.ToArray(), trx);
                     }
                 }
 

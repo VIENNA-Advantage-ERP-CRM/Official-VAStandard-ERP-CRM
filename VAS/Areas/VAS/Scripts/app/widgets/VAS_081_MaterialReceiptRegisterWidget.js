@@ -42,6 +42,7 @@
  * 24  | Representative                        | VAS_081_Representative
  * 25  | Month                                 | Month
  * 26  | Year                                  | Year
+ * 27  | Attribute                             | VAS_081_Attribute
  */
 ; VAS = window.VAS || {};
 
@@ -78,6 +79,7 @@
         var rowsById = {};
         var pageNo = 1;
         var pageSize = 5;
+        var loadedPageSize = 5;   // size the rows on screen were fetched with (pager text uses it)
         var totalPages = 0;
         var totalRecords = 0;
         var loading = false;
@@ -157,17 +159,29 @@
             showBusy(true);
             if ($prevBtn) { $prevBtn.prop("disabled", true); }
             if ($nextBtn) { $nextBtn.prop("disabled", true); }
+            var requestedSize = pageSize;
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_081_MaterialReceiptRegisterWidget/GetReceipts',
                 type: 'GET',
                 cache: false,
-                data: { pageNo: p, pageSize: pageSize, year: filterYear, month: filterMonth },
+                data: { pageNo: p, pageSize: requestedSize, year: filterYear, month: filterMonth },
                 success: function (res) {
                     var data = parseResponse(res);
                     loading = false;
                     showBusy(false);
                     if (!data || data.error) { setEmpty(); return; }
+
+                    /* 29-Oct 4.13: the page size can be re-measured while this request is in flight
+                       (syncPageSize skips the reload then); the rows were cut at the size SENT, so
+                       re-fetch at the current size instead of showing e.g. 5 rows under "1–4 of 30". */
+                    var servedSize = Number(data.pageSize || requestedSize);
+                    if (servedSize !== pageSize) {
+                        var firstShown = ((Number(data.pageNo || p) - 1) * servedSize) + 1;
+                        loadPage(Math.max(1, Math.ceil(firstShown / pageSize)));
+                        return;
+                    }
+                    loadedPageSize = servedSize;
 
                     ROWS = data.rows || [];
                     rowsById = {};
@@ -237,14 +251,16 @@
 
             /* Review #45: the register fits 4 records on the standard 2x3 card
                (compact rows); the count still grows with taller screens/zoom. */
-            return Math.max(4, Math.floor(listHeight / rowHeight));
+            // Capped at the server's own maximum (50) so the size sent is the size served.
+            return Math.min(50, Math.max(4, Math.floor(listHeight / rowHeight)));
         }
 
         function syncPageSize() {
             var nextPageSize = measurePageSize();
             if (nextPageSize === pageSize) { return; }
 
-            var firstRecord = ((pageNo - 1) * pageSize) + 1;
+            /* First record of the page on screen - laid out at the size it was loaded with. */
+            var firstRecord = ((pageNo - 1) * loadedPageSize) + 1;
             pageSize = nextPageSize;
             pageNo = Math.max(1, Math.ceil(firstRecord / pageSize));
             if (!loading) { loadPage(pageNo); }
@@ -350,8 +366,9 @@
             }
             if ($pageInfo) {
                 if (totalRecords > 0) {
-                    var from = (pageNo - 1) * pageSize + 1;
-                    var to = Math.min(pageNo * pageSize, totalRecords);
+                    // 29-Oct 4.13: count what is actually listed, so "Showing" always matches the rows.
+                    var from = (pageNo - 1) * loadedPageSize + 1;
+                    var to = Math.min(from + Math.max(ROWS.length, 1) - 1, totalRecords);
                     $pageInfo.text(lbl("VAS_081_Showing", "Showing") + ' ' + from + '–' + to + ' ' + lbl("VAS_081_Of", "of") + ' ' + totalRecords);
                 } else { $pageInfo.text(''); }
             }
@@ -388,12 +405,9 @@
             $dialog.find('.vas-mrr-modal-close').on('click', function () { closeDetail(); });
             $dialog.on('click', '.vas-mrr-grn-link', function () {
                 var receiptId = Number($(this).attr('data-receiptid'));
-                if (!receiptId || !VAS.ZoomUtil) { return; }
+                if (!receiptId) { return; }
                 closeDetail();
-                VAS.ZoomUtil.zoomToRecord('M_InOut_ID', receiptId, grnZoomWindowId, 'VAS_MaterialReceipt', 'Material Receipt')
-                    .done(function (id) {
-                        if (id > 0) { grnZoomWindowId = id; }
-                    });
+                zoomToGRN(receiptId);
             });
             // Review #22: pager for the modal line table.
             $dialog.on('click', '.vas-mrr-lprev', function () {
@@ -403,6 +417,48 @@
                 detailPage++; renderLinesPage();
             });
             $('body').append($dialog);
+        }
+
+        /* The framework navigates IN-PLACE (no new window) only when the payload's ActionName
+           equals the name of the window currently HOSTING this widget; resolve it from the
+           listener chain (same as VAS_091_MaterialReceiptSearchWidget's zoomTo). */
+        function hostWindowName() {
+            try {
+                var l = $self.listener;
+                for (var i = 0; i < 6 && l; i++) {
+                    if (l.apanel && l.apanel.gridWindow && l.apanel.gridWindow.getName) {
+                        return l.apanel.gridWindow.getName();
+                    }
+                    if (l.gridWindow && l.gridWindow.getName) {
+                        return l.gridWindow.getName();
+                    }
+                    l = l.listener;
+                }
+            } catch (e) { }
+            return '';
+        }
+
+        /* 29-Oct 4.15: the GRN opens on the Goods Receipt Note screen in the SAME tab - hosted in a
+           window, the host grid navigates to the record; only on the Home page (no host window) the
+           Material Receipt window is opened by name. */
+        function zoomToGRN(receiptId) {
+            try {
+                if ($self.listener && $self.windowNo >= 0) {
+                    $self.widgetFirevalueChanged({
+                        "TabWhereClause": "M_InOut.M_InOut_ID=" + receiptId,
+                        "TabLayout": "Y",
+                        "TabIndex": "0",
+                        "ActionName": hostWindowName() || "VAS_MaterialReceipt",
+                        "ActionType": "W"
+                    });
+                    return;
+                }
+                if (!VAS.ZoomUtil) { return; }
+                VAS.ZoomUtil.zoomToRecord('M_InOut_ID', receiptId, grnZoomWindowId, 'VAS_MaterialReceipt', 'Material Receipt')
+                    .done(function (id) {
+                        if (id > 0) { grnZoomWindowId = id; }
+                    });
+            } catch (e) { /* zoom is best-effort */ }
         }
 
         function field(labelKey, fallback, value, strong) {
@@ -416,7 +472,7 @@
             var r = rowsById[receiptId];
             if (!r || !$dialog) { return; }
 
-            /* QA sheet GRN #107: the receipt number opens that GRN in the Material Receipt window (new tab). */
+            /* QA sheet GRN #107 / 29-Oct 4.15: the receipt number opens that GRN on the Goods Receipt Note screen (same tab). */
             $dialogTitle.html(
                 '<button type="button" class="vas-mrr-grn-link" data-receiptid="' + escapeHtml(r.receiptId) + '">' + escapeHtml(r.receiptNo || '') + '</button>' +
                 escapeHtml(' - ' + (r.supplier || '')));
@@ -482,12 +538,17 @@
             var start = (detailPage - 1) * detailPageSize;
             var pageLines = detailLines.slice(start, start + detailPageSize);
 
+            // 29-Oct 4.11: an Attribute column next to the product, shown when ANY line of the
+            // receipt (not only this page) has an attribute value; each line shows its own values.
+            var showAttrs = false;
+            for (var k = 0; k < detailLines.length; k++) {
+                if (detailLines[k].attributes && detailLines[k].attributes.length) { showAttrs = true; break; }
+            }
+
             // Review #23: the PO Qty column was removed from the modal table.
             var body = '';
             for (var i = 0; i < pageLines.length; i++) {
                 var ln = pageLines[i];
-                // Attribute values sit under the product name; nothing is rendered
-                // for a line (or a whole receipt) without attributes.
                 var attrText = '';
                 var attrs = ln.attributes || [];
                 for (var a = 0; a < attrs.length; a++) {
@@ -495,8 +556,10 @@
                 }
                 body +=
                     '<tr>' +
-                    '<td class="vas-mrr-l-item" title="' + escapeHtml(ln.itemName + (attrText ? ' - ' + attrText : '')) + '"><span class="vas-mrr-trunc">' + escapeHtml(ln.itemName) + '</span>' +
-                    (attrText ? '<span class="vas-mrr-trunc vas-mrr-l-attr">' + escapeHtml(attrText) + '</span>' : '') + '</td>' +
+                    '<td class="vas-mrr-l-item" title="' + escapeHtml(ln.itemName) + '"><span class="vas-mrr-trunc">' + escapeHtml(ln.itemName) + '</span></td>' +
+                    (showAttrs
+                        ? '<td class="vas-mrr-l-attrcol" title="' + escapeHtml(attrText) + '"><span class="vas-mrr-trunc">' + escapeHtml(attrText || '—') + '</span></td>'
+                        : '') +
                     '<td class="vas-mrr-l-num">' + escapeHtml(formatQty(ln.receivedQty)) + '</td>' +
                     '<td class="vas-mrr-l-uom" title="' + escapeHtml(ln.uom) + '">' + escapeHtml(ln.uom) + '</td>' +
                     '</tr>';
@@ -521,6 +584,7 @@
                 '<table class="vas-mrr-lines-table">' +
                 '<thead><tr>' +
                 '<th class="vas-mrr-l-item">' + escapeHtml(lbl("VAS_081_Product", "Item")) + '</th>' +
+                (showAttrs ? '<th class="vas-mrr-l-attrcol">' + escapeHtml(lbl("VAS_081_Attribute", "Attribute")) + '</th>' : '') +
                 '<th class="vas-mrr-l-num">' + escapeHtml(lbl("VAS_081_Received", "Received")) + '</th>' +
                 '<th class="vas-mrr-l-uom">' + escapeHtml(lbl("VAS_081_Uom", "UOM")) + '</th>' +
                 '</tr></thead><tbody>' + body + '</tbody></table>' + pager
@@ -556,6 +620,14 @@
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
         ensureDashInlineSizeVar(this.getRoot());
+    };
+
+    VAS.VAS_081_MaterialReceiptRegisterWidget.prototype.addChangeListener = function (listener) {
+        this.listener = listener;
+    };
+
+    VAS.VAS_081_MaterialReceiptRegisterWidget.prototype.widgetFirevalueChanged = function (value) {
+        if (this.listener) { this.listener.widgetFirevalueChanged(value); }
     };
 
     VAS.VAS_081_MaterialReceiptRegisterWidget.prototype.widgetSizeChange = function (height, width) { };

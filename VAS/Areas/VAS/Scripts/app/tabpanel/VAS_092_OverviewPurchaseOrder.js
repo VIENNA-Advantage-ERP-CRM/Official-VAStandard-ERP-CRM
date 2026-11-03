@@ -1392,9 +1392,14 @@
         // 7-stage progress. The Partial Received stage relabels to "Received"
         // once the order is fully received so it never reads as partial.
         function progressStages() {
-            var recvLabel = data.IsFullyDelivered
+            // Reads "Received" (Pending) until a GRN is created / completed, then
+            // "Partially Received", and "Received" again once everything is in.
+            var recvLabel = (!data.IsPartialDelivered || data.IsFullyDelivered)
                 ? getMsg("VAS_092_FullyReceived")
                 : getMsg("VAS_092_PartialDelivered");
+            // With Vendor is reached only once the order has actually been sent;
+            // until then it stays grey with its number, not a green tick.
+            var withVendorDone = !!(data.IsWithVendor && data.IsEmailSent);
             // Payment stage: "Payment Completed" (green) once every invoice is
             // fully paid; otherwise "Pending Amount".
             var paymentLabel = data.IsPaymentDone
@@ -1423,7 +1428,7 @@
                 // late in the local evening reports the following UTC day.
                 { key: "VAS_092_Drafted",          done: true,                     active: data.CurrentStage === 1, date: data.Created || data.DateOrdered, stamp: true },
                 { key: "VAS_092_Completed",        done: data.IsCompleted,         active: data.CurrentStage === 2, date: data.OrderCompletedDate || data.DateOrdered },
-                { key: "VAS_092_WithVendor",       label: withVendorLabel, done: data.IsWithVendor, active: data.CurrentStage === 3, date: data.OrderCompletedDate || data.DateOrdered, meta: withVendorMeta },
+                { key: "VAS_092_WithVendor",       label: withVendorLabel, done: withVendorDone, active: false, date: data.OrderCompletedDate || data.DateOrdered, meta: withVendorMeta },
                 { key: "VAS_092_ExpectedDelivery", done: data.IsExpectedDelivery,  active: data.CurrentStage === 4, date: data.DatePromised, required: true },
                 // The receipt stage dates from when the GRN was CREATED (model
                 // side), which is a stamp — not the movement date it used to

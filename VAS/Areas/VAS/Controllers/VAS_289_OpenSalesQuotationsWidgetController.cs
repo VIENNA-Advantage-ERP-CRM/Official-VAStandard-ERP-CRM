@@ -35,7 +35,7 @@ namespace VAS.Controllers
     ///   mock field names/rules in the paired HTML do not match the real schema and
     ///   are overridden here):
     ///     - Open quotation = C_Order with IsActive='Y', IsSOTrx='Y', non-return,
-    ///       IsSalesQuotation='Y', DocStatus IN ('CO','IP'), not expired
+    ///       IsSalesQuotation='Y', DocStatus = 'CO' (completed only - QA 8.37), not expired
     ///       (ValidTillDate IS NULL OR &gt;= today), with at least one active line
     ///       carrying pending quantity (quoted - already ordered &gt; 0).
     ///     - There is NO stored "AlreadyOrderedQty" column anywhere. Already-ordered
@@ -82,6 +82,11 @@ namespace VAS.Controllers
     ///   linked_orders/quote_balance statement - never on the combined multi-CTE query.
     /// Chronological development:
     ///   VAI052      2026-09-15 Created
+    ///               2026-10-29 QA 8.37-8.75: completed quotations only, quantities/rates in the
+    ///                          line's entered UOM, "same as screen" lookups (org-filtered
+    ///                          warehouses/doc types, SO price lists, sales reps, SO taxes),
+    ///                          customer search + customer defaults, mandatory/date checks,
+    ///                          editable rate, Drafted/Completed document status.
     /// </summary>
     [System.Web.Mvc.SessionState(System.Web.SessionState.SessionStateBehavior.ReadOnly)]
     public class VAS_289_OpenSalesQuotationsWidgetController : Controller
@@ -136,7 +141,7 @@ namespace VAS.Controllers
                    AND q.IsSOTrx = 'Y'
                    AND COALESCE(q.IsReturnTrx, 'N') = 'N'
                    AND (q.IsSalesQuotation = 'Y' OR EXISTS (SELECT 1 FROM C_DocType dtq WHERE dtq.C_DocType_ID = q.C_DocTypeTarget_ID AND dtq.DocSubTypeSO IN ('ON', 'OB')))
-                   AND q.DocStatus IN ('CO', 'IP')
+                   AND q.DocStatus = 'CO'
                    AND (q.ValidTillDate IS NULL OR q.ValidTillDate >= @Today)";
         }
 
@@ -365,12 +370,13 @@ namespace VAS.Controllers
                     COALESCE(p.Name, p.Value) AS Product_Name,
                     COALESCE(p.IsStocked, 'N') AS Is_Stocked,
                     ql.M_AttributeSetInstance_ID AS Asi_Id,
-                    asi.Description AS Attribute_Text,
                     ql.C_UOM_ID AS Uom_Id,
                     u.Name AS Uom_Name,
+                    COALESCE(u.StdPrecision, 0) AS Uom_Precision,
                     COALESCE(ql.QtyOrdered, 0) AS Quoted_Qty,
+                    COALESCE(ql.QtyEntered, ql.QtyOrdered, 0) AS Quoted_Qty_Entered,
                     COALESCE(lo.Already_Ordered_Qty, 0) AS Already_Ordered_Qty,
-                    ql.PriceActual AS Rate,
+                    COALESCE(ql.PriceEntered, ql.PriceActual) AS Rate,
                     ql.C_Tax_ID AS Tax_Id,
                     ql.DatePromised AS Date_Promised,
                     ql.Description AS Description,
@@ -380,7 +386,6 @@ namespace VAS.Controllers
                   LEFT OUTER JOIN linked_orders lo ON ( lo.Quotation_Line_Id = ql.C_OrderLine_ID )
                   LEFT OUTER JOIN M_Product p ON ( p.M_Product_ID = ql.M_Product_ID )
                   LEFT OUTER JOIN C_UOM u ON ( u.C_UOM_ID = ql.C_UOM_ID )
-                  LEFT OUTER JOIN M_AttributeSetInstance asi ON ( asi.M_AttributeSetInstance_ID = ql.M_AttributeSetInstance_ID )
                  WHERE ql.C_Order_ID = @Quotation_Id
                    AND ql.IsActive = 'Y'
                  ORDER BY ql.Line ASC";
@@ -397,13 +402,18 @@ namespace VAS.Controllers
                 while (dr2 != null && dr2.Read())
                 {
                     decimal quoted = dr2["Quoted_Qty"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr2["Quoted_Qty"]);
+                    decimal quotedEntered = dr2["Quoted_Qty_Entered"] == DBNull.Value ? quoted : Util.GetValueOfDecimal(dr2["Quoted_Qty_Entered"]);
                     decimal already = dr2["Already_Ordered_Qty"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr2["Already_Ordered_Qty"]);
                     decimal pending = Math.Max(0m, quoted - already);
+                    int uomPrecision = dr2["Uom_Precision"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr2["Uom_Precision"]);
+                    // QA 8.73: QtyOrdered/linked-order quantities are in the product's base UOM;
+                    // the line is shown (and ordered) in the quotation line's own UOM.
+                    decimal enteredPerBase = EnteredPerBase(quoted, quotedEntered);
                     if (already > quoted)
                     {
                         Log.Log(Level.WARNING, "VAS_289_OpenSalesQuotationsWidget: negative pending qty clamped to zero for quotation line " + Util.GetValueOfInt(dr2["Line_Id"]));
                     }
-                    if (pending <= 0) { continue; } // fully consumed lines are never selectable
+                    if (pending <= 0 || ToEnteredQty(pending, enteredPerBase, uomPrecision) <= 0) { continue; } // fully consumed lines are never selectable
 
                     int productId = dr2["Product_Id"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr2["Product_Id"]);
                     int lineWarehouseId = dr2["Warehouse_Id"] == DBNull.Value ? headerWarehouseId : Util.GetValueOfInt(dr2["Warehouse_Id"]);
@@ -417,12 +427,13 @@ namespace VAS.Controllers
                         ProductName = Util.GetValueOfString(dr2["Product_Name"]),
                         IsStocked = isStocked,
                         AttributeSetInstanceId = dr2["Asi_Id"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr2["Asi_Id"]),
-                        AttributeText = Util.GetValueOfString(dr2["Attribute_Text"]),
                         UomId = dr2["Uom_Id"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr2["Uom_Id"]),
                         UomName = Util.GetValueOfString(dr2["Uom_Name"]),
-                        QuotedQty = quoted,
-                        AlreadyOrderedQty = already,
-                        PendingQty = pending,
+                        UomPrecision = uomPrecision,
+                        EnteredPerBase = enteredPerBase,
+                        QuotedQty = ToEnteredQty(quoted, enteredPerBase, uomPrecision),
+                        AlreadyOrderedQty = ToEnteredQty(already, enteredPerBase, uomPrecision),
+                        PendingQty = ToEnteredQty(pending, enteredPerBase, uomPrecision),
                         Rate = dr2["Rate"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr2["Rate"]),
                         TaxId = dr2["Tax_Id"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr2["Tax_Id"]),
                         DatePromised = datePromised.HasValue ? datePromised.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : null,
@@ -438,6 +449,15 @@ namespace VAS.Controllers
                 CloseReader(dr2);
             }
 
+            // Book1 row 110 (Sr. 32): readable attribute text, never the instance's raw
+            // description (e.g. "2_@AU180@"); a line without attributes gets none.
+            Dictionary<int, string> attributeTexts = LoadAttributeTexts(ctx, result.Lines.Select(l => l.AttributeSetInstanceId));
+            foreach (QuotationLineRow line in result.Lines)
+            {
+                string text;
+                line.AttributeText = attributeTexts.TryGetValue(line.AttributeSetInstanceId, out text) ? text : string.Empty;
+            }
+
             result.Quotation.LineCount = result.Lines.Count;
             result.Quotation.QuotedQty = result.Lines.Sum(l => l.QuotedQty);
             result.Quotation.AlreadyOrderedQty = result.Lines.Sum(l => l.AlreadyOrderedQty);
@@ -448,6 +468,81 @@ namespace VAS.Controllers
             result.Quotation.StatusChipClass = statusChip;
 
             return result;
+        }
+
+        /// <summary>
+        /// Readable text per attribute set instance: "Attribute: value" for each attribute value,
+        /// then Lot and Serial No (they sit on the instance itself), joined with ", ". The raw
+        /// M_AttributeSetInstance.Description is an internal encoding ("2_@AU180@") and is never shown.
+        /// Instances with nothing readable are left out of the map.
+        /// </summary>
+        private Dictionary<int, string> LoadAttributeTexts(Ctx ctx, IEnumerable<int> asiIds)
+        {
+            Dictionary<int, string> texts = new Dictionary<int, string>();
+            List<int> ids = asiIds.Where(id => id > 0).Distinct().ToList();
+            if (ids.Count == 0) { return texts; }
+
+            Dictionary<int, List<string>> parts = ids.ToDictionary(id => id, id => new List<string>());
+            string idList = string.Join(",", ids);
+
+            IDataReader dr = null;
+            try
+            {
+                dr = DB.ExecuteReader(@"
+                    SELECT ai.M_AttributeSetInstance_ID AS Asi_Id,
+                           a.Name AS Attribute_Name,
+                           av.Name AS List_Value,
+                           ai.Value AS Text_Value,
+                           ai.ValueNumber AS Number_Value
+                      FROM M_AttributeInstance ai
+                     INNER JOIN M_Attribute a ON ( a.M_Attribute_ID = ai.M_Attribute_ID AND a.IsActive = 'Y' )
+                      LEFT OUTER JOIN M_AttributeValue av ON ( av.M_AttributeValue_ID = ai.M_AttributeValue_ID )
+                     WHERE ai.M_AttributeSetInstance_ID IN (" + idList + @")
+                       AND ai.IsActive = 'Y'
+                     ORDER BY ai.M_AttributeSetInstance_ID, a.Name");
+                while (dr != null && dr.Read())
+                {
+                    string value = Util.GetValueOfString(dr["List_Value"]);
+                    if (string.IsNullOrWhiteSpace(value)) { value = Util.GetValueOfString(dr["Text_Value"]); }
+                    if (string.IsNullOrWhiteSpace(value) && dr["Number_Value"] != DBNull.Value)
+                    {
+                        value = Util.GetValueOfDecimal(dr["Number_Value"]).ToString("0.####", CultureInfo.InvariantCulture);
+                    }
+                    AddAttributePart(parts[Util.GetValueOfInt(dr["Asi_Id"])], Util.GetValueOfString(dr["Attribute_Name"]), value);
+                }
+            }
+            finally
+            {
+                CloseReader(dr);
+            }
+
+            try
+            {
+                dr = DB.ExecuteReader("SELECT M_AttributeSetInstance_ID AS Asi_Id, Lot, SerNo FROM M_AttributeSetInstance WHERE M_AttributeSetInstance_ID IN (" + idList + ")");
+                while (dr != null && dr.Read())
+                {
+                    List<string> list = parts[Util.GetValueOfInt(dr["Asi_Id"])];
+                    AddAttributePart(list, Msg.Translate(ctx, "Lot"), Util.GetValueOfString(dr["Lot"]));
+                    AddAttributePart(list, Msg.Translate(ctx, "SerNo"), Util.GetValueOfString(dr["SerNo"]));
+                }
+            }
+            finally
+            {
+                CloseReader(dr);
+            }
+
+            foreach (KeyValuePair<int, List<string>> entry in parts)
+            {
+                if (entry.Value.Count > 0) { texts[entry.Key] = string.Join(", ", entry.Value); }
+            }
+            return texts;
+        }
+
+        private static void AddAttributePart(List<string> list, string label, string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) { return; }
+            string part = string.IsNullOrWhiteSpace(label) ? value.Trim() : label.Trim() + ": " + value.Trim();
+            if (!list.Contains(part)) { list.Add(part); }
         }
 
         /// <summary>Warehouse-level free stock for one product+attribute: QtyOnHand - QtyReserved - QtyDedicated - QtyAllocated, summed across the warehouse's active locators. Called only for stocked products (M_Product.IsStocked='Y').</summary>
@@ -523,8 +618,12 @@ namespace VAS.Controllers
             OrderFormDefaultsResult result = new OrderFormDefaultsResult();
             if (ctx == null || quotationId <= 0) { return result; }
 
+            bool hasPaymentMethod = ColumnExists("C_Order", "VA009_PaymentMethod_ID");
+
             string headerSql = @"
                 SELECT q.C_Order_ID AS Quotation_Id,
+                       q.AD_Org_ID AS Org_Id," + (hasPaymentMethod ? @"
+                       q.VA009_PaymentMethod_ID AS Payment_Method_Id," : "") + @"
                        q.C_BPartner_ID AS BPartner_Id,
                        q.C_BPartner_Location_ID AS Location_Id,
                        q.AD_User_ID AS Contact_Id,
@@ -557,7 +656,7 @@ namespace VAS.Controllers
 
             headerSql = MRole.GetDefault(ctx).AddAccessSQL(headerSql, "q", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            int bpartnerId = 0;
+            int bpartnerId = 0, orgId = 0;
 
             IDataReader dr = null;
             try
@@ -571,6 +670,7 @@ namespace VAS.Controllers
                 if (dr == null || !dr.Read()) { return result; }
 
                 bpartnerId = Util.GetValueOfInt(dr["BPartner_Id"]);
+                orgId = Util.GetValueOfInt(dr["Org_Id"]);
                 DateTime? datePromised = dr["Date_Promised"] == DBNull.Value ? (DateTime?)null : Util.GetValueOfDateTime(dr["Date_Promised"]);
 
                 result.Defaults = new OrderDefaults
@@ -588,6 +688,7 @@ namespace VAS.Controllers
                     DatePromised = datePromised.HasValue ? datePromised.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : DateTime.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                     POReference = Util.GetValueOfString(dr["Po_Reference"]),
                     PaymentTermId = dr["Payment_Term_Id"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr["Payment_Term_Id"]),
+                    PaymentMethodId = (hasPaymentMethod && dr["Payment_Method_Id"] != DBNull.Value) ? Util.GetValueOfInt(dr["Payment_Method_Id"]) : 0,
                     DeliveryRule = Util.GetValueOfString(dr["Delivery_Rule"]),
                     DeliveryViaRule = Util.GetValueOfString(dr["Delivery_Via_Rule"]),
                     PriceListId = dr["Price_List_Id"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr["Price_List_Id"]),
@@ -605,13 +706,62 @@ namespace VAS.Controllers
 
             if (result.Defaults == null) { return result; }
 
-            result.Defaults.DocTypeTargetId = ResolveSalesOrderDocType(ctx);
-            result.Options = LoadFormOptions(ctx);
+            result.Defaults.OrgId = orgId;
+            result.Defaults.DocTypeTargetId = ResolveSalesOrderDocType(ctx, orgId);
+            result.Options = LoadFormOptions(ctx, orgId);
             BPartnerOptions bpOptions = LoadBPartnerOptions(ctx, bpartnerId);
             result.Options.Locations = bpOptions.Locations;
             result.Options.Contacts = bpOptions.Contacts;
+            // QA 8.57: Payment Method has no blank option - fall back to the customer's own method.
+            if (result.Defaults.PaymentMethodId <= 0) { result.Defaults.PaymentMethodId = bpOptions.PaymentMethodId; }
 
             return result;
+        }
+
+        /// <summary>QA 8.54: customer lookup for the order-details step - active, non-summary customers (IsCustomer='Y'), as the Sales Order window's Business Partner field offers.</summary>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult SearchCustomers(string searchText)
+        {
+            if (Session["ctx"] == null) { return Json("", JsonRequestBehavior.AllowGet); }
+            Ctx ctx = Session["ctx"] as Ctx;
+
+            try
+            {
+                string sql = @"
+                    SELECT bp.C_BPartner_ID AS Id, bp.Name AS Name, bp.Value AS Code
+                      FROM C_BPartner bp
+                     WHERE bp.AD_Client_ID = @AD_Client_ID
+                       AND bp.IsActive = 'Y'
+                       AND bp.IsCustomer = 'Y'
+                       AND COALESCE(bp.IsSummary, 'N') = 'N'
+                       AND ( UPPER(bp.Name) LIKE @Search OR UPPER(bp.Value) LIKE @Search )";
+                sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "bp", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                sql += " ORDER BY bp.Name OFFSET 0 ROWS FETCH NEXT 50 ROWS ONLY";
+
+                List<OptionItem> list = new List<OptionItem>();
+                IDataReader dr = null;
+                try
+                {
+                    dr = DB.ExecuteReader(sql, new[]
+                    {
+                        new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
+                        new SqlParameter("@Search", "%" + (searchText ?? "").Trim().ToUpper() + "%")
+                    });
+                    while (dr != null && dr.Read())
+                    {
+                        list.Add(new OptionItem { Id = Util.GetValueOfInt(dr["Id"]), Code = Util.GetValueOfString(dr["Code"]), Name = Util.GetValueOfString(dr["Name"]) });
+                    }
+                }
+                finally { CloseReader(dr); }
+
+                return Json(JsonConvert.SerializeObject(list), JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                Log.Log(Level.SEVERE, "VAS_289_OpenSalesQuotationsWidget.SearchCustomers", ex);
+                return ErrorResult(ctx);
+            }
         }
 
         /// <summary>Location/contact lists for a Business Partner - re-fetched by the client whenever the user changes Business Partner on the order-details step.</summary>
@@ -677,30 +827,78 @@ namespace VAS.Controllers
             }
             finally { CloseReader(dr2); }
 
+            // QA 8.54: the customer's own Price List / Payment Term / Payment Method / Sales Rep,
+            // auto-filled on the order-details step when the customer is changed.
+            bool bpHasPaymentMethod = ColumnExists("C_BPartner", "VA009_PaymentMethod_ID");
+            string bpSql = @"
+                SELECT bp.M_PriceList_ID AS Price_List_Id,
+                       bp.C_PaymentTerm_ID AS Payment_Term_Id,
+                       bp.SalesRep_ID AS Sales_Rep_Id" + (bpHasPaymentMethod ? @",
+                       bp.VA009_PaymentMethod_ID AS Payment_Method_Id" : "") + @"
+                  FROM C_BPartner bp
+                 WHERE bp.C_BPartner_ID = @BPartner_ID";
+            IDataReader dr3 = null;
+            try
+            {
+                dr3 = DB.ExecuteReader(bpSql, new[] { new SqlParameter("@BPartner_ID", bpartnerId) });
+                if (dr3 != null && dr3.Read())
+                {
+                    data.PriceListId = dr3["Price_List_Id"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr3["Price_List_Id"]);
+                    data.PaymentTermId = dr3["Payment_Term_Id"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr3["Payment_Term_Id"]);
+                    data.SalesRepId = dr3["Sales_Rep_Id"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr3["Sales_Rep_Id"]);
+                    data.PaymentMethodId = (bpHasPaymentMethod && dr3["Payment_Method_Id"] != DBNull.Value) ? Util.GetValueOfInt(dr3["Payment_Method_Id"]) : 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Log(Level.WARNING, "VAS_289_OpenSalesQuotationsWidget.LoadBPartnerOptions(defaults)", ex);
+            }
+            finally { CloseReader(dr3); }
+
             return data;
         }
 
-        /// <summary>True when docTypeId is a real, active DocBaseType='SOO' document type for this client - guards the client-supplied Step 3 selection before it is trusted.</summary>
-        private bool IsValidSalesOrderDocType(Ctx ctx, int docTypeId)
+        /// <summary>
+        /// QA 8.48: Target Document Type list as the Sales Order window offers it - the
+        /// C_Order.C_DocTypeTarget_ID validation "C_DocType PO or SO" evaluated for a new
+        /// sales order (IsSOTrx=Y, IsReturnTrx=N, IsSalesQuotation=N, IsBlanketTrx=N), at "*"
+        /// or the order's organization; quotation/proposal subtypes are excluded as well.
+        /// </summary>
+        private const string SalesOrderDocTypeWhere = @"
+                 WHERE dt.IsActive = 'Y'
+                   AND dt.DocBaseType = 'SOO'
+                   AND dt.IsSOTrx = 'Y'
+                   AND COALESCE(dt.IsReturnTrx, 'N') = 'N'
+                   AND COALESCE(dt.IsSalesQuotation, 'N') = 'N'
+                   AND COALESCE(dt.IsBlanketTrx, 'N') = 'N'
+                   AND COALESCE(dt.DocSubTypeSO, ' ') NOT IN ('ON', 'OB')
+                   AND dt.AD_Client_ID = @c
+                   AND dt.AD_Org_ID IN (0, @o)";
+
+        /// <summary>True when docTypeId is in the Sales Order document type list for this client/org - guards the client-supplied Step 3 selection before it is trusted.</summary>
+        private bool IsValidSalesOrderDocType(Ctx ctx, int docTypeId, int orgId)
         {
-            string sql = @"
-                SELECT COUNT(*) FROM C_DocType
-                 WHERE C_DocType_ID = @DocTypeId AND IsActive = 'Y' AND DocBaseType = 'SOO' AND AD_Client_ID IN (0, @AD_Client_ID)";
+            string sql = "SELECT COUNT(*) FROM C_DocType dt " + SalesOrderDocTypeWhere + " AND dt.C_DocType_ID = @DocTypeId";
             return Util.GetValueOfInt(DB.ExecuteScalar(sql, new[]
             {
-                new SqlParameter("@DocTypeId", docTypeId),
-                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+                new SqlParameter("@c", ctx.GetAD_Client_ID()),
+                new SqlParameter("@o", orgId),
+                new SqlParameter("@DocTypeId", docTypeId)
             }, null)) > 0;
         }
 
-        /// <summary>Resolves a valid Sales Order target document type (DocBaseType='SOO') for this client - never the quotation's own document type.</summary>
-        private int ResolveSalesOrderDocType(Ctx ctx)
+        /// <summary>QA 8.47: default target document type = the standard "Sales Order" type (DocSubTypeSO='SO'), then the default/org-specific one - never the quotation's own document type.</summary>
+        private int ResolveSalesOrderDocType(Ctx ctx, int orgId)
         {
-            string sql = @"
-                SELECT C_DocType_ID FROM C_DocType
-                 WHERE IsActive = 'Y' AND DocBaseType = 'SOO' AND AD_Client_ID IN (0, @AD_Client_ID)
-                 ORDER BY AD_Client_ID DESC, IsDefault DESC, C_DocType_ID ASC";
-            return Util.GetValueOfInt(DB.ExecuteScalar(sql, new[] { new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()) }, null));
+            string sql = "SELECT dt.C_DocType_ID FROM C_DocType dt " + SalesOrderDocTypeWhere + @"
+                 ORDER BY CASE WHEN dt.DocSubTypeSO = 'SO' THEN 0 ELSE 1 END,
+                          CASE WHEN UPPER(dt.Name) = 'SALES ORDER' THEN 0 ELSE 1 END,
+                          dt.IsDefault DESC, dt.AD_Org_ID DESC, dt.C_DocType_ID ASC";
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql, new[]
+            {
+                new SqlParameter("@c", ctx.GetAD_Client_ID()),
+                new SqlParameter("@o", orgId)
+            }, null));
         }
 
         private static readonly ConcurrentDictionary<string, bool> ColumnExistsCache = new ConcurrentDictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
@@ -733,30 +931,74 @@ namespace VAS.Controllers
             return string.Empty;
         }
 
-        private FormOptions LoadFormOptions(Ctx ctx)
+        /// <summary>
+        /// Dropdown option lists for the order-details / lines steps. QA 8.41b/8.48/8.53/8.58/
+        /// 8.60/8.66: each list follows the Sales Order window's own field lookup - role
+        /// access (AddAccessSQL) plus the field's validation rule on C_Order / C_OrderLine:
+        /// warehouses of the order's organization ("M_Warehouse Org with Blanket"), Sales
+        /// Order document types ("C_DocType PO or SO"), SO price lists with an active version
+        /// ("Sales &amp; Purchase Price List"), valid payment terms, inco terms of the
+        /// organization ("C_IncoTerm Org"), sales representatives ("VAS_SalesRepValid") and
+        /// line taxes ("C_Tax (Trx)").
+        /// </summary>
+        private FormOptions LoadFormOptions(Ctx ctx, int orgId)
         {
             FormOptions options = new FormOptions();
             int clientId = ctx.GetAD_Client_ID();
+            MRole role = MRole.GetDefault(ctx);
 
-            options.DocTypes = LoadOptionList("SELECT C_DocType_ID AS Id, Name AS Name FROM C_DocType WHERE IsActive='Y' AND DocBaseType='SOO' AND AD_Client_ID IN (0, @c) ORDER BY Name", clientId);
-            options.PaymentTerms = LoadOptionList("SELECT C_PaymentTerm_ID AS Id, Name AS Name FROM C_PaymentTerm WHERE IsActive='Y' AND AD_Client_ID IN (0, @c) ORDER BY Name", clientId);
-            options.PriceLists = LoadOptionList("SELECT M_PriceList_ID AS Id, Name AS Name FROM M_PriceList WHERE IsActive='Y' AND IsSOPriceList='Y' AND AD_Client_ID IN (0, @c) ORDER BY Name", clientId);
+            options.DocTypes = LoadOptionList(
+                role.AddAccessSQL("SELECT dt.C_DocType_ID AS Id, dt.Name AS Name FROM C_DocType dt " + SalesOrderDocTypeWhere, "dt", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO)
+                + " ORDER BY dt.Name", clientId, orgId);
+            options.PaymentTerms = LoadOptionList(
+                role.AddAccessSQL("SELECT pt.C_PaymentTerm_ID AS Id, pt.Name AS Name FROM C_PaymentTerm pt WHERE pt.IsActive='Y' AND pt.IsValid='Y' AND pt.AD_Client_ID IN (0, @c)", "pt", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO)
+                + " ORDER BY pt.Name", clientId, orgId);
+            options.PriceLists = LoadPriceListOptions(
+                role.AddAccessSQL(@"SELECT pl.M_PriceList_ID AS Id, pl.Name AS Name, pl.C_Currency_ID AS Currency_Id FROM M_PriceList pl
+                                     WHERE pl.IsActive='Y' AND pl.IsSOPriceList='Y' AND pl.AD_Client_ID = @c
+                                       AND EXISTS (SELECT 1 FROM M_PriceList_Version plv WHERE plv.M_PriceList_ID = pl.M_PriceList_ID AND plv.IsActive='Y')", "pl", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO)
+                + " ORDER BY pl.Name", clientId, orgId);
             options.Currencies = LoadCurrencyOptions(clientId);
-            options.ConversionTypes = LoadOptionList("SELECT C_ConversionType_ID AS Id, Name AS Name FROM C_ConversionType WHERE IsActive='Y' AND AD_Client_ID IN (0, @c) ORDER BY Name", clientId);
-            options.IncoTerms = LoadOptionList("SELECT C_IncoTerm_ID AS Id, Name AS Name FROM C_IncoTerm WHERE IsActive='Y' ORDER BY Name", clientId);
-            options.Warehouses = LoadOptionList("SELECT M_Warehouse_ID AS Id, Name AS Name FROM M_Warehouse WHERE IsActive='Y' AND AD_Client_ID = @c ORDER BY Name", clientId);
-            options.Taxes = LoadOptionList("SELECT C_Tax_ID AS Id, Name AS Name FROM C_Tax WHERE IsActive='Y' AND COALESCE(IsSummary,'N')='N' AND AD_Client_ID IN (0, @c) ORDER BY Name", clientId);
+            options.ConversionTypes = LoadOptionList("SELECT C_ConversionType_ID AS Id, Name AS Name FROM C_ConversionType WHERE IsActive='Y' AND AD_Client_ID IN (0, @c) ORDER BY Name", clientId, orgId);
+            options.IncoTerms = LoadOptionList("SELECT C_IncoTerm_ID AS Id, Name AS Name FROM C_IncoTerm WHERE IsActive='Y' AND AD_Client_ID IN (0, @c) AND AD_Org_ID IN (0, @o) ORDER BY Name", clientId, orgId);
+            options.Warehouses = LoadOptionList(
+                role.AddAccessSQL("SELECT wh.M_Warehouse_ID AS Id, wh.Name AS Name FROM M_Warehouse wh WHERE wh.IsActive='Y' AND wh.AD_Client_ID = @c AND wh.AD_Org_ID = @o", "wh", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO)
+                + " ORDER BY wh.Name", clientId, orgId);
+            options.SalesReps = LoadOptionList(
+                role.AddAccessSQL(@"SELECT usr.AD_User_ID AS Id, usr.Name AS Name FROM AD_User usr
+                                     WHERE usr.IsActive='Y' AND usr.AD_Client_ID = @c
+                                       AND EXISTS (SELECT 1 FROM C_BPartner sbp WHERE sbp.C_BPartner_ID = usr.C_BPartner_ID AND sbp.IsSalesRep = 'Y')", "usr", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO)
+                + " ORDER BY usr.Name", clientId, orgId);
+            options.Taxes = LoadTaxOptions(
+                role.AddAccessSQL("SELECT tx.C_Tax_ID AS Id, tx.Name AS Name, tx.Rate AS Rate FROM C_Tax tx WHERE tx.IsActive='Y' AND COALESCE(tx.IsSurcharge,'N')='N' AND COALESCE(tx.Parent_Tax_ID, 0)=0 AND tx.AD_Client_ID IN (0, @c) AND tx.AD_Org_ID IN (0, @o)", "tx", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO)
+                + " ORDER BY tx.Name", clientId, orgId);
 
             options.DeliveryRules = LoadRefListOptions("C_Order", "DeliveryRule");
             options.DeliveryViaRules = LoadRefListOptions("C_Order", "DeliveryViaRule");
             options.PriorityRules = LoadRefListOptions("C_Order", "PriorityRule");
+            // QA 8.71: the new order can be saved Drafted or Completed.
+            options.DocStatuses = LoadRefListOptions("C_Order", "DocStatus")
+                .Where(s => s.Code == MOrder.DOCSTATUS_Drafted || s.Code == MOrder.DOCSTATUS_Completed).ToList();
+            if (options.DocStatuses.Count == 0)
+            {
+                options.DocStatuses = new List<OptionItem>
+                {
+                    new OptionItem { Code = MOrder.DOCSTATUS_Drafted, Name = "Drafted" },
+                    new OptionItem { Code = MOrder.DOCSTATUS_Completed, Name = "Completed" }
+                };
+            }
 
             if (ColumnExists("C_Order", "VA009_PaymentMethod_ID") && ColumnExists("VA009_PaymentMethod", "VA009_PaymentMethod_ID"))
             {
+                // Book1 row 129: the login tenant's methods only, as the window's "VA009_PayMethod
+                // for PO" rule does (AD_Client_ID = @AD_Client_ID@). Reading tenant 0 as well
+                // listed the system "Cash" / "Check" next to the tenant's own copies.
                 string nameCol = ResolvePaymentMethodNameColumn();
                 options.PaymentMethods = string.IsNullOrEmpty(nameCol)
                     ? new List<OptionItem>()
-                    : LoadOptionList("SELECT VA009_PaymentMethod_ID AS Id, " + nameCol + " AS Name FROM VA009_PaymentMethod WHERE IsActive='Y' AND AD_Client_ID IN (0, @c) ORDER BY " + nameCol, clientId);
+                    : LoadOptionList(
+                        role.AddAccessSQL("SELECT pm.VA009_PaymentMethod_ID AS Id, pm." + nameCol + " AS Name FROM VA009_PaymentMethod pm WHERE pm.IsActive='Y' AND pm.AD_Client_ID = @c", "pm", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO)
+                        + " ORDER BY pm." + nameCol, clientId);
             }
             else
             {
@@ -766,13 +1008,21 @@ namespace VAS.Controllers
             return options;
         }
 
-        private List<OptionItem> LoadOptionList(string sql, int clientId)
+        /// <summary>@c = AD_Client_ID; @o = the order's AD_Org_ID (bound only when the statement uses it).</summary>
+        private SqlParameter[] OptionParams(string sql, int clientId, int orgId)
+        {
+            return sql.Contains("@o")
+                ? new[] { new SqlParameter("@c", clientId), new SqlParameter("@o", orgId) }
+                : new[] { new SqlParameter("@c", clientId) };
+        }
+
+        private List<OptionItem> LoadOptionList(string sql, int clientId, int orgId = 0)
         {
             List<OptionItem> list = new List<OptionItem>();
             IDataReader dr = null;
             try
             {
-                dr = DB.ExecuteReader(sql, new[] { new SqlParameter("@c", clientId) });
+                dr = DB.ExecuteReader(sql, OptionParams(sql, clientId, orgId));
                 while (dr != null && dr.Read())
                 {
                     list.Add(new OptionItem { Id = Util.GetValueOfInt(dr["Id"]), Name = Util.GetValueOfString(dr["Name"]) });
@@ -781,6 +1031,58 @@ namespace VAS.Controllers
             catch (Exception ex)
             {
                 Log.Log(Level.WARNING, "VAS_289_OpenSalesQuotationsWidget.LoadOptionList", ex);
+            }
+            finally { CloseReader(dr); }
+            return list;
+        }
+
+        /// <summary>QA 8.59/8.60: SO price lists carry their currency so the read-only Currency follows the selected price list.</summary>
+        private List<PriceListOption> LoadPriceListOptions(string sql, int clientId, int orgId)
+        {
+            List<PriceListOption> list = new List<PriceListOption>();
+            IDataReader dr = null;
+            try
+            {
+                dr = DB.ExecuteReader(sql, OptionParams(sql, clientId, orgId));
+                while (dr != null && dr.Read())
+                {
+                    list.Add(new PriceListOption
+                    {
+                        Id = Util.GetValueOfInt(dr["Id"]),
+                        Name = Util.GetValueOfString(dr["Name"]),
+                        CurrencyId = dr["Currency_Id"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr["Currency_Id"])
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Log(Level.WARNING, "VAS_289_OpenSalesQuotationsWidget.LoadPriceListOptions", ex);
+            }
+            finally { CloseReader(dr); }
+            return list;
+        }
+
+        /// <summary>QA 8.70: taxes carry their rate so the lines step can show the order's total tax.</summary>
+        private List<TaxOption> LoadTaxOptions(string sql, int clientId, int orgId)
+        {
+            List<TaxOption> list = new List<TaxOption>();
+            IDataReader dr = null;
+            try
+            {
+                dr = DB.ExecuteReader(sql, OptionParams(sql, clientId, orgId));
+                while (dr != null && dr.Read())
+                {
+                    list.Add(new TaxOption
+                    {
+                        Id = Util.GetValueOfInt(dr["Id"]),
+                        Name = Util.GetValueOfString(dr["Name"]),
+                        Rate = dr["Rate"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Rate"])
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Log(Level.WARNING, "VAS_289_OpenSalesQuotationsWidget.LoadTaxOptions", ex);
             }
             finally { CloseReader(dr); }
             return list;
@@ -866,6 +1168,33 @@ namespace VAS.Controllers
             {
                 return ConflictResult(ctx, Msg.GetMsg(ctx, "VAS_289_WarehouseRequired") ?? "A ship-from warehouse is required.", null);
             }
+            // QA 8.64: mandatory header fields are re-checked here, never only trusted from the client.
+            if (request.BusinessPartnerId <= 0 || request.LocationId <= 0 || request.SalesRepId <= 0 || request.PaymentTermId <= 0
+                || request.PriceListId <= 0 || string.IsNullOrEmpty(request.PriorityRule) || string.IsNullOrEmpty(request.DeliveryRule)
+                || string.IsNullOrEmpty(request.DeliveryViaRule) || string.IsNullOrEmpty(request.DateOrdered) || string.IsNullOrEmpty(request.DatePromised))
+            {
+                return ConflictResult(ctx, GetMsgOrDefault(ctx, "VAS_289_FillMandatory", "Please fill the mandatory fields:"), null);
+            }
+
+            // QA 8.49/8.68: Date Promised (header and every line) may not be before Date Ordered.
+            DateTime requestDateOrdered, requestDatePromised;
+            if (!DateTime.TryParse(request.DateOrdered, CultureInfo.InvariantCulture, DateTimeStyles.None, out requestDateOrdered))
+            {
+                requestDateOrdered = DateTime.Today;
+            }
+            if (!DateTime.TryParse(request.DatePromised, CultureInfo.InvariantCulture, DateTimeStyles.None, out requestDatePromised))
+            {
+                requestDatePromised = requestDateOrdered;
+            }
+            bool lineDateBeforeOrdered = request.Lines.Any(l =>
+            {
+                DateTime d;
+                return !string.IsNullOrEmpty(l.DatePromised) && DateTime.TryParse(l.DatePromised, CultureInfo.InvariantCulture, DateTimeStyles.None, out d) && d.Date < requestDateOrdered.Date;
+            });
+            if (requestDatePromised.Date < requestDateOrdered.Date || lineDateBeforeOrdered)
+            {
+                return ConflictResult(ctx, GetMsgOrDefault(ctx, "VAS_289_DatePromisedBeforeOrdered", "Error: Date Promised should be greater than or equal to Date Ordered"), null);
+            }
 
             Trx trx = null;
             try
@@ -916,8 +1245,10 @@ namespace VAS.Controllers
                 {
                     string lineSql = @"
                         SELECT ql.C_OrderLine_ID, ql.C_Order_ID, ql.M_Product_ID, ql.M_AttributeSetInstance_ID,
-                               ql.C_UOM_ID, ql.QtyOrdered, ql.PriceActual, ql.C_Tax_ID, ql.DatePromised,
+                               ql.C_UOM_ID, ql.QtyOrdered, ql.QtyEntered, ql.PriceActual, ql.PriceEntered, ql.C_Tax_ID, ql.DatePromised,
                                ql.Description, ql.PrintDescription, ql.M_Warehouse_ID,
+                               ( SELECT COALESCE(u.StdPrecision, 0) FROM C_UOM u WHERE u.C_UOM_ID = ql.C_UOM_ID ) AS Uom_Precision,
+                               ( SELECT COALESCE(bu.StdPrecision, 0) FROM M_Product bp INNER JOIN C_UOM bu ON ( bu.C_UOM_ID = bp.C_UOM_ID ) WHERE bp.M_Product_ID = ql.M_Product_ID ) AS Base_Uom_Precision,
                                ( SELECT COALESCE(SUM(sol.QtyOrdered), 0)
                                    FROM C_OrderLine sol
                                    INNER JOIN C_Order so ON ( so.C_Order_ID = sol.C_Order_ID
@@ -946,14 +1277,31 @@ namespace VAS.Controllers
 
                     DataRow lRow = lds.Tables[0].Rows[0];
                     decimal quoted = Util.GetValueOfDecimal(lRow["QtyOrdered"]);
+                    decimal quotedEntered = lRow["QtyEntered"] == DBNull.Value ? quoted : Util.GetValueOfDecimal(lRow["QtyEntered"]);
                     decimal already = Util.GetValueOfDecimal(lRow["Already_Ordered_Qty"]);
                     decimal pending = Math.Max(0m, quoted - already);
+                    int uomPrecision = lRow["Uom_Precision"] == DBNull.Value ? 0 : Util.GetValueOfInt(lRow["Uom_Precision"]);
+                    int baseUomPrecision = lRow["Base_Uom_Precision"] == DBNull.Value ? uomPrecision : Util.GetValueOfInt(lRow["Base_Uom_Precision"]);
 
-                    if (lineInput.Qty <= 0 || lineInput.Qty > pending)
+                    // QA 8.42/8.73: the requested quantity is in the line's UOM, at that UOM's precision;
+                    // pending is compared in the same UOM and converted back to the base UOM for QtyOrdered.
+                    decimal enteredPerBase = EnteredPerBase(quoted, quotedEntered);
+                    decimal pendingEntered = ToEnteredQty(pending, enteredPerBase, uomPrecision);
+                    decimal qtyEntered = Math.Round(lineInput.Qty, Math.Max(0, uomPrecision), MidpointRounding.AwayFromZero);
+
+                    if (qtyEntered <= 0 || qtyEntered > pendingEntered)
                     {
-                        conflicts.Add(new ConflictLine { QuotationLineId = lineInput.QuotationLineId, Reason = "Pending quantity changed.", CurrentPendingQty = pending });
+                        conflicts.Add(new ConflictLine { QuotationLineId = lineInput.QuotationLineId, Reason = "Pending quantity changed.", CurrentPendingQty = pendingEntered });
                         continue;
                     }
+                    decimal qtyBase = qtyEntered == pendingEntered
+                        ? pending
+                        : Math.Min(pending, Math.Round(qtyEntered / enteredPerBase, Math.Max(0, baseUomPrecision), MidpointRounding.AwayFromZero));
+                    if (qtyBase <= 0) { qtyBase = Math.Min(pending, qtyEntered / enteredPerBase); }
+
+                    // QA 8.65: the user may change the rate (per line UOM); blank keeps the quotation's.
+                    decimal quotedRate = lRow["PriceEntered"] == DBNull.Value ? Util.GetValueOfDecimal(lRow["PriceActual"]) : Util.GetValueOfDecimal(lRow["PriceEntered"]);
+                    decimal rate = lineInput.Rate.HasValue ? Math.Max(0m, Math.Round(lineInput.Rate.Value, 2, MidpointRounding.AwayFromZero)) : quotedRate;
 
                     DateTime? overrideDatePromised = null;
                     DateTime parsedDatePromised;
@@ -968,13 +1316,16 @@ namespace VAS.Controllers
                         ProductId = Util.GetValueOfInt(lRow["M_Product_ID"]),
                         AsiId = lRow["M_AttributeSetInstance_ID"] == DBNull.Value ? 0 : Util.GetValueOfInt(lRow["M_AttributeSetInstance_ID"]),
                         UomId = Util.GetValueOfInt(lRow["C_UOM_ID"]),
-                        Rate = Util.GetValueOfDecimal(lRow["PriceActual"]),
+                        Rate = rate,
+                        EnteredPerBase = enteredPerBase,
                         // Step 4 lets the user override tax and date promised per line; 0/blank keeps the quotation line's own value.
                         TaxId = lineInput.TaxId > 0 ? lineInput.TaxId : (lRow["C_Tax_ID"] == DBNull.Value ? 0 : Util.GetValueOfInt(lRow["C_Tax_ID"])),
-                        DatePromised = overrideDatePromised ?? (lRow["DatePromised"] == DBNull.Value ? (DateTime?)null : Util.GetValueOfDateTime(lRow["DatePromised"])),
-                        Description = Util.GetValueOfString(lRow["Description"]),
-                        PrintDescription = Util.GetValueOfString(lRow["PrintDescription"]),
-                        Qty = lineInput.Qty
+                        DatePromised = overrideDatePromised ?? requestDatePromised,
+                        // QA 8.69: Description / Print Description are edited in Step 4 (max 255 characters).
+                        Description = Truncate(lineInput.Description != null ? lineInput.Description : Util.GetValueOfString(lRow["Description"]), 255),
+                        PrintDescription = Truncate(lineInput.PrintDescription != null ? lineInput.PrintDescription : Util.GetValueOfString(lRow["PrintDescription"]), 255),
+                        Qty = qtyEntered,
+                        QtyBase = qtyBase
                     };
                 }
 
@@ -986,9 +1337,9 @@ namespace VAS.Controllers
 
                 // 3) Create the Sales Order header. A client-supplied doc type is revalidated against
                 // the real SOO list for this client - never trusted blindly.
-                int docTypeId = (request.DocTypeId > 0 && IsValidSalesOrderDocType(ctx, request.DocTypeId))
+                int docTypeId = (request.DocTypeId > 0 && IsValidSalesOrderDocType(ctx, request.DocTypeId, orgId))
                     ? request.DocTypeId
-                    : ResolveSalesOrderDocType(ctx);
+                    : ResolveSalesOrderDocType(ctx, orgId);
                 if (docTypeId <= 0)
                 {
                     trx.Rollback();
@@ -1007,9 +1358,9 @@ namespace VAS.Controllers
                 if (request.SalesRepId > 0) { newOrder.SetSalesRep_ID(request.SalesRepId); }
                 newOrder.SetM_Warehouse_ID(request.WarehouseId);
                 if (!string.IsNullOrEmpty(request.PriorityRule)) { newOrder.SetPriorityRule(request.PriorityRule); }
-                DateTime datePromised;
-                newOrder.SetDatePromised(DateTime.TryParse(request.DatePromised, CultureInfo.InvariantCulture, DateTimeStyles.None, out datePromised) ? datePromised : DateTime.Today);
-                if (!string.IsNullOrEmpty(request.POReference)) { newOrder.SetPOReference(request.POReference); }
+                newOrder.SetDatePromised(requestDatePromised);
+                // QA 8.51: Order Reference max 20 characters.
+                if (!string.IsNullOrEmpty(request.POReference)) { newOrder.SetPOReference(Truncate(request.POReference, 20)); }
                 if (request.PaymentTermId > 0) { newOrder.SetC_PaymentTerm_ID(request.PaymentTermId); }
                 if (request.PaymentMethodId > 0 && newOrder.Get_ColumnIndex("VA009_PaymentMethod_ID") >= 0)
                 {
@@ -1021,21 +1372,20 @@ namespace VAS.Controllers
                 }
                 if (!string.IsNullOrEmpty(request.DeliveryViaRule)) { newOrder.SetDeliveryViaRule(request.DeliveryViaRule); }
                 if (request.PriceListId > 0) { newOrder.SetM_PriceList_ID(request.PriceListId); }
-                if (request.CurrencyId > 0) { newOrder.SetC_Currency_ID(request.CurrencyId); }
+                // QA 8.59: Currency always follows the selected price list's currency.
+                int priceListCurrencyId = request.PriceListId > 0
+                    ? Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_Currency_ID FROM M_PriceList WHERE M_PriceList_ID = @PriceList_ID",
+                        new[] { new SqlParameter("@PriceList_ID", request.PriceListId) }, trx))
+                    : 0;
+                int currencyId = priceListCurrencyId > 0 ? priceListCurrencyId : request.CurrencyId;
+                if (currencyId > 0) { newOrder.SetC_Currency_ID(currencyId); }
                 if (request.ConversionTypeId > 0) { newOrder.SetC_ConversionType_ID(request.ConversionTypeId); }
                 if (request.IncoTermId > 0 && newOrder.Get_ColumnIndex("C_IncoTerm_ID") >= 0) { newOrder.SetC_IncoTerm_ID(request.IncoTermId); }
-                if (!string.IsNullOrEmpty(request.Description)) { newOrder.SetDescription(request.Description); }
+                // QA 8.63: Description max 255 characters.
+                if (!string.IsNullOrEmpty(request.Description)) { newOrder.SetDescription(Truncate(request.Description, 255)); }
 
-                DateTime dateOrdered;
-                if (!string.IsNullOrEmpty(request.DateOrdered) && DateTime.TryParse(request.DateOrdered, CultureInfo.InvariantCulture, DateTimeStyles.None, out dateOrdered))
-                {
-                    newOrder.SetDateOrdered(dateOrdered);
-                }
-                else
-                {
-                    dateOrdered = DateTime.Today;
-                    newOrder.SetDateOrdered(dateOrdered);
-                }
+                DateTime dateOrdered = requestDateOrdered;
+                newOrder.SetDateOrdered(dateOrdered);
                 if (newOrder.Get_ColumnIndex("DateAcct") >= 0) { newOrder.SetDateAcct(dateOrdered); }
 
                 newOrder.SetC_DocType_ID(docTypeId);
@@ -1067,10 +1417,11 @@ namespace VAS.Controllers
                     ol.SetM_Product_ID(snap.ProductId);
                     if (snap.AsiId > 0) { ol.SetM_AttributeSetInstance_ID(snap.AsiId); }
                     ol.SetC_UOM_ID(snap.UomId);
+                    // Qty/rate are in the line UOM (QtyEntered/PriceEntered); QtyOrdered/PriceActual in the base UOM.
                     ol.SetQtyEntered(snap.Qty);
-                    ol.SetQtyOrdered(snap.Qty);
+                    ol.SetQtyOrdered(snap.QtyBase);
                     ol.SetPriceEntered(snap.Rate);
-                    ol.SetPriceActual(snap.Rate);
+                    ol.SetPriceActual(snap.QtyBase != 0 ? (snap.Rate * snap.Qty / snap.QtyBase) : snap.Rate);
                     if (snap.TaxId > 0) { ol.SetC_Tax_ID(snap.TaxId); }
                     ol.SetDatePromised(snap.DatePromised ?? newOrder.GetDatePromised());
                     if (!string.IsNullOrEmpty(snap.Description)) { ol.SetDescription(snap.Description); }
@@ -1099,11 +1450,47 @@ namespace VAS.Controllers
 
                 trx.Commit();
 
+                int salesOrderId = newOrder.GetC_Order_ID();
+                string documentNo = newOrder.GetDocumentNo();
+
+                // QA 8.71: "Completed" runs the document's own DocAction workflow (same path as the
+                // window's Complete button) on the committed draft; a failure leaves the order Drafted
+                // and the reason is reported back to the user.
+                string completeError = null;
+                if (request.DocStatus == MOrder.DOCSTATUS_Completed)
+                {
+                    try
+                    {
+                        int docActionProcessId = Util.GetValueOfInt(DB.ExecuteScalar(
+                            @"SELECT c.AD_Process_ID FROM AD_Column c INNER JOIN AD_Table t ON ( t.AD_Table_ID = c.AD_Table_ID )
+                               WHERE t.TableName = 'C_Order' AND c.ColumnName = 'DocAction' AND c.IsActive = 'Y'", null, null));
+                        completeError = docActionProcessId > 0
+                            ? VAdvantage.Process.DocumentEngine.CompleteOrReverse(ctx, "C_Order", newOrder.Get_Table_ID(), salesOrderId, docActionProcessId, MOrder.DOCACTION_Complete)
+                            : Msg.GetMsg(ctx, "DocNotCompleted");
+                    }
+                    catch (Exception cex)
+                    {
+                        Log.Log(Level.SEVERE, "VAS_289_OpenSalesQuotationsWidget.CreateSalesOrder(complete)", cex);
+                        completeError = cex.Message;
+                    }
+                }
+
+                MOrder savedOrder = new MOrder(ctx, salesOrderId, null);
+                if (!string.IsNullOrEmpty(savedOrder.GetDocumentNo())) { documentNo = savedOrder.GetDocumentNo(); }
+                string finalDocStatus = savedOrder.GetDocStatus();
+                if (request.DocStatus == MOrder.DOCSTATUS_Completed && string.IsNullOrEmpty(completeError)
+                    && finalDocStatus != MOrder.DOCSTATUS_Completed)
+                {
+                    completeError = Msg.GetMsg(ctx, "DocNotCompleted");
+                }
+
                 return Json(JsonConvert.SerializeObject(new
                 {
                     Success = true,
-                    SalesOrderId = newOrder.GetC_Order_ID(),
-                    SalesOrderNumber = newOrder.GetDocumentNo(),
+                    SalesOrderId = salesOrderId,
+                    SalesOrderNumber = documentNo,
+                    DocStatus = finalDocStatus,
+                    CompleteError = string.IsNullOrEmpty(completeError) ? null : completeError,
                     BusinessPartnerName = request.BusinessPartnerName,
                     LineCount = request.Lines.Count,
                     OrderTotal = orderTotal
@@ -1145,6 +1532,32 @@ namespace VAS.Controllers
             if (reader == null) { return; }
             reader.Close();
             reader.Dispose();
+        }
+
+        /// <summary>Line-UOM quantity per base-UOM quantity (QtyEntered / QtyOrdered of the quotation line); 1 when not derivable.</summary>
+        private static decimal EnteredPerBase(decimal qtyOrdered, decimal qtyEntered)
+        {
+            if (qtyOrdered == 0m || qtyEntered == 0m) { return 1m; }
+            return qtyEntered / qtyOrdered;
+        }
+
+        /// <summary>Base-UOM quantity converted to the line's UOM, rounded to that UOM's StdPrecision.</summary>
+        private static decimal ToEnteredQty(decimal baseQty, decimal enteredPerBase, int precision)
+        {
+            return Math.Round(baseQty * enteredPerBase, Math.Max(0, Math.Min(precision, 12)), MidpointRounding.AwayFromZero);
+        }
+
+        private static string Truncate(string value, int maxLength)
+        {
+            if (string.IsNullOrEmpty(value) || value.Length <= maxLength) { return value; }
+            return value.Substring(0, maxLength);
+        }
+
+        /// <summary>Msg.GetMsg echoes the key back when no message is defined - fall back to English text then.</summary>
+        private static string GetMsgOrDefault(Ctx ctx, string key, string fallback)
+        {
+            string text = Msg.GetMsg(ctx, key);
+            return (string.IsNullOrEmpty(text) || text == key) ? fallback : text;
         }
 
         private JsonResult ErrorResult(Ctx ctx)
@@ -1213,9 +1626,15 @@ namespace VAS.Controllers
             public string AttributeText { get; set; }
             public int UomId { get; set; }
             public string UomName { get; set; }
+            /// <summary>C_UOM.StdPrecision of the line UOM - Qty to Order is validated against it.</summary>
+            public int UomPrecision { get; set; }
+            /// <summary>Line-UOM quantity per base-UOM quantity (free stock is in the base UOM).</summary>
+            public decimal EnteredPerBase { get; set; }
+            /// <summary>Quoted / already-ordered / pending quantities are in the line UOM.</summary>
             public decimal QuotedQty { get; set; }
             public decimal AlreadyOrderedQty { get; set; }
             public decimal PendingQty { get; set; }
+            /// <summary>Unit price per line UOM (PriceEntered).</summary>
             public decimal Rate { get; set; }
             public int TaxId { get; set; }
             public string DatePromised { get; set; }
@@ -1233,6 +1652,8 @@ namespace VAS.Controllers
 
         private class OrderDefaults
         {
+            public int OrgId { get; set; }
+            public int PaymentMethodId { get; set; }
             public int BusinessPartnerId { get; set; }
             public string BusinessPartnerName { get; set; }
             public int LocationId { get; set; }
@@ -1263,11 +1684,13 @@ namespace VAS.Controllers
             public List<OptionItem> PaymentTerms { get; set; }
             public List<OptionItem> PaymentMethods { get; set; }
             public List<OptionItem> Warehouses { get; set; }
-            public List<OptionItem> Taxes { get; set; }
+            public List<TaxOption> Taxes { get; set; }
+            public List<OptionItem> SalesReps { get; set; }
+            public List<OptionItem> DocStatuses { get; set; }
             public List<OptionItem> DeliveryRules { get; set; }
             public List<OptionItem> DeliveryViaRules { get; set; }
             public List<OptionItem> PriorityRules { get; set; }
-            public List<OptionItem> PriceLists { get; set; }
+            public List<PriceListOption> PriceLists { get; set; }
             public List<CurrencyOption> Currencies { get; set; }
             public List<OptionItem> ConversionTypes { get; set; }
             public List<OptionItem> IncoTerms { get; set; }
@@ -1279,6 +1702,11 @@ namespace VAS.Controllers
         {
             public List<OptionItem> Locations { get; set; }
             public List<OptionItem> Contacts { get; set; }
+            /// <summary>Customer's own defaults (C_BPartner) - 0 when not set.</summary>
+            public int PriceListId { get; set; }
+            public int PaymentTermId { get; set; }
+            public int PaymentMethodId { get; set; }
+            public int SalesRepId { get; set; }
         }
 
         private class OptionItem
@@ -1286,6 +1714,20 @@ namespace VAS.Controllers
             public int Id { get; set; }
             public string Code { get; set; }
             public string Name { get; set; }
+        }
+
+        private class PriceListOption
+        {
+            public int Id { get; set; }
+            public string Name { get; set; }
+            public int CurrencyId { get; set; }
+        }
+
+        private class TaxOption
+        {
+            public int Id { get; set; }
+            public string Name { get; set; }
+            public decimal Rate { get; set; }
         }
 
         private class CurrencyOption
@@ -1318,13 +1760,21 @@ namespace VAS.Controllers
             public string Description { get; set; }
             public int DocTypeId { get; set; }
             public string DateOrdered { get; set; }
+            /// <summary>QA 8.71: "DR" (default) or "CO" - the status the new Sales Order is left in.</summary>
+            public string DocStatus { get; set; }
             public List<CreateOrderLineInput> Lines { get; set; }
         }
 
         private class CreateOrderLineInput
         {
             public int QuotationLineId { get; set; }
+            /// <summary>Quantity in the quotation line's UOM.</summary>
             public decimal Qty { get; set; }
+            /// <summary>QA 8.65: optional edited rate per line UOM; null keeps the quotation line's rate.</summary>
+            public decimal? Rate { get; set; }
+            /// <summary>Step 4 description / print description; null keeps the quotation line's own text.</summary>
+            public string Description { get; set; }
+            public string PrintDescription { get; set; }
             /// <summary>Optional per-line override from Step 4 (line editing); 0/null keeps the quotation line's own value.</summary>
             public int TaxId { get; set; }
             /// <summary>Optional per-line override from Step 4; blank keeps the quotation line's own value.</summary>
@@ -1338,11 +1788,15 @@ namespace VAS.Controllers
             public int AsiId { get; set; }
             public int UomId { get; set; }
             public decimal Rate { get; set; }
+            public decimal EnteredPerBase { get; set; }
             public int TaxId { get; set; }
             public DateTime? DatePromised { get; set; }
             public string Description { get; set; }
             public string PrintDescription { get; set; }
+            /// <summary>Quantity in the line UOM (QtyEntered).</summary>
             public decimal Qty { get; set; }
+            /// <summary>Quantity in the product's base UOM (QtyOrdered).</summary>
+            public decimal QtyBase { get; set; }
         }
 
         private class ConflictLine

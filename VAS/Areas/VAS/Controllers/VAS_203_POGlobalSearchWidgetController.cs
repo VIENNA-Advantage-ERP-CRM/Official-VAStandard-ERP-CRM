@@ -133,7 +133,7 @@ namespace VAS.Controllers
                         o.DateOrdered AS order_date,
                         o.DocStatus AS document_status,
                         bp.Name AS vendor_name,
-                        CASE WHEN COALESCE((SELECT pl.IsTaxIncluded FROM M_PriceList pl WHERE pl.M_PriceList_ID = o.M_PriceList_ID), 'N') = 'Y' THEN COALESCE(o.TotalLines, 0) - (SELECT COALESCE(SUM(COALESCE(tl.TaxAmt, 0)), 0) FROM C_OrderLine tl WHERE tl.C_Order_ID = o.C_Order_ID AND tl.IsActive = 'Y') ELSE COALESCE(o.TotalLines, 0) END AS total_amount, -- Sub total (excl. taxes; TotalLines already holds the tax on a tax-inclusive price list)
+                        CASE WHEN COALESCE((SELECT pl.IsTaxIncluded FROM M_PriceList pl WHERE pl.M_PriceList_ID = o.M_PriceList_ID), 'N') = 'Y' THEN COALESCE(o.TotalLines, 0) - (SELECT COALESCE(SUM(COALESCE(tl.TaxAmt, 0)), 0) FROM C_OrderTax tl WHERE tl.C_Order_ID = o.C_Order_ID AND tl.IsActive = 'Y') ELSE COALESCE(o.TotalLines, 0) END AS total_amount, -- Sub total (excl. taxes; TotalLines already holds the tax on a tax-inclusive price list, so the extracted tax of the order (C_OrderTax) is taken off - the line TaxAmt is not maintained on every line)
                         curr.ISO_Code AS currency_code,
                         curr.CurSymbol AS currency_symbol,
                         curr.StdPrecision AS currency_precision
@@ -245,7 +245,7 @@ namespace VAS.Controllers
                         p.Value AS product_code,
                         p.SKU AS product_sku,
                         r.DocumentNo AS requisition_number,
-                        CASE WHEN COALESCE((SELECT pl.IsTaxIncluded FROM M_PriceList pl WHERE pl.M_PriceList_ID = o.M_PriceList_ID), 'N') = 'Y' THEN COALESCE(o.TotalLines, 0) - (SELECT COALESCE(SUM(COALESCE(tl.TaxAmt, 0)), 0) FROM C_OrderLine tl WHERE tl.C_Order_ID = o.C_Order_ID AND tl.IsActive = 'Y') ELSE COALESCE(o.TotalLines, 0) END AS total_amount, -- Sub total (excl. taxes; TotalLines already holds the tax on a tax-inclusive price list)
+                        CASE WHEN COALESCE((SELECT pl.IsTaxIncluded FROM M_PriceList pl WHERE pl.M_PriceList_ID = o.M_PriceList_ID), 'N') = 'Y' THEN COALESCE(o.TotalLines, 0) - (SELECT COALESCE(SUM(COALESCE(tl.TaxAmt, 0)), 0) FROM C_OrderTax tl WHERE tl.C_Order_ID = o.C_Order_ID AND tl.IsActive = 'Y') ELSE COALESCE(o.TotalLines, 0) END AS total_amount, -- Sub total (excl. taxes; TotalLines already holds the tax on a tax-inclusive price list, so the extracted tax of the order (C_OrderTax) is taken off - the line TaxAmt is not maintained on every line)
                         curr.ISO_Code AS currency_code,
                         curr.CurSymbol AS currency_symbol,
                         curr.StdPrecision AS currency_precision
@@ -723,7 +723,8 @@ namespace VAS.Controllers
                         COALESCE(ol.LineNetAmt, 0) AS LineNetAmt,
                         COALESCE(ol.TaxAmt, 0) AS LineTaxAmt,
                         " + surchargeExpr + @" AS LineSurchargeAmt,
-                        COALESCE(tx.Rate, 0) AS TaxRate
+                        COALESCE(tx.Rate, 0) AS TaxRate,
+                        ol.C_Tax_ID AS LineTaxId
                     FROM C_OrderLine ol
                     LEFT JOIN C_Tax tx ON tx.C_Tax_ID = ol.C_Tax_ID
                     LEFT JOIN M_Product p ON p.M_Product_ID = ol.M_Product_ID
@@ -743,6 +744,13 @@ namespace VAS.Controllers
                     new SqlParameter("@OrderID", orderId)
                 };
 
+                // Tax-inclusive price list: the order's own tax summary (C_OrderTax) states, per tax, the net
+                // base and the extracted tax of the lines carrying it. A line's amount without tax is its gross
+                // scaled by that tax's base / (base + tax), so the lines add up exactly to the total below. The
+                // line's own TaxAmt is not maintained on every line (often 0, or computed on the gross), which
+                // left the gross - or a wrong net - in the amount.
+                Dictionary<int, decimal> netRatioByTax = plTaxIncluded ? GetOrderTaxNetRatios(orderId) : new Dictionary<int, decimal>();
+
                 var lines = new List<object>();
                 decimal linesNet = 0m;       // line amounts as shown (without tax)
                 decimal linesGross = 0m;     // SUM(LineNetAmt) as stored
@@ -759,7 +767,12 @@ namespace VAS.Controllers
                         // shown directly.
                         decimal lineAmt = Util.GetValueOfDecimal(dr["LineNetAmt"]);
                         decimal lineNet = lineAmt;
-                        if (plTaxIncluded)
+                        int lineTaxId = Util.GetValueOfInt(dr["LineTaxId"]);
+                        if (plTaxIncluded && netRatioByTax.ContainsKey(lineTaxId))
+                        {
+                            lineNet = Math.Round(lineAmt * netRatioByTax[lineTaxId], stdPrecision, MidpointRounding.AwayFromZero);
+                        }
+                        else if (plTaxIncluded)
                         {
                             decimal lineTax = Util.GetValueOfDecimal(dr["LineTaxAmt"]) + Util.GetValueOfDecimal(dr["LineSurchargeAmt"]);
                             decimal taxRate = Util.GetValueOfDecimal(dr["TaxRate"]);
@@ -846,6 +859,61 @@ namespace VAS.Controllers
                             WHERE ot.C_Order_ID = @OrderID
                               AND ot.IsActive = 'Y'";
             return Util.GetValueOfDecimal(DB.ExecuteScalar(sql, new SqlParameter[] { new SqlParameter("@OrderID", orderId) }, null));
+        }
+
+        /// <summary>
+        /// Per tax of a tax-inclusive order, the share of a gross line amount that is net of tax:
+        /// C_OrderTax.TaxBaseAmt (on an inclusive price list MOrderTax stores the base with the tax - and any
+        /// surcharge - taken out) over SUM(LineNetAmt) of the order's lines carrying that tax (the gross).
+        /// Taxes without a usable row are left out (the caller falls back to the line tax / rate).
+        /// </summary>
+        /// <param name="orderId">C_Order_ID</param>
+        /// <returns>C_Tax_ID -> net ratio</returns>
+        private static Dictionary<int, decimal> GetOrderTaxNetRatios(int orderId)
+        {
+            Dictionary<int, decimal> ratios = new Dictionary<int, decimal>();
+            try
+            {
+                SqlParameter[] orderParam = new SqlParameter[] { new SqlParameter("@OrderID", orderId) };
+                Dictionary<int, decimal> grossByTax = new Dictionary<int, decimal>();
+                DataSet grossDs = DB.ExecuteDataset(@"SELECT ol.C_Tax_ID, COALESCE(SUM(ol.LineNetAmt), 0) AS Gross
+                                                        FROM C_OrderLine ol
+                                                       WHERE ol.C_Order_ID = @OrderID
+                                                         AND ol.IsActive = 'Y'
+                                                       GROUP BY ol.C_Tax_ID", orderParam, null);
+                if (grossDs != null && grossDs.Tables.Count > 0)
+                {
+                    foreach (DataRow row in grossDs.Tables[0].Rows)
+                    {
+                        grossByTax[Util.GetValueOfInt(row["C_Tax_ID"])] = Util.GetValueOfDecimal(row["Gross"]);
+                    }
+                }
+
+                DataSet ds = DB.ExecuteDataset(@"SELECT ot.C_Tax_ID, COALESCE(SUM(ot.TaxBaseAmt), 0) AS TaxBaseAmt
+                                                   FROM C_OrderTax ot
+                                                  WHERE ot.C_Order_ID = @OrderID
+                                                    AND ot.IsActive = 'Y'
+                                                  GROUP BY ot.C_Tax_ID",
+                    new SqlParameter[] { new SqlParameter("@OrderID", orderId) }, null);
+                if (ds != null && ds.Tables.Count > 0)
+                {
+                    foreach (DataRow row in ds.Tables[0].Rows)
+                    {
+                        int taxId = Util.GetValueOfInt(row["C_Tax_ID"]);
+                        decimal taxBase = Util.GetValueOfDecimal(row["TaxBaseAmt"]);
+                        decimal gross;
+                        if (taxBase > 0m && grossByTax.TryGetValue(taxId, out gross) && gross > 0m && taxBase <= gross)
+                        {
+                            ratios[taxId] = taxBase / gross;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Log(Level.SEVERE, "VAS_203_POGlobalSearchWidget.GetOrderTaxNetRatios", ex);
+            }
+            return ratios;
         }
 
         private static bool HasColumn(string tableName, string columnName)

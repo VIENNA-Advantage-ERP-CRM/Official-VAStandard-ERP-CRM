@@ -2,7 +2,7 @@
  * PO Fulfilment % Widget (Material Receipt / GRN dashboard)
  * Purpose - Read-only 2x1 glass KPI tile showing the overall purchase-order
  *           fulfilment percentage (delivered qty / ordered qty) across completed
- *           POs for the period, in success-green, with a "▲/▼ X% vs last month"
+ *           POs for the period, in success-green, with a "▲/▼ X pts vs last month"
  *           point-change meta line. Not clickable, no icon.
  * Design  - design.md (Onfinity) "KPI And Summary Widget"; sizes in `em` against
  *           a widget-root clamp; label clamp anchored to --dash-inline-size.
@@ -16,6 +16,7 @@
  * ----+-----------------------+----------------------------------------
  *  1  | PO Fulfilment %       | VAS_085_POFulfilmentPct
  *  2  | vs last month         | VAS_085_VsLastMonthShort
+ *  3  | pts                   | VAS_085_PointsShort
  * ─────────────────────────────────────────────────────────────────────
  */
 ; VAS = window.VAS || {};
@@ -69,14 +70,19 @@
             return Number(value || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 1 }) + "%";
         }
 
-        /* "▲ 7% vs last month" / "▼ 4% vs last month" / "0% vs last month".
-           change is a percentage-point difference (current − last month). */
+        /* "▲ 7 pts vs last month" / "▼ 4 pts vs last month" / "0 pts vs last month".
+           change is a percentage-POINT difference (current % − last month's %), so it is
+           labelled "pts", not "%" (Book1 row 3, Sr. 5 - label pending confirmation). */
+        function formatPoints(value) {
+            return Number(value || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 1 }) + " " + lbl("VAS_085_PointsShort", "pts");
+        }
+
         function metaText(change) {
             var c = Number(change || 0);
             var suffix = lbl("VAS_085_VsLastMonthShort", "vs last month");
-            if (c > 0) { return "▲ " + formatPercent(c) + " " + suffix; }
-            if (c < 0) { return "▼ " + formatPercent(Math.abs(c)) + " " + suffix; }
-            return formatPercent(0) + " " + suffix;
+            if (c > 0) { return "▲ " + formatPoints(c) + " " + suffix; }
+            if (c < 0) { return "▼ " + formatPoints(Math.abs(c)) + " " + suffix; }
+            return formatPoints(0) + " " + suffix;
         }
 
         function escapeHtml(value) {

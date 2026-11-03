@@ -31,6 +31,29 @@ namespace VIS.Controllers
     {
         private static readonly VLogger _log = VLogger.GetVLogger(typeof(VAS_213_POsExpectedThisMonthWidgetController).FullName);
 
+        /// <summary>
+        /// Order value excluding taxes (sub total) for the C_Order aliased "o". On a tax-exclusive
+        /// order this is TotalLines; on a tax-inclusive order (IsTaxIncluded = 'Y') TotalLines is the
+        /// gross, so the order's extracted tax (SUM(C_OrderTax.TaxAmt)) is deducted.
+        /// </summary>
+        private const string PO_VALUE_EXCL_TAX_SQL = @"(COALESCE(o.TotalLines, 0) - CASE WHEN COALESCE(o.IsTaxIncluded, 'N') = 'Y'
+                             THEN COALESCE((SELECT SUM(ot.TaxAmt) FROM C_OrderTax ot
+                                             WHERE ot.C_Order_ID = o.C_Order_ID AND ot.IsActive = 'Y'), 0)
+                             ELSE 0 END)";
+
+        /// <summary>
+        /// Role-filtered C_Order ids as a simple, parseable sub-query, for statements MRole.AddAccessSQL
+        /// cannot rewrite (derived tables / scalar sub-selects).
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <returns>SELECT returning the accessible C_Order_ID values of the client</returns>
+        private static string GetOrderAccessSql(Ctx ctx)
+        {
+            return MRole.GetDefault(ctx).AddAccessSQL(
+                "SELECT accessOrd.C_Order_ID FROM C_Order accessOrd WHERE accessOrd.AD_Client_ID = " + ctx.GetAD_Client_ID(),
+                "accessOrd", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+        }
+
         [Authorize]
         public ActionResult Index()
         {
@@ -129,7 +152,9 @@ namespace VIS.Controllers
                         rep.Name AS representative_name,
                         c.CurSymbol AS doc_cur_symbol,
                         c.ISO_Code AS doc_cur_iso,
-                        COALESCE(o.TotalLines, 0) AS po_value,
+                        -- PO value excludes taxes: on a tax-inclusive order TotalLines carries the
+                        -- gross, so the extracted tax (C_OrderTax) is taken off to get the sub total.
+                        " + PO_VALUE_EXCL_TAX_SQL + @" AS po_value,
                         q.ordered_qty,
                         q.delivered_qty
                     FROM C_Order o
@@ -318,7 +343,9 @@ namespace VIS.Controllers
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
                       AND COALESCE(o.IsBlanketTrx, 'N') = 'N'
-                      AND o.DocStatus NOT IN ('CL', 'VO', 'RE')
+                      -- Same population as the expected list (completed, not fully received);
+                      -- drafted / in-process POs are not open for delivery and inflated this count.
+                      AND o.DocStatus = 'CO'
                       AND q.ordered_qty > q.delivered_qty
                       AND o.C_Order_ID IN (@P_ORDER_ACCESS@)";
 
@@ -395,7 +422,7 @@ namespace VIS.Controllers
                         o.DateOrdered,
                         o.DatePromised,
                         o.DocStatus,
-                        o.TotalLines AS GrandTotal,
+                        " + PO_VALUE_EXCL_TAX_SQL + @" AS GrandTotal,
                         bp.Name AS VendorName,
                         w.Name AS WarehouseName,
                         rep.Name AS RepName,
@@ -409,7 +436,9 @@ namespace VIS.Controllers
                     LEFT JOIN C_Currency cur ON cur.C_Currency_ID = o.C_Currency_ID
                     WHERE o.C_Order_ID = " + C_Order_ID;
 
-                headerSql = MRole.GetDefault(ctx).AddAccessSQL(headerSql, "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                // The excl.-tax value is a scalar sub-select, which MRole.AddAccessSQL cannot parse;
+                // role access is applied through a simple sub-query on C_Order instead.
+                headerSql += " AND o.C_Order_ID IN (" + GetOrderAccessSql(ctx) + ")";
 
                 IDataReader hDr = null;
                 string docNo = "";
@@ -658,7 +687,7 @@ namespace VIS.Controllers
                         o.DateOrdered AS order_date,
                         o.DatePromised AS promised_date,
                         o.DocStatus AS doc_status,
-                        o.TotalLines AS grand_total,
+                        " + PO_VALUE_EXCL_TAX_SQL + @" AS grand_total,
                         bp.Name AS vendor_name,
                         w.Name AS warehouse_name,
                         u.Name AS created_by_name,
@@ -675,7 +704,9 @@ namespace VIS.Controllers
                     LEFT JOIN C_Currency c ON c.C_Currency_ID = o.C_Currency_ID
                     WHERE o.C_Order_ID = " + C_Order_ID;
 
-                headerSql = MRole.GetDefault(ctx).AddAccessSQL(headerSql, "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                // The excl.-tax value is a scalar sub-select, which MRole.AddAccessSQL cannot parse;
+                // role access is applied through a simple sub-query on C_Order instead.
+                headerSql += " AND o.C_Order_ID IN (" + GetOrderAccessSql(ctx) + ")";
 
                 object headerObj = null;
                 IDataReader hdrDr = null;

@@ -3,8 +3,9 @@
  * Purpose - A near-term commitment window: firm (DocStatus 'CO') Sales Orders with
  *           pending delivery, promised for delivery in the CURRENT calendar month -
  *           no Month/Year filter, always recomputed against today. Shows a headline
- *           count, a supporting "value · next-7-days" meta line, and the 3 rows with
- *           the earliest promised dates. An overdue order promised earlier in the
+ *           count, a supporting "value · next-7-days" meta line, and EVERY counted
+ *           order, earliest promised first, in a scrollable list (Sr 8.31 - the list
+ *           used to stop at 3 rows while the count could be higher). An overdue order promised earlier in the
  *           current month stays counted here while pending (this tile answers
  *           "promised in this month", not "not yet overdue" - VAS_274 Overdue
  *           Deliveries is the dedicated overdue view). The next-7-days figure is
@@ -13,8 +14,10 @@
  *
  * Design  - 12-due-for-delivery.html / .md: glass 2x2 tile, header (no filter),
  *           KPI headline + meta line directly under the header (not in a .kpi
- *           container), then a 3-row preview list separated by a top divider - no
- *           footer, no pager. Each row is a full-width button: SO number (link
+ *           container), then the due orders separated by a top divider, paged by a
+ *           footer pager whose page size follows the tile height (Sr 8.31: the list
+ *           must account for every order in the headline count, and widgets never
+ *           scroll). Each row is a full-width button: SO number (link
  *           color) over "<customer first word> · <promised date short>" on the
  *           left, order value on the right. Row click opens that order's record
  *           modal DIRECTLY - there is no intermediate documents-list modal for this
@@ -66,6 +69,7 @@
  * 38  | of                                                                    | VAS_279_Of
  * 39  | Showing                                                               | VAS_279_Showing
  * 40  | Search is unavailable right now. Try again in a moment.               | VAS_279_LoadError
+ * 41  | Overdue                                                               | VAS_279_OverdueTag
  */
 ; VAS = window.VAS || {};
 
@@ -133,7 +137,7 @@
                 if ($root.css('position') === 'static') { $root.css('position', 'relative'); }
                 var text = '';
                 try { text = VIS.Msg.getMsg('VAS_SO_Retry'); } catch (e) { text = ''; }
-                if (!text || text === 'VAS_SO_Retry') { text = 'Retry'; }
+                if (!text || text === 'VAS_SO_Retry' || text === '[VAS_SO_Retry]') { text = 'Retry'; }
                 $('<button type="button" class="vasso-retry"></button>').text(text)
                     .attr('title', text)
                     .on('click', function (e) {
@@ -178,18 +182,34 @@
 
         var $self = this;
         var $root = $('<div class="vas279-root">');
-        var $shell, $kpiVal, $kpiMeta, $list;
+        var $shell, $kpiVal, $kpiMeta, $list, $tileFoot, tileObserver;
         var $mask, $modal, $mHead, $mTitle, $mSub, $mBack, $mBody, $mFoot;
 
         var SELF_ENDPOINT = 'VAS_279_DueForDeliveryWidget/';
+        // Per-instance event-namespace suffix (Sr 8.28): disposing an old instance must
+        // not unbind the window handlers of a re-created one with the same widget id.
+        var instanceTag = 'i' + Math.random().toString(36).slice(2, 9);
 
         var summaryState = 'loading'; // 'loading' | 'ready' | 'error'
         var summary = null;
 
         var lineState = null; // { order, lines, page, size, tableId }
+        var tileState = { rows: [], page: 0, size: 3 }; // preview rows on the tile
 
         function label(key, fallback) {
             return VIS.Msg.getMsg(key);
+        }
+
+        /* Sr 8.31b: the "Overdue" tag showed its raw key in brackets ("[VAS_279_OverdueTag]")
+           because the key is not in the message table and the old guard only caught the
+           bare key. A missing message is detected in either form (bare key, or the key
+           wrapped in brackets) and the English text is used until the key is added. */
+        function messageOr(key, fallback) {
+            var text = '';
+            try { text = VIS.Msg.getMsg(key); } catch (e) { text = ''; }
+            text = String(text == null ? '' : text).trim();
+            if (!text || text === key || text === '[' + key + ']' || /^\[[^\]]*\]$/.test(text)) { return fallback; }
+            return text;
         }
 
         function escapeHtml(value) {
@@ -274,7 +294,7 @@
         }
 
         /* ============================================================
-         * Widget shell: header (no filter) + KPI block + 3-row preview
+         * Widget shell: header (no filter) + KPI block + paged order list
          * ============================================================ */
         function createWidget() {
             $shell = $('<div class="vas279-shell"></div>');
@@ -288,13 +308,35 @@
             $kpiVal = $('<p class="vas279-kpi-val"><span class="vas279-skel-val"></span></p>');
             $kpiMeta = $('<p class="vas279-kpi-meta"></p>');
             $list = $('<div class="vas279-mini"></div>');
+            $tileFoot = $('<div class="vas279-mtfoot" hidden></div>');
 
-            $shell.append($head, $kpiVal, $kpiMeta, $list);
+            $shell.append($head, $kpiVal, $kpiMeta, $list, $tileFoot);
             $root.append($shell);
+            bindList();
 
-            $list.on('click', function (event) {
+            // Sr 8.31: rows per page follow the list's height (Adaptive Row Count).
+            if (typeof ResizeObserver !== 'undefined') {
+                tileObserver = new ResizeObserver(function () { fitTileRows(); });
+                tileObserver.observe($list[0]);
+            }
+        }
+
+        /* Sr 8.28: (re)binds the list click. Run on init AND on every refresh - after a
+           "refresh all" from the mosaic panel the host can strip jQuery handlers from
+           the widget's DOM (re-attaching the same nodes), which left rows that rendered
+           fine but opened nothing. off() first keeps it to one handler. */
+        function bindList() {
+            if (!$list) { return; }
+            $list.off('click.vas279').on('click.vas279', function (event) {
                 var row = event.target.closest ? event.target.closest('[data-so]') : null;
                 if (row) { openRecordModal(Number(row.getAttribute('data-so'))); }
+            });
+            $tileFoot.off('click.vas279').on('click.vas279', function (event) {
+                var pageBtn = event.target.closest ? event.target.closest('[data-dir]') : null;
+                if (pageBtn && !pageBtn.disabled) {
+                    tileState.page += Number(pageBtn.getAttribute('data-dir'));
+                    drawTileRows();
+                }
             });
         }
 
@@ -327,6 +369,8 @@
         }
 
         function renderWidget() {
+            tileState.rows = [];
+            $tileFoot.attr('hidden', true).html('');
             if (summaryState === 'loading') {
                 $kpiVal.html('<span class="vas279-skel-val"></span>');
                 $kpiMeta.text('');
@@ -352,12 +396,38 @@
             var meta = formatINR(summary.DueThisMonthValue) + ' · ' + formatNum(summary.DueNext7DaysCount) + ' ' + label('VAS_279_Next7Suffix', 'due in the next 7 days');
             $kpiMeta.attr('title', meta).text(meta);
 
-            var rows = summary.Preview || [];
-            $list.html(rows.map(function (row) {
+            tileState.rows = summary.Preview || [];
+            tileState.page = 0;
+            drawTileRows();
+            fitTileRows();
+        }
+
+        /* Sr 8.31: the headline count covers every due order, so the tile pages through all
+           of them; the "Showing a–b of N" helper always matches the rows on screen. */
+        function fitTileRows() {
+            if (!tileState.rows.length || !$list) { return; }
+            var first = $list.children('.vas279-mrow2')[0];
+            if (!first || !first.offsetHeight) { return; }
+            var avail = $list[0].clientHeight - (parseFloat($list.css('padding-top')) || 0);
+            var size = Math.max(1, Math.floor(avail / first.offsetHeight));
+            if (size !== tileState.size) {
+                tileState.size = size;
+                drawTileRows();
+            }
+        }
+
+        function drawTileRows() {
+            var rows = tileState.rows;
+            var pages = Math.max(1, Math.ceil(rows.length / tileState.size));
+            tileState.page = Math.min(pages - 1, Math.max(0, tileState.page));
+            var start = tileState.page * tileState.size;
+            var slice = rows.slice(start, start + tileState.size);
+
+            $list.html(slice.map(function (row) {
                 var meta2 = escapeHtml(firstWord(row.CustomerName)) + ' · ' + escapeHtml(formatDateShort(row.PromisedDate));
                 // A promised date already behind us is flagged so the row is not mistaken for an upcoming delivery.
                 var todayIso = new Date(); todayIso = todayIso.getFullYear() + '-' + ('0' + (todayIso.getMonth() + 1)).slice(-2) + '-' + ('0' + todayIso.getDate()).slice(-2);
-                if (row.PromisedDate && String(row.PromisedDate).slice(0, 10) < todayIso) { meta2 += ' · ' + escapeHtml((function () { var t = label('VAS_279_OverdueTag'); return (!t || t === 'VAS_279_OverdueTag') ? 'Overdue' : t; })()); }
+                if (row.PromisedDate && String(row.PromisedDate).slice(0, 10) < todayIso) { meta2 += ' · ' + escapeHtml(messageOr('VAS_279_OverdueTag', 'Overdue')); }
                 return '<button type="button" class="vas279-mrow2" data-so="' + row.SalesOrderId + '" title="' + escapeHtml(row.SalesOrderNumber) + '">' +
                     '<span class="vas279-mtxt">' +
                         '<span class="vas279-mname" title="' + escapeHtml(row.SalesOrderNumber) + '">' + escapeHtml(row.SalesOrderNumber) + '</span>' +
@@ -365,6 +435,15 @@
                     '</span>' +
                     '<span class="vas279-mval" title="' + escapeHtml(formatINR(row.OrderValue)) + '">' + escapeHtml(formatINR(row.OrderValue)) + '</span></button>';
             }).join(''));
+
+            var showing = label('VAS_279_Showing', 'Showing') + ' ' + (start + 1) + '–' + (start + slice.length) + ' ' + label('VAS_279_Of', 'of') + ' ' + rows.length;
+            $tileFoot.removeAttr('hidden').html('<span class="vas279-helper" title="' + escapeHtml(showing) + '">' + escapeHtml(showing) + '</span>' +
+                (pages > 1 ?
+                    '<span class="vas279-pager">' +
+                        '<button type="button" class="vas279-pbtn" data-dir="-1"' + (tileState.page === 0 ? ' disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_279_PrevPage', 'Previous page')) + '">' + icon('prev') + '</button>' +
+                        '<span class="vas279-ptxt">' + (tileState.page + 1) + ' ' + escapeHtml(label('VAS_279_Of', 'of')) + ' ' + pages + '</span>' +
+                        '<button type="button" class="vas279-pbtn" data-dir="1"' + (tileState.page >= pages - 1 ? ' disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_279_NextPage', 'Next page')) + '">' + icon('next') + '</button>' +
+                    '</span>' : '<span></span>'));
         }
 
         /* ============================================================
@@ -401,7 +480,7 @@
         }
 
         function bindDocumentLevelEvents() {
-            var ns = '.vas279-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget');
+            var ns = '.vas279-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '-' + instanceTag;
 
             $(window).on('resize' + ns, function () {
                 if ($mask.hasClass('is-open')) { fitLineTable(); }
@@ -587,14 +666,22 @@
         this.getRoot = function () { return $root; };
 
         this.disposeComponent = function () {
-            var ns = '.vas279-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget');
+            var ns = '.vas279-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '-' + instanceTag;
             $(document).off(ns);
             $(window).off(ns);
+            if (tileObserver) { tileObserver.disconnect(); tileObserver = null; }
             if ($mask) { $mask.remove(); }
             $root.remove();
         };
 
-        this.refreshWidget = function () { loadSummary(); };
+        // Sr 8.28: a refresh also re-arms the list and re-creates the modal shell if
+        // the host removed it, so the widget stays clickable after "refresh all".
+        this.refreshWidget = function () {
+            if (!$mask || !$.contains(document.body, $mask[0])) { createModal(); }
+            if ($shell && !$.contains($root[0], $shell[0])) { $root.append($shell); }
+            bindList();
+            loadSummary();
+        };
     };
 
     VAS.VAS_279_DueForDeliveryWidget.prototype.widgetFirevalueChanged = function (value) {

@@ -53,6 +53,9 @@ namespace VAS.Controllers
     ///                           clock, and the widget shows that instead of comparing with the browser's
     ///                           clock. Sr 37: "Products in BOM" list ordering - most
     ///                           recently added BOM component first (see GetProductsInBom).
+    ///   VAI163       2026-10-29 BOM Verification: "latest updated" now covers the BOM header and its
+    ///                           lines as well as the parent product, so editing a BOM brings it to the
+    ///                           top; verified and not-verified stay interleaved.
     /// </summary>
     public class VAS_134_BillOfMaterialsWidgetController : Controller
     {
@@ -270,30 +273,61 @@ namespace VAS.Controllers
             {
                 string bomRows = @"
                     SELECT b.M_BOM_ID AS bom_id, b.Name AS bom_code, p.M_Product_ID AS assembly_product_id,
-                           p.Name AS assembly_name, p.VersionNo AS revision,
-                           COUNT(bp.M_BOMProduct_ID) AS component_count,
-                           p.IsVerified AS raw_verified, p.UpdatedBy AS updated_by_id, u.Name AS updated_by_name, p.Updated AS updated_at
+                           p.Name AS assembly_name, p.VersionNo AS revision, p.IsVerified AS raw_verified,
+                           p.UpdatedBy AS product_updated_by, p.Updated AS product_updated,
+                           b.UpdatedBy AS bom_updated_by, b.Updated AS bom_updated
                     FROM M_BOM b
                     JOIN M_Product p ON (p.M_Product_ID = b.M_Product_ID AND p.AD_Client_ID = b.AD_Client_ID)
-                    LEFT JOIN M_BOMProduct bp ON (bp.M_BOM_ID = b.M_BOM_ID AND bp.AD_Client_ID = b.AD_Client_ID AND bp.IsActive = 'Y')
-                    LEFT JOIN AD_User u ON (u.AD_User_ID = p.UpdatedBy)
                     WHERE b.AD_Client_ID = @AD_Client_ID1
                       AND b.IsActive = 'Y'
                       AND p.IsActive = 'Y'
                       AND p.IsBOM = 'Y'";
                 bomRows = MRole.GetDefault(ctx).AddAccessSQL(bomRows, "b", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-                bomRows += @"
-                    GROUP BY b.M_BOM_ID, b.Name, p.M_Product_ID, p.Name, p.VersionNo, p.IsVerified, p.UpdatedBy, u.Name, p.Updated";
 
+                // "Latest updated" is the newest change to the BOM as a whole -
+                // the parent product, the BOM header or any of its lines (a
+                // deactivated line is a change too, so all lines count here) -
+                // and the user shown is whoever made that change.
                 string sql = @"
                     WITH bom_rows AS (
                         " + bomRows + @"
                     ),
-                    normalized_boms AS (
-                        SELECT br.bom_id, br.bom_code, br.assembly_product_id, br.assembly_name, br.revision, br.component_count,
-                            CASE WHEN COALESCE(br.raw_verified, 'N') = 'Y' THEN 'Y' ELSE 'N' END AS is_verified,
-                            br.updated_by_id, br.updated_by_name, br.updated_at
+                    line_stats AS (
+                        SELECT bp.M_BOM_ID AS bom_id,
+                            SUM(CASE WHEN bp.IsActive = 'Y' THEN 1 ELSE 0 END) AS component_count,
+                            MAX(bp.Updated) AS line_updated
+                        FROM M_BOMProduct bp
+                        JOIN bom_rows br ON (br.bom_id = bp.M_BOM_ID)
+                        WHERE bp.AD_Client_ID = @AD_Client_ID2
+                        GROUP BY bp.M_BOM_ID
+                    ),
+                    line_last AS (
+                        SELECT bp.M_BOM_ID AS bom_id, MAX(bp.UpdatedBy) AS line_updated_by
+                        FROM M_BOMProduct bp
+                        JOIN line_stats ls ON (ls.bom_id = bp.M_BOM_ID AND bp.Updated = ls.line_updated)
+                        GROUP BY bp.M_BOM_ID
+                    ),
+                    latest_change AS (
+                        SELECT br.bom_id, br.bom_code, br.assembly_product_id, br.assembly_name, br.revision, br.raw_verified,
+                            COALESCE(ls.component_count, 0) AS component_count,
+                            CASE WHEN ls.line_updated IS NOT NULL AND ls.line_updated > br.bom_updated
+                                      AND ls.line_updated > br.product_updated THEN ls.line_updated
+                                 WHEN br.bom_updated > br.product_updated THEN br.bom_updated
+                                 ELSE br.product_updated END AS updated_at,
+                            CASE WHEN ls.line_updated IS NOT NULL AND ls.line_updated > br.bom_updated
+                                      AND ls.line_updated > br.product_updated THEN ll.line_updated_by
+                                 WHEN br.bom_updated > br.product_updated THEN br.bom_updated_by
+                                 ELSE br.product_updated_by END AS updated_by_id
                         FROM bom_rows br
+                        LEFT JOIN line_stats ls ON (ls.bom_id = br.bom_id)
+                        LEFT JOIN line_last ll ON (ll.bom_id = br.bom_id)
+                    ),
+                    normalized_boms AS (
+                        SELECT lc.bom_id, lc.bom_code, lc.assembly_product_id, lc.assembly_name, lc.revision, lc.component_count,
+                            CASE WHEN COALESCE(lc.raw_verified, 'N') = 'Y' THEN 'Y' ELSE 'N' END AS is_verified,
+                            lc.updated_by_id, u.Name AS updated_by_name, lc.updated_at
+                        FROM latest_change lc
+                        LEFT JOIN AD_User u ON (u.AD_User_ID = lc.updated_by_id)
                     ),
                     ranked_boms AS (
                         SELECT nb.bom_id, nb.bom_code, nb.assembly_product_id, nb.assembly_name, nb.revision, nb.component_count,
@@ -301,7 +335,7 @@ namespace VAS.Controllers
                             COUNT(*) OVER () AS total_count,
                             SUM(CASE WHEN nb.is_verified = 'N' THEN 1 ELSE 0 END) OVER () AS not_verified_count,
                             ROW_NUMBER() OVER (
-                                ORDER BY nb.updated_at DESC, nb.bom_code ASC, nb.bom_id ASC
+                                ORDER BY nb.updated_at DESC, nb.bom_id DESC
                             ) AS row_num
                         FROM normalized_boms nb
                     )
@@ -315,6 +349,7 @@ namespace VAS.Controllers
                 SqlParameter[] parms = new SqlParameter[]
                 {
                     new SqlParameter("@AD_Client_ID1", ctx.GetAD_Client_ID()),
+                    new SqlParameter("@AD_Client_ID2", ctx.GetAD_Client_ID()),
                     new SqlParameter("@Offset1", offset),
                     new SqlParameter("@Offset2", offset),
                     new SqlParameter("@PageSize", pageSize)

@@ -177,6 +177,10 @@
         var $kpiMeta = null;
         var $subTitle = null;
         var $listContainer = null;
+        var $listFoot = null;
+        // Widget list shows three POs per page (pager instead of a scroller)
+        var LIST_PAGE_SIZE = 3;
+        var listPage = 0;
         var $busy = null;
         var widgetObserver = null;
 
@@ -254,6 +258,13 @@
                         '<span class="vas-213-kpi-meta">—</span>' +
                     '</button>' +
                     '<div class="vas-213-mini" id="vas201_mini_list"></div>' +
+                    '<div class="vas-213-wfoot vas-213-hidden">' +
+                        '<span class="vas-213-pager">' +
+                            '<button type="button" class="vas-213-pbtn vas-213-wpbtn" data-wdir="-1" aria-label="' + esc(lbl('VAS_213_Previous', 'Previous')) + '">' + ICON_PREV + '</button>' +
+                            '<span class="vas-213-ptxt vas-213-wptxt"></span>' +
+                            '<button type="button" class="vas-213-pbtn vas-213-wpbtn" data-wdir="1" aria-label="' + esc(lbl('VAS_213_Next', 'Next')) + '">' + ICON_NEXT + '</button>' +
+                        '</span>' +
+                    '</div>' +
                 '</section>'
             );
 
@@ -261,6 +272,16 @@
             $kpiMeta = $card.find('.vas-213-kpi-meta');
             $subTitle = $card.find('.vas-213-sub');
             $listContainer = $card.find('.vas-213-mini');
+            $listFoot = $card.find('.vas-213-wfoot');
+
+            // Widget list pager: three POs per page, no scroller
+            $listFoot.on('click', '.vas-213-wpbtn', function () {
+                var dir = parseInt($(this).attr('data-wdir'), 10) || 0;
+                var recs = (widgetData && widgetData.records) || [];
+                var pages = Math.max(1, Math.ceil(recs.length / LIST_PAGE_SIZE));
+                listPage = Math.min(pages - 1, Math.max(0, listPage + dir));
+                renderList(recs);
+            });
 
             // Headline click opens the full expected-PO list modal
             $card.find('.vas-213-headline').on('click', function () {
@@ -341,9 +362,23 @@
                 $kpiMeta.attr('title', metaStr);
             }
 
-            // Render every expected order, nearest promised first; the list scrolls when long
+            // Expected orders, nearest promised first, three per page
+            listPage = 0;
+            renderList(records);
+        }
+
+        function renderList(records) {
             if ($listContainer) {
                 $listContainer.empty();
+                var pages = Math.max(1, Math.ceil(records.length / LIST_PAGE_SIZE));
+                if (listPage > pages - 1) { listPage = pages - 1; }
+
+                if ($listFoot) {
+                    $listFoot.toggleClass('vas-213-hidden', pages <= 1);
+                    $listFoot.find('.vas-213-wptxt').text((listPage + 1) + ' ' + lbl('VAS_Of', 'of') + ' ' + pages);
+                    $listFoot.find('[data-wdir="-1"]').prop('disabled', listPage === 0);
+                    $listFoot.find('[data-wdir="1"]').prop('disabled', listPage >= pages - 1);
+                }
 
                 if (records.length === 0) {
                     $listContainer.html(
@@ -353,7 +388,9 @@
                     );
                 } else {
                     var html = '';
-                    for (var i = 0; i < records.length; i++) {
+                    var start = listPage * LIST_PAGE_SIZE;
+                    var end = Math.min(records.length, start + LIST_PAGE_SIZE);
+                    for (var i = start; i < end; i++) {
                         var p = records[i];
                         var pVal = formatMoney(p.POValue, p.CurrencySymbol, p.CurrencyISO);
                         var vendorShort = p.ShortVendorName || p.VendorName || '—';
@@ -376,6 +413,7 @@
         function setError() {
             if ($kpiCount) { $kpiCount.text('—'); }
             if ($kpiMeta) { $kpiMeta.text(lbl('VAS_CouldntLoad', "Couldn't load data")); }
+            if ($listFoot) { $listFoot.addClass('vas-213-hidden'); }
             if ($listContainer) {
                 $listContainer.html(
                     '<div class="vas-213-empty-state">' +
