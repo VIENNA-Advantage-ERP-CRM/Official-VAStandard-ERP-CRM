@@ -267,20 +267,27 @@ namespace VAdvantage.Model
                                      WHERE C_ConversionType_ID = " + C_ConversionType_ID, null, null));
                     if (isFetchAllDateOrNot == "Y")
                     {
-                        //System took currencies rate from last updated rate, 
+                        //System took currencies rate from last updated rate,
                         //when current date rate not defined and consider previous record is true on Conversion type
-                        sql = @"SELECT MultiplyRate FROM C_Conversion_Rate WHERE C_Conversion_Rate_id = (
-                              SELECT MAX(C_Conversion_Rate_id) keep (dense_rank last ORDER BY ValidFrom, C_Conversion_Rate_id)
-                               FROM C_Conversion_Rate WHERE IsActive = 'Y' AND C_Currency_ID = " + CurFrom_ID + @"
-                              AND C_Currency_To_ID   = " + CurTo_ID + @" 
-                              AND C_ConversionType_ID= " + C_ConversionType_ID + @"
+                        // latest rate starting before the date; first row only, works on both Oracle and PostgreSQL
+                        sql = @"SELECT MultiplyRate FROM C_Conversion_Rate
+                              WHERE IsActive = 'Y' AND C_Currency_ID = @CurFrom_ID
+                              AND C_Currency_To_ID = @CurTo_ID
+                              AND C_ConversionType_ID = @C_ConversionType_ID
                               AND ValidFrom < " + DataBase.DB.TO_DATE(convDate, true) + @"
-                              AND AD_Client_ID      IN (0," + AD_Client_ID + ")" + @"
-                              AND AD_Org_ID         IN (0," + AD_Org_ID + "))";
+                              AND AD_Client_ID IN (0, @AD_Client_ID)
+                              AND AD_Org_ID IN (0, @AD_Org_ID)
+                              ORDER BY ValidFrom DESC, C_Conversion_Rate_ID DESC";
+                        System.Data.SqlClient.SqlParameter[] param = new System.Data.SqlClient.SqlParameter[5];
+                        param[0] = new System.Data.SqlClient.SqlParameter("@CurFrom_ID", CurFrom_ID);
+                        param[1] = new System.Data.SqlClient.SqlParameter("@CurTo_ID", CurTo_ID);
+                        param[2] = new System.Data.SqlClient.SqlParameter("@C_ConversionType_ID", C_ConversionType_ID);
+                        param[3] = new System.Data.SqlClient.SqlParameter("@AD_Client_ID", AD_Client_ID);
+                        param[4] = new System.Data.SqlClient.SqlParameter("@AD_Org_ID", AD_Org_ID);
                         retValue = null;
                         try
                         {
-                            ds = DataBase.DB.ExecuteDataset(sql, null, null);
+                            ds = DataBase.DB.ExecuteDataset(sql, param, null, 1, 1);
                             for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                             {
                                 DataRow dr = ds.Tables[0].Rows[i];
