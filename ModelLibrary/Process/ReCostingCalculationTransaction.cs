@@ -438,12 +438,41 @@ namespace VAdvantage.Process
                 {
                     sql.Append(@" AND NVL(LCA.M_InOutLine_ID  , 0) = 0");
                 }
-                sql.Append(") ");
-                sql.Append(@" SELECT * from trx 
-                              UNION ALL 
+                sql.Append("), ");
+                // Shipment / Receipt lines of non-stocked items have no M_Transaction, so pick them from the document;
+                // their cost flags are reset above and must be calculated again
+                sql.Append($@"InOutNoTrx as
+                                (SELECT io.ad_client_ID ,  io.AD_Org_ID ,  il.M_Product_ID, 0 AS M_AttributeSetInstance_ID ,io.MovementDate as movementdate,  to_char(io.created, 'DD-MON-YY HH24:MI:SS') AS created  ,
+                                0 as M_Transaction_ID,  MIN(il.M_InOutLine_ID) as M_InOutline_ID  , 0 as M_Inventoryline_ID  , 0 as M_Movementline_ID , 0 as M_productionline_ID,
+                                0 as VAMFG_M_wrkodrtransaction_ID  , 0 as VAMFG_M_wrkodrtrnsctionline_ID,
+                                0 as VAFAM_assetdisposal_ID, 0 AS VA143_JobWorkInOutLine_ID, 0 AS C_Invoiceline_ID, '' as vas_iscreditnote, '' as vas_islandedcost, '' as treatasdiscount, io.M_InOut_ID AS Record_Id,
+                                io.issotrx ,  io.isreturntrx ,  '' AS IsInternalUse, io.docstatus,  'M_InOut' AS TableName
+                         FROM M_InOut io
+                         INNER JOIN M_InOutLine il ON (il.M_InOut_ID = io.M_InOut_ID)
+                         INNER JOIN M_Product p ON (p.M_Product_ID = il.M_Product_ID)
+                         WHERE io.IsActive = 'Y' AND il.IsActive = 'Y' AND io.AD_Client_ID = {GetCtx().GetAD_Client_ID()} AND io.DocStatus IN ('CO', 'CL')
+                         AND p.ProductType = 'I' AND p.IsStocked = 'N'
+                         AND NOT EXISTS (SELECT 1 FROM M_Transaction mt WHERE mt.AD_Client_ID = {GetCtx().GetAD_Client_ID()} AND mt.M_InOutLine_ID = il.M_InOutLine_ID) ");
+                if (!string.IsNullOrEmpty(productCategoryID) || !string.IsNullOrEmpty(productID))
+                {
+                    sql.Append(@" AND il.M_Product_ID IN ( " + ((!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID)) ? pc : productID) + @" )");
+                }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append(@" AND il.M_AttributeSetInstance_ID IN ( " + M_AttributeSetInstance_ID + @" )");
+                }
+                if (DateFrom != null)
+                {
+                    sql.Append($@" AND io.MovementDate >= { GlobalVariable.TO_DATE(DateFrom, true) }");
+                }
+                sql.Append(@" GROUP BY io.ad_client_ID, io.AD_Org_ID, il.M_Product_ID, io.MovementDate, io.created, io.M_InOut_ID, io.issotrx, io.isreturntrx, io.docstatus) ");
+                sql.Append(@" SELECT * from trx
+                              UNION ALL
                               SELECT * from MatchInv
-                              UNION ALL 
-                              SELECT * from LandedCost");
+                              UNION ALL
+                              SELECT * from LandedCost
+                              UNION ALL
+                              SELECT * from InOutNoTrx");
                 sql.Append($@")t WHERE t.AD_Client_ID = {GetCtx().GetAD_Client_ID()} ");
                 int totalRecord = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(*) FROM (" + sql.ToString(), null, Get_Trx()));
 
@@ -4557,9 +4586,11 @@ namespace VAdvantage.Process
             inout = new MInOut(GetCtx(), M_Inout_ID, Get_Trx());
 
             sql.Clear();
-            sql.Append(@"SELECT il.* , ilma.M_AttributeSetInstance_ID AS M_AttributeSetInstance_IDMA , ilma.M_Transaction_ID, ilma.MovementQty AS MovementQtyMA 
-                            FROM M_InoutLine il INNER JOIN M_InOutLineMA ilma ON (il.M_InoutLine_ID = ilma.M_InoutLine_ID) 
-                        WHERE il.IsActive = 'Y' AND il.M_Inout_ID = " + inout.GetM_InOut_ID());
+            // non-stocked item lines have no M_InOutLineMA / M_Transaction, so take Attribute and Qty from the line itself
+            sql.Append(@"SELECT il.* , NVL(ilma.M_AttributeSetInstance_ID, il.M_AttributeSetInstance_ID) AS M_AttributeSetInstance_IDMA , NVL(ilma.M_Transaction_ID, 0) AS M_Transaction_ID, NVL(ilma.MovementQty, il.MovementQty) AS MovementQtyMA
+                            FROM M_InoutLine il LEFT JOIN M_InOutLineMA ilma ON (il.M_InoutLine_ID = ilma.M_InoutLine_ID)
+                        WHERE il.IsActive = 'Y' AND (ilma.M_InOutLine_ID IS NOT NULL OR il.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE ProductType = 'I' AND IsStocked = 'N'))
+                        AND il.M_Inout_ID = " + inout.GetM_InOut_ID());
             if (inout.IsReversal())
             {
                 sql.Append(" AND (il.iscostcalculated = 'Y' OR il.IsCostImmediate = 'Y') AND il.IsReversedCostCalculated = 'N' ");
@@ -4578,7 +4609,7 @@ namespace VAdvantage.Process
             sql.Append(" AND il.M_Product_ID IN (" + productID + " )");
             if (M_AttributeSetInstance_ID > 0)
             {
-                sql.Append(" AND NVL(ilma.M_AttributeSetInstance_ID, 0) = " + M_AttributeSetInstance_ID);
+                sql.Append(" AND NVL(ilma.M_AttributeSetInstance_ID, NVL(il.M_AttributeSetInstance_ID, 0)) = " + M_AttributeSetInstance_ID);
             }
             //}
             sql.Append(" ORDER BY il.Line");
@@ -4782,9 +4813,11 @@ namespace VAdvantage.Process
             inout = new MInOut(GetCtx(), M_Inout_ID, Get_Trx());
 
             sql.Clear();
-            sql.Append(@"SELECT il.* , ilma.M_AttributeSetInstance_ID AS M_AttributeSetInstance_IDMA , ilma.M_Transaction_ID, ilma.MovementQty AS MovementQtyMA 
-                            FROM M_InoutLine il INNER JOIN M_InOutLineMA ilma ON (il.M_InoutLine_ID = ilma.M_InoutLine_ID) 
-                        WHERE il.IsActive = 'Y' AND il.M_Inout_ID = " + inout.GetM_InOut_ID());
+            // non-stocked item lines have no M_InOutLineMA / M_Transaction, so take Attribute and Qty from the line itself
+            sql.Append(@"SELECT il.* , NVL(ilma.M_AttributeSetInstance_ID, il.M_AttributeSetInstance_ID) AS M_AttributeSetInstance_IDMA , NVL(ilma.M_Transaction_ID, 0) AS M_Transaction_ID, NVL(ilma.MovementQty, il.MovementQty) AS MovementQtyMA
+                            FROM M_InoutLine il LEFT JOIN M_InOutLineMA ilma ON (il.M_InoutLine_ID = ilma.M_InoutLine_ID)
+                        WHERE il.IsActive = 'Y' AND (ilma.M_InOutLine_ID IS NOT NULL OR il.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE ProductType = 'I' AND IsStocked = 'N'))
+                        AND il.M_Inout_ID = " + inout.GetM_InOut_ID());
             if (inout.IsReversal())
             {
                 sql.Append(" AND (il.iscostcalculated = 'Y' OR il.IsCostImmediate = 'Y') AND il.IsReversedCostCalculated = 'N' ");
@@ -4803,7 +4836,7 @@ namespace VAdvantage.Process
             sql.Append(" AND il.M_Product_ID IN (" + productID + " )");
             if (M_AttributeSetInstance_ID > 0)
             {
-                sql.Append(" AND NVL(ilma.M_AttributeSetInstance_ID, 0) = " + M_AttributeSetInstance_ID);
+                sql.Append(" AND NVL(ilma.M_AttributeSetInstance_ID, NVL(il.M_AttributeSetInstance_ID, 0)) = " + M_AttributeSetInstance_ID);
             }
             //}
             sql.Append(" ORDER BY il.Line");
@@ -5047,9 +5080,11 @@ namespace VAdvantage.Process
             inout = new MInOut(GetCtx(), M_Inout_ID, Get_Trx());
 
             sql.Clear();
-            sql.Append(@"SELECT il.* , ilma.M_AttributeSetInstance_ID AS M_AttributeSetInstance_IDMA , ilma.M_Transaction_ID, ilma.MovementQty AS MovementQtyMA 
-                            FROM M_InoutLine il INNER JOIN M_InOutLineMA ilma ON (il.M_InoutLine_ID = ilma.M_InoutLine_ID) 
-                        WHERE il.IsActive = 'Y' AND il.M_Inout_ID = " + inout.GetM_InOut_ID());
+            // non-stocked item lines have no M_InOutLineMA / M_Transaction, so take Attribute and Qty from the line itself
+            sql.Append(@"SELECT il.* , NVL(ilma.M_AttributeSetInstance_ID, il.M_AttributeSetInstance_ID) AS M_AttributeSetInstance_IDMA , NVL(ilma.M_Transaction_ID, 0) AS M_Transaction_ID, NVL(ilma.MovementQty, il.MovementQty) AS MovementQtyMA
+                            FROM M_InoutLine il LEFT JOIN M_InOutLineMA ilma ON (il.M_InoutLine_ID = ilma.M_InoutLine_ID)
+                        WHERE il.IsActive = 'Y' AND (ilma.M_InOutLine_ID IS NOT NULL OR il.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE ProductType = 'I' AND IsStocked = 'N'))
+                        AND il.M_Inout_ID = " + inout.GetM_InOut_ID());
             if (inout.IsReversal())
             {
                 sql.Append(" AND (il.iscostcalculated = 'Y' OR il.IsCostImmediate = 'Y') AND il.IsReversedCostCalculated = 'N' ");
@@ -5068,7 +5103,7 @@ namespace VAdvantage.Process
             sql.Append(" AND il.M_Product_ID IN (" + productID + " )");
             if (M_AttributeSetInstance_ID > 0)
             {
-                sql.Append(" AND NVL(ilma.M_AttributeSetInstance_ID, 0) = " + M_AttributeSetInstance_ID);
+                sql.Append(" AND NVL(ilma.M_AttributeSetInstance_ID, NVL(il.M_AttributeSetInstance_ID, 0)) = " + M_AttributeSetInstance_ID);
             }
             //}
             sql.Append(" ORDER BY il.Line");
@@ -5354,9 +5389,11 @@ namespace VAdvantage.Process
             inout = new MInOut(GetCtx(), M_Inout_ID, Get_Trx());
 
             sql.Clear();
-            sql.Append(@"SELECT il.* , ilma.M_AttributeSetInstance_ID AS M_AttributeSetInstance_IDMA , ilma.M_Transaction_ID, ilma.MovementQty AS MovementQtyMA 
-                            FROM M_InoutLine il INNER JOIN M_InOutLineMA ilma ON (il.M_InoutLine_ID = ilma.M_InoutLine_ID) 
-                        WHERE il.IsActive = 'Y' AND il.M_Inout_ID = " + inout.GetM_InOut_ID());
+            // non-stocked item lines have no M_InOutLineMA / M_Transaction, so take Attribute and Qty from the line itself
+            sql.Append(@"SELECT il.* , NVL(ilma.M_AttributeSetInstance_ID, il.M_AttributeSetInstance_ID) AS M_AttributeSetInstance_IDMA , NVL(ilma.M_Transaction_ID, 0) AS M_Transaction_ID, NVL(ilma.MovementQty, il.MovementQty) AS MovementQtyMA
+                            FROM M_InoutLine il LEFT JOIN M_InOutLineMA ilma ON (il.M_InoutLine_ID = ilma.M_InoutLine_ID)
+                        WHERE il.IsActive = 'Y' AND (ilma.M_InOutLine_ID IS NOT NULL OR il.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE ProductType = 'I' AND IsStocked = 'N'))
+                        AND il.M_Inout_ID = " + inout.GetM_InOut_ID());
             if (inout.IsReversal())
             {
                 sql.Append(" AND (il.iscostcalculated = 'Y' OR il.IsCostImmediate = 'Y') AND il.IsReversedCostCalculated = 'N' ");
@@ -5374,7 +5411,7 @@ namespace VAdvantage.Process
             sql.Append(" AND il.M_Product_ID IN (" + productID + " )");
             if (M_AttributeSetInstance_ID > 0)
             {
-                sql.Append(" AND NVL(ilma.M_AttributeSetInstance_ID, 0) = " + M_AttributeSetInstance_ID);
+                sql.Append(" AND NVL(ilma.M_AttributeSetInstance_ID, NVL(il.M_AttributeSetInstance_ID, 0)) = " + M_AttributeSetInstance_ID);
             }
             //}
             sql.Append(" ORDER BY il.Line");
@@ -5812,9 +5849,11 @@ namespace VAdvantage.Process
             inout = new MInOut(GetCtx(), M_Inout_ID, Get_Trx());
 
             sql.Clear();
-            sql.Append(@"SELECT il.* , ilma.M_AttributeSetInstance_ID AS M_AttributeSetInstance_IDMA , ilma.M_Transaction_ID, ilma.MovementQty AS MovementQtyMA 
-                            FROM M_InoutLine il INNER JOIN M_InOutLineMA ilma ON (il.M_InoutLine_ID = ilma.M_InoutLine_ID) 
-                        WHERE il.IsActive = 'Y' AND il.M_Inout_ID = " + inout.GetM_InOut_ID());
+            // non-stocked item lines have no M_InOutLineMA / M_Transaction, so take Attribute and Qty from the line itself
+            sql.Append(@"SELECT il.* , NVL(ilma.M_AttributeSetInstance_ID, il.M_AttributeSetInstance_ID) AS M_AttributeSetInstance_IDMA , NVL(ilma.M_Transaction_ID, 0) AS M_Transaction_ID, NVL(ilma.MovementQty, il.MovementQty) AS MovementQtyMA
+                            FROM M_InoutLine il LEFT JOIN M_InOutLineMA ilma ON (il.M_InoutLine_ID = ilma.M_InoutLine_ID)
+                        WHERE il.IsActive = 'Y' AND (ilma.M_InOutLine_ID IS NOT NULL OR il.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE ProductType = 'I' AND IsStocked = 'N'))
+                        AND il.M_Inout_ID = " + inout.GetM_InOut_ID());
             if (inout.IsReversal())
             {
                 sql.Append(" AND (il.iscostcalculated = 'Y' OR il.IsCostImmediate = 'Y') AND il.IsReversedCostCalculated = 'N' ");
@@ -5833,7 +5872,7 @@ namespace VAdvantage.Process
             sql.Append(" AND il.M_Product_ID IN (" + productID + " )");
             if (M_AttributeSetInstance_ID > 0)
             {
-                sql.Append(" AND NVL(ilma.M_AttributeSetInstance_ID, 0) = " + M_AttributeSetInstance_ID);
+                sql.Append(" AND NVL(ilma.M_AttributeSetInstance_ID, NVL(il.M_AttributeSetInstance_ID, 0)) = " + M_AttributeSetInstance_ID);
             }
             //}
             sql.Append(" ORDER BY il.Line");
