@@ -467,6 +467,25 @@
     border-bottom: none;
 }
 
+/* Keep long / unbroken text inside the row. `fr` columns default to a min-content floor,
+   so one long word (or a name with no spaces) used to stretch the whole grid past the
+   panel. min-width:0 lets the column shrink to its track; overflow-wrap breaks the text. */
+.vas_105_acct-clickrow,
+.vas_105_acct-tablehead {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.vas_105_acct-clickrow > *,
+.vas_105_acct-tablehead > * {
+    min-width: 0;
+}
+
+.vas_105_acct-clickrow > span {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
 .vas_105_acct-clickrow:hover {
     background: #F7FBFF;
 }
@@ -778,6 +797,18 @@
     max-width: 24em;
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
     pointer-events: none;
+}
+
+/* Two-line clamp: wraps to a second line, then ends with an ellipsis. Pair with
+   .vas_105_acct-tip (data-tip) so the full text shows on hover. */
+.vas_105_acct-clamp2 {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 html[dir="rtl"] .vas_105_acct-tip[data-tip]:hover::after {

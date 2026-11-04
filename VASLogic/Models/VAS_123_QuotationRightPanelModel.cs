@@ -27,6 +27,7 @@ namespace VAS.Models
     ///               and quotation-to-sales-order conversion for the CRM right panel.
     /// Chronological development:
     ///   VAI154  20-Jul-2026
+    ///   VAI154  03-Nov-2026  Orders section lists every order generated from the quotation (via C_OrderLine.C_Order_Quotation), not only the latest
     /// </summary>
     public class VAS_123_QuotationRightPanelModel
     {
@@ -418,6 +419,9 @@ namespace VAS.Models
                 meeting.meetingUrl  = Util.GetValueOfString(row["MeetingUrl"]);
                 meeting.location    = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["Location"]));
                 meeting.attendeeInfo  = Util.GetValueOfString(row["AttendeeInfo"]);
+                // AttendeeInfo holds AD_User_IDs (e.g. "1005390;1005391"), not names — resolve them
+                // so the avatars show initials and the hover shows the person's name.
+                meeting.attendeeNames = ResolveAttendeeNames(meeting.attendeeInfo);
                 meeting.emailToInfo   = Util.GetValueOfString(row["EmailToInfo"]);
                 meeting.description   = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["Description"]));
 
@@ -428,6 +432,71 @@ namespace VAS.Models
                 _log.SaveError("VAS_123_QuotationRightPanelModel.GetNextMeeting", ex.Message);
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Turns a stored AttendeeInfo value (";" / "," / "|" separated, possibly wrapped in a JSON-ish
+        /// [ ] list) into display names, in the stored order. A numeric token is an AD_User_ID and is
+        /// replaced by that user's name (an id with no active user is dropped); any other token
+        /// (a name or an e-mail) is kept as it is. Each person appears once.
+        /// </summary>
+        private List<string> ResolveAttendeeNames(string raw)
+        {
+            var names = new List<string>();
+            if (string.IsNullOrWhiteSpace(raw)) return names;
+
+            var tokens = new List<string>();
+            foreach (string part in raw.Split(new[] { ';', ',', '|' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                string t = part.Trim().Trim('[', ']', '"', '\'').Trim();
+                if (t.Length > 0) tokens.Add(t);
+            }
+
+            // One lookup for every numeric id.
+            var ids = tokens.Select(t => { int v; return int.TryParse(t, out v) ? v : 0; })
+                            .Where(v => v > 0).Distinct().ToList();
+            var idToName = new Dictionary<int, string>();
+            if (ids.Count > 0)
+            {
+                try
+                {
+                    var holders = new List<string>();
+                    var ps      = new List<SqlParameter>();
+                    for (int i = 0; i < ids.Count; i++)
+                    {
+                        holders.Add("@uid" + i);
+                        ps.Add(new SqlParameter("@uid" + i, ids[i]));
+                    }
+                    DataSet ds = DB.ExecuteDataset(
+                        "SELECT AD_User_ID, Name FROM AD_User WHERE IsActive = 'Y' AND AD_User_ID IN (" + string.Join(",", holders) + ")",
+                        ps.ToArray(), null);
+                    if (ds != null && ds.Tables.Count > 0)
+                    {
+                        foreach (DataRow r in ds.Tables[0].Rows)
+                            idToName[Util.GetValueOfInt(r["AD_User_ID"])] = Util.GetValueOfString(r["Name"]);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _log.SaveError("VAS_123_QuotationRightPanelModel.ResolveAttendeeNames", ex.Message);
+                }
+            }
+
+            foreach (string t in tokens)
+            {
+                string name;
+                int id;
+                if (int.TryParse(t, out id))
+                {
+                    if (!idToName.TryGetValue(id, out name) || string.IsNullOrWhiteSpace(name)) continue;
+                }
+                else
+                {
+                    name = System.Net.WebUtility.HtmlDecode(t);
+                }
+                if (!names.Contains(name, StringComparer.OrdinalIgnoreCase)) names.Add(name);
+            }
+            return names;
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -744,9 +813,22 @@ namespace VAS.Models
         /// <returns>List of dynamic objects, one per generated order, ordered newest first.</returns>
         public List<dynamic> GetGeneratedOrders(Ctx ctx, int orderId)
         {
-            var result = new List<dynamic>();
+            var result  = new List<dynamic>();
+            var seen    = new HashSet<int>();
+            var created = new Dictionary<int, DateTime>();   // for the final newest-first order
 
-            string baseSql = @"SELECT so.C_Order_ID AS C_Order_ID,
+            // A quotation can be converted to several sales orders, but the conversion only keeps
+            // the quotation's Ref_Order_ID = the LATEST order (earlier ones are overwritten). So the
+            // orders are gathered from several independent links, each in its OWN try/catch — a link
+            // that does not exist (or fails) on this schema must never hide the others:
+            //   1. Ref_Order_ID either way round            (the original, proven link)
+            //   2. C_Order.C_Order_Quotation  = quotation id (set on the order header)
+            //   3. C_OrderLine.C_Order_Quotation = quotation id (set on the order lines)
+            // C_Order_Quotation is a VARCHAR holding the quotation's C_Order_ID, so it is compared
+            // as text (@qid) — comparing it to a number raises a type error.
+            string qid = orderId.ToString();
+
+            const string selectCols = @"SELECT so.C_Order_ID AS C_Order_ID,
                 so.DocumentNo AS DocumentNo,
                 so.DateOrdered AS DateOrdered,
                 so.DatePromised AS DatePromised,
@@ -754,50 +836,75 @@ namespace VAS.Models
                 COALESCE(so.GrandTotal, 0) AS GrandTotal,
                 so.C_Currency_ID AS C_Currency_ID,
                 so.Ref_Order_ID AS Ref_Order_ID,
+                so.Created AS Created,
                 so.Updated AS Updated
                 FROM C_Order so
-                WHERE (so.Ref_Order_ID = @orderId OR so.C_Order_ID = (SELECT q.Ref_Order_ID FROM C_Order q WHERE q.C_Order_ID = @orderId AND q.IsActive = 'Y'))
+                WHERE (";
+            const string salesOrderOnly = @")
                 AND so.IsSOTrx = 'Y'
                 AND COALESCE(so.IsSalesQuotation,'N') = 'N'
                 AND COALESCE(so.IsBlanketTrx,'N') = 'N'
                 AND COALESCE(so.IsReturnTrx,'N') = 'N'
-                AND so.IsActive = 'Y'
-                ORDER BY so.Created DESC";
+                AND so.IsActive = 'Y'";
 
-            string accessSql = MRole.GetDefault(ctx).AddAccessSQL(
-                baseSql, "so", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-
-            try
+            // (predicate, parameters) per link
+            var links = new List<KeyValuePair<string, SqlParameter[]>>();
+            links.Add(new KeyValuePair<string, SqlParameter[]>(
+                "so.Ref_Order_ID = @orderId OR so.C_Order_ID = (SELECT q.Ref_Order_ID FROM C_Order q WHERE q.C_Order_ID = @orderId AND q.IsActive = 'Y')",
+                new SqlParameter[] { new SqlParameter("@orderId", orderId) }));
+            if (ColumnExists("C_Order", "C_Order_Quotation"))
+                links.Add(new KeyValuePair<string, SqlParameter[]>(
+                    "TRIM(so.C_Order_Quotation) = @qid",
+                    new SqlParameter[] { new SqlParameter("@qid", qid) }));
+            if (ColumnExists("C_OrderLine", "C_Order_Quotation"))
             {
-                DataSet ds = DB.ExecuteDataset(accessSql,
-                    new SqlParameter[] { new SqlParameter("@orderId", orderId) }, null);
+                links.Add(new KeyValuePair<string, SqlParameter[]>(
+                    "EXISTS (SELECT 1 FROM C_OrderLine qol WHERE qol.C_Order_ID = so.C_Order_ID AND TRIM(qol.C_Order_Quotation) = @qid)",
+                    new SqlParameter[] { new SqlParameter("@qid", qid) }));
+                // In case that line column is numeric on this schema (TRIM would then fail above).
+                links.Add(new KeyValuePair<string, SqlParameter[]>(
+                    "EXISTS (SELECT 1 FROM C_OrderLine qol WHERE qol.C_Order_ID = so.C_Order_ID AND qol.C_Order_Quotation = @orderId)",
+                    new SqlParameter[] { new SqlParameter("@orderId", orderId) }));
+            }
 
-                if (ds == null || ds.Tables.Count == 0) return result;
-
-                // Fetch decoded DocStatus labels for display
-                var statusLabels = GetRefListNames(ctx, "DocStatus", "C_Order");
-
-                foreach (DataRow row in ds.Tables[0].Rows)
+            foreach (var link in links)
+            {
+                try
                 {
-                    dynamic o = new ExpandoObject();
-                    o.c_Order_ID   = Util.GetValueOfInt(row["C_Order_ID"]);
-                    o.documentNo   = Util.GetValueOfString(row["DocumentNo"]);
-                    o.dateOrdered  = row["DateOrdered"] != DBNull.Value
-                        ? Convert.ToDateTime(row["DateOrdered"]) : (DateTime?)null;
-                    o.datePromised = row["DatePromised"] != DBNull.Value
-                        ? Convert.ToDateTime(row["DatePromised"]) : (DateTime?)null;
-                    o.docStatus    = Util.GetValueOfString(row["DocStatus"]);
-                    o.grandTotal   = row["GrandTotal"] != DBNull.Value
-                        ? Convert.ToDecimal(row["GrandTotal"]) : 0m;
-                    o.c_Currency_ID = Util.GetValueOfInt(row["C_Currency_ID"]);
-                    result.Add(o);
+                    string accessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                        selectCols + link.Key + salesOrderOnly, "so", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                    DataSet ds = DB.ExecuteDataset(accessSql, link.Value, null);
+                    if (ds == null || ds.Tables.Count == 0) continue;
+
+                    foreach (DataRow row in ds.Tables[0].Rows)
+                    {
+                        int id = Util.GetValueOfInt(row["C_Order_ID"]);
+                        if (id <= 0 || !seen.Add(id)) continue;
+
+                        dynamic o = new ExpandoObject();
+                        o.c_Order_ID   = id;
+                        o.documentNo   = Util.GetValueOfString(row["DocumentNo"]);
+                        o.dateOrdered  = row["DateOrdered"] != DBNull.Value
+                            ? Convert.ToDateTime(row["DateOrdered"]) : (DateTime?)null;
+                        o.datePromised = row["DatePromised"] != DBNull.Value
+                            ? Convert.ToDateTime(row["DatePromised"]) : (DateTime?)null;
+                        o.docStatus    = Util.GetValueOfString(row["DocStatus"]);
+                        o.grandTotal   = row["GrandTotal"] != DBNull.Value
+                            ? Convert.ToDecimal(row["GrandTotal"]) : 0m;
+                        o.c_Currency_ID = Util.GetValueOfInt(row["C_Currency_ID"]);
+                        result.Add(o);
+                        created[id] = row["Created"] != DBNull.Value ? Convert.ToDateTime(row["Created"]) : DateTime.MinValue;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // This link is unavailable here; carry on with the others.
+                    _log.SaveError("VAS_123_QuotationRightPanelModel.GetGeneratedOrders", ex.Message);
                 }
             }
-            catch (Exception ex)
-            {
-                _log.SaveError("VAS_123_QuotationRightPanelModel.GetGeneratedOrders", ex.Message);
-            }
 
+            // Newest first across all links.
+            result = result.OrderByDescending(r => created[(int)r.c_Order_ID]).ToList();
             return result;
         }
 
@@ -1455,29 +1562,49 @@ namespace VAS.Models
             var result = new List<dynamic>();
             try
             {
-                var sb = new StringBuilder();
-                sb.Append("SELECT o.C_Order_ID AS C_Order_ID,");
-                sb.Append("       o.DocumentNo AS DocumentNo,");
-                sb.Append("       o.GrandTotal AS GrandTotal,");
-                sb.Append("       o.DocStatus AS DocStatus,");
-                sb.Append("       bp.Name AS BPartnerName,");
-                sb.Append("       cur.ISO_Code AS CurrencyISO,");
-                sb.Append("       cur.CurSymbol AS CurrencySymbol,");
-                sb.Append("       cur.StdPrecision AS CurrencyPrecision,");
-                sb.Append("       TO_CHAR(o.DateOrdered, 'YYYY-MM-DD') AS DateOrdered");
-                sb.Append("  FROM C_Order o");
-                sb.Append("  LEFT OUTER JOIN C_BPartner bp ON (bp.C_BPartner_ID = o.C_BPartner_ID AND bp.IsActive = 'Y')");
-                sb.Append("  LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID = o.C_Currency_ID)");
-                sb.Append(" WHERE o.VAS_Opportunity_ID = @opportunityId");
-                sb.Append("   AND o.IsSalesQuotation = 'Y'");
-                sb.Append("   AND o.IsActive = 'Y'");
+                // Quotations of an opportunity are found through the quotation's own
+                // VAS_Opportunity_ID AND through the opportunity's Ref_Order_ID (the quotation that
+                // was generated from it), so a quotation linked only one way is not missed. If the
+                // second link cannot be read on this schema, fall back to the first alone.
+                DataSet ds = null;
+                for (int attempt = 0; attempt < 2 && ds == null; attempt++)
+                {
+                    string linkPredicate = (attempt == 0)
+                        ? "(o.VAS_Opportunity_ID = @opportunityId OR o.C_Order_ID IN (SELECT op.Ref_Order_ID FROM VAS_Opportunity op WHERE op.VAS_Opportunity_ID = @opportunityId))"
+                        : "o.VAS_Opportunity_ID = @opportunityId";
 
-                string accessSql = MRole.GetDefault(ctx).AddAccessSQL(
-                    sb.ToString(), "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-                accessSql += " ORDER BY o.DateOrdered DESC";
+                    var sb = new StringBuilder();
+                    sb.Append("SELECT o.C_Order_ID AS C_Order_ID,");
+                    sb.Append("       o.DocumentNo AS DocumentNo,");
+                    sb.Append("       o.GrandTotal AS GrandTotal,");
+                    sb.Append("       o.DocStatus AS DocStatus,");
+                    sb.Append("       bp.Name AS BPartnerName,");
+                    sb.Append("       cur.ISO_Code AS CurrencyISO,");
+                    sb.Append("       cur.CurSymbol AS CurrencySymbol,");
+                    sb.Append("       cur.StdPrecision AS CurrencyPrecision,");
+                    sb.Append("       TO_CHAR(o.DateOrdered, 'YYYY-MM-DD') AS DateOrdered");
+                    sb.Append("  FROM C_Order o");
+                    sb.Append("  LEFT OUTER JOIN C_BPartner bp ON (bp.C_BPartner_ID = o.C_BPartner_ID AND bp.IsActive = 'Y')");
+                    sb.Append("  LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID = o.C_Currency_ID)");
+                    sb.Append(" WHERE " + linkPredicate);
+                    sb.Append("   AND o.IsSalesQuotation = 'Y'");
+                    sb.Append("   AND o.IsActive = 'Y'");
 
-                DataSet ds = DB.ExecuteDataset(accessSql,
-                    new SqlParameter[] { new SqlParameter("@opportunityId", opportunityId) }, null);
+                    string accessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                        sb.ToString(), "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                    accessSql += " ORDER BY o.DateOrdered DESC";
+
+                    try
+                    {
+                        ds = DB.ExecuteDataset(accessSql,
+                            new SqlParameter[] { new SqlParameter("@opportunityId", opportunityId) }, null);
+                    }
+                    catch (Exception exLink)
+                    {
+                        _log.SaveError("VAS_123_QuotationRightPanelModel.GetLinkedQuotations (attempt " + attempt + ")", exLink.Message);
+                        ds = null;
+                    }
+                }
 
                 if (ds == null || ds.Tables.Count == 0) return result;
 
@@ -2595,7 +2722,8 @@ namespace VAS.Models
                 var sb = new StringBuilder();
                 sb.Append("SELECT ma.MailAttachment1_ID AS Id,");
                 sb.Append("       ma.Title AS Subject,");
-                sb.Append("       SUBSTR(ma.TextMsg, 1, 4000) AS Body,");
+                // Full body — no SUBSTR (the old 4000-char cut truncated long mails).
+                sb.Append("       ma.TextMsg AS Body,");
                 sb.Append("       CASE WHEN ma.AttachmentType = 'I'");
                 // Fall back to Created when DateMailReceived is NULL so the detail modal
                 // always shows a timestamp for incoming mails.
@@ -2631,89 +2759,11 @@ namespace VAS.Models
                     response.toEmail = toAddr;
                     response.ccEmail = ccAddr;
 
-                    // Collect To + CC + From addresses and resolve all to AD_User names in one query.
-                    // peopleNames (outgoing): resolved To+CC names shown in the People field.
-                    // fromName  (incoming):   resolved From name shown in the People field.
-                    string fromEmailRaw = (response.fromEmail ?? "").Trim();
-                    var allAddrs = new List<string>();
-                    foreach (var part in new[] { toAddr, ccAddr })
-                    {
-                        if (!string.IsNullOrWhiteSpace(part))
-                            allAddrs.AddRange(part.Split(new char[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries));
-                    }
-                    // Include fromEmail so its name is resolved in the same query
-                    if (!string.IsNullOrWhiteSpace(fromEmailRaw)) allAddrs.Add(fromEmailRaw);
-
-                    var uniqueAddrs = allAddrs
-                        .Select(e => e.Trim().ToLowerInvariant())
-                        .Where(e => !string.IsNullOrEmpty(e))
-                        .Distinct()
-                        .Take(20)
-                        .ToList();
-
-                    if (uniqueAddrs.Count > 0)
-                    {
-                        try
-                        {
-                            var snb        = new StringBuilder();
-                            var nameParams = new List<SqlParameter>();
-                            var holders    = new List<string>();
-                            for (int i = 0; i < uniqueAddrs.Count; i++)
-                            {
-                                holders.Add("@em" + i);
-                                nameParams.Add(new SqlParameter("@em" + i, uniqueAddrs[i]));
-                            }
-                            snb.Append("SELECT LOWER(TRIM(u.EMail)) AS Email, u.Name AS UName");
-                            snb.Append("  FROM AD_User u");
-                            snb.Append(" WHERE u.IsActive = 'Y'");
-                            snb.Append("   AND LOWER(TRIM(u.EMail)) IN (");
-                            snb.Append(string.Join(", ", holders));
-                            snb.Append(")");
-
-                            DataSet nameDs = DB.ExecuteDataset(snb.ToString(), nameParams.ToArray(), null);
-                            var nameMap    = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                            if (nameDs != null && nameDs.Tables.Count > 0)
-                            {
-                                foreach (DataRow nr in nameDs.Tables[0].Rows)
-                                {
-                                    string eml  = Util.GetValueOfString(nr["Email"]);
-                                    string unam = Util.GetValueOfString(nr["UName"]);
-                                    if (!string.IsNullOrEmpty(eml) && !nameMap.ContainsKey(eml))
-                                        nameMap[eml] = unam;
-                                }
-                            }
-
-                            // peopleNames: To+CC resolved names (for outgoing People field)
-                            var toCcAddrs = allAddrs
-                                .Where(a => !string.Equals(a.Trim(), fromEmailRaw, StringComparison.OrdinalIgnoreCase))
-                                .Select(e => e.Trim().ToLowerInvariant())
-                                .Where(e => !string.IsNullOrEmpty(e))
-                                .Distinct().ToList();
-                            var peopleList = new List<string>();
-                            foreach (var addr in toCcAddrs)
-                            {
-                                if (nameMap.ContainsKey(addr))
-                                    peopleList.Add(nameMap[addr]);
-                            }
-                            response.peopleNames = string.Join(";", peopleList);
-
-                            // fromName: resolved name for From address (for incoming People field).
-                            // Falls back to the raw email so JS always has something to display.
-                            string fromKey = fromEmailRaw.ToLowerInvariant();
-                            response.fromName = !string.IsNullOrEmpty(fromKey) && nameMap.ContainsKey(fromKey)
-                                ? nameMap[fromKey] : fromEmailRaw;
-                        }
-                        catch (Exception exNames)
-                        {
-                            _log.SaveError("VAS_123.GetEmailDetail.PeopleNames", exNames.Message);
-                            // peopleNames stays empty; JS falls back to data.who
-                        }
-                    }
-                    else if (!string.IsNullOrEmpty(fromEmailRaw))
-                    {
-                        // No To/CC but we have a fromEmail — use it directly as fromName fallback
-                        response.fromName = fromEmailRaw;
-                    }
+                    // fromName / people (names; never BCC) — the same logic as the Customer Master
+                    // panel's e-mail dialog, so the two dialogs show identical details.
+                    VAS_105_AccountRightPanelModel.ApplyMailPeople(ctx, response,
+                        Util.GetValueOfString(row["FromEmail"]), toAddr, ccAddr,
+                        Util.GetValueOfString(row["Direction"]), Util.GetValueOfString(row["Who"]));
                 }
             }
             catch (Exception ex)
