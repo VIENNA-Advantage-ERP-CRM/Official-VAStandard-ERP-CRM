@@ -29,6 +29,8 @@ namespace VAS.Models
 ///   VAI154  02-Sep-2026  Contract detail: owner, type display name, product first+count
 ///   VAI154  02-Sep-2026  Ticket detail: assignedTo, description, customerName, dateNextAction added to GetTickets
 ///   VAI154  02-Sep-2026  GetWindowIdByTable added; openInWindow JS uses it so C_Contract opens correct window
+    ///   VAI154  02-Nov-2026  Email detail returns the full TextMsg (removed 4000-char SUBSTR)
+    ///   VAI154  02-Nov-2026  Engagement meetings: card timestamp = created time, meeting time beside heading, sorted by meeting date
     /// </summary>
     public class VAS_105_AccountRightPanelModel
     {
@@ -2591,7 +2593,10 @@ namespace VAS.Models
                 var sb = new StringBuilder();
                 sb.Append("SELECT ma.MailAttachment1_ID AS Id,");
                 sb.Append("       ma.Title AS Subject,");
-                sb.Append("       SUBSTR(ma.TextMsg, 1, 4000) AS Body,");
+                // Full body — no SUBSTR. The detail view must show the whole mail; the old
+                // SUBSTR(..., 1, 4000) cut long (HTML) bodies off. The list preview is the
+                // only place a short excerpt belongs.
+                sb.Append("       ma.TextMsg AS Body,");
                 // Fall back to Created when DateMailReceived is NULL so incoming mails always show a timestamp.
                 sb.Append("       CASE WHEN ma.AttachmentType = 'I'");
                 sb.Append("            THEN TO_CHAR(COALESCE(ma.DateMailReceived, ma.Created), 'YYYY-MM-DD HH24:MI')");
@@ -2624,70 +2629,9 @@ namespace VAS.Models
                     response.toEmail = toAddr;
                     response.ccEmail = ccAddr;
 
-                    // Collect all To + CC addresses, look up AD_User names, return as
-                    // semicolon-separated peopleNames for the JS People field.
-                    var allAddrs = new List<string>();
-                    foreach (var part in new[] { toAddr, ccAddr })
-                    {
-                        if (!string.IsNullOrWhiteSpace(part))
-                            allAddrs.AddRange(part.Split(new char[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries));
-                    }
-                    var uniqueAddrs = allAddrs
-                        .Select(e => e.Trim().ToLowerInvariant())
-                        .Where(e => !string.IsNullOrEmpty(e))
-                        .Distinct()
-                        .Take(20)
-                        .ToList();
-
-                    if (uniqueAddrs.Count > 0)
-                    {
-                        try
-                        {
-                            var snb        = new StringBuilder();
-                            var nameParams = new List<SqlParameter>();
-                            var holders    = new List<string>();
-                            for (int i = 0; i < uniqueAddrs.Count; i++)
-                            {
-                                holders.Add("@em" + i);
-                                nameParams.Add(new SqlParameter("@em" + i, uniqueAddrs[i]));
-                            }
-                            snb.Append("SELECT LOWER(TRIM(u.EMail)) AS Email, u.Name AS UName");
-                            snb.Append("  FROM AD_User u");
-                            snb.Append(" WHERE u.IsActive = 'Y'");
-                            snb.Append("   AND LOWER(TRIM(u.EMail)) IN (");
-                            snb.Append(string.Join(", ", holders));
-                            snb.Append(")");
-
-                            DataSet nameDs  = DB.ExecuteDataset(snb.ToString(), nameParams.ToArray(), null);
-                            var nameMap     = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                            if (nameDs != null && nameDs.Tables.Count > 0)
-                            {
-                                foreach (DataRow nr in nameDs.Tables[0].Rows)
-                                {
-                                    string eml  = Util.GetValueOfString(nr["Email"]);
-                                    string unam = Util.GetValueOfString(nr["UName"]);
-                                    if (!string.IsNullOrEmpty(eml) && !nameMap.ContainsKey(eml))
-                                        nameMap[eml] = unam;
-                                }
-                            }
-
-                            // Build people list: only include addresses resolved to an AD_User name.
-                            // External email addresses with no matching AD_User are excluded so the
-                            // People field shows names only, never raw email addresses.
-                            var peopleList = new List<string>();
-                            foreach (var addr in uniqueAddrs)
-                            {
-                                if (nameMap.ContainsKey(addr))
-                                    peopleList.Add(nameMap[addr]);
-                            }
-                            response.peopleNames = string.Join(";", peopleList);
-                        }
-                        catch (Exception exNames)
-                        {
-                            _log.SaveError("VAS_105.GetEmailDetail.PeopleNames", exNames.Message);
-                            // peopleNames stays empty; JS falls back to data.who
-                        }
-                    }
+                    // fromName / people (names; never BCC) — shared with the Sales Quotation panel.
+                    ApplyMailPeople(ctx, response, Util.GetValueOfString(row["FromEmail"]),
+                        toAddr, ccAddr, Util.GetValueOfString(row["Direction"]), Util.GetValueOfString(row["Who"]));
                 }
             }
             catch (Exception ex)
@@ -2696,6 +2640,144 @@ namespace VAS.Models
                 response.error = ex.Message;
             }
             return response;
+        }
+
+        /// <summary>
+        /// Fills the From / People part of an e-mail detail response — used by every panel's
+        /// GetEmailDetail so the dialogs stay identical.
+        ///   fromName    the sender as a NAME (From row). An OUTGOING mail leaves from a shared /
+        ///               system mailbox that is not the person who sent it, so the sender is the user
+        ///               who created the mail; an INCOMING mail's sender is the From address's own
+        ///               name (user / partner / lead, else display name, else the address).
+        ///   people      the To + CC recipients as NAMES (array, so a name containing "," or ";" stays
+        ///               whole); an address with no match shows as the full e-mail. BCC is never read.
+        ///   peopleNames the same names ";"-joined, kept for older callers.
+        /// </summary>
+        internal static void ApplyMailPeople(Ctx ctx, dynamic response, string fromAddr,
+            string toAddr, string ccAddr, string direction, string creatorName)
+        {
+            response.fromName    = "";
+            response.people      = new List<string>();
+            response.peopleNames = "";
+            try
+            {
+                var fromList = ParseMailAddresses(fromAddr);
+                var others   = ParseMailAddresses(toAddr);
+                others.AddRange(ParseMailAddresses(ccAddr));
+
+                var everyone = new List<KeyValuePair<string, string>>(fromList);
+                everyone.AddRange(others);
+                var nameMap = ResolveMailNames(ctx, everyone.Select(p => p.Key).Distinct().Take(60).ToList());
+
+                Func<KeyValuePair<string, string>, string> nameOf = p =>
+                {
+                    string n;
+                    if (nameMap.TryGetValue(p.Key, out n) && !string.IsNullOrWhiteSpace(n)) return n;
+                    if (!string.IsNullOrWhiteSpace(p.Value)) return p.Value.Trim();
+                    // No matching user / partner / lead and no display name in the header:
+                    // show the full e-mail address rather than a guessed name.
+                    return p.Key;
+                };
+
+                response.fromName = (direction == "out" && !string.IsNullOrWhiteSpace(creatorName))
+                    ? creatorName
+                    : string.Join(", ", fromList.Select(nameOf).Distinct());
+
+                var peopleList = new List<string>();
+                var seenAddr   = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var p in others)
+                {
+                    if (!seenAddr.Add(p.Key)) continue;
+                    string n = nameOf(p);
+                    if (!string.IsNullOrWhiteSpace(n) && !peopleList.Contains(n, StringComparer.OrdinalIgnoreCase))
+                        peopleList.Add(n);
+                }
+                response.people      = peopleList;
+                response.peopleNames = string.Join(";", peopleList);
+            }
+            catch (Exception exNames)
+            {
+                _log.SaveError("VAS_105.ApplyMailPeople", exNames.Message);
+                // fromName / people stay empty; the JS falls back to the address / data.who
+            }
+        }
+
+        // Matches either  Name <addr@host>  (name optional, quotes optional)  or a bare  addr@host.
+        private static readonly System.Text.RegularExpressions.Regex _mailAddrRx =
+            new System.Text.RegularExpressions.Regex(
+                @"(?:""?(?<n>[^"";,<>]+?)""?\s*)?<\s*(?<e>[^<>\s;,]+@[^<>\s;,]+)\s*>|(?<e2>[^\s<>;,""']+@[^\s<>;,""']+)",
+                System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        /// <summary>
+        /// Splits a stored From / To / Cc value ("a@x.com; Name &lt;b@y.com&gt;, c@z.com") into
+        /// (lower-case address, display name or null) pairs, in order, each address once.
+        /// </summary>
+        internal static List<KeyValuePair<string, string>> ParseMailAddresses(string value)
+        {
+            var list = new List<KeyValuePair<string, string>>();
+            if (string.IsNullOrWhiteSpace(value)) return list;
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            // Addresses are stored HTML-encoded by the platform (&lt; &gt; &amp;).
+            string decoded = System.Net.WebUtility.HtmlDecode(value);
+            foreach (System.Text.RegularExpressions.Match m in _mailAddrRx.Matches(decoded))
+            {
+                string addr = (m.Groups["e"].Success ? m.Groups["e"].Value : m.Groups["e2"].Value).Trim().ToLowerInvariant();
+                if (addr.Length == 0 || !seen.Add(addr)) continue;
+                string disp = m.Groups["n"].Success ? m.Groups["n"].Value.Trim() : null;
+                list.Add(new KeyValuePair<string, string>(addr, string.IsNullOrEmpty(disp) ? null : disp));
+            }
+            return list;
+        }
+
+        /// <summary>
+        /// Address → person name, using the same lookup order the mail-attach process uses to link a
+        /// mail to a record: AD_User (contacts / employees), then C_BPartner, then C_Lead.
+        /// An address with no match is simply absent from the result.
+        /// </summary>
+        internal static Dictionary<string, string> ResolveMailNames(Ctx ctx, List<string> addresses)
+        {
+            var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (addresses == null || addresses.Count == 0) return map;
+
+            var parms   = new List<SqlParameter>();
+            var holders = new List<string>();
+            for (int i = 0; i < addresses.Count; i++)
+            {
+                holders.Add("@em" + i);
+                parms.Add(new SqlParameter("@em" + i, addresses[i]));
+            }
+            string inList = string.Join(", ", holders);
+            string client = " AND {0}.AD_Client_ID IN (0, " + ctx.GetAD_Client_ID() + ")";
+
+            string[] sources =
+            {
+                "SELECT LOWER(TRIM(t.EMail)) AS Email, t.Name AS PName FROM AD_User t WHERE t.IsActive = 'Y'" + string.Format(client, "t") + " AND LOWER(TRIM(t.EMail)) IN (" + inList + ")",
+                "SELECT LOWER(TRIM(t.EMail)) AS Email, t.Name AS PName FROM C_BPartner t WHERE t.IsActive = 'Y'" + string.Format(client, "t") + " AND LOWER(TRIM(t.EMail)) IN (" + inList + ")",
+                "SELECT LOWER(TRIM(t.EMail)) AS Email, t.Name AS PName FROM C_Lead t WHERE t.IsActive = 'Y'" + string.Format(client, "t") + " AND LOWER(TRIM(t.EMail)) IN (" + inList + ")"
+            };
+
+            foreach (string sql in sources)
+            {
+                try
+                {
+                    DataSet ds = DB.ExecuteDataset(sql, parms.ToArray(), null);
+                    if (ds == null || ds.Tables.Count == 0) continue;
+                    foreach (DataRow r in ds.Tables[0].Rows)
+                    {
+                        string e = Util.GetValueOfString(r["Email"]);
+                        string n = Util.GetValueOfString(r["PName"]);
+                        // Earlier source wins (AD_User before C_BPartner before C_Lead).
+                        if (!string.IsNullOrEmpty(e) && !string.IsNullOrWhiteSpace(n) && !map.ContainsKey(e))
+                            map[e] = n;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // A table / column that does not exist on this schema must not lose the others.
+                    _log.SaveError("VAS_105.ResolveMailNames", ex.Message);
+                }
+            }
+            return map;
         }
 
         // ─────────────────────────────────────────────────────────
@@ -2895,6 +2977,7 @@ namespace VAS.Models
                     var sbMt = new StringBuilder();
                     sbMt.Append("SELECT MIN(a.AppointmentsInfo_ID) AS MeetingId,");
                     sbMt.Append("       TO_CHAR(MIN(a.StartDate),'YYYY-MM-DD HH24:MI') AS when_ts,");
+                    sbMt.Append("       TO_CHAR(MIN(a.Created),'YYYY-MM-DD HH24:MI') AS created_ts,");
                     sbMt.Append("       TO_CHAR(MIN(a.EndDate),'YYYY-MM-DD HH24:MI') AS end_date,");
                     sbMt.Append("       COALESCE(MIN(a.Subject), N'') AS title,");
                     sbMt.Append("       COALESCE(MIN(a.Location), N'') AS location,");
@@ -2926,9 +3009,16 @@ namespace VAS.Models
                             dynamic item = new ExpandoObject();
                             item.touchType = "MEETING";
                             item.meetingId = Util.GetValueOfInt(row["MeetingId"]);
-                            item.whenTs    = Util.GetValueOfString(row["when_ts"]);
+                            // whenTs is what the card shows on the right: when the appointment
+                            // was CREATED. meetingTs (the meeting's own start) is shown beside the
+                            // heading, and also drives the timeline position via sortTs.
+                            string meetingStart = Util.GetValueOfString(row["when_ts"]);
+                            string meetingCreated = Util.GetValueOfString(row["created_ts"]);
+                            item.meetingTs = meetingStart;
+                            item.sortTs    = meetingStart;
+                            item.whenTs    = string.IsNullOrEmpty(meetingCreated) ? meetingStart : meetingCreated;
                             item.title     = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["title"]));
-                            item.location  = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["location"]));
+                            item.location  =System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["location"]));
                             item.preview   = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["preview"]));
                             item.hasTranscript = Util.GetValueOfString(row["has_transcript"]) == "Y";
                             item.who       = Util.GetValueOfString(row["who"]);
@@ -3281,13 +3371,17 @@ namespace VAS.Models
             }
 
             // ── Step 6: merge, sort newest-first ─────────────────────────────
+            // Meetings carry sortTs (the meeting date) so they are placed by when the
+            // meeting happens, not by when it was created; every other touch sorts on whenTs.
             allItems.Sort((a, b) =>
             {
-                string ta = (a as IDictionary<string, object>).ContainsKey("whenTs")
-                    ? (string)((IDictionary<string, object>)a)["whenTs"] : "";
-                string tb = (b as IDictionary<string, object>).ContainsKey("whenTs")
-                    ? (string)((IDictionary<string, object>)b)["whenTs"] : "";
-                return string.Compare(tb, ta, StringComparison.Ordinal);
+                var da = (IDictionary<string, object>)a;
+                var db = (IDictionary<string, object>)b;
+                string ta = da.ContainsKey("sortTs") ? (string)da["sortTs"]
+                          : da.ContainsKey("whenTs") ? (string)da["whenTs"] : "";
+                string tb = db.ContainsKey("sortTs") ? (string)db["sortTs"]
+                          : db.ContainsKey("whenTs") ? (string)db["whenTs"] : "";
+                return string.Compare(tb ?? "", ta ?? "", StringComparison.Ordinal);
             });
 
             // ── Step 7: build response ────────────────────────────────────────
