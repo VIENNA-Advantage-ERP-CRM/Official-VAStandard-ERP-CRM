@@ -6,6 +6,14 @@
 // Date    : 21-Aug-2026
 // Chronological development:
 //   NT   21-Aug-2026  Created (adapted from VAS_107)
+//        04-Nov-2026  Product/charge dropdown now follows its input on scroll/resize instead of staying put
+//        04-Nov-2026  Qty / Planned Price inputs: field-length cap (16 fallback) and instant clamp to the max value
+//        04-Nov-2026  Row Undo icon moved into its own last grid column, plain amber icon (matches VAS_107)
+//        04-Nov-2026  Refresh / page change only warn about unsaved lines that have a Product or Charge selected
+//        04-Nov-2026  Saved line with no attribute shows "---" instead of "Set attribute…" (matches VAS_107)
+//        04-Nov-2026  Choosing an attribute re-prices the line (attribute price from the price list) instead of zeroing it
+//        04-Nov-2026  Save is ignored while a save is in flight (repeated clicks inserted duplicate lines)
+//        04-Nov-2026  Delete refreshes the header record (was save only); own refresh echo no longer reloads the grid
 
 ;VAS = window.VAS || {};
 (function (VAS, $) {
@@ -236,6 +244,32 @@
             if (/^[0-9.]$/.test(k)) return;
             // Block all other characters (letters, symbols, etc.)
             e.preventDefault();
+        }
+
+        /**
+         * Limits a numeric text input (Qty / Planned Price) while the user types or pastes:
+         *  - at most the column's field length (AD_Column.FieldLength; 16 when the metadata is
+         *    missing, which is the length on the tab) — the maxlength attribute alone is not
+         *    enough, it is skipped when the metadata is not loaded and a paste can bypass it;
+         *  - only digits, one decimal point (and thousands commas);
+         *  - a value above the largest storable number (AMOUNT_MAX_VALUE) turns into that number
+         *    at once — e.g. typing the 11th digit gives 2147483647 — so the stored value always
+         *    equals what the grid displays.
+         * @param {jQuery} $inp
+         * @param {string} col - ColumnName used to look up the field length.
+         */
+        function limitNumericInput($inp, col) {
+            var maxLen = colFieldLength(col) || 16;
+            $inp.attr("maxlength", maxLen);
+            $inp.on("input", function () {
+                var s = this.value;
+                var t = s.replace(/[^0-9.,]/g, "");
+                var dot = t.indexOf(".");
+                if (dot >= 0) t = t.slice(0, dot + 1) + t.slice(dot + 1).replace(/\./g, "");
+                if (t.length > maxLen) t = t.slice(0, maxLen);
+                if (parseNum(t) > AMOUNT_MAX_VALUE) t = String(AMOUNT_MAX_VALUE);
+                if (t !== s) this.value = t;
+            });
         }
 
         /**
@@ -858,9 +892,9 @@
             $row.append('<div class="vas-ol-cell vas-ol-cell--right" role="columnheader">' + esc(lbl("VAS_218_PlannedQtyUOM", "Qty / UOM")) + '</div>');
             $row.append('<div class="vas-ol-cell vas-ol-cell--right" role="columnheader">' + esc(lbl("VAS_218_PlannedPrice", "Planned Price")) + '</div>');
             $row.append('<div class="vas-ol-cell vas-ol-cell--right" role="columnheader">' + esc(lbl("VAS_218_PlannedAmt", "Planned Amt")) + '</div>');
-            // No --more column header: opportunity lines have no Additional Info modal, so the
-            // action cell (Undo button) is absolutely positioned over the row instead of occupying
-            // a dedicated grid column.
+            // Last (blank) header cell: the row Undo icon has its own grid column, as in the
+            // Create Order panel. Opportunity lines have no Additional Info modal, so no "..." here.
+            $row.append('<div class="vas-ol-cell vas-ol-cell--more" role="columnheader"></div>');
             return $row;
         }
 
@@ -920,7 +954,7 @@
 
             $pager.find("[data-act='lp-prev']").on("click", function () {
                 if (linePage <= 1) return;
-                if (hasDirtyLines()) {
+                if (hasUnsavedLineWithItem()) {
                     showConfirmDialog(msg("VAS_218_UnsavedChanges"), function () {
                         fetchData(parent && parent.VAS_Opportunity_ID, linePage - 1);
                     });
@@ -930,7 +964,7 @@
             });
             $pager.find("[data-act='lp-next']").on("click", function () {
                 if (linePage >= totalPages) return;
-                if (hasDirtyLines()) {
+                if (hasUnsavedLineWithItem()) {
                     showConfirmDialog(msg("VAS_218_UnsavedChanges"), function () {
                         fetchData(parent && parent.VAS_Opportunity_ID, linePage + 1);
                     });
@@ -1092,6 +1126,22 @@
         function hasDirtyLines() {
             for (var i = 0; i < lines.length; i++) {
                 if (lines[i]._dirty || lines[i]._isNew) return true;
+            }
+            return false;
+        }
+
+        /**
+         * Returns true when an unsaved line holds real work, i.e. a Product or Charge is selected.
+         * A blank new row (no product / charge yet) has nothing to save, so Refresh and page
+         * changes just discard it instead of warning "save or discard your changes".
+         * @returns {boolean}
+         */
+        function hasUnsavedLineWithItem() {
+            for (var i = 0; i < lines.length; i++) {
+                var l = lines[i];
+                if (!(l._dirty || l._isNew)) continue;
+                var v = l.values || {};
+                if ((parseInt(v.M_Product_ID, 10) || 0) > 0 || (parseInt(v.C_Charge_ID, 10) || 0) > 0) return true;
             }
             return false;
         }
@@ -1420,6 +1470,8 @@
             // Append to body so the popup is never clipped by the panel's overflow:auto.
             // position:fixed (CSS) lets positionCatalog() place it relative to the viewport.
             $("body").append(catalog.$pop);
+            // Keep the popover glued to its input while the grid / window scrolls or resizes.
+            followCatalog();
             // Defer positioning: the row may not be in the DOM yet (buildRow is called as
             // part of renderAll before $linesBody.append). setTimeout(0) fires after the
             // synchronous DOM operations complete so getBoundingClientRect() returns real
@@ -1462,10 +1514,53 @@
         }
 
         /**
+         * The popover is position:fixed on <body>, so it does not move when the grid, the panel or
+         * the window scrolls. While it is open, re-place it on every scroll (capture phase, so the
+         * scrolling of ANY ancestor is seen) and on resize. When the input has been scrolled out of
+         * its scroll container the popover is hidden rather than left floating over other content.
+         */
+        var _catalogFollow = null;
+
+        function followCatalog() {
+            unfollowCatalog();
+            var onMove = function (e) {
+                if (!catalog.$pop || !catalog.$inp || !catalog.$inp.length) return;
+                // Scrolling the popover's own list (paging through results) must not re-place it.
+                if (e && e.target && catalog.$pop[0] && (e.target === catalog.$pop[0] || catalog.$pop[0].contains(e.target))) return;
+                var inp = catalog.$inp[0];
+                var r   = inp.getBoundingClientRect();
+                // Clip rectangle = the input's nearest scrollable ancestor (falls back to the viewport).
+                var top = 0, bottom = window.innerHeight;
+                for (var el = inp.parentElement; el && el !== document.body; el = el.parentElement) {
+                    var cs = window.getComputedStyle(el);
+                    if (/(auto|scroll|hidden)/.test(cs.overflowY) && el.scrollHeight > el.clientHeight) {
+                        var cr = el.getBoundingClientRect();
+                        top = Math.max(top, cr.top); bottom = Math.min(bottom, cr.bottom);
+                        break;
+                    }
+                }
+                var visible = r.bottom > top && r.top < bottom;
+                catalog.$pop.css("visibility", visible ? "" : "hidden");
+                if (visible) positionCatalog();
+            };
+            window.addEventListener("scroll", onMove, true);
+            window.addEventListener("resize", onMove);
+            _catalogFollow = onMove;
+        }
+
+        function unfollowCatalog() {
+            if (!_catalogFollow) return;
+            window.removeEventListener("scroll", _catalogFollow, true);
+            window.removeEventListener("resize", _catalogFollow);
+            _catalogFollow = null;
+        }
+
+        /**
          * Removes the popover and resets loading state immediately.
          * Called before committing a selection so the row's busy-opacity doesn't bleed through.
          */
         function closeCatalog() {
+            unfollowCatalog();
             if (catalog.debounce) { clearTimeout(catalog.debounce); catalog.debounce = null; }
             if (catalog.$pop) { catalog.$pop.remove(); catalog.$pop = null; }
             catalog.$inp = null;
@@ -1670,8 +1765,13 @@
                     { placeholder: msg("VAS_218_AddProductCharge") }));
                 // Attribute link sub-line for products that carry an attribute set
                 if (line.values.M_Product_ID > 0 && (disp.attrName || disp.hasAttributeSet)) {
-                    var attrTxt = disp.attrName || msg("VAS_218_SetAttribute");
-                    var $attr   = $('<span class="vas-ol-attr-link"></span>').text(attrTxt).attr("title", attrTxt);
+                    // No attribute yet: "Set attribute…" while the line is unsaved (new or edited),
+                    // a plain "---" once it is saved (same as the Create Order panel). Clicking
+                    // either still opens the picker; the tooltip keeps the "Set attribute…" hint.
+                    var attrTxt = disp.attrName
+                        || ((line._isNew || line._dirty) ? msg("VAS_218_SetAttribute") : "---");
+                    var $attr   = $('<span class="vas-ol-attr-link"></span>').text(attrTxt)
+                                    .attr("title", disp.attrName || msg("VAS_218_SetAttribute"));
                     if (!disp.attrName) $attr.addClass("vas-ol-attr-link--empty");
                     $attr.on("click", (function (ln) { return function (e) { e.stopPropagation(); if (blockedByTabChanges()) return; openAttrDialog(ln); }; })(line));
                     wrap.append($attr);
@@ -1745,8 +1845,7 @@
             if (isEditQty) {
                 var $q = $('<input type="text" class="vas-ol-cell-edit__input vas-ol-qtyval" inputmode="decimal" />');
                 $q.val(v.PlannedQty ? fmtQty(v.PlannedQty) : "").css("text-align", "right");
-                var qLen = colFieldLength("PlannedQty");
-                if (qLen > 0) $q.attr("maxlength", qLen);
+                limitNumericInput($q, "PlannedQty");
                 $q.on("blur", function () {
                     var n = parseNum($q.val());
                     fieldSet(line, "PlannedQty", n);
@@ -1848,8 +1947,7 @@
             if (isEditingThis) {
                 var $inp = $('<input type="text" class="vas-ol-cell-edit__input" inputmode="decimal" />');
                 $inp.val(fmtMoney(line.values.PlannedPrice || 0)).css("text-align", "right");
-                var pLen = colFieldLength("PlannedPrice");
-                if (pLen > 0) $inp.attr("maxlength", pLen);
+                limitNumericInput($inp, "PlannedPrice");
                 $inp.on("blur", function () {
                     var n = parseNum($inp.val());
                     // Mark price as manually set so server callouts don't overwrite it.
@@ -1954,9 +2052,7 @@
             $amtCell.append('<span class="vas-ol-amt">' + esc(fmtMoney(v.PlannedAmt)) + '</span>');
             $row.append($amtCell);
 
-            // Undo action — absolutely positioned over the row's right edge so it does
-            // not occupy a grid track.  Do NOT add style="position:relative" here;
-            // the CSS class already sets position:absolute (inline overrides class).
+            // Undo action — the row's last grid column (same layout as the Create Order panel).
             var $moreCell = $('<div class="vas-ol-cell vas-ol-cell--more" role="cell"></div>');
 
             // Re-apply per-row spinner after a re-render so an in-flight save or callout
@@ -2167,6 +2263,21 @@
          * @param {number} idx
          */
         /**
+         * After an attribute instance is chosen (or cleared) re-prices the line on the server:
+         * the price-list price defined for that attribute — and the price reference fields,
+         * UOM and amount that go with it — fill in automatically; with no attribute price the
+         * product's own price applies. _priceOverride is cleared first so a price typed earlier
+         * does not block the lookup (the server skips PlannedPrice while it is set).
+         * @param {object} line
+         */
+        function applyAttributePricing(line) {
+            line._priceOverride = false;
+            runCallout(line, "M_AttributeSetInstance_ID", function () {
+                renderAll();
+            });
+        }
+
+        /**
          * Opens the attribute-set picker for the given line's product.
          * Accepts a line object directly (matching the VAS_107 pattern).
          * Auto-opens when called from commitCatalogItem if the product has an attribute set.
@@ -2219,23 +2330,7 @@
                         markDirty(line);
                         attrState = null;
                         editing = { rowId: line.rowId, field: "description" };
-                        if (asi > 0) {
-                            // Run callout first so UOM is updated, then force price/amount
-                            // to 0 AFTER applyPatch runs so the server's recalculated values
-                            // do not overwrite the reset. _priceOverride is cleared so the
-                            // user can enter a fresh price after attribute selection.
-                            runCallout(line, "M_AttributeSetInstance_ID", function () {
-                                line._priceOverride = false;
-                                fieldSet(line, "PlannedPrice", 0);
-                                fieldSet(line, "PlannedAmt", 0);
-                                renderAll();
-                            });
-                        } else {
-                            line._priceOverride = false;
-                            fieldSet(line, "PlannedPrice", 0);
-                            fieldSet(line, "PlannedAmt", 0);
-                            renderAll();
-                        }
+                        applyAttributePricing(line);
                     },
                     onClose: function () {
                         attrState = null;
@@ -2258,19 +2353,7 @@
                         markDirty(line);
                         attrState = null;
                         editing = { rowId: line.rowId, field: "description" };
-                        if (asi > 0) {
-                            runCallout(line, "M_AttributeSetInstance_ID", function () {
-                                line._priceOverride = false;
-                                fieldSet(line, "PlannedPrice", 0);
-                                fieldSet(line, "PlannedAmt", 0);
-                                renderAll();
-                            });
-                        } else {
-                            line._priceOverride = false;
-                            fieldSet(line, "PlannedPrice", 0);
-                            fieldSet(line, "PlannedAmt", 0);
-                            renderAll();
-                        }
+                        applyAttributePricing(line);
                     },
                     onCancel: function () {
                         attrState = null;
@@ -2609,6 +2692,9 @@
                             // Re-append draft rows that were not part of the delete operation
                             for (var d = 0; d < preservedDrafts.length; d++) lines.push(preservedDrafts[d]);
                             renderAll();
+                            // The delete changed the opportunity's Planned Amount — refresh the header
+                            // record so the header, the form and the right panel show it at once.
+                            refreshHeaderRecord();
                         } else {
                             showToast(msg("VAS_218_DeleteError"), true);
                             renderAll();
@@ -2719,6 +2805,10 @@
         function refreshHeaderRecord() {
             var tab = curTab || (self && self.curTab);
             if (tab && typeof tab.dataRefresh === "function") {
+                // dataRefresh() re-reads the header row, which makes the framework tell every panel
+                // (this one included) to refresh. The grid already holds the server's result, so
+                // that echo must not reload it — it would jump back to page 1 and drop draft rows.
+                ownRefreshUntil = Date.now() + 5000;
                 tab.dataRefresh();
             }
         }
@@ -2739,7 +2829,13 @@
         /**
          * Saves all dirty lines to the server.
          */
+        var saveInFlight = false;   // true from the moment a save starts until its response (or failure) arrives
+        var ownRefreshUntil = 0;    // while Date.now() < this, a framework refresh of the current record is our own echo
+
         function saveRows() {
+            // A save is already running: a second click / Ctrl+Alt+S would collect the SAME new
+            // rows again and insert them a second time.
+            if (saveInFlight) return;
             if (blockedByTabChanges()) return;        // unsaved header edit — save the tab first
             if (!parent || !parent.VAS_Opportunity_ID) {
                 showToast(msg("VAS_218_NoOpportunity"), true);
@@ -2751,6 +2847,7 @@
             // Collect dirty lines
             var dirtyLines = [];
             for (var i = 0; i < lines.length; i++) {
+                if (lines[i]._saving) continue;           // already on its way to the server
                 if (lines[i]._dirty || lines[i]._isNew) {
                     var errMsg = validateLine(lines[i]);
                     if (errMsg) {
@@ -2770,6 +2867,7 @@
 
             // Lock each dirty row with a "Saving…" spinner before the round-trip starts,
             // matching the VAS_107 pattern so the user sees per-row feedback immediately.
+            saveInFlight = true;
             var savingLabel = msg("VAS_218_Saving");
             for (var k = 0; k < dirtyLines.length; k++) {
                 dirtyLines[k]._saving = true;
@@ -2788,6 +2886,7 @@
                     })
                 },
                 function (raw) {
+                    saveInFlight = false;
                     // Clear the per-row saving flags before any render.
                     for (var k = 0; k < dirtyLines.length; k++) {
                         dirtyLines[k]._saving = false;
@@ -2823,6 +2922,7 @@
                     }
                 }
             ).fail(function () {
+                saveInFlight = false;
                 for (var k = 0; k < dirtyLines.length; k++) {
                     dirtyLines[k]._saving = false;
                     dirtyLines[k]._busy   = false;
@@ -3139,7 +3239,7 @@
                 /** Alt+Ctrl+Q — refresh the current page (same as the Refresh button). */
                 onRefresh: function () {
                     if (!parent || !parent.VAS_Opportunity_ID) return;
-                    if (hasDirtyLines()) {
+                    if (hasUnsavedLineWithItem()) {
                         showToast(msg("VAS_218_RefreshWithUnsaved"), true);
                         return;
                     }
@@ -3234,7 +3334,7 @@
 
             $refreshBtn.on("click", function () {
                 if (!parent || !parent.VAS_Opportunity_ID) return;
-                if (hasDirtyLines()) {
+                if (hasUnsavedLineWithItem()) {
                     showToast(msg("VAS_218_RefreshWithUnsaved"), true);
                     return;
                 }
@@ -3455,7 +3555,7 @@
                 });
                 $refreshBtn.on("click", function () {
                     if (!parent || !parent.VAS_Opportunity_ID) return;
-                    if (hasDirtyLines()) {
+                    if (hasUnsavedLineWithItem()) {
                         showToast(msg("VAS_218_RefreshWithUnsaved"), true);
                         return;
                     }
@@ -3523,6 +3623,12 @@
                 // Normal record navigation — clear the edit-mode flag before loading fresh data
                 _headerEditMode = false;
                 self = this;
+                // Echo of our own header refresh after a save / delete on this very record: the
+                // grid is already up to date, so keep it (and its page / draft rows) as it is.
+                if (Date.now() < ownRefreshUntil && parent && (+recordID === +parent.VAS_Opportunity_ID)) {
+                    ownRefreshUntil = 0;
+                    return;
+                }
                 fetchData(recordID, 1);
             },
 

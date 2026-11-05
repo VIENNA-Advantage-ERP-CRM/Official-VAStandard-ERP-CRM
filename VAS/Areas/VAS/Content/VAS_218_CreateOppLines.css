@@ -339,10 +339,9 @@
 
 .vas-ol-row {
     display: grid;
-    /* 6 columns: checkbox | product | description | qty/uom | price | amount.
-       The undo-action cell is absolutely positioned over the row so it does not
-       consume a grid track — opportunity lines have no Additional Info modal. */
-    grid-template-columns: 1.75em minmax(0, 1.9fr) minmax(0, 1.4fr) minmax(7em, 1fr) minmax(6em, 0.7fr) minmax(6.75em, 0.85fr);
+    /* 7 columns: checkbox | product | description | qty/uom | price | amount | undo.
+       The last track holds the row Undo icon (same layout as the Create Order panel). */
+    grid-template-columns: 1.75em minmax(0, 1.9fr) minmax(0, 1.4fr) minmax(7em, 1fr) minmax(6em, 0.7fr) minmax(6.75em, 0.85fr) 3.5em;
     gap: 0.75em;
     align-items: center;
     padding: 0.75em 0;
@@ -412,12 +411,6 @@
     .vas-ol-row--line.is-unsaved.is-selected {
         background: var(--cil-blue-soft);
     }
-
-/* On dirty rows, push the amount text left by the undo-button width so the
-   absolutely-positioned undo button does not overlap the amount value. */
-.vas-ol-row--line.is-unsaved .vas-ol-cell--amt {
-    padding-right: 1.75em;
-}
 
 .vas-ol-row--line.is-invalid {
     background: var(--cil-danger-bg);
@@ -517,24 +510,12 @@
 }
 
 .vas-ol-cell--more {
-    /* Absolutely positioned over the row's right edge so it does not occupy a
-       grid track — keeps the Amount column flush to the right like the totals row.
-       z-index: 2 ensures the undo button paints above all non-positioned grid items. */
-    position: absolute;
-    right: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    display: flex;
+    /* Its own grid track at the row's right edge (same as the Create Order panel, VAS_107),
+       so the Undo icon sits beside the Amount instead of on top of it. */
     flex-direction: row;
     align-items: center;
     justify-content: center;
     gap: 0.25em;
-    pointer-events: none;
-    z-index: 2;
-}
-
-.vas-ol-cell--more > * {
-    pointer-events: auto;
 }
 
 .vas-ol-cell input[type="checkbox"] {
@@ -907,8 +888,8 @@
             color: var(--cil-text-disabled);
         }
 /* Row Undo: only shown on a saved row with unsaved edits; reverts to last snapshot.
-   White background + subtle shadow ensures visibility against any row background
-   (including the amber unsaved-row tint where transparent amber-on-amber is invisible). */
+   Plain amber icon (no box) to read as "discard pending change" against the unsaved-row
+   tint — same as the Create Order panel. */
 .vas-ol-undo-btn {
     width: 1.5em;
     height: 1.5em;
@@ -916,11 +897,10 @@
     align-items: center;
     justify-content: center;
     border: none;
-    background: var(--cil-surface, #ffffff);
+    background: transparent;
     border-radius: var(--cil-r-sm);
     color: var(--cil-warning);
     cursor: pointer;
-    box-shadow: 0 0 0 1px rgba(0,0,0,.08), 0 1px 3px rgba(0,0,0,.08);
     transition: background .12s, color .12s;
 }
 
@@ -2024,8 +2004,8 @@
         grid-template-columns: 1.75em minmax(0, 1.6fr) 7em 6em 6em 3.5em;
     }
 
-    .vas-ol-row--head .vas-ol-cell:nth-child(3), .vas-ol-row--line .vas-ol-cell:nth-child(3),
-    .vas-ol-row--head .vas-ol-cell:nth-child(6), .vas-ol-row--line .vas-ol-cell:nth-child(6) {
+    /* Description (3) is hidden on narrow widths; Amount (6) stays visible beside the Undo cell (7). */
+    .vas-ol-row--head .vas-ol-cell:nth-child(3), .vas-ol-row--line .vas-ol-cell:nth-child(3) {
         display: none;
     }
 }
