@@ -93,7 +93,7 @@
         var $input;
         var $clearBtn;
         var $dropdown;
-        var $dashboardScroll;
+        var pillObserver = null;
         var $modal;
         var $modalTitle;
         var $modalStatus;
@@ -137,8 +137,14 @@
             S: { msgKey: 'VAS_144_ViaShipper', fallback: 'Shipper' }
         };
 
+        /* Released texts of a few keys still carry a build note in brackets
+           ("Shipper (via-rule labels)", "Line Item (facet labels)") - strip
+           that note; a missing key falls back to the English text. */
+        var BUILD_NOTE = /\s*\((?:[\w-]+\s+)?labels?\)\s*$/i;
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            var text = VIS.Msg.getMsg(key);
+            if (!text || text === key || text === '[' + key + ']') { return fallback || key; }
+            return String(text).replace(BUILD_NOTE, '') || fallback || key;
         }
 
         function escapeHtml(value) {
@@ -244,6 +250,12 @@
         function positionDropdown() {
             if (!$dropdown || !$pill) { return; }
             var rect = $pill[0].getBoundingClientRect();
+            /* Pill hidden or scrolled out of view: close instead of leaving
+               the list floating on its own. */
+            if (!rect.width || rect.bottom < 0 || rect.top > (window.innerHeight || document.documentElement.clientHeight)) {
+                closeDropdown();
+                return;
+            }
             $dropdown.css({
                 left: Math.round(rect.left) + 'px',
                 top: Math.round(rect.bottom + 6) + 'px',
@@ -262,6 +274,25 @@
 
         function dropdownIsOpen() {
             return $dropdown && $dropdown.hasClass('MPC-dos-open');
+        }
+
+        /* The list is fixed on <body>, so it is re-anchored under the pill on
+           EVERY scroll (page, dashboard or any scrolling ancestor - captured
+           at document level) and on pill resize, one frame at a time. */
+        var repositionFrame = null;
+        function scheduleReposition() {
+            if (!dropdownIsOpen() || repositionFrame) { return; }
+            var raf = window.requestAnimationFrame || function (cb) { return setTimeout(cb, 16); };
+            repositionFrame = raf(function () {
+                repositionFrame = null;
+                if (dropdownIsOpen()) { positionDropdown(); }
+            });
+        }
+
+        function onAnyScroll(event) {
+            // Scrolling inside the list itself (lazy load) must not reposition.
+            if ($dropdown && event && event.target && $dropdown[0].contains(event.target)) { return; }
+            scheduleReposition();
         }
 
         function scheduleSearch() {
@@ -711,14 +742,12 @@
                 if (event.key !== 'Escape') { return; }
                 if (dropdownIsOpen()) { closeDropdown(); }
             });
-            $(window).on('scroll' + eventNamespace, closeDropdown);
-            $(window).on('resize' + eventNamespace, function () {
-                if (dropdownIsOpen()) { positionDropdown(); }
-            });
-
-            $dashboardScroll = $root.closest('.vis-widget-container, [data-dashboard-container]');
-            if ($dashboardScroll.length) {
-                $dashboardScroll.on('scroll' + eventNamespace, closeDropdown);
+            $(window).on('resize' + eventNamespace, scheduleReposition);
+            // Capture phase: element scroll events don't bubble to window.
+            document.addEventListener('scroll', onAnyScroll, true);
+            if (typeof ResizeObserver !== 'undefined') {
+                pillObserver = new ResizeObserver(scheduleReposition);
+                pillObserver.observe($pill[0]);
             }
         };
 
@@ -740,7 +769,8 @@
             if (detailRequest && detailRequest.readyState !== 4) { detailRequest.abort(); }
             $(document).off(eventNamespace);
             $(window).off(eventNamespace);
-            if ($dashboardScroll && $dashboardScroll.length) { $dashboardScroll.off(eventNamespace); }
+            document.removeEventListener('scroll', onAnyScroll, true);
+            if (pillObserver) { pillObserver.disconnect(); pillObserver = null; }
             if ($dropdown) { $dropdown.remove(); $dropdown = null; }
             if ($modal) { $modal.remove(); $modal = null; }
             $('body').removeClass('MPC-dos-body-lock');

@@ -67,6 +67,9 @@ namespace VAS.Controllers
     ///   Read-only here; no writes.
     /// Chronological development:
     ///   VAI052      2026-09-14 Created
+    ///   Claude      2026-11-05 Row 34: charge lines show the charge name. Row 36: lines carry
+    ///               IsItem (cards count Item lines only). Row 35: previous-window value and
+    ///               window end returned with the month-over-month comparison.
     /// </summary>
     [System.Web.Mvc.SessionState(System.Web.SessionState.SessionStateBehavior.ReadOnly)]
     public class VAS_273_OrderValueBookedMTDWidgetController : Controller
@@ -302,6 +305,9 @@ namespace VAS.Controllers
             DateTime prevPeriodEnd = prevMonthStart.AddDays(clampedElapsed);
 
             result.ComparisonMonthStart = prevMonthStart.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            // 5-Nov Row 35: the compared window is sent too (inclusive last day), so the
+            // card can name it ("vs 1-5 Oct 2026") and show its value.
+            result.ComparisonPeriodEnd = prevPeriodEnd.AddDays(-1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
             string sql = @"
                 SELECT SUM(COALESCE(o.TotalLines, 0)) AS Previous_Order_Value
@@ -326,6 +332,14 @@ namespace VAS.Controllers
                 new SqlParameter("@Prev_Period_End", prevPeriodEnd)
             }, null));
 
+            // 5-Nov Row 35 ("Vs Oct 2026" card showed no data): the comparison is over the
+            // EQUIVALENT elapsed window only (e.g. 1-5 Oct on 5 Nov), and only a positive
+            // previous value yields a percentage - when nothing was booked in those first
+            // days of the previous month MomPercent stays null and the card had nothing to
+            // show ("—"). The query itself is fine on PostgreSQL (SUM over no rows is NULL
+            // and reads as 0). The previous window's value is now returned as well, so the
+            // card always states what it compares against.
+            result.PreviousOrderValue = previousValue;
             if (previousValue > 0)
             {
                 result.MomPercent = Math.Round(((result.OrderValue - previousValue) / previousValue) * 100m, 1);
@@ -520,10 +534,16 @@ namespace VAS.Controllers
         /// </summary>
         private void LoadOrderLines(Ctx ctx, OrderDetailResult result, int orderId, int headerWarehouseId)
         {
+            // ProductType is a CHAR column and the charge / product names are NVARCHAR -
+            // all selected raw and resolved in C# (no COALESCE against a literal, see VAS_203).
             string sql = @"
                 SELECT ol.C_OrderLine_ID AS Line_Id,
                        ol.Line AS Line_No,
                        ol.M_Product_ID AS Product_Id,
+                       ol.C_Charge_ID AS Charge_Id,
+                       ol.Description AS Description,
+                       p.ProductType AS Product_Type,
+                       ch.Name AS Charge_Name,
                        ol.QtyOrdered AS Qty_Ordered,
                        ol.QtyDelivered AS Qty_Delivered,
                        ol.PriceActual AS Price_Actual,
@@ -536,6 +556,7 @@ namespace VAS.Controllers
                        COALESCE(u.Name, N'') AS Uom_Name
                   FROM C_OrderLine ol
                   LEFT OUTER JOIN M_Product p ON ( p.M_Product_ID = ol.M_Product_ID )
+                  LEFT OUTER JOIN C_Charge ch ON ( ch.C_Charge_ID = ol.C_Charge_ID )
                   LEFT OUTER JOIN M_AttributeSetInstance asi ON ( asi.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID )
                   LEFT OUTER JOIN C_UOM u ON ( u.C_UOM_ID = ol.C_UOM_ID )
                  WHERE ol.C_Order_ID = @Order_Id
@@ -560,16 +581,28 @@ namespace VAS.Controllers
                     int lineWarehouseId = dr["Line_Warehouse_Id"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr["Line_Warehouse_Id"]);
                     int warehouseId = lineWarehouseId > 0 ? lineWarehouseId : headerWarehouseId;
 
+                    // 5-Nov Row 36: only Item-type product lines carry ordered / pending
+                    // figures for the "Order" / "Pending" cards - charges and other product
+                    // types are excluded.
+                    bool isItem = productId > 0
+                        && string.Equals((Util.GetValueOfString(dr["Product_Type"]) ?? "").Trim(), "I", StringComparison.OrdinalIgnoreCase);
+
+                    // 5-Nov Row 34: a line created with a charge shows the charge's name.
+                    string productName = Util.GetValueOfString(dr["Product_Name"]);
+                    if (string.IsNullOrEmpty(productName)) { productName = Util.GetValueOfString(dr["Charge_Name"]); }
+                    if (string.IsNullOrEmpty(productName)) { productName = Util.GetValueOfString(dr["Description"]); }
+
                     result.Lines.Add(new OrderLineRow
                     {
                         LineNo = Util.GetValueOfInt(dr["Line_No"]),
-                        ProductName = Util.GetValueOfString(dr["Product_Name"]),
+                        ProductName = productName,
                         AttributeText = Util.GetValueOfString(dr["Attribute_Text"]),
                         UomName = Util.GetValueOfString(dr["Uom_Name"]),
+                        IsItem = isItem,
                         QtyOrdered = qtyOrdered,
                         QtyDelivered = qtyDelivered,
-                        QtyPending = qtyOrdered - qtyDelivered,
-                        FreeStock = ResolveFreeStock(ctx, productId, warehouseId),
+                        QtyPending = isItem ? Math.Max(0m, qtyOrdered - qtyDelivered) : 0m,
+                        FreeStock = isItem ? ResolveFreeStock(ctx, productId, warehouseId) : 0m,
                         Rate = dr["Price_Actual"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Price_Actual"]),
                         Amount = dr["Line_Net_Amt"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Line_Net_Amt"])
                     });
@@ -732,6 +765,10 @@ namespace VAS.Controllers
             public decimal AvgOrderValue { get; set; }
             public decimal? MomPercent { get; set; }
             public string ComparisonMonthStart { get; set; }
+            /// <summary>Inclusive last day of the compared previous-month window (5-Nov Row 35).</summary>
+            public string ComparisonPeriodEnd { get; set; }
+            /// <summary>Booked value of the compared previous-month window (5-Nov Row 35).</summary>
+            public decimal PreviousOrderValue { get; set; }
             public int CustomersBilled { get; set; }
             public int NewCustomers { get; set; }
             public int FromQuotationCount { get; set; }
@@ -787,6 +824,8 @@ namespace VAS.Controllers
             public string ProductName { get; set; }
             public string AttributeText { get; set; }
             public string UomName { get; set; }
+            /// <summary>Item-type product line (5-Nov Row 36) - only these carry ordered/pending figures for the cards.</summary>
+            public bool IsItem { get; set; }
             public decimal QtyOrdered { get; set; }
             public decimal QtyDelivered { get; set; }
             public decimal QtyPending { get; set; }

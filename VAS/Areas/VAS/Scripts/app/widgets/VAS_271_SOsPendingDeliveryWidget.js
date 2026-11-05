@@ -21,8 +21,9 @@
  *           self-contained copy, matching how every widget controller/JS pair in
  *           this codebase owns its own modal implementation.
  *
- * Modal   - Documents (top-level) -> Lines (child, back-navigable; SO number and
- *           lines icon open the same pop-up, Sr 8.11), same
+ * Modal   - Documents (top-level) -> Lines (child, back-navigable; opened by the
+ *           lines icon - the SO number opens the record on the Sales Order screen in
+ *           the same tab, 5-Nov Row 41), same
  *           { title, subtitle, size, render } config-stack engine as VAS_270 -
  *           "back" pops the stack and re-runs the popped config's render() from its
  *           own already-fetched state, never stale HTML.
@@ -179,6 +180,7 @@
 
     var MAX_ROWS_PER_PAGE = 10;
     var MIN_ROWS_PER_PAGE = 2;
+    var ZOOM_WINDOW_NAME = 'VAS_SalesOrder';
     var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
     /* design.md §Widget Header / §Measurement Setup: keep --dash-inline-size on
@@ -209,9 +211,10 @@
         var $self = this;
         var $root = $('<div class="vas271-root">');
         var $tile;
-        var $mask, $modal, $mHead, $mTitle, $mSub, $mBack, $mBody, $mFoot;
+        var $mask, $modal, $mHead, $mTitle, $mSub, $mBack, $mBody, $mFoot, $mClose;
 
         var SELF_ENDPOINT = 'VAS_271_SOsPendingDeliveryWidget/';
+        var zoomWindowId = 0;
         // Per-instance event-namespace suffix (Sr 8.28): disposing an old instance must
         // not unbind the window handlers of a re-created one with the same widget id.
         var instanceTag = 'i' + Math.random().toString(36).slice(2, 9);
@@ -223,8 +226,20 @@
         var cfgStack = [];
         var currentCfg = null;
 
+        // A missing message key must never render raw ("[KEY]") - fall back to the English text.
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            var text = '';
+            try { text = VIS.Msg.getMsg(key); } catch (e) { text = ''; }
+            if (!text || text === key || text === '[' + key + ']') { return fallback || key; }
+            return text;
+        }
+
+        // A table of THIS instance's modal, looked up inside its own body - never via
+        // document.getElementById: a modal left on <body> by an earlier instance (one the
+        // host re-created on "refresh all" without disposing) carries the same ids and
+        // would be found first, so the new modal stayed empty.
+        function tableEl(id) {
+            return $mBody ? $mBody.find('#' + id)[0] : null;
         }
 
         function escapeHtml(value) {
@@ -434,8 +449,8 @@
             $mSub = $('<div class="vas271-msub"></div>');
             $titleWrap.append($mTitle, $mSub);
             $htxt.append($mBack, $titleWrap);
-            var $closeBtn = $('<button type="button" class="vas271-xbtn" aria-label="' + escapeHtml(label('VAS_271_Close', 'Close')) + '">' + icon('close') + '</button>');
-            $mHead.append($htxt, $closeBtn);
+            $mClose = $('<button type="button" class="vas271-xbtn" aria-label="' + escapeHtml(label('VAS_271_Close', 'Close')) + '">' + icon('close') + '</button>');
+            $mHead.append($htxt, $mClose);
 
             $mBody = $('<div class="vas271-mbody"></div>');
             $mFoot = $('<div class="vas271-mfoot"></div>');
@@ -444,17 +459,49 @@
             $mask.append($modal);
             $('body').append($mask);
 
-            $closeBtn.on('click', closeModal);
-            $mBack.on('click', backModal);
-            $mBody.on('click', function (event) {
+            bindModal();
+        }
+
+        /* 5-Nov Row 24: the modal's own handlers are (re)bound here under one namespace,
+           off() first, on init AND on every refresh - like the tile, they must survive a
+           host that strips jQuery handlers on "refresh all". */
+        function bindModal() {
+            if (!$mBody) { return; }
+            var ns = '.vas271m-' + instanceTag;
+            $mClose.off(ns).on('click' + ns, closeModal);
+            $mBack.off(ns).on('click' + ns, backModal);
+            $mBody.off(ns).on('click' + ns, function (event) {
                 var pageBtn = event.target.closest ? event.target.closest('[data-dir]') : null;
                 if (pageBtn) { turnPage(pageBtn.getAttribute('data-table'), Number(pageBtn.getAttribute('data-dir'))); return; }
-                // Sr 8.11: the document number and the Line Details icon open the SAME pop-up.
+                // 5-Nov Row 41: the document number opens that record on the Sales Order
+                // screen (same tab, VAS_268's Open Record pattern); the Line Details icon
+                // opens the "Sales order lines" pop-up.
                 var soBtn = event.target.closest ? event.target.closest('[data-so]') : null;
-                if (soBtn) { openLinesModal(Number(soBtn.getAttribute('data-so'))); return; }
+                if (soBtn) { openRecordInWindow(Number(soBtn.getAttribute('data-so'))); return; }
                 var linesBtn = event.target.closest ? event.target.closest('[data-lines]') : null;
                 if (linesBtn) { openLinesModal(Number(linesBtn.getAttribute('data-lines'))); return; }
             });
+        }
+
+        /* 5-Nov Row 41 - navigates to the Sales Order record in the SAME tab (VAS_268
+           "Open Record"): hosted inside the Sales Order window (windowNo >= 0) the host's
+           value-changed channel re-queries the window it is already in (TabWhereClause);
+           only on the Home page, where there is no host window, the shared zoom helper
+           opens the Sales Order window. */
+        function openRecordInWindow(orderId) {
+            closeModal();
+            if (!orderId) { return; }
+            if ($self.windowNo >= 0) {
+                $self.widgetFirevalueChanged({
+                    "TabWhereClause": "C_Order.C_Order_ID=" + Number(orderId),
+                    "TabLayout": "Y",
+                    "TabIndex": "0"
+                });
+                return;
+            }
+            if (!window.VAS || !VAS.ZoomUtil) { return; }
+            VAS.ZoomUtil.zoomToRecord('C_Order_ID', orderId, zoomWindowId, ZOOM_WINDOW_NAME, ZOOM_WINDOW_NAME)
+                .done(function (id) { if (id > 0) { zoomWindowId = id; } });
         }
 
         function bindDocumentLevelEvents() {
@@ -623,7 +670,7 @@
         ];
 
         function drawDocumentsTable() {
-            var el = document.getElementById('vas271-docstbl');
+            var el = tableEl('vas271-docstbl');
             if (!el) { return; }
             var tpl = DOC_COLS.map(function (c) { return 'minmax(0,' + c.w + 'fr)'; }).join(' ');
             var pages = Math.max(1, Math.ceil(docsState.total / docsState.size));
@@ -704,18 +751,17 @@
             });
         }
 
-        /* Sr 8.11: the document number and the Line Details icon both open this one
-           "Sales order lines" pop-up (the separate record-preview screen is retired). */
+        /* The Line Details icon opens this "Sales order lines" pop-up (the document
+           number navigates to the record instead - 5-Nov Row 41). */
         function lineFootHtml(order, lines) {
             // Ordered / shortage count Item-type product lines only (Sr 8.15);
-            // shortage = pending - on hand, never negative.
+            // shortage = pending - on hand, never negative - stated by the server in the
+            // line's UOM (QtyShort), since on hand is in the base UOM (5-Nov Row 26).
             var qtyOrdered = 0, qtyShort = 0;
             lines.forEach(function (line) {
                 if (!line.IsItem) { return; }
                 qtyOrdered += Number(line.QtyOrdered) || 0;
-                var pending = Number(line.QtyPending) || 0;
-                var onHand = Math.max(0, Number(line.FreeStock) || 0);
-                if (pending > onHand) { qtyShort += (pending - onHand); }
+                qtyShort += Math.max(0, Number(line.QtyShort) || 0);
             });
             var footNote = lines.length + ' ' + label('VAS_271_LinesSuffix', 'lines') +
                 ' · ' + formatQty(qtyOrdered) + ' ' + label('VAS_271_QtyOrderedSuffix', 'qty ordered') +
@@ -790,8 +836,16 @@
             { key: 'status', label: label('VAS_271_ColLineStatus', 'Line status'), w: 1 }
         ];
 
+        // 5-Nov Row 26: on hand is in the product's base UOM; its name is shown with the
+        // figure when the line was entered in another UOM.
+        function inStockText(line) {
+            var text = formatQty(line.FreeStock);
+            if (line.BaseUomName && line.BaseUomName !== line.UomName) { text += ' ' + line.BaseUomName; }
+            return text;
+        }
+
         function drawLineTable(tableId) {
-            var el = document.getElementById(tableId);
+            var el = tableEl(tableId);
             if (!el || !lineState) { return; }
 
             // Sr 8.17: the Attribute column is shown only when some line of the order has
@@ -812,10 +866,12 @@
             '</div>';
 
             var body = slice.map(function (line) {
-                var st = lineStatus(line);
                 // Delivered / pending / in stock only for Item-type products (Sr 8.15);
                 // charges and other product types show a dash.
                 var isItem = !!line.IsItem;
+                // 5-Nov Row 38: a line status only for Item-type product lines - blank
+                // for charges and other product types.
+                var st = isItem ? lineStatus(line) : null;
                 var cells = [
                     cellHtml(String(line.LineNo), 'vas271-c-std', 'right'),
                     cellHtml(line.ProductName, 'vas271-c-prim'),
@@ -824,10 +880,12 @@
                     cellHtml(formatQty(line.QtyOrdered), 'vas271-c-std', 'right'),
                     cellHtml(isItem ? formatQty(line.QtyDelivered) : '—', 'vas271-c-std', 'right'),
                     cellHtml(isItem ? formatQty(line.QtyPending) : '—', 'vas271-c-prim', 'right'),
-                    cellHtml(isItem ? formatQty(line.FreeStock) : '—', (isItem && line.FreeStock < line.QtyPending ? 'vas271-c-short' : 'vas271-c-ok'), 'right'),
+                    cellHtml(isItem ? inStockText(line) : '—', (isItem && Number(line.QtyShort) > 0 ? 'vas271-c-short' : 'vas271-c-ok'), 'right'),
                     cellHtml(formatMoney(line.Rate, cur, 2), 'vas271-c-std', 'right'),
                     cellHtml(formatMoney(line.Amount, cur, prec), 'vas271-c-emph', 'right')
-                ].join('') + '<span class="vas271-cell"><span class="vas271-chip ' + st.cls + '" title="' + escapeHtml(st.text) + '">' + escapeHtml(st.text) + '</span></span>';
+                ].join('') + (st
+                    ? '<span class="vas271-cell"><span class="vas271-chip ' + st.cls + '" title="' + escapeHtml(st.text) + '">' + escapeHtml(st.text) + '</span></span>'
+                    : '<span class="vas271-cell"></span>');
                 return '<div class="vas271-mrow" style="grid-template-columns:' + tpl + '">' + cells + '</div>';
             }).join('');
 
@@ -852,7 +910,7 @@
            forcing page 0; the guard on "n !== size" makes this converge instead
            of looping. */
         function fitTable(id, currentSize, onResize) {
-            var el = document.getElementById(id);
+            var el = tableEl(id);
             if (!el) { return; }
             var avail = el.clientHeight;
             if (avail < 40) { return; }
@@ -906,6 +964,7 @@
             if (!$mask || !$.contains(document.body, $mask[0])) { createModal(); }
             if ($tile && !$.contains($root[0], $tile[0])) { $root.append($tile); }
             bindTile();
+            bindModal();
             loadSummary();
         };
     };

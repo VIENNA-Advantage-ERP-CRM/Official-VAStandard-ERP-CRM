@@ -218,8 +218,12 @@
         var cfgStack = [];
         var currentCfg = null;
 
+        // Never render a raw "[KEY]": fall back to the English text when the key is missing.
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            var text = '';
+            try { text = VIS.Msg.getMsg(key); } catch (e) { text = ''; }
+            if (!text || text === key || text === '[' + key + ']') { return fallback || key; }
+            return text;
         }
 
         function escapeHtml(value) {
@@ -516,6 +520,7 @@
                 Outstanding: Number(row.Outstanding) || 0,
                 OrderValue: Number(row.OrderValue) || 0,
                 OverdueInvoiceCount: Number(row.OverdueInvoiceCount) || 0,
+                OverdueAmount: Number(row.OverdueAmount) || 0,
                 HoldReason: row.HoldReason || ''
             };
         }
@@ -572,7 +577,8 @@
                     cellHtml(formatINR(row.CreditLimit), 'vas275-c-std', 'right'),
                     cellHtml(formatINR(row.Outstanding), 'vas275-c-std', 'right'),
                     cellHtml(formatINR(row.OrderValue), 'vas275-c-emph', 'right'),
-                    cellHtml(row.OverdueInvoiceCount > 0 ? formatNum(row.OverdueInvoiceCount) : '—', 'vas275-c-std', 'right'),
+                    // 5-Nov row 37: count of the customer's overdue AR invoices · their open amount.
+                    cellHtml(row.OverdueInvoiceCount > 0 ? formatNum(row.OverdueInvoiceCount) + ' · ' + formatINR(row.OverdueAmount) : '—', 'vas275-c-std', 'right'),
                     cellHtml(row.HoldReason, 'vas275-c-std')
                 ];
                 return '<div class="vas275-mrow" style="grid-template-columns:' + tpl + '">' + cells.join('') + '</div>';

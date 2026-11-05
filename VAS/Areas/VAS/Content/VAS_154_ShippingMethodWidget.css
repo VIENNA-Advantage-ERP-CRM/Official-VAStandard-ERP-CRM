@@ -13,14 +13,16 @@
 
 /* ---- header ---- */
 .vas-shm-head { display: flex; align-items: center; justify-content: space-between; gap: .625em; flex-shrink: 0; }
-.vas-shm-head-l { display: flex; align-items: center; gap: .625em; min-width: 0; }
+.vas-shm-head-l { display: flex; align-items: center; gap: .625em; flex: 1 1 auto; min-width: 0; }
 .vas-shm-ico { width: 2em; height: 2em; flex: 0 0 2em; border-radius: 0.5em; background: #EEF6FF; border: 0.05em solid #E4EDF4; display: flex; align-items: center; justify-content: center; }
 .vas-shm-ico svg { width: 1em; height: 1em; }
-.vas-shm-titles { min-width: 0; }
+.vas-shm-titles { flex: 0 1 auto; min-width: 0; }
 .vas-shm-title { font-weight: 500; color: #102C3F; line-height: 1.2; font-size: .8125em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vas-shm-sub { font-weight: 400; font-size: .6875em; color: #748494; line-height: 1.25; margin-top: .125em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.vas-shm-filters { display: flex; align-items: center; gap: .375em; flex-shrink: 0; }
+/* Filters sit left-aligned right after the title (5-Nov sheet row 16, same as
+   VAS_145); the title/subtitle truncate first, the filters never shrink. */
+.vas-shm-filters { display: flex; align-items: center; justify-content: flex-start; gap: .375em; flex: 0 0 auto; }
 .vas-shm-sel { position: relative; display: inline-flex; }
 .vas-shm-sel select {
     appearance: none !important;
@@ -37,8 +39,8 @@
     padding: .35em .75em;
     cursor: pointer;
     line-height: 1.2;
-    text-align: center;
-    text-align-last: center;
+    text-align: left;
+    text-align-last: left;
 }
 .vas-shm-sel select.vas-shm-month-sel { min-width: 7.5em; }
 .vas-shm-sel select.vas-shm-year-sel { min-width: 5.2em; }

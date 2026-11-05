@@ -108,7 +108,8 @@
     color: #102C3F;
     line-height: 1.2;
     margin: 0;
-    /* Reduced heading size (was clamp(16px, ..., 17px)): the long title fits the 2-wide tile. */
+    /* Reduced heading size (was clamp(16px, ..., 17px)): the long title fits the 2-wide tile; a title
+       still too long ellipsises (full text in the title attribute). */
     font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * 0.0095), 15px);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -247,8 +248,8 @@
 
 .vas-w205-modal-header h2 {
     margin: 0;
-    /* Reduced heading size (was 1em) */
-    font-size: 0.875em;
+    /* Reduced heading size (was 1em, then 0.875em) */
+    font-size: 0.8125em;
     font-weight: 400;
     color: #141414;
     line-height: 1.2;
@@ -389,8 +390,8 @@
 
 /* Section Divider */
 .vas-w205-msec {
-    /* Reduced heading size (was 0.9375em) */
-    font-size: 0.8125em;
+    /* Reduced heading size (was 0.9375em, then 0.8125em) */
+    font-size: 0.75em;
     font-weight: 500;
     color: #102C3F;
     margin: 0.25em 0 0.35em;

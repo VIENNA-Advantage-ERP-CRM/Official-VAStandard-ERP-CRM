@@ -12,6 +12,23 @@
     var TRANSFER_ZOOM_WINDOW_NEW = 'VAS_MaterialTransfer';
     var TRANSFER_ZOOM_WINDOW_OLD = 'Material Transfer';
 
+    // Material Transfer Confirmation window (M_MovementConfirm) - where Open Record goes.
+    var CONFIRM_ZOOM_WINDOW_NEW = 'VAS_MoveConfirmation';
+    var CONFIRM_ZOOM_WINDOW_OLD = 'Material Transfer Confirmation';
+
+    // The number shown for a pending item is the confirmation's own document number; the
+    // transfer's number stands in only when no open confirmation was found.
+    function confirmNo(tr) {
+        return (tr && (tr.ConfirmNo || tr.TransferNo)) || '—';
+    }
+
+    // The Material Transfer's own document number, as a link to that transfer.
+    function transferLink(tr) {
+        if (!tr || !tr.TransferNo || !tr.TransferID) { return ''; }
+        return '<button type="button" class="vas-172-mtlink" title="' + escapeHtml(lbl('VAS_172_MaterialTransfer', 'Material Transfer')) + '">' +
+            escapeHtml(tr.TransferNo) + '</button>';
+    }
+
     // Longest Description the line takes (the controller truncates to the same).
     var DESCRIPTION_MAX = 255;
 
@@ -207,13 +224,17 @@
                 var routeStr = (item.SourceLocator || item.SourceWarehouse || 'Src') + ' → ' + (item.DestLocator || item.DestWarehouse || 'Dst') + ' · ' + (item.LineCount || 0) + ' ' + (item.LineCount === 1 ? lbl('VAS_172_LineCountSingular', 'line') : lbl('VAS_172_LineCountPlural', 'lines'));
                 var statusPill = '<span class="vas-172-pill vas-172-pill--amber">' + escapeHtml(lbl('VAS_172_Pending', 'Pending')) + '</span>';
 
-                html += '<button type="button" class="vas-172-row' + (i === slice.length - 1 ? ' vas-172-row--last' : '') + '" data-idx="' + (start + i) + '">' +
+                // A div (not a button) so the transfer number inside it can be its own link.
+                html += '<div role="button" tabindex="0" class="vas-172-row' + (i === slice.length - 1 ? ' vas-172-row--last' : '') + '" data-idx="' + (start + i) + '">' +
                     '<div class="vas-172-row-top">' +
-                        '<span class="vas-172-trno">' + escapeHtml(item.TransferNo || '—') + '</span>' +
+                        '<span class="vas-172-row-nos">' +
+                            '<span class="vas-172-trno">' + escapeHtml(confirmNo(item)) + '</span>' +
+                            transferLink(item) +
+                        '</span>' +
                         statusPill +
                     '</div>' +
                     '<div class="vas-172-row-meta">' + escapeHtml(routeStr) + '</div>' +
-                '</button>';
+                '</div>';
             }
             html += '</div>';
             $body.html(html);
@@ -221,6 +242,20 @@
             $body.find('.vas-172-row').on('click', function () {
                 var idx = parseInt($(this).attr('data-idx'), 10);
                 openModal(allQueueRecords[idx]);
+            }).on('keydown', function (e) {
+                if (e.target !== this) { return; }
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    var idx = parseInt($(this).attr('data-idx'), 10);
+                    openModal(allQueueRecords[idx]);
+                }
+            });
+
+            // The transfer number opens the Material Transfer record, not the pop-up.
+            $body.find('.vas-172-mtlink').on('click', function (e) {
+                e.stopPropagation();
+                var idx = parseInt($(this).closest('.vas-172-row').attr('data-idx'), 10);
+                openTransfer(allQueueRecords[idx]);
             });
 
             renderFooter($footer, start + 1, end, total, currentPage, totalPages);
@@ -271,12 +306,24 @@
             activeLine = null;
         }
 
-        // Opens the transfer. The pop-up is closed first so nothing stays behind its scrim.
-        // Hosted on the Material Transfer window (windowNo >= 0) the window's own grid is navigated
-        // to the record (same pattern as InvoicesWidget / VAS_227); on a home dashboard the
-        // Material Transfer window is opened on it.
+        // Open Record: the Material Transfer Confirmation window, positioned on the confirmation.
+        // It is a different window from the Material Transfer one this widget sits on, so it is
+        // always a zoom (the host grid cannot show M_MovementConfirm). The pop-up is closed first
+        // so nothing stays behind its scrim.
         function openRecord() {
             var tr = activeTransfer;
+            if (!tr || !tr.ConfirmID) { return; }
+            var id = Number(tr.ConfirmID);
+            closeModal();
+            try {
+                VAS.ZoomUtil.zoomToRecord('M_MovementConfirm_ID', id, 0, CONFIRM_ZOOM_WINDOW_NEW, CONFIRM_ZOOM_WINDOW_OLD);
+            } catch (e) { }
+        }
+
+        // The transfer number link: opens the Material Transfer. Hosted on the Material Transfer
+        // window (windowNo >= 0) the window's own grid is navigated to the record (same pattern as
+        // InvoicesWidget / VAS_227); on a home dashboard the Material Transfer window is opened on it.
+        function openTransfer(tr) {
             if (!tr || !tr.TransferID) { return; }
             var id = Number(tr.TransferID);
             closeModal();
@@ -325,7 +372,7 @@
                 '<div class="vas-172-modal-scrim">' +
                     '<div class="vas-172-modal">' +
                         '<div class="vas-172-modal-header">' +
-                            '<span class="vas-172-modal-title">' + escapeHtml((tr.TransferNo || 'TR') + ' · ' + lbl('VAS_172_TransferConfirmation', 'Transfer Confirmation')) + '</span>' +
+                            '<span class="vas-172-modal-title">' + escapeHtml(confirmNo(tr) + ' · ' + lbl('VAS_172_TransferConfirmation', 'Transfer Confirmation')) + '</span>' +
                             '<span class="vas-172-pill vas-172-pill--amber">' + escapeHtml(lbl('VAS_172_Pending', 'Pending')) + '</span>' +
                             openRecordButton() +
                             '<button type="button" class="vas-172-modal-close" id="vas172-m-close">&#215;</button>' +
@@ -334,7 +381,11 @@
                             '<div class="vas-172-field-grid">' +
                                 '<div class="vas-172-field">' +
                                     '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_DocumentNumber', 'Document Number')) + '</div>' +
-                                    '<div class="vas-172-field-value">' + escapeHtml(tr.TransferNo || '—') + '</div>' +
+                                    '<div class="vas-172-field-value">' + escapeHtml(confirmNo(tr)) + '</div>' +
+                                '</div>' +
+                                '<div class="vas-172-field">' +
+                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_MaterialTransfer', 'Material Transfer')) + '</div>' +
+                                    '<div class="vas-172-field-value">' + (transferLink(tr) || '—') + '</div>' +
                                 '</div>' +
                                 '<div class="vas-172-field">' +
                                     '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_Route', 'Route')) + '</div>' +
@@ -366,6 +417,7 @@
 
             $modal.find('#vas172-m-close').on('click', closeModal);
             $modal.find('#vas172-btn-open').on('click', openRecord);
+            $modal.find('.vas-172-mtlink').on('click', function () { openTransfer(tr); });
 
             $modal.find('.vas-172-line-row').on('click', function () {
                 var lidx = parseInt($(this).attr('data-lidx'), 10);
@@ -409,7 +461,7 @@
                             '<button type="button" class="vas-172-modal-close" id="vas172-m-close2">&#215;</button>' +
                         '</div>' +
                         '<div class="vas-172-modal-body vas-172-modal-body--v2">' +
-                            '<button type="button" class="vas-172-back-link" id="vas172-b2">&#8249; ' + escapeHtml(lbl('VAS_172_BackTo', 'Back to')) + ' ' + escapeHtml(tr.TransferNo || 'TR') + '</button>' +
+                            '<button type="button" class="vas-172-back-link" id="vas172-b2">&#8249; ' + escapeHtml(lbl('VAS_172_BackTo', 'Back to')) + ' ' + escapeHtml(confirmNo(tr)) + '</button>' +
                             '<div class="vas-172-v2-grid">' +
                                 '<div class="vas-172-v2-field vas-172-v2-readonly">' +
                                     '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_TransferLine', 'Transfer Line')) + '</div>' +

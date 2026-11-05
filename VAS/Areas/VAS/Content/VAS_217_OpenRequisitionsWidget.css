@@ -846,6 +846,11 @@ select.vas-217-orw-fctl {
     text-align: right;
 }
 
+/* Native date pickers show the user's date format; keep it left-aligned */
+.vas-217-orw-rowin[type="date"] {
+    text-align: left;
+}
+
 .vas-217-orw-rowin:focus {
     border-color: #0083DA;
     outline: none;

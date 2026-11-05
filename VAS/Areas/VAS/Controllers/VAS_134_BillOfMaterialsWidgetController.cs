@@ -56,6 +56,8 @@ namespace VAS.Controllers
     ///   VAI163       2026-10-29 BOM Verification: "latest updated" now covers the BOM header and its
     ///                           lines as well as the parent product, so editing a BOM brings it to the
     ///                           top; verified and not-verified stay interleaved.
+    ///   VAS163       2026-11-05 BOM Verification: list now groups not-verified BOMs first, then verified,
+    ///                           each group latest updated first (supersedes the 29-Oct interleaving).
     /// </summary>
     public class VAS_134_BillOfMaterialsWidgetController : Controller
     {
@@ -248,8 +250,8 @@ namespace VAS.Controllers
 
         /// <summary>
         /// Returns one page (2-8 rows) of active BOMs with verification
-        /// status, most recently updated first - verified and not-verified
-        /// rows are interleaved, not grouped.
+        /// status: not-verified BOMs first, then verified, each group most
+        /// recently updated first.
         /// </summary>
         /// <param name="offset">Zero-based result offset.</param>
         /// <param name="pageSize">Requested page size; clamped to 2-8.</param>
@@ -335,7 +337,8 @@ namespace VAS.Controllers
                             COUNT(*) OVER () AS total_count,
                             SUM(CASE WHEN nb.is_verified = 'N' THEN 1 ELSE 0 END) OVER () AS not_verified_count,
                             ROW_NUMBER() OVER (
-                                ORDER BY nb.updated_at DESC, nb.bom_id DESC
+                                ORDER BY CASE WHEN nb.is_verified = 'N' THEN 0 ELSE 1 END,
+                                         nb.updated_at DESC, nb.bom_id DESC
                             ) AS row_num
                         FROM normalized_boms nb
                     )

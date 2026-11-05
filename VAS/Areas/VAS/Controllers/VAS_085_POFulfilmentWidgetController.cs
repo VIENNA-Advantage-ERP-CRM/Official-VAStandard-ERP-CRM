@@ -14,8 +14,8 @@ namespace VIS.Controllers
     /// <summary>
     /// Module Name : PO Fulfilment % (Material Receipt / GRN dashboard KPI)
     /// Purpose     : KPI = purchase-order fulfilment percentage for purchase orders raised in
-    ///               the current calendar month (received qty / ordered qty over Item-type
-    ///               lines, received capped at ordered per line), plus the point change vs the
+    ///               the current calendar month (GRN-received qty net of vendor returns / ordered
+    ///               qty over Item-type lines, received capped at ordered per line), plus the point change vs the
     ///               POs raised in the previous calendar month. Completed / closed vendor POs,
     ///               no returns, no blanket orders. Read-only. MRole on C_Order.
     /// Chronological development:
@@ -25,6 +25,10 @@ namespace VIS.Controllers
     ///   VAI163     2026-10-29 Closed POs measured against the quantity originally ordered
     ///              (QtyOrdered + QtyLostSales) instead of the post-close QtyOrdered, which
     ///              CloseIt sets equal to QtyDelivered and so showed every closed PO as 100%
+    ///   VAS163     2026-11-05 Received qty taken from completed material receipts (GRN lines) against
+    ///              the PO line, net of completed vendor returns, instead of C_OrderLine.QtyDelivered
+    ///              (match-driven: capped at the invoiced qty when the invoice came first, and not
+    ///              reduced by vendor returns). Per line: LEAST(GREATEST(received - returned, 0), ordered).
     /// </summary>
     public class VAS_085_POFulfilmentWidgetController : Controller
     {
@@ -52,7 +56,8 @@ namespace VIS.Controllers
                Now: POs raised this calendar month versus those raised last calendar month. */
             DateTime today = DateTime.Today;
             DateTime currentStart = new DateTime(today.Year, today.Month, 1);
-            DateTime currentEndNext = today.AddDays(1);
+            /* Whole calendar month: a PO of this month dated after today was left out before. */
+            DateTime currentEndNext = currentStart.AddMonths(1);
             DateTime previousStart = currentStart.AddMonths(-1);
             DateTime previousEndNext = currentStart;
 
@@ -62,15 +67,9 @@ namespace VIS.Controllers
                on a closed PO (void is excluded by the DocStatus filter). */
             string orderedQty = "(COALESCE(OrdLine.QtyOrdered, 0) + CASE WHEN Ord.DocStatus = 'CL' THEN COALESCE(OrdLine.QtyLostSales, 0) ELSE 0 END)";
 
-            string sql = @"
-                SELECT SUM(CASE WHEN Ord.DateOrdered >= @CurrentStart1 AND Ord.DateOrdered < @CurrentEndNext1
-                                THEN " + orderedQty + @" ELSE 0 END) AS Current_Ordered,
-                       SUM(CASE WHEN Ord.DateOrdered >= @CurrentStart2 AND Ord.DateOrdered < @CurrentEndNext2
-                                THEN LEAST(COALESCE(OrdLine.QtyDelivered, 0), " + orderedQty + @") ELSE 0 END) AS Current_Delivered,
-                       SUM(CASE WHEN Ord.DateOrdered >= @PreviousStart1 AND Ord.DateOrdered < @PreviousEndNext1
-                                THEN " + orderedQty + @" ELSE 0 END) AS Previous_Ordered,
-                       SUM(CASE WHEN Ord.DateOrdered >= @PreviousStart2 AND Ord.DateOrdered < @PreviousEndNext2
-                                THEN LEAST(COALESCE(OrdLine.QtyDelivered, 0), " + orderedQty + @") ELSE 0 END) AS Previous_Delivered
+            /* The PO lines in scope (single WHERE, so MRole is applied here, before the wrapping). */
+            string poLines = @"
+                SELECT Ord.DateOrdered, OrdLine.C_OrderLine_ID, " + orderedQty + @" AS OrderedQty
                 FROM C_Order Ord
                 INNER JOIN C_OrderLine OrdLine ON (OrdLine.C_Order_ID=Ord.C_Order_ID)
                 INNER JOIN M_Product Product ON (Product.M_Product_ID=OrdLine.M_Product_ID)
@@ -84,7 +83,43 @@ namespace VIS.Controllers
                   AND Ord.DateOrdered >= @RangeStart
                   AND Ord.DateOrdered < @RangeEndNext";
 
-            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "Ord", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            poLines = MRole.GetDefault(ctx).AddAccessSQL(poLines, "Ord", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+            /* 5-Nov "incorrect data": the received quantity was read from C_OrderLine.QtyDelivered, which
+               for purchase lines is maintained by M_MatchPO - when a vendor invoice was entered before the
+               receipt, the match (and so QtyDelivered) is capped at the invoiced quantity, and goods sent
+               back on a vendor return stay counted as received. The received quantity is now what the
+               completed material receipts (GRNs) actually brought in against the PO line, less what
+               completed vendor returns sent back against it (return-order lines pointing at the PO line
+               via Orig_OrderLine_ID). Drafted / in-progress / reversed / voided receipts never count. */
+            string sql = @"
+                SELECT SUM(CASE WHEN l.DateOrdered >= @CurrentStart1 AND l.DateOrdered < @CurrentEndNext1
+                                THEN l.OrderedQty ELSE 0 END) AS Current_Ordered,
+                       SUM(CASE WHEN l.DateOrdered >= @CurrentStart2 AND l.DateOrdered < @CurrentEndNext2
+                                THEN LEAST(GREATEST(l.ReceivedQty - l.ReturnedQty, 0), l.OrderedQty) ELSE 0 END) AS Current_Delivered,
+                       SUM(CASE WHEN l.DateOrdered >= @PreviousStart1 AND l.DateOrdered < @PreviousEndNext1
+                                THEN l.OrderedQty ELSE 0 END) AS Previous_Ordered,
+                       SUM(CASE WHEN l.DateOrdered >= @PreviousStart2 AND l.DateOrdered < @PreviousEndNext2
+                                THEN LEAST(GREATEST(l.ReceivedQty - l.ReturnedQty, 0), l.OrderedQty) ELSE 0 END) AS Previous_Delivered
+                FROM (
+                    SELECT po.DateOrdered, po.OrderedQty,
+                           COALESCE((SELECT SUM(RcvLine.MovementQty)
+                                     FROM M_InOutLine RcvLine
+                                     INNER JOIN M_InOut Rcv ON (Rcv.M_InOut_ID=RcvLine.M_InOut_ID)
+                                     WHERE RcvLine.C_OrderLine_ID=po.C_OrderLine_ID
+                                       AND Rcv.IsSOTrx='N'
+                                       AND COALESCE(Rcv.IsReturnTrx, 'N')='N'
+                                       AND Rcv.DocStatus IN ('CO', 'CL')), 0) AS ReceivedQty,
+                           COALESCE((SELECT SUM(RetInLine.MovementQty)
+                                     FROM M_InOutLine RetInLine
+                                     INNER JOIN M_InOut RetIn ON (RetIn.M_InOut_ID=RetInLine.M_InOut_ID)
+                                     INNER JOIN C_OrderLine RetLine ON (RetLine.C_OrderLine_ID=RetInLine.C_OrderLine_ID)
+                                     WHERE RetLine.Orig_OrderLine_ID=po.C_OrderLine_ID
+                                       AND RetIn.IsSOTrx='N'
+                                       AND RetIn.IsReturnTrx='Y'
+                                       AND RetIn.DocStatus IN ('CO', 'CL')), 0) AS ReturnedQty
+                    FROM (" + poLines + @") po
+                ) l";
 
             /* The database layer binds positionally: one parameter per placeholder occurrence, in order. */
             SqlParameter[] parameters =

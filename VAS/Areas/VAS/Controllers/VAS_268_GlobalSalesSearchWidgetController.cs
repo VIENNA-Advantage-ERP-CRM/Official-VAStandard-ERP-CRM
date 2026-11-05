@@ -47,6 +47,9 @@ namespace VAS.Controllers
     ///   Read-only here; no writes.
     /// Chronological development:
     ///   VAI052      2026-09-11 Created
+    ///   Claude      2026-11-05 Row 23: tax-inclusive orders (order or price-list IsTaxIncluded = 'Y')
+    ///               are valued ex tax from C_OrderTax (header, search list, recent list, line
+    ///               amounts and rates). Row 26: In stock in the product's base UOM (+ its name).
     /// </summary>
     public class VAS_268_GlobalSalesSearchWidgetController : Controller
     {
@@ -208,17 +211,28 @@ namespace VAS.Controllers
         }
 
         /// <summary>
+        /// 'Y' when the order's prices include tax - the order's own IsTaxIncluded flag
+        /// (5-Nov Row 23: "SO has IsTaxIncluded = Y") or its price list's flag.
+        /// </summary>
+        private const string TaxIncludedSql =
+            "(CASE WHEN COALESCE(o.IsTaxIncluded, 'N') = 'Y' " +
+            "OR COALESCE((SELECT pl.IsTaxIncluded FROM M_PriceList pl WHERE pl.M_PriceList_ID = o.M_PriceList_ID), 'N') = 'Y' " +
+            "THEN 'Y' ELSE 'N' END)";
+
+        /// <summary>
         /// SO value WITHOUT taxes (Sr 7.8), as the Sales Order window states its Sub
-        /// Total: on a tax-inclusive price list (M_PriceList.IsTaxIncluded = 'Y')
-        /// C_Order.TotalLines holds the gross, so the lines' tax is taken off; on a
-        /// tax-exclusive one TotalLines is used as is. Same expression VAS_203 (PO
-        /// search) uses; scalar sub-selects in the SELECT list leave the main WHERE
-        /// untouched for AddAccessSQL. The value is in the order's own currency, which
-        /// is the price list's currency (Sr 8.7).
+        /// Total: on a tax-inclusive order C_Order.TotalLines holds the gross, so the
+        /// order's extracted tax (C_OrderTax.TaxAmt) is taken off; otherwise TotalLines
+        /// is used as is. 5-Nov Row 23: the tax was previously read from
+        /// C_OrderLine.TaxAmt, which is not maintained on every line (often 0), so the
+        /// gross stayed in the value - C_OrderTax is the order's own tax summary (same
+        /// source VAS_203 settled on). Scalar sub-selects in the SELECT list leave the
+        /// main WHERE untouched for AddAccessSQL. The value is in the order's own
+        /// currency, which is the price list's currency (Sr 8.7).
         /// </summary>
         private const string OrderValueExclTaxSql =
-            "CASE WHEN COALESCE((SELECT pl.IsTaxIncluded FROM M_PriceList pl WHERE pl.M_PriceList_ID = o.M_PriceList_ID), 'N') = 'Y' " +
-            "THEN COALESCE(o.TotalLines, 0) - (SELECT COALESCE(SUM(COALESCE(tl.TaxAmt, 0)), 0) FROM C_OrderLine tl WHERE tl.C_Order_ID = o.C_Order_ID AND tl.IsActive = 'Y') " +
+            "CASE WHEN " + TaxIncludedSql + " = 'Y' " +
+            "THEN COALESCE(o.TotalLines, 0) - (SELECT COALESCE(SUM(COALESCE(ot.TaxAmt, 0)), 0) FROM C_OrderTax ot WHERE ot.C_Order_ID = o.C_Order_ID AND ot.IsActive = 'Y') " +
             "ELSE COALESCE(o.TotalLines, 0) END";
 
         private SearchResult SearchSalesOrdersData(Ctx ctx, string searchText, int max)
@@ -405,7 +419,7 @@ namespace VAS.Controllers
                        o.DocumentNo AS Document_No,
                        o.DateOrdered AS Date_Ordered,
                        o.DocStatus AS Doc_Status_Code,
-                       o.TotalLines AS Order_Value,
+                       " + OrderValueExclTaxSql + @" AS Order_Value,
                        COALESCE(bp.Name, N'') AS Customer_Name
                   FROM C_Order o
                   INNER JOIN C_BPartner bp ON ( bp.C_BPartner_ID = o.C_BPartner_ID )
@@ -469,7 +483,7 @@ namespace VAS.Controllers
                        o.DatePromised AS Date_Promised,
                        o.DocStatus AS Doc_Status_Code,
                        " + OrderValueExclTaxSql + @" AS Order_Value,
-                       COALESCE((SELECT pl.IsTaxIncluded FROM M_PriceList pl WHERE pl.M_PriceList_ID = o.M_PriceList_ID), 'N') AS Price_List_Tax_Included,
+                       " + TaxIncludedSql + @" AS Price_List_Tax_Included,
                        curr.CurSymbol AS Currency_Symbol,
                        curr.ISO_Code AS Currency_Code,
                        curr.StdPrecision AS Currency_Precision,
@@ -595,6 +609,7 @@ namespace VAS.Controllers
                        ol.PriceEntered AS Price_Entered,
                        ol.LineNetAmt AS Line_Net_Amt,
                        ol.TaxAmt AS Line_Tax_Amt,
+                       ol.C_Tax_ID AS Line_Tax_Id,
                        tx.Rate AS Tax_Rate,
                        ol.M_AttributeSetInstance_ID AS Asi_Id,
                        ol.C_UOM_ID AS Uom_Id,
@@ -603,17 +618,23 @@ namespace VAS.Controllers
                        p.ProductType AS Product_Type,
                        ch.Name AS Charge_Name,
                        COALESCE(asi.Description, N'') AS Attribute_Text,
-                       COALESCE(u.Name, N'') AS Uom_Name
+                       COALESCE(u.Name, N'') AS Uom_Name,
+                       COALESCE(bu.Name, N'') AS Base_Uom_Name
                   FROM C_OrderLine ol
                   LEFT OUTER JOIN M_Product p ON ( p.M_Product_ID = ol.M_Product_ID )
                   LEFT OUTER JOIN C_Charge ch ON ( ch.C_Charge_ID = ol.C_Charge_ID )
                   LEFT OUTER JOIN C_Tax tx ON ( tx.C_Tax_ID = ol.C_Tax_ID )
                   LEFT OUTER JOIN M_AttributeSetInstance asi ON ( asi.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID )
                   LEFT OUTER JOIN C_UOM u ON ( u.C_UOM_ID = ol.C_UOM_ID )
+                  LEFT OUTER JOIN C_UOM bu ON ( bu.C_UOM_ID = p.C_UOM_ID )
                  WHERE ol.C_Order_ID = @Order_Id
                    AND ol.IsActive = 'Y'
                  ORDER BY ol.Line ASC
                  OFFSET 0 ROWS FETCH NEXT @Max_Line_Rows ROWS ONLY";
+
+            // 5-Nov Row 23: on a tax-inclusive order each line is restated net of tax with
+            // the order's own tax summary (C_OrderTax) - see GetOrderTaxNetRatios.
+            Dictionary<int, decimal> netRatioByTax = priceListTaxIncluded ? GetOrderTaxNetRatios(orderId) : new Dictionary<int, decimal>();
 
             IDataReader dr = null;
             try
@@ -654,25 +675,47 @@ namespace VAS.Controllers
                     if (string.IsNullOrEmpty(productName)) { productName = Util.GetValueOfString(dr["Charge_Name"]); }
                     if (string.IsNullOrEmpty(productName)) { productName = description; }
 
-                    // Sr 7.8: amounts without tax. On a tax-inclusive price list LineNetAmt is
-                    // the gross, so the line tax is taken off (derived from the rate when the
-                    // line carries no TaxAmt), exactly as VAS_203 does.
-                    decimal lineAmt = dr["Line_Net_Amt"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Line_Net_Amt"]);
-                    if (priceListTaxIncluded)
+                    // Sr 7.8 / 5-Nov Row 23: amounts without tax. On a tax-inclusive order
+                    // LineNetAmt is the gross: it is scaled by its tax's net/gross ratio from
+                    // C_OrderTax (so the lines add up to the header SO value); only when the
+                    // order has no tax summary for that tax is the line's own TaxAmt (or the
+                    // rate-derived tax) taken off.
+                    decimal lineGross = dr["Line_Net_Amt"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Line_Net_Amt"]);
+                    decimal lineAmt = lineGross;
+                    int lineTaxId = dr["Line_Tax_Id"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr["Line_Tax_Id"]);
+                    if (priceListTaxIncluded && netRatioByTax.ContainsKey(lineTaxId))
+                    {
+                        lineAmt = Math.Round(lineGross * netRatioByTax[lineTaxId], stdPrecision, MidpointRounding.AwayFromZero);
+                    }
+                    else if (priceListTaxIncluded)
                     {
                         decimal lineTax = dr["Line_Tax_Amt"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Line_Tax_Amt"]);
                         decimal taxRate = dr["Tax_Rate"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Tax_Rate"]);
                         if (lineTax == 0m && taxRate > 0m)
                         {
-                            lineTax = Math.Round(lineAmt * taxRate / (100m + taxRate), stdPrecision, MidpointRounding.AwayFromZero);
+                            lineTax = Math.Round(lineGross * taxRate / (100m + taxRate), stdPrecision, MidpointRounding.AwayFromZero);
                         }
-                        lineAmt -= lineTax;
+                        lineAmt = lineGross - lineTax;
                     }
 
                     // Sr 7.7: the rate per selected UOM (PriceEntered), falling back to PriceActual.
+                    // 5-Nov Row 23: on a tax-inclusive order the price is gross too, so it is
+                    // restated with the same net/gross proportion as the line amount.
                     decimal rate = dr["Price_Entered"] == DBNull.Value
                         ? (dr["Price_Actual"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Price_Actual"]))
                         : Util.GetValueOfDecimal(dr["Price_Entered"]);
+                    if (priceListTaxIncluded && lineGross != 0m)
+                    {
+                        rate = Math.Round(rate * lineAmt / lineGross, 6, MidpointRounding.AwayFromZero);
+                    }
+
+                    // 5-Nov Row 26: In stock is ALWAYS in the product's base UOM (product
+                    // master UOM), never scaled to the line's UOM - the base UOM name is sent
+                    // with it. Sr 8.3: on-hand stock, not free stock (its reservation already
+                    // contains this order). The shortage is still judged in the line's UOM:
+                    // pending (line UOM) against on hand restated in the line's UOM.
+                    decimal onHandBase = isItem ? ResolveOnHand(ctx, productId, warehouseId) : 0m;
+                    decimal qtyPending = isItem ? Math.Max(0m, qtyOrdered - qtyDelivered) : 0m;
 
                     result.Lines.Add(new OrderLineRow
                     {
@@ -681,14 +724,13 @@ namespace VAS.Controllers
                         Description = description,
                         AttributeText = Util.GetValueOfString(dr["Attribute_Text"]),
                         UomName = Util.GetValueOfString(dr["Uom_Name"]),
+                        BaseUomName = Util.GetValueOfString(dr["Base_Uom_Name"]),
                         IsItem = isItem,
                         QtyOrdered = qtyOrdered,
                         QtyDelivered = qtyDelivered,
-                        QtyPending = isItem ? Math.Max(0m, qtyOrdered - qtyDelivered) : 0m,
-                        // Sr 8.3: on-hand stock (in the line's UOM) - not free stock, whose
-                        // reservation already contains this very order and double-counted
-                        // the shortage (ordered 18, on hand 0 showed 36 short).
-                        FreeStock = isItem ? ResolveOnHand(ctx, productId, warehouseId) * uomRatio : 0m,
+                        QtyPending = qtyPending,
+                        FreeStock = onHandBase,
+                        QtyShort = isItem ? Math.Max(0m, qtyPending - Math.Max(0m, onHandBase) * uomRatio) : 0m,
                         Rate = rate,
                         Amount = lineAmt
                     });
@@ -730,6 +772,60 @@ namespace VAS.Controllers
                 new SqlParameter("@M_Product_ID", productId),
                 new SqlParameter("@M_Warehouse_ID", warehouseId)
             }, null));
+        }
+
+        /// <summary>
+        /// Tax-inclusive order only (5-Nov Row 23): per C_Tax_ID, the share of the lines'
+        /// gross (SUM(LineNetAmt)) that is NOT tax, taken from the order's own tax summary
+        /// (C_OrderTax.TaxAmt) - the same tax the header SO value takes off, so the lines
+        /// add up to it. A tax with no summary row (or an implausible one) is left out and
+        /// the caller falls back to the line's own TaxAmt / rate.
+        /// </summary>
+        private static Dictionary<int, decimal> GetOrderTaxNetRatios(int orderId)
+        {
+            Dictionary<int, decimal> ratios = new Dictionary<int, decimal>();
+            try
+            {
+                Dictionary<int, decimal> grossByTax = new Dictionary<int, decimal>();
+                DataSet grossDs = DB.ExecuteDataset(@"
+                    SELECT ol.C_Tax_ID AS Tax_Id, COALESCE(SUM(ol.LineNetAmt), 0) AS Gross
+                      FROM C_OrderLine ol
+                     WHERE ol.C_Order_ID = @Order_Id
+                       AND ol.IsActive = 'Y'
+                     GROUP BY ol.C_Tax_ID", new[] { new SqlParameter("@Order_Id", orderId) }, null);
+                if (grossDs != null && grossDs.Tables.Count > 0)
+                {
+                    foreach (DataRow row in grossDs.Tables[0].Rows)
+                    {
+                        grossByTax[Util.GetValueOfInt(row["Tax_Id"])] = Util.GetValueOfDecimal(row["Gross"]);
+                    }
+                }
+
+                DataSet taxDs = DB.ExecuteDataset(@"
+                    SELECT ot.C_Tax_ID AS Tax_Id, COALESCE(SUM(ot.TaxAmt), 0) AS Tax_Amt
+                      FROM C_OrderTax ot
+                     WHERE ot.C_Order_ID = @Order_Id
+                       AND ot.IsActive = 'Y'
+                     GROUP BY ot.C_Tax_ID", new[] { new SqlParameter("@Order_Id", orderId) }, null);
+                if (taxDs != null && taxDs.Tables.Count > 0)
+                {
+                    foreach (DataRow row in taxDs.Tables[0].Rows)
+                    {
+                        int taxId = Util.GetValueOfInt(row["Tax_Id"]);
+                        decimal taxAmt = Util.GetValueOfDecimal(row["Tax_Amt"]);
+                        decimal gross;
+                        if (grossByTax.TryGetValue(taxId, out gross) && gross > 0m && taxAmt >= 0m && taxAmt < gross)
+                        {
+                            ratios[taxId] = (gross - taxAmt) / gross;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Log(Level.SEVERE, "VAS_268_GlobalSalesSearchWidget.GetOrderTaxNetRatios", ex);
+            }
+            return ratios;
         }
 
         /// <summary>Escapes the LIKE metacharacters (and the escape character itself) so user text is matched literally under an explicit ESCAPE '\' clause.</summary>
@@ -917,11 +1013,16 @@ namespace VAS.Controllers
             public string Description { get; set; }
             public string AttributeText { get; set; }
             public string UomName { get; set; }
+            /// <summary>The product's base (master) UOM name - the unit FreeStock is stated in (5-Nov Row 26).</summary>
+            public string BaseUomName { get; set; }
             public bool IsItem { get; set; }
             public decimal QtyOrdered { get; set; }
             public decimal QtyDelivered { get; set; }
             public decimal QtyPending { get; set; }
+            /// <summary>On-hand stock in the product's BASE UOM (5-Nov Row 26).</summary>
             public decimal FreeStock { get; set; }
+            /// <summary>Pending quantity not covered by on-hand stock, in the line's UOM.</summary>
+            public decimal QtyShort { get; set; }
             public decimal Rate { get; set; }
             public decimal Amount { get; set; }
         }

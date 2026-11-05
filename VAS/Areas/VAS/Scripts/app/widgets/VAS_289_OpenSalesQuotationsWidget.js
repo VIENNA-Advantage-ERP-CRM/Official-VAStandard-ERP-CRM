@@ -161,7 +161,8 @@
  * 87  | Stock Qty (In Base UOM)                                             | VAS_289_ColStockQtyBaseUom
  * 88  | Date Ordered                                                        | VAS_289_DateOrdered
  * 89  | Location                                                            | VAS_289_Location
- * 90  | Document Status                                                     | VAS_289_FieldDocStatus
+ * 90  | Document Status (lines step footer, 5-Nov row 40)                   | VAS_289_FieldDocStatus
+ * --  | Attribute (5-Nov row 39)                                            | VAS_289_ColAttribute
  * 91  | Search customer                                                     | VAS_289_SearchCustomer
  * 92  | Please fill the mandatory fields:                                   | VAS_289_FillMandatory
  * 93  | Error: Date Promised should be greater than or equal to Date Ordered | VAS_289_DatePromisedBeforeOrdered
@@ -299,8 +300,10 @@
         function label(key, fallback) {
             var text = '';
             try { text = VIS.Msg.getMsg(key); } catch (e) { text = ''; }
-            // VIS.Msg echoes the key back when no message is defined - show the English text then.
-            return (!text || text === key) && fallback !== undefined ? fallback : text;
+            // VIS.Msg echoes the key back (bare or as "[KEY]") when no message is defined - show
+            // the English text then, so a key that is not released yet never renders raw.
+            if (!text || text === key || text === '[' + key + ']') { return fallback !== undefined ? fallback : key; }
+            return text;
         }
 
         /* QA 8.49/8.68 and other blocking validations - the framework's info dialog when
@@ -823,6 +826,8 @@
         var SEL_COLS = [
             { key: 'chk', label: '', w: .3 },
             { key: 'product', label: label('VAS_289_ColProduct', 'Product'), w: 1.7 },
+            // 5-Nov row 39: attribute values ("_"-joined) in their own column next to Product.
+            { key: 'attr', label: label('VAS_289_ColAttribute', 'Attribute'), w: 1 },
             { key: 'uom', label: label('VAS_289_ColUom', 'UoM'), w: .55 },
             { key: 'pending', label: label('VAS_289_ColPendingQty', 'Pending qty'), w: .8, align: 'right' },
             { key: 'qty', label: label('VAS_289_ColQtyToOrder', 'Qty to order'), w: .95 },
@@ -831,6 +836,13 @@
             // QA 8.74: free stock is the base-UOM stock quantity.
             { key: 'stock', label: label('VAS_289_ColStockQtyBaseUom', 'Stock Qty (In Base UOM)'), w: .95, align: 'right' }
         ];
+
+        /* 5-Nov row 39: the Attribute column is shown only when at least one of the table's
+           lines carries attribute values. */
+        function visibleCols(cols, lines) {
+            var anyAttr = (lines || []).some(function (l) { return !!l.attributeText; });
+            return anyAttr ? cols : cols.filter(function (c) { return c.key !== 'attr'; });
+        }
 
         /* QA 8.41b: the per-line warehouse list is the Sales Order window's list (warehouses of
            the order's organization). A line whose quotation warehouse is not in it falls back
@@ -897,7 +909,9 @@
                 return;
             }
 
-            var tpl = SEL_COLS.map(function (c) { return 'minmax(0,' + c.w + 'fr)'; }).join(' ');
+            var cols = visibleCols(SEL_COLS, wizard.lines);
+            var showAttr = cols.length === SEL_COLS.length;
+            var tpl = cols.map(function (c) { return 'minmax(0,' + c.w + 'fr)'; }).join(' ');
             var size = lineSelState.size;
             var pages = Math.max(1, Math.ceil(wizard.lines.length / size));
             if (linePage2 > pages - 1) { linePage2 = pages - 1; }
@@ -905,7 +919,7 @@
             var slice = wizard.lines.slice(start, start + size);
 
             var head = '<div class="vas289-mrow vas289-mhead-row" style="grid-template-columns:' + tpl + '">' +
-                SEL_COLS.map(function (c) { return '<span class="vas289-cell' + (c.align === 'right' ? ' right' : '') + '" title="' + escapeHtml(c.label) + '">' + escapeHtml(c.label) + '</span>'; }).join('') +
+                cols.map(function (c) { return '<span class="vas289-cell' + (c.align === 'right' ? ' right' : '') + '" title="' + escapeHtml(c.label) + '">' + escapeHtml(c.label) + '</span>'; }).join('') +
             '</div>';
 
             var body = slice.map(function (line, i) {
@@ -917,7 +931,8 @@
                 }
                 return '<div class="vas289-mrow vas289-mrow-pick" data-line-idx="' + idx + '" style="grid-template-columns:' + tpl + '">' +
                     '<span class="vas289-cell center"><input type="checkbox" class="vas289-chk" data-line-idx="' + idx + '"' + (line.selected ? ' checked' : '') + ' aria-label="' + escapeHtml(line.productName) + '"></span>' +
-                    cellHtml(line.productName + (line.attributeText ? ' · ' + line.attributeText : ''), 'vas289-c-prim') +
+                    cellHtml(line.productName, 'vas289-c-prim') +
+                    (showAttr ? cellHtml(line.attributeText, 'vas289-c-std') : '') +
                     cellHtml(line.uomName, 'vas289-c-std') +
                     cellHtml(formatQty(line.pendingQty, line.precision), 'vas289-c-dark', 'right') +
                     '<span class="vas289-cell"><input type="number" class="vas289-qty-input" data-line-idx="' + idx + '" min="0" max="' + line.pendingQty + '" step="' + qtyStep(line.precision) + '" value="' + roundTo(line.qtyToOrder, line.precision) + '"></span>' +
@@ -1223,7 +1238,6 @@
                 '<div class="vas289-formsec">' + escapeHtml(label('VAS_289_GroupDocument', 'Document')) + '</div>' +
                 '<div class="vas289-form-grid">' +
                     fieldBlock(label('VAS_289_FieldDocType', 'Target Document Type'), selectHtml('', 'docTypeId', o.DocTypes, 'Id', 'Name', h.docTypeId, null, true), true, 'docTypeId') +
-                    fieldBlock(label('VAS_289_FieldDocStatus', 'Document Status'), selectHtml('', 'docStatus', o.DocStatuses, 'Code', 'Name', h.docStatus), false, 'docStatus') +
                     fieldBlock(label('VAS_289_FieldPOReference', 'Order Reference'), '<input type="text" maxlength="20" class="vas289-fctl" data-field="poReference" value="' + escapeHtml(h.poReference) + '">') +
                     fieldBlock(label('VAS_289_DateOrdered', 'Date Ordered'), '<input type="date" max="9999-12-31" class="vas289-fctl" data-field="dateOrdered" value="' + escapeHtml(h.dateOrdered) + '">', true, 'dateOrdered') +
                     fieldBlock(label('VAS_289_FieldDatePromised', 'Date Promised'), '<input type="date" max="9999-12-31" class="vas289-fctl" data-field="datePromised" value="' + escapeHtml(h.datePromised) + '">', true, 'datePromised') +
@@ -1447,6 +1461,7 @@
 
         var REV_COLS = [
             { key: 'product', label: label('VAS_289_ColProduct', 'Product'), w: 1.6 },
+            { key: 'attr', label: label('VAS_289_ColAttribute', 'Attribute'), w: .9 },   // 5-Nov row 39
             { key: 'uom', label: label('VAS_289_ColUom', 'UoM'), w: .5 },
             { key: 'qty', label: label('VAS_289_ColQtyToOrder', 'Qty to order'), w: .8, align: 'right' },
             { key: 'rate', label: label('VAS_289_ColRate', 'Rate'), w: .8, align: 'right' },
@@ -1462,7 +1477,9 @@
 
             var taxes = (wizard.formOptions && wizard.formOptions.Taxes) || [];
             var selected = wizard.selectedLines();
-            var tpl = REV_COLS.map(function (c) { return 'minmax(0,' + c.w + 'fr)'; }).join(' ');
+            var cols = visibleCols(REV_COLS, selected);
+            var showAttr = cols.length === REV_COLS.length;
+            var tpl = cols.map(function (c) { return 'minmax(0,' + c.w + 'fr)'; }).join(' ');
             var size = lineReviewState.size;
             var pages = Math.max(1, Math.ceil(selected.length / size));
             if (lineReviewPage > pages - 1) { lineReviewPage = pages - 1; }
@@ -1470,7 +1487,7 @@
             var slice = selected.slice(start, start + size);
 
             var head = '<div class="vas289-mrow vas289-mhead-row" style="grid-template-columns:' + tpl + '">' +
-                REV_COLS.map(function (c) { return '<span class="vas289-cell' + (c.align === 'right' ? ' right' : '') + '" title="' + escapeHtml(c.label) + '">' + escapeHtml(c.label) + '</span>'; }).join('') +
+                cols.map(function (c) { return '<span class="vas289-cell' + (c.align === 'right' ? ' right' : '') + '" title="' + escapeHtml(c.label) + '">' + escapeHtml(c.label) + '</span>'; }).join('') +
             '</div>';
 
             var body = slice.map(function (line) {
@@ -1488,7 +1505,8 @@
                     '</div>'
                 ) : '';
                 return '<div class="vas289-mrow" style="grid-template-columns:' + tpl + '">' +
-                    cellHtml(line.productName + (line.attributeText ? ' · ' + line.attributeText : ''), 'vas289-c-prim') +
+                    cellHtml(line.productName, 'vas289-c-prim') +
+                    (showAttr ? cellHtml(line.attributeText, 'vas289-c-std') : '') +
                     cellHtml(line.uomName, 'vas289-c-std') +
                     cellHtml(formatQty(line.qtyToOrder, line.precision), 'vas289-c-dark', 'right') +
                     // QA 8.65/8.75: editable rate, two decimals.
@@ -1593,10 +1611,25 @@
             return code ? code + ' ' + text : text;
         }
 
+        /* 5-Nov rows 25/40: the Document Status (Drafted / Completed) of the SO to create is
+           chosen on this lines step, next to the Create button - the same place as the
+           "PO stage" selector of the Open Requisitions widget (VAS_217) - not on Details. */
         function renderStep4Footer() {
+            var statusText = label('VAS_289_FieldDocStatus', 'Document Status');
+            var statuses = (wizard.formOptions && wizard.formOptions.DocStatuses) || [];
+            if (!statuses.some(function (s) { return s.Code === wizard.header.docStatus; })) {
+                wizard.header.docStatus = statuses.some(function (s) { return s.Code === 'DR'; }) ? 'DR' : (statuses.length ? statuses[0].Code : 'DR');
+            }
+            var statusSel = statuses.length
+                ? '<select class="vas289-fctl vas289-stagesel" id="vas289-step4-docstatus" aria-label="' + escapeHtml(statusText) + '" title="' + escapeHtml(statusText) + '">' +
+                    statuses.map(function (s) { return '<option value="' + escapeHtml(s.Code) + '"' + (s.Code === wizard.header.docStatus ? ' selected' : '') + '>' + escapeHtml(s.Name) + '</option>'; }).join('') +
+                  '</select> '
+                : '';
             $mFoot.html('<span class="vas289-foot-note" id="vas289-step4-note"></span>' +
-                '<span><button type="button" class="vas289-btn" id="vas289-step4-back">' + escapeHtml(label('VAS_289_BackToDetails', 'Back to details')) + '</button> ' +
+                '<span class="vas289-foot-actions">' + statusSel +
+                '<button type="button" class="vas289-btn" id="vas289-step4-back">' + escapeHtml(label('VAS_289_BackToDetails', 'Back to details')) + '</button> ' +
                 '<button type="button" class="vas289-btn vas289-btn-primary" id="vas289-step4-create">' + escapeHtml(label('VAS_289_CreateSalesOrder', 'Create SO')) + '</button></span>');
+            $mFoot.find('#vas289-step4-docstatus').on('change', function () { wizard.header.docStatus = $(this).val() || 'DR'; });
             $mFoot.find('#vas289-step4-back').on('click', backModal);
             $mFoot.find('#vas289-step4-create').on('click', submitCreate);
         }
