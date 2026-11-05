@@ -9,6 +9,8 @@
  *                  ported the line members required by VAS_GenerateQuotation
  *                  (constructors, line numbering, currency precision, PlannedAmt
  *                  calculation) from MProjectLine, adapted to VAS_Opportunity columns.
+ *                  04-Nov-2026 - BeforeSave now computes Discount % from List Price and
+ *                  Planned Price, so lines created from the bottom panel get it too.
  ******************************************************/
 
 using System;
@@ -88,6 +90,27 @@ namespace VAdvantage.Model
                 plannedAmt = Decimal.Round(plannedAmt, GetCurPrecision(), MidpointRounding.AwayFromZero);
             }
             SetPlannedAmt(plannedAmt);
+
+            //	Discount % = (List Price - Planned Price) * 100 / List Price — the same formula the
+            //	opportunity-line window callout (CalloutVASOpportunity) applies. Lines saved from the
+            //	bottom panel never run that client callout, so without this Discount stayed 0.
+            //	Done when the line is new or its price / list price changed; with no list price the
+            //	discount is 0 (as the callout does) and an existing value is left alone.
+            if (newRecord || Is_ValueChanged("PlannedPrice") || Is_ValueChanged("PriceList"))
+            {
+                Decimal priceList = GetPriceList();
+                if (priceList.CompareTo(Env.ZERO) != 0)
+                {
+                    Decimal discount = Decimal.Divide(
+                        Decimal.Multiply(Decimal.Subtract(priceList, GetPlannedPrice()), Env.ONEHUNDRED), priceList);
+                    SetDiscount(Decimal.Round(discount, 2, MidpointRounding.AwayFromZero));
+                }
+                else if (newRecord)
+                {
+                    SetDiscount(Env.ZERO);
+                }
+            }
+
             //	Planned Margin
             if (Is_ValueChanged("M_Product_ID") 
                 || Is_ValueChanged("PlannedQty") || Is_ValueChanged("PlannedPrice"))

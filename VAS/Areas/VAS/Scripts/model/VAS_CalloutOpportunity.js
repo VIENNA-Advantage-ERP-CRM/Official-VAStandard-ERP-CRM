@@ -78,6 +78,15 @@
             mTab.setValue("PlannedQty", 1);
             var PriceLimit = Util.getValueOfDecimal(dr["PriceLimit"]);
             mTab.setValue("PriceLimit", PriceLimit)
+
+            // Planned Amount = Planned Qty (1 on product selection) x Planned Price.
+            // Must be set here: while this callout runs the engine is flagged active, so the
+            // Planned callout that normally calculates the amount is skipped when PlannedQty /
+            // PlannedPrice are set above (and setting qty 1 over an existing 1 fires nothing).
+            // It is done before the discount block so that every return path below has it.
+            var StdPrecision = ctx.getStdPrecision();
+            mTab.setValue("PlannedAmt", (1 * PriceStd).toFixed(StdPrecision));
+
             var discount;
             try {
 
@@ -85,6 +94,10 @@
                 if (isNaN(discount)) {
                     this.setCalloutActive(false);
                     return VIS.Msg.getMsg("PriceNotDefined");
+                }
+                // No list price (division by 0 gives +/-Infinity): there is no discount to show.
+                if (!isFinite(discount)) {
+                    discount = 0;
                 }
             }
             catch (err) {
@@ -95,7 +108,7 @@
             mTab.setValue("Discount", discount.toFixed(2));
             // oppLine.SetDiscount(Decimal.Subtract(PriceList ,PriceStd));
 
-            mTab.setValue("PlannedMarginAmt", (PriceStd - PriceLimit));
+            mTab.setValue("PlannedMarginAmt", ((PriceStd - PriceLimit) * 1).toFixed(StdPrecision));
             // oppLine.SetPlannedMarginAmt( Decimal.Subtract(PriceStd, PriceLimit));
 
             //set base UOM if not selected
@@ -153,9 +166,16 @@
 
         var paramString = OpportunityID.toString() + "," + productID.toString();
 
-        var PriceLimit = VIS.dataContext.getJSONRecord("MProject/GetVASProjectPriceLimit", paramString);
-
-        PlannedQty = Util.getValueOfDecimal(mTab.getValue("PlannedQty"));
+        // Use the Limit Price on the line (set by ProductInfo / UOMInfo or typed by the user) so the margin
+        // follows an edited Limit Price and the line's UOM; the server lookup is only a fallback.
+        var PriceLimit;
+        if (mTab.findColumn("PriceLimit") > -1) {
+            PriceLimit = Util.getValueOfDecimal(mTab.getValue("PriceLimit"));
+        }
+        else {
+            PriceLimit = VIS.dataContext.getJSONRecord("MProject/GetVASProjectPriceLimit", paramString);
+        }
+        PlannedQty =Util.getValueOfDecimal(mTab.getValue("PlannedQty"));
         if (PlannedQty == null) {
             PlannedQty = Envs.ONE;
         }
@@ -309,6 +329,49 @@
             mTab.setValue("PlannedMarginAmt", 0);
             mTab.setValue("PlannedAmt", 0);
         }
+        this.setCalloutActive(false);
+        ctx = windowNo = mTab = mField = value = oldValue = null;
+        return "";
+    };
+    /**
+     * To recalculate Planned Margin when Limit Price is changed on VAS_OppLines.
+     * Planned Margin = (Planned Price - Limit Price) * Planned Qty.
+     * Attach to the PriceLimit column of VAS_OppLines:
+     * VAS.Model.CalloutVASOpportunity.LimitPrice
+     * @param {any} ctx
+     * @param {any} windowNo
+     * @param {any} mTab
+     * @param {any} mField
+     * @param {any} value
+     * @param {any} oldValue
+     * @returns
+     */
+    CalloutVASOpportunity.prototype.LimitPrice = function (ctx, windowNo, mTab, mField, value, oldValue) {
+        // Skip when another callout of this class (ProductInfo / UOMInfo / Planned) is already setting the values
+        if (this.isCalloutActive()) {
+            return "";
+        }
+        this.setCalloutActive(true);
+
+        var StdPrecision = ctx.getStdPrecision();
+        var paramString = ctx.getContextAsInt(windowNo, "M_PriceList_Version_ID");
+        if (paramString != 0) {
+            var dr = VIS.dataContext.getJSONRecord("MProject/GetPriceListPrecision", paramString.toString());
+            if (dr != null) {
+                StdPrecision = Util.getValueOfInt(dr["StdPrecision"]);
+            }
+        }
+
+        var PriceLimit = Util.getValueOfDecimal(value);          // an emptied field counts as 0
+        var PlannedPrice = Util.getValueOfDecimal(mTab.getValue("PlannedPrice"));
+        var PlannedQty = Util.getValueOfDecimal(mTab.getValue("PlannedQty"));
+
+        var margin = (PlannedPrice - PriceLimit) * PlannedQty;
+        if (!isFinite(margin)) {
+            margin = 0;
+        }
+        mTab.setValue("PlannedMarginAmt", margin.toFixed(StdPrecision));
+
         this.setCalloutActive(false);
         ctx = windowNo = mTab = mField = value = oldValue = null;
         return "";
