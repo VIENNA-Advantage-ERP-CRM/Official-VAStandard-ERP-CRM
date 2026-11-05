@@ -255,7 +255,9 @@
     var MODAL_MIN_ROWS = 2;
     var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-    var TABLE_TEMPLATE = 'minmax(0,1.7fr) minmax(0,.6fr) minmax(0,.9fr) minmax(0,.9fr) minmax(0,1.05fr)';
+    // 5-Nov retest: no Status column in the widget list (it is shown on the
+    // next pop-up step, as in Open Requisitions).
+    var TABLE_TEMPLATE = 'minmax(0,1.9fr) minmax(0,.7fr) minmax(0,1fr) minmax(0,1fr)';
 
     var ZOOM_WINDOW_NAME = 'VAS_SalesQuotation';
 
@@ -452,8 +454,7 @@
                 { l: label('VAS_289_ColQuotation', 'Quotation'), right: false },
                 { l: label('VAS_289_ColLines', 'Lines'), right: true },
                 { l: label('VAS_289_ColPendingQty', 'Pending qty'), right: true },
-                { l: label('VAS_289_ColValidTill', 'Valid till'), right: false },
-                { l: label('VAS_289_ColStatus', 'Status'), right: false }
+                { l: label('VAS_289_ColValidTill', 'Valid till'), right: false }
             ].map(function (c) {
                 return '<span class="vas289-cell' + (c.right ? ' right' : '') + '" title="' + escapeHtml(c.l) + '">' + escapeHtml(c.l) + '</span>';
             }).join(''));
@@ -494,7 +495,6 @@
                     '<span class="vas289-cell right"><span class="vas289-skel-cell" style="width:40%;margin-left:auto"></span></span>' +
                     '<span class="vas289-cell right"><span class="vas289-skel-cell" style="width:50%;margin-left:auto"></span></span>' +
                     '<span class="vas289-cell"><span class="vas289-skel-cell" style="width:55%"></span></span>' +
-                    '<span class="vas289-cell"><span class="vas289-skel-cell" style="width:65%"></span></span>' +
                 '</div>';
             }
             return rows;
@@ -564,7 +564,6 @@
                     cellHtml(formatNumDisplay(row.LineCount), 'vas289-c-dark', 'right') +
                     cellHtml(formatNumDisplay(row.PendingQty), 'vas289-c-dark', 'right') +
                     cellHtml(formatDateShort(row.ValidTillDate), 'vas289-c-std') +
-                    '<span class="vas289-cell" title="' + escapeHtml(row.StatusLabel) + '"><span class="vas289-chip ' + chipClass(row.StatusChipClass) + '">' + escapeHtml(row.StatusLabel) + '</span></span>' +
                 '</button>';
             }).join(''));
 
