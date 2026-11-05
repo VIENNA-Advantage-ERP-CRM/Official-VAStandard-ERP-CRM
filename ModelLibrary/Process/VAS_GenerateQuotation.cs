@@ -208,10 +208,12 @@ namespace ModelLibrary.Process
                 order.SetFreightCostRule("I");
                 if (order.GetC_Campaign_ID() == 0 && fromOpportunity.GetC_Campaign_ID() > 0)
                     order.SetC_Campaign_ID(fromOpportunity.GetC_Campaign_ID());
-                order.SetDocStatus("IP");
+                order.SetDocStatus(X_C_Order.DOCSTATUS_Drafted);
                 order.SetC_DocType_ID(Doctype_id);
                 order.SetC_DocTypeTarget_ID(Doctype_id);
                 order.SetIsSOTrx(true);
+                DateTime nextValidDate=DateTime.Now.AddMonths(1);
+                order.Set_Value("ValidTillDate", nextValidDate);
                 order.Set_Value("IsSalesQuotation", true);
 
                 // Set Conditional Flag here to improve performance
