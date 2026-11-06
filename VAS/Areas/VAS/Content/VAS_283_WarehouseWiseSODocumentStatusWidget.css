@@ -350,6 +350,13 @@
     .vas283-mstats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
+/* Warehouse drill-down strip (5-Nov rows 27/28): Total SOs, Drafted, In process,
+   Partly delivered, Completed always sit on ONE line - the "Period" tile was removed
+   (the period is already in the modal subtitle). Declared after the container query
+   so it also wins on narrow modals; long labels ellipsize instead of wrapping. */
+.vas283-mstats.vas283-mstats-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.vas283-mstats-5 .vas283-mstat .l { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .vas283-mstat {
     border: 1px solid #D9E2EB;
     border-radius: 10px;

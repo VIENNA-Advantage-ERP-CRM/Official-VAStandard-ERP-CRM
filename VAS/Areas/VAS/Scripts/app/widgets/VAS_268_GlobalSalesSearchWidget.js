@@ -110,7 +110,7 @@
         var $self = this;
         var $root = $('<div class="vas268-root">');
         var $input, $clear, $results;
-        var $mask, $modal, $mHead, $mTitle, $mSub, $mBack, $mBody, $mFoot;
+        var $mask, $modal, $mHead, $mTitle, $mSub, $mBack, $mBody, $mFoot, $mClose;
 
         var SELF_ENDPOINT = 'VAS_268_GlobalSalesSearchWidget/';
         // Per-instance suffix for the event namespace (Sr 8.28): when the dashboard
@@ -129,8 +129,12 @@
         var lineState = null; // { lines, page, size }
         var zoomWindowId = 0;
 
+        // A missing message key must never render raw ("[KEY]") - fall back to the English text.
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            var text = '';
+            try { text = VIS.Msg.getMsg(key); } catch (e) { text = ''; }
+            if (!text || text === key || text === '[' + key + ']') { return fallback || key; }
+            return text;
         }
 
         function escapeHtml(value) {
@@ -250,8 +254,8 @@
             $mSub = $('<div class="vas268-msub"></div>');
             $titleWrap.append($mTitle, $mSub);
             $htxt.append($mBack, $titleWrap);
-            var $closeBtn = $('<button type="button" class="vas268-xbtn" aria-label="' + escapeHtml(label('VAS_268_Close', 'Close')) + '">' + icon('close') + '</button>');
-            $mHead.append($htxt, $closeBtn);
+            $mClose = $('<button type="button" class="vas268-xbtn" aria-label="' + escapeHtml(label('VAS_268_Close', 'Close')) + '">' + icon('close') + '</button>');
+            $mHead.append($htxt, $mClose);
 
             $mBody = $('<div class="vas268-mbody"></div>');
             $mFoot = $('<div class="vas268-mfoot"></div>');
@@ -259,8 +263,15 @@
             $modal.append($mHead, $mBody, $mFoot);
             $mask.append($modal);
             $('body').append($mask);
+            // The close button is (re)bound in bindEvents with the other handlers.
+        }
 
-            $closeBtn.on('click', closeModal);
+        // The line table of THIS instance's modal. Looked up inside its own body, never
+        // via document.getElementById: a modal left on <body> by an earlier instance
+        // (e.g. one the host re-created on "refresh all" without disposing) carries the
+        // same id and would be found first.
+        function lineTableEl() {
+            return $mBody ? $mBody.find('#vas268-linetbl')[0] : null;
         }
 
         /* Every handler is bound under one namespace and unbound first, so this can
@@ -274,6 +285,7 @@
             $clear.off(ns);
             $results.off(ns);
             $mBody.off(ns);
+            $mClose.off(ns);
             $(document).off(ns);
             $(window).off(ns);
 
@@ -318,6 +330,7 @@
                 var pageBtn = event.target.closest ? event.target.closest('[data-dir]') : null;
                 if (pageBtn) { turnLinePage(Number(pageBtn.getAttribute('data-dir'))); }
             });
+            $mClose.on('click' + ns, closeModal);
         }
 
         function toggleClear() {
@@ -563,14 +576,14 @@
             $mBody.html(statsHtml + secHtml + '<div class="vas268-mtwrap"><div class="vas268-mtbl" id="vas268-linetbl"></div></div>');
 
             // Ordered / shortage totals count Item-type product lines only (Sr 7.11 /
-            // 8.1). Shortage = pending - on hand per line (Sr 8.3), never negative.
+            // 8.1). Shortage = pending - on hand per line (Sr 8.3), never negative - the
+            // server states it in the line's UOM (QtyShort), since on hand is now in the
+            // product's base UOM (5-Nov Row 26).
             var qtyOrdered = 0, qtyShort = 0;
             lines.forEach(function (line) {
                 if (!line.IsItem) { return; }
                 qtyOrdered += Number(line.QtyOrdered) || 0;
-                var pending = Number(line.QtyPending) || 0;
-                var onHand = Math.max(0, Number(line.FreeStock) || 0);
-                if (pending > onHand) { qtyShort += (pending - onHand); }
+                qtyShort += Math.max(0, Number(line.QtyShort) || 0);
             });
 
             var showAttribute = lines.some(function (line) { return hasAttributeValue(line.AttributeText); });
@@ -595,8 +608,16 @@
             requestAnimationFrame(function () { fitLineTable(); requestAnimationFrame(fitLineTable); });
         }
 
+        // 5-Nov Row 26: on hand is in the product's base UOM; its name is shown with the
+        // figure when the line was entered in another UOM.
+        function inStockText(line) {
+            var text = formatQty(line.FreeStock);
+            if (line.BaseUomName && line.BaseUomName !== line.UomName) { text += ' ' + line.BaseUomName; }
+            return text;
+        }
+
         function drawLineTable() {
-            var el = document.getElementById('vas268-linetbl');
+            var el = lineTableEl();
             if (!el || !lineState) { return; }
 
             // Sr 8.2: the Attribute column is drawn only when at least one line of the
@@ -629,10 +650,12 @@
             '</div>';
 
             var body = slice.map(function (line) {
-                var st = lineStatus(lineState.order, line);
                 // Delivered / pending / in-stock are shown for Item-type products only
                 // (Sr 7.11 / 8.1); charges and other product types show a dash.
                 var isItem = !!line.IsItem;
+                // 5-Nov Row 38: a line status only for Item-type product lines - blank
+                // for charges and other product types.
+                var st = isItem ? lineStatus(lineState.order, line) : null;
                 var cells = [
                     { v: String(line.LineNo), cls: 'vas268-c-std', align: 'right' },
                     { v: line.ProductName, cls: 'vas268-c-prim' }
@@ -643,13 +666,15 @@
                     { v: formatQty(line.QtyOrdered), cls: 'vas268-c-std', align: 'right' },
                     { v: isItem ? formatQty(line.QtyDelivered) : '—', cls: 'vas268-c-std', align: 'right' },
                     { v: isItem ? formatQty(line.QtyPending) : '—', cls: 'vas268-c-prim', align: 'right' },
-                    { v: isItem ? formatQty(line.FreeStock) : '—', cls: (isItem && line.FreeStock < line.QtyPending ? 'vas268-c-short' : 'vas268-c-ok'), align: 'right' },
+                    { v: isItem ? inStockText(line) : '—', cls: (isItem && Number(line.QtyShort) > 0 ? 'vas268-c-short' : 'vas268-c-ok'), align: 'right' },
                     { v: formatMoney(line.Rate, cur, 2), cls: 'vas268-c-std', align: 'right' },
                     { v: formatMoney(line.Amount, cur, prec), cls: 'vas268-c-emph', align: 'right' }
                 ]);
                 var rowHtml = cells.map(function (c, ci) {
                     return '<span class="vas268-cell' + (cols[ci].align === 'right' ? ' right' : '') + ' ' + c.cls + '" title="' + escapeHtml(c.v) + '">' + escapeHtml(c.v) + '</span>';
-                }).join('') + '<span class="vas268-cell"><span class="vas268-chip ' + st.cls + '" title="' + escapeHtml(st.text) + '">' + escapeHtml(st.text) + '</span></span>';
+                }).join('') + (st
+                    ? '<span class="vas268-cell"><span class="vas268-chip ' + st.cls + '" title="' + escapeHtml(st.text) + '">' + escapeHtml(st.text) + '</span></span>'
+                    : '<span class="vas268-cell"></span>');
                 return '<div class="vas268-mrow" style="grid-template-columns:' + tpl + '">' + rowHtml + '</div>';
             }).join('');
 
@@ -677,7 +702,7 @@
         // Sizes the line table's rows-per-page to the space actually left in the
         // modal body, so the body never grows an inner scrollbar (spec §7 / §9).
         function fitLineTable() {
-            var el = document.getElementById('vas268-linetbl');
+            var el = lineTableEl();
             if (!el || !lineState) { return; }
             var avail = el.clientHeight;
             if (avail < 40) { return; }

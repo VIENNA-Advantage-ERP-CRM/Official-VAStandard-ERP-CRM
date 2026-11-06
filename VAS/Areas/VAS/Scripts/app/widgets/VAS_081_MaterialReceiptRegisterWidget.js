@@ -552,7 +552,9 @@
                 var attrText = '';
                 var attrs = ln.attributes || [];
                 for (var a = 0; a < attrs.length; a++) {
-                    attrText += (a ? ', ' : '') + attrs[a].label + ': ' + attrs[a].value;
+                    // 5-Nov: values only (no "Name:" labels), several values joined with '_'.
+                    if (attrs[a].value == null || String(attrs[a].value).trim() === '') { continue; }
+                    attrText += (attrText ? '_' : '') + String(attrs[a].value).trim();
                 }
                 body +=
                     '<tr>' +

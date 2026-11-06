@@ -5,8 +5,9 @@
  * Ranks vendors by the Grand Total of their completed, fully received purchase
  * orders (last receipt in the selected fiscal year, amounts in the accounting
  * schema currency), as a bar list; clicking a vendor opens a drill-down modal
- * listing every product received from that vendor (code, attribute chips -
- * column shown only when a value exists, received qty + full base UOM name).
+ * listing every product received from that vendor (code, Attribute column of
+ * values joined with '_' - column shown only when a value exists, received
+ * qty + full base UOM name).
  * Pagers (widget and modal) are visible only when there is more than one page. Fit-to-height widget pagination and dynamic no-scroll modal
  * pagination (both clamp 1-8). Self-contained file - no code shared with any
  * other widget file. Read-only. Plain DOM internals (no jQuery in the widget
@@ -20,7 +21,7 @@
  *  2 | Fiscal year                                | VAS_130_TV_FyAria
  *  3 | Last receipt                              | VAS_130_TV_DateMeta
  *  4 | No material receipts in this fiscal year. | VAS_130_TV_EmptyState
- *  5 | product / code / attributes / Qty (UOM)    | VAS_130_TV_ColProduct / VAS_130_TV_ColCode / VAS_130_TV_ColAttributes / VAS_130_TV_ColQty
+ *  5 | product / code / attribute / Qty (UOM)     | VAS_130_TV_ColProduct / VAS_130_TV_ColCode / VAS_130_TV_ColAttribute / VAS_130_TV_ColQty
  *  6 | products (count/year/date assembled in code) | VAS_130_TV_ModalSub
  *  7 | Retry                                      | VAS_130_TV_Retry
  *  8 | Showing / of                               | VAS_Showing / VAS_Of (shared global keys)
@@ -91,7 +92,9 @@
         var lastFocusedEl = null;
 
         function lbl(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            var msg = VIS.Msg.getMsg(key);
+            if (!msg || msg === key || msg === '[' + key + ']') { return fallback; }
+            return msg;
         }
 
         function el(tag, className, text) {
@@ -570,26 +573,38 @@
             var head = el('div', 'MPC-vnd-m-row MPC-vnd-m-ghead' + (showAttrs ? '' : ' MPC-vnd-m-noattrs'));
             head.appendChild(el('span', null, lbl('VAS_130_TV_ColProduct', 'product')));
             head.appendChild(el('span', null, lbl('VAS_130_TV_ColCode', 'code')));
+            if (showAttrs) { head.appendChild(el('span', null, lbl('VAS_130_TV_ColAttribute', 'attribute'))); }
             head.appendChild(el('span', null, lbl('VAS_130_TV_ColQty', 'Qty (UOM)')));
 
             return head;
+        }
+
+        // 5-Nov: the product's attribute VALUES only (no "Name:" labels), joined with '_'
+        // (e.g. "Red_XL_LOT12"); '' when the product has none.
+        function attributeValuesText(item) {
+            var parts = [];
+            (item.attributes || []).forEach(function (a) {
+                var v = (a && a.value != null) ? String(a.value).trim() : '';
+                if (v) { parts.push(v); }
+            });
+            return parts.join('_');
         }
 
         function buildModalDataRow(item) {
             var showAttrs = modalHasAttributes();
             var row = el('div', 'MPC-vnd-m-row MPC-vnd-m-datarow' + (showAttrs ? '' : ' MPC-vnd-m-noattrs'));
 
-            // The product's attributes travel with its name in one cell.
+            // 5-Nov: attributes moved out of the name cell into their own Attribute column.
             var primary = el('span', 'MPC-vnd-m-primary', item.name || '');
-            var attrs = item.attributes || [];
-            var attrText = '';
-            attrs.forEach(function (a) {
-                primary.appendChild(el('span', 'MPC-vnd-chip', a.label + ': ' + a.value));
-                attrText += ' ' + a.label + ': ' + a.value;
-            });
-            primary.title = (item.name || '') + attrText;
+            primary.title = item.name || '';
             row.appendChild(primary);
             row.appendChild(el('span', 'MPC-vnd-m-cell', item.code || ''));
+            if (showAttrs) {
+                var attrText = attributeValuesText(item);
+                var attrCell = el('span', 'MPC-vnd-m-attrs', attrText);
+                attrCell.title = attrText;
+                row.appendChild(attrCell);
+            }
             var qty = (item.qty != null) ? item.qty : 0;
             row.appendChild(el('span', 'MPC-vnd-m-qty', qty + ' ' + (item.uom || '')));
 

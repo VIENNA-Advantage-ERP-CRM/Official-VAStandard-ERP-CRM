@@ -46,8 +46,10 @@ namespace VAS.Controllers
     ///        invoice date when an invoice has no schedule.
     ///     B. ADVANCE OUTSTANDING - only when path A does not apply (an order with a
     ///        qualifying open invoice never also gets an Advance row - one SO appears
-    ///        once only): the order's payment term has C_PaymentTerm.VA009_Advance =
-    ///        'Y' and C_Order.GrandTotal minus completed ('CO'/'CL') customer receipts
+    ///        once only): the order is Completed/Closed, has no completed sales invoice
+    ///        yet, its payment term is an advance term (C_PaymentTerm.VA009_Advance =
+    ///        'Y' OR any active C_PaySchedule row of that term has VA009_Advance = 'Y',
+    ///        5-Nov row 31) and C_Order.GrandTotal minus completed ('CO'/'CL') customer receipts
     ///        (C_Payment.IsReceipt='Y') linked to that order is > 0. Amount = that
     ///        difference (GrandTotal, never TotalLines, because payment can include
     ///        tax/freight). Due date = C_Order.DateOrdered - the schema exposes no
@@ -87,10 +89,12 @@ namespace VAS.Controllers
         /// </summary>
         /// <param name="page">Zero-based page index.</param>
         /// <param name="size">Rows per page (capped at <see cref="MaxPageSize"/>).</param>
+        /// <param name="sortBy">"date" (SO date) or "due" (payment due, the default).</param>
+        /// <param name="sortDir">"asc" (default) or "desc".</param>
         /// <returns>JSON { TotalDue, Total, Rows:[...] } or { Error }.</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetPendingPayment(int page = 0, int size = DefaultPageSize)
+        public JsonResult GetPendingPayment(int page = 0, int size = DefaultPageSize, string sortBy = "due", string sortDir = "asc")
         {
             if (Session["ctx"] == null) { return Json("", JsonRequestBehavior.AllowGet); }
 
@@ -100,7 +104,7 @@ namespace VAS.Controllers
 
             try
             {
-                string json = JsonConvert.SerializeObject(GetPendingPaymentData(ctx, page, size));
+                string json = JsonConvert.SerializeObject(GetPendingPaymentData(ctx, page, size, sortBy, sortDir));
                 return Json(json, JsonRequestBehavior.AllowGet);
             }
             catch (Exception ex)
@@ -152,7 +156,8 @@ namespace VAS.Controllers
                        o.C_BPartner_ID AS BPartner_Id,
                        o.M_Warehouse_ID AS Warehouse_Id,
                        o.C_PaymentTerm_ID AS Payment_Term_Id,
-                       o.GrandTotal AS Grand_Total
+                       o.GrandTotal AS Grand_Total,
+                       o.DocStatus AS Doc_Status_Code
                   FROM C_Order o
                  WHERE o.AD_Client_ID = @AD_Client_ID
                    AND o.IsActive = 'Y'
@@ -162,12 +167,26 @@ namespace VAS.Controllers
                    AND o.DocStatus NOT IN ('DR', 'VO', 'RE', 'IN', 'NA')";
         }
 
-        private PendingPaymentResult GetPendingPaymentData(Ctx ctx, int page, int size)
+        private PendingPaymentResult GetPendingPaymentData(Ctx ctx, int page, int size, string sortBy, string sortDir)
         {
             PendingPaymentResult result = new PendingPaymentResult { Rows = new List<PendingPaymentRow>() };
             if (ctx == null) { return result; }
 
             string baseOrdersSql = MRole.GetDefault(ctx).AddAccessSQL(BuildBaseOrdersSql(), "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+            // 5-Nov row 32: column-heading sort, applied before OFFSET/FETCH so it holds
+            // across every page. Whitelisted - the client value never reaches the SQL text.
+            string dir = string.Equals(sortDir, "desc", StringComparison.OrdinalIgnoreCase) ? "DESC" : "ASC";
+            string dueExpr = "CASE WHEN c.Invoice_Order_Id IS NOT NULL THEN c.Invoice_Due_Date ELSE c.Date_Ordered END";
+            string orderBy;
+            if (string.Equals(sortBy, "date", StringComparison.OrdinalIgnoreCase))
+            {
+                orderBy = "c.Date_Ordered " + dir + ", c.Document_No " + dir;
+            }
+            else
+            {
+                orderBy = dueExpr + " " + dir + ", c.Document_No " + dir;
+            }
 
             string sql = @"
                 WITH base_orders AS (" + baseOrdersSql + @"),
@@ -219,7 +238,24 @@ namespace VAS.Controllers
                         bo.BPartner_Id AS BPartner_Id,
                         bo.Warehouse_Id AS Warehouse_Id,
                         bo.Grand_Total AS Grand_Total,
-                        pt.VA009_Advance AS Advance_Flag,
+                        bo.Doc_Status_Code AS Doc_Status_Code,
+                        -- 5-Nov row 31: advance term = VA009_Advance on the payment term
+                        -- itself OR on any of its active payment schedule rows.
+                        CASE WHEN COALESCE(pt.VA009_Advance, 'N') = 'Y'
+                               OR EXISTS (SELECT 1 FROM C_PaySchedule ps
+                                           WHERE ps.C_PaymentTerm_ID = bo.Payment_Term_Id
+                                             AND ps.IsActive = 'Y'
+                                             AND ps.VA009_Advance = 'Y')
+                             THEN 'Y' ELSE 'N'
+                        END AS Advance_Flag,
+                        CASE WHEN EXISTS (SELECT 1 FROM C_Invoice ci
+                                           WHERE ci.C_Order_ID = bo.C_Order_ID
+                                             AND ci.IsActive = 'Y'
+                                             AND ci.IsSOTrx = 'Y'
+                                             AND COALESCE(ci.IsReturnTrx, 'N') = 'N'
+                                             AND ci.DocStatus IN ('CO', 'CL'))
+                             THEN 'Y' ELSE 'N'
+                        END AS Has_Invoice,
                         inv.C_Order_ID AS Invoice_Order_Id,
                         COALESCE(sd.Schedule_Due_Date, inv.Payment_Due_Date) AS Invoice_Due_Date,
                         inv.Open_Amount AS Invoice_Open_Amount,
@@ -253,12 +289,12 @@ namespace VAS.Controllers
                  WHERE c.Invoice_Open_Amount > 0
                     OR (
                         c.Invoice_Order_Id IS NULL
-                        AND COALESCE(c.Advance_Flag, 'N') = 'Y'
+                        AND c.Advance_Flag = 'Y'
+                        AND c.Doc_Status_Code IN ('CO', 'CL')
+                        AND c.Has_Invoice = 'N'
                         AND (c.Grand_Total - c.Received_Amount) > 0
                     )
-                 ORDER BY
-                    CASE WHEN c.Invoice_Order_Id IS NOT NULL THEN c.Invoice_Due_Date ELSE c.Date_Ordered END ASC,
-                    c.Document_No ASC
+                 ORDER BY " + orderBy + @"
                  OFFSET @Row_Offset ROWS FETCH NEXT @Page_Size ROWS ONLY";
 
             DateTime today = DateTime.Today;

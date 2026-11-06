@@ -211,6 +211,10 @@
         var $mask, $modal, $mHead, $mTitle, $mSub, $mBack, $mBody, $mFoot;
 
         var SELF_ENDPOINT = 'VAS_273_OrderValueBookedMTDWidget/';
+        // Per-instance event-namespace suffix (Sr 8.28 pattern of VAS_270/271): disposing an
+        // old instance must not unbind the handlers of a re-created one with the same id.
+        var instanceTag = 'i' + Math.random().toString(36).slice(2, 9);
+        var $mClose;
 
         var summary = null;           // last fetched GetSummary payload
         var summaryState = 'loading'; // 'loading' | 'ready' | 'error'
@@ -219,8 +223,20 @@
         var cfgStack = [];
         var currentCfg = null;
 
+        // A missing message key must never render raw ("[KEY]") - fall back to the English text.
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            var text = '';
+            try { text = VIS.Msg.getMsg(key); } catch (e) { text = ''; }
+            if (!text || text === key || text === '[' + key + ']') { return fallback || key; }
+            return text;
+        }
+
+        // A table of THIS instance's modal, looked up inside its own body - never via
+        // document.getElementById: a modal left on <body> by an earlier instance (one the
+        // host re-created on "refresh all" without disposing) carries the same ids and
+        // would be found first, so the new modal stayed empty.
+        function tableEl(id) {
+            return $mBody ? $mBody.find('#' + id)[0] : null;
         }
 
         function escapeHtml(value) {
@@ -330,8 +346,18 @@
                     '</div>' +
                 '</button>'
             );
-            $tile.on('click', function () { openDocumentsModal(); });
             $root.append($tile);
+            bindTile();
+        }
+
+        /* 5-Nov Row 24 (Sr 8.28 pattern of VAS_270/271): (re)binds the tile click. Run on
+           init AND on every refresh - after a "refresh all" from the mosaic panel the host
+           can strip jQuery handlers from the widget's DOM (re-attaching the same nodes),
+           which left a tile that rendered fine but opened nothing. off() first keeps it
+           to one handler. */
+        function bindTile() {
+            if (!$tile) { return; }
+            $tile.off('click.vas273').on('click.vas273', function () { openDocumentsModal(); });
         }
 
         function renderTile() {
@@ -408,8 +434,8 @@
             $mSub = $('<div class="vas273-msub"></div>');
             $titleWrap.append($mTitle, $mSub);
             $htxt.append($mBack, $titleWrap);
-            var $closeBtn = $('<button type="button" class="vas273-xbtn" aria-label="' + escapeHtml(label('VAS_273_Close', 'Close')) + '">' + icon('close') + '</button>');
-            $mHead.append($htxt, $closeBtn);
+            $mClose = $('<button type="button" class="vas273-xbtn" aria-label="' + escapeHtml(label('VAS_273_Close', 'Close')) + '">' + icon('close') + '</button>');
+            $mHead.append($htxt, $mClose);
 
             $mBody = $('<div class="vas273-mbody"></div>');
             $mFoot = $('<div class="vas273-mfoot"></div>');
@@ -418,9 +444,18 @@
             $mask.append($modal);
             $('body').append($mask);
 
-            $closeBtn.on('click', closeModal);
-            $mBack.on('click', backModal);
-            $mBody.on('click', function (event) {
+            bindModal();
+        }
+
+        /* 5-Nov Row 24: the modal's own handlers are (re)bound here under one namespace,
+           off() first, on init AND on every refresh - like the tile, they must survive a
+           host that strips jQuery handlers on "refresh all". */
+        function bindModal() {
+            if (!$mBody) { return; }
+            var ns = '.vas273m-' + instanceTag;
+            $mClose.off(ns).on('click' + ns, closeModal);
+            $mBack.off(ns).on('click' + ns, backModal);
+            $mBody.off(ns).on('click' + ns, function (event) {
                 var pageBtn = event.target.closest ? event.target.closest('[data-dir]') : null;
                 if (pageBtn) { turnPage(pageBtn.getAttribute('data-table'), Number(pageBtn.getAttribute('data-dir'))); return; }
                 var soBtn = event.target.closest ? event.target.closest('[data-so]') : null;
@@ -431,7 +466,7 @@
         }
 
         function bindDocumentLevelEvents() {
-            var ns = '.vas273-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget');
+            var ns = '.vas273-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '-' + instanceTag;
 
             $(window).on('resize' + ns, function () {
                 if ($mask.hasClass('is-open')) { fitAllTables(); }
@@ -496,7 +531,9 @@
         }
 
         function openDocumentsModal() {
-            if (summaryState === 'error') { return; }
+            // 5-Nov Row 24 (Sr 8.28 pattern): never swallow the click - when the tile's
+            // last load failed (e.g. the HTTP 500 request burst of a "refresh all"), the
+            // modal opens and loads the figures again instead of doing nothing.
             showLoading(label('VAS_273_Title', 'Order Value Booked MTD'));
 
             function loadAndShow() {
@@ -545,8 +582,15 @@
         }
 
         function renderDocumentsBody() {
-            var momValue = (summary.MomPercent !== null && summary.MomPercent !== undefined) ? formatSignedPercent(summary.MomPercent) : '—';
-            var momLabel = label('VAS_273_VsPrefix', 'vs') + ' ' + formatMonthYear(summary.ComparisonMonthStart);
+            // 5-Nov Row 35: the comparison is over the equivalent elapsed window of the
+            // previous month (e.g. 1–5 Oct on 5 Nov). When nothing was booked in that
+            // window no percentage exists and the card used to show only "—"; it now names
+            // the window and shows its booked value (with the % change when there is one).
+            var hasMom = summary.MomPercent !== null && summary.MomPercent !== undefined;
+            var prevValueText = formatINR(summary.PreviousOrderValue);
+            var momValue = hasMom ? (formatSignedPercent(summary.MomPercent) + ' · ' + prevValueText) : prevValueText;
+            var momLabel = label('VAS_273_VsPrefix', 'vs') + ' ' +
+                (summary.ComparisonPeriodEnd ? formatPeriod(summary.ComparisonMonthStart, summary.ComparisonPeriodEnd) : formatMonthYear(summary.ComparisonMonthStart));
 
             var statsHtml = '<div class="vas273-mstats">' +
                 statTile(label('VAS_273_StatOrderValue', 'Order value'), formatINR(summary.OrderValue)) +
@@ -584,7 +628,7 @@
         ];
 
         function drawDocumentsTable() {
-            var el = document.getElementById('vas273-docstbl');
+            var el = tableEl('vas273-docstbl');
             if (!el) { return; }
             var tpl = DOC_COLS.map(function (c) { return 'minmax(0,' + c.w + 'fr)'; }).join(' ');
             var pages = Math.max(1, Math.ceil(docsState.total / docsState.size));
@@ -706,8 +750,11 @@
         }
 
         function lineFootHtml(order, lines) {
+            // Item-type product lines only (5-Nov Row 36) - charges and other product
+            // types carry no ordered / pending / stock figure.
             var qtyOrdered = 0, qtyShort = 0;
             lines.forEach(function (line) {
+                if (!line.IsItem) { return; }
                 qtyOrdered += Number(line.QtyOrdered) || 0;
                 var pending = Number(line.QtyPending) || 0;
                 var freeStock = Number(line.FreeStock) || 0;
@@ -741,8 +788,14 @@
         }
 
         function renderLinesBody(order, lines) {
+            // 5-Nov Row 36: the "Ordered" / "Pending" cards count Item-type product lines
+            // only - other product types and charges are excluded.
             var qtyOrdered = 0, qtyPending = 0;
-            lines.forEach(function (l) { qtyOrdered += Number(l.QtyOrdered) || 0; qtyPending += Number(l.QtyPending) || 0; });
+            lines.forEach(function (l) {
+                if (!l.IsItem) { return; }
+                qtyOrdered += Number(l.QtyOrdered) || 0;
+                qtyPending += Number(l.QtyPending) || 0;
+            });
 
             var breadcrumb = '<div class="vas273-polink">' + escapeHtml(label('VAS_273_SalesOrderPrefix', 'Sales order')) +
                 ' <button type="button" class="vas273-lnk" data-so="' + order.SalesOrderId + '">' + escapeHtml(order.SalesOrderNumber) + '</button>' +
@@ -781,7 +834,7 @@
         ];
 
         function drawLineTable(tableId) {
-            var el = document.getElementById(tableId);
+            var el = tableEl(tableId);
             if (!el || !lineState) { return; }
 
             var tpl = LINE_COLS.map(function (c) { return 'minmax(0,' + c.w + 'fr)'; }).join(' ');
@@ -832,7 +885,7 @@
            forcing page 0; the guard on "n !== size" makes this converge instead
            of looping. */
         function fitTable(id, currentSize, onResize) {
-            var el = document.getElementById(id);
+            var el = tableEl(id);
             if (!el) { return; }
             var avail = el.clientHeight;
             if (avail < 40) { return; }
@@ -873,14 +926,23 @@
         this.getRoot = function () { return $root; };
 
         this.disposeComponent = function () {
-            var ns = '.vas273-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget');
+            var ns = '.vas273-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '-' + instanceTag;
             $(document).off(ns);
             $(window).off(ns);
             if ($mask) { $mask.remove(); }
             $root.remove();
         };
 
-        this.refreshWidget = function () { loadSummary(); };
+        // 5-Nov Row 24: a refresh also re-arms the tile and the modal and re-creates the
+        // modal shell if the host removed it, so the widget stays clickable after
+        // "refresh all" (same as VAS_270/271).
+        this.refreshWidget = function () {
+            if (!$mask || !$.contains(document.body, $mask[0])) { createModal(); }
+            if ($tile && !$.contains($root[0], $tile[0])) { $root.append($tile); }
+            bindTile();
+            bindModal();
+            loadSummary();
+        };
     };
 
     VAS.VAS_273_OrderValueBookedMTDWidget.prototype.widgetFirevalueChanged = function (value) {

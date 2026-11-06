@@ -49,15 +49,20 @@ namespace VAS.Controllers
     ///     - "Oldest held SO" (the confirmed replacement for the original draft's
     ///       "Oldest hold") is calendar days from the oldest held order's DateOrdered
     ///       to today - no hold-timestamp column is added or assumed.
-    ///     - Hold reason is a fixed four-value vocabulary evaluated as a priority
-    ///       chain (never free text, never more than one value per row):
-    ///       (1) "Awaiting advance" when the order's payment term has
-    ///       C_PaymentTerm.VA009_Advance='Y' AND no completed receipt
-    ///       (C_Payment.IsReceipt='Y', DocStatus='CO', PayAmt&gt;0) is linked directly to
-    ///       this order; (2) "Invoice overdue 60d" when the customer has an open
-    ///       RV_OpenItem (IsSOTrx='Y', OpenAmt&gt;0) at least 60 days past due;
-    ///       (3) "Invoice overdue 30d" for 30 days past due; (4) otherwise "Limit
-    ///       exceeded".
+    ///     - Outstanding (5-Nov row 37) = the effective level's TotalOpenBalance (the
+    ///       customer's open AR that VA credit management compares with the limit),
+    ///       SO_CreditUsed when that is empty.
+    ///     - Overdue invoices (5-Nov row 37) = count + open amount of the customer's
+    ///       completed/closed, non-return AR invoices with VA009_OpenAmount &gt; 0 whose
+    ///       due date (earliest unpaid C_InvoicePaySchedule, else DueDate, else
+    ///       DateInvoiced) is before today.
+    ///     - Hold reason is a fixed vocabulary evaluated as a priority chain (never
+    ///       free text, never more than one value per row): (1) "Limit exceeded" when
+    ///       credit limit &gt; 0 and Outstanding &gt; limit; (2) "Invoice overdue
+    ///       60d" / "30d" / "Invoice overdue" by the oldest overdue invoice; (3)
+    ///       "Awaiting advance" when the order's payment term has VA009_Advance='Y' AND
+    ///       no completed receipt is linked to this order; (4) otherwise "Credit status
+    ///       on hold" (status set to Credit Hold without either condition).
     ///
     ///   Per the CTE/MRole rule (Prompt_Instructions.txt "Case 1"), AddAccessSQL is
     ///   applied to the isolated "base_orders" fragment (BuildBaseOrdersSql) BEFORE it
@@ -189,8 +194,8 @@ namespace VAS.Controllers
                            ELSE COALESCE(bp.SO_CreditLimit, 0)
                        END AS Credit_Limit,
                        CASE
-                           WHEN bp.CreditStatusSettingOn = 'CL' THEN COALESCE(bpl.SO_CreditUsed, 0)
-                           ELSE COALESCE(bp.SO_CreditUsed, 0)
+                           WHEN bp.CreditStatusSettingOn = 'CL' THEN COALESCE(bpl.TotalOpenBalance, bpl.SO_CreditUsed, 0)
+                           ELSE COALESCE(bp.TotalOpenBalance, bp.SO_CreditUsed, 0)
                        END AS Outstanding,
                        CASE WHEN COALESCE(pt.VA009_Advance, 'N') = 'Y' THEN 'Y' ELSE 'N' END AS Advance_Term_Flag
                   FROM C_Order o
@@ -270,22 +275,50 @@ namespace VAS.Controllers
             DateTime overdue30Cutoff = today.AddDays(-30);
             DateTime overdue60Cutoff = today.AddDays(-60);
 
-            // ar_overdue (RV_OpenItem) and order_receipt (C_Payment) are secondary
-            // aggregates joined onto the already-access-filtered base_orders cohort -
-            // never AddAccessSQL targets themselves (Prompt_Instructions "Case 1").
+            // open_inv / ar_overdue (C_Invoice + C_InvoicePaySchedule) and order_receipt
+            // (C_Payment) are secondary aggregates joined onto the already-access-filtered
+            // base_orders cohort - never AddAccessSQL targets themselves (Prompt_Instructions "Case 1").
+            //
+            // 5-Nov row 37: overdue invoices used to come from RV_OpenItem, which counted
+            // one row per payment-schedule line (so a single invoice could count several
+            // times) and does not follow the VA009 paid flags. Now: one row per customer
+            // AR invoice (completed/closed, non-return, VA009_OpenAmount > 0) whose due
+            // date - the earliest UNPAID schedule (VA009_IsPaid='N'), else the invoice's
+            // DueDate, else DateInvoiced - is before today. Count + open amount are returned.
             string sql = @"
                 WITH base_orders AS (" + baseOrdersSql + @"),
+                open_inv AS (
+                    SELECT
+                        i.C_Invoice_ID AS C_Invoice_ID,
+                        i.C_BPartner_ID AS C_BPartner_ID,
+                        COALESCE(i.VA009_OpenAmount, 0) AS Open_Amount,
+                        COALESCE(
+                            (SELECT MIN(ips.DueDate)
+                               FROM C_InvoicePaySchedule ips
+                              WHERE ips.C_Invoice_ID = i.C_Invoice_ID
+                                AND ips.IsActive = 'Y'
+                                AND ips.VA009_IsPaid = 'N'),
+                            i.DueDate,
+                            i.DateInvoiced
+                        ) AS Due_Date
+                      FROM C_Invoice i
+                     WHERE i.AD_Client_ID = @AD_Client_ID
+                       AND i.IsActive = 'Y'
+                       AND i.IsSOTrx = 'Y'
+                       AND COALESCE(i.IsReturnTrx, 'N') = 'N'
+                       AND i.DocStatus IN ('CO', 'CL')
+                       AND COALESCE(i.VA009_OpenAmount, 0) > 0
+                       AND i.C_BPartner_ID IN (SELECT bo0.Bpartner_Id FROM base_orders bo0)
+                ),
                 ar_overdue AS (
                     SELECT
                         oi.C_BPartner_ID AS C_BPartner_ID,
                         COUNT(1) AS Overdue_Invoice_Count,
-                        SUM(CASE WHEN oi.DueDate <= @Overdue_60_Cutoff THEN 1 ELSE 0 END) AS Overdue_60_Count,
-                        SUM(CASE WHEN oi.DueDate <= @Overdue_30_Cutoff THEN 1 ELSE 0 END) AS Overdue_30_Count
-                      FROM RV_OpenItem oi
-                     WHERE oi.AD_Client_ID = @AD_Client_ID
-                       AND oi.IsSOTrx = 'Y'
-                       AND COALESCE(oi.OpenAmt, 0) > 0
-                       AND oi.DueDate < CURRENT_DATE
+                        SUM(oi.Open_Amount) AS Overdue_Amount,
+                        SUM(CASE WHEN oi.Due_Date <= @Overdue_60_Cutoff THEN 1 ELSE 0 END) AS Overdue_60_Count,
+                        SUM(CASE WHEN oi.Due_Date <= @Overdue_30_Cutoff THEN 1 ELSE 0 END) AS Overdue_30_Count
+                      FROM open_inv oi
+                     WHERE oi.Due_Date < @Today
                      GROUP BY oi.C_BPartner_ID
                 ),
                 order_receipt AS (
@@ -311,6 +344,7 @@ namespace VAS.Controllers
                     bo.Order_Value AS Order_Value,
                     bo.Advance_Term_Flag AS Advance_Term_Flag,
                     COALESCE(ao.Overdue_Invoice_Count, 0) AS Overdue_Invoice_Count,
+                    COALESCE(ao.Overdue_Amount, 0) AS Overdue_Amount,
                     COALESCE(ao.Overdue_60_Count, 0) AS Overdue_60_Count,
                     COALESCE(ao.Overdue_30_Count, 0) AS Overdue_30_Count,
                     COALESCE(rc.Receipt_Count, 0) AS Receipt_Count,
@@ -326,15 +360,16 @@ namespace VAS.Controllers
             {
                 // This DB layer binds parameters POSITIONALLY (matching left-to-right
                 // textual occurrence, not by name): "@AD_Client_ID" occurs three times
-                // (base_orders, ar_overdue, order_receipt) and the text references
-                // "@Overdue_60_Cutoff" BEFORE "@Overdue_30_Cutoff" inside ar_overdue -
-                // every occurrence needs its own array entry, in that exact order.
+                // (base_orders, open_inv, order_receipt) and ar_overdue references
+                // "@Overdue_60_Cutoff", "@Overdue_30_Cutoff" then "@Today" - every
+                // occurrence needs its own array entry, in that exact order.
                 dr = DB.ExecuteReader(sql, new[]
                 {
                     new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
+                    new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
                     new SqlParameter("@Overdue_60_Cutoff", overdue60Cutoff),
                     new SqlParameter("@Overdue_30_Cutoff", overdue30Cutoff),
-                    new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
+                    new SqlParameter("@Today", today),
                     new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
                     new SqlParameter("@Row_Offset", page * size),
                     new SqlParameter("@Page_Size", size)
@@ -350,11 +385,22 @@ namespace VAS.Controllers
                         && (dr["Receipt_Count"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr["Receipt_Count"])) == 0;
                     int overdue60Count = dr["Overdue_60_Count"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr["Overdue_60_Count"]);
                     int overdue30Count = dr["Overdue_30_Count"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr["Overdue_30_Count"]);
+                    int overdueCount = dr["Overdue_Invoice_Count"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr["Overdue_Invoice_Count"]);
+                    decimal creditLimit = dr["Credit_Limit"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Credit_Limit"]);
+                    decimal outstanding = dr["Outstanding"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Outstanding"]);
 
+                    // 5-Nov row 37: the reason now explains WHY the customer's credit status
+                    // is Hold, in this priority: (1) the open balance is above the credit
+                    // limit (the condition that sets Credit Hold automatically); (2) the
+                    // customer has overdue AR invoices (60d / 30d / any); (3) an advance-term
+                    // order with no receipt yet; (4) otherwise the status was put on Credit
+                    // Hold without either condition (manual hold). The old chain put
+                    // "Awaiting advance" first and reported "Limit exceeded" as the catch-all
+                    // even when the balance was within the limit.
                     string holdReasonKey, holdReasonFallback;
-                    if (awaitingAdvance)
+                    if (creditLimit > 0 && outstanding > creditLimit)
                     {
-                        holdReasonKey = "VAS_275_ReasonAwaitingAdvance"; holdReasonFallback = "Awaiting advance";
+                        holdReasonKey = "VAS_275_ReasonLimitExceeded"; holdReasonFallback = "Limit exceeded";
                     }
                     else if (overdue60Count > 0)
                     {
@@ -364,9 +410,17 @@ namespace VAS.Controllers
                     {
                         holdReasonKey = "VAS_275_ReasonOverdue30"; holdReasonFallback = "Invoice overdue 30d";
                     }
+                    else if (overdueCount > 0)
+                    {
+                        holdReasonKey = "VAS_275_ReasonOverdue"; holdReasonFallback = "Invoice overdue";
+                    }
+                    else if (awaitingAdvance)
+                    {
+                        holdReasonKey = "VAS_275_ReasonAwaitingAdvance"; holdReasonFallback = "Awaiting advance";
+                    }
                     else
                     {
-                        holdReasonKey = "VAS_275_ReasonLimitExceeded"; holdReasonFallback = "Limit exceeded";
+                        holdReasonKey = "VAS_275_ReasonCreditHold"; holdReasonFallback = "Credit status on hold";
                     }
 
                     result.Rows.Add(new OrderRow
@@ -375,11 +429,12 @@ namespace VAS.Controllers
                         SalesOrderNumber = Util.GetValueOfString(dr["Document_No"]),
                         SalesOrderDate = dateOrdered.HasValue ? dateOrdered.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                         CustomerName = Util.GetValueOfString(dr["Customer_Name"]),
-                        CreditLimit = dr["Credit_Limit"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Credit_Limit"]),
-                        Outstanding = dr["Outstanding"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Outstanding"]),
+                        CreditLimit = creditLimit,
+                        Outstanding = outstanding,
                         OrderValue = dr["Order_Value"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Order_Value"]),
-                        OverdueInvoiceCount = dr["Overdue_Invoice_Count"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr["Overdue_Invoice_Count"]),
-                        HoldReason = Msg.GetMsg(ctx, holdReasonKey) ?? holdReasonFallback
+                        OverdueInvoiceCount = overdueCount,
+                        OverdueAmount = dr["Overdue_Amount"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Overdue_Amount"]),
+                        HoldReason = GetText(ctx, holdReasonKey, holdReasonFallback)
                     });
                 }
                 result.Total = total;
@@ -687,6 +742,14 @@ namespace VAS.Controllers
             return string.IsNullOrWhiteSpace(language) ? "en_US" : language;
         }
 
+        /// <summary>Message text for a key, or the English fallback when the key is not released (never a raw "[KEY]").</summary>
+        private static string GetText(Ctx ctx, string key, string fallback)
+        {
+            string text = Msg.GetMsg(ctx, key);
+            if (string.IsNullOrEmpty(text) || text == key || text == "[" + key + "]") { return fallback; }
+            return text;
+        }
+
         private void CloseReader(IDataReader reader)
         {
             if (reader == null) { return; }
@@ -725,6 +788,7 @@ namespace VAS.Controllers
             public decimal Outstanding { get; set; }
             public decimal OrderValue { get; set; }
             public int OverdueInvoiceCount { get; set; }
+            public decimal OverdueAmount { get; set; }
             public string HoldReason { get; set; }
         }
 

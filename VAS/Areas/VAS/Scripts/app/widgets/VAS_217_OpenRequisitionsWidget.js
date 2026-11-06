@@ -16,6 +16,8 @@
  *                     and the line date pickers start at the PO date.
  *   Claude 2026-10-16 On a tax-inclusive price list the Subtotal is the gross less the extracted tax
  *                     (it showed the gross), and the Order total stays the gross.
+ *   Claude 2026-11-05 PO date / Date promised (header and lines) are native date pickers again, shown in
+ *                     the user's date format; the custom free-text date parser was removed.
  *
  * Message Table:
  *   # | Fallback Text                                    | Message Key
@@ -264,49 +266,18 @@
             return dt.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (day < 10 ? '0' : '') + day;
         }
 
+        // yyyy-mm-dd -> the user's standard (browser culture) date display, as the other VIS widgets show dates
         function isoDisp(v) {
-            if (!v || v.indexOf('-') < 0) return v || '';
-            var q = v.split('-');
-            var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-            var mIdx = parseInt(q[1], 10) - 1;
-            return q[2] + ' ' + (MONTHS[mIdx] || q[1]) + ' ' + q[0];
+            var iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v || ''));
+            if (!iso) return v || '';
+            var d = new Date(+iso[1], +iso[2] - 1, +iso[3]);
+            return d.toLocaleDateString(window.navigator.language, { year: 'numeric', month: 'short', day: '2-digit' });
         }
 
-        // Typed date text -> yyyy-mm-dd ('' when it is not a real date). Accepts yyyy-mm-dd, dd/mm/yyyy,
-        // dd-mm-yyyy, dd.mm.yyyy, dd MMM yyyy and MMM dd yyyy - the month typed as a name (short or full,
-        // any case) or a number, the year as four or two digits.
-        function parseDateText(txt) {
-            var s = String(txt == null ? '' : txt).trim();
-            if (!s) return '';
-            var MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-            var monthOf = function (t) {
-                return /^\d+$/.test(t) ? +t : MONTHS.indexOf(t.substring(0, 3).toLowerCase()) + 1;
-            };
-            var yearOf = function (t) {
-                return t.length === 2 ? 2000 + (+t) : +t;
-            };
-            var y, m, d;
-            var iso = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s);
-            var dmy, mdy;
-            if (iso) {
-                y = +iso[1]; m = +iso[2]; d = +iso[3];
-            } else if ((dmy = /^(\d{1,2})[\/\-. ]+(\d{1,2}|[A-Za-z]{3,9})[\/\-. ,]+(\d{4}|\d{2})$/.exec(s))) {
-                d = +dmy[1]; y = yearOf(dmy[3]);
-                m = monthOf(dmy[2]);
-            } else if ((mdy = /^([A-Za-z]{3,9})[\/\-. ]+(\d{1,2})[\/\-. ,]+(\d{4}|\d{2})$/.exec(s))) {
-                m = monthOf(mdy[1]); d = +mdy[2]; y = yearOf(mdy[3]);
-            } else {
-                return '';
-            }
-            if (!(y >= 1900 && y <= 9999 && m >= 1 && m <= 12 && d >= 1)) return '';
-            var dt = new Date(y, m - 1, d);
-            if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) return '';
-            return y + '-' + (m < 10 ? '0' : '') + m + '-' + (d < 10 ? '0' : '') + d;
-        }
-
-        // Value of a date text box as yyyy-mm-dd ('' when blank or not a valid date)
+        // Value of a native date picker (always yyyy-mm-dd) - '' when blank or incomplete
         function dateVal($el) {
-            return parseDateText($el.val());
+            var v = String($el.val() || '');
+            return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : '';
         }
 
         function toast(msg) {
@@ -1350,8 +1321,8 @@
                 '  <div class="vas-217-orw-form-grid">' +
                 '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_217_TargetDocType', 'Target document type')) + star + '</label><select class="vas-217-orw-fctl" id="fDocType">' + docTypeOpts + '</select></div>' +
                 '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_217_OrderReference', 'Order reference')) + '</label><input class="vas-217-orw-fctl" id="fOrderRef" maxlength="20" value="' + esc(poHeaderValues.orderReference || '') + '"></div>' +
-                '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_PODate', 'PO date')) + star + '</label><input type="text" maxlength="20" autocomplete="off" placeholder="' + esc(lbl('VAS_217_DateFormatHint', 'dd mmm yyyy')) + '" class="vas-217-orw-fctl vas-217-date" id="fPoDate" value="' + esc(isoDisp(poHeaderValues.dateOrdered || fIso())) + '"></div>' +
-                '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_217_DatePromised', 'Date promised')) + star + '</label><input type="text" maxlength="20" autocomplete="off" placeholder="' + esc(lbl('VAS_217_DateFormatHint', 'dd mmm yyyy')) + '" class="vas-217-orw-fctl vas-217-date" id="fPromised" value="' + esc(isoDisp(poHeaderValues.datePromised || fIso())) + '"></div>' +
+                '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_PODate', 'PO date')) + star + '</label><input type="date" max="9999-12-31" placeholder=" " data-placeholder="" class="vas-217-orw-fctl vas-217-date" id="fPoDate" value="' + esc(poHeaderValues.dateOrdered || fIso()) + '"></div>' +
+                '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_217_DatePromised', 'Date promised')) + star + '</label><input type="date" max="9999-12-31" placeholder=" " data-placeholder="" class="vas-217-orw-fctl vas-217-date" id="fPromised" min="' + esc(poHeaderValues.dateOrdered || fIso()) + '" value="' + esc(poHeaderValues.datePromised || fIso()) + '"></div>' +
                 '    <div class="vas-217-orw-field"><label>' + esc(lbl('VAS_217_Priority', 'Priority')) + star + '</label><select class="vas-217-orw-fctl" id="fPriority">' + prioOpts + '</select></div>' +
                 '  </div>' +
 
@@ -1459,11 +1430,13 @@
             var invalid = isPromisedBeforeOrdered(promised, ordered);
             $host.find('#fPromised').toggleClass('vas-217-orw-invalid', invalid || !promised);
             $host.find('#fPoDate').toggleClass('vas-217-orw-invalid', !ordered);
+            // The date picker greys out days before the PO date.
+            $host.find('#fPromised').attr('min', ordered || '');
             // A back-dated Date promised blocks the next step until it is corrected.
             $('#vas_217_to_lines').prop('disabled', invalid);
             var $note = $('#vas_217_details_note');
             if (!promised || !ordered) {
-                $note.attr('class', 'vas-217-orw-warnnote').text(lbl('VAS_217_InvalidDate', 'Enter a valid date, for example 15 Nov 2026'));
+                $note.attr('class', 'vas-217-orw-warnnote').text(lbl('VAS_217_InvalidDate', 'Enter a valid date'));
                 return false;
             }
             if (invalid) {
@@ -1510,13 +1483,6 @@
                     poHeaderValues.currencyId = priceList.currencyId;
                     $host.find('#fCur').val(priceList.currencyId);
                 }
-            });
-
-            // A typed date is tidied to "dd Mon yyyy" when it is a real date (bound first, so the
-            // handlers below read the tidied value)
-            $host.find('.vas-217-date').on('change', function () {
-                var iso = dateVal($(this));
-                if (iso) { $(this).val(isoDisp(iso)); }
             });
 
             $host.find('#fPoDate, #fPromised').on('change', function () {
@@ -1706,7 +1672,7 @@
                         '<span class="vas-217-orw-cell"><input class="vas-217-orw-rowin in-lrate" type="number" min="0" step="any" value="' + (Number(l.rate) || 0) + '" data-idx="' + globalIdx + '" aria-label="' + esc(lbl('VAS_Rate', 'Rate')) + '"></span>' +
                         '<span class="vas-217-orw-cell"><select class="vas-217-orw-rowsel sel-ltax" data-idx="' + globalIdx + '" aria-label="' + esc(lbl('VAS_217_Tax', 'Tax')) + '">' + taxOptionsHtml + '</select></span>' +
                         '<span class="vas-217-orw-cell right c-emph amt-cell" title="' + esc(fmtMoney(amt)) + '">' + esc(fmtMoney(amt)) + '</span>' +
-                        '<span class="vas-217-orw-cell"><input class="vas-217-orw-rowin in-ldate" type="text" maxlength="20" autocomplete="off" value="' + esc(isoDisp(l.datePromised || fIso())) + '" data-idx="' + globalIdx + '" aria-label="' + esc(lbl('VAS_217_DatePromised', 'Date promised')) + '"></span>' +
+                        '<span class="vas-217-orw-cell"><input class="vas-217-orw-rowin in-ldate" type="date" max="9999-12-31" placeholder=" " data-placeholder="" min="' + esc(poHeaderValues.dateOrdered || '') + '" value="' + esc(l.datePromised || fIso()) + '" data-idx="' + globalIdx + '" aria-label="' + esc(lbl('VAS_217_DatePromised', 'Date promised')) + '"></span>' +
                         '<span class="vas-217-orw-cell vas-217-orw-actcell">' +
                         '  <button type="button" class="vas-217-orw-iconbtn sm btn-act-desc" data-idx="' + globalIdx + '" title="' + esc(lbl('VAS_217_Description', 'Description')) + '">' + ICON_DESC + '</button>' +
                         '</span>' +
@@ -1757,7 +1723,7 @@
                     var iso = dateVal($(this));
                     if (iso) {
                         poLinesState[idx].datePromised = iso;
-                        $(this).val(isoDisp(iso)).removeClass('vas-217-orw-invalid');
+                        $(this).removeClass('vas-217-orw-invalid');
                         validateLineDates($host);
                     } else {
                         // Not a real date: mark it and keep the last valid date on the line

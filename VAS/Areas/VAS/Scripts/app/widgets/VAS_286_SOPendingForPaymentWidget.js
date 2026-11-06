@@ -47,7 +47,9 @@
  *  9  | Customer                                                              | VAS_286_ColCustomer
  * 10  | Warehouse (Sr 8.35; was VAS_286_ColShipFrom "Ship from")               | VAS_286_ColWarehouse
  * --  | Open Record (Sr 8.36)                                                 | VAS_286_OpenRecord
- * 11  | Payment type                                                          | VAS_286_ColPaymentType
+ * 11  | Payment type (column removed 5-Nov row 33; key no longer used)        | VAS_286_ColPaymentType
+ * --  | click to sort (5-Nov row 32)                                          | VAS_286_SortHint
+ * --  | click a row for the SO (5-Nov row 32, non-default sort)               | VAS_286_ClickRowHint
  * 12  | Payment due                                                           | VAS_286_ColPaymentDue
  * 13  | Amount                                                                | VAS_286_ColAmount
  * 14  | Invoice                                                               | VAS_286_TypeInvoice
@@ -178,7 +180,9 @@
     // (design.md §11, with the mock's "Delivered on" column replaced by "Payment
     // type" per the prompt's UI override): SO No / SO date / Customer / Ship from /
     // Payment type / Payment due / Amount.
-    var TABLE_TEMPLATE = 'minmax(0,1.1fr) minmax(0,.95fr) minmax(0,1.7fr) minmax(0,1.1fr) minmax(0,.95fr) minmax(0,1fr) minmax(0,1fr)';
+    // 5-Nov row 33: the "Payment type" column was removed, leaving SO No / SO date /
+    // Customer / Warehouse / Payment due / Amount.
+    var TABLE_TEMPLATE = 'minmax(0,1.1fr) minmax(0,.95fr) minmax(0,1.8fr) minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr)';
 
     /* Keep --dash-inline-size on :root equal to the dashboard container's current
        pixel width so the widget clamp resolves against the dashboard's visible
@@ -219,11 +223,19 @@
 
         var listState = 'loading'; // 'loading' | 'ready' | 'error'
         var docsState = { page: 0, size: WIDGET_PAGE_SIZE, total: 0, rows: [], totalDue: 0 };
+        // 5-Nov row 32: heading sort (server side, so it spans every page). Default
+        // keeps the original "oldest payment due first" order.
+        var sortState = { by: 'due', dir: 'asc' };
+        var $thead;
 
         var lineState = null; // { order, lines, page, size }
 
+        // Never render a raw "[KEY]": fall back to the English text when the key is missing.
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            var text = '';
+            try { text = VIS.Msg.getMsg(key); } catch (e) { text = ''; }
+            if (!text || text === key || text === '[' + key + ']') { return fallback || key; }
+            return text;
         }
 
         function escapeHtml(value) {
@@ -277,11 +289,6 @@
             return (d.getDate() < 10 ? '0' : '') + d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
         }
 
-        function paymentTypeLabel(code) {
-            if (code === 'Advance') { return label('VAS_286_TypeAdvance', 'Advance'); }
-            return label('VAS_286_TypeInvoice', 'Invoice');
-        }
-
         function parseResponse(res) {
             var data = res;
             if (typeof data === 'string') { data = JSON.parse(data); }
@@ -311,18 +318,8 @@
             $head.append($htxt, $chip);
 
             var $tbl = $('<div class="vas286-tbl"></div>');
-            var $thead = $('<div class="vas286-trow vas286-thead"></div>').css('grid-template-columns', TABLE_TEMPLATE);
-            $thead.html([
-                { l: label('VAS_286_ColSoNo', 'SO No'), right: false },
-                { l: label('VAS_286_ColSoDate', 'SO date'), right: false },
-                { l: label('VAS_286_ColCustomer', 'Customer'), right: false },
-                { l: label('VAS_286_ColWarehouse', 'Warehouse'), right: false },   // Sr 8.35 (was "Ship from")
-                { l: label('VAS_286_ColPaymentType', 'Payment type'), right: false },
-                { l: label('VAS_286_ColPaymentDue', 'Payment due'), right: false },
-                { l: label('VAS_286_ColAmount', 'Amount'), right: true }
-            ].map(function (c) {
-                return '<span class="vas286-cell' + (c.right ? ' right' : '') + '" title="' + escapeHtml(c.l) + '">' + escapeHtml(c.l) + '</span>';
-            }).join(''));
+            $thead = $('<div class="vas286-trow vas286-thead"></div>').css('grid-template-columns', TABLE_TEMPLATE);
+            renderHead();
 
             $tbody = $('<div class="vas286-tbody"></div>');
             $tbl.append($thead, $tbody);
@@ -342,6 +339,36 @@
             bindWidgetEvents();
         }
 
+        /* 5-Nov row 32: SO date and Payment due headings are sortable - click toggles
+           asc/desc (a different column starts at asc); the active column shows an arrow. */
+        function renderHead() {
+            $thead.html([
+                { l: label('VAS_286_ColSoNo', 'SO No'), right: false },
+                { l: label('VAS_286_ColSoDate', 'SO date'), right: false, sort: 'date' },
+                { l: label('VAS_286_ColCustomer', 'Customer'), right: false },
+                { l: label('VAS_286_ColWarehouse', 'Warehouse'), right: false },   // Sr 8.35 (was "Ship from")
+                { l: label('VAS_286_ColPaymentDue', 'Payment due'), right: false, sort: 'due' },
+                { l: label('VAS_286_ColAmount', 'Amount'), right: true }
+            ].map(function (c) {
+                if (!c.sort) {
+                    return '<span class="vas286-cell' + (c.right ? ' right' : '') + '" title="' + escapeHtml(c.l) + '">' + escapeHtml(c.l) + '</span>';
+                }
+                var active = sortState.by === c.sort;
+                var arrow = active ? (sortState.dir === 'asc' ? ' ▲' : ' ▼') : '';
+                var aria = active ? (sortState.dir === 'asc' ? 'ascending' : 'descending') : 'none';
+                var tip = c.l + ' - ' + label('VAS_286_SortHint', 'click to sort');
+                return '<span class="vas286-cell vas286-sort' + (active ? ' is-active' : '') + '" role="button" tabindex="0" data-sort="' + c.sort + '" aria-sort="' + aria + '" title="' + escapeHtml(tip) + '">' +
+                    escapeHtml(c.l) + '<span class="vas286-sort-ind" aria-hidden="true">' + arrow + '</span></span>';
+            }).join(''));
+        }
+
+        function toggleSort(by) {
+            if (sortState.by === by) { sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc'; }
+            else { sortState.by = by; sortState.dir = 'asc'; }
+            renderHead();
+            loadPendingPayment(0);
+        }
+
         /* Sr 8.28: (re)binds the widget's own handlers. Run on init AND on every refresh -
            after a "refresh all" from the mosaic panel the host can strip jQuery handlers
            from the widget's DOM (re-attaching the same nodes), which left rows that
@@ -349,6 +376,12 @@
         function bindWidgetEvents() {
             $prevBtn.off('click.vas286').on('click.vas286', function () { turnWidgetPage(-1); });
             $nextBtn.off('click.vas286').on('click.vas286', function () { turnWidgetPage(1); });
+
+            $thead.off('click.vas286 keydown.vas286')
+                .on('click.vas286', '[data-sort]', function () { toggleSort(this.getAttribute('data-sort')); })
+                .on('keydown.vas286', '[data-sort]', function (event) {
+                    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleSort(this.getAttribute('data-sort')); }
+                });
 
             $tbody.off('click.vas286').on('click.vas286', function (event) {
                 var row = event.target.closest ? event.target.closest('[data-so]') : null;
@@ -365,7 +398,6 @@
                     '<span class="vas286-cell"><span class="vas286-skel-cell" style="width:55%"></span></span>' +
                     '<span class="vas286-cell"><span class="vas286-skel-cell" style="width:75%"></span></span>' +
                     '<span class="vas286-cell"><span class="vas286-skel-cell" style="width:60%"></span></span>' +
-                    '<span class="vas286-cell"><span class="vas286-skel-cell" style="width:50%"></span></span>' +
                     '<span class="vas286-cell"><span class="vas286-skel-cell" style="width:55%"></span></span>' +
                     '<span class="vas286-cell right"><span class="vas286-skel-cell" style="width:50%;margin-left:auto"></span></span>' +
                 '</div>';
@@ -380,7 +412,7 @@
             VASSONet.ajax({
                 url: VIS.Application.contextUrl + SELF_ENDPOINT + 'GetPendingPayment',
                 type: 'GET', dataType: 'json', cache: false,
-                data: { page: page, size: WIDGET_PAGE_SIZE },
+                data: { page: page, size: WIDGET_PAGE_SIZE, sortBy: sortState.by, sortDir: sortState.dir },
                 success: function (res) {
                     var parsed = parseResponse(res);
                     if (parsed.Error) { listState = 'error'; }
@@ -449,7 +481,6 @@
                     cellHtml(formatDateShort(row.SalesOrderDate), 'vas286-c-std') +
                     cellHtml(row.CustomerName, 'vas286-c-std') +
                     cellHtml(row.WarehouseName || '—', 'vas286-c-dark') +
-                    cellHtml(paymentTypeLabel(row.PaymentType), 'vas286-c-std') +
                     dueCell +
                     cellHtml(formatINR(row.Amount), 'vas286-c-emph', 'right') +
                 '</button>';
@@ -457,7 +488,9 @@
 
             var pages = Math.max(1, Math.ceil(docsState.total / docsState.size));
             var start = docsState.page * docsState.size;
-            var helperText = label('VAS_286_Showing', 'Showing') + ' ' + (start + 1) + '–' + (start + docsState.rows.length) + ' ' + label('VAS_286_Of', 'of') + ' ' + docsState.total + ' · ' + label('VAS_286_RankedBy', 'oldest due first · click a row for the SO');
+            var isDefaultSort = sortState.by === 'due' && sortState.dir === 'asc';
+            var helperText = label('VAS_286_Showing', 'Showing') + ' ' + (start + 1) + '–' + (start + docsState.rows.length) + ' ' + label('VAS_286_Of', 'of') + ' ' + docsState.total + ' · ' +
+                (isDefaultSort ? label('VAS_286_RankedBy', 'oldest due first · click a row for the SO') : label('VAS_286_ClickRowHint', 'click a row for the SO'));
             $helper.attr('title', helperText).text(helperText);
             $pageTxt.text((docsState.page + 1) + ' ' + label('VAS_286_Of', 'of') + ' ' + pages);
             $prevBtn.prop('disabled', docsState.page === 0);

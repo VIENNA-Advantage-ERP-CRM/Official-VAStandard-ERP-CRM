@@ -65,6 +65,7 @@ namespace VAS.Controllers
     ///   Read-only here; no writes.
     /// Chronological development:
     ///   VAI052      2026-09-14 Created
+    ///   Claude      2026-11-05 Row 26: line pop-up In stock in the product's base UOM (+ its name).
     /// </summary>
     [System.Web.Mvc.SessionState(System.Web.SessionState.SessionStateBehavior.ReadOnly)]
     public class VAS_271_SOsPendingDeliveryWidgetController : Controller
@@ -623,13 +624,15 @@ namespace VAS.Controllers
                        p.ProductType AS Product_Type,
                        ch.Name AS Charge_Name,
                        COALESCE(asi.Description, N'') AS Attribute_Text,
-                       COALESCE(u.Name, N'') AS Uom_Name
+                       COALESCE(u.Name, N'') AS Uom_Name,
+                       COALESCE(bu.Name, N'') AS Base_Uom_Name
                   FROM C_OrderLine ol
                   LEFT OUTER JOIN M_Product p ON ( p.M_Product_ID = ol.M_Product_ID )
                   LEFT OUTER JOIN C_Charge ch ON ( ch.C_Charge_ID = ol.C_Charge_ID )
                   LEFT OUTER JOIN C_Tax tx ON ( tx.C_Tax_ID = ol.C_Tax_ID )
                   LEFT OUTER JOIN M_AttributeSetInstance asi ON ( asi.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID )
                   LEFT OUTER JOIN C_UOM u ON ( u.C_UOM_ID = ol.C_UOM_ID )
+                  LEFT OUTER JOIN C_UOM bu ON ( bu.C_UOM_ID = p.C_UOM_ID )
                  WHERE ol.C_Order_ID = @Order_Id
                    AND ol.IsActive = 'Y'
                  ORDER BY ol.Line ASC
@@ -687,19 +690,26 @@ namespace VAS.Controllers
                         ? (dr["Price_Actual"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Price_Actual"]))
                         : Util.GetValueOfDecimal(dr["Price_Entered"]);
 
+                    // 5-Nov Row 26: In stock is ALWAYS in the product's base UOM (product
+                    // master UOM), never scaled to the line's UOM - the base UOM name is sent
+                    // with it. On-hand, not free stock (its reservation already holds this
+                    // order). The shortage is judged in the line's UOM.
+                    decimal onHandBase = isItem ? ResolveOnHand(ctx, productId, warehouseId) : 0m;
+                    decimal qtyPending = isItem ? Math.Max(0m, qtyOrdered - qtyDelivered) : 0m;
+
                     result.Lines.Add(new OrderLineRow
                     {
                         LineNo = Util.GetValueOfInt(dr["Line_No"]),
                         ProductName = productName,
                         AttributeText = Util.GetValueOfString(dr["Attribute_Text"]),
                         UomName = Util.GetValueOfString(dr["Uom_Name"]),
+                        BaseUomName = Util.GetValueOfString(dr["Base_Uom_Name"]),
                         IsItem = isItem,
                         QtyOrdered = qtyOrdered,
                         QtyDelivered = qtyDelivered,
-                        QtyPending = isItem ? Math.Max(0m, qtyOrdered - qtyDelivered) : 0m,
-                        // On-hand stock in the line's UOM (not free stock - its reservation
-                        // already holds this order and double-counted the shortage).
-                        FreeStock = isItem ? ResolveOnHand(ctx, productId, warehouseId) * uomRatio : 0m,
+                        QtyPending = qtyPending,
+                        FreeStock = onHandBase,
+                        QtyShort = isItem ? Math.Max(0m, qtyPending - Math.Max(0m, onHandBase) * uomRatio) : 0m,
                         Rate = rate,
                         Amount = lineAmt
                     });
@@ -913,11 +923,16 @@ namespace VAS.Controllers
             public string ProductName { get; set; }
             public string AttributeText { get; set; }
             public string UomName { get; set; }
+            /// <summary>The product's base (master) UOM name - the unit FreeStock is stated in (5-Nov Row 26).</summary>
+            public string BaseUomName { get; set; }
             public bool IsItem { get; set; }
             public decimal QtyOrdered { get; set; }
             public decimal QtyDelivered { get; set; }
             public decimal QtyPending { get; set; }
+            /// <summary>On-hand stock in the product's BASE UOM (5-Nov Row 26).</summary>
             public decimal FreeStock { get; set; }
+            /// <summary>Pending quantity not covered by on-hand stock, in the line's UOM.</summary>
+            public decimal QtyShort { get; set; }
             public decimal Rate { get; set; }
             public decimal Amount { get; set; }
         }

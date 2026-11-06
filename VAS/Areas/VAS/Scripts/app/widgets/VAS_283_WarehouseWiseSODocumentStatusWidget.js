@@ -209,6 +209,8 @@
         var $mask, $modal, $mHead, $mTitle, $mSub, $mBack, $mBody, $mFoot;
 
         var SELF_ENDPOINT = 'VAS_283_WarehouseWiseSODocumentStatusWidget/';
+        var ZOOM_WINDOW_NAME = 'VAS_SalesOrder';   // same Sales Order window VAS_268 / VAS_286 open
+        var zoomWindowId = 0;
 
         var listState = 'loading'; // 'loading' | 'ready' | 'error'
         var docsState = { page: 0, size: WIDGET_PAGE_SIZE, total: 0, rows: [], grandTotal: 0 };
@@ -218,8 +220,12 @@
         var cfgStack = [];
         var currentCfg = null;
 
+        // Never render a raw "[KEY]": fall back to the English text when the key is missing.
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            var text = '';
+            try { text = VIS.Msg.getMsg(key); } catch (e) { text = ''; }
+            if (!text || text === key || text === '[' + key + ']') { return fallback || key; }
+            return text;
         }
 
         function escapeHtml(value) {
@@ -504,8 +510,9 @@
             $mBody.on('click', function (event) {
                 var pageBtn = event.target.closest ? event.target.closest('[data-dir]') : null;
                 if (pageBtn) { turnPage(pageBtn.getAttribute('data-table'), Number(pageBtn.getAttribute('data-dir'))); return; }
+                // 5-Nov row 29: a document number opens that SO on the Sales Order screen.
                 var soBtn = event.target.closest ? event.target.closest('[data-so]') : null;
-                if (soBtn) { openRecordModal(Number(soBtn.getAttribute('data-so'))); return; }
+                if (soBtn) { openRecordInWindow(Number(soBtn.getAttribute('data-so'))); return; }
                 var linesBtn = event.target.closest ? event.target.closest('[data-lines]') : null;
                 if (linesBtn) { openLinesModal(Number(linesBtn.getAttribute('data-lines'))); return; }
             });
@@ -625,13 +632,14 @@
 
         function renderWarehouseBody() {
             var summary = whState.summary;
-            var statsHtml = '<div class="vas283-mstats">' +
+            // 5-Nov rows 27/28: the "Period" tile is gone (the period is already in the
+            // subtitle) and the remaining 5 cards share one line (.vas283-mstats-5).
+            var statsHtml = '<div class="vas283-mstats vas283-mstats-5">' +
                 statTile(label('VAS_283_StatTotalSos', 'Total SOs'), formatNum(summary.TotalCount)) +
                 statTile(label('VAS_283_ColDrafted', 'Drafted'), formatNum(summary.DraftedCount)) +
                 statTile(label('VAS_283_ColInProcess', 'In process'), formatNum(summary.InProcessCount)) +
                 statTile(label('VAS_283_ColPartlyDelivered', 'Partly delivered'), formatNum(summary.PartlyDeliveredCount)) +
                 statTile(label('VAS_283_ColCompleted', 'Completed'), formatNum(summary.CompletedCount)) +
-                statTile(label('VAS_283_StatPeriod', 'Period'), periodLabel()) +
             '</div>';
 
             var secHtml = '<div class="vas283-msec">' + escapeHtml(label('VAS_283_SectionHeading', 'Sales orders')) + '</div>';
@@ -743,6 +751,27 @@
                 },
                 error: function () { cb(null); }
             });
+        }
+
+        /* 5-Nov row 29: navigates to the Sales Order record in the SAME tab. Hosted inside
+           the Sales Order window (windowNo >= 0) the host's value-changed channel re-queries
+           the window it is already in (TabWhereClause) - same pattern as VAS_268 / VAS_286.
+           On the Home page (no host window) the shared cross-window zoom helper opens the
+           Sales Order window on that record. */
+        function openRecordInWindow(orderId) {
+            closeModal();
+            if (!orderId) { return; }
+            if ($self.windowNo >= 0) {
+                $self.widgetFirevalueChanged({
+                    "TabWhereClause": "C_Order.C_Order_ID=" + Number(orderId),
+                    "TabLayout": "Y",
+                    "TabIndex": "0"
+                });
+                return;
+            }
+            if (!window.VAS || !VAS.ZoomUtil) { return; }
+            VAS.ZoomUtil.zoomToRecord('C_Order_ID', orderId, zoomWindowId, ZOOM_WINDOW_NAME, ZOOM_WINDOW_NAME)
+                .done(function (id) { if (id > 0) { zoomWindowId = id; } });
         }
 
         function openRecordModal(orderId) {
