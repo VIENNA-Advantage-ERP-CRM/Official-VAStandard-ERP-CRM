@@ -190,7 +190,7 @@
                 '<button type="button" class="vas-w205-card vas-w205-border-ok" aria-label="' + escapeHtml(title) + '">' +
                     '<div class="vas-w205-head">' +
                         '<div class="vas-w205-head-txt">' +
-                            '<p class="vas-w205-title">' + escapeHtml(title) + '</p>' +
+                            '<p class="vas-w205-title" title="' + escapeHtml(title) + '">' + escapeHtml(title) + '</p>' +
                         '</div>' +
                     '</div>' +
                     '<div class="vas-w205-body-row">' +

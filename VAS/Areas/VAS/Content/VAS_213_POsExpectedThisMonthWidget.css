@@ -99,7 +99,8 @@
     border: 0;
     background: none;
     padding: 0;
-    margin: 0.5em 0;
+    /* Tightened (was 0.5em 0) so the three list rows below fit the 2x2 tile in full */
+    margin: 0.3em 0;
     font-family: inherit;
     text-align: left;
     cursor: pointer;
@@ -120,7 +121,8 @@
 }
 
 .vas-213-kpi-val {
-    font-size: 1.75em;
+    /* 1.5em (was 1.75em): the KPI headline stays within the ~24px stat cap and frees room for the list */
+    font-size: 1.5em;
     font-weight: 600;
     line-height: 1.05;
     margin: 0;
@@ -139,7 +141,7 @@
     font-size: 0.6875em;
     color: #5F7283;
     line-height: 1.3;
-    margin-top: 0.25em;
+    margin-top: 0.1em;
     display: block;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -155,7 +157,7 @@
     /* Three rows per page with a pager below - the list never scrolls */
     overflow: hidden;
     border-top: 1px solid #E2EAF1;
-    padding-top: 0.47em;
+    padding-top: 0.25em;
     justify-content: flex-start;
 }
 
@@ -165,7 +167,7 @@
     align-items: center;
     justify-content: flex-end;
     flex: none;
-    padding-top: 0.3em;
+    padding-top: 0.2em;
 }
 
 .vas-213-wfoot.vas-213-hidden {
@@ -177,7 +179,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.5em;
-    padding: 0.32em 0.4em;
+    padding: 0.15em 0.4em;
     border: 0;
     border-bottom: 1px solid #E2EAF1;
     background: transparent;
@@ -186,9 +188,12 @@
     width: 100%;
     text-align: left;
     font-family: inherit;
-    /* Fixed row height, stacked from the top - a short list must not stretch its rows. */
-    min-height: 3.2em;
-    flex: 0 0 auto;
+    /* Each row is exactly a third of the list area, stacked from the top: three rows always fit
+       in full (the fixed 3.2em rows overran the 2x2 tile and the third row clipped), and a short
+       list does not stretch its rows. */
+    min-height: 0;
+    flex: 0 0 calc(100% / 3);
+    overflow: hidden;
     outline: none;
     transition: background-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -222,7 +227,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    line-height: 1.25;
+    line-height: 1.2;
 }
 
 .vas-213-mmeta {
@@ -232,7 +237,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    line-height: 1.25;
+    line-height: 1.2;
     margin-top: 1px;
 }
 

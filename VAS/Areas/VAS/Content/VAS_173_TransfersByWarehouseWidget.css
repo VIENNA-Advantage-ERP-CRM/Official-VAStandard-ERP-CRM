@@ -162,37 +162,35 @@
     text-align: center;
 }
 
-/* 4 rows per page, each a fixed quarter of the body (VAS_145 pattern): the spacing grows with
-   the tile and shrinks on a short one, so all 4 records always show in full, never clipped.
-   A page with fewer rows stacks them from the top at the same spacing. */
+/* 4 rows per page, each a fixed quarter of what is left of the body after the 3 gaps between
+   them (VAS_145 pattern): all 4 records always show in full, never clipped, with a visible gap
+   of at least 8px between them. A page with fewer rows stacks them from the top at the same
+   spacing. */
 .vas-173-list {
+    --vas-173-row-gap: max(8px, 0.45em);
     display: flex;
     flex-direction: column;
-    gap: 0;
+    gap: var(--vas-173-row-gap);
     flex: 1;
     min-height: 0;
 }
 
 .vas-173-row {
     width: 100%;
-    flex: 0 0 25%;
+    flex: 0 0 calc((100% - 3 * var(--vas-173-row-gap)) / 4);
     min-height: 0;
     display: flex;
     align-items: center;
     gap: 0.5em;
-    padding: 0 0.3em;
-    border: none;
-    border-bottom: 1px solid #EDF2F6;
-    background: transparent;
+    padding: 0 0.5em;
+    /* Each record is its own light tile, so the gap between records reads clearly. */
+    border: 1px solid #EDF2F6;
+    background: rgba(255, 255, 255, 0.55);
     cursor: pointer;
     text-align: left;
     border-radius: 8px;
     transition: background-color 120ms ease;
     outline: none;
-}
-
-.vas-173-row:last-child {
-    border-bottom: none;
 }
 
 .vas-173-row:hover,

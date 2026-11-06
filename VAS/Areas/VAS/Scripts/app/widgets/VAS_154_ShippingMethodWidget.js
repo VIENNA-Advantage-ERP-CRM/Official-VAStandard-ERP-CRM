@@ -89,7 +89,9 @@
         ];
 
         function lbl(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            var text = VIS.Msg.getMsg(key);
+            if (!text || text === key || text === '[' + key + ']') { return fallback || key; }
+            return text;
         }
 
         function escapeHtml(value) {
@@ -178,14 +180,17 @@
                 '<div class="vas-shm-head-l">' +
                 '<span class="vas-shm-ico">' + truckIcon() + '</span>' +
                 '<div class="vas-shm-titles">' +
-                '<div class="vas-shm-title">' + escapeHtml(lbl('VAS_154_SHM_Title', 'Shipping Method')) + '</div>' +
-                '<div class="vas-shm-sub">' + escapeHtml(lbl('VAS_154_SHM_Subtitle', 'Delivery orders by fulfillment type')) + '</div>' +
+                '<div class="vas-shm-title" title="' + escapeHtml(lbl('VAS_154_SHM_Title', 'Shipping Method')) + '">' + escapeHtml(lbl('VAS_154_SHM_Title', 'Shipping Method')) + '</div>' +
+                '<div class="vas-shm-sub" title="' + escapeHtml(lbl('VAS_154_SHM_Subtitle', 'Delivery orders by fulfillment type')) + '">' + escapeHtml(lbl('VAS_154_SHM_Subtitle', 'Delivery orders by fulfillment type')) + '</div>' +
                 '</div>' +
                 '</div>' +
+                '</div>' +
+                // Month / Year filters on their own row under the title, flush
+                // with the widget's left edge (5-Nov retest: next to the long
+                // subtitle they were pushed to the far right of the header).
                 '<div class="vas-shm-filters">' +
-                '<span class="vas-shm-sel"><select class="vas-shm-month vas-shm-month-sel" aria-label="' + escapeHtml(lbl('VAS_154_SHM_FilterByMonth')) + '"></select></span>' +
-                '<span class="vas-shm-sel"><select class="vas-shm-year vas-shm-year-sel" aria-label="' + escapeHtml(lbl('VAS_154_SHM_FilterByYear')) + '"></select></span>' +
-                '</div>' +
+                '<span class="vas-shm-sel"><select class="vas-shm-month vas-shm-month-sel" aria-label="' + escapeHtml(lbl('VAS_154_SHM_FilterByMonth', 'Filter by month')) + '"></select></span>' +
+                '<span class="vas-shm-sel"><select class="vas-shm-year vas-shm-year-sel" aria-label="' + escapeHtml(lbl('VAS_154_SHM_FilterByYear', 'Filter by year')) + '"></select></span>' +
                 '</div>' +
                 '<div class="vas-shm-body">' +
                 '<div class="vas-shm-donut"></div>' +

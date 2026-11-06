@@ -122,7 +122,9 @@
         var state = { month: CURRENT_MONTH, year: CURRENT_YEAR, items: [], page: 0 };
 
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            var text = VIS.Msg.getMsg(key);
+            if (!text || text === key || text === '[' + key + ']') { return fallback || key; }
+            return text;
         }
 
         function escapeHtml(value) {
@@ -615,14 +617,14 @@
                                 /* Full title on hover when it is truncated. */
                                 '<span class="MPC-dor-title" title="' + escapeHtml(label('VAS_145_Title', 'Delivery Orders by Representative')) + '">' + escapeHtml(label('VAS_145_Title', 'Delivery Orders by Representative')) + '</span>' +
                             '</span>' +
+                            /* Month / Year filters on the header row, right after
+                               the title (5-Nov sheet row 15 - supersedes the 30-Oct
+                               own-row layout); the title truncates first. */
+                            '<div class="MPC-dor-filters">' +
+                                '<select class="MPC-dor-select MPC-dor-month" aria-label="' + escapeHtml(label('VAS_145_FilterByMonth', 'Filter by month')) + '"></select>' +
+                                '<select class="MPC-dor-select MPC-dor-year" aria-label="' + escapeHtml(label('VAS_145_FilterByYear', 'Filter by year')) + '"></select>' +
+                            '</div>' +
                         '</div>' +
-                    '</div>' +
-                    /* Month / Year filters on their own row, left-aligned with the
-                       card content (Book1 row 14, Sr. 22), so the title keeps the
-                       full header width. */
-                    '<div class="MPC-dor-filters">' +
-                        '<select class="MPC-dor-select MPC-dor-month" aria-label="' + escapeHtml(label('VAS_145_FilterByMonth', 'Filter by month')) + '"></select>' +
-                        '<select class="MPC-dor-select MPC-dor-year" aria-label="' + escapeHtml(label('VAS_145_FilterByYear', 'Filter by year')) + '"></select>' +
                     '</div>' +
                     /* Status legend on its own full-width row so all four
                        statuses and their colors are always visible (never

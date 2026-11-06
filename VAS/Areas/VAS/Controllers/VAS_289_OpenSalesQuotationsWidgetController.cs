@@ -471,8 +471,9 @@ namespace VAS.Controllers
         }
 
         /// <summary>
-        /// Readable text per attribute set instance: "Attribute: value" for each attribute value,
-        /// then Lot and Serial No (they sit on the instance itself), joined with ", ". The raw
+        /// Readable text per attribute set instance: each attribute's value (ordered by attribute
+        /// name), then the Lot and Serial No values (they sit on the instance itself), joined with
+        /// "_" - values only, no labels (5-Nov row 39; shown in its own Attribute column). The raw
         /// M_AttributeSetInstance.Description is an internal encoding ("2_@AU180@") and is never shown.
         /// Instances with nothing readable are left out of the map.
         /// </summary>
@@ -508,7 +509,7 @@ namespace VAS.Controllers
                     {
                         value = Util.GetValueOfDecimal(dr["Number_Value"]).ToString("0.####", CultureInfo.InvariantCulture);
                     }
-                    AddAttributePart(parts[Util.GetValueOfInt(dr["Asi_Id"])], Util.GetValueOfString(dr["Attribute_Name"]), value);
+                    AddAttributePart(parts[Util.GetValueOfInt(dr["Asi_Id"])], value);
                 }
             }
             finally
@@ -522,8 +523,8 @@ namespace VAS.Controllers
                 while (dr != null && dr.Read())
                 {
                     List<string> list = parts[Util.GetValueOfInt(dr["Asi_Id"])];
-                    AddAttributePart(list, Msg.Translate(ctx, "Lot"), Util.GetValueOfString(dr["Lot"]));
-                    AddAttributePart(list, Msg.Translate(ctx, "SerNo"), Util.GetValueOfString(dr["SerNo"]));
+                    AddAttributePart(list, Util.GetValueOfString(dr["Lot"]));
+                    AddAttributePart(list, Util.GetValueOfString(dr["SerNo"]));
                 }
             }
             finally
@@ -533,15 +534,16 @@ namespace VAS.Controllers
 
             foreach (KeyValuePair<int, List<string>> entry in parts)
             {
-                if (entry.Value.Count > 0) { texts[entry.Key] = string.Join(", ", entry.Value); }
+                if (entry.Value.Count > 0) { texts[entry.Key] = string.Join("_", entry.Value); }
             }
             return texts;
         }
 
-        private static void AddAttributePart(List<string> list, string label, string value)
+        /// <summary>5-Nov row 39: values only (no "Name:" prefix) - the caller joins them with "_".</summary>
+        private static void AddAttributePart(List<string> list, string value)
         {
             if (string.IsNullOrWhiteSpace(value)) { return; }
-            string part = string.IsNullOrWhiteSpace(label) ? value.Trim() : label.Trim() + ": " + value.Trim();
+            string part = value.Trim();
             if (!list.Contains(part)) { list.Add(part); }
         }
 

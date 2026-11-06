@@ -97,11 +97,14 @@ namespace VIS.Controllers
                 foreach (var h in headers)
                 {
                     GetRouteDetail(h);
+                    GetConfirmation(h);
                     var lines = GetLines(ctx, h.TransferID);
                     records.Add(new
                     {
                         TransferID = h.TransferID,
                         TransferNo = h.TransferNo,
+                        ConfirmID = h.ConfirmID,
+                        ConfirmNo = h.ConfirmNo,
                         ConfirmationStatus = h.ConfirmationStatus,
                         MovementDate = h.MovementDate,
                         SourceWarehouse = h.SourceWarehouse,
@@ -129,6 +132,8 @@ namespace VIS.Controllers
         {
             public int    TransferID;
             public string TransferNo;
+            public int    ConfirmID;
+            public string ConfirmNo;
             public string ConfirmationStatus;
             public string MovementDate;
             public string SourceWarehouse;
@@ -144,8 +149,8 @@ namespace VIS.Controllers
                 SELECT
                     wSrc.Name  AS SourceWarehouse,
                     wDst.Name  AS DestWarehouse,
-                    COALESCE(lSrc.LocatorCombination, lSrc.Bin, lSrc.Value) AS SourceLocator,
-                    COALESCE(lDst.LocatorCombination, lDst.Bin, lDst.Value) AS DestLocator
+                    " + LocatorNameSql("lSrc") + @" AS SourceLocator,
+                    " + LocatorNameSql("lDst") + @" AS DestLocator
                 FROM M_MovementLine ml
                 LEFT JOIN M_Locator lSrc ON lSrc.M_Locator_ID = ml.M_Locator_ID
                 LEFT JOIN M_Warehouse wSrc ON wSrc.M_Warehouse_ID = lSrc.M_Warehouse_ID
@@ -174,12 +179,46 @@ namespace VIS.Controllers
         }
 
         /// <summary>
+        /// The open Material Transfer Confirmation (M_MovementConfirm, Drafted / In Progress) of the
+        /// transfer - its document number is what the list and the pop-up show, and its id is what
+        /// Open Record navigates to. The latest one wins when a transfer carries several.
+        /// </summary>
+        private static void GetConfirmation(TransferHeader h)
+        {
+            string sql = @"
+                SELECT mc.M_MovementConfirm_ID AS ConfirmID,
+                       mc.DocumentNo           AS ConfirmNo
+                FROM M_MovementConfirm mc
+                WHERE mc.M_Movement_ID = " + h.TransferID + @"
+                  AND mc.IsActive = 'Y'
+                  AND mc.DocStatus IN ('DR', 'IP')
+                ORDER BY mc.M_MovementConfirm_ID DESC";
+
+            IDataReader dr = null;
+            try
+            {
+                dr = DB.ExecuteReader(sql);
+                if (dr != null && dr.Read())
+                {
+                    h.ConfirmID = Util.GetValueOfInt(dr["ConfirmID"]);
+                    h.ConfirmNo = Util.GetValueOfString(dr["ConfirmNo"]);
+                }
+            }
+            finally
+            {
+                if (dr != null) { dr.Close(); dr.Dispose(); }
+            }
+        }
+
+        /// <summary>
         /// A locator's display name - the same text the pop-up's route line shows ("John Warehouse
-        /// locator"): the locator combination, then the bin, the search key only as a last resort.
+        /// locator"): the locator combination (the "Locator" name field of the Warehouse Structure
+        /// window), then the bin, the search key ("Locator Code") only as a last resort. A blank
+        /// name counts as missing, so a locator saved with an empty name never shows as nothing.
         /// </summary>
         private static string LocatorNameSql(string alias)
         {
-            return "COALESCE(" + alias + ".LocatorCombination, " + alias + ".Bin, " + alias + ".Value)";
+            return "COALESCE(NULLIF(TRIM(" + alias + ".LocatorCombination), N''), NULLIF(TRIM(" + alias + ".Bin), N''), " + alias + ".Value)";
         }
 
         private List<object> GetLines(Ctx ctx, int movementId)

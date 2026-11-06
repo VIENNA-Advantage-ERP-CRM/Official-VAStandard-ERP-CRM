@@ -142,7 +142,36 @@
 
 .vas-172-row--last { border-bottom: none; }
 
-.vas-172-row:hover { background: rgba(31,131,255,.05); }
+.vas-172-row:hover,
+.vas-172-row:focus-visible { background: rgba(31,131,255,.05); outline: none; }
+
+/* Confirmation no. first, then the Material Transfer no. as its own link. */
+.vas-172-row-nos {
+    display: flex;
+    align-items: baseline;
+    gap: .4em;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.vas-172-mtlink {
+    font: inherit;
+    font-weight: 600;
+    color: #0083DA;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.vas-172-mtlink:hover,
+.vas-172-mtlink:focus-visible { text-decoration: underline; outline: none; }
+
+.vas-172-row-nos .vas-172-mtlink { font-size: .6875em; }
 
 .vas-172-row-top {
     display: flex;

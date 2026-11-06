@@ -253,6 +253,11 @@
 }
 
 .vas289-foot-note { font-size: 13px; color: #5F7283; }
+
+/* 5-Nov rows 25/40: Document Status selector beside Back / Create SO on the lines step
+   (same placement as VAS_217's "PO stage" selector). */
+.vas289-foot-actions { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.vas289-mfoot .vas289-stagesel { width: auto; min-width: 9em; flex: none; }
 .vas289-warnnote { font-size: 13px; color: #A33F3F; }
 .vas289-oknote { font-size: 13px; color: #0B6B45; }
 

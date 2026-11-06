@@ -51,6 +51,7 @@
     display: flex;
     align-items: center;
     gap: 0.625em;
+    flex: 1 1 auto;
     min-width: 0;
 }
 
@@ -75,6 +76,7 @@
 .MPC-dor-titles {
     display: flex;
     flex-direction: column;
+    flex: 0 1 auto;
     min-width: 0;
 }
 
@@ -119,14 +121,14 @@
 }
 
 /* ---- Month / Year filters ---- */
-/* Own row under the header, starting at the card's left padding. */
+/* On the header row right after the widget title (left side, 5-Nov sheet
+   row 15); the title gives way (ellipsis + tooltip), the filters never do. */
 .MPC-dor-filters {
     display: flex;
     align-items: center;
     justify-content: flex-start;
     gap: 0.375em;
-    flex-shrink: 0;
-    margin-top: 0.5em;
+    flex: 0 0 auto;
 }
 
 .MPC-dor-select {

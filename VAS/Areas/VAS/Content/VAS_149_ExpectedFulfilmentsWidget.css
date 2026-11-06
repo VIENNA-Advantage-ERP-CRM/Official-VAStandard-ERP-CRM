@@ -66,8 +66,8 @@
     white-space: nowrap;
 }
 
-/* 4 rows per page with at least 8px between records (Book1 row 21, Sr. 27 - default pending confirmation). */
-.vas-exf-body { flex: 1; min-height: 0; display: grid; grid-template-rows: repeat(4, minmax(0, 1fr)); row-gap: max(8px, .5em); overflow: hidden; }
+/* 4 rows per page; smaller row text with a wider (>= 14px) gap between records (5-Nov sheet row 17). No inner scroller. */
+.vas-exf-body { flex: 1; min-height: 0; display: grid; grid-template-rows: repeat(4, minmax(0, 1fr)); row-gap: max(14px, .9em); overflow: hidden; }
 .vas-exf-empty { grid-row: 1 / -1; display: flex; align-items: center; justify-content: center; color: #748494; font-size: .8125em; }
 
 .vas-exf-row {
@@ -94,17 +94,17 @@
 }
 .vas-exf-fi svg { width: .85em; height: .85em; }
 
-.vas-exf-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .3em; }
+.vas-exf-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .25em; }
 
 .vas-exf-r1 { display: flex; align-items: baseline; gap: .5em; line-height: 1.08; }
-.vas-exf-no { font-size: .8em; font-weight: 700; color: #102C3F; white-space: nowrap; flex: 0 0 auto; }
-.vas-exf-cust { flex: 1; min-width: 0; font-size: .72em; color: #5F7283; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vas-exf-val { font-size: .8em; font-weight: 700; color: #0083DA; white-space: nowrap; flex: 0 0 auto; }
+.vas-exf-no { font-size: .72em; font-weight: 700; color: #102C3F; white-space: nowrap; flex: 0 0 auto; }
+.vas-exf-cust { flex: 1; min-width: 0; font-size: .66em; color: #5F7283; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vas-exf-val { font-size: .72em; font-weight: 700; color: #0083DA; white-space: nowrap; flex: 0 0 auto; }
 
 .vas-exf-r2 { display: flex; align-items: baseline; gap: .5em; line-height: 1.02; }
-.vas-exf-wh { font-size: .64em; color: #748494; white-space: nowrap; flex: 0 1 auto; max-width: 50%; overflow: hidden; text-overflow: ellipsis; }
-.vas-exf-addr { flex: 1; min-width: 0; font-size: .64em; color: #748494; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vas-exf-lc { font-size: .64em; color: #748494; white-space: nowrap; flex: 0 0 auto; }
+.vas-exf-wh { font-size: .6em; color: #748494; white-space: nowrap; flex: 0 1 auto; max-width: 50%; overflow: hidden; text-overflow: ellipsis; }
+.vas-exf-addr { flex: 1; min-width: 0; font-size: .6em; color: #748494; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vas-exf-lc { font-size: .6em; color: #748494; white-space: nowrap; flex: 0 0 auto; }
 
 .vas-exf-foot {
     flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;

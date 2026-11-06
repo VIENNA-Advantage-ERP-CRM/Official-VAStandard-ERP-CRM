@@ -410,7 +410,8 @@
 
 .MPC-vnd-m-row {
     display: grid;
-    grid-template-columns: 3.2fr 0.9fr 0.9fr;
+    /* product | code | attribute | qty (5-Nov: attribute values in their own column) */
+    grid-template-columns: 1.8fr 0.9fr 1.4fr 0.9fr;
     gap: 0.75em;
     align-items: center;
 }

@@ -121,6 +121,13 @@
 
 .vas286-thead .vas286-cell.right { text-align: right; }
 
+/* 5-Nov row 32: sortable headings (SO date, Payment due) + direction arrow. */
+.vas286-thead .vas286-sort { cursor: pointer; user-select: none; }
+.vas286-thead .vas286-sort:hover,
+.vas286-thead .vas286-sort:focus-visible { color: #1a5fb4; outline: none; text-decoration: underline; }
+.vas286-thead .vas286-sort.is-active { color: #102C3F; font-weight: 600; }
+.vas286-sort-ind { font-size: .85em; }
+
 .vas286-tbody {
     display: flex;
     flex-direction: column;

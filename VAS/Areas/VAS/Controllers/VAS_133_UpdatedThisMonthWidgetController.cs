@@ -43,6 +43,11 @@ namespace VAS.Controllers
     ///               tab are reported (LoadTrackedTables), and the list order
     ///               includes the column so no field of a multi-field save is
     ///               skipped between pages (e.g. Guarantee Days).
+    ///   VAS163      2026-11-05 Record-level fallback (tab badge, user, time from
+    ///               the record's Updated / UpdatedBy) for EVERY tracked tab whose
+    ///               latest save left no field-level change log (table or column
+    ///               not change-logged), not only for a product with no log at all
+    ///               this month - so an unlogged field is never silently missed.
     /// </summary>
     public class VAS_133_UpdatedThisMonthWidgetController : Controller
     {
@@ -373,7 +378,11 @@ namespace VAS.Controllers
             {
                 branches.Add(ChangeBranch(ctx, tracked[i], i + 1, full));
             }
-            branches.Add(FallbackBranch(ctx, tracked.Count + 1, full));
+            // 5-Nov: a record-level fallback for EVERY tracked tab, not only the product header.
+            for (int i = 0; i < tracked.Count; i++)
+            {
+                branches.Add(FallbackBranch(ctx, tracked[i], tracked.Count + i + 1, full));
+            }
             return string.Join(" UNION ALL ", branches);
         }
 
@@ -426,65 +435,77 @@ namespace VAS.Controllers
         }
 
         /// <summary>
-        /// Products saved this month that left NO field-level log (a column whose
-        /// change log is switched off). They stay in the feed as a record-level
-        /// entry rather than vanishing; the NOT EXISTS keeps them from doubling the
-        /// logged ones. Uses placeholder sets n (product) and n+1 (probe).
+        /// Records of a tracked tab saved this month whose LATEST save left no
+        /// field-level log - the table/role does not keep a change log, or the
+        /// changed column is not logged (e.g. Guarantee Days). They stay in the
+        /// feed as a record-level entry (tab badge, user, time) rather than
+        /// vanishing. 5-Nov: this used to exist for the product header only, and
+        /// only when the product had NO log at all this month, so an unlogged
+        /// field saved after any logged one (or on any other tab) was missed.
+        /// The probe now asks whether the latest save (record.Updated) produced a
+        /// real change-log row; the log of a save is written in that same save, so
+        /// it is never older than the record's Updated stamp. Uses placeholder set n.
         /// </summary>
-        private string FallbackBranch(Ctx ctx, int n, bool full)
+        private string FallbackBranch(Ctx ctx, Tracked t, int n, bool full)
         {
+            string a = t.Alias;
+            string nul = NLiteral(ctx, "~");
+            string tabName = t.FallbackTab.Replace("'", "''");
+            string fieldText = "PRODUCT".Equals(t.SourceType)
+                ? "Product details updated"
+                : tabName + " details updated";
             string select = full
                 ? @"SELECT
-                        " + NLiteral(ctx, "PRODUCT") + @" AS source_type,
-                        p.M_Product_ID AS source_record_id,
-                        p.M_Product_ID AS product_id,
+                        " + NLiteral(ctx, t.SourceType + "_REC") + @" AS source_type,
+                        " + a + "." + t.KeyColumn + @" AS source_record_id,
+                        " + t.ProductIdExpr + @" AS product_id,
                         p.Name AS product_name,
-                        " + NLiteral(ctx, "Product details updated") + @" AS field_name,
+                        " + NLiteral(ctx, fieldText) + @" AS field_name,
                         NULL AS column_name,
                         0 AS column_id,
                         0 AS ref_id,
                         0 AS ref_value_id,
                         NULL AS old_value,
                         NULL AS new_value,
-                        " + NLiteral(ctx, "Product") + @" AS tab_name,
-                        p.UpdatedBy AS updated_by_id,
-                        p.Updated AS updated_at"
-                : @"SELECT p.M_Product_ID AS product_id, p.UpdatedBy AS updated_by_id, p.Updated AS updated_at";
+                        " + NLiteral(ctx, tabName) + @" AS tab_name,
+                        " + a + @".UpdatedBy AS updated_by_id,
+                        " + a + @".Updated AS updated_at"
+                : @"SELECT " + t.ProductIdExpr + @" AS product_id, " + a + @".UpdatedBy AS updated_by_id, " + a + @".Updated AS updated_at";
 
             string sql = select + @"
-                    FROM M_Product p
-                    WHERE p.AD_Client_ID = @AD_Client_ID" + n + @"
-                      AND p.Updated >= @MonthStart" + n + @"
-                      AND p.Updated < @NextMonthStart" + n;
-            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                    FROM " + t.TableName + " " + a + @"
+                    " + t.ProductJoin + @"
+                    WHERE " + a + @".AD_Client_ID = @AD_Client_ID" + n + @"
+                      AND " + a + @".Updated >= @MonthStart" + n + @"
+                      AND " + a + @".Updated < @NextMonthStart" + n;
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, a, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
             // Appended after the role filter so that filter lands on the outer WHERE.
+            // No placeholders here (the probe is correlated to the record's own Updated).
             return sql + @"
                       AND NOT EXISTS (SELECT 1
                                         FROM AD_ChangeLog c2
-                                        JOIN AD_Table t2 ON (t2.AD_Table_ID = c2.AD_Table_ID AND t2.TableName = 'M_Product')
-                                       WHERE c2.Record_ID = p.M_Product_ID
-                                         AND c2.Created >= @MonthStart" + (n + 1) + @"
-                                         AND c2.Created < @NextMonthStart" + (n + 1) + @")";
+                                        JOIN AD_Table t2 ON (t2.AD_Table_ID = c2.AD_Table_ID AND t2.TableName = '" + t.TableName + @"')
+                                       WHERE c2.Record_ID = " + a + "." + t.KeyColumn + @"
+                                         AND c2.Created >= " + a + @".Updated
+                                         AND COALESCE(c2.IsActive, 'Y') = 'Y'
+                                         AND COALESCE(c2.OldValue, " + nul + ") <> COALESCE(c2.NewValue, " + nul + "))";
         }
 
         /// <summary>
         /// Positional parameter set: DB.ExecuteReader matches this array to the
         /// left-to-right order the @placeholders appear in the final SQL, so every
         /// numbered set below is supplied in the order BuildUnion emits it: one per
-        /// tracked table, then the product fallback, then its NOT EXISTS probe
-        /// (the last set), which carries no client id.
+        /// tracked table's change-log branch, then one per tracked table's
+        /// record-level fallback branch.
         /// </summary>
         private SqlParameter[] BuildDateParams(Ctx ctx, int trackedCount, DateBounds bounds, bool withToday)
         {
-            int branchSets = trackedCount + 2;
+            int branchSets = trackedCount * 2;
             List<SqlParameter> list = new List<SqlParameter>();
             for (int n = 1; n <= branchSets; n++)
             {
-                if (n != branchSets)
-                {
-                    list.Add(new SqlParameter("@AD_Client_ID" + n, ctx.GetAD_Client_ID()));
-                }
+                list.Add(new SqlParameter("@AD_Client_ID" + n, ctx.GetAD_Client_ID()));
                 list.Add(new SqlParameter("@MonthStart" + n, SqlDbType.DateTime) { Value = bounds.MonthStart });
                 list.Add(new SqlParameter("@NextMonthStart" + n, SqlDbType.DateTime) { Value = bounds.NextMonthStart });
             }

@@ -53,10 +53,12 @@ namespace VAS.Controllers
     ///       as VAS_278's "Open SOs" stat (never a QtyOrdered&gt;QtyDelivered count
     ///       across CL orders, which are already fully settled by definition).
     ///     - Avg cycle (drill-down) = mean calendar days from C_Order.DateOrdered to
-    ///       the completing outbound M_InOut.MovementDate, averaged ONLY across that
-    ///       representative's period orders that are fully delivered (every active
-    ///       line's QtyDelivered &gt;= QtyOrdered). Orders not yet fully delivered are
-    ///       excluded from the average, never counted as zero. The day-difference
+    ///       the last completed/closed outbound M_InOut.MovementDate (matched through
+    ///       M_InOutLine.C_OrderLine_ID, header C_Order_ID as fallback), averaged ONLY
+    ///       across that representative's period orders that are fully delivered
+    ///       (order QtyDelivered &gt;= QtyOrdered). Orders not yet fully delivered are
+    ///       excluded from the average, never counted as zero; when the month has none,
+    ///       the trailing 12 months are used (5-Nov row 30). The day-difference
     ///       itself is computed here in C#, never in SQL (cross-database rule).
     ///     - Access control is inherited entirely through the existing MRole
     ///       AddAccessSQL org-scoping already applied to every widget on this
@@ -383,13 +385,42 @@ namespace VAS.Controllers
                 CloseReader(dr1);
             }
 
-            // Query 3 of 3 - Avg cycle: fetch (DateOrdered, CompletionDate) pairs for
-            // this representative's FULLY delivered period orders only, then compute
-            // the calendar-day average here in C# (cross-database rule - never
-            // Oracle-only or PostgreSQL-only date arithmetic in the SQL itself).
-            string baseOrdersSql3 = MRole.GetDefault(ctx).AddAccessSQL(BuildBaseOrdersSql(true), "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            // Query 3 of 3 - Avg cycle (5-Nov row 30). Cycle = calendar days from
+            // C_Order.DateOrdered to the LAST completed/closed customer shipment of a
+            // FULLY delivered order. The card used to stay "—" because (a) the shipment
+            // was matched only through the M_InOut.C_Order_ID header link, which is
+            // empty for shipments generated across orders / built from order lines,
+            // (b) Closed ('CL') shipments were ignored, and (c) a current month usually
+            // has no fully delivered order yet. The shipment is now matched through
+            // its lines (M_InOutLine.C_OrderLine_ID) with the header link as fallback,
+            // CO and CL both count, and when the selected month has no fully delivered
+            // order the average widens to the trailing 12 months (same fallback as the
+            // PO dashboard's VAS_215 Avg cycle). Day arithmetic stays in C#.
+            int cycleCount;
+            double cycleDaysTotal;
+            ComputeCycleDays(ctx, repId, monthStart, monthEnd, out cycleCount, out cycleDaysTotal);
+            if (cycleCount == 0)
+            {
+                ComputeCycleDays(ctx, repId, monthStart.AddMonths(-12), monthEnd, out cycleCount, out cycleDaysTotal);
+            }
+            result.AvgCycleDays = cycleCount > 0 ? (decimal?)Math.Round(cycleDaysTotal / cycleCount, 1) : null;
+
+            return result;
+        }
+
+        /// <summary>
+        /// Sums the order-to-final-shipment calendar days of the representative's fully
+        /// delivered booked orders dated in [fromDate, toDate). Orders without a
+        /// completed/closed shipment, or whose shipment predates the order, are skipped.
+        /// </summary>
+        private void ComputeCycleDays(Ctx ctx, int repId, DateTime fromDate, DateTime toDate, out int cycleCount, out double cycleDaysTotal)
+        {
+            cycleCount = 0;
+            cycleDaysTotal = 0;
+
+            string baseOrdersSql = MRole.GetDefault(ctx).AddAccessSQL(BuildBaseOrdersSql(true), "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             string cycleSql = @"
-                WITH base_orders AS (" + baseOrdersSql3 + @"),
+                WITH base_orders AS (" + baseOrdersSql + @"),
                 line_stats AS (
                     SELECT bo.C_Order_ID AS C_Order_ID,
                            bo.Date_Ordered AS Date_Ordered,
@@ -401,45 +432,62 @@ namespace VAS.Controllers
                 )
                 SELECT
                     ls.Date_Ordered AS Date_Ordered,
-                    (
-                        SELECT MAX(io.MovementDate)
-                          FROM M_InOut io
-                         WHERE io.C_Order_ID = ls.C_Order_ID
-                           AND io.IsActive = 'Y'
-                           AND io.IsSOTrx = 'Y'
-                           AND COALESCE(io.IsReturnTrx, 'N') = 'N'
-                           AND io.DocStatus = 'CO'
+                    COALESCE(
+                        (
+                            SELECT MAX(io.MovementDate)
+                              FROM M_InOut io
+                              INNER JOIN M_InOutLine iol ON ( iol.M_InOut_ID = io.M_InOut_ID )
+                              INNER JOIN C_OrderLine sol ON ( sol.C_OrderLine_ID = iol.C_OrderLine_ID )
+                             WHERE sol.C_Order_ID = ls.C_Order_ID
+                               AND io.IsActive = 'Y'
+                               AND io.IsSOTrx = 'Y'
+                               AND COALESCE(io.IsReturnTrx, 'N') = 'N'
+                               AND io.DocStatus IN ('CO', 'CL')
+                        ),
+                        (
+                            SELECT MAX(io2.MovementDate)
+                              FROM M_InOut io2
+                             WHERE io2.C_Order_ID = ls.C_Order_ID
+                               AND io2.IsActive = 'Y'
+                               AND io2.IsSOTrx = 'Y'
+                               AND COALESCE(io2.IsReturnTrx, 'N') = 'N'
+                               AND io2.DocStatus IN ('CO', 'CL')
+                        )
                     ) AS Completion_Date
                   FROM line_stats ls
                  WHERE ls.Qty_Ordered > 0
                    AND ls.Qty_Delivered >= ls.Qty_Ordered";
 
-            IDataReader dr2 = null;
+            IDataReader dr = null;
             try
             {
-                dr2 = DB.ExecuteReader(cycleSql, periodParams);
-
-                int cycleCount = 0;
-                double cycleDaysTotal = 0;
-                while (dr2 != null && dr2.Read())
+                // Fresh parameter set per execution, in placeholder order.
+                dr = DB.ExecuteReader(cycleSql, new[]
                 {
-                    DateTime? dateOrdered = dr2["Date_Ordered"] == DBNull.Value ? (DateTime?)null : Util.GetValueOfDateTime(dr2["Date_Ordered"]);
-                    DateTime? completionDate = dr2["Completion_Date"] == DBNull.Value ? (DateTime?)null : Util.GetValueOfDateTime(dr2["Completion_Date"]);
+                    new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
+                    new SqlParameter("@Month_Start", fromDate),
+                    new SqlParameter("@Month_End", toDate),
+                    new SqlParameter("@Sales_Rep_ID", repId)
+                });
+
+                while (dr != null && dr.Read())
+                {
+                    DateTime? dateOrdered = dr["Date_Ordered"] == DBNull.Value ? (DateTime?)null : Util.GetValueOfDateTime(dr["Date_Ordered"]);
+                    DateTime? completionDate = dr["Completion_Date"] == DBNull.Value ? (DateTime?)null : Util.GetValueOfDateTime(dr["Completion_Date"]);
 
                     if (!dateOrdered.HasValue || !completionDate.HasValue) { continue; }
 
-                    cycleDaysTotal += (completionDate.Value.Date - dateOrdered.Value.Date).Days;
+                    int days = (completionDate.Value.Date - dateOrdered.Value.Date).Days;
+                    if (days < 0) { continue; }
+
+                    cycleDaysTotal += days;
                     cycleCount++;
                 }
-
-                result.AvgCycleDays = cycleCount > 0 ? (decimal?)Math.Round(cycleDaysTotal / cycleCount, 1) : null;
             }
             finally
             {
-                CloseReader(dr2);
+                CloseReader(dr);
             }
-
-            return result;
         }
 
         private RepresentativeOrdersResult GetRepresentativeOrdersData(Ctx ctx, int repId, int month, int year, int page, int size)

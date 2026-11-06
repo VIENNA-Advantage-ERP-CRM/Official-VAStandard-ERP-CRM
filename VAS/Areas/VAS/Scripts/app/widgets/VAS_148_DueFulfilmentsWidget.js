@@ -100,7 +100,9 @@
         var selectedWarehouseId = 0;
 
         function lbl(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            var text = VIS.Msg.getMsg(key);
+            if (!text || text === key || text === '[' + key + ']') { return fallback || key; }
+            return text;
         }
 
         function escapeHtml(value) {
@@ -326,6 +328,8 @@
             $c.on('change', '.vas-duf-loc', function () { onLocatorChange(Number($(this).data('id')), Number($(this).val())); });
             $c.on('keydown', '.vas-duf-qty', onQtyKeyDown);
             $c.on('input', '.vas-duf-qty', function () { onQtyChange(Number($(this).data('id')), $(this).val(), this); });
+            $c.on('paste', '.vas-duf-qty', onQtyPaste);
+            $c.on('change', '.vas-duf-qty', onQtyCommit);
             $c.on('click', '.vas-duf-lprev', function () { if (linePage > 1) { linePage--; renderLineList(); } });
             $c.on('click', '.vas-duf-lnext', function () { if (linePage < lineTotalPages()) { linePage++; renderLineList(); } });
             $c.on('click', '.vas-duf-gen', onGenerate);
@@ -457,6 +461,33 @@
             var key = e.key;
             if (key === 'e' || key === 'E' || key === '+' || key === '-') { e.preventDefault(); return; }
             if (precision <= 0 && (key === '.' || key === ',' || key === 'Decimal')) { e.preventDefault(); }
+        }
+
+        /* Pasted text: a number input rejects anything unparsable (the value
+           then reads back as ''), so the clipboard is cleaned here and the
+           quantity written at the line's UOM precision. */
+        function onQtyPaste(e) {
+            var clip = e.originalEvent && e.originalEvent.clipboardData;
+            if (!clip) { return; }
+            e.preventDefault();
+            var precision = Number($(this).attr('data-precision')) || 0;
+            var text = String(clip.getData('text') || '').replace(/[^\d.,]/g, '');
+            // "1,000" / "1,000.50" -> group separators; a lone "1,5" -> decimal comma.
+            text = (text.indexOf('.') < 0 && /^\d+,\d{1,2}$/.test(text)) ? text.replace(',', '.') : text.replace(/,/g, '');
+            var n = Number(text);
+            var fixed = (text !== '' && isFinite(n) && n > 0) ? truncateToPrecision(n, precision) : 0;
+            $(this).val(fixed);
+            onQtyChange(Number($(this).data('id')), String(fixed), this);
+        }
+
+        /* On commit (blur / Enter / spinner) the box always shows the stored,
+           precision-correct quantity - never a negative, blank or over-precise
+           value the browser let through. */
+        function onQtyCommit() {
+            var line = lineState[Number($(this).data('id'))];
+            if (!line) { return; }
+            var current = $(this).val();
+            if (current === '' || Number(current) !== Number(line.qty)) { $(this).val(line.qty); }
         }
 
         function onQtyChange(id, val, input) {
