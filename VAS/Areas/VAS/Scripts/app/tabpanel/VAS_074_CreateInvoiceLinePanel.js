@@ -399,6 +399,12 @@
             // vis-apanel-busy, so we skip ours there to avoid a stacked double spinner.
             var isPageChange = (typeof page === "number");
             if (isPageChange) showBusy(true);
+            // A framework reload of the SAME invoice (e.g. after the header was saved) while the
+            // panel still holds unsaved lines: keep that work (merged in the success handler) and
+            // reload the page the user is on, since page navigation is blocked while lines are
+            // unsaved - so all of them are on the current page.
+            var keepUnsaved = !isPageChange && !!parent && +parent.C_Invoice_ID === +recordID && hasPanelChanges();
+            if (keepUnsaved) reqPage = linePage;
             // Re-baseline the lock watcher: whatever this load paints is the state the next
             // data-status event is compared against (see onTabDataStatus).
             lastLockState = null;
@@ -448,8 +454,12 @@
                     // new invoice so its val rule re-resolves against the new header context
                     // (e.g. a different C_BPartner_ID) instead of serving the prior invoice's list.
                     _mlookupCache = {};
-                    lines = [];
-                    if (parent && parent.Lines) for (var j = 0; j < parent.Lines.length; j++) lines.push(fromServerRow(parent.Lines[j]));
+                    if (keepUnsaved && parent && +parent.C_Invoice_ID === +recordID && hasPanelChanges()) {
+                        mergeReloadedLines(parent.Lines || []);
+                    } else {
+                        lines = [];
+                        if (parent && parent.Lines) for (var j = 0; j < parent.Lines.length; j++) lines.push(fromServerRow(parent.Lines[j]));
+                    }
                     editing = null; morePopoverFor = null;
                     taxSummary = null;   // drop the prior record's breakdown -> fallback shows first
                     // Re-baseline the lock watcher against what this render actually paints. Reset
@@ -517,6 +527,61 @@
             // from the server (initial load + mergeSavedLines after a save).
             line._saved = snapshotLine(line);
             return line;
+        }
+
+        /* Does the panel hold work not yet saved - a new line or an edited saved line? */
+        function hasPanelChanges() {
+            for (var i = 0; i < lines.length; i++) if (lines[i].status === "new" || lines[i].dirty) return true;
+            return false;
+        }
+
+        /* Same value for change detection: empty / null alike, numbers compared as numbers. */
+        function sameVal(a, b) {
+            a = (a == null) ? "" : a; b = (b == null) ? "" : b;
+            if (a === b) return true;
+            var sa = String(a), sb = String(b);
+            if (sa !== "" && sb !== "" && !isNaN(sa) && !isNaN(sb)) return +sa === +sb;
+            return sa === sb;
+        }
+
+        /* Was the saved line changed on the server since the panel loaded it? Compares the
+           server's fresh copy with the line's load-time snapshot (_saved). */
+        function serverRowChanged(line, fresh) {
+            var base = line._saved && line._saved.values;
+            if (!base) return true;
+            for (var k in fresh.values) if (fresh.values.hasOwnProperty(k)) {
+                if (!sameVal(fresh.values[k], base[k])) return true;
+            }
+            return false;
+        }
+
+        /* Rebuild the lines from a reload of the SAME invoice without losing panel work:
+             - new (never-saved) lines are kept as they are;
+             - an edited saved line keeps the panel's edit when the server copy is unchanged,
+               and takes the server copy when the server changed it (server wins);
+             - an edited line the server no longer has (deleted elsewhere) is dropped.
+           Clean saved lines are refreshed from the server rows. */
+        function mergeReloadedLines(serverRows) {
+            var dirtyById = {}, seen = {}, refreshed = 0, removed = 0;
+            lines.forEach(function (l) {
+                var id = +l.values.C_InvoiceLine_ID || 0;
+                if (id > 0 && l.dirty) dirtyById[id] = l;
+            });
+            var newKeep = lines.filter(function (l) { return (+l.values.C_InvoiceLine_ID || 0) <= 0; });
+            var merged = (serverRows || []).map(function (r) {
+                var fresh = fromServerRow(r);
+                var mine = dirtyById[r.C_InvoiceLine_ID];
+                if (!mine) return fresh;
+                seen[r.C_InvoiceLine_ID] = true;
+                if (serverRowChanged(mine, fresh)) { refreshed++; return fresh; }
+                return mine;
+            });
+            for (var id in dirtyById) if (dirtyById.hasOwnProperty(id) && !seen[id]) removed++;
+            lines = newKeep.concat(merged);
+            if (refreshed || removed) {
+                showToast(lbl("VAS_074_LinesChangedOnServer",
+                    "Some edited lines were changed or removed on the server - the server version is shown for them"));
+            }
         }
 
         /* Deep-clone the revertible parts of a line for the Undo snapshot. */
