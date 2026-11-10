@@ -85,6 +85,9 @@
  * 53  | of                                                                    | VAS_283_Of
  * 54  | Showing                                                               | VAS_283_Showing
  * 55  | Search is unavailable right now. Try again in a moment.               | VAS_283_LoadError
+ * 56  | Month                                                                 | VAS_283_Month
+ * 57  | Year                                                                  | VAS_283_Year
+ * 58  | Lines                                                                 | VAS_283_StatLines
  */
 ; VAS = window.VAS || {};
 
@@ -151,8 +154,8 @@
                 $root.find('.vasso-retry').remove();
                 if ($root.css('position') === 'static') { $root.css('position', 'relative'); }
                 var text = '';
-                try { text = VIS.Msg.getMsg('VAS_SO_Retry'); } catch (e) { text = ''; }
-                if (!text || text === 'VAS_SO_Retry') { text = 'Retry'; }
+                try { text = VIS.Msg.translate(VIS.Env.getCtx(), 'VAS_SO_Retry'); } catch (e) { text = ''; }
+                if (!text || text === 'VAS_SO_Retry' || String(text).charAt(0) === '[') { text = 'Retry'; }
                 $('<button type="button" class="vasso-retry"></button>').text(text)
                     .attr('title', text)
                     .on('click', function (e) {
@@ -169,7 +172,6 @@
     var WIDGET_PAGE_SIZE = 7;   // warehouse rows per widget page
     var MAX_ROWS_PER_PAGE = 10;
     var MIN_ROWS_PER_PAGE = 2;
-    var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     var MIN_YEAR = 2024;
     var YEAR_SPAN = 3;
 
@@ -220,12 +222,47 @@
         var cfgStack = [];
         var currentCfg = null;
 
+        // Translated texts, loaded once per widget instance (see loadMessages()).
+        var translatedTexts = null;
+
+        function loadMessages() {
+            var elements = [
+                'VAS_283_Title', 'VAS_283_ColWarehouse', 'VAS_283_ColDrafted', 'VAS_283_ColInProcess',
+                'VAS_283_ColPartlyDelivered', 'VAS_283_ColCompleted', 'VAS_283_ColTotal', 'VAS_283_PrevPage',
+                'VAS_283_NextPage', 'VAS_283_ErrorState', 'VAS_283_ZeroStatePrefix', 'VAS_283_Showing',
+                'VAS_283_Of', 'VAS_283_OpenSosSuffix', 'VAS_283_Back', 'VAS_283_Close', 'VAS_283_LoadError',
+                'VAS_283_SubtitlePrefix', 'VAS_283_StatTotalSos', 'VAS_283_SectionHeading', 'VAS_283_ColSoNo',
+                'VAS_283_SoDate', 'VAS_283_Customer', 'VAS_283_Representative', 'VAS_283_ColValue',
+                'VAS_283_ColDelivery', 'VAS_283_ColStatus', 'VAS_283_DeliveryFull', 'VAS_283_LinePartial',
+                'VAS_283_LineInProcess', 'VAS_283_DatePromised', 'VAS_283_SoValue', 'VAS_283_ShipFrom',
+                'VAS_283_DeliveryMode', 'VAS_283_DocumentStatus', 'VAS_283_DeliveryStatus',
+                'VAS_283_SalesOrderLines', 'VAS_283_LinesSuffix', 'VAS_283_QtyOrderedSuffix',
+                'VAS_283_QtyShortSuffix', 'VAS_283_SalesOrderPrefix', 'VAS_283_ColLine', 'VAS_283_ColOrdered',
+                'VAS_283_ColPending', 'VAS_283_ColProduct', 'VAS_283_ColAttribute', 'VAS_283_ColUom',
+                'VAS_283_ColDelivered', 'VAS_283_ColInStock', 'VAS_283_ColRate', 'VAS_283_ColAmount',
+                'VAS_283_ColLineStatus', 'VAS_283_Month', 'VAS_283_Year', 'VAS_283_StatLines'
+            ];
+            try { translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {}; }
+            catch (e) { translatedTexts = {}; }
+        }
+
         // Never render a raw "[KEY]": fall back to the English text when the key is missing.
         function label(key, fallback) {
-            var text = '';
-            try { text = VIS.Msg.getMsg(key); } catch (e) { text = ''; }
-            if (!text || text === key || text === '[' + key + ']') { return fallback || key; }
+            if (translatedTexts === null) { loadMessages(); }
+            var text = translatedTexts ? translatedTexts[key] : '';
+            if (!text || text === key || String(text).charAt(0) === '[') { return fallback || key; }
             return text;
+        }
+
+        /* Browser-culture formatting (window.navigator.language). */
+        function fmtDate(d, opts) {
+            try { return new Intl.DateTimeFormat(window.navigator.language, opts).format(d); } catch (e) { return ''; }
+        }
+
+        function fmtNumber(n, minFrac, maxFrac) {
+            try {
+                return Number(n).toLocaleString(window.navigator.language, { minimumFractionDigits: minFrac, maximumFractionDigits: maxFrac });
+            } catch (e) { return String(n); }
         }
 
         function escapeHtml(value) {
@@ -256,15 +293,24 @@
             return '';
         }
 
-        function formatINR(value) {
+        // The widget's API returns bare amounts (no currency ISO / symbol), so none is invented here.
+        // If the backend ever supplies the currency ISO code, return it from this function.
+        function currencyIso() { return ''; }
+
+        function formatAmount(value) {
             var num = Number(value || 0);
-            if (num >= 1e7) { return '₹ ' + (num / 1e7).toFixed(2) + ' Cr'; }
-            if (num >= 1e5) { return '₹ ' + (num / 1e5).toFixed(2) + ' L'; }
-            return '₹ ' + Math.round(num).toLocaleString('en-IN');
+            try {
+                var iso = currencyIso();
+                var compactFrom = VIS.Util.usesIndianNumbering(iso) ? 1e5 : 1e6;
+                if (Math.abs(num) >= compactFrom) {
+                    return (num < 0 ? '-' : '') + VIS.Util.formatCompactAmount(Math.abs(num), iso, 2);
+                }
+            } catch (e) { /* shared compact helper unavailable - use the plain number below */ }
+            return fmtNumber(Math.round(num), 0, 0);
         }
 
         function formatNum(value) {
-            return Math.round(Number(value || 0)).toLocaleString('en-IN');
+            return fmtNumber(Math.round(Number(value || 0)), 0, 0);
         }
 
         function parseIso(iso) {
@@ -276,11 +322,11 @@
         function formatDateFull(iso) {
             var d = parseIso(iso);
             if (!d) { return ''; }
-            return (d.getDate() < 10 ? '0' : '') + d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+            return fmtDate(d, { day: '2-digit', month: 'short', year: 'numeric' });
         }
 
         function periodLabel() {
-            return MONTHS[selectedMonth()] + ' ' + selectedYear();
+            return fmtDate(new Date(selectedYear(), selectedMonth(), 1), { month: 'short', year: 'numeric' });
         }
 
         function selectedMonth() { return $monthSel && $monthSel.length ? Number($monthSel.val()) : new Date().getMonth(); }
@@ -306,9 +352,11 @@
          * ============================================================ */
         function fillMonthSelect($sel) {
             var curM = new Date().getMonth();
-            $sel.html(MONTHS.map(function (m, i) {
-                return '<option value="' + i + '"' + (i === curM ? ' selected' : '') + '>' + m + '</option>';
-            }).join(''));
+            var html = '';
+            for (var i = 0; i < 12; i++) {
+                html += '<option value="' + i + '"' + (i === curM ? ' selected' : '') + '>' + escapeHtml(fmtDate(new Date(2000, i, 1), { month: 'short' })) + '</option>';
+            }
+            $sel.html(html);
         }
 
         function fillYearSelect($sel) {
@@ -328,8 +376,8 @@
             $htxt.append('<p class="vas283-title">' + escapeHtml(label('VAS_283_Title', 'Warehouse Wise SO · Document Status')) + '</p>');
 
             var $filter = $('<div class="vas283-mfilter"></div>');
-            $monthSel = $('<select class="vas283-msel" aria-label="Month"></select>');
-            $yearSel = $('<select class="vas283-msel" aria-label="Year"></select>');
+            $monthSel = $('<select class="vas283-msel" aria-label="' + escapeHtml(label('VAS_283_Month', 'Month')) + '"></select>');
+            $yearSel = $('<select class="vas283-msel" aria-label="' + escapeHtml(label('VAS_283_Year', 'Year')) + '"></select>');
             fillMonthSelect($monthSel);
             fillYearSelect($yearSel);
             $filter.append($monthSel, $yearSel);
@@ -686,7 +734,7 @@
                     mcellHtml(row.CustomerName, 'vas283-c-prim'),
                     mcellHtml(row.WarehouseName || '—', 'vas283-c-std'),
                     mcellHtml(row.RepresentativeName || '—', 'vas283-c-std'),
-                    mcellHtml(formatINR(row.OrderValue), 'vas283-c-emph', 'right'),
+                    mcellHtml(formatAmount(row.OrderValue), 'vas283-c-emph', 'right'),
                     '<span class="vas283-mcell" title="' + escapeHtml(row.DeliveryStatus) + '"><span class="vas283-mchip ' + deliveryChipClass(row.DeliveryStatusCode) + '">' + escapeHtml(row.DeliveryStatus) + '</span></span>',
                     '<span class="vas283-mcell" title="' + escapeHtml(row.DocumentStatus) + '"><span class="vas283-mchip vas283-mchip-ok">' + escapeHtml(row.DocumentStatus) + '</span></span>'
                 ];
@@ -796,7 +844,7 @@
                 statTile(label('VAS_283_Customer', 'Customer'), order.CustomerName) +
                 statTile(label('VAS_283_SoDate', 'SO date'), formatDateFull(order.SalesOrderDate)) +
                 statTile(label('VAS_283_DatePromised', 'Date promised'), formatDateFull(order.DatePromised)) +
-                statTile(label('VAS_283_SoValue', 'SO value'), formatINR(order.OrderValue)) +
+                statTile(label('VAS_283_SoValue', 'SO value'), formatAmount(order.OrderValue)) +
                 statTile(label('VAS_283_ShipFrom', 'Ship from'), order.WarehouseName) +
                 statTile(label('VAS_283_DeliveryMode', 'Delivery mode'), order.DeliveryMode) +
                 statTile(label('VAS_283_DocumentStatus', 'Document status'), order.DocumentStatus) +
@@ -860,8 +908,8 @@
                 ' · ' + escapeHtml(formatDateFull(order.SalesOrderDate)) + ' · ' + escapeHtml(order.DocumentStatus) + '</div>';
 
             var stats = '<div class="vas283-mstats">' +
-                statTile(label('VAS_283_ColLine', 'Line') + 's', String(lines.length)) +
-                statTile(label('VAS_283_SoValue', 'SO value'), formatINR(order.OrderValue)) +
+                statTile(label('VAS_283_StatLines', 'Lines'), String(lines.length)) +
+                statTile(label('VAS_283_SoValue', 'SO value'), formatAmount(order.OrderValue)) +
                 statTile(label('VAS_283_ColOrdered', 'Ordered'), formatNum(qtyOrdered)) +
                 statTile(label('VAS_283_ColPending', 'Pending'), formatNum(qtyPending)) +
             '</div>';
@@ -916,8 +964,8 @@
                     mcellHtml(formatNum(line.QtyDelivered), 'vas283-c-std', 'right'),
                     mcellHtml(formatNum(line.QtyPending), 'vas283-c-prim', 'right'),
                     mcellHtml(formatNum(line.FreeStock), (line.FreeStock < line.QtyPending ? 'vas283-c-short' : 'vas283-c-ok'), 'right'),
-                    mcellHtml('₹ ' + formatNum(line.Rate), 'vas283-c-std', 'right'),
-                    mcellHtml(formatINR(line.Amount), 'vas283-c-emph', 'right')
+                    mcellHtml(formatNum(line.Rate), 'vas283-c-std', 'right'),
+                    mcellHtml(formatAmount(line.Amount), 'vas283-c-emph', 'right')
                 ].join('') + '<span class="vas283-mcell"><span class="vas283-mchip ' + st.cls + '" title="' + escapeHtml(st.text) + '">' + escapeHtml(st.text) + '</span></span>';
                 return '<div class="vas283-mrow" style="grid-template-columns:' + tpl + '">' + cells + '</div>';
             }).join('');
@@ -978,6 +1026,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createModal();
             bindDocumentLevelEvents();

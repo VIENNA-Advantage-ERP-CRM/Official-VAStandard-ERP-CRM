@@ -12,6 +12,7 @@
  *           widget sits ON one. From the Home / landing dashboard (windowNo < 0) the
  *           Customer window is resolved by name through VAS.ZoomUtil and started on a
  *           blank record instead, so the tile works on both hosts.
+ *           2026-11-10 - Messages via VIS.Msg.translate (single batched lookup).
  * Design  - new-customer.html (attached) + Design Specs/dashboard-widgets.md
  *           "Quick Action Widget": pale-blue glass, 2px dashed #9ED1FF border,
  *           centred blue "+" well above a bold title and muted subtitle. Internal
@@ -65,8 +66,24 @@
         var $self = this;
         var $root = $('<div class="vas121-root">');
 
+        var translatedTexts = null;
+
+        /* Loads every message key used by this widget in ONE VIS.Msg.translate call. */
+        function loadMessages() {
+            var elements = [
+                'VAS_121_NewCustomer',
+                'VAS_121_AddCustomer'
+            ];
+            try {
+                translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {};
+            } catch (e) { translatedTexts = {}; }
+        }
+
         function lbl(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            if (translatedTexts === null) { loadMessages(); }
+            var v = translatedTexts ? translatedTexts[key] : null;
+            if (!v || v === key || String(v).charAt(0) === '[') { return fallback || key; }
+            return v;
         }
 
         function escapeHtml(value) {
@@ -146,6 +163,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
         };
 

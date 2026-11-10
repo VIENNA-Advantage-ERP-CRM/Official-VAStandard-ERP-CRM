@@ -69,8 +69,21 @@
         var zoomWindowId = 0;
         var $card = null;
 
+        var translatedTexts = null;
+
+        /** Loads every message key this widget uses with a single VIS.Msg.translate call. */
+        function loadMessages() {
+            var elements = ['VAS_269_NewSalesOrder', 'VAS_269_AddSalesOrder'];
+            try { translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {}; }
+            catch (e) { translatedTexts = {}; }
+        }
+
+        // A missing message key must never render raw ("[KEY]") - fall back to the English text.
         function lbl(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            if (translatedTexts === null) { loadMessages(); }
+            var text = translatedTexts[key];
+            if (!text || text === key || String(text).charAt(0) === '[') { return fallback || key; }
+            return text;
         }
 
         function escapeHtml(value) {
@@ -183,6 +196,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
         };
 

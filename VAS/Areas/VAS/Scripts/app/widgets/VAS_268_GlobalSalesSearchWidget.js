@@ -84,6 +84,15 @@
  * 46  | Esc                                                                   | VAS_268_EscHint
  * 47  | Warehouse                                                             | VAS_268_Warehouse
  * 48  | Clear                                                                 | VAS_268_Clear
+ * 49  | Sales order (search category)                                         | VAS_268_CatSalesOrder
+ * 50  | Customer (search category)                                            | VAS_268_CatCustomer
+ * 51  | Product (search category)                                             | VAS_268_CatProduct
+ * 52  | Representative (search category)                                      | VAS_268_CatRepresentative
+ * 53  | Warehouse (search category)                                           | VAS_268_CatWarehouse
+ * 54  | Quotation (search category)                                           | VAS_268_CatQuotation
+ * 55  | Description (search category)                                         | VAS_268_CatDescription
+ * 56  | Order reference (search category)                                     | VAS_268_CatOrderReference
+ * 57  | Location (search category)                                            | VAS_268_CatLocation
  */
 ; VAS = window.VAS || {};
 
@@ -129,13 +138,56 @@
         var lineState = null; // { lines, page, size }
         var zoomWindowId = 0;
 
+        var translatedTexts = null;
+
+        /** Loads every message key this widget uses with a single VIS.Msg.translate call. */
+        function loadMessages() {
+            var elements = [
+                'VAS_268_SearchPlaceholder', 'VAS_268_Clear', 'VAS_268_EscHint', 'VAS_268_Back', 'VAS_268_Close',
+                'VAS_268_Searching', 'VAS_268_SearchError', 'VAS_268_RecentAcrossSales', 'VAS_268_NoRecent',
+                'VAS_268_NoMatches', 'VAS_268_ViewAll', 'VAS_268_LineDrafted', 'VAS_268_LineVoided',
+                'VAS_268_LineDelivered', 'VAS_268_LinePartial', 'VAS_268_LineInProcess', 'VAS_268_DatePromised',
+                'VAS_268_SoValue', 'VAS_268_Warehouse', 'VAS_268_DeliveryStatus', 'VAS_268_SalesOrderLines',
+                'VAS_268_LinesSuffix', 'VAS_268_QtyOrderedSuffix', 'VAS_268_QtyShortSuffix', 'VAS_268_OpenRecord',
+                'VAS_268_ColLine', 'VAS_268_ColProduct', 'VAS_268_ColAttribute', 'VAS_268_ColUom',
+                'VAS_268_ColOrdered', 'VAS_268_ColDelivered', 'VAS_268_ColPending', 'VAS_268_ColInStock',
+                'VAS_268_ColRate', 'VAS_268_ColAmount', 'VAS_268_ColLineStatus', 'VAS_268_Showing', 'VAS_268_Of',
+                'VAS_268_PrevPage', 'VAS_268_NextPage',
+                'VAS_268_CatSalesOrder', 'VAS_268_CatCustomer', 'VAS_268_CatProduct', 'VAS_268_CatRepresentative',
+                'VAS_268_CatWarehouse', 'VAS_268_CatQuotation', 'VAS_268_CatDescription', 'VAS_268_CatOrderReference',
+                'VAS_268_CatLocation'
+            ];
+            try { translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {}; }
+            catch (e) { translatedTexts = {}; }
+        }
+
         // A missing message key must never render raw ("[KEY]") - fall back to the English text.
         function label(key, fallback) {
-            var text = '';
-            try { text = VIS.Msg.getMsg(key); } catch (e) { text = ''; }
-            if (!text || text === key || text === '[' + key + ']') { return fallback || key; }
+            if (translatedTexts === null) { loadMessages(); }
+            var text = translatedTexts[key];
+            if (!text || text === key || String(text).charAt(0) === '[') { return fallback || key; }
             return text;
         }
+
+        // Server sends the search category in English; show it translated (unknown values pass through).
+        var CATEGORY_LABELS = {
+            'Sales order': ['VAS_268_CatSalesOrder', 'Sales order'],
+            'Customer': ['VAS_268_CatCustomer', 'Customer'],
+            'Product': ['VAS_268_CatProduct', 'Product'],
+            'Representative': ['VAS_268_CatRepresentative', 'Representative'],
+            'Warehouse': ['VAS_268_CatWarehouse', 'Warehouse'],
+            'Quotation': ['VAS_268_CatQuotation', 'Quotation'],
+            'Description': ['VAS_268_CatDescription', 'Description'],
+            'Order reference': ['VAS_268_CatOrderReference', 'Order reference'],
+            'Location': ['VAS_268_CatLocation', 'Location']
+        };
+        function categoryLabel(category) {
+            var entry = CATEGORY_LABELS[category];
+            return entry ? label(entry[0], entry[1]) : category;
+        }
+
+        // Browser culture drives every date / number format (window.navigator.language).
+        function lang() { return window.navigator.language; }
 
         function escapeHtml(value) {
             return String(value == null ? '' : value)
@@ -172,30 +224,25 @@
             return '';
         }
 
-        // Indian-numbering display convention (₹ x.xx Cr / ₹ x.xx L / grouped
-        // integer) - matches the design mock's fmtINR exactly (01-global-search.html).
-        function formatINR(value) {
-            var num = Number(value || 0);
-            if (num >= 1e7) { return '₹ ' + (num / 1e7).toFixed(2) + ' Cr'; }
-            if (num >= 1e5) { return '₹ ' + (num / 1e5).toFixed(2) + ' L'; }
-            return '₹ ' + Math.round(num).toLocaleString('en-IN');
-        }
-
         function formatNum(value) {
-            return Math.round(Number(value || 0)).toLocaleString('en-IN');
+            var num = Math.round(Number(value || 0));
+            try { return num.toLocaleString(lang()); } catch (e) { return String(num); }
         }
 
         // Sr 8.7: amounts in the order's (price list's) own currency, with that
         // currency's precision - not a hard-coded rupee sign.
         function formatMoney(value, symbol, precision) {
             var prec = (typeof precision === 'number' && precision >= 0) ? precision : 2;
-            var text = Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: prec, maximumFractionDigits: prec });
+            var text;
+            try { text = Number(value || 0).toLocaleString(lang(), { minimumFractionDigits: prec, maximumFractionDigits: prec }); }
+            catch (e) { text = Number(value || 0).toFixed(prec); }
             return symbol ? symbol + ' ' + text : text;
         }
 
         // Sr 7.6: quantities are in the line's selected UOM and can be fractional.
         function formatQty(value) {
-            return Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+            try { return Number(value || 0).toLocaleString(lang(), { maximumFractionDigits: 2 }); }
+            catch (e) { return String(Number(value || 0)); }
         }
 
         // An attribute set instance with no values can still carry a description made
@@ -205,15 +252,18 @@
             return !!text && /[^\s\-‐-―_.,:;()\[\]\/\\|]/.test(String(text));
         }
 
-        var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         function formatDateShort(iso) {
             if (!iso) { return ''; }
-            var d = new Date(iso + 'T00:00:00');
+            // A date-only 'yyyy-mm-dd' string becomes a LOCAL date (no timezone shift).
+            var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso));
+            var d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(iso + 'T00:00:00');
             if (isNaN(d.getTime())) { return iso; }
-            return (d.getDate() < 10 ? '0' : '') + d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+            try { return new Intl.DateTimeFormat(lang(), { day: '2-digit', month: 'short', year: 'numeric' }).format(d); }
+            catch (e) { return String(iso); }
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createModal();
             bindEvents();
@@ -442,14 +492,14 @@
             rows.forEach(function (row, index) {
                 if (!isRecentState && row.Category !== lastGroup) {
                     lastGroup = row.Category;
-                    html += '<div class="vas268-rgroup">' + escapeHtml(row.Category) + '</div>';
+                    html += '<div class="vas268-rgroup">' + escapeHtml(categoryLabel(row.Category)) + '</div>';
                 }
 
                 var secondary = [row.SalesOrderNumber, formatDateShort(row.SalesOrderDate), row.CustomerName, row.DocumentStatus]
                     .filter(function (part) { return part; }).join(' · ');
                 var primary = isRecentState ? row.SalesOrderNumber : row.MatchedText;
                 var tint = CATEGORY_TINT[row.Category] || '#F1F4F8';
-                var badgeLetter = isRecentState ? 'S' : (row.Category.charAt(0) || 'S');
+                var badgeLetter = isRecentState ? 'S' : (categoryLabel(row.Category).charAt(0) || 'S');
 
                 html += '<button type="button" class="vas268-ritem' + (index === activeIndex ? ' is-active' : '') + '" role="option" data-index="' + index + '">' +
                     '<span class="vas268-ico" style="background:' + tint + '">' + escapeHtml(badgeLetter) + '</span>' +
@@ -462,7 +512,7 @@
             });
 
             if (!isRecentState && totalMatches > rows.length) {
-                var moreText = label('VAS_268_ViewAll', 'View all {n} results').replace('{n}', totalMatches);
+                var moreText = label('VAS_268_ViewAll', 'View all {n} results').replace('{n}', formatNum(totalMatches));
                 html += '<div class="vas268-rmore" role="button" tabindex="0">' + escapeHtml(moreText) + ' ' + icon('arrow') + '</div>';
             }
 
@@ -590,7 +640,7 @@
             lineState = { order: order, lines: lines, page: 0, size: MAX_LINES_PER_PAGE, showAttribute: showAttribute };
             drawLineTable();
 
-            var footNote = lines.length + ' ' + label('VAS_268_LinesSuffix', 'lines') +
+            var footNote = formatNum(lines.length) + ' ' + label('VAS_268_LinesSuffix', 'lines') +
                 ' · ' + formatQty(qtyOrdered) + ' ' + label('VAS_268_QtyOrderedSuffix', 'qty ordered') +
                 ' · ' + order.DeliveryStatus +
                 (qtyShort > 0 ? ' · ' + formatQty(qtyShort) + ' ' + label('VAS_268_QtyShortSuffix', 'qty short of stock') : '');
@@ -678,13 +728,13 @@
                 return '<div class="vas268-mrow" style="grid-template-columns:' + tpl + '">' + rowHtml + '</div>';
             }).join('');
 
-            var showingLabel = label('VAS_268_Showing', 'Showing') + ' ' + (start + 1) + '–' + (start + slice.length) + ' ' + label('VAS_268_Of', 'of') + ' ' + lineState.lines.length;
+            var showingLabel = label('VAS_268_Showing', 'Showing') + ' ' + formatNum(start + 1) + '–' + formatNum(start + slice.length) + ' ' + label('VAS_268_Of', 'of') + ' ' + formatNum(lineState.lines.length);
 
             var foot = '<div class="vas268-mtfoot"><span class="vas268-helper">' + escapeHtml(showingLabel) + '</span>' +
                 (pages > 1 ?
                     '<span class="vas268-pager">' +
                         '<button type="button" class="vas268-pbtn" data-dir="-1"' + (lineState.page === 0 ? ' disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_268_PrevPage', 'Previous page')) + '">' + icon('prev') + '</button>' +
-                        '<span class="vas268-ptxt">' + (lineState.page + 1) + ' ' + escapeHtml(label('VAS_268_Of', 'of')) + ' ' + pages + '</span>' +
+                        '<span class="vas268-ptxt">' + formatNum(lineState.page + 1) + ' ' + escapeHtml(label('VAS_268_Of', 'of')) + ' ' + formatNum(pages) + '</span>' +
                         '<button type="button" class="vas268-pbtn" data-dir="1"' + (lineState.page >= pages - 1 ? ' disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_268_NextPage', 'Next page')) + '">' + icon('next') + '</button>' +
                     '</span>' : '<span></span>') +
             '</div>';

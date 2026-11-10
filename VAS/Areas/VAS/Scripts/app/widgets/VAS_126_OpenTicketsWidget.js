@@ -22,6 +22,8 @@
  *           landing dashboard (windowNo < 0) there is no host grid, so the standard
  *           Customer window is opened via VAS.ZoomUtil - on the picked record, or
  *           unpositioned for "open in browser" (record id 0).
+ *           2026-11-10 - Messages via VIS.Msg.translate (single batched lookup); amounts and
+ *           pager numbers formatted with the browser culture (Intl, symbol placed per locale).
  *
  * ── Labels / Message Keys ─────────────────────────────────────────────────
  *  #  | Current Text                   | Message Key
@@ -102,8 +104,73 @@
         var listLoading = false;
         var searchCurrency = { symbol: '', iso: '', precision: 0 };
 
+        var translatedTexts = null;
+
+        /* Loads every message key used by this widget in ONE VIS.Msg.translate call. */
+        function loadMessages() {
+            var elements = [
+                'Loading',
+                'VAS_126_OpenTickets',
+                'VAS_126_Click',
+                'VAS_126_Triage',
+                'VAS_126_OpenTriageList',
+                'VAS_126_UnableToLoad',
+                'VAS_126_CustomersWithOpenTickets',
+                'VAS_126_KeyClient',
+                'VAS_126_NothingHere',
+                'VAS_126_Of',
+                'VAS_126_Showing',
+                'VAS_126_Close',
+                'VAS_126_Customer',
+                'VAS_126_Customers',
+                'VAS_126_Tier',
+                'VAS_126_Owner',
+                'VAS_126_ARR',
+                'VAS_126_Segment',
+                'VAS_126_PrevPage',
+                'VAS_126_NextPage',
+                'VAS_126_OpenTicketsFact',
+                'VAS_126_Projects',
+                'VAS_126_Pipeline',
+                'VAS_126_Onboarding',
+                'VAS_126_OpenSupportTickets',
+                'VAS_126_KeyPrioritise',
+                'VAS_126_OpenRequests',
+                'VAS_126_Overdue',
+                'VAS_126_DaysPastDue',
+                'VAS_126_Signals',
+                'VAS_126_CustomerDetails',
+                'VAS_126_OpenRecord',
+                'VAS_126_OpenInBrowser'
+            ];
+            try {
+                translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {};
+            } catch (e) { translatedTexts = {}; }
+        }
+
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            if (translatedTexts === null) { loadMessages(); }
+            var v = translatedTexts ? translatedTexts[key] : null;
+            if (!v || v === key || String(v).charAt(0) === '[') { return fallback || key; }
+            return v;
+        }
+
+        // Currency symbol split into the text that goes before / after the number for
+        // the browser culture (e.g. "$" + n in en-US, n + " €" in de-DE). Falls back to
+        // the server-supplied symbol in front when no ISO code is available.
+        function currencyAffixes(symbol, isoCode) {
+            var fallback = { before: symbol || isoCode || '', after: '' };
+            if (!isoCode) { return fallback; }
+            try {
+                var parts = new Intl.NumberFormat(window.navigator.language, { style: 'currency', currency: isoCode }).formatToParts(1);
+                var before = '', after = '', seenInteger = false;
+                for (var i = 0; i < parts.length; i++) {
+                    if (parts[i].type === 'integer') { seenInteger = true; continue; }
+                    if (parts[i].type === 'decimal' || parts[i].type === 'fraction') { continue; }
+                    if (seenInteger) { after += parts[i].value; } else { before += parts[i].value; }
+                }
+                return { before: before, after: after };
+            } catch (e) { return fallback; }
         }
 
         function escapeHtml(value) {
@@ -214,8 +281,8 @@
             var n = Number(value || 0);
             if (!isFinite(n)) { n = 0; }
             var sign = n < 0 ? '-' : '';
-            var symbol = searchCurrency.symbol || searchCurrency.iso || '';
-            return sign + symbol + VIS.Util.formatCompactAmount(n, searchCurrency.iso, currencyPrecision());
+            var affix = currencyAffixes(searchCurrency.symbol, searchCurrency.iso);
+            return sign + affix.before + VIS.Util.formatCompactAmount(Math.abs(n), searchCurrency.iso, currencyPrecision()) + affix.after;
         }
         function formatArrFull(value) {
             var n = Number(value || 0);
@@ -224,10 +291,20 @@
             var abs = Math.abs(n);
             var symbol = searchCurrency.symbol || searchCurrency.iso || '';
             var precision = currencyPrecision();
-            var formatted = abs.toLocaleString(window.navigator.language, {
-                minimumFractionDigits: precision, maximumFractionDigits: precision
-            });
-            return sign + (symbol ? symbol + ' ' + formatted : formatted);
+            try {
+                if (searchCurrency.iso) {
+                    return sign + new Intl.NumberFormat(window.navigator.language, {
+                        style: 'currency', currency: searchCurrency.iso,
+                        minimumFractionDigits: precision, maximumFractionDigits: precision
+                    }).format(abs);
+                }
+                var formatted = abs.toLocaleString(window.navigator.language, {
+                    minimumFractionDigits: precision, maximumFractionDigits: precision
+                });
+                return sign + (symbol ? symbol + ' ' + formatted : formatted);
+            } catch (e) {
+                return sign + (symbol ? symbol + ' ' + abs.toFixed(precision) : abs.toFixed(precision));
+            }
         }
 
         // Segment = the marketing target list(s) the customer belongs to. The server
@@ -397,10 +474,10 @@
                left, compact prev · "N of M" · next right. */
             var of = label('VAS_126_Of', 'of');
             $dialogPager.html(
-                '<span class="vas126-pglabel">' + escapeHtml(label('VAS_126_Showing', 'Showing') + ' ' + start + '–' + end + ' ' + of + ' ' + formatCount(listTotal)) + '</span>' +
+                '<span class="vas126-pglabel">' + escapeHtml(label('VAS_126_Showing', 'Showing') + ' ' + formatCount(start) + '–' + formatCount(end) + ' ' + of + ' ' + formatCount(listTotal)) + '</span>' +
                 '<span class="vas126-pgctl">' +
                     '<button type="button" class="vas126-pgbtn" data-dir="prev" ' + (currentPage <= 0 ? 'disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_126_PrevPage', 'Previous')) + '">' + icon('chevL') + '</button>' +
-                    '<span class="vas126-pgtext">' + escapeHtml((currentPage + 1) + ' ' + of + ' ' + pages) + '</span>' +
+                    '<span class="vas126-pgtext">' + escapeHtml(formatCount(currentPage + 1) + ' ' + of + ' ' + formatCount(pages)) + '</span>' +
                     '<button type="button" class="vas126-pgbtn" data-dir="next" ' + (currentPage >= pages - 1 ? 'disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_126_NextPage', 'Next')) + '">' + icon('chevR') + '</button>' +
                 '</span>'
             );
@@ -662,6 +739,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             $card = $(
                 '<div class="vas126-card" role="button" tabindex="0" aria-live="polite">' +
                     '<div class="vas126-label">' + escapeHtml(label('VAS_126_OpenTickets', 'Open tickets')) +

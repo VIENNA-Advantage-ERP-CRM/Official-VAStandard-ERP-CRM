@@ -94,6 +94,7 @@
  * 51  | of                                                                    | VAS_270_Of
  * 52  | Showing                                                               | VAS_270_Showing
  * 53  | Search is unavailable right now. Try again in a moment.               | VAS_270_LoadError
+ * 54  | Lines (stat tile label)                                               | VAS_270_StatLines
  */
 ; VAS = window.VAS || {};
 
@@ -160,8 +161,8 @@
                 $root.find('.vasso-retry').remove();
                 if ($root.css('position') === 'static') { $root.css('position', 'relative'); }
                 var text = '';
-                try { text = VIS.Msg.getMsg('VAS_SO_Retry'); } catch (e) { text = ''; }
-                if (!text || text === 'VAS_SO_Retry' || text === '[VAS_SO_Retry]') { text = 'Retry'; }
+                try { text = VIS.Msg.translate(VIS.Env.getCtx(), 'VAS_SO_Retry'); } catch (e) { text = ''; }
+                if (!text || text === 'VAS_SO_Retry' || String(text).charAt(0) === '[') { text = 'Retry'; }
                 $('<button type="button" class="vasso-retry"></button>').text(text)
                     .attr('title', text)
                     .on('click', function (e) {
@@ -178,7 +179,6 @@
     var MAX_ROWS_PER_PAGE = 10;
     var MIN_ROWS_PER_PAGE = 2;
     var ZOOM_WINDOW_NAME = 'VAS_SalesOrder';
-    var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
     /* design.md §Widget Header / §Measurement Setup: keep --dash-inline-size on
        :root equal to the dashboard container's current pixel width so the widget
@@ -223,13 +223,38 @@
         var cfgStack = [];
         var currentCfg = null;
 
+        var translatedTexts = null;
+
+        /** Loads every message key this widget uses with a single VIS.Msg.translate call. */
+        function loadMessages() {
+            var elements = [
+                'VAS_270_Title', 'VAS_270_DateOrderedLabel', 'VAS_270_DeliveredSuffix', 'VAS_270_ShippedOnTimeSuffix',
+                'VAS_270_ZeroState', 'VAS_270_ErrorState', 'VAS_270_StatCompleted', 'VAS_270_StatWithDelivery',
+                'VAS_270_StatDeliveredValue', 'VAS_270_StatOnTime', 'VAS_270_SectionDocuments', 'VAS_270_Close',
+                'VAS_270_Back', 'VAS_270_Customer', 'VAS_270_SoDate', 'VAS_270_SoValue', 'VAS_270_SalesOrderLines',
+                'VAS_270_ColLine', 'VAS_270_ColProduct', 'VAS_270_ColAttribute', 'VAS_270_ColUom',
+                'VAS_270_ColOrdered', 'VAS_270_ColDelivered', 'VAS_270_ColPending', 'VAS_270_ColInStock',
+                'VAS_270_ColRate', 'VAS_270_ColAmount', 'VAS_270_ColLineStatus', 'VAS_270_ColSoNo',
+                'VAS_270_Warehouse', 'VAS_270_Representative', 'VAS_270_ColValue', 'VAS_270_ColDelivery',
+                'VAS_270_ColStatus', 'VAS_270_DeliveryPartial', 'VAS_270_DeliveryFull', 'VAS_270_LineInProcess',
+                'VAS_270_LinePartial', 'VAS_270_SalesOrderPrefix', 'VAS_270_LinesSuffix', 'VAS_270_QtyOrderedSuffix',
+                'VAS_270_QtyShortSuffix', 'VAS_270_PrevPage', 'VAS_270_NextPage', 'VAS_270_Of', 'VAS_270_Showing',
+                'VAS_270_LoadError', 'VAS_270_StatLines'
+            ];
+            try { translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {}; }
+            catch (e) { translatedTexts = {}; }
+        }
+
         // A missing message key must never render raw ("[KEY]") - fall back to the English text.
         function label(key, fallback) {
-            var text = '';
-            try { text = VIS.Msg.getMsg(key); } catch (e) { text = ''; }
-            if (!text || text === key || text === '[' + key + ']') { return fallback || key; }
+            if (translatedTexts === null) { loadMessages(); }
+            var text = translatedTexts[key];
+            if (!text || text === key || String(text).charAt(0) === '[') { return fallback || key; }
             return text;
         }
+
+        // Browser culture drives every date / number format (window.navigator.language).
+        function lang() { return window.navigator.language; }
 
         // A table of THIS instance's modal, looked up inside its own body - never via
         // document.getElementById: a modal left on <body> by an earlier instance (one the
@@ -267,29 +292,44 @@
             return '';
         }
 
-        // Indian-numbering display convention (₹ x.xx Cr / ₹ x.xx L / grouped
-        // integer), matching every other widget on this dashboard (VAS_268 fmtINR).
-        function formatINR(value) {
+        // Headline / list amounts. The summary and document-list payloads carry NO
+        // currency (symbol / ISO), so only the number is shown: compact in the browser
+        // culture's own scale (e.g. K / M / B, or L / Cr in Indian locales) from 1e5 up, else a
+        // grouped integer.
+        function formatAmount(value) {
             var num = Number(value || 0);
-            if (num >= 1e7) { return '₹ ' + (num / 1e7).toFixed(2) + ' Cr'; }
-            if (num >= 1e5) { return '₹ ' + (num / 1e5).toFixed(2) + ' L'; }
-            return '₹ ' + Math.round(num).toLocaleString('en-IN');
+            try {
+                if (Math.abs(num) >= 1e5) {
+                    return new Intl.NumberFormat(lang(), { notation: 'compact', maximumFractionDigits: 2 }).format(num);
+                }
+                return Math.round(num).toLocaleString(lang());
+            } catch (e) { return String(Math.round(num)); }
         }
 
         function formatNum(value) {
-            return Math.round(Number(value || 0)).toLocaleString('en-IN');
+            var num = Math.round(Number(value || 0));
+            try { return num.toLocaleString(lang()); } catch (e) { return String(num); }
+        }
+
+        function formatPercent(value) {
+            var pct = Math.round(Number(value || 0));
+            try { return new Intl.NumberFormat(lang(), { style: 'percent', maximumFractionDigits: 0 }).format(pct / 100); }
+            catch (e) { return pct + '%'; }
         }
 
         // Amounts in the order's (price list's) own currency and precision.
         function formatMoney(value, symbol, precision) {
             var prec = (typeof precision === 'number' && precision >= 0) ? precision : 2;
-            var text = Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: prec, maximumFractionDigits: prec });
+            var text;
+            try { text = Number(value || 0).toLocaleString(lang(), { minimumFractionDigits: prec, maximumFractionDigits: prec }); }
+            catch (e) { text = Number(value || 0).toFixed(prec); }
             return symbol ? symbol + ' ' + text : text;
         }
 
         // Sr 8.13: line quantities are in the selected UOM and can be fractional.
         function formatQty(value) {
-            return Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+            try { return Number(value || 0).toLocaleString(lang(), { maximumFractionDigits: 2 }); }
+            catch (e) { return String(Number(value || 0)); }
         }
 
         // Sr 8.17: a description made only of blanks / separators is not an attribute value (VAS_203 rule).
@@ -299,28 +339,36 @@
 
         function parseIso(iso) {
             if (!iso) { return null; }
-            var d = new Date(iso + 'T00:00:00');
+            // A date-only 'yyyy-mm-dd' string becomes a LOCAL date (no timezone shift).
+            var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso));
+            var d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(iso + 'T00:00:00');
             return isNaN(d.getTime()) ? null : d;
         }
 
         function formatDateShort(iso) {
             var d = parseIso(iso);
             if (!d) { return ''; }
-            return (d.getDate() < 10 ? '0' : '') + d.getDate() + ' ' + MONTHS[d.getMonth()];
+            try { return new Intl.DateTimeFormat(lang(), { day: '2-digit', month: 'short' }).format(d); }
+            catch (e) { return String(iso); }
         }
 
         function formatDateFull(iso) {
             var d = parseIso(iso);
             if (!d) { return ''; }
-            return (d.getDate() < 10 ? '0' : '') + d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+            try { return new Intl.DateTimeFormat(lang(), { day: '2-digit', month: 'short', year: 'numeric' }).format(d); }
+            catch (e) { return String(iso); }
         }
 
-        // "1-12 Aug 2026" style window - MTD always starts on the 1st of the
-        // month PeriodEnd falls in, per 03_...txt "VISIBLE COPY".
+        // "01 - 12 Aug 2026" style window (locale decides the form) - MTD always starts
+        // on the 1st of the month PeriodEnd falls in, per 03_...txt "VISIBLE COPY".
         function formatPeriod(startIso, endIso) {
             var start = parseIso(startIso), end = parseIso(endIso);
             if (!start || !end) { return ''; }
-            return start.getDate() + '-' + end.getDate() + ' ' + MONTHS[end.getMonth()] + ' ' + end.getFullYear();
+            var opts = { day: '2-digit', month: 'short', year: 'numeric' };
+            try {
+                var fmt = new Intl.DateTimeFormat(lang(), opts);
+                return typeof fmt.formatRange === 'function' ? fmt.formatRange(start, end) : (fmt.format(start) + ' – ' + fmt.format(end));
+            } catch (e) { return String(startIso) + ' - ' + String(endIso); }
         }
 
         function parseResponse(res) {
@@ -391,8 +439,8 @@
             }
 
             var onTimeText = (summary.OnTimePercent === null || summary.OnTimePercent === undefined)
-                ? '—' : (Math.round(summary.OnTimePercent) + '%');
-            var meta = formatINR(summary.DeliveredValue) + ' ' + label('VAS_270_DeliveredSuffix', 'delivered') +
+                ? '—' : formatPercent(summary.OnTimePercent);
+            var meta = formatAmount(summary.DeliveredValue) + ' ' + label('VAS_270_DeliveredSuffix', 'delivered') +
                 ' · ' + onTimeText + ' ' + label('VAS_270_ShippedOnTimeSuffix', 'shipped on time');
             $meta.attr('title', meta).text(meta);
         }
@@ -619,8 +667,8 @@
             var statsHtml = '<div class="vas270-mstats">' +
                 statTile(label('VAS_270_StatCompleted', 'Completed SOs'), formatNum(summary.CompletedCount)) +
                 statTile(label('VAS_270_StatWithDelivery', 'SOs with delivery'), formatNum(summary.DeliveredOrderCount)) +
-                statTile(label('VAS_270_StatDeliveredValue', 'Delivered value'), formatINR(summary.DeliveredValue)) +
-                statTile(label('VAS_270_StatOnTime', 'On-time shipment'), (summary.OnTimePercent === null || summary.OnTimePercent === undefined) ? '—' : (Math.round(summary.OnTimePercent) + '%')) +
+                statTile(label('VAS_270_StatDeliveredValue', 'Delivered value'), formatAmount(summary.DeliveredValue)) +
+                statTile(label('VAS_270_StatOnTime', 'On-time shipment'), (summary.OnTimePercent === null || summary.OnTimePercent === undefined) ? '—' : formatPercent(summary.OnTimePercent)) +
             '</div>';
 
             var secHtml = '<div class="vas270-msec">' + escapeHtml(label('VAS_270_SectionDocuments', 'Documents')) + '</div>';
@@ -665,7 +713,7 @@
                     cellHtml(row.CustomerName, 'vas270-c-prim'),
                     cellHtml(row.WarehouseName, 'vas270-c-std'),
                     cellHtml(row.RepresentativeName, 'vas270-c-std'),
-                    cellHtml(formatINR(row.OrderValue), 'vas270-c-emph', 'right'),
+                    cellHtml(formatAmount(row.OrderValue), 'vas270-c-emph', 'right'),
                     '<span class="vas270-cell" title="' + escapeHtml(row.DeliveryStatus) + '"><span class="vas270-chip ' + deliveryChipClass(row.DeliveryStatus) + '">' + escapeHtml(row.DeliveryStatus) + '</span></span>',
                     '<span class="vas270-cell" title="' + escapeHtml(row.DocumentStatus) + '"><span class="vas270-chip vas270-chip-ok">' + escapeHtml(row.DocumentStatus) + '</span></span>'
                 ];
@@ -673,13 +721,13 @@
             }).join('');
 
             var start = docsState.page * docsState.size;
-            var showingLabel = label('VAS_270_Showing', 'Showing') + ' ' + (docsState.total ? (start + 1) : 0) + '–' + (start + docsState.rows.length) + ' ' + label('VAS_270_Of', 'of') + ' ' + docsState.total;
+            var showingLabel = label('VAS_270_Showing', 'Showing') + ' ' + formatNum(docsState.total ? (start + 1) : 0) + '–' + formatNum(start + docsState.rows.length) + ' ' + label('VAS_270_Of', 'of') + ' ' + formatNum(docsState.total);
 
             var foot = '<div class="vas270-mtfoot"><span class="vas270-helper">' + escapeHtml(showingLabel) + '</span>' +
                 (pages > 1 ?
                     '<span class="vas270-pager">' +
                         '<button type="button" class="vas270-pbtn" data-table="docs" data-dir="-1"' + (docsState.page === 0 ? ' disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_270_PrevPage', 'Previous page')) + '">' + icon('prev') + '</button>' +
-                        '<span class="vas270-ptxt">' + (docsState.page + 1) + ' ' + escapeHtml(label('VAS_270_Of', 'of')) + ' ' + pages + '</span>' +
+                        '<span class="vas270-ptxt">' + formatNum(docsState.page + 1) + ' ' + escapeHtml(label('VAS_270_Of', 'of')) + ' ' + formatNum(pages) + '</span>' +
                         '<button type="button" class="vas270-pbtn" data-table="docs" data-dir="1"' + (docsState.page >= pages - 1 ? ' disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_270_NextPage', 'Next page')) + '">' + icon('next') + '</button>' +
                     '</span>' : '<span></span>') +
             '</div>';
@@ -739,7 +787,7 @@
                 qtyOrdered += Number(line.QtyOrdered) || 0;
                 qtyShort += Math.max(0, Number(line.QtyShort) || 0);
             });
-            var footNote = lines.length + ' ' + label('VAS_270_LinesSuffix', 'lines') +
+            var footNote = formatNum(lines.length) + ' ' + label('VAS_270_LinesSuffix', 'lines') +
                 ' · ' + formatQty(qtyOrdered) + ' ' + label('VAS_270_QtyOrderedSuffix', 'qty ordered') +
                 ' · ' + order.DeliveryStatus +
                 (qtyShort > 0 ? ' · ' + formatQty(qtyShort) + ' ' + label('VAS_270_QtyShortSuffix', 'qty short of stock') : '');
@@ -780,7 +828,7 @@
                 ' · ' + escapeHtml(formatDateFull(order.SalesOrderDate)) + ' · ' + escapeHtml(order.DocumentStatus) + '</div>';
 
             var stats = '<div class="vas270-mstats">' +
-                statTile(label('VAS_270_ColLine', 'Line') + 's', String(lines.length)) +
+                statTile(label('VAS_270_StatLines', 'Lines'), formatNum(lines.length)) +
                 statTile(label('VAS_270_SoValue', 'SO value'), formatMoney(order.OrderValue, order.CurrencySymbol, order.CurrencyPrecision)) +
                 statTile(label('VAS_270_ColOrdered', 'Ordered'), formatQty(qtyOrdered)) +
                 statTile(label('VAS_270_ColPending', 'Pending'), formatQty(qtyPending)) +
@@ -865,13 +913,13 @@
                 return '<div class="vas270-mrow" style="grid-template-columns:' + tpl + '">' + cells + '</div>';
             }).join('');
 
-            var showingLabel = label('VAS_270_Showing', 'Showing') + ' ' + (lineState.lines.length ? (start + 1) : 0) + '–' + (start + slice.length) + ' ' + label('VAS_270_Of', 'of') + ' ' + lineState.lines.length;
+            var showingLabel = label('VAS_270_Showing', 'Showing') + ' ' + formatNum(lineState.lines.length ? (start + 1) : 0) + '–' + formatNum(start + slice.length) + ' ' + label('VAS_270_Of', 'of') + ' ' + formatNum(lineState.lines.length);
 
             var foot = '<div class="vas270-mtfoot"><span class="vas270-helper">' + escapeHtml(showingLabel) + '</span>' +
                 (pages > 1 ?
                     '<span class="vas270-pager">' +
                         '<button type="button" class="vas270-pbtn" data-table="lines" data-dir="-1"' + (lineState.page === 0 ? ' disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_270_PrevPage', 'Previous page')) + '">' + icon('prev') + '</button>' +
-                        '<span class="vas270-ptxt">' + (lineState.page + 1) + ' ' + escapeHtml(label('VAS_270_Of', 'of')) + ' ' + pages + '</span>' +
+                        '<span class="vas270-ptxt">' + formatNum(lineState.page + 1) + ' ' + escapeHtml(label('VAS_270_Of', 'of')) + ' ' + formatNum(pages) + '</span>' +
                         '<button type="button" class="vas270-pbtn" data-table="lines" data-dir="1"' + (lineState.page >= pages - 1 ? ' disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_270_NextPage', 'Next page')) + '">' + icon('next') + '</button>' +
                     '</span>' : '<span></span>') +
             '</div>';
@@ -918,6 +966,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createModal();
             bindDocumentLevelEvents();

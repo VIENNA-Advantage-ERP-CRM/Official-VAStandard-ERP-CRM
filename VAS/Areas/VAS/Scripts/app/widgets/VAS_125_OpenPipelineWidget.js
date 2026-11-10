@@ -23,6 +23,8 @@
  *           swallowed silently. The endpoint is fixed in
  *           VAS_139_HighValuePipelineWidgetController; a lead row is now tagged and opens
  *           its Lead record instead of doing nothing (see mapRow / zoomToLead below).
+ *           2026-11-10 - Messages via VIS.Msg.translate (single batched lookup); amounts
+ *           formatted with the browser culture (Intl, currency symbol placed per locale).
  *
  * ── Labels / Message Keys ─────────────────────────────────────────────────
  *  # | Current Text                | Message Key
@@ -96,16 +98,50 @@
         /* Same, for the Lead window a lead-backed pipeline row opens. */
         var leadWindowId = 0;
 
+        var translatedTexts = null;
+
+        /* Loads every message key used by this widget in ONE VIS.Msg.translate call. */
+        function loadMessages() {
+            var elements = [
+                'VAS_125_OpenPipeline',
+                'VAS_125_ClientsWithOpps',
+                'VAS_125_ClientWithOpps',
+                'VAS_125_NoOpenOpportunities',
+                'VAS_125_PipelineUnavailable',
+                'VAS_125_RateUnavailable',
+                'VAS_125_DrillTitle',
+                'VAS_125_Opp',
+                'VAS_125_Opps',
+                'VAS_125_Lead'
+            ];
+            try {
+                translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {};
+            } catch (e) { translatedTexts = {}; }
+        }
+
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            if (translatedTexts === null) { loadMessages(); }
+            var v = translatedTexts ? translatedTexts[key] : null;
+            if (!v || v === key || String(v).charAt(0) === '[') { return fallback || key; }
+            return v;
         }
 
-        function usesIndianNumbering(isoCode) {
-            return VIS.Util.usesIndianNumbering(isoCode);
-        }
-
-        function currencyLocale(isoCode) {
-            return usesIndianNumbering(isoCode) ? 'en-IN' : window.navigator.language;
+        // Currency symbol split into the text that goes before / after the number for
+        // the browser culture (e.g. "$" + n in en-US, n + " €" in de-DE). Falls back to
+        // the server-supplied symbol in front when no ISO code is available.
+        function currencyAffixes(symbol, isoCode) {
+            var fallback = { before: symbol || isoCode || '', after: '' };
+            if (!isoCode) { return fallback; }
+            try {
+                var parts = new Intl.NumberFormat(window.navigator.language, { style: 'currency', currency: isoCode }).formatToParts(1);
+                var before = '', after = '', seenInteger = false;
+                for (var i = 0; i < parts.length; i++) {
+                    if (parts[i].type === 'integer') { seenInteger = true; continue; }
+                    if (parts[i].type === 'decimal' || parts[i].type === 'fraction') { continue; }
+                    if (seenInteger) { after += parts[i].value; } else { before += parts[i].value; }
+                }
+                return { before: before, after: after };
+            } catch (e) { return fallback; }
         }
 
         function getPrecision(value) {
@@ -125,8 +161,8 @@
             var number = Number(value || 0);
             if (!isFinite(number)) { number = 0; }
             var sign = number < 0 ? '-' : '';
-            var currency = symbol || isoCode || '';
-            return sign + currency + VIS.Util.formatCompactAmount(number, isoCode, getPrecision(precision));
+            var affix = currencyAffixes(symbol, isoCode);
+            return sign + affix.before + VIS.Util.formatCompactAmount(Math.abs(number), isoCode, getPrecision(precision)) + affix.after;
         }
 
         // Full, precise currency amount for the value tooltip.
@@ -137,11 +173,17 @@
             var abs = Math.abs(number);
             var currency = symbol || isoCode || '';
             var stdPrecision = getPrecision(precision);
-            var formatted = abs.toLocaleString(currencyLocale(isoCode), {
-                minimumFractionDigits: stdPrecision,
-                maximumFractionDigits: stdPrecision
-            });
-            return sign + (currency ? currency + ' ' + formatted : formatted);
+            var opts = { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision };
+            try {
+                if (isoCode) {
+                    return sign + new Intl.NumberFormat(window.navigator.language,
+                        { style: 'currency', currency: isoCode, minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision }).format(abs);
+                }
+                var formatted = abs.toLocaleString(window.navigator.language, opts);
+                return sign + (currency ? currency + ' ' + formatted : formatted);
+            } catch (e) {
+                return sign + (currency ? currency + ' ' + abs.toFixed(stdPrecision) : abs.toFixed(stdPrecision));
+            }
         }
 
         function parseResponse(response) {
@@ -319,6 +361,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             $card = $(
                 '<div class="vas125-card MPC-kpi-clickable" aria-live="polite" role="button" tabindex="0">' +
                     '<div class="vas125-label"></div>' +

@@ -86,6 +86,12 @@
  * 46  | of                                                                    | VAS_282_Of
  * 47  | Showing                                                               | VAS_282_Showing
  * 48  | Search is unavailable right now. Try again in a moment.               | VAS_282_LoadError
+ * 49  | Month                                                                 | VAS_282_Month
+ * 50  | Year                                                                  | VAS_282_Year
+ * 51  | Delivery                                                              | VAS_282_ModeDelivery
+ * 52  | Pickup                                                                | VAS_282_ModePickup
+ * 53  | Shipper                                                               | VAS_282_ModeShipper
+ * 54  | Lines                                                                 | VAS_282_StatLines
  */
 ; VAS = window.VAS || {};
 
@@ -152,8 +158,8 @@
                 $root.find('.vasso-retry').remove();
                 if ($root.css('position') === 'static') { $root.css('position', 'relative'); }
                 var text = '';
-                try { text = VIS.Msg.getMsg('VAS_SO_Retry'); } catch (e) { text = ''; }
-                if (!text || text === 'VAS_SO_Retry') { text = 'Retry'; }
+                try { text = VIS.Msg.translate(VIS.Env.getCtx(), 'VAS_SO_Retry'); } catch (e) { text = ''; }
+                if (!text || typeof text !== 'string' || text === 'VAS_SO_Retry' || text.charAt(0) === '[') { text = 'Retry'; }
                 $('<button type="button" class="vasso-retry"></button>').text(text)
                     .attr('title', text)
                     .on('click', function (e) {
@@ -169,7 +175,6 @@
 
     var MAX_ROWS_PER_PAGE = 10;
     var MIN_ROWS_PER_PAGE = 2;
-    var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     var MIN_YEAR = 2024;
     var YEAR_SPAN = 3;
 
@@ -177,9 +182,9 @@
     // drops to zero never reshuffles the others. Fallback English names match the
     // confirmed D/P/S override mapping exactly.
     var MODE_SCAFFOLD = [
-        { code: 'D', fallback: 'Delivery', color: '#A9D2FF' },
-        { code: 'P', fallback: 'Pickup', color: '#A3E0D4' },
-        { code: 'S', fallback: 'Shipper', color: '#FFDCA1' }
+        { code: 'D', msgKey: 'VAS_282_ModeDelivery', fallback: 'Delivery', color: '#A9D2FF' },
+        { code: 'P', msgKey: 'VAS_282_ModePickup', fallback: 'Pickup', color: '#A3E0D4' },
+        { code: 'S', msgKey: 'VAS_282_ModeShipper', fallback: 'Shipper', color: '#FFDCA1' }
     ];
 
     var now = new Date();
@@ -226,8 +231,35 @@
         var cfgStack = [];
         var currentCfg = null;
 
+        var translatedTexts = null;   // message-key -> translated text (see loadMessages)
+
+        // Every message key used by this widget, translated in ONE call.
+        function loadMessages() {
+            var elements = [
+                'VAS_282_Title', 'VAS_282_Subtitle', 'VAS_282_ZeroState', 'VAS_282_ErrorState', 'VAS_282_SubtitlePrefix',
+                'VAS_282_StatShare', 'VAS_282_StatDispatchValue', 'VAS_282_StatSalesOrders', 'VAS_282_StatDispatches',
+                'VAS_282_SectionHeading', 'VAS_282_ColSoNo', 'VAS_282_Customer', 'VAS_282_ShipFrom',
+                'VAS_282_ColDeliveryMode', 'VAS_282_ColPromised', 'VAS_282_ColValue', 'VAS_282_Back', 'VAS_282_Close',
+                'VAS_282_SoDate', 'VAS_282_DatePromised', 'VAS_282_SoValue', 'VAS_282_DocumentStatus',
+                'VAS_282_DeliveryStatus', 'VAS_282_SalesOrderLines', 'VAS_282_ColLine', 'VAS_282_ColProduct',
+                'VAS_282_ColAttribute', 'VAS_282_ColUom', 'VAS_282_ColOrdered', 'VAS_282_ColDelivered', 'VAS_282_ColPending',
+                'VAS_282_ColInStock', 'VAS_282_ColRate', 'VAS_282_ColAmount', 'VAS_282_ColLineStatus',
+                'VAS_282_DeliveryFull', 'VAS_282_LinePartial', 'VAS_282_LineInProcess', 'VAS_282_SalesOrderPrefix',
+                'VAS_282_LinesSuffix', 'VAS_282_QtyOrderedSuffix', 'VAS_282_QtyShortSuffix', 'VAS_282_PrevPage',
+                'VAS_282_NextPage', 'VAS_282_Of', 'VAS_282_Showing', 'VAS_282_LoadError', 'VAS_282_Month', 'VAS_282_Year',
+                'VAS_282_ModeDelivery', 'VAS_282_ModePickup', 'VAS_282_ModeShipper', 'VAS_282_StatLines'
+            ];
+            try { translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {}; }
+            catch (e) { translatedTexts = {}; }
+        }
+
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            if (translatedTexts === null) { loadMessages(); }
+            var text = translatedTexts[key];
+            if (text === undefined || text === null || typeof text !== 'string' || text === '' || text === key || text.charAt(0) === '[') {
+                return fallback;
+            }
+            return text;
         }
 
         function escapeHtml(value) {
@@ -258,15 +290,29 @@
             return '';
         }
 
-        function formatINR(value) {
+        // Browser-culture number display: grouping, decimal separator and the compact
+        // scale words (K / M / B, or lakh / crore in Indian locales) all come from the browser locale.
+        // The mix/summary APIs carry no currency code or symbol, so none is shown.
+        function formatMoney(value) {
             var num = Number(value || 0);
-            if (num >= 1e7) { return '₹ ' + (num / 1e7).toFixed(2) + ' Cr'; }
-            if (num >= 1e5) { return '₹ ' + (num / 1e5).toFixed(2) + ' L'; }
-            return '₹ ' + Math.round(num).toLocaleString('en-IN');
+            try {
+                if (Math.abs(num) >= 1e5) {
+                    return num.toLocaleString(window.navigator.language, { notation: 'compact', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                }
+                return Math.round(num).toLocaleString(window.navigator.language);
+            }
+            catch (e) { return String(Math.round(num)); }
         }
 
         function formatNum(value) {
-            return Math.round(Number(value || 0)).toLocaleString('en-IN');
+            try { return Math.round(Number(value || 0)).toLocaleString(window.navigator.language); }
+            catch (e) { return String(Math.round(Number(value || 0))); }
+        }
+
+        // Whole-number percentage in the browser's percent style.
+        function formatPercent(value) {
+            try { return (Number(value || 0) / 100).toLocaleString(window.navigator.language, { style: 'percent', maximumFractionDigits: 0 }); }
+            catch (e) { return Math.round(Number(value || 0)) + '%'; }
         }
 
         function parseIso(iso) {
@@ -278,11 +324,20 @@
         function formatDateFull(iso) {
             var d = parseIso(iso);
             if (!d) { return ''; }
-            return (d.getDate() < 10 ? '0' : '') + d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+            try { return new Intl.DateTimeFormat(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' }).format(d); }
+            catch (e) { return String(iso); }
         }
 
+        // Month + year of the selected period, e.g. "Aug 2026" (order and wording follow the browser locale).
         function periodLabel() {
-            return MONTHS[selectedMonth()] + ' ' + selectedYear();
+            try { return new Intl.DateTimeFormat(window.navigator.language, { month: 'short', year: 'numeric' }).format(new Date(selectedYear(), selectedMonth(), 1)); }
+            catch (e) { return (selectedMonth() + 1) + '-' + selectedYear(); }
+        }
+
+        // Month-name label for the Month filter (zero-based month index).
+        function monthName(monthIndex) {
+            try { return new Intl.DateTimeFormat(window.navigator.language, { month: 'short' }).format(new Date(2000, monthIndex, 1)); }
+            catch (e) { return String(monthIndex + 1); }
         }
 
         function selectedMonth() { return $monthSel && $monthSel.length ? Number($monthSel.val()) : CUR_M; }
@@ -307,9 +362,11 @@
          * Widget shell: header (title/subtitle + Month/Year filter) + bar list
          * ============================================================ */
         function fillMonthSelect($sel) {
-            $sel.html(MONTHS.map(function (m, i) {
-                return '<option value="' + i + '"' + (i === CUR_M ? ' selected' : '') + '>' + m + '</option>';
-            }).join(''));
+            var html = '';
+            for (var i = 0; i < 12; i++) {
+                html += '<option value="' + i + '"' + (i === CUR_M ? ' selected' : '') + '>' + escapeHtml(monthName(i)) + '</option>';
+            }
+            $sel.html(html);
         }
 
         function fillYearSelect($sel) {
@@ -329,8 +386,8 @@
             $htxt.append('<p class="vas282-sub">' + escapeHtml(label('VAS_282_Subtitle', 'Dispatches this month')) + '</p>');
 
             var $filter = $('<div class="vas282-mfilter"></div>');
-            $monthSel = $('<select class="vas282-msel" aria-label="Month"></select>');
-            $yearSel = $('<select class="vas282-msel" aria-label="Year"></select>');
+            $monthSel = $('<select class="vas282-msel" aria-label="' + escapeHtml(label('VAS_282_Month', 'Month')) + '"></select>');
+            $yearSel = $('<select class="vas282-msel" aria-label="' + escapeHtml(label('VAS_282_Year', 'Year')) + '"></select>');
             fillMonthSelect($monthSel);
             fillYearSelect($yearSel);
             $filter.append($monthSel, $yearSel);
@@ -399,7 +456,7 @@
                 totalValue += value;
                 return {
                     ModeCode: s.code,
-                    ModeName: m ? m.ModeName : s.fallback,
+                    ModeName: m ? m.ModeName : label(s.msgKey, s.fallback),
                     Color: s.color,
                     Value: value,
                     Percent: 0
@@ -441,7 +498,7 @@
             $list.html(rows.map(function (r) {
                 return '<button type="button" class="vas282-mixrow" data-mode="' + r.ModeCode + '">' +
                     '<span class="vas282-line"><span class="vas282-n" title="' + escapeHtml(r.ModeName) + '">' + escapeHtml(r.ModeName) + '</span>' +
-                    '<span class="vas282-v" title="' + r.Percent + '%">' + r.Percent + '%</span></span>' +
+                    '<span class="vas282-v" title="' + escapeHtml(formatPercent(r.Percent)) + '">' + escapeHtml(formatPercent(r.Percent)) + '</span></span>' +
                     '<span class="vas282-track"><span class="vas282-fill" style="width:' + r.Percent + '%;background:' + r.Color + '"></span></span></button>';
             }).join(''));
         }
@@ -598,8 +655,8 @@
             var share = summary.TotalValue > 0 ? Math.round((summary.ModeValue / summary.TotalValue) * 100) : 0;
 
             var statsHtml = '<div class="vas282-mstats">' +
-                statTile(label('VAS_282_StatShare', 'Share of dispatch value'), share + '%') +
-                statTile(label('VAS_282_StatDispatchValue', 'Dispatch value'), formatINR(summary.ModeValue)) +
+                statTile(label('VAS_282_StatShare', 'Share of dispatch value'), formatPercent(share)) +
+                statTile(label('VAS_282_StatDispatchValue', 'Dispatch value'), formatMoney(summary.ModeValue)) +
                 statTile(label('VAS_282_StatSalesOrders', 'Sales orders'), formatNum(summary.OrderCount)) +
                 statTile(label('VAS_282_StatDispatches', 'Dispatches'), formatNum(summary.DispatchCount)) +
             '</div>';
@@ -650,19 +707,19 @@
                     cellHtml(row.WarehouseName || '—', 'vas282-c-std'),
                     cellHtml(row.ModeLabel, 'vas282-c-std'),
                     cellHtml(formatDateFull(row.PromisedDate), 'vas282-c-std'),
-                    cellHtml(formatINR(row.DispatchValue), 'vas282-c-emph', 'right')
+                    cellHtml(formatMoney(row.DispatchValue), 'vas282-c-emph', 'right')
                 ];
                 return '<div class="vas282-mrow" style="grid-template-columns:' + tpl + '">' + cells.join('') + '</div>';
             }).join('');
 
             var start = docs.page * docs.size;
-            var showingLabel = label('VAS_282_Showing', 'Showing') + ' ' + (docs.total ? (start + 1) : 0) + '–' + (start + docs.rows.length) + ' ' + label('VAS_282_Of', 'of') + ' ' + docs.total + ' · ' + docState.modeName.toLowerCase();
+            var showingLabel = label('VAS_282_Showing', 'Showing') + ' ' + formatNum(docs.total ? (start + 1) : 0) + '–' + formatNum(start + docs.rows.length) + ' ' + label('VAS_282_Of', 'of') + ' ' + formatNum(docs.total) + ' · ' + docState.modeName.toLowerCase();
 
             var foot = '<div class="vas282-mtfoot"><span class="vas282-helper">' + escapeHtml(showingLabel) + '</span>' +
                 (pages > 1 ?
                     '<span class="vas282-pager">' +
                         '<button type="button" class="vas282-pbtn" data-table="docs" data-dir="-1"' + (docs.page === 0 ? ' disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_282_PrevPage', 'Previous page')) + '">' + icon('prev') + '</button>' +
-                        '<span class="vas282-ptxt">' + (docs.page + 1) + ' ' + escapeHtml(label('VAS_282_Of', 'of')) + ' ' + pages + '</span>' +
+                        '<span class="vas282-ptxt">' + formatNum(docs.page + 1) + ' ' + escapeHtml(label('VAS_282_Of', 'of')) + ' ' + formatNum(pages) + '</span>' +
                         '<button type="button" class="vas282-pbtn" data-table="docs" data-dir="1"' + (docs.page >= pages - 1 ? ' disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_282_NextPage', 'Next page')) + '">' + icon('next') + '</button>' +
                     '</span>' : '<span></span>') +
             '</div>';
@@ -737,7 +794,7 @@
                 statTile(label('VAS_282_Customer', 'Customer'), order.CustomerName) +
                 statTile(label('VAS_282_SoDate', 'SO date'), formatDateFull(order.SalesOrderDate)) +
                 statTile(label('VAS_282_DatePromised', 'Date promised'), formatDateFull(order.DatePromised)) +
-                statTile(label('VAS_282_SoValue', 'SO value'), formatINR(order.OrderValue)) +
+                statTile(label('VAS_282_SoValue', 'SO value'), formatMoney(order.OrderValue)) +
                 statTile(label('VAS_282_ShipFrom', 'Ship from'), order.WarehouseName) +
                 statTile(label('VAS_282_ColDeliveryMode', 'Delivery mode'), order.DeliveryMode) +
                 statTile(label('VAS_282_DocumentStatus', 'Document status'), order.DocumentStatus) +
@@ -765,7 +822,7 @@
                 var freeStock = Number(line.FreeStock) || 0;
                 if (pending > freeStock) { qtyShort += (pending - freeStock); }
             });
-            var footNote = lines.length + ' ' + label('VAS_282_LinesSuffix', 'lines') +
+            var footNote = formatNum(lines.length) + ' ' + label('VAS_282_LinesSuffix', 'lines') +
                 ' · ' + formatNum(qtyOrdered) + ' ' + label('VAS_282_QtyOrderedSuffix', 'qty ordered') +
                 ' · ' + order.DeliveryStatus +
                 (qtyShort > 0 ? ' · ' + formatNum(qtyShort) + ' ' + label('VAS_282_QtyShortSuffix', 'qty short of stock') : '');
@@ -801,8 +858,8 @@
                 ' · ' + escapeHtml(formatDateFull(order.SalesOrderDate)) + ' · ' + escapeHtml(order.DocumentStatus) + '</div>';
 
             var stats = '<div class="vas282-mstats">' +
-                statTile(label('VAS_282_ColLine', 'Line') + 's', String(lines.length)) +
-                statTile(label('VAS_282_SoValue', 'SO value'), formatINR(order.OrderValue)) +
+                statTile(label('VAS_282_StatLines', 'Lines'), formatNum(lines.length)) +
+                statTile(label('VAS_282_SoValue', 'SO value'), formatMoney(order.OrderValue)) +
                 statTile(label('VAS_282_ColOrdered', 'Ordered'), formatNum(qtyOrdered)) +
                 statTile(label('VAS_282_ColPending', 'Pending'), formatNum(qtyPending)) +
             '</div>';
@@ -857,19 +914,19 @@
                     cellHtml(formatNum(line.QtyDelivered), 'vas282-c-std', 'right'),
                     cellHtml(formatNum(line.QtyPending), 'vas282-c-prim', 'right'),
                     cellHtml(formatNum(line.FreeStock), (line.FreeStock < line.QtyPending ? 'vas282-c-short' : 'vas282-c-ok'), 'right'),
-                    cellHtml('₹ ' + formatNum(line.Rate), 'vas282-c-std', 'right'),
-                    cellHtml(formatINR(line.Amount), 'vas282-c-emph', 'right')
+                    cellHtml(formatNum(line.Rate),'vas282-c-std', 'right'),
+                    cellHtml(formatMoney(line.Amount), 'vas282-c-emph', 'right')
                 ].join('') + '<span class="vas282-cell"><span class="vas282-chip ' + st.cls + '" title="' + escapeHtml(st.text) + '">' + escapeHtml(st.text) + '</span></span>';
                 return '<div class="vas282-mrow" style="grid-template-columns:' + tpl + '">' + cells + '</div>';
             }).join('');
 
-            var showingLabel = label('VAS_282_Showing', 'Showing') + ' ' + (lineState.lines.length ? (start + 1) : 0) + '–' + (start + slice.length) + ' ' + label('VAS_282_Of', 'of') + ' ' + lineState.lines.length;
+            var showingLabel = label('VAS_282_Showing', 'Showing') + ' ' + formatNum(lineState.lines.length ? (start + 1) : 0) + '–' + formatNum(start + slice.length) + ' ' + label('VAS_282_Of', 'of') + ' ' + formatNum(lineState.lines.length);
 
             var foot = '<div class="vas282-mtfoot"><span class="vas282-helper">' + escapeHtml(showingLabel) + '</span>' +
                 (pages > 1 ?
                     '<span class="vas282-pager">' +
                         '<button type="button" class="vas282-pbtn" data-table="lines" data-dir="-1"' + (lineState.page === 0 ? ' disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_282_PrevPage', 'Previous page')) + '">' + icon('prev') + '</button>' +
-                        '<span class="vas282-ptxt">' + (lineState.page + 1) + ' ' + escapeHtml(label('VAS_282_Of', 'of')) + ' ' + pages + '</span>' +
+                        '<span class="vas282-ptxt">' + formatNum(lineState.page + 1) + ' ' + escapeHtml(label('VAS_282_Of', 'of')) + ' ' + formatNum(pages) + '</span>' +
                         '<button type="button" class="vas282-pbtn" data-table="lines" data-dir="1"' + (lineState.page >= pages - 1 ? ' disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_282_NextPage', 'Next page')) + '">' + icon('next') + '</button>' +
                     '</span>' : '<span></span>') +
             '</div>';
@@ -919,6 +976,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createModal();
             bindDocumentLevelEvents();

@@ -74,6 +74,10 @@
  *                        - Taxable Amount is qty x price (no Discount factor) and follows
  *                          the Price / Quantity as it is typed (previewLineAmount).
  *                        - The "Add product / charge…" placeholder is grey (CSS).
+ *            2026-11-10  Localization: texts are read with one VIS.Msg.translate batch call
+ *                        (loadMessages / lbl); sentences with dynamic parts use {0} tokens;
+ *                        amounts, quantities, counts and dates follow the browser culture
+ *                        (Intl; currency symbol placed per locale from the order's ISO code).
  ************************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -259,9 +263,150 @@
             } catch (e) { el = ""; }
             return (elementCache[key] = isMsgMiss(el, key) ? "" : String(el));
         }
-        function lbl(key, fallback) {
+        /* Message texts for this panel, translated in ONE call (VIS.Msg.translate with the
+           whole key list) and read by key. */
+        var translatedTexts = null;
+        function loadMessages() {
+            var elements = [
+                "VAS_107_NoOrder",
+                "VAS_107_DocQuotation",
+                "VAS_107_DocOrder",
+                "VAS_107_QuotationLinesSummary",
+                "VAS_107_LinesSummaryFor",
+                "VAS_107_Scan",
+                "VAS_107_AddLine",
+                "VAS_107_SaveRow",
+                "VAS_107_DeleteRecord",
+                "VAS_107_Refresh",
+                "VAS_107_SelectAll",
+                "VAS_107_ProductCharge",
+                "VAS_107_Description",
+                "VAS_107_QtyUom",
+                "VAS_107_Tax",
+                "VAS_107_TaxableAmt",
+                "VAS_107_More",
+                "VAS_107_Price",
+                "VAS_107_InclTax",
+                "VAS_107_NoLines",
+                "VAS_107_ShowingRange",
+                "VAS_107_PageOfCount",
+                "VAS_107_Prev",
+                "VAS_107_Next",
+                "VAS_107_SavePageFirst",
+                "VAS_107_Subtotal",
+                "VAS_107_Surcharge",
+                "VAS_107_Total",
+                "VAS_107_DocLockedNow",
+                "VAS_107_SaveHeaderFirst",
+                "VAS_107_SaveRows",
+                "VAS_107_AddDescription",
+                "VAS_107_Saving",
+                "VAS_107_Calculating",
+                "VAS_107_SearchProduct",
+                "VAS_107_SearchCharge",
+                "VAS_107_AddProductCharge",
+                "VAS_107_SetAttributeLabel",
+                "VAS_107_SetAttribute",
+                "VAS_107_Qty",
+                "VAS_107_Uom",
+                "VAS_107_UndoNewLine",
+                "VAS_107_UndoChanges",
+                "VAS_107_NoAdditionalInfo",
+                "VAS_107_LineNumber",
+                "VAS_107_Done",
+                "VAS_107_DocViewOnly",
+                "VAS_107_AdditionalInfo",
+                "VAS_107_Close",
+                "VAS_107_Loading",
+                "VAS_107_SelectTax",
+                "VAS_107_OrderNotEditable",
+                "VAS_107_NoBlanketItems",
+                "VAS_107_NoMatches",
+                "VAS_107_Charge",
+                "VAS_107_Product",
+                "VAS_107_RequiredField",
+                "VAS_107_GrpDimensions",
+                "VAS_107_GrpContract",
+                "VAS_107_GrpReferences",
+                "VAS_107_ShowMore",
+                "VAS_107_ShowLess",
+                "VAS_107_SelectOption",
+                "VAS_107_BlanketLineNotFound",
+                "VAS_107_NoOpenBlanketLine",
+                "VAS_107_AddProductChargeMsg",
+                "VAS_107_QtyRequired",
+                "VAS_107_Code",
+                "VAS_107_GuaranteeDate",
+                "VAS_107_QtyOnHand",
+                "VAS_107_SelectAttribute",
+                "VAS_107_Back",
+                "VAS_107_NewAttribute",
+                "VAS_107_AttrSearch",
+                "VAS_107_Edit",
+                "VAS_107_OK",
+                "VAS_107_Cancel",
+                "VAS_107_AddAttribute",
+                "VAS_107_Lot",
+                "VAS_107_NewLot",
+                "VAS_107_SerialNo",
+                "VAS_107_Generate",
+                "VAS_107_NoInstanceAttr",
+                "VAS_107_LotFailed",
+                "VAS_107_SerNoFailed",
+                "VAS_107_UpdateAttribute",
+                "VAS_107_NoRecords",
+                "VAS_107_RangeOfTotal",
+                "VAS_107_AttrNotPersisted",
+                "VAS_107_AttrSaveFailed",
+                "VAS_107_NothingEntered",
+                "VAS_107_QuickAddBarcode",
+                "VAS_107_ScanToReviewSubmit",
+                "VAS_107_ScanHint",
+                "VAS_107_SimulateScan",
+                "VAS_107_ListeningScans",
+                "VAS_107_ScanToBegin",
+                "VAS_107_ScanExampleHint",
+                "VAS_107_Status",
+                "VAS_107_NoScans",
+                "VAS_107_AddLines",
+                "VAS_107_NoCatalogMatchFor",
+                "VAS_107_Unknown",
+                "VAS_107_ScanSummaryUnknown",
+                "VAS_107_ScanSummary",
+                "VAS_107_LinesSaved",
+                "VAS_107_SaveFailed",
+                "VAS_107_LinesDeleted",
+                "VAS_107_DeleteFailed",
+                "VAS_107_SaveBeforeRefresh",
+                "VAS_107_SelectRowToDelete",
+                "VAS_107_NothingToUndo",
+                "Lot",
+                "GuaranteeDate",
+                "M_Locator_ID",
+                "QtyOnHand",
+                "VA106_TaxCollectedAtSource"
+            ];
+            try {
+                translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {};
+            } catch (e) { translatedTexts = {}; }
+        }
+        /* The translated text of one key ("" when the framework gave nothing). A key that
+           was not in the batch (a key the server names at run time, or one a shared helper
+           such as the attribute picker asks for) is looked up on its own, once. */
+        function translatedText(key) {
             var t = "";
-            try { t = VIS.Msg.getMsg(key); } catch (e) { t = ""; }
+            try {
+                if (!translatedTexts) loadMessages();
+                t = translatedTexts[key];
+                if (t === undefined) {
+                    t = VIS.Msg.translate(VIS.Env.getCtx(), key);
+                    translatedTexts[key] = t;
+                }
+            } catch (e) { t = ""; }
+            return t;
+        }
+        function lbl(key, fallback) {
+            var t = translatedText(key);
             if (!isMsgMiss(t, key)) return t;
             var el = elementCaption(key);
             if (el) return el;
@@ -270,9 +415,45 @@
 
         function precision() { return (parent && parent.StdPrecision >= 0) ? parent.StdPrecision : 2; }
 
+        /* Browser culture for every date / time / number shown to the user. */
+        function uiLang() { return window.navigator.language; }
+
+        /* A number with exactly `p` decimals in the browser's number format. */
+        function fmtNum(n, p) {
+            n = +n || 0;
+            try { return n.toLocaleString(uiLang(), { minimumFractionDigits: p, maximumFractionDigits: p }); }
+            catch (e) { return String(n); }
+        }
+
         function fmtMoney(n) {
-            var p = precision();
-            return (+n || 0).toLocaleString(window.navigator.language, { minimumFractionDigits: p, maximumFractionDigits: p });
+            return fmtNum(n, precision());
+        }
+
+        /* A currency amount, the symbol placed the way the browser's culture writes it.
+           `iso` is the currency's ISO code (parent.CurISO); without one the symbol the
+           server supplied goes in front, as before. */
+        function fmtCurrency(n, p, iso, sym) {
+            n = +n || 0;
+            if (iso) {
+                try {
+                    return new Intl.NumberFormat(uiLang(), { style: "currency", currency: iso, minimumFractionDigits: p, maximumFractionDigits: p }).format(n);
+                } catch (e) { }
+            }
+            return (sym ? sym + " " : "") + fmtNum(n, p);
+        }
+
+        /* A date in the browser's culture, month as a short name (e.g. 05 Nov 2026). A
+           date-only 'yyyy-mm-dd' is read as a LOCAL date so no timezone shift moves the
+           day. An unreadable date falls back to its first ten characters, as dateStr does. */
+        function fmtDateDisplay(d) {
+            if (!d) return "";
+            var dt;
+            var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d));
+            if (m && !(d instanceof Date)) dt = new Date(+m[1], +m[2] - 1, +m[3]);
+            else dt = (d instanceof Date) ? d : new Date(d);
+            if (isNaN(dt.getTime())) return String(d).slice(0, 10);
+            try { return new Intl.DateTimeFormat(uiLang(), { day: "2-digit", month: "short", year: "numeric" }).format(dt); }
+            catch (e) { return String(d).slice(0, 10); }
         }
 
         function esc(s) {
@@ -395,7 +576,8 @@
 
         /* ---------- lifecycle ---------- */
         this.init = function () {
-            $root = $('<div class="vas-obl-root"></div>');
+            loadMessages();   // all panel texts, before any UI text is built
+            $root =$('<div class="vas-obl-root"></div>');
             $body = $('<div class="vas-obl-body"></div>');
             $emptyState = $('<div class="vas-obl-empty" style="display:none;"></div>');
             $emptyState.text(lbl("VAS_107_NoOrder", "Select a record to add lines"));
@@ -869,8 +1051,10 @@
             var pageCount = Math.max(1, Math.ceil(total / size));
             var start = linePage * size + 1;
             var end = Math.min(total, (linePage + 1) * size);
-            var showing = lbl("VAS_107_Showing", "Showing") + " " + start + "–" + end + " " + lbl("VAS_107_Of", "of") + " " + total;
-            var pageInfo = (linePage + 1) + " " + lbl("VAS_107_Of", "of") + " " + pageCount;
+            var showing = lbl("VAS_107_ShowingRange", "Showing {0}–{1} of {2}")
+                .replace("{0}", fmtNum(start, 0)).replace("{1}", fmtNum(end, 0)).replace("{2}", fmtNum(total, 0));
+            var pageInfo = lbl("VAS_107_PageOfCount", "{0} of {1}")
+                .replace("{0}", fmtNum(linePage + 1, 0)).replace("{1}", fmtNum(pageCount, 0));
             $pager.html(
                 '<span class="vas-obl-linepager__showing">' + esc(showing) + "</span>" +
                 '<div class="vas-obl-linepager__nav">' +
@@ -911,9 +1095,10 @@
             // across all pages. refreshSummary() populates taxSummary after each load/save/delete.
             if (taxSummary && taxSummary.length) {
                 var h = taxSummary[0];
-                var sym = h.CurSymbol ? h.CurSymbol + " " : "";
+                var sym = h.CurSymbol || "";
+                var iso = h.CurISO || (parent && parent.CurISO) || "";
                 var prec = (h.StdPrecision != null && h.StdPrecision >= 0) ? h.StdPrecision : precision();
-                function fmtP(n) { return sym + (+n || 0).toLocaleString(window.navigator.language, { minimumFractionDigits: prec, maximumFractionDigits: prec }); }
+                function fmtP(n) { return fmtCurrency(n, prec, iso, sym); }
                 $totalsRow.append(totalsRow(lbl("VAS_107_Subtotal", "Sub Total") + ":", fmtP(h.TotalLines), false));
                 var taxTotal = 0;
                 for (var i = 0; i < taxSummary.length; i++) {
@@ -961,8 +1146,9 @@
                 tax += lineTaxSaved(lines[i]) + lineSurcharge(lines[i]);
                 tcs += lineTcs(lines[i]);
             }
-            var sym = (parent && parent.CurSymbol) ? parent.CurSymbol + " " : "";
-            function fmt(n) { return sym + fmtMoney(n); }
+            var sym = (parent && parent.CurSymbol) || "";
+            var iso = (parent && parent.CurISO) || "";
+            function fmt(n) { return fmtCurrency(n, precision(), iso, sym); }
             $totalsRow.append(totalsRow(lbl("VAS_107_Subtotal", "Sub Total") + ":", fmt(sub), false));
             $totalsRow.append(totalsRow(lbl("VAS_107_Tax", "Tax") + ":", fmt(tax), false));
             if (tcs) $totalsRow.append(totalsRow(lbl("VA106_TaxCollectedAtSource", "TCS") + ":", fmt(tcs), false));
@@ -1222,12 +1408,12 @@
             var locked = !panelEditable();
             $addBtn.removeClass("vas-obl-is-hidden");
             $saveBtn.removeClass("vas-obl-is-hidden");
-            var plural   = n > 1 ? lbl("VAS_107_PluralS", "s") : "";
+            var saveTxt  = n > 1 ? lbl("VAS_107_SaveRows", "Save rows") : lbl("VAS_107_SaveRow", "Save row");
             var countTxt = n > 0 ? " (" + n + ")" : "";
             // Save glyph: the framework icon font (vis vis-save), the SAME mark the invoice
             // line panel (VAS_074) uses, so Save reads identically across the document
             // panels instead of this one carrying its own hard-drive SVG.
-            $saveBtn.html('<i class="vis vis-save vas-obl-icon" aria-hidden="true"></i><span>' + esc(lbl("VAS_107_SaveRow", "Save row")) + plural + countTxt + "</span>");
+            $saveBtn.html('<i class="vis vis-save vas-obl-icon" aria-hidden="true"></i><span>' + esc(saveTxt) + countTxt + "</span>");
             var sc = selectedCount();
             $deleteBtn.find(".vas-obl-sel-count").text(sc > 0 ? "(" + sc + ")" : "");
             if ($selectAll) $selectAll.prop("checked", lines.length > 0 && sc === lines.length).prop("disabled", locked);
@@ -1475,7 +1661,7 @@
                 setTimeout(function () { $q.focus(); $q.select(); }, 0);
             } else {
                 var hasQ = v.QtyEntered !== undefined && v.QtyEntered !== "" && +v.QtyEntered !== 0;
-                wrap.append(dispInput(line, "quantity", hasQ ? fmtAmtInput(v.QtyEntered, 2) : "",
+                wrap.append(dispInput(line, "quantity", hasQ ? fmtNum(v.QtyEntered, 2) : "",
                     { align: "right", placeholder: lbl("VAS_107_Qty", "Qty"), cls: "vas-obl-qtyval", readOnly: isColumnReadOnly(line, "QtyEntered") }));
             }
 
@@ -1626,7 +1812,7 @@
                 _error:        line._error
             };
             var primaryName = line.display.productName || line.display.chargeName ||
-                (lbl("VAS_107_Line", "Line") + " " + line.values.Line);
+                lbl("VAS_107_LineNumber", "Line {0}").replace("{0}", line.values.Line);
 
             var $backdrop = $('<div class="vas-obl-dialog-backdrop" id="vasOblMore"></div>');
             var $dialog   = $('<div class="vas-obl-dialog"></div>');
@@ -2589,7 +2775,7 @@
         }
         /* "Required: <field>" — one wording for every mandatory-field failure. Purchase
            orders name the field; a sales document keeps naming the column as before. */
-        function requiredMsg(col) { return lbl("VAS_107_FieldRequired", "Required") + ": " + colLabel(col); }   // every screen: never a raw column name
+        function requiredMsg(col) { return lbl("VAS_107_RequiredField", "Required: {0}").replace("{0}", function () { return colLabel(col); }); }   // every screen: never a raw column name
 
         /* ---------- AD_Column read-only logic ----------
          * A field is read-only when AD_Field.IsReadOnly is set or the column's
@@ -3957,7 +4143,7 @@
                     if (!dynMandatory(line, dm)) return;
                     dynRules.push({
                         col: dm.ColumnName,
-                        msg: lbl("VAS_107_FieldRequired", "Required") + ": " + (dm.Name || dm.ColumnName),
+                        msg: lbl("VAS_107_RequiredField", "Required: {0}").replace("{0}", function () { return dm.Name || dm.ColumnName; }),
                         check: function (vv) {
                             if (!dynFieldVisible(line, dm)) return false;
                             if (isColumnReadOnly(line, dm.ColumnName)) return false;
@@ -4118,7 +4304,7 @@
                         // Lot No: the lot, else the serial number - never the instance id.
                         code: r.Lot || r.SerNo || "",
                         label: r.Description || "",
-                        spec: r.GuaranteeDate ? dateStr(r.GuaranteeDate) : "",   // guarantee / expiration
+                        spec: r.GuaranteeDate ? fmtDateDisplay(r.GuaranteeDate) : "",   // guarantee / expiration
                         locator: r.Value || "",                                  // l.Value (locator)
                         availability: fmtMoney(qoh),                             // QtyOnHand
                         qtyOnHand: qoh,
@@ -4347,7 +4533,10 @@
             var info = $("#vasOblAttrPageInfo");
             if (!info.length) return;
             if (!total) { info.text(lbl("VAS_107_NoRecords", "No records")); }
-            else { info.text((start + 1) + "-" + (start + shown) + " " + lbl("VAS_107_Of", "of") + " " + total); }
+            else {
+                info.text(lbl("VAS_107_RangeOfTotal", "{0}-{1} of {2}")
+                    .replace("{0}", fmtNum(start + 1, 0)).replace("{1}", fmtNum(start + shown, 0)).replace("{2}", fmtNum(total, 0)));
+            }
             $("#vasOblAttr [data-act=attr-prev]").prop("disabled", attrState.page <= 0);
             $("#vasOblAttr [data-act=attr-next]").prop("disabled", attrState.page >= pageCount - 1);
         }
@@ -4408,7 +4597,7 @@
         }
         // The dynamic form validates on submit, so the button stays enabled.
         function updateAttrSubmit() { $("#vasOblAttr [data-act=attr-submit]").prop("disabled", false); }
-        function attrErr(name) { attrState.error = lbl("VAS_107_FieldRequired", "Required") + ": " + name; updateAttrError(); }
+        function attrErr(name) { attrState.error = lbl("VAS_107_RequiredField", "Required: {0}").replace("{0}", function () { return name; }); updateAttrError(); }
 
         function commitAttribute() {
             var sel = attrState.options.filter(function (o) { return optionKey(o) === attrState.selected; })[0];
@@ -4572,7 +4761,7 @@
                 success: function (raw) {
                     var it = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     scanState.rows.push({ id: "s" + (++rowCounter), code: code, item: (it && it.RecordId > 0) ? it : null, qty: "1" });
-                    scanState.error = (it && it.RecordId > 0) ? "" : lbl("VAS_107_NoMatchFor", "No catalog match for") + ' "' + code + '"';
+                    scanState.error = (it && it.RecordId > 0) ? "" : lbl("VAS_107_NoCatalogMatchFor", 'No catalog match for "{0}"').replace("{0}", function () { return code; });
                     renderScanRows();
                 },
                 error: function (err) { console.log(err); }
@@ -4606,7 +4795,9 @@
             var units = matched.reduce(function (a, r) { return a + (parseInt(r.qty || "0", 10) || 0); }, 0);
             var unknown = scanState.rows.length - matched.length;
             d.find("#vasOblScanSummary").text(!scanState.rows.length ? lbl("VAS_107_NoScans", "No scans yet")
-                : matched.length + " " + lbl("VAS_107_Matched", "matched") + " · " + units + " " + lbl("VAS_107_Units", "unit(s)") + (unknown > 0 ? " · " + unknown + " " + lbl("VAS_107_Unknown", "unknown") : ""));
+                : (unknown > 0
+                    ? lbl("VAS_107_ScanSummaryUnknown", "{0} matched · {1} unit(s) · {2} unknown").replace("{0}", matched.length).replace("{1}", units).replace("{2}", unknown)
+                    : lbl("VAS_107_ScanSummary", "{0} matched · {1} unit(s)").replace("{0}", matched.length).replace("{1}", units)));
             d.find("[data-act=submit-scan]").prop("disabled", matched.length === 0).text(lbl("VAS_107_AddLines", "Add lines") + (matched.length ? " (" + matched.length + ")" : ""));
         }
 

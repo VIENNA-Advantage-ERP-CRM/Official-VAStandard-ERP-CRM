@@ -68,8 +68,25 @@
         var $self = this;
         var $root = $('<div class="vas242-root">');
 
+        var translatedTexts = null;
+
+        // Batch-translates every message key this widget uses in a single call.
+        function loadMessages() {
+            var elements = [
+                'VAS_242_NewContract',
+                'VAS_242_AddContract'
+            ];
+            try {
+                translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {};
+            } catch (e) {
+                translatedTexts = {};
+            }
+        }
+
         function lbl(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            if (translatedTexts === null) { loadMessages(); }
+            var t = translatedTexts[key];
+            return (t && t !== key && t.charAt(0) !== '[') ? t : fallback;
         }
 
         function escapeHtml(value) {
@@ -143,6 +160,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
         };
 
