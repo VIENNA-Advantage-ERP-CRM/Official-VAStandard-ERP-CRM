@@ -119,11 +119,31 @@
         var decSep = dotDecimal ? "." : ",";
         var grpSep = dotDecimal ? "," : ".";
 
+        /* Parse text the USER typed in the browser's number format (e.g. "1.234,56" in sl-SI).
+           A value that is already a number is returned as is - formatting it to text and
+           re-parsing would read its "." as a group separator in comma-decimal cultures. */
         function parseNum(s) {
+            if (typeof s === "number") return isFinite(s) ? s : 0;
             s = String(s == null ? "" : s).split(grpSep).join("");
             if (decSep !== ".") s = s.split(decSep).join(".");
             var n = parseFloat(s.replace(/[^0-9.\-]/g, ""));
             return isNaN(n) ? 0 : n;
+        }
+
+        /* Number from a server / callout value: a JS number, or text in invariant format
+           ("1.23"), never in the browser's culture. */
+        function toNum(v) {
+            if (typeof v === "number") return isFinite(v) ? v : 0;
+            var n = parseFloat(String(v == null ? "" : v));
+            return isNaN(n) ? 0 : n;
+        }
+
+        /* A number for an input box in the browser's format, without forcing a precision
+           (12.5 -> "12,5" in sl-SI). Empty stays empty. */
+        function fmtNumInput(v) {
+            if (v == null || v === "") return "";
+            var s = String(toNum(v));
+            return (decSep !== ".") ? s.replace(".", decSep) : s;
         }
 
         function fmtAmtInput(v, prec) {
@@ -2252,7 +2272,7 @@
         function sanitizeLine(line) {
             var v = line.values;
             for (var col in ID_COLS) if (ID_COLS.hasOwnProperty(col)) v[col] = parseInt(v[col], 10) || 0;
-            v.PriceEntered = parseNum(v.PriceEntered);
+            v.PriceEntered = toNum(v.PriceEntered);
             // The panel's Qty column IS QtyEntered (user-entered, in the entered UOM). The
             // framework callout ALSO writes QtyInvoiced = QtyEntered converted to the product
             // base UOM (the purchasing-UOM multiply). Do NOT copy QtyInvoiced back onto
@@ -2260,7 +2280,7 @@
             // attribute change) reconverts, it compounded the multiplication. QtyInvoiced is
             // recomputed server-side on save (MInvoiceLine.beforeSave for PO), so keep it only
             // as a numeric scratch value for any callout that reads it back.
-            if (v.QtyInvoiced != null && v.QtyInvoiced !== "") v.QtyInvoiced = parseNum(v.QtyInvoiced);
+            if (v.QtyInvoiced != null && v.QtyInvoiced !== "") v.QtyInvoiced = toNum(v.QtyInvoiced);
         }
 
         /* Refresh display labels + product/charge exclusivity after the callout. */
@@ -3218,7 +3238,7 @@
                 return $s;
             }
             if (kind === "int" || kind === "number") {
-                var $n = $('<input type="text" inputmode="decimal" />').val(v == null || v === "" ? "" : String(v));
+                var $n = $('<input type="text" inputmode="decimal" />').val(kind === "int" ? (v == null || v === "" ? "" : String(v)) : fmtNumInput(v));
                 $n.on("blur", function () { setDyn(line, col, kind === "int" ? (parseInt($n.val(), 10) || 0) : parseNum($n.val())); });
                 return $n;
             }
@@ -3348,7 +3368,7 @@
             v.M_AttributeSetInstance_ID = asi;
             var uom = parseInt(d.C_UOM_ID, 10) || 0;
             if (uom > 0) v.C_UOM_ID = uom;
-            v.QtyEntered = parseNum(d.QtyEntered);
+            v.QtyEntered = toNum(d.QtyEntered);
             disp.productName = d.ProductName || "";
             disp.chargeName = "";
             disp.attrName = d.AttrName || "";
