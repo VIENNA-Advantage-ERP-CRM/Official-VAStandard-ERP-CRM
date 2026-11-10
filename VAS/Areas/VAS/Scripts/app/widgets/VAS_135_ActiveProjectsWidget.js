@@ -19,6 +19,8 @@
  *           grid in place (widgetFirevalueChanged); on the Home / landing dashboard
  *           (windowNo < 0) there is no host grid, so the record is opened in the
  *           standard Customer window via VAS.ZoomUtil.
+ *           2026-11-10 - Messages via VIS.Msg.translate (single batched lookup); due dates
+ *           via Intl.DateTimeFormat; pager / progress numbers formatted per browser culture.
  *
  * ── Labels / Message Keys ─────────────────────────────────────────────────
  *  #  | Current Text            | Message Key
@@ -110,8 +112,49 @@
         // zoom and reused afterwards (0 = not resolved yet).
         var zoomWindowId = 0;
 
+        var translatedTexts = null;
+
+        /* Loads every message key used by this widget in ONE VIS.Msg.translate call. */
+        function loadMessages() {
+            var elements = [
+                'Loading',
+                'VAS_135_ActiveProjects',
+                'VAS_135_Clients',
+                'VAS_135_WithDelays',
+                'VAS_135_All',
+                'VAS_135_View',
+                'VAS_135_Project',
+                'VAS_135_Projects',
+                'VAS_135_NoOwner',
+                'VAS_135_Delayed',
+                'VAS_135_OnTrack',
+                'VAS_135_StateDelayed',
+                'VAS_135_StateOnTime',
+                'VAS_135_StateOngoing',
+                'VAS_135_StateUpcoming',
+                'VAS_135_StateCompleted',
+                'VAS_135_Due',
+                'VAS_135_Activities',
+                'VAS_135_NothingHere',
+                'VAS_135_UnableToLoad',
+                'VAS_135_Of',
+                'VAS_135_AllTitle',
+                'VAS_135_Close',
+                'VAS_135_OpenRecord',
+                'VAS_135_Showing',
+                'VAS_135_PrevPage',
+                'VAS_135_NextPage'
+            ];
+            try {
+                translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {};
+            } catch (e) { translatedTexts = {}; }
+        }
+
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            if (translatedTexts === null) { loadMessages(); }
+            var v = translatedTexts ? translatedTexts[key] : null;
+            if (!v || v === key || String(v).charAt(0) === '[') { return fallback || key; }
+            return v;
         }
         function escapeHtml(value) {
             if (value == null) { return ''; }
@@ -136,7 +179,11 @@
             if (parts.length !== 3) { return iso; }
             var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
             if (isNaN(d.getTime())) { return iso; }
-            return d.toLocaleDateString(window.navigator.language, { year: 'numeric', month: 'short', day: '2-digit' });
+            try {
+                return new Intl.DateTimeFormat(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' }).format(d);
+            } catch (e) {
+                return d.toLocaleDateString(window.navigator.language, { year: 'numeric', month: 'short', day: '2-digit' });
+            }
         }
 
         function icon(name) {
@@ -228,8 +275,8 @@
             var current = Math.floor(offset / size);
             var end = Math.min(offset + size, total);
             var of = label('VAS_135_Of', 'of');
-            var helper = label('VAS_135_Showing', 'Showing') + ' ' + start + '–' + end + ' ' + of + ' ' + formatCount(total);
-            var pageText = (current + 1) + ' ' + of + ' ' + pages;
+            var helper = label('VAS_135_Showing', 'Showing') + ' ' + formatCount(start) + '–' + formatCount(end) + ' ' + of + ' ' + formatCount(total);
+            var pageText = formatCount(current + 1) + ' ' + of + ' ' + formatCount(pages);
             return '<div class="vas135-pager">' +
                 '<span class="vas135-pglabel">' + escapeHtml(helper) + '</span>' +
                 '<span class="vas135-pgctl">' +
@@ -369,7 +416,7 @@
                 (breakdown ? '<div class="vas135-proj-bd">' + breakdown + '</div>' : '') +
                 '<div class="vas135-bar"><div style="width:' + Math.max(0, Math.min(100, progress)) + '%"></div></div>' +
                 '<div class="vas135-proj-foot">' +
-                    '<span>' + formatCount(project.completed) + '/' + formatCount(total) + ' ' + escapeHtml(label('VAS_135_Activities', 'activities')) + ' · ' + progress + '%</span>' +
+                    '<span>' + formatCount(project.completed) + '/' + formatCount(total) + ' ' + escapeHtml(label('VAS_135_Activities', 'activities')) + ' · ' + progress.toLocaleString(window.navigator.language) + '%</span>' +
                     '<span>' + escapeHtml(label('VAS_135_Due', 'Due')) + ' ' + escapeHtml(formatDate(project.dueDate)) + '</span>' +
                 '</div>' +
             '</div>';
@@ -485,6 +532,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createAllDialog();
             createProjectsDialog();

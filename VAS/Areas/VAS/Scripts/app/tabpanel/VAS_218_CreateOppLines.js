@@ -14,6 +14,7 @@
 //        04-Nov-2026  Choosing an attribute re-prices the line (attribute price from the price list) instead of zeroing it
 //        04-Nov-2026  Save is ignored while a save is in flight (repeated clicks inserted duplicate lines)
 //        04-Nov-2026  Delete refreshes the header record (was save only); own refresh echo no longer reloads the grid
+//        10-Nov-2026  Texts via VIS.Msg.translate (loadMessages); amounts, quantities and counts formatted in the browser culture
 
 ;VAS = window.VAS || {};
 (function (VAS, $) {
@@ -172,31 +173,92 @@
 
         // ── Utility helpers ──────────────────────────────────────────────────
 
+        // Browser culture used for every number / currency format in this panel
+        var lang = (window.navigator && window.navigator.language) ? window.navigator.language : undefined;
+
+        // All message keys used by this panel, translated once via VIS.Msg.translate
+        var translatedTexts = null;
+
         /**
-         * Translates a message key using VIS.Msg.getMsg with a fallback to the key itself.
-         * @param {string} key - Message key (e.g. "VAS_218_NoLines").
-         * @returns {string} Translated text.
+         * Loads every message key used by the panel with a single VIS.Msg.translate call.
+         * The result is an object keyed by message key; on failure it is an empty object so
+         * the English fallback texts are shown.
          */
-        function msg(key) {
-            if (VIS && VIS.Msg && VIS.Msg.getMsg) {
-                var t = VIS.Msg.getMsg(key);
-                return (t && t !== key) ? t : key;
+        function loadMessages() {
+            var elements = [
+                "GrandTotal",
+                "VAS_218_Add", "VAS_218_AddDescription", "VAS_218_AdditionalInfo", "VAS_218_AddProductCharge",
+                "VAS_218_Calculating", "VAS_218_Cancel", "VAS_218_Charge", "VAS_218_Code",
+                "VAS_218_ConfirmDelete", "VAS_218_Delete", "VAS_218_DeleteError", "VAS_218_Desc",
+                "VAS_218_GrpDimension", "VAS_218_GuaranteeDate", "VAS_218_LoadError", "VAS_218_Loading",
+                "VAS_218_More", "VAS_218_NoLines", "VAS_218_NoMatches", "VAS_218_NoOpportunity",
+                "VAS_218_NothingToUndo", "VAS_218_Of", "VAS_218_Ok", "VAS_218_OppLinesSummary",
+                "VAS_218_PlannedAmt", "VAS_218_PlannedPrice", "VAS_218_PlannedQtyUOM", "VAS_218_PluralS",
+                "VAS_218_Product", "VAS_218_ProductRequired", "VAS_218_Qty", "VAS_218_QtyOnHand",
+                "VAS_218_QtyRequired", "VAS_218_Refresh", "VAS_218_RefreshWithUnsaved", "VAS_218_Save",
+                "VAS_218_SaveError", "VAS_218_SaveSuccess", "VAS_218_SaveTabChangesFirst", "VAS_218_Saving",
+                "VAS_218_SearchProduct", "VAS_218_SelectAll", "VAS_218_SelectLine", "VAS_218_SelectRowToDelete",
+                "VAS_218_SetAttribute", "VAS_218_Showing", "VAS_218_UndoChanges", "VAS_218_UndoNewLine",
+                "VAS_218_UnsavedChanges", "VAS_218_UOM"
+            ];
+            try {
+                translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {};
+            } catch (e) {
+                translatedTexts = {};
             }
-            return key;
         }
 
         /**
-         * Translates a label key; returns def when VIS.Msg is unavailable.
+         * Returns the translated text for a key, or "" when it is missing
+         * (empty, equal to the key itself, or in the "[Key]" form).
+         * A key that was not part of loadMessages() (e.g. an error key sent by the server)
+         * is looked up with a single VIS.Msg.translate call.
+         * @param {string} key
+         * @returns {string}
+         */
+        function translated(key) {
+            if (translatedTexts === null) loadMessages();
+            var t = translatedTexts ? translatedTexts[key] : undefined;
+            if (t === undefined && key) {
+                try {
+                    t = VIS.Msg.translate(VIS.Env.getCtx(), key);
+                } catch (e) {
+                    t = "";
+                }
+                if (translatedTexts) translatedTexts[key] = t || "";
+            }
+            if (!t || t === key || String(t).charAt(0) === "[") return "";
+            return String(t);
+        }
+
+        /**
+         * Translates a message key; falls back to def (when given) or the key itself.
+         * @param {string} key - Message key (e.g. "VAS_218_NoLines").
+         * @param {string} [def] - Optional English fallback text.
+         * @returns {string} Translated text.
+         */
+        function msg(key, def) {
+            return translated(key) || def || key;
+        }
+
+        /**
+         * Translates a label key; returns def when the key has no translation.
          * @param {string} key - Message key.
          * @param {string} def - Default/fallback text.
          * @returns {string}
          */
         function lbl(key, def) {
-            if (VIS && VIS.Msg && VIS.Msg.getMsg) {
-                var t = VIS.Msg.getMsg(key);
-                return (t && t !== key) ? t : (def || key);
-            }
-            return def || key;
+            return translated(key) || def || key;
+        }
+
+        /**
+         * Formats a whole number (counts, page numbers) in the browser culture.
+         * @param {number} n
+         * @returns {string}
+         */
+        function fmtInt(n) {
+            var v = +n || 0;
+            try { return v.toLocaleString(lang); } catch (e) { return String(v); }
         }
 
         /**
@@ -273,25 +335,81 @@
         }
 
         /**
-         * Formats a number as a money string with two decimal places.
+         * Formats a number as a money string with two decimal places, in the browser culture
+         * (grouping / decimal separators follow the locale). Display only - the editable
+         * Price input uses fmtMoneyEdit so parseNum can read it back.
          * @param {number} n
          * @returns {string}
          */
         function fmtMoney(n) {
-            if (n == null || isNaN(n)) return "0.00";
-            var v = parseFloat(n);
+            var v = (n == null || isNaN(n)) ? 0 : parseFloat(n);
             if (Math.abs(v) > AMOUNT_MAX_VALUE) v = AMOUNT_MAX_VALUE;
-            return v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+            try {
+                return v.toLocaleString(lang, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            } catch (e) {
+                return v.toFixed(2);
+            }
         }
 
         /**
-         * Formats a quantity value showing at least 2 decimal places (up to 6),
-         * stripping trailing zeros beyond the 2nd place.
-         * Examples: 8 → "8.00", 8.5 → "8.50", 8.1234 → "8.1234"
+         * Plain "1234.50" text for the editable Price input (decimal point, no grouping).
+         * The input only accepts digits and "." and is read back with parseNum.
+         * @param {number} n
+         * @returns {string}
+         */
+        function fmtMoneyEdit(n) {
+            var v = (n == null || isNaN(n)) ? 0 : parseFloat(n);
+            if (Math.abs(v) > AMOUNT_MAX_VALUE) v = AMOUNT_MAX_VALUE;
+            return v.toFixed(2);
+        }
+
+        /**
+         * Formats an amount with the opportunity's currency in the browser culture
+         * (symbol position follows the locale). Falls back to the server-supplied symbol
+         * in front of the number when no ISO code is available.
+         * @param {number} n
+         * @returns {string}
+         */
+        function fmtCurrency(n) {
+            var iso = (parent && parent.CurISO) ? String(parent.CurISO) : "";
+            if (iso) {
+                try {
+                    var v = (n == null || isNaN(n)) ? 0 : parseFloat(n);
+                    if (Math.abs(v) > AMOUNT_MAX_VALUE) v = AMOUNT_MAX_VALUE;
+                    return new Intl.NumberFormat(lang, {
+                        style: "currency", currency: iso,
+                        minimumFractionDigits: 2, maximumFractionDigits: 2
+                    }).format(v);
+                } catch (e) { /* fall through to symbol + number */ }
+            }
+            var sym = (parent && parent.CurSymbol) ? parent.CurSymbol + " " : "";
+            return sym + fmtMoney(n);
+        }
+
+        /**
+         * Formats a quantity value showing at least 2 decimal places (up to 6), in the
+         * browser culture. Display only - the editable Qty input uses fmtQtyEdit.
+         * Examples (en): 8 → "8.00", 8.5 → "8.50", 8.1234 → "8.1234"
          * @param {number} n
          * @returns {string}
          */
         function fmtQty(n) {
+            var v = (n == null || isNaN(n)) ? 0 : parseFloat(n);
+            if (Math.abs(v) > AMOUNT_MAX_VALUE) v = AMOUNT_MAX_VALUE;
+            try {
+                return v.toLocaleString(lang, { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+            } catch (e) {
+                return v.toFixed(2);
+            }
+        }
+
+        /**
+         * Plain "8.50" text for the editable Qty input (decimal point, no grouping): at least
+         * 2 decimal places (up to 6), trailing zeros beyond the 2nd place stripped.
+         * @param {number} n
+         * @returns {string}
+         */
+        function fmtQtyEdit(n) {
             if (n == null || isNaN(n)) return "0.00";
             var v = parseFloat(n);
             if (Math.abs(v) > AMOUNT_MAX_VALUE) v = AMOUNT_MAX_VALUE;
@@ -908,9 +1026,7 @@
             $totalsRow.empty();
             var amt = otherAmt;
             for (var i = 0; i < lines.length; i++) amt += +lineVal(lines[i], "PlannedAmt") || 0;
-            var sym = (parent && parent.CurSymbol) ? parent.CurSymbol + " " : "";
-            function fmt(n) { return sym + fmtMoney(n); }
-            $totalsRow.append(totalsRow(lbl("GrandTotal", "Planned Amount") + ":", fmt(amt), true));
+            $totalsRow.append(totalsRow(lbl("GrandTotal", "Planned Amount") + ":", fmtCurrency(amt), true));
         }
 
         /**
@@ -940,8 +1056,8 @@
             var totalPages = Math.ceil(totalLineCount / LINE_PAGE_SIZE);
             var from       = (linePage - 1) * LINE_PAGE_SIZE + 1;
             var to         = Math.min(linePage * LINE_PAGE_SIZE, totalLineCount);
-            var showing    = lbl("VAS_218_Showing", "Showing") + " " + from + "–" + to + " " + lbl("VAS_218_Of", "of") + " " + totalLineCount;
-            var pageInfo   = linePage + " / " + totalPages;
+            var showing    = lbl("VAS_218_Showing", "Showing") + " " + fmtInt(from) + "–" + fmtInt(to) + " " + lbl("VAS_218_Of", "of") + " " + fmtInt(totalLineCount);
+            var pageInfo   = fmtInt(linePage) + " / " + fmtInt(totalPages);
 
             $pager.html(
                 '<span class="vas-ol-linepager__showing">' + esc(showing) + '</span>' +
@@ -1844,7 +1960,7 @@
             // ── Quantity ──
             if (isEditQty) {
                 var $q = $('<input type="text" class="vas-ol-cell-edit__input vas-ol-qtyval" inputmode="decimal" />');
-                $q.val(v.PlannedQty ? fmtQty(v.PlannedQty) : "").css("text-align", "right");
+                $q.val(v.PlannedQty ? fmtQtyEdit(v.PlannedQty) : "").css("text-align", "right");
                 limitNumericInput($q, "PlannedQty");
                 $q.on("blur", function () {
                     var n = parseNum($q.val());
@@ -1946,7 +2062,7 @@
 
             if (isEditingThis) {
                 var $inp = $('<input type="text" class="vas-ol-cell-edit__input" inputmode="decimal" />');
-                $inp.val(fmtMoney(line.values.PlannedPrice || 0)).css("text-align", "right");
+                $inp.val(fmtMoneyEdit(line.values.PlannedPrice || 0)).css("text-align", "right");
                 limitNumericInput($inp, "PlannedPrice");
                 $inp.on("blur", function () {
                     var n = parseNum($inp.val());
@@ -1981,7 +2097,7 @@
                 var hasP = line.values.PlannedPrice !== undefined && +line.values.PlannedPrice !== 0;
                 wrap.append(dispInput(line, "price",
                     hasP ? fmtMoney(line.values.PlannedPrice) : "",
-                    { align: "right", placeholder: "0.00" }));
+                    { align: "right", placeholder: fmtMoney(0) }));
             }
             return cell;
         }
@@ -2770,7 +2886,7 @@
             // editor is active (HTML disabled swallows the event). Mirrors VAS_074 pattern.
             var saveLbl = lbl("VAS_218_Save", "Save row");
             if (dirtyCount > 1) saveLbl += lbl("VAS_218_PluralS", "s");
-            if (dirtyCount > 0) saveLbl += " (" + dirtyCount + ")";
+            if (dirtyCount > 0) saveLbl += " (" + fmtInt(dirtyCount) + ")";
             $saveBtn.find(".vas-ol-save-lbl").text(saveLbl);
             $saveBtn.prop("disabled", locked)
                     .toggleClass("vas-ol-is-disabled", locked || dirtyCount === 0);
@@ -2780,7 +2896,7 @@
                    .toggleClass("vas-ol-is-disabled", locked);
 
             // Delete button: selection count badge
-            $deleteBtn.find(".vas-ol-sel-count").text(selCount > 0 ? "(" + selCount + ")" : "");
+            $deleteBtn.find(".vas-ol-sel-count").text(selCount > 0 ? "(" + fmtInt(selCount) + ")" : "");
             $deleteBtn.prop("disabled", selCount === 0 || locked)
                       .toggleClass("vas-ol-is-disabled", selCount === 0 || locked);
 
@@ -3271,6 +3387,7 @@
          */
         function render(parentRecord, $container, opts) {
             opts     = opts || {};
+            loadMessages();
             parent   = parentRecord || null;
             $self    = $container;
             self     = opts.instance || self;
@@ -3509,6 +3626,7 @@
              * Called by startPanel; safe to call multiple times (rebuilds shell).
              */
             init: function () {
+                loadMessages();
                 self  = this;
                 $self = $('<div class="vas-ol-root"></div>');
 

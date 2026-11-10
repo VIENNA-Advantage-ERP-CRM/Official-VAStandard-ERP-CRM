@@ -133,14 +133,21 @@
     flex-direction: column;
 }
 
-    /* Widget body: split the available height into `pageSize` (3) equal rows so
-     * the records fill the compact card top-to-bottom (grid-template-rows set
-     * inline in JS). Partial pages leave empty tracks at the bottom rather than
-     * stretching. The "All" modal list keeps the flex layout above, since this
-     * only targets the direct child of the widget body. Matches VAS_135/138/294. */
+    /* Widget body: records stack from the top of the card in fixed-height rows
+     * (see `.vas295-body .vas295-row`), so a 1- or 2-record page sits at the top
+     * instead of being stretched/centred across the card. Any spare height stays
+     * empty above the pager, which remains pinned to the bottom. The "All" modal
+     * list is unaffected (it is not a direct child of the widget body). */
     .vas295-body > .vas295-list {
-        display: grid;
-        grid-auto-rows: minmax(0, 1fr);
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: stretch;
+    }
+
+    .vas295-body .vas295-row {
+        flex: 0 0 auto;
+        height: 3.4em;                          /* fixed row height */
     }
 
 .vas295-row {

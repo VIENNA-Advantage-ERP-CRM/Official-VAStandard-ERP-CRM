@@ -100,72 +100,116 @@
             return isFinite(n) ? n : 0;
         }
 
-        // ── Helper: currency format with thousands separator ──────────────────
+        // ── Browser-culture formatting (date / time / number / amount) ─────────
+        // Same source as the platform: the browser language. Order, separators,
+        // month names (always text, never numeric), 12h/24h clock, decimal mark and
+        // the position of the currency sign all come from that culture.
+        var VASLocale = (window.navigator && (navigator.language || (navigator.languages && navigator.languages[0]))) || undefined;
+
+        // Localised plain number with a fixed / bounded number of decimals.
+        function fmtNum(v, minFrac, maxFrac) {
+            var n = toNum(v);
+            try {
+                return n.toLocaleString(VASLocale, { minimumFractionDigits: minFrac, maximumFractionDigits: maxFrac });
+            } catch (e) { return n.toFixed(minFrac); }
+        }
+
+        // Localised percentage for a value expressed in percent (5 → "5%" / "5 %").
+        function fmtPct(v) {
+            try {
+                return new Intl.NumberFormat(VASLocale, { style: 'percent', maximumFractionDigits: 2 }).format(toNum(v) / 100);
+            } catch (e) { return toNum(v) + '%'; }
+        }
+
+        // Where the browser culture puts the currency sign relative to the number
+        // (and any spacing between them), learnt once from Intl.
+        var _curLayout = null;
+        function curLayout() {
+            if (_curLayout) return _curLayout;
+            _curLayout = { before: true, gap: '' };
+            try {
+                var parts = new Intl.NumberFormat(VASLocale, { style: 'currency', currency: 'USD' }).formatToParts(1234.5);
+                var ci = -1, ni = -1, i;
+                for (i = 0; i < parts.length; i++) {
+                    if (parts[i].type === 'currency' && ci < 0) ci = i;
+                    if (parts[i].type === 'integer' && ni < 0) ni = i;
+                }
+                if (ci >= 0 && ni >= 0) {
+                    _curLayout.before = ci < ni;
+                    var near = _curLayout.before ? parts[ci + 1] : parts[ci - 1];
+                    _curLayout.gap = (near && near.type === 'literal') ? near.value : '';
+                }
+            } catch (e) { /* keep sign-in-front default */ }
+            return _curLayout;
+        }
+
+        // Amount in the browser culture: grouping + decimal mark per locale, the
+        // server-supplied currency sign placed where that locale puts it.
         function fmtCurrency(v, sym, prec) {
             var s = (sym != null ? String(sym) : '');
             var p = (prec != null ? Math.max(0, parseInt(prec, 10) || 0) : 2);
-            return s + toNum(v).toFixed(p).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            var n = toNum(v);
+            var body = fmtNum(Math.abs(n), p, p);
+            var sign = (n < 0 && Math.abs(n) * Math.pow(10, p) >= 0.5) ? '-' : '';
+            if (!s) return sign + body;
+            var lay = curLayout();
+            return lay.before ? (sign + s + lay.gap + body) : (sign + body + lay.gap + s);
         }
 
-        // ── Helper: format YYYY-MM-DD or ISO timestamp → "DD Mon YYYY" ────────
+        // "YYYY-MM-DD" or "YYYY-MM-DD[T ]HH:mm[:ss]" (server local time, no zone) → local Date.
+        // Built from its parts so a date-only value never shifts a day across time zones.
+        function parseStamp(v) {
+            var m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/.exec(String(v));
+            if (m) {
+                return { date: new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0)), hasTime: m[4] !== undefined };
+            }
+            var d = new Date(v);
+            return isNaN(d.getTime()) ? null : { date: d, hasTime: true };
+        }
+
+        function fmtTimeOf(d) {
+            try { return d.toLocaleTimeString(VASLocale, { hour: '2-digit', minute: '2-digit' }); }
+            catch (e) { return ''; }
+        }
+
+        // ── Helper: date → browser culture, text month ("20. Aug. 2026" / "15 Oct 2026") ──
         function fmtDate(iso) {
             if (!iso) return '';
-            var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-            // Support both "YYYY-MM-DD" and ISO datetime strings
-            var s = String(iso);
-            var parts = s.substring(0, 10).split('-');
-            if (parts.length === 3) {
-                var m = parseInt(parts[1], 10) - 1;
-                return parts[2] + ' ' + (MONTHS[m] || '') + ' ' + parts[0];
-            }
-            return s;
+            var st = parseStamp(iso);
+            if (!st) return String(iso);
+            try { return st.date.toLocaleDateString(VASLocale, { day: '2-digit', month: 'short', year: 'numeric' }); }
+            catch (e) { return String(iso); }
         }
 
-        // ── Helper: format ISO datetime → "DD Mon · HH:mm" ──────────────────
+        // ── Helper: datetime → browser culture date + time ──────────────────
         function fmtDateTime(iso) {
             if (!iso) return '';
-            var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-            var s = String(iso);
-            var datePart = s.substring(0, 10);
-            var timePart = s.length > 10 ? s.substring(11, 16) : '';
-            var parts = datePart.split('-');
-            if (parts.length === 3) {
-                var m = parseInt(parts[1], 10) - 1;
-                var dateStr = parts[2] + ' ' + (MONTHS[m] || '') + ' ' + parts[0];
-                return timePart ? (dateStr + ' · ' + timePart) : dateStr;
-            }
-            return s;
+            var st = parseStamp(iso);
+            if (!st) return String(iso);
+            var dateStr = fmtDate(iso);
+            return st.hasTime ? (dateStr + ', ' + fmtTimeOf(st.date)) : dateStr;
         }
 
-        // ── Helper: format engagement timestamp → "Mon DD, H:MMam/pm" ──────────
+        // ── Helper: engagement timestamp → browser culture "day month, time" ──
+        // The server returns its local time as text; it is read as local time (not UTC) so
+        // the timezone offset is never applied twice.
         function fmtEngTs(ts) {
             if (!ts) return '';
-            var p = String(ts).split(' ');
-            if (p.length < 2) return ts;
-            var d = p[0].split('-'), t = p[1].split(':');
-            var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-            // TO_CHAR on the server returns the DB server's local time string — parse as local,
-            // not UTC. Using Date.UTC() was incorrectly double-applying the timezone offset
-            // (server local → treated as UTC → getHours() re-adds local offset).
-            var dt = new Date(
-                parseInt(d[0], 10), parseInt(d[1], 10) - 1, parseInt(d[2], 10),
-                parseInt(t[0], 10), parseInt(t[1], 10)
-            );
-            var h = dt.getHours(), mi = dt.getMinutes();
-            var miStr = (mi < 10 ? '0' : '') + mi;
-            var ampm = h >= 12 ? 'pm' : 'am';
-            if (h > 12) h -= 12; else if (h === 0) h = 12;
-            return months[dt.getMonth()] + ' ' + dt.getDate() + ', ' + h + ':' + miStr + ampm;
+            var st = parseStamp(ts);
+            if (!st) return ts;
+            try {
+                var dStr = st.date.toLocaleDateString(VASLocale, { day: '2-digit', month: 'short' });
+                return st.hasTime ? (dStr + ', ' + fmtTimeOf(st.date)) : dStr;
+            } catch (e) { return ts; }
         }
 
         // Date-only variant of fmtEngTs — used for meetings where only the date is relevant.
         function fmtEngDate(ts) {
             if (!ts) return '';
-            var datePart = String(ts).split(' ')[0]; // YYYY-MM-DD
-            var d = datePart.split('-');
-            if (d.length < 3) return ts;
-            var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-            return months[parseInt(d[1], 10) - 1] + ' ' + parseInt(d[2], 10);
+            var st = parseStamp(ts);
+            if (!st) return ts;
+            try { return st.date.toLocaleDateString(VASLocale, { day: '2-digit', month: 'short' }); }
+            catch (e) { return ts; }
         }
 
         // ── Helper: inline SVG wrapper ────────────────────────────────────────
@@ -1257,8 +1301,8 @@
                     // For charge lines (no product), fall back to line description as the display name
                     if (!product) product = lineDesc;
 
-                    var metaStr = (sku ? esc(sku) + ' · ' : '') + qty + ' ' + esc(uom) + ' × ' + esc(fmtCurrency(price, sym, prec));
-                    if (disc > 0) { metaStr += ' · −' + disc + '%'; }
+                    var metaStr = (sku ? esc(sku) + ' · ' : '') + esc(fmtNum(qty, 0, 4)) + ' ' + esc(uom) + ' × ' + esc(fmtCurrency(price, sym, prec));
+                    if (disc > 0) { metaStr += ' · −' + esc(fmtPct(disc)); }
 
                     // §9b  Build history toggle + drawer for this line
                     var lineHist   = histMap[lId] || [];
@@ -1292,7 +1336,7 @@
                                 '<div class="vas_123_qrp-lh-row">' +
                                     '<span class="vas_123_qrp-lh-when">' + esc(fmtEngTs(hr.changedOn || hr.ChangedOn)) + '</span>' +
                                     '<span>' + esc(fmtCurrency(toNum(hr.priceActual || hr.PriceActual), sym, hCPrec)) + '</span>' +
-                                    '<span>' + esc(hQty.toFixed(hPrec) + (hUom ? ' ' + hUom : '')) + '</span>' +
+                                    '<span>' + esc(fmtNum(hQty, hPrec, hPrec) + (hUom ? ' ' + hUom : '')) + '</span>' +
                                     '<span>' + esc(fmtCurrency(toNum(hr.lineNetAmt || hr.LineNetAmt), sym, hCPrec)) + '</span>' +
                                 '</div>';
                         }
@@ -2008,7 +2052,7 @@
             // For charge lines productTypeName is empty — show "Charge" label instead
             var typeDisplay = (chargeId > 0) ? msg('VAS_123_TypeCharge') : productTypeName;
 
-            var priceDisplay = fmtCurrency(price, sym, prec) + (disc > 0 ? ' · −' + disc + '%' : '');
+            var priceDisplay = fmtCurrency(price, sym, prec) + (disc > 0 ? ' · −' + fmtPct(disc) : '');
 
             var bodyHtml =
                 '<div class="vas_123_qrp-mgrid">' +

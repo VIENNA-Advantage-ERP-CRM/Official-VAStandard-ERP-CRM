@@ -85,6 +85,8 @@
  * 50  | of                                                                   | VAS_288_Of
  * 51  | Showing                                                              | VAS_288_Showing
  * 52  | Search is unavailable right now. Try again in a moment.              | VAS_288_LoadError
+ * 53  | Month                                                                | VAS_288_Month
+ * 54  | Year                                                                 | VAS_288_Year
  */
 ; VAS = window.VAS || {};
 
@@ -151,8 +153,8 @@
                 $root.find('.vasso-retry').remove();
                 if ($root.css('position') === 'static') { $root.css('position', 'relative'); }
                 var text = '';
-                try { text = VIS.Msg.getMsg('VAS_SO_Retry'); } catch (e) { text = ''; }
-                if (!text || text === 'VAS_SO_Retry') { text = 'Retry'; }
+                try { text = VIS.Msg.translate(VIS.Env.getCtx(), 'VAS_SO_Retry'); } catch (e) { text = ''; }
+                if (!text || text === 'VAS_SO_Retry' || String(text).charAt(0) === '[') { text = 'Retry'; }
                 $('<button type="button" class="vasso-retry"></button>').text(text)
                     .attr('title', text)
                     .on('click', function (e) {
@@ -169,7 +171,6 @@
     var WIDGET_PAGE_SIZE = 6;   // rows per widget page
     var MAX_ROWS_PER_PAGE = 10;
     var MIN_ROWS_PER_PAGE = 2;
-    var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     var MIN_YEAR = 2024;
     var YEAR_SPAN = 3;
 
@@ -228,8 +229,46 @@
 
         var lineState = null; // { order, lines, page, size }
 
+        // Translated texts, loaded once per widget instance (see loadMessages()).
+        var translatedTexts = null;
+
+        function loadMessages() {
+            var elements = [
+                'VAS_288_Title', 'VAS_288_Subtitle', 'VAS_288_Month', 'VAS_288_Year', 'VAS_288_ColDocumentNo',
+                'VAS_288_ColDateOrdered', 'VAS_288_ColBusinessPartner', 'VAS_288_ColWarehouse',
+                'VAS_288_ColQuotationNo', 'VAS_288_ColSalesRep', 'VAS_288_ColDatePromised', 'VAS_288_ColSubTotal',
+                'VAS_288_ColDocumentStatus', 'VAS_288_PrevPage', 'VAS_288_NextPage', 'VAS_288_ErrorState',
+                'VAS_288_ZeroStatePrefix', 'VAS_288_StatusDrafted', 'VAS_288_StatusInProgress',
+                'VAS_288_StatusCompleted', 'VAS_288_Showing', 'VAS_288_Of', 'VAS_288_ClickRowHint', 'VAS_288_Close',
+                'VAS_288_LoadError', 'VAS_288_DeliveryFull', 'VAS_288_LinePartial', 'VAS_288_LineInProcess',
+                'VAS_288_Customer', 'VAS_288_SoDate', 'VAS_288_DatePromised', 'VAS_288_SoValue', 'VAS_288_ShipFrom',
+                'VAS_288_DeliveryMode', 'VAS_288_DocumentStatus', 'VAS_288_DeliveryStatus', 'VAS_288_SalesOrderLines',
+                'VAS_288_LinesSuffix', 'VAS_288_QtyOrderedSuffix', 'VAS_288_QtyShortSuffix', 'VAS_288_ColLine',
+                'VAS_288_ColProduct', 'VAS_288_ColAttribute', 'VAS_288_ColUom', 'VAS_288_ColOrdered',
+                'VAS_288_ColDelivered', 'VAS_288_ColPending', 'VAS_288_ColInStock', 'VAS_288_ColRate',
+                'VAS_288_ColLineAmount', 'VAS_288_ColLineStatus'
+            ];
+            try { translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {}; }
+            catch (e) { translatedTexts = {}; }
+        }
+
+        // Never render a raw "[KEY]": fall back to the English text when the key is missing.
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            if (translatedTexts === null) { loadMessages(); }
+            var text = translatedTexts ? translatedTexts[key] : '';
+            if (!text || text === key || String(text).charAt(0) === '[') { return fallback || key; }
+            return text;
+        }
+
+        /* Browser-culture formatting (window.navigator.language). */
+        function fmtDate(d, opts) {
+            try { return new Intl.DateTimeFormat(window.navigator.language, opts).format(d); } catch (e) { return ''; }
+        }
+
+        function fmtNumber(n, minFrac, maxFrac) {
+            try {
+                return Number(n).toLocaleString(window.navigator.language, { minimumFractionDigits: minFrac, maximumFractionDigits: maxFrac });
+            } catch (e) { return String(n); }
         }
 
         function escapeHtml(value) {
@@ -254,15 +293,24 @@
             return '';
         }
 
-        function formatINR(value) {
+        // The widget's API returns bare amounts (no currency ISO / symbol), so none is invented here.
+        // If the backend ever supplies the currency ISO code, return it from this function.
+        function currencyIso() { return ''; }
+
+        function formatAmount(value) {
             var num = Number(value || 0);
-            if (num >= 1e7) { return '₹ ' + (num / 1e7).toFixed(2) + ' Cr'; }
-            if (num >= 1e5) { return '₹ ' + (num / 1e5).toFixed(2) + ' L'; }
-            return '₹ ' + Math.round(num).toLocaleString('en-IN');
+            try {
+                var iso = currencyIso();
+                var compactFrom = VIS.Util.usesIndianNumbering(iso) ? 1e5 : 1e6;
+                if (Math.abs(num) >= compactFrom) {
+                    return (num < 0 ? '-' : '') + VIS.Util.formatCompactAmount(Math.abs(num), iso, 2);
+                }
+            } catch (e) { /* shared compact helper unavailable - use the plain number below */ }
+            return fmtNumber(Math.round(num), 0, 0);
         }
 
         function formatNum(value) {
-            return Math.round(Number(value || 0)).toLocaleString('en-IN');
+            return fmtNumber(Math.round(Number(value || 0)), 0, 0);
         }
 
         function parseIso(iso) {
@@ -274,17 +322,17 @@
         function formatDateShort(iso) {
             var d = parseIso(iso);
             if (!d) { return ''; }
-            return (d.getDate() < 10 ? '0' : '') + d.getDate() + ' ' + MONTHS[d.getMonth()];
+            return fmtDate(d, { day: '2-digit', month: 'short' });
         }
 
         function formatDateFull(iso) {
             var d = parseIso(iso);
             if (!d) { return ''; }
-            return (d.getDate() < 10 ? '0' : '') + d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+            return fmtDate(d, { day: '2-digit', month: 'short', year: 'numeric' });
         }
 
         function periodLabel() {
-            return MONTHS[selectedMonth()] + ' ' + selectedYear();
+            return fmtDate(new Date(selectedYear(), selectedMonth(), 1), { month: 'short', year: 'numeric' });
         }
 
         function selectedMonth() { return $monthSel && $monthSel.length ? Number($monthSel.val()) : CUR_M; }
@@ -310,9 +358,11 @@
          * Widget shell: header (title/subtitle + Month/Year filter) + queue table + pager
          * ============================================================ */
         function fillMonthSelect($sel) {
-            $sel.html(MONTHS.map(function (m, i) {
-                return '<option value="' + i + '"' + (i === CUR_M ? ' selected' : '') + '>' + m + '</option>';
-            }).join(''));
+            var html = '';
+            for (var i = 0; i < 12; i++) {
+                html += '<option value="' + i + '"' + (i === CUR_M ? ' selected' : '') + '>' + escapeHtml(fmtDate(new Date(2000, i, 1), { month: 'short' })) + '</option>';
+            }
+            $sel.html(html);
         }
 
         function fillYearSelect($sel) {
@@ -332,8 +382,8 @@
             $htxt.append('<p class="vas288-sub">' + escapeHtml(label('VAS_288_Subtitle', 'Live sales orders by promised delivery date')) + '</p>');
 
             var $filter = $('<div class="vas288-mfilter"></div>');
-            $monthSel = $('<select class="vas288-msel" aria-label="Month"></select>');
-            $yearSel = $('<select class="vas288-msel" aria-label="Year"></select>');
+            $monthSel = $('<select class="vas288-msel" aria-label="' + escapeHtml(label('VAS_288_Month', 'Month')) + '"></select>');
+            $yearSel = $('<select class="vas288-msel" aria-label="' + escapeHtml(label('VAS_288_Year', 'Year')) + '"></select>');
             fillMonthSelect($monthSel);
             fillYearSelect($yearSel);
             $filter.append($monthSel, $yearSel);
@@ -461,7 +511,8 @@
             var tpl = TABLE_TEMPLATE;
             $tbody.html(docsState.rows.map(function (row) {
                 var st = STATUS_META[row.DocumentStatus] || { fallback: row.DocumentStatus, cls: 'vas288-chip-neutral' };
-                var statusLabel = label('VAS_288_Status' + (row.DocumentStatus === 'DR' ? 'Drafted' : row.DocumentStatus === 'IP' ? 'InProgress' : 'Completed'), st.fallback);
+                var statusKey = row.DocumentStatus === 'DR' ? 'VAS_288_StatusDrafted' : row.DocumentStatus === 'IP' ? 'VAS_288_StatusInProgress' : 'VAS_288_StatusCompleted';
+                var statusLabel = label(statusKey, st.fallback);
                 return '<button type="button" class="vas288-trow" style="grid-template-columns:' + tpl + '" data-so="' + row.SalesOrderId + '">' +
                     '<span class="vas288-cell vas288-c-link" title="' + escapeHtml(row.DocumentNo) + '">' + escapeHtml(row.DocumentNo) + '</span>' +
                     cellHtml(formatDateShort(row.DateOrdered), 'vas288-c-std') +
@@ -470,7 +521,7 @@
                     cellHtml(row.QuotationNo, 'vas288-c-std') +
                     cellHtml(row.SalesRep || '—', 'vas288-c-dark') +
                     cellHtml(formatDateShort(row.DatePromised), 'vas288-c-std') +
-                    cellHtml(formatINR(row.SubTotal), 'vas288-c-emph', 'right') +
+                    cellHtml(formatAmount(row.SubTotal), 'vas288-c-emph', 'right') +
                     '<span class="vas288-cell" title="' + escapeHtml(statusLabel) + '"><span class="vas288-chip ' + st.cls + '">' + escapeHtml(statusLabel) + '</span></span>' +
                 '</button>';
             }).join(''));
@@ -579,7 +630,7 @@
                 statTile(label('VAS_288_Customer', 'Customer'), order.CustomerName) +
                 statTile(label('VAS_288_SoDate', 'SO date'), formatDateFull(order.SalesOrderDate)) +
                 statTile(label('VAS_288_DatePromised', 'Date promised'), formatDateFull(order.DatePromised)) +
-                statTile(label('VAS_288_SoValue', 'SO value'), formatINR(order.OrderValue)) +
+                statTile(label('VAS_288_SoValue', 'SO value'), formatAmount(order.OrderValue)) +
                 statTile(label('VAS_288_ShipFrom', 'Ship from'), order.WarehouseName) +
                 statTile(label('VAS_288_DeliveryMode', 'Delivery mode'), order.DeliveryMode) +
                 statTile(label('VAS_288_DocumentStatus', 'Document status'), order.DocumentStatus) +
@@ -650,8 +701,8 @@
                     cellHtml(formatNum(line.QtyDelivered), 'vas288-c-std', 'right'),
                     cellHtml(formatNum(line.QtyPending), 'vas288-c-prim', 'right'),
                     cellHtml(formatNum(line.FreeStock), (line.FreeStock < line.QtyPending ? 'vas288-c-short' : 'vas288-c-ok'), 'right'),
-                    cellHtml('₹ ' + formatNum(line.Rate), 'vas288-c-std', 'right'),
-                    cellHtml(formatINR(line.Amount), 'vas288-c-emph', 'right')
+                    cellHtml(formatNum(line.Rate), 'vas288-c-std', 'right'),
+                    cellHtml(formatAmount(line.Amount), 'vas288-c-emph', 'right')
                 ].join('') + '<span class="vas288-cell"><span class="vas288-chip ' + st.cls + '" title="' + escapeHtml(st.text) + '">' + escapeHtml(st.text) + '</span></span>';
                 return '<div class="vas288-mrow" style="grid-template-columns:' + tpl + '">' + cells + '</div>';
             }).join('');
@@ -701,6 +752,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createModal();
             bindDocumentLevelEvents();

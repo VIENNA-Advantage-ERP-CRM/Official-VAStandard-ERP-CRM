@@ -40,6 +40,7 @@
  * 11  | Overdue receivables                | VAS_138_AllTitle
  * 12  | Close                              | VAS_138_Close
  * 13  | Customer details                   | VAS_138_CustomerDetails
+ * 14  | {0}d (days short, e.g. 12d)        | VAS_138_DaysShort
  * ──────────────────────────────────────────────────────────────────────────
  */
 ; VAS = window.VAS || {};
@@ -106,8 +107,75 @@
         // zoom and reused afterwards (0 = not resolved yet).
         var zoomWindowId = 0;
 
+        var translatedTexts = null;
+
+        /** Loads every message key used by this widget in one VIS.Msg.translate call. */
+        function loadMessages() {
+            var elements = [
+                'Loading',
+                'VAS_138_DelayedPayments',
+                'VAS_138_Clients',
+                'VAS_138_Client',
+                'VAS_138_Overdue',
+                'VAS_138_All',
+                'VAS_138_Open',
+                'VAS_138_Of',
+                'VAS_138_Showing',
+                'VAS_138_PrevPage',
+                'VAS_138_NextPage',
+                'VAS_138_NothingHere',
+                'VAS_138_UnableToLoad',
+                'VAS_138_Retry',
+                'VAS_138_AllTitle',
+                'VAS_138_Close',
+                'VAS_138_CustomerDetails',
+                'VAS_138_Invoice',
+                'VAS_138_Invoices',
+                'VAS_138_DaysShort',
+                'VAS_138_KeyClient',
+                'VAS_138_Tier',
+                'VAS_138_Segment',
+                'VAS_138_Owner',
+                'VAS_138_ARR',
+                'VAS_138_OpenTicketsFact',
+                'VAS_138_Projects',
+                'VAS_138_Pipeline',
+                'VAS_138_Onboarding',
+                'VAS_138_DaysPastDue',
+                'VAS_138_OpenSupportTickets',
+                'VAS_138_KeyPrioritise',
+                'VAS_138_OpenRequests',
+                'VAS_138_Signals',
+                'VAS_138_OpenRecord',
+                'VAS_138_StateDelayed',
+                'VAS_138_StateOnTime',
+                'VAS_138_StateOngoing',
+                'VAS_138_StateUpcoming',
+                'VAS_138_StateCompleted',
+                'VAS_138_Activities',
+                'VAS_138_Due',
+                'VAS_138_NoProjects',
+                'VAS_138_NoActivities',
+                'VAS_138_ActiveProjects',
+                'VAS_138_Customer'
+            ];
+            try {
+                translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {};
+            } catch (e) {
+                translatedTexts = {};
+            }
+        }
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            if (translatedTexts === null) { loadMessages(); }
+            var v = translatedTexts ? translatedTexts[key] : null;
+            if (v == null || v === '' || v === key || String(v).charAt(0) === '[') {
+                return fallback == null ? key : fallback;
+            }
+            return v;
+        }
+        // "{0}d" - a day count with its unit suffix, word order left to the translation.
+        function daysShort(value) {
+            return label('VAS_138_DaysShort', '{0}d').replace('{0}', formatCount(value));
         }
 
         function escapeHtml(value) {
@@ -139,6 +207,35 @@
             return Math.round(n).toLocaleString(window.navigator.language);
         }
 
+        // Locale-aware percentage (value is already 0..100, e.g. 45 -> "45%").
+        function formatPercent(value, maxFraction) {
+            var n = Number(value || 0);
+            if (!isFinite(n)) { n = 0; }
+            try {
+                return new Intl.NumberFormat(window.navigator.language, { style: 'percent', minimumFractionDigits: 0, maximumFractionDigits: maxFraction || 0 }).format(n / 100);
+            } catch (e) { return n + '%'; }
+        }
+
+        // Currency symbol placement for the browser locale: returns { symbol, before, space }.
+        // With no ISO available the server-supplied symbol is kept, in front.
+        function currencyAffix(iso, serverSymbol) {
+            var fallback = { symbol: serverSymbol || iso || '', before: true, space: '' };
+            if (!iso) { return fallback; }
+            try {
+                var parts = new Intl.NumberFormat(window.navigator.language, { style: 'currency', currency: iso }).formatToParts(1);
+                var ci = -1, ii = -1, i;
+                for (i = 0; i < parts.length; i++) {
+                    if (parts[i].type === 'currency' && ci < 0) { ci = i; }
+                    if (parts[i].type === 'integer' && ii < 0) { ii = i; }
+                }
+                if (ci < 0) { return fallback; }
+                var before = ii < 0 || ci < ii;
+                var adj = before ? parts[ci + 1] : parts[ci - 1];
+                var space = adj && adj.type === 'literal' ? adj.value : '';
+                return { symbol: parts[ci].value, before: before, space: space };
+            } catch (e) { return fallback; }
+        }
+
         // Standard precision of the supplied base-currency descriptor, falling back to
         // the session context when the endpoint did not send one.
         function precisionOf(cur) {
@@ -157,8 +254,9 @@
             var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
             var sign = n < 0 ? '-' : '';
             var iso = (cur && cur.iso) || '';
-            var symbol = (cur && (cur.symbol || cur.iso)) || '';
-            return sign + symbol + VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
+            var aff = currencyAffix(iso, cur && cur.symbol);
+            var compact = VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
+            return sign + (aff.before ? aff.symbol + aff.space + compact : compact + aff.space + aff.symbol);
         }
 
         function icon(name) {
@@ -270,7 +368,7 @@
                 : label('VAS_138_Invoices', 'invoices');
             var meta = [
                 invoices > 0 ? formatCount(invoices) + ' ' + invoiceWord : '',
-                formatCount(days) + 'd ' + label('VAS_138_Overdue', 'overdue')
+                daysShort(days) + ' ' + label('VAS_138_Overdue', 'overdue')
             ].filter(function (p) { return p; }).join(' · ');
             return '<div class="vas138-row" data-id="' + Number(item.customerId) + '">' +
                 '<span class="vas138-row-ic">' + icon('cash') + '</span>' +
@@ -302,12 +400,12 @@
                on a single page with both arrows disabled, so the widget's row
                grid never shifts height between pages. */
             var of = label('VAS_138_Of', 'of');
-            var helper = label('VAS_138_Showing', 'Showing') + ' ' + start + '–' + end + ' ' + of + ' ' + formatCount(listTotal);
+            var helper = label('VAS_138_Showing', 'Showing') + ' ' + formatCount(start) + '–' + formatCount(end) + ' ' + of + ' ' + formatCount(listTotal);
             var pager = '<div class="vas138-pager">' +
                 '<span class="vas138-pglabel">' + escapeHtml(helper) + '</span>' +
                 '<span class="vas138-pgctl">' +
                     '<button type="button" class="vas138-pgbtn" data-dir="prev" aria-label="' + escapeHtml(label('VAS_138_PrevPage', 'Previous page')) + '" ' + (current <= 0 ? 'disabled' : '') + '>' + icon('chevL') + '</button>' +
-                    '<span class="vas138-pgtext">' + escapeHtml((current + 1) + ' ' + of + ' ' + pages) + '</span>' +
+                    '<span class="vas138-pgtext">' + escapeHtml(formatCount(current + 1) + ' ' + of + ' ' + formatCount(pages)) + '</span>' +
                     '<button type="button" class="vas138-pgbtn" data-dir="next" aria-label="' + escapeHtml(label('VAS_138_NextPage', 'Next page')) + '" ' + (current >= pages - 1 ? 'disabled' : '') + '>' + icon('chev') + '</button>' +
                 '</span>' +
             '</div>';
@@ -369,10 +467,10 @@
             var current = Math.floor(allOffset / ALL_PAGE);
             var allOf = label('VAS_138_Of', 'of');
             $allPager.html(
-                '<span class="vas138-pglabel">' + escapeHtml(label('VAS_138_Showing', 'Showing') + ' ' + start + '–' + end + ' ' + allOf + ' ' + formatCount(allTotal)) + '</span>' +
+                '<span class="vas138-pglabel">' + escapeHtml(label('VAS_138_Showing', 'Showing') + ' ' + formatCount(start) + '–' + formatCount(end) + ' ' + allOf + ' ' + formatCount(allTotal)) + '</span>' +
                 '<span class="vas138-pgctl">' +
                     '<button type="button" class="vas138-pgbtn" data-alldir="prev" aria-label="' + escapeHtml(label('VAS_138_PrevPage', 'Previous page')) + '" ' + (current <= 0 ? 'disabled' : '') + '>' + icon('chevL') + '</button>' +
-                    '<span class="vas138-pgtext">' + escapeHtml((current + 1) + ' ' + allOf + ' ' + pages) + '</span>' +
+                    '<span class="vas138-pgtext">' + escapeHtml(formatCount(current + 1) + ' ' + allOf + ' ' + formatCount(pages)) + '</span>' +
                     '<button type="button" class="vas138-pgbtn" data-alldir="next" aria-label="' + escapeHtml(label('VAS_138_NextPage', 'Next page')) + '" ' + (current >= pages - 1 ? 'disabled' : '') + '>' + icon('chev') + '</button>' +
                 '</span>'
             );
@@ -465,7 +563,7 @@
                 fact(label('VAS_138_OpenTicketsFact', 'Open tickets'), escapeHtml(formatCount(data.openTickets || 0))) +
                 fact(label('VAS_138_Projects', 'Projects'), projectText(data.projectName, projects, dash)) +
                 fact(label('VAS_138_Pipeline', 'Pipeline'), pipeline > 0 ? escapeHtml(formatMoney(pipeline, detailCurrency)) : dash) +
-                fact(label('VAS_138_Onboarding', 'Onboarding'), data.onboardingPercent == null ? dash : escapeHtml(formatCount(data.onboardingPercent) + '%')) +
+                fact(label('VAS_138_Onboarding', 'Onboarding'), data.onboardingPercent == null ? dash : escapeHtml(formatPercent(data.onboardingPercent, 2))) +
             '</div>';
 
             var signals = '';
@@ -548,7 +646,9 @@
             if (parts.length !== 3) { return iso; }
             var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
             if (isNaN(d.getTime())) { return iso; }
-            return d.toLocaleDateString(window.navigator.language, { year: 'numeric', month: 'short', day: '2-digit' });
+            try {
+                return new Intl.DateTimeFormat(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' }).format(d);
+            } catch (e) { return iso; }
         }
         function projStateLabel(state) {
             if (state === 'delayed') { return label('VAS_138_StateDelayed', 'Delayed'); }
@@ -608,7 +708,7 @@
                 (breakdown ? '<div class="vas138-proj-bd">' + breakdown + '</div>' : '') +
                 '<div class="vas138-bar"><div style="width:' + Math.max(0, Math.min(100, progress)) + '%"></div></div>' +
                 '<div class="vas138-proj-foot">' +
-                    '<span>' + formatCount(project.completed) + '/' + formatCount(total) + ' ' + escapeHtml(label('VAS_138_Activities', 'activities')) + ' · ' + progress + '%</span>' +
+                    '<span>' + formatCount(project.completed) + '/' + formatCount(total) + ' ' + escapeHtml(label('VAS_138_Activities', 'activities')) + ' · ' + formatPercent(progress, 2) + '</span>' +
                     '<span>' + escapeHtml(label('VAS_138_Due', 'Due')) + ' ' + escapeHtml(formatDate(project.dueDate)) + '</span>' +
                 '</div>' +
             '</div>';
@@ -711,6 +811,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createAllDialog();
             createDetailDialog();

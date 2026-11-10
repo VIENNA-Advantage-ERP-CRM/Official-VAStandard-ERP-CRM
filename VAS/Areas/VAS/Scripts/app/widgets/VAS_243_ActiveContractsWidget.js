@@ -74,9 +74,27 @@
         var $root = $('<div class="vas243-root">');
         var $card;
 
+        var translatedTexts = null;
+
+        // Batch-translates every message key this widget uses in a single call.
+        function loadMessages() {
+            var elements = [
+                'VAS_243_Title',
+                'VAS_243_PortfolioValue',
+                'VAS_243_Live',
+                'VAS_243_LoadError'
+            ];
+            try {
+                translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {};
+            } catch (e) {
+                translatedTexts = {};
+            }
+        }
+
         function label(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            return t && t.charAt(0) !== '[' ? t : fallback;
+            if (translatedTexts === null) { loadMessages(); }
+            var t = translatedTexts[key];
+            return (t && t !== key && t.charAt(0) !== '[') ? t : fallback;
         }
 
         function escapeHtml(value) {
@@ -99,26 +117,63 @@
             return Math.round(n).toLocaleString(window.navigator.language);
         }
 
+        // Locale-formatted number with a fixed number of fraction digits.
+        function fmtNum(v, digits) {
+            try {
+                return v.toLocaleString(window.navigator.language, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+            } catch (e) { return String(v); }
+        }
+
         // Compact K/M/B magnitude, 2 decimals - matches the mock's "$20.85M".
         function fmtCompact(value, precision) {
             var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
             var p = Number(precision); if (isNaN(p) || p < 0) { p = 2; }
             var abs = Math.abs(n);
             var sign = n < 0 ? '-' : '';
-            if (abs >= 1e9) { return sign + (abs / 1e9).toFixed(2) + 'B'; }
-            if (abs >= 1e6) { return sign + (abs / 1e6).toFixed(2) + 'M'; }
-            if (abs >= 1e3) { return sign + (abs / 1e3).toFixed(2) + 'K'; }
-            return sign + abs.toFixed(p);
+            if (abs >= 1e9) { return sign + fmtNum(abs / 1e9, 2) + 'B'; }
+            if (abs >= 1e6) { return sign + fmtNum(abs / 1e6, 2) + 'M'; }
+            if (abs >= 1e3) { return sign + fmtNum(abs / 1e3, 2) + 'K'; }
+            return sign + fmtNum(abs, p);
+        }
+
+        // Currency symbol + its position for the browser locale (before/after
+        // the number, with the locale's own gap). Null when no ISO / Intl fails.
+        function currencyAffix(iso) {
+            if (!iso) { return null; }
+            try {
+                var parts = new Intl.NumberFormat(window.navigator.language, { style: 'currency', currency: iso }).formatToParts(1);
+                var seenInteger = false;
+                for (var i = 0; i < parts.length; i++) {
+                    if (parts[i].type === 'integer') { seenInteger = true; }
+                    else if (parts[i].type === 'currency') {
+                        var before = !seenInteger;
+                        var next = before ? parts[i + 1] : parts[i - 1];
+                        return {
+                            symbol: parts[i].value,
+                            before: before,
+                            gap: (next && next.type === 'literal') ? next.value : ''
+                        };
+                    }
+                }
+            } catch (e) { /* fall through */ }
+            return null;
         }
 
         function formatMoney(value, iso, symbol, precision) {
             var tag = symbol || iso || '';
+            var affix = currencyAffix(iso);
+            var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
+            var sign = n < 0 ? '-' : '';
+            var num;
             if (window.VIS && VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
-                var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
-                var sign = n < 0 ? '-' : '';
-                return sign + tag + VIS.Util.formatCompactAmount(Math.abs(n), iso || '', precision);
+                num = VIS.Util.formatCompactAmount(Math.abs(n), iso || '', precision);
+            } else {
+                num = fmtCompact(Math.abs(n), precision);
             }
-            return tag + fmtCompact(value, precision);
+            if (affix) {
+                return sign + (affix.before ? affix.symbol + affix.gap + num : num + affix.gap + affix.symbol);
+            }
+            return sign + tag + num;
         }
 
         function createWidget() {
@@ -176,6 +231,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             load();
         };

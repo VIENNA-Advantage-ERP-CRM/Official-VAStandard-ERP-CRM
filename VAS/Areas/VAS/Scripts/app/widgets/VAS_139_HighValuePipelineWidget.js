@@ -110,8 +110,71 @@
         // zoom and reused afterwards (0 = not resolved yet).
         var zoomWindowId = 0;
 
+        var translatedTexts = null;
+
+        /** Loads every message key used by this widget in one VIS.Msg.translate call. */
+        function loadMessages() {
+            var elements = [
+                'Loading',
+                'VAS_139_HighValuePipeline',
+                'VAS_139_Clients',
+                'VAS_139_Client',
+                'VAS_139_Open',
+                'VAS_139_Opp',
+                'VAS_139_Opps',
+                'VAS_139_Of',
+                'VAS_139_Showing',
+                'VAS_139_PrevPage',
+                'VAS_139_NextPage',
+                'VAS_139_NothingHere',
+                'VAS_139_UnableToLoad',
+                'VAS_139_Retry',
+                'VAS_139_Pipeline',
+                'VAS_139_OpenOpportunity',
+                'VAS_139_OpenOpportunities',
+                'VAS_139_Total',
+                'VAS_139_TotalPipeline',
+                'VAS_139_NoOpportunities',
+                'VAS_139_Customer',
+                'VAS_139_OpenRecord',
+                'VAS_139_Close',
+                'VAS_139_CustomerDetails',
+                'VAS_139_LikelyClose',
+                'VAS_139_Stage10',
+                'VAS_139_Stage11',
+                'VAS_139_Stage12',
+                'VAS_139_Stage13',
+                'VAS_139_Stage15',
+                'VAS_139_StageNone',
+                'VAS_139_KeyClient',
+                'VAS_139_Tier',
+                'VAS_139_Segment',
+                'VAS_139_Owner',
+                'VAS_139_ARR',
+                'VAS_139_OpenTicketsFact',
+                'VAS_139_Projects',
+                'VAS_139_Onboarding',
+                'VAS_139_OpenPipelineSig',
+                'VAS_139_Overdue',
+                'VAS_139_DaysPastDue',
+                'VAS_139_OpenSupportTickets',
+                'VAS_139_KeyPrioritise',
+                'VAS_139_OpenRequests',
+                'VAS_139_Signals'
+            ];
+            try {
+                translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {};
+            } catch (e) {
+                translatedTexts = {};
+            }
+        }
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            if (translatedTexts === null) { loadMessages(); }
+            var v = translatedTexts ? translatedTexts[key] : null;
+            if (v == null || v === '' || v === key || String(v).charAt(0) === '[') {
+                return fallback == null ? key : fallback;
+            }
+            return v;
         }
 
         function escapeHtml(value) {
@@ -143,6 +206,35 @@
             return Math.round(n).toLocaleString(window.navigator.language);
         }
 
+        // Locale-aware percentage (value is already 0..100, e.g. 45 -> "45%").
+        function formatPercent(value, maxFraction) {
+            var n = Number(value || 0);
+            if (!isFinite(n)) { n = 0; }
+            try {
+                return new Intl.NumberFormat(window.navigator.language, { style: 'percent', minimumFractionDigits: 0, maximumFractionDigits: maxFraction || 0 }).format(n / 100);
+            } catch (e) { return n + '%'; }
+        }
+
+        // Currency symbol placement for the browser locale: returns { symbol, before, space }.
+        // With no ISO available the server-supplied symbol is kept, in front.
+        function currencyAffix(iso, serverSymbol) {
+            var fallback = { symbol: serverSymbol || iso || '', before: true, space: '' };
+            if (!iso) { return fallback; }
+            try {
+                var parts = new Intl.NumberFormat(window.navigator.language, { style: 'currency', currency: iso }).formatToParts(1);
+                var ci = -1, ii = -1, i;
+                for (i = 0; i < parts.length; i++) {
+                    if (parts[i].type === 'currency' && ci < 0) { ci = i; }
+                    if (parts[i].type === 'integer' && ii < 0) { ii = i; }
+                }
+                if (ci < 0) { return fallback; }
+                var before = ii < 0 || ci < ii;
+                var adj = before ? parts[ci + 1] : parts[ci - 1];
+                var space = adj && adj.type === 'literal' ? adj.value : '';
+                return { symbol: parts[ci].value, before: before, space: space };
+            } catch (e) { return fallback; }
+        }
+
         // Standard precision of the supplied base-currency descriptor, falling back to
         // the session context when the endpoint did not send one.
         function precisionOf(cur) {
@@ -161,8 +253,9 @@
             var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
             var sign = n < 0 ? '-' : '';
             var iso = (cur && cur.iso) || '';
-            var symbol = (cur && (cur.symbol || cur.iso)) || '';
-            return sign + symbol + VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
+            var aff = currencyAffix(iso, cur && cur.symbol);
+            var compact = VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
+            return sign + (aff.before ? aff.symbol + aff.space + compact : compact + aff.space + aff.symbol);
         }
 
         function formatDate(iso) {
@@ -171,7 +264,9 @@
             if (parts.length !== 3) { return iso; }
             var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
             if (isNaN(d.getTime())) { return iso; }
-            return d.toLocaleDateString(window.navigator.language, { year: 'numeric', month: 'short', day: '2-digit' });
+            try {
+                return new Intl.DateTimeFormat(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' }).format(d);
+            } catch (e) { return iso; }
         }
 
         // VAS_Opportunity.VAS_OppStage codes. 16 (Won) and 17 (Lost/Archived) are
@@ -296,12 +391,12 @@
                on a single page with both arrows disabled, so the widget's row
                grid never shifts height between pages. */
             var of = label('VAS_139_Of', 'of');
-            var helper = label('VAS_139_Showing', 'Showing') + ' ' + start + '–' + end + ' ' + of + ' ' + formatCount(listTotal);
+            var helper = label('VAS_139_Showing', 'Showing') + ' ' + formatCount(start) + '–' + formatCount(end) + ' ' + of + ' ' + formatCount(listTotal);
             var pager = '<div class="vas139-pager">' +
                 '<span class="vas139-pglabel">' + escapeHtml(helper) + '</span>' +
                 '<span class="vas139-pgctl">' +
                     '<button type="button" class="vas139-pgbtn" data-dir="prev" aria-label="' + escapeHtml(label('VAS_139_PrevPage', 'Previous page')) + '" ' + (current <= 0 ? 'disabled' : '') + '>' + icon('chevL') + '</button>' +
-                    '<span class="vas139-pgtext">' + escapeHtml((current + 1) + ' ' + of + ' ' + pages) + '</span>' +
+                    '<span class="vas139-pgtext">' + escapeHtml(formatCount(current + 1) + ' ' + of + ' ' + formatCount(pages)) + '</span>' +
                     '<button type="button" class="vas139-pgbtn" data-dir="next" aria-label="' + escapeHtml(label('VAS_139_NextPage', 'Next page')) + '" ' + (current >= pages - 1 ? 'disabled' : '') + '>' + icon('chev') + '</button>' +
                 '</span>' +
             '</div>';
@@ -496,7 +591,7 @@
                 fact(label('VAS_139_OpenTicketsFact', 'Open tickets'), escapeHtml(formatCount(data.openTickets || 0))) +
                 fact(label('VAS_139_Projects', 'Projects'), projectText(data.projectName, projects, dash)) +
                 fact(label('VAS_139_Pipeline', 'Pipeline'), pipeline > 0 ? escapeHtml(formatMoney(pipeline, detailCurrency)) : dash) +
-                fact(label('VAS_139_Onboarding', 'Onboarding'), data.onboardingPercent == null ? dash : escapeHtml(formatCount(data.onboardingPercent) + '%')) +
+                fact(label('VAS_139_Onboarding', 'Onboarding'), data.onboardingPercent == null ? dash : escapeHtml(formatPercent(data.onboardingPercent, 2))) +
             '</div>';
 
             var signals = '';
@@ -585,6 +680,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createPipelineDialog();
             createDetailDialog();

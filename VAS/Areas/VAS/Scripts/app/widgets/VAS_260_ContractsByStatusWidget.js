@@ -131,8 +131,41 @@
         { key: 'Cancelled', color: '#8A99A8', labelKey: 'VAS_260_BandCancelled', fallback: 'Cancelled' }
     ];
 
+    var translatedTexts = null;
+
+    /** Loads every message key used by this widget in ONE VIS.Msg.translate call. */
+    function loadMessages() {
+        var elements = [
+            'VAS_260_Title', 'VAS_260_SubLine', 'VAS_260_BandActive', 'VAS_260_BandExpiring', 'VAS_260_BandDraft',
+            'VAS_260_BandExpired', 'VAS_260_BandCancelled', 'VAS_260_NoContracts', 'VAS_260_LoadError',
+            'VAS_260_ListTitlePrefix', 'VAS_260_ContractsCount', 'VAS_260_ColContract', 'VAS_260_ColValue',
+            'VAS_260_ColEnds', 'VAS_260_ColRenewal', 'VAS_260_ColStatus', 'VAS_260_Of', 'VAS_260_PrevPage',
+            'VAS_260_NextPage', 'VAS_260_Empty', 'VAS_260_UnableToLoad', 'VAS_260_Close', 'VAS_260_OpenInBrowser',
+            'VAS_260_ContractTitle', 'VAS_260_OpenRecord', 'VAS_260_Rep', 'VAS_260_Cycles', 'VAS_260_Value',
+            'VAS_260_Status', 'VAS_260_Type', 'VAS_260_Renewal', 'VAS_260_Ends', 'VAS_260_EndsIn',
+            'VAS_260_EndedAgo', 'VAS_260_NoticeDays', 'VAS_260_Billed', 'VAS_260_Unbilled',
+            'VAS_260_NeedsAttention', 'VAS_260_NoOpenActions', 'VAS_260_RenewalNoticeOverdue',
+            'VAS_260_RenewalNoticeDueToday', 'VAS_260_ManualRenewal', 'VAS_260_NoticeOverdueBy',
+            'VAS_260_EndsPrefix', 'VAS_260_BillingOverdue', 'VAS_260_NextPeriodOverdue', 'VAS_260_UnbilledTotal',
+            'VAS_260_BillingSchedule', 'VAS_260_Period', 'VAS_260_Invoiced', 'VAS_260_SchedulePending',
+            'VAS_260_GenerateInvoice', 'VAS_260_Renew', 'VAS_260_ConfirmRenew', 'VAS_260_ConfirmGenerateInvoice',
+            'VAS_260_Working', 'VAS_260_ActionFailed', 'VAS_260_DetailLoadError', 'VAS_260_DaysSuffix',
+            'VAS_260_DaysAgoSuffix', 'VAS_260_Cancel', 'VAS_260_Ok', 'Loading'
+        ];
+        try {
+            translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {};
+        } catch (e) {
+            translatedTexts = {};
+        }
+    }
+
     function label(key, fallback) {
-        return VIS.Msg.getMsg(key);
+        if (translatedTexts == null) { loadMessages(); }
+        var v = translatedTexts[key];
+        if (v == null || v === '' || v === key || String(v).charAt(0) === '[') {
+            return fallback != null ? fallback : key;
+        }
+        return v;
     }
 
     function escapeHtml(value) {
@@ -155,25 +188,83 @@
         return Math.round(n).toLocaleString(window.navigator.language);
     }
 
+    // Locale-formatted percentage from a whole-number value (e.g. 25 -> 25%).
+    function formatPercent(value) {
+        var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
+        try {
+            return (n / 100).toLocaleString(window.navigator.language, { style: 'percent', maximumFractionDigits: 0 });
+        } catch (e) { return n + '%'; }
+    }
+
+    // Locale-formatted number with a fixed number of fraction digits.
+    function fmtNum(v, digits) {
+        try {
+            return v.toLocaleString(window.navigator.language, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+        } catch (e) { return v.toFixed(digits); }
+    }
+
     function fmtCompact(value, precision) {
         var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
         var p = Number(precision); if (isNaN(p) || p < 0) { p = 2; }
         var abs = Math.abs(n);
         var sign = n < 0 ? '-' : '';
-        if (abs >= 1e9) { return sign + (abs / 1e9).toFixed(2) + 'B'; }
-        if (abs >= 1e6) { return sign + (abs / 1e6).toFixed(2) + 'M'; }
-        if (abs >= 1e3) { return sign + (abs / 1e3).toFixed(2) + 'K'; }
-        return sign + abs.toFixed(p);
+        if (abs >= 1e9) { return sign + fmtNum(abs / 1e9, 2) + 'B'; }
+        if (abs >= 1e6) { return sign + fmtNum(abs / 1e6, 2) + 'M'; }
+        if (abs >= 1e3) { return sign + fmtNum(abs / 1e3, 2) + 'K'; }
+        return sign + fmtNum(abs, p);
+    }
+
+    // Currency symbol + its position for the browser locale (before/after
+    // the number, with the locale's own gap). Null when no ISO / Intl fails.
+    function currencyAffix(iso) {
+        if (!iso) { return null; }
+        try {
+            var parts = new Intl.NumberFormat(window.navigator.language, { style: 'currency', currency: iso }).formatToParts(1);
+            var seenInteger = false;
+            for (var i = 0; i < parts.length; i++) {
+                if (parts[i].type === 'integer') { seenInteger = true; }
+                else if (parts[i].type === 'currency') {
+                    var before = !seenInteger;
+                    var next = before ? parts[i + 1] : parts[i - 1];
+                    return {
+                        symbol: parts[i].value,
+                        before: before,
+                        gap: (next && next.type === 'literal') ? next.value : ''
+                    };
+                }
+            }
+        } catch (e) { /* fall through */ }
+        return null;
     }
 
     function formatMoney(value, iso, symbol, precision) {
         var tag = symbol || iso || '';
+        var affix = currencyAffix(iso);
+        var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
+        var sign = n < 0 ? '-' : '';
+        var num;
         if (window.VIS && VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
-            var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
-            var sign = n < 0 ? '-' : '';
-            return sign + tag + VIS.Util.formatCompactAmount(Math.abs(n), iso || '', precision);
+            num = VIS.Util.formatCompactAmount(Math.abs(n), iso || '', precision);
+        } else {
+            num = fmtCompact(Math.abs(n), precision);
         }
-        return tag + fmtCompact(value, precision);
+        if (affix) {
+            return sign + (affix.before ? affix.symbol + affix.gap + num : num + affix.gap + affix.symbol);
+        }
+        return sign + tag + num;
+    }
+
+    // Date for the browser culture (never numeric month). Date-only
+    // 'yyyy-mm-dd' is parsed as a LOCAL date; invalid/empty -> original text.
+    function formatDate(value) {
+        if (!value) { return ''; }
+        try {
+            var d;
+            var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value));
+            d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(value);
+            if (isNaN(d.getTime())) { return String(value); }
+            return new Intl.DateTimeFormat(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' }).format(d);
+        } catch (e) { return String(value); }
     }
 
     function endsText(days) {
@@ -331,7 +422,7 @@
                         '<span class="vas260-sw" style="background:' + band.color + '"></span>' +
                         escapeHtml(label(band.labelKey, band.fallback)) +
                     '</span>' +
-                    '<span class="vas260-seg-r"><span class="vas260-seg-v">' + formatCount(count) + '</span> · ' + pct + '%</span>' +
+                    '<span class="vas260-seg-r"><span class="vas260-seg-v">' + formatCount(count) + '</span> · ' + formatPercent(pct) + '</span>' +
                 '</div>' +
                 '<div class="vas260-bar"><div style="width:' + widthPct + '%;background:' + band.color + '"></div></div>' +
             '</div>';
@@ -748,7 +839,7 @@
             var pendingLabel = label('VAS_260_SchedulePending', 'Pending');
 
             var body = rows.map(function (period) {
-                var dateRange = (period.FromDate || period.ToDate) ? ' · ' + escapeHtml(period.FromDate || '') + ' – ' + escapeHtml(period.ToDate || '') : '';
+                var dateRange = (period.FromDate || period.ToDate) ? ' · ' + escapeHtml(formatDate(period.FromDate)) + ' – ' + escapeHtml(formatDate(period.ToDate)) : '';
                 var left = periodLabel + ' ' + period.Period + (period.FrequencyName ? ' · ' + escapeHtml(period.FrequencyName) : '') + dateRange;
                 var badgeClass = period.Invoiced ? 'vas260-band-ok' : 'vas260-band-warn';
                 var badgeText = period.Invoiced ? invoicedLabel : pendingLabel;
@@ -773,7 +864,7 @@
             var band = bandClass(row.LifecycleStatusCode);
             var subtitleParts = [row.DocumentNo, row.ProductName, row.ContactName, row.SalesRepName ? label('VAS_260_Rep', 'rep') + ' ' + row.SalesRepName : '']
                 .filter(function (p) { return p; });
-            var cyclesText = [row.FrequencyName, (row.Cycles != null ? row.Cycles + ' ' + label('VAS_260_Cycles', 'cycles') : '')]
+            var cyclesText = [row.FrequencyName, (row.Cycles != null ? formatCount(row.Cycles) + ' ' + label('VAS_260_Cycles', 'cycles') : '')]
                 .filter(function (p) { return p; }).join(' · ');
 
             var html =
@@ -794,7 +885,7 @@
                     statHtml('VAS_260_Type', 'Type', row.ContractType) +
                     statHtml('VAS_260_Renewal', 'Renewal', row.RenewalType) +
                     statHtml('VAS_260_Ends', 'Ends', endsText(row.DaysToEnd)) +
-                    statHtml('VAS_260_NoticeDays', 'Notice days', row.NoticeDays != null ? row.NoticeDays : '') +
+                    statHtml('VAS_260_NoticeDays', 'Notice days', row.NoticeDays != null ? formatCount(row.NoticeDays) : '') +
                     statHtml('VAS_260_Billed', 'Billed amount', formatMoney(row.Billed, row.CurrencyIso, row.CurrencySymbol, row.CurrencyPrecision)) +
                     statHtml('VAS_260_Unbilled', 'Unbilled amount', formatMoney(row.Unbilled, row.CurrencyIso, row.CurrencySymbol, row.CurrencyPrecision)) +
                 '</div>' +
@@ -840,6 +931,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createListDialog();
             createDetailDialog();

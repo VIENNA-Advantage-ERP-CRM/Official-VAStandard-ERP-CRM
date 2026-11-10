@@ -42,6 +42,8 @@
  *           New Email / New Letter are not actions on this widget; the platform's
  *           standard email entry point is VIS.Email in a VIS.CFrame (see VAS_105),
  *           and "Letter" exists as an activity category rather than its own form.
+ *           2026-11-10 - Messages via VIS.Msg.translate (single batched lookup); match total
+ *           formatted per browser culture.
  *
  * ── Labels / Message Keys ─────────────────────────────────────────────────
  *  #  | Current Text                                              | Message Key
@@ -149,8 +151,64 @@
             { days: 7, key: 'VAS_120_DueNextWeek', text: 'Next week' }
         ];
 
+        var translatedTexts = null;
+
+        /* Loads every message key used by this widget in ONE VIS.Msg.translate call. */
+        function loadMessages() {
+            var elements = [
+                'Clear',
+                'VAS_120_SearchPlaceholder',
+                'VAS_120_Searching',
+                'VAS_120_NoMatches',
+                'VAS_120_TypeMore',
+                'VAS_120_LoadError',
+                'VAS_120_SeeAll',
+                'VAS_120_Matches',
+                'VAS_120_Unsegmented',
+                'VAS_120_NoOwner',
+                'VAS_120_CreateTask',
+                'VAS_120_Schedule',
+                'VAS_120_Key',
+                'VAS_120_Close',
+                'VAS_120_Cancel',
+                'VAS_120_Title',
+                'VAS_120_Date',
+                'VAS_120_Time',
+                'VAS_120_ScheduleAppointment',
+                'VAS_120_Review',
+                'VAS_120_TitleRequired',
+                'VAS_120_DateRequired',
+                'VAS_120_ScheduleSaveFailed',
+                'VAS_120_NewTask',
+                'VAS_120_Task',
+                'VAS_120_TaskPlaceholder',
+                'VAS_120_Customer',
+                'VAS_120_Due',
+                'VAS_120_DueToday',
+                'VAS_120_DueTomorrow',
+                'VAS_120_DueIn3Days',
+                'VAS_120_DueNextWeek',
+                'VAS_120_AddTask',
+                'VAS_120_TaskRequired',
+                'VAS_120_TaskSaveFailed'
+            ];
+            try {
+                translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {};
+            } catch (e) { translatedTexts = {}; }
+        }
+
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            if (translatedTexts === null) { loadMessages(); }
+            var v = translatedTexts ? translatedTexts[key] : null;
+            if (!v || v === key || String(v).charAt(0) === '[') { return fallback || key; }
+            return v;
+        }
+
+        // Whole number in the browser culture (match totals).
+        function formatCount(value) {
+            var n = Number(value || 0);
+            if (!isFinite(n)) { n = 0; }
+            return Math.round(n).toLocaleString(window.navigator.language);
         }
 
         function escapeHtml(value) {
@@ -249,6 +307,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createSuggestionList();
             createScheduleDialog();
@@ -458,7 +517,7 @@
             }).join('');
 
             if (lastTotal > suggestions.length) {
-                var moreText = label('VAS_120_SeeAll', 'See all') + ' ' + lastTotal + ' ' + label('VAS_120_Matches', 'matches');
+                var moreText = label('VAS_120_SeeAll', 'See all') + ' ' + formatCount(lastTotal) + ' ' + label('VAS_120_Matches', 'matches');
                 html += '<div class="vas120-more" role="button" tabindex="0">' + escapeHtml(moreText) + ' ' + icon('arrow') + '</div>';
             }
 

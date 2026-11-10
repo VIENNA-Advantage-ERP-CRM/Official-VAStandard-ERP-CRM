@@ -44,6 +44,7 @@
  * 14  | Previous page                   | VAS_300_PrevPage
  * 15  | Next page                       | VAS_300_NextPage
  * 16  | Close                           | VAS_300_Close
+ * 17  | last {0} months                 | VAS_300_LastMonths
  * ──────────────────────────────────────────────────────────────────────────
  */
 ; VAS = window.VAS || {};
@@ -99,8 +100,40 @@
         // zoom and reused afterwards (0 = not resolved yet).
         var zoomWindowId = 0;
 
+        // Translated texts, loaded once per widget instance via VIS.Msg.translate.
+        var translatedTexts = null;
+        function loadMessages() {
+            var elements = [
+                "Loading",
+                "VAS_300_BusinessBySource",
+                "VAS_300_LastMonths",
+                "VAS_300_3Mo",
+                "VAS_300_6Mo",
+                "VAS_300_SourceTitle",
+                "VAS_300_NoOwner",
+                "VAS_300_NothingHere",
+                "VAS_300_NoCustomers",
+                "VAS_300_UnableToLoad",
+                "VAS_300_Retry",
+                "VAS_300_Of",
+                "VAS_300_Showing",
+                "VAS_300_PrevPage",
+                "VAS_300_NextPage",
+                "VAS_300_Close"
+            ];
+            try {
+                translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {};
+            } catch (e) {
+                translatedTexts = {};
+            }
+        }
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            if (translatedTexts === null) { loadMessages(); }
+            var text = translatedTexts ? translatedTexts[key] : null;
+            if (!text || text === key || String(text).charAt(0) === '[') {
+                return fallback != null ? fallback : key;
+            }
+            return text;
         }
         function escapeHtml(value) {
             if (value == null) { return ''; }
@@ -119,6 +152,15 @@
             if (!isFinite(n)) { n = 0; }
             return Math.round(n).toLocaleString(window.navigator.language);
         }
+        function formatPercent(value, maxFraction) {
+            var n = Number(value || 0);
+            if (!isFinite(n)) { n = 0; }
+            try {
+                return new Intl.NumberFormat(window.navigator.language, { style: 'percent', maximumFractionDigits: maxFraction }).format(n / 100);
+            } catch (e) {
+                return n + '%';
+            }
+        }
         function precisionOf(cur) {
             var p = Number(cur && cur.precision);
             if (!isNaN(p) && p >= 0) { return p; }
@@ -134,7 +176,26 @@
             var sign = n < 0 ? '-' : '';
             var iso = (cur && cur.iso) || '';
             var symbol = (cur && (cur.symbol || cur.iso)) || '';
-            return sign + symbol + VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
+            var compact = VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
+            // Currency symbol placed per the browser locale (before / after the number).
+            if (iso) {
+                try {
+                    var parts = new Intl.NumberFormat(window.navigator.language, { style: 'currency', currency: iso }).formatToParts(1);
+                    var ci = -1, ni = -1;
+                    parts.forEach(function (p, i) {
+                        if (p.type === 'currency' && ci < 0) { ci = i; }
+                        if (p.type === 'integer' && ni < 0) { ni = i; }
+                    });
+                    if (ci >= 0 && ni >= 0) {
+                        var sym = parts[ci].value;
+                        if (ci < ni) {
+                            return sign + sym + (parts[ci + 1] && parts[ci + 1].type === 'literal' ? parts[ci + 1].value : '') + compact;
+                        }
+                        return sign + compact + (parts[ci - 1] && parts[ci - 1].type === 'literal' ? parts[ci - 1].value : '') + sym;
+                    }
+                } catch (e) { /* fall back to the server symbol in front */ }
+            }
+            return sign + symbol + compact;
         }
         var AVATAR_COLORS = ['#1F83FF', '#5F4AA6', '#0B6B45', '#D78B10', '#0083DA', '#A33F3F'];
         function avatarColor(text) {
@@ -191,8 +252,8 @@
                     var data = parseResponse(response);
                     if (data && data.error) { renderError(); return; }
                     widgetCurrency = { symbol: data.currency_symbol || '', iso: data.currency_iso || '', precision: data.std_precision };
-                    var months = srcPeriod === 'biz6' ? '6' : '3';
-                    $sub.text(formatMoney(data.total, widgetCurrency) + ' · ' + label('VAS_300_Last', 'last') + ' ' + months + ' ' + label('VAS_300_Months', 'months'));
+                    var months = srcPeriod === 'biz6' ? 6 : 3;
+                    $sub.text(formatMoney(data.total, widgetCurrency) + ' · ' + label('VAS_300_LastMonths', 'last {0} months').replace('{0}', formatCount(months)));
                     renderSources(data.items || [], Number(data.total || 0));
                 },
                 error: renderError
@@ -213,7 +274,7 @@
                         '<span class="vas300-sw" style="background:' + src.color + '"></span>' +
                         '<span class="vas300-src-name" title="' + escapeHtml(src.name) + '">' + escapeHtml(src.name) + '</span>' +
                     '</button>' +
-                    '<span class="vas300-src-v">' + escapeHtml(formatMoney(src.value, widgetCurrency)) + ' · ' + share + '%</span>' +
+                    '<span class="vas300-src-v">' + escapeHtml(formatMoney(src.value, widgetCurrency)) + ' · ' + escapeHtml(formatPercent(share, 0)) + '</span>' +
                 '</div>' +
                 '<div class="vas300-bar"><div style="width:' + share + '%;background:' + src.color + '"></div></div>' +
             '</div>';
@@ -244,12 +305,12 @@
             if (pages > 1) {
                 var from = start + 1, to = start + slice.length;
                 var srcOf = label('VAS_300_Of', 'of');
-                var srcHelper = label('VAS_300_Showing', 'Showing') + ' ' + from + '–' + to + ' ' + srcOf + ' ' + formatCount(count);
+                var srcHelper = label('VAS_300_Showing', 'Showing') + ' ' + formatCount(from) + '–' + formatCount(to) + ' ' + srcOf + ' ' + formatCount(count);
                 html += '<div class="vas300-wpager">' +
                     '<span class="vas300-wpglabel">' + escapeHtml(srcHelper) + '</span>' +
                     '<span class="vas300-wpgctl">' +
                         '<button type="button" class="vas300-wpgbtn" data-srcdir="prev" aria-label="' + escapeHtml(label('VAS_300_PrevPage', 'Previous page')) + '" ' + (srcPage <= 0 ? 'disabled' : '') + '>' + icon('chevL') + '</button>' +
-                        '<span class="vas300-wpgtext">' + escapeHtml((srcPage + 1) + ' ' + srcOf + ' ' + pages) + '</span>' +
+                        '<span class="vas300-wpgtext">' + escapeHtml(formatCount(srcPage + 1) + ' ' + srcOf + ' ' + formatCount(pages)) + '</span>' +
                         '<button type="button" class="vas300-wpgbtn" data-srcdir="next" aria-label="' + escapeHtml(label('VAS_300_NextPage', 'Next page')) + '" ' + (srcPage >= pages - 1 ? 'disabled' : '') + '>' + icon('chev') + '</button>' +
                     '</span>' +
                 '</div>';
@@ -323,12 +384,12 @@
             var pages = Math.max(1, Math.ceil(listTotal / LIST_PAGE));
             var current = Math.floor(listOffset / LIST_PAGE);
             var of = label('VAS_300_Of', 'of');
-            var helper = label('VAS_300_Showing', 'Showing') + ' ' + start + '–' + end + ' ' + of + ' ' + formatCount(listTotal);
+            var helper = label('VAS_300_Showing', 'Showing') + ' ' + formatCount(start) + '–' + formatCount(end) + ' ' + of + ' ' + formatCount(listTotal);
             $listPager.html(
                 '<span class="vas300-pglabel">' + escapeHtml(helper) + '</span>' +
                 '<span class="vas300-pgctl">' +
                     '<button type="button" class="vas300-pgbtn" data-dir="prev" aria-label="' + escapeHtml(label('VAS_300_PrevPage', 'Previous page')) + '" ' + (current <= 0 ? 'disabled' : '') + '>' + icon('chevL') + '</button>' +
-                    '<span class="vas300-pgtext">' + escapeHtml((current + 1) + ' ' + of + ' ' + pages) + '</span>' +
+                    '<span class="vas300-pgtext">' + escapeHtml(formatCount(current + 1) + ' ' + of + ' ' + formatCount(pages)) + '</span>' +
                     '<button type="button" class="vas300-pgbtn" data-dir="next" aria-label="' + escapeHtml(label('VAS_300_NextPage', 'Next page')) + '" ' + (current >= pages - 1 ? 'disabled' : '') + '>' + icon('chev') + '</button>' +
                 '</span>'
             );
@@ -408,6 +469,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createListDialog();
             $(document).on('keydown.MPCvas300', function (event) {
