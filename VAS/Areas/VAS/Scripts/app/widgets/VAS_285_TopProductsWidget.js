@@ -90,6 +90,9 @@
  * 51  | of                                                                   | VAS_285_Of
  * 52  | Showing                                                              | VAS_285_Showing
  * 53  | Search is unavailable right now. Try again in a moment.              | VAS_285_LoadError
+ * 54  | Month                                                                | VAS_285_Month
+ * 55  | Year                                                                 | VAS_285_Year
+ * 56  | Lines                                                                | VAS_285_StatLines
  */
 ; VAS = window.VAS || {};
 
@@ -156,8 +159,8 @@
                 $root.find('.vasso-retry').remove();
                 if ($root.css('position') === 'static') { $root.css('position', 'relative'); }
                 var text = '';
-                try { text = VIS.Msg.getMsg('VAS_SO_Retry'); } catch (e) { text = ''; }
-                if (!text || text === 'VAS_SO_Retry' || text === '[VAS_SO_Retry]') { text = 'Retry'; }
+                try { text = VIS.Msg.translate(VIS.Env.getCtx(), 'VAS_SO_Retry'); } catch (e) { text = ''; }
+                if (!text || text === 'VAS_SO_Retry' || String(text).charAt(0) === '[') { text = 'Retry'; }
                 $('<button type="button" class="vasso-retry"></button>').text(text)
                     .attr('title', text)
                     .on('click', function (e) {
@@ -174,7 +177,6 @@
     var MAX_ROWS_PER_PAGE = 10;
     var MIN_ROWS_PER_PAGE = 2;
     var TOP_COUNT = 4;
-    var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     var MIN_YEAR = 2024;
     var YEAR_SPAN = 3;
 
@@ -228,8 +230,46 @@
         var cfgStack = [];
         var currentCfg = null;
 
+        // Translated texts, loaded once per widget instance (see loadMessages()).
+        var translatedTexts = null;
+
+        function loadMessages() {
+            var elements = [
+                'VAS_285_Title', 'VAS_285_Subtitle', 'VAS_285_Month', 'VAS_285_Year', 'VAS_285_ErrorState',
+                'VAS_285_ZeroState', 'VAS_285_Back', 'VAS_285_Close', 'VAS_285_LoadError', 'VAS_285_SubtitlePrefix',
+                'VAS_285_StatOrderValue', 'VAS_285_StatOpenQty', 'VAS_285_StatFreeStock', 'VAS_285_StatCoverage',
+                'VAS_285_SectionHeading', 'VAS_285_ColSoNo', 'VAS_285_SoDate', 'VAS_285_Customer',
+                'VAS_285_ColWarehouse', 'VAS_285_Representative', 'VAS_285_ColValue', 'VAS_285_ColDelivery',
+                'VAS_285_ColStatus', 'VAS_285_Showing', 'VAS_285_Of', 'VAS_285_ClickRowHint', 'VAS_285_PrevPage',
+                'VAS_285_NextPage', 'VAS_285_DeliveryFull', 'VAS_285_LinePartial', 'VAS_285_LineInProcess',
+                'VAS_285_DatePromised', 'VAS_285_SoValue', 'VAS_285_ShipFrom', 'VAS_285_DeliveryMode',
+                'VAS_285_DocumentStatus', 'VAS_285_DeliveryStatus', 'VAS_285_SalesOrderLines', 'VAS_285_LinesSuffix',
+                'VAS_285_QtyOrderedSuffix', 'VAS_285_QtyShortSuffix', 'VAS_285_SalesOrderPrefix', 'VAS_285_StatLines',
+                'VAS_285_ColOrdered', 'VAS_285_ColPending', 'VAS_285_ColLine', 'VAS_285_ColProduct',
+                'VAS_285_ColAttribute', 'VAS_285_ColUom', 'VAS_285_ColDelivered', 'VAS_285_ColInStock',
+                'VAS_285_ColRate', 'VAS_285_ColAmount', 'VAS_285_ColLineStatus'
+            ];
+            try { translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {}; }
+            catch (e) { translatedTexts = {}; }
+        }
+
+        // Never render a raw "[KEY]": fall back to the English text when the key is missing.
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            if (translatedTexts === null) { loadMessages(); }
+            var text = translatedTexts ? translatedTexts[key] : '';
+            if (!text || text === key || String(text).charAt(0) === '[') { return fallback || key; }
+            return text;
+        }
+
+        /* Browser-culture formatting (window.navigator.language). */
+        function fmtDate(d, opts) {
+            try { return new Intl.DateTimeFormat(window.navigator.language, opts).format(d); } catch (e) { return ''; }
+        }
+
+        function fmtNumber(n, minFrac, maxFrac) {
+            try {
+                return Number(n).toLocaleString(window.navigator.language, { minimumFractionDigits: minFrac, maximumFractionDigits: maxFrac });
+            } catch (e) { return String(n); }
         }
 
         function escapeHtml(value) {
@@ -260,25 +300,34 @@
             return '';
         }
 
-        // List rows show the full amount (not a mix of "₹ 1.37 L" and "₹ 42,240") so values in one list compare at a glance.
-        function formatINRFull(value) {
-            return '₹ ' + Math.round(Number(value || 0)).toLocaleString('en-IN');
+        // The widget's API returns bare amounts (no currency ISO / symbol), so none is invented here.
+        // If the backend ever supplies the currency ISO code, return it from this function.
+        function currencyIso() { return ''; }
+
+        // List rows show the full amount (not a mix of compact and full values) so values in one list compare at a glance.
+        function formatAmountFull(value) {
+            return fmtNumber(Math.round(Number(value || 0)), 0, 0);
         }
 
-        function formatINR(value) {
+        function formatAmount(value) {
             var num = Number(value || 0);
-            if (num >= 1e7) { return '₹ ' + (num / 1e7).toFixed(2) + ' Cr'; }
-            if (num >= 1e5) { return '₹ ' + (num / 1e5).toFixed(2) + ' L'; }
-            return '₹ ' + Math.round(num).toLocaleString('en-IN');
+            try {
+                var iso = currencyIso();
+                var compactFrom = VIS.Util.usesIndianNumbering(iso) ? 1e5 : 1e6;
+                if (Math.abs(num) >= compactFrom) {
+                    return (num < 0 ? '-' : '') + VIS.Util.formatCompactAmount(Math.abs(num), iso, 2);
+                }
+            } catch (e) { /* shared compact helper unavailable - use the plain number below */ }
+            return fmtNumber(Math.round(num), 0, 0);
         }
 
         function formatNum(value) {
-            return Math.round(Number(value || 0)).toLocaleString('en-IN');
+            return fmtNumber(Math.round(Number(value || 0)), 0, 0);
         }
 
         function formatPercent(value) {
             if (value === null || value === undefined) { return '—'; }
-            return Math.round(Number(value)) + '%';
+            return fmtNumber(Math.round(Number(value)), 0, 0) + '%';
         }
 
         function parseIso(iso) {
@@ -290,11 +339,11 @@
         function formatDateFull(iso) {
             var d = parseIso(iso);
             if (!d) { return ''; }
-            return (d.getDate() < 10 ? '0' : '') + d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+            return fmtDate(d, { day: '2-digit', month: 'short', year: 'numeric' });
         }
 
         function periodLabel() {
-            return MONTHS[selectedMonth()] + ' ' + selectedYear();
+            return fmtDate(new Date(selectedYear(), selectedMonth(), 1), { month: 'short', year: 'numeric' });
         }
 
         function selectedMonth() { return $monthSel && $monthSel.length ? Number($monthSel.val()) : CUR_M; }
@@ -319,9 +368,11 @@
          * Widget shell: header (title/subtitle + Month/Year filter) + bar list
          * ============================================================ */
         function fillMonthSelect($sel) {
-            $sel.html(MONTHS.map(function (m, i) {
-                return '<option value="' + i + '"' + (i === CUR_M ? ' selected' : '') + '>' + m + '</option>';
-            }).join(''));
+            var html = '';
+            for (var i = 0; i < 12; i++) {
+                html += '<option value="' + i + '"' + (i === CUR_M ? ' selected' : '') + '>' + escapeHtml(fmtDate(new Date(2000, i, 1), { month: 'short' })) + '</option>';
+            }
+            $sel.html(html);
         }
 
         function fillYearSelect($sel) {
@@ -341,8 +392,8 @@
             $htxt.append('<p class="vas285-sub">' + escapeHtml(label('VAS_285_Subtitle', 'By SO value')) + '</p>');
 
             var $filter = $('<div class="vas285-mfilter"></div>');
-            $monthSel = $('<select class="vas285-msel" aria-label="Month"></select>');
-            $yearSel = $('<select class="vas285-msel" aria-label="Year"></select>');
+            $monthSel = $('<select class="vas285-msel" aria-label="' + escapeHtml(label('VAS_285_Month', 'Month')) + '"></select>');
+            $yearSel = $('<select class="vas285-msel" aria-label="' + escapeHtml(label('VAS_285_Year', 'Year')) + '"></select>');
             fillMonthSelect($monthSel);
             fillYearSelect($yearSel);
             $filter.append($monthSel, $yearSel);
@@ -430,7 +481,7 @@
                 var color = BAR_COLORS[i % BAR_COLORS.length];
                 return '<button type="button" class="vas285-hrow" data-pid="' + p.ProductId + '" data-pname="' + escapeHtml(p.ProductName) + '" data-psku="' + escapeHtml(p.Sku) + '">' +
                     '<span class="vas285-line"><span class="vas285-nm" title="' + escapeHtml(p.ProductName) + '">' + escapeHtml(p.ProductName) + '</span>' +
-                    '<span class="vas285-vl" title="' + escapeHtml(formatINRFull(p.OrderValue)) + '">' + escapeHtml(formatINRFull(p.OrderValue)) + '</span></span>' +
+                    '<span class="vas285-vl" title="' + escapeHtml(formatAmountFull(p.OrderValue)) + '">' + escapeHtml(formatAmountFull(p.OrderValue)) + '</span></span>' +
                     '<span class="vas285-track"><span class="vas285-fill" style="width:' + pct + '%;background:' + color + '"></span></span></button>';
             }).join(''));
         }
@@ -614,7 +665,7 @@
         function renderProductBody() {
             var summary = prodState.summary;
             var statsHtml = '<div class="vas285-mstats">' +
-                statTile(label('VAS_285_StatOrderValue', 'SO value'), formatINR(summary.OrderValue)) +
+                statTile(label('VAS_285_StatOrderValue', 'SO value'), formatAmount(summary.OrderValue)) +
                 statTile(label('VAS_285_StatOpenQty', 'Qty on open SO'), formatNum(summary.OpenQty) + (summary.UomName ? ' ' + summary.UomName : '')) +
                 statTile(label('VAS_285_StatFreeStock', 'Free stock'), formatNum(summary.FreeStock) + (summary.UomName ? ' ' + summary.UomName : '')) +
                 statTile(label('VAS_285_StatCoverage', 'Coverage'), formatPercent(summary.CoveragePercent)) +
@@ -660,7 +711,7 @@
                     cellHtml(row.CustomerName, 'vas285-c-prim'),
                     cellHtml(row.WarehouseName || '—', 'vas285-c-std'),
                     cellHtml(row.RepresentativeName || '—', 'vas285-c-std'),
-                    cellHtml(formatINR(row.OrderValue), 'vas285-c-emph', 'right'),
+                    cellHtml(formatAmount(row.OrderValue), 'vas285-c-emph', 'right'),
                     '<span class="vas285-cell" title="' + escapeHtml(row.DeliveryStatus) + '"><span class="vas285-chip ' + deliveryChipClass(row.DeliveryStatusCode) + '">' + escapeHtml(row.DeliveryStatus) + '</span></span>',
                     '<span class="vas285-cell" title="' + escapeHtml(row.DocumentStatus) + '"><span class="vas285-chip vas285-chip-ok">' + escapeHtml(row.DocumentStatus) + '</span></span>'
                 ];
@@ -749,7 +800,7 @@
                 statTile(label('VAS_285_Customer', 'Customer'), order.CustomerName) +
                 statTile(label('VAS_285_SoDate', 'SO date'), formatDateFull(order.SalesOrderDate)) +
                 statTile(label('VAS_285_DatePromised', 'Date promised'), formatDateFull(order.DatePromised)) +
-                statTile(label('VAS_285_SoValue', 'SO value'), formatINR(order.OrderValue)) +
+                statTile(label('VAS_285_SoValue', 'SO value'), formatAmount(order.OrderValue)) +
                 statTile(label('VAS_285_ShipFrom', 'Ship from'), order.WarehouseName) +
                 statTile(label('VAS_285_DeliveryMode', 'Delivery mode'), order.DeliveryMode) +
                 statTile(label('VAS_285_DocumentStatus', 'Document status'), order.DocumentStatus) +
@@ -813,8 +864,8 @@
                 ' · ' + escapeHtml(formatDateFull(order.SalesOrderDate)) + ' · ' + escapeHtml(order.DocumentStatus) + '</div>';
 
             var stats = '<div class="vas285-mstats">' +
-                statTile(label('VAS_285_ColLine', 'Line') + 's', String(lines.length)) +
-                statTile(label('VAS_285_SoValue', 'SO value'), formatINR(order.OrderValue)) +
+                statTile(label('VAS_285_StatLines', 'Lines'), String(lines.length)) +
+                statTile(label('VAS_285_SoValue', 'SO value'), formatAmount(order.OrderValue)) +
                 statTile(label('VAS_285_ColOrdered', 'Ordered'), formatNum(qtyOrdered)) +
                 statTile(label('VAS_285_ColPending', 'Pending'), formatNum(qtyPending)) +
             '</div>';
@@ -869,8 +920,8 @@
                     cellHtml(formatNum(line.QtyDelivered), 'vas285-c-std', 'right'),
                     cellHtml(formatNum(line.QtyPending), 'vas285-c-prim', 'right'),
                     cellHtml(formatNum(line.FreeStock), (line.FreeStock < line.QtyPending ? 'vas285-c-short' : 'vas285-c-ok'), 'right'),
-                    cellHtml('₹ ' + formatNum(line.Rate), 'vas285-c-std', 'right'),
-                    cellHtml(formatINR(line.Amount), 'vas285-c-emph', 'right')
+                    cellHtml(formatNum(line.Rate), 'vas285-c-std', 'right'),
+                    cellHtml(formatAmount(line.Amount), 'vas285-c-emph', 'right')
                 ].join('') + '<span class="vas285-cell"><span class="vas285-chip ' + st.cls + '" title="' + escapeHtml(st.text) + '">' + escapeHtml(st.text) + '</span></span>';
                 return '<div class="vas285-mrow" style="grid-template-columns:' + tpl + '">' + cells + '</div>';
             }).join('');
@@ -931,6 +982,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createModal();
             bindDocumentLevelEvents();

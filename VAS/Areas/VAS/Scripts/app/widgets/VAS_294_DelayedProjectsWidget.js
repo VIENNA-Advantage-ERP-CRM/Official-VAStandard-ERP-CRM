@@ -110,8 +110,50 @@
         // zoom and reused afterwards (0 = not resolved yet).
         var zoomWindowId = 0;
 
+        // Translated texts, loaded once per widget instance via VIS.Msg.translate.
+        var translatedTexts = null;
+        function loadMessages() {
+            var elements = [
+                "Loading",
+                "VAS_294_DelayedProjects",
+                "VAS_294_Clients",
+                "VAS_294_WithSlippingWork",
+                "VAS_294_All",
+                "VAS_294_View",
+                "VAS_294_ProjectFallback",
+                "VAS_294_NoOwner",
+                "VAS_294_Delayed",
+                "VAS_294_StateDelayed",
+                "VAS_294_StateOnTime",
+                "VAS_294_StateOngoing",
+                "VAS_294_StateUpcoming",
+                "VAS_294_StateCompleted",
+                "VAS_294_Due",
+                "VAS_294_Activities",
+                "VAS_294_NothingHere",
+                "VAS_294_UnableToLoad",
+                "VAS_294_Of",
+                "VAS_294_AllTitle",
+                "VAS_294_Close",
+                "VAS_294_OpenRecord",
+                "VAS_294_Showing",
+                "VAS_294_PrevPage",
+                "VAS_294_NextPage",
+                "VAS_294_ActiveProjects"
+            ];
+            try {
+                translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {};
+            } catch (e) {
+                translatedTexts = {};
+            }
+        }
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            if (translatedTexts === null) { loadMessages(); }
+            var text = translatedTexts ? translatedTexts[key] : null;
+            if (!text || text === key || String(text).charAt(0) === '[') {
+                return fallback != null ? fallback : key;
+            }
+            return text;
         }
         function escapeHtml(value) {
             if (value == null) { return ''; }
@@ -130,13 +172,26 @@
             if (!isFinite(n)) { n = 0; }
             return Math.round(n).toLocaleString(window.navigator.language);
         }
+        function formatPercent(value) {
+            var n = Number(value || 0);
+            if (!isFinite(n)) { n = 0; }
+            try {
+                return new Intl.NumberFormat(window.navigator.language, { style: 'percent', maximumFractionDigits: 2 }).format(n / 100);
+            } catch (e) {
+                return n + '%';
+            }
+        }
         function formatDate(iso) {
             if (!iso) { return '—'; }
             var parts = String(iso).split('-');
             if (parts.length !== 3) { return iso; }
             var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
             if (isNaN(d.getTime())) { return iso; }
-            return d.toLocaleDateString(window.navigator.language, { year: 'numeric', month: 'short', day: '2-digit' });
+            try {
+                return new Intl.DateTimeFormat(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' }).format(d);
+            } catch (e) {
+                return d.toLocaleDateString(window.navigator.language, { year: 'numeric', month: 'short', day: '2-digit' });
+            }
         }
 
         function icon(name) {
@@ -164,6 +219,15 @@
             if (state === 'ongoing') { return label('VAS_294_StateOngoing', 'Ongoing'); }
             if (state === 'upcoming') { return label('VAS_294_StateUpcoming', 'Upcoming'); }
             return label('VAS_294_StateCompleted', 'Completed');
+        }
+        // Translated text for a project status coming from the server; unknown values are shown as received.
+        function statusText(status) {
+            if (status === 'Delayed') { return stateLabel('delayed'); }
+            if (status === 'On time') { return stateLabel('ontime'); }
+            if (status === 'Ongoing') { return stateLabel('ongoing'); }
+            if (status === 'Upcoming') { return stateLabel('upcoming'); }
+            if (status === 'Completed') { return stateLabel('completed'); }
+            return status;
         }
         // Status tag colour class per the Onfinity activity palette.
         function statusClass(status) {
@@ -223,8 +287,8 @@
             var current = Math.floor(offset / size);
             var end = Math.min(offset + size, total);
             var of = label('VAS_294_Of', 'of');
-            var helper = label('VAS_294_Showing', 'Showing') + ' ' + start + '–' + end + ' ' + of + ' ' + formatCount(total);
-            var pageText = (current + 1) + ' ' + of + ' ' + pages;
+            var helper = label('VAS_294_Showing', 'Showing') + ' ' + formatCount(start) + '–' + formatCount(end) + ' ' + of + ' ' + formatCount(total);
+            var pageText = formatCount(current + 1) + ' ' + of + ' ' + formatCount(pages);
             return '<div class="vas294-pager">' +
                 '<span class="vas294-pglabel">' + escapeHtml(helper) + '</span>' +
                 '<span class="vas294-pgctl">' +
@@ -359,12 +423,12 @@
             return '<div class="vas294-proj">' +
                 '<div class="vas294-proj-head">' +
                     '<span class="vas294-proj-name" title="' + escapeHtml(project.name) + '">' + escapeHtml(project.name) + '</span>' +
-                    '<span class="vas294-tag ' + statusClass(project.status) + '">' + escapeHtml(project.status) + '</span>' +
+                    '<span class="vas294-tag ' + statusClass(project.status) + '">' + escapeHtml(statusText(project.status)) + '</span>' +
                 '</div>' +
                 (breakdown ? '<div class="vas294-proj-bd">' + breakdown + '</div>' : '') +
                 '<div class="vas294-bar"><div style="width:' + Math.max(0, Math.min(100, progress)) + '%"></div></div>' +
                 '<div class="vas294-proj-foot">' +
-                    '<span>' + formatCount(project.completed) + '/' + formatCount(total) + ' ' + escapeHtml(label('VAS_294_Activities', 'activities')) + ' · ' + progress + '%</span>' +
+                    '<span>' + formatCount(project.completed) + '/' + formatCount(total) + ' ' + escapeHtml(label('VAS_294_Activities', 'activities')) + ' · ' + escapeHtml(formatPercent(progress)) + '</span>' +
                     '<span>' + escapeHtml(label('VAS_294_Due', 'Due')) + ' ' + escapeHtml(formatDate(project.dueDate)) + '</span>' +
                 '</div>' +
             '</div>';
@@ -480,6 +544,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createAllDialog();
             createProjectsDialog();

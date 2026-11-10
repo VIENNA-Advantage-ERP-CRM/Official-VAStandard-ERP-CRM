@@ -48,11 +48,48 @@
                 .replace(/'/g, '&#039;');
         }
 
+        // Browser culture used for every date / number format in this panel
+        var lang = (window.navigator && window.navigator.language) ? window.navigator.language : undefined;
+
+        // All message keys used by this panel, translated once via VIS.Msg.translate
+        var translatedTexts = null;
+
+        function loadMessages() {
+            var elements = [
+                'VAS_290_AccountsPayable', 'VAS_290_AccountsReceivable', 'VAS_290_AccountType', 'VAS_290_ActionDone',
+                'VAS_290_ActionFailed', 'VAS_290_Amount', 'VAS_290_Attribute', 'VAS_290_Billing',
+                'VAS_290_BillingFrequency', 'VAS_290_BillingStatus', 'VAS_290_Confirm', 'VAS_290_ConfirmGenerateInvoice',
+                'VAS_290_ConfirmGenerateSchedule', 'VAS_290_ConfirmRenew', 'VAS_290_ContractDetails', 'VAS_290_ContractReference',
+                'VAS_290_ContractSchedule', 'VAS_290_ContractType', 'VAS_290_Currency', 'VAS_290_Customer',
+                'VAS_290_CustomerDetails', 'VAS_290_CustomerName', 'VAS_290_Description', 'VAS_290_Discount',
+                'VAS_290_Drafted', 'VAS_290_Due', 'VAS_290_EndDate', 'VAS_290_FullyBilled',
+                'VAS_290_GenerateInvoice', 'VAS_290_GenerateSchedule', 'VAS_290_Invoiced', 'VAS_290_InvoiceStatus',
+                'VAS_290_LineNetAmount', 'VAS_290_ListPrice', 'VAS_290_LoadError', 'VAS_290_Location',
+                'VAS_290_Months', 'VAS_290_NextPage', 'VAS_290_NoContractSelected', 'VAS_290_NoOfSchedules',
+                'VAS_290_NoSchedule', 'VAS_290_NoSchedulesAvailable', 'VAS_290_NoticeDays', 'VAS_290_NotYetBilled',
+                'VAS_290_Of', 'VAS_290_OrderLine', 'VAS_290_PartiallyBilled', 'VAS_290_PaymentTerm',
+                'VAS_290_PendingMonths', 'VAS_290_PeriodEnd', 'VAS_290_PeriodStart', 'VAS_290_PerScheduleContractValue',
+                'VAS_290_PreviousPage', 'VAS_290_Price', 'VAS_290_PriceList', 'VAS_290_Processed',
+                'VAS_290_Product', 'VAS_290_ProductAndPricing', 'VAS_290_Renew', 'VAS_290_RenewalAndCancellation',
+                'VAS_290_RenewalType', 'VAS_290_Retry', 'VAS_290_Scheduled', 'VAS_290_Schedules',
+                'VAS_290_Showing', 'VAS_290_SourceOrder', 'VAS_290_StartDate', 'VAS_290_Surcharge',
+                'VAS_290_SurchargeAmount', 'VAS_290_Tax', 'VAS_290_TaxAmount', 'VAS_290_Total',
+                'VAS_290_TotalContractValue', 'VAS_290_TotalInvoiced', 'VAS_290_UnitOfMeasure', 'VAS_290_Validity',
+                'VAS_290_Vendor', 'VAS_290_VendorDetails', 'VAS_290_VendorName'
+            ];
+            try {
+                translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {};
+            } catch (e) {
+                translatedTexts = {};
+            }
+        }
+
         function msg(k, fallback) {
-            var v = (VIS && VIS.Msg && VIS.Msg.getMsg) ? VIS.Msg.getMsg(k) : '';
-            // VIS.Msg.getMsg returns '[KeyName]' when AD_Message row is missing — fall back to the
-            // optional fallback text, otherwise to the key
-            if (!v || (v.charAt(0) === '[' && v.charAt(v.length - 1) === ']')) return fallback || k;
+            if (translatedTexts === null) loadMessages();
+            var v = translatedTexts ? translatedTexts[k] : '';
+            // A missing AD_Message row comes back empty, as the key itself, or as '[KeyName]' —
+            // fall back to the optional fallback text, otherwise to the key
+            if (!v || v === k || String(v).charAt(0) === '[') return fallback || k;
             return v;
         }
 
@@ -64,8 +101,14 @@
 
         // Business partner wording follows the contract type: AP contracts are with a Vendor,
         // everything else (AR) with a Customer.
+        // The ContractType reference stores 'ASP' (Accounts Payable) and 'ASR' (Accounts Receivable);
+        // an empty type is treated as Receivable, as the Generate Invoice process does.
+        function isAPContract(data) {
+            return !!data && (data.contractType === 'ASP' || data.contractType === 'AP');
+        }
+
         function partnerLabels(data) {
-            var isAP = !!data && data.contractType === 'AP';
+            var isAP = isAPContract(data);
             return {
                 role:    isAP ? msg('VAS_290_Vendor', 'Vendor')                : msg('VAS_290_Customer'),
                 details: isAP ? msg('VAS_290_VendorDetails', 'Vendor Details') : msg('VAS_290_CustomerDetails'),
@@ -83,12 +126,31 @@
             return new Date(parts[0], parts[1] - 1, parts[2]);
         }
 
-        var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
+        // Date as day, short month name, year - field order follows the browser culture
         function fmtDate(isoValue) {
             var dt = parseIsoDate(isoValue);
             if (!dt) return '—';
-            return ('0' + dt.getDate()).slice(-2) + ' ' + MONTHS[dt.getMonth()] + ' ' + dt.getFullYear();
+            try {
+                return new Intl.DateTimeFormat(lang, { day: '2-digit', month: 'short', year: 'numeric' }).format(dt);
+            } catch (e) {
+                return dt.toDateString();
+            }
+        }
+
+        // Whole-number / count formatting in the browser culture
+        function fmtInt(v) {
+            var n = toNum(v);
+            try { return n.toLocaleString(lang); } catch (e) { return String(n); }
+        }
+
+        // Percentage (value given as 12.5 for 12.5%), two decimals, culture-aware sign placement
+        function fmtPercent(v) {
+            var n = toNum(v);
+            try {
+                return new Intl.NumberFormat(lang, { style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n / 100);
+            } catch (e) {
+                return n.toFixed(2) + '%';
+            }
         }
 
         function fmtMoney(amount, currencyCode, precision) {
@@ -97,7 +159,7 @@
             var prec = (precision != null && isFinite(precision)) ? Math.max(0, parseInt(precision, 10)) : 2;
             if (currencyCode) {
                 try {
-                    return new Intl.NumberFormat(undefined, {
+                    return new Intl.NumberFormat(lang, {
                         style: 'currency',
                         currency: String(currencyCode),
                         minimumFractionDigits: prec,
@@ -109,7 +171,11 @@
             // Manual fallback
             var d = sectionState.header.data;
             var sym = (d && d.currencySymbol) ? String(d.currencySymbol) : '';
-            return sym + n.toFixed(prec).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            try {
+                return sym + n.toLocaleString(lang, { minimumFractionDigits: prec, maximumFractionDigits: prec });
+            } catch (e) {
+                return sym + n.toFixed(prec);
+            }
         }
 
         // Pending-months calculation from spec (§4.8, calendar-month logic in JS)
@@ -372,7 +438,7 @@
             if (startDt && endDt) {
                 var mths = (endDt.getFullYear() - startDt.getFullYear()) * 12 + (endDt.getMonth() - startDt.getMonth());
                 if (endDt.getDate() >= startDt.getDate()) mths += 1;
-                validityStr = Math.max(0, mths) + ' ' + msg('VAS_290_Months');
+                validityStr = fmtInt(Math.max(0, mths)) + ' ' + msg('VAS_290_Months');
             }
 
             // Single status chip driven by Processed: Drafted until processed, then Processed.
@@ -380,7 +446,7 @@
             var statusLabel = esc(isProcessed ? msg('VAS_290_Processed', 'Processed') : msg('VAS_290_Drafted', 'Drafted'));
             var statusCls   = isProcessed ? 'cs' : 'ci';
 
-            var contractTypeTxt = esc(data.contractTypeLabel || (data.contractType === 'AR'
+            var contractTypeTxt = esc(data.contractTypeLabel || (!isAPContract(data)
                 ? msg('VAS_290_AccountsReceivable') : msg('VAS_290_AccountsPayable')));
 
             var customerLoc = esc(data.billingLocationName || data.billingLocationAddress || '');
@@ -650,7 +716,7 @@
                 '<div class="vas_290_sc-frows">' +
                     frowPlain(partnerLbl.name, data.bPartnerName) +
                     frowPlain(msg('VAS_290_Location'),     data.billingLocationName || data.billingLocationAddress || '—') +
-                    frowPlain(msg('VAS_290_AccountType'),  data.contractTypeLabel || (data.contractType === 'AR' ? msg('VAS_290_AccountsReceivable') : msg('VAS_290_AccountsPayable'))) +
+                    frowPlain(msg('VAS_290_AccountType'),  data.contractTypeLabel || (!isAPContract(data) ? msg('VAS_290_AccountsReceivable') : msg('VAS_290_AccountsPayable'))) +
                     frowPlain(msg('VAS_290_Currency'),     (data.currencyIsoCode ? data.currencyIsoCode + (data.currencySymbol ? ' (' + data.currencySymbol + ')' : '') : '—')) +
                     frowPlain(msg('VAS_290_PaymentTerm'),  data.paymentTermName) +
                     frowPlain(msg('VAS_290_PriceList'),    data.priceListName) +
@@ -667,7 +733,7 @@
 
             var body =
                 '<div class="vas_290_sc-frows">' +
-                    frowPlain(msg('VAS_290_ContractType'),      data.contractTypeLabel || (data.contractType === 'AR' ? msg('VAS_290_AccountsReceivable') : msg('VAS_290_AccountsPayable'))) +
+                    frowPlain(msg('VAS_290_ContractType'),      data.contractTypeLabel || (!isAPContract(data) ? msg('VAS_290_AccountsReceivable') : msg('VAS_290_AccountsPayable'))) +
                     frowPlain(msg('VAS_290_ContractReference'),  refContractTxt) +
                     frowPlain(msg('VAS_290_StartDate'),          fmtDate(data.startDate)) +
                     frowPlain(msg('VAS_290_EndDate'),            fmtDate(data.endDate)) +
@@ -693,7 +759,7 @@
                     frowPlain(msg('VAS_290_Attribute'),      data.attributeDisplay) +
                     frowPlain(msg('VAS_290_Price'),          fmtMoney(data.priceEntered,   ccy, prec)) +
                     frowPlain(msg('VAS_290_ListPrice'),      fmtMoney(data.priceListAmount, ccy, prec)) +
-                    frowPlain(msg('VAS_290_Discount'),       (data.discount != null ? toNum(data.discount).toFixed(2) + '%' : '—')) +
+                    frowPlain(msg('VAS_290_Discount'),       (data.discount != null ? fmtPercent(data.discount) : '—')) +
                     frowPlain(msg('VAS_290_LineNetAmount'),  fmtMoney(data.lineNetAmt,      ccy, prec)) +
                     frowPlain(msg('VAS_290_TaxAmount'),      fmtMoney(data.taxAmt,         ccy, prec)) +
                     frowPlain(msg('VAS_290_SurchargeAmount', 'Surcharge Amount'), fmtMoney(data.surchargeAmt, ccy, prec)) +
@@ -727,7 +793,7 @@
             var body =
                 '<div class="vas_290_sc-frows">' +
                     frowPlain(msg('VAS_290_BillingFrequency'), data.frequencyName || '—') +
-                    frowPlain(msg('VAS_290_NoOfSchedules'),    String(summary.count)) +
+                    frowPlain(msg('VAS_290_NoOfSchedules'),    fmtInt(summary.count)) +
                     frowPlain(msg('VAS_290_TotalInvoiced'),    invoicedTxt) +
                     frow(msg('VAS_290_InvoiceStatus'), chip(summary.status, statusCls)) +
                 '</div>';
@@ -740,8 +806,7 @@
         function renderRenewalSection(data) {
             var pendingMonths = calculatePendingMonths(data.endDate);
             var pendingTxt = pendingMonths === null ? '—'
-                : pendingMonths === 0 ? '0 ' + msg('VAS_290_Months')
-                : pendingMonths + ' ' + msg('VAS_290_Months');
+                : fmtInt(pendingMonths) + ' ' + msg('VAS_290_Months');
 
             var renewalCls = (data.renewalTypeLabel || '').toLowerCase().indexOf('auto') >= 0 ? 'vs' : '';
 
@@ -753,7 +818,7 @@
                 '<div class="vas_290_sc-frows">' +
                     frow(msg('VAS_290_RenewalType'),    esc(data.renewalTypeLabel || data.renewalType || '—'), renewalCls) +
                     frowPlain(msg('VAS_290_PendingMonths'),  pendingTxt) +
-                    (isManualRenewal ? '' : frowPlain(msg('VAS_290_NoticeDays'), data.cancelBeforeDays != null ? String(data.cancelBeforeDays) : '—')) +
+                    (isManualRenewal ? '' : frowPlain(msg('VAS_290_NoticeDays'), data.cancelBeforeDays != null ? fmtInt(data.cancelBeforeDays) : '—')) +
                 '</div>';
 
             setSecBodyHtml('renewal', body);
@@ -822,8 +887,9 @@
                     '<span class="vas_290_sc-cell">' + esc(msg('VAS_290_BillingStatus')) + '</span>' +
                 '</div>';
 
-            // isSOTrx determined from header: AR contracts produce Sales Invoices
-            var hdrIsSOTrx = (d && d.contractType === 'AR') ? 'Y' : 'N';
+            // isSOTrx determined from header: AR contracts produce Sales Invoices, AP (ASP) ones
+            // Vendor invoices, so the zoom opens the matching invoice window.
+            var hdrIsSOTrx = isAPContract(d) ? 'N' : 'Y';
 
             var body = '';
             for (var i = 0; i < slice.length; i++) {
@@ -868,7 +934,7 @@
             var foot =
                 '<div class="vas_290_sc-dg-foot">' +
                     '<span class="vas_290_sc-dg-foot__lbl">' +
-                        esc(msg('VAS_290_Total')) + ' · ' + items.length + ' ' + esc(msg('VAS_290_Schedules')) +
+                        esc(msg('VAS_290_Total')) + ' · ' + fmtInt(items.length) + ' ' + esc(msg('VAS_290_Schedules')) +
                         ' · ' + esc(msg('VAS_290_Tax')) + ' ' + esc(fmtMoney(tax, ccy, prec)) +
                         (hasSurcharge ? ' · ' + esc(msg('VAS_290_Surcharge', 'Surcharge')) + ' ' + esc(fmtMoney(surcharge, ccy, prec)) : '') +
                     '</span>' +
@@ -882,15 +948,15 @@
                 pager =
                     '<div class="vas_290_sc-pager">' +
                         '<span class="vas_290_sc-pager__info">' +
-                            esc(msg('VAS_290_Showing')) + ' ' + (from + 1) + '–' + (from + slice.length) +
-                            ' ' + esc(msg('VAS_290_Of')) + ' ' + items.length +
+                            esc(msg('VAS_290_Showing')) + ' ' + fmtInt(from + 1) + '–' + fmtInt(from + slice.length) +
+                            ' ' + esc(msg('VAS_290_Of')) + ' ' + fmtInt(items.length) +
                         '</span>' +
                         '<span class="vas_290_sc-pager__ctl">' +
                             '<button class="vas_290_sc-pgbtn" id="' + pgPrevId + '" aria-label="' + esc(msg('VAS_290_PreviousPage')) + '"' +
                                     (schedPage === 0 ? ' disabled' : '') + '>' +
                                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">' + ICONS.chevL + '</svg>' +
                             '</button>' +
-                            '<span>' + (schedPage + 1) + ' / ' + pages + '</span>' +
+                            '<span>' + fmtInt(schedPage + 1) + ' / ' + fmtInt(pages) + '</span>' +
                             '<button class="vas_290_sc-pgbtn" id="' + pgNextId + '" aria-label="' + esc(msg('VAS_290_NextPage')) + '"' +
                                     (schedPage >= pages - 1 ? ' disabled' : '') + '>' +
                                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">' + ICONS.chevR + '</svg>' +
@@ -906,7 +972,7 @@
             }
 
             setSecBodyHtml('schedule', head + body + foot + pager);
-            updateSectionSum('schedule', (d && d.frequencyName ? d.frequencyName + ' · ' : '') + items.length + ' ' + msg('VAS_290_Schedules'));
+            updateSectionSum('schedule', (d && d.frequencyName ? d.frequencyName + ' · ' : '') + fmtInt(items.length) + ' ' + msg('VAS_290_Schedules'));
             // Update hero label/value with final schedule count (Monthly: count × lineNetAmt)
             refreshHeroContractValue();
         }
@@ -1006,6 +1072,7 @@
 
         // ── Initialize ────────────────────────────────────────────────────────
         this.Initialize = function () {
+            loadMessages();
             widgetID = (this.widgetInfo && this.widgetInfo.AD_UserHomeWidgetID)
                 ? this.widgetInfo.AD_UserHomeWidgetID
                 : ($self.windowNo || 0);

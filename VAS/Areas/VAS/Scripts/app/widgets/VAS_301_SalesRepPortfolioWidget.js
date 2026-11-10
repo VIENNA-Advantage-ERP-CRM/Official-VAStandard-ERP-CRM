@@ -98,8 +98,43 @@
         // zoom and reused afterwards (0 = not resolved yet).
         var zoomWindowId = 0;
 
+        // Translated texts, loaded once per widget instance via VIS.Msg.translate.
+        var translatedTexts = null;
+        function loadMessages() {
+            var elements = [
+                "Loading",
+                "VAS_301_SalesRepPortfolio",
+                "VAS_301_Reps",
+                "VAS_301_Rep",
+                "VAS_301_OwnedARR",
+                "VAS_301_Accts",
+                "VAS_301_Opps",
+                "VAS_301_AtRisk",
+                "VAS_301_Healthy",
+                "VAS_301_PortfolioSuffix",
+                "VAS_301_NothingHere",
+                "VAS_301_NoCustomers",
+                "VAS_301_UnableToLoad",
+                "VAS_301_Retry",
+                "VAS_301_Of",
+                "VAS_301_Showing",
+                "VAS_301_PrevPage",
+                "VAS_301_NextPage",
+                "VAS_301_Close"
+            ];
+            try {
+                translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {};
+            } catch (e) {
+                translatedTexts = {};
+            }
+        }
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            if (translatedTexts === null) { loadMessages(); }
+            var text = translatedTexts ? translatedTexts[key] : null;
+            if (!text || text === key || String(text).charAt(0) === '[') {
+                return fallback != null ? fallback : key;
+            }
+            return text;
         }
         function escapeHtml(value) {
             if (value == null) { return ''; }
@@ -133,7 +168,26 @@
             var sign = n < 0 ? '-' : '';
             var iso = (cur && cur.iso) || '';
             var symbol = (cur && (cur.symbol || cur.iso)) || '';
-            return sign + symbol + VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
+            var compact = VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
+            // Currency symbol placed per the browser locale (before / after the number).
+            if (iso) {
+                try {
+                    var parts = new Intl.NumberFormat(window.navigator.language, { style: 'currency', currency: iso }).formatToParts(1);
+                    var ci = -1, ni = -1;
+                    parts.forEach(function (p, i) {
+                        if (p.type === 'currency' && ci < 0) { ci = i; }
+                        if (p.type === 'integer' && ni < 0) { ni = i; }
+                    });
+                    if (ci >= 0 && ni >= 0) {
+                        var sym = parts[ci].value;
+                        if (ci < ni) {
+                            return sign + sym + (parts[ci + 1] && parts[ci + 1].type === 'literal' ? parts[ci + 1].value : '') + compact;
+                        }
+                        return sign + compact + (parts[ci - 1] && parts[ci - 1].type === 'literal' ? parts[ci - 1].value : '') + sym;
+                    }
+                } catch (e) { /* fall back to the server symbol in front */ }
+            }
+            return sign + symbol + compact;
         }
         var AVATAR_COLORS = ['#1F83FF', '#5F4AA6', '#0B6B45', '#D78B10', '#0083DA', '#A33F3F'];
         function avatarColor(text) {
@@ -229,8 +283,8 @@
             var current = Math.floor(offset / size);
             var end = Math.min(offset + size, total);
             var of = label('VAS_301_Of', 'of');
-            var helper = label('VAS_301_Showing', 'Showing') + ' ' + start + '–' + end + ' ' + of + ' ' + formatCount(total);
-            var pageText = (current + 1) + ' ' + of + ' ' + pages;
+            var helper = label('VAS_301_Showing', 'Showing') + ' ' + formatCount(start) + '–' + formatCount(end) + ' ' + of + ' ' + formatCount(total);
+            var pageText = formatCount(current + 1) + ' ' + of + ' ' + formatCount(pages);
             return '<div class="vas301-pager">' +
                 '<span class="vas301-pglabel">' + escapeHtml(helper) + '</span>' +
                 '<span class="vas301-pgctl">' +
@@ -305,12 +359,12 @@
             var pages = Math.max(1, Math.ceil(listRepTotal / LIST_PAGE));
             var current = Math.floor(listOffset / LIST_PAGE);
             var of = label('VAS_301_Of', 'of');
-            var helper = label('VAS_301_Showing', 'Showing') + ' ' + start + '–' + end + ' ' + of + ' ' + formatCount(listRepTotal);
+            var helper = label('VAS_301_Showing', 'Showing') + ' ' + formatCount(start) + '–' + formatCount(end) + ' ' + of + ' ' + formatCount(listRepTotal);
             $listPager.html(
                 '<span class="vas301-pglabel">' + escapeHtml(helper) + '</span>' +
                 '<span class="vas301-pgctl">' +
                     '<button type="button" class="vas301-pgbtn" data-listdir="prev" aria-label="' + escapeHtml(label('VAS_301_PrevPage', 'Previous page')) + '" ' + (current <= 0 ? 'disabled' : '') + '>' + icon('chevL') + '</button>' +
-                    '<span class="vas301-pgtext">' + escapeHtml((current + 1) + ' ' + of + ' ' + pages) + '</span>' +
+                    '<span class="vas301-pgtext">' + escapeHtml(formatCount(current + 1) + ' ' + of + ' ' + formatCount(pages)) + '</span>' +
                     '<button type="button" class="vas301-pgbtn" data-listdir="next" aria-label="' + escapeHtml(label('VAS_301_NextPage', 'Next page')) + '" ' + (current >= pages - 1 ? 'disabled' : '') + '>' + icon('chev') + '</button>' +
                 '</span>'
             );
@@ -387,6 +441,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createListDialog();
             $(document).on('keydown.MPCvas301', function (event) {

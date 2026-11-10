@@ -42,6 +42,7 @@
  * 20  | Showing                                  | VAS_137_Showing
  * 21  | Previous page                            | VAS_137_PrevPage
  * 22  | Next page                                | VAS_137_NextPage
+ * 23  | {0}d (days short, e.g. 12d)              | VAS_137_DaysShort
  * ──────────────────────────────────────────────────────────────────────────
  */
 ; VAS = window.VAS || {};
@@ -101,8 +102,68 @@
         // zoom and reused afterwards (0 = not resolved yet).
         var zoomWindowId = 0;
 
+        var translatedTexts = null;
+
+        /** Loads every message key used by this widget in one VIS.Msg.translate call. */
+        function loadMessages() {
+            var elements = [
+                'Loading',
+                'VAS_137_NeedsAttention',
+                'VAS_137_FilteredLists',
+                'VAS_137_DelayedPayments',
+                'VAS_137_Unresponded',
+                'VAS_137_NotSegmented',
+                'VAS_137_OnboardingOpen',
+                'VAS_137_OpenList',
+                'VAS_137_Invoices',
+                'VAS_137_Invoice',
+                'VAS_137_Overdue',
+                'VAS_137_Open',
+                'VAS_137_Waiting',
+                'VAS_137_DaysShort',
+                'VAS_137_NoOwner',
+                'VAS_137_NoMatch',
+                'VAS_137_UnableToLoad',
+                'VAS_137_Retry',
+                'VAS_137_Of',
+                'VAS_137_Close',
+                'VAS_137_Showing',
+                'VAS_137_PrevPage',
+                'VAS_137_NextPage',
+                'VAS_137_KeyClient',
+                'VAS_137_Tier',
+                'VAS_137_Segment',
+                'VAS_137_Owner',
+                'VAS_137_ARR',
+                'VAS_137_OpenTicketsFact',
+                'VAS_137_Projects',
+                'VAS_137_Pipeline',
+                'VAS_137_Onboarding',
+                'VAS_137_OpenSupportTickets',
+                'VAS_137_KeyPrioritise',
+                'VAS_137_OpenRequests',
+                'VAS_137_DaysPastDue',
+                'VAS_137_Signals',
+                'VAS_137_CustomerDetails',
+                'VAS_137_OpenRecord'
+            ];
+            try {
+                translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {};
+            } catch (e) {
+                translatedTexts = {};
+            }
+        }
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            if (translatedTexts === null) { loadMessages(); }
+            var v = translatedTexts ? translatedTexts[key] : null;
+            if (v == null || v === '' || v === key || String(v).charAt(0) === '[') {
+                return fallback == null ? key : fallback;
+            }
+            return v;
+        }
+        // "{0}d" - a day count with its unit suffix, word order left to the translation.
+        function daysShort(value) {
+            return label('VAS_137_DaysShort', '{0}d').replace('{0}', formatCount(value));
         }
         function escapeHtml(value) {
             if (value == null) { return ''; }
@@ -130,6 +191,33 @@
             if (!isFinite(n)) { n = 0; }
             return Math.round(n).toLocaleString(window.navigator.language);
         }
+        // Locale-aware percentage (value is already 0..100, e.g. 45 -> "45%").
+        function formatPercent(value, maxFraction) {
+            var n = Number(value || 0);
+            if (!isFinite(n)) { n = 0; }
+            try {
+                return new Intl.NumberFormat(window.navigator.language, { style: 'percent', minimumFractionDigits: 0, maximumFractionDigits: maxFraction || 0 }).format(n / 100);
+            } catch (e) { return n + '%'; }
+        }
+        // Currency symbol placement for the browser locale: returns { symbol, before, space }.
+        // With no ISO available the server-supplied symbol is kept, in front.
+        function currencyAffix(iso, serverSymbol) {
+            var fallback = { symbol: serverSymbol || iso || '', before: true, space: '' };
+            if (!iso) { return fallback; }
+            try {
+                var parts = new Intl.NumberFormat(window.navigator.language, { style: 'currency', currency: iso }).formatToParts(1);
+                var ci = -1, ii = -1, i;
+                for (i = 0; i < parts.length; i++) {
+                    if (parts[i].type === 'currency' && ci < 0) { ci = i; }
+                    if (parts[i].type === 'integer' && ii < 0) { ii = i; }
+                }
+                if (ci < 0) { return fallback; }
+                var before = ii < 0 || ci < ii;
+                var adj = before ? parts[ci + 1] : parts[ci - 1];
+                var space = adj && adj.type === 'literal' ? adj.value : '';
+                return { symbol: parts[ci].value, before: before, space: space };
+            } catch (e) { return fallback; }
+        }
         // Standard precision of the supplied base-currency descriptor, falling back to
         // the session context when the endpoint did not send one.
         function precisionOf(cur) {
@@ -147,8 +235,9 @@
             var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
             var sign = n < 0 ? '-' : '';
             var iso = (cur && cur.iso) || '';
-            var symbol = (cur && (cur.symbol || cur.iso)) || '';
-            return sign + symbol + VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
+            var aff = currencyAffix(iso, cur && cur.symbol);
+            var compact = VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
+            return sign + (aff.before ? aff.symbol + aff.space + compact : compact + aff.space + aff.symbol);
         }
         function formatAmount(value) {
             return formatMoney(value, listCurrency);
@@ -246,10 +335,10 @@
         function rowMeta(item) {
             if (listFlag === 'overdue') {
                 var invWord = Number(item.invoiceCount) === 1 ? label('VAS_137_Invoice', 'invoice') : label('VAS_137_Invoices', 'invoices');
-                return formatCount(item.invoiceCount) + ' ' + invWord + ' · ' + formatCount(item.maxDays) + 'd ' + label('VAS_137_Overdue', 'overdue');
+                return formatCount(item.invoiceCount) + ' ' + invWord + ' · ' + daysShort(item.maxDays) + ' ' + label('VAS_137_Overdue', 'overdue');
             }
             if (listFlag === 'unresponded') {
-                return formatCount(item.requestCount) + ' ' + label('VAS_137_Open', 'open') + ' · ' + formatCount(item.maxWaitDays) + 'd ' + label('VAS_137_Waiting', 'waiting');
+                return formatCount(item.requestCount) + ' ' + label('VAS_137_Open', 'open') + ' · ' + daysShort(item.maxWaitDays) + ' ' + label('VAS_137_Waiting', 'waiting');
             }
             if (listFlag === 'unsegmented') {
                 return [item.code, item.rep || label('VAS_137_NoOwner', 'No owner')].filter(function (p) { return p; }).join(' · ');
@@ -258,7 +347,7 @@
         }
         function rowValue(item) {
             if (listFlag === 'overdue') { return '<span class="vas137-row-val vas137-danger">' + escapeHtml(formatAmount(item.amount)) + '</span>'; }
-            if (listFlag === 'onbIncomplete') { return '<span class="vas137-row-val">' + Number(item.progress || 0) + '%</span>'; }
+            if (listFlag === 'onbIncomplete') { return '<span class="vas137-row-val">' + formatPercent(item.progress, 2) + '</span>'; }
             return '';
         }
 
@@ -287,8 +376,8 @@
                left, compact prev · "N of M" · next right. The control stays put
                on a single page with both arrows disabled. */
             var of = label('VAS_137_Of', 'of');
-            var helper = label('VAS_137_Showing', 'Showing') + ' ' + start + '–' + end + ' ' + of + ' ' + formatCount(listTotal);
-            var pageText = (current + 1) + ' ' + of + ' ' + pages;
+            var helper = label('VAS_137_Showing', 'Showing') + ' ' + formatCount(start) + '–' + formatCount(end) + ' ' + of + ' ' + formatCount(listTotal);
+            var pageText = formatCount(current + 1) + ' ' + of + ' ' + formatCount(pages);
 
             $listBody.html('<div class="vas137-list">' + rows + '</div>');
             $listPager.html(
@@ -408,7 +497,7 @@
                 fact(label('VAS_137_OpenTicketsFact', 'Open tickets'), escapeHtml(formatCount(data.openTickets || 0))) +
                 fact(label('VAS_137_Projects', 'Projects'), projectText(data.projectName, projects, dash)) +
                 fact(label('VAS_137_Pipeline', 'Pipeline'), pipeline > 0 ? escapeHtml(formatDetailAmount(pipeline)) : dash) +
-                fact(label('VAS_137_Onboarding', 'Onboarding'), data.onboardingPercent == null ? dash : escapeHtml(formatCount(data.onboardingPercent) + '%')) +
+                fact(label('VAS_137_Onboarding', 'Onboarding'), data.onboardingPercent == null ? dash : escapeHtml(formatPercent(data.onboardingPercent, 2))) +
             '</div>';
 
             var signals = '';
@@ -509,6 +598,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createListDialog();
             createDetailDialog();

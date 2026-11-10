@@ -92,8 +92,59 @@
         // zoom and reused afterwards (0 = not resolved yet).
         var zoomWindowId = 0;
 
+        var translatedTexts = null;
+
+        /** Loads every message key used by this widget in one VIS.Msg.translate call. */
+        function loadMessages() {
+            var elements = [
+                'Loading',
+                'VAS_136_OnboardingStatus',
+                'VAS_136_Complete',
+                'VAS_136_Onboarded',
+                'VAS_136_InProgress',
+                'VAS_136_OnboardedTitle',
+                'VAS_136_InProgressTitle',
+                'VAS_136_NoOwner',
+                'VAS_136_NothingHere',
+                'VAS_136_UnableToLoad',
+                'VAS_136_Retry',
+                'VAS_136_Of',
+                'VAS_136_Close',
+                'VAS_136_Showing',
+                'VAS_136_PrevPage',
+                'VAS_136_NextPage',
+                'VAS_136_ClickHint',
+                'VAS_136_KeyClient',
+                'VAS_136_Tier',
+                'VAS_136_Segment',
+                'VAS_136_Owner',
+                'VAS_136_ARR',
+                'VAS_136_OpenTicketsFact',
+                'VAS_136_Projects',
+                'VAS_136_Pipeline',
+                'VAS_136_Overdue',
+                'VAS_136_OpenSupportTickets',
+                'VAS_136_KeyPrioritise',
+                'VAS_136_OpenRequests',
+                'VAS_136_OverdueWord',
+                'VAS_136_DaysPastDue',
+                'VAS_136_Signals',
+                'VAS_136_CustomerDetails',
+                'VAS_136_OpenRecord'
+            ];
+            try {
+                translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {};
+            } catch (e) {
+                translatedTexts = {};
+            }
+        }
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            if (translatedTexts === null) { loadMessages(); }
+            var v = translatedTexts ? translatedTexts[key] : null;
+            if (v == null || v === '' || v === key || String(v).charAt(0) === '[') {
+                return fallback == null ? key : fallback;
+            }
+            return v;
         }
         function escapeHtml(value) {
             if (value == null) { return ''; }
@@ -120,6 +171,33 @@
             var n = Number(value || 0);
             if (!isFinite(n)) { n = 0; }
             return Math.round(n).toLocaleString(window.navigator.language);
+        }
+        // Locale-aware percentage (value is already 0..100, e.g. 45 -> "45%").
+        function formatPercent(value, maxFraction) {
+            var n = Number(value || 0);
+            if (!isFinite(n)) { n = 0; }
+            try {
+                return new Intl.NumberFormat(window.navigator.language, { style: 'percent', minimumFractionDigits: 0, maximumFractionDigits: maxFraction || 0 }).format(n / 100);
+            } catch (e) { return n + '%'; }
+        }
+        // Currency symbol placement for the browser locale: returns { symbol, before, space }.
+        // With no ISO available the server-supplied symbol is kept, in front.
+        function currencyAffix(iso, serverSymbol) {
+            var fallback = { symbol: serverSymbol || iso || '', before: true, space: '' };
+            if (!iso) { return fallback; }
+            try {
+                var parts = new Intl.NumberFormat(window.navigator.language, { style: 'currency', currency: iso }).formatToParts(1);
+                var ci = -1, ii = -1, i;
+                for (i = 0; i < parts.length; i++) {
+                    if (parts[i].type === 'currency' && ci < 0) { ci = i; }
+                    if (parts[i].type === 'integer' && ii < 0) { ii = i; }
+                }
+                if (ci < 0) { return fallback; }
+                var before = ii < 0 || ci < ii;
+                var adj = before ? parts[ci + 1] : parts[ci - 1];
+                var space = adj && adj.type === 'literal' ? adj.value : '';
+                return { symbol: parts[ci].value, before: before, space: space };
+            } catch (e) { return fallback; }
         }
         function icon(name) {
             if (name === 'rocket') {
@@ -178,8 +256,9 @@
         function formatArr(value) {
             var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
             var sign = n < 0 ? '-' : '';
-            var symbol = searchCurrency.symbol || searchCurrency.iso || '';
-            return sign + symbol + VIS.Util.formatCompactAmount(n, searchCurrency.iso, currencyPrecision());
+            var aff = currencyAffix(searchCurrency.iso, searchCurrency.symbol);
+            var compact = VIS.Util.formatCompactAmount(n, searchCurrency.iso, currencyPrecision());
+            return sign + (aff.before ? aff.symbol + aff.space + compact : compact + aff.space + aff.symbol);
         }
 
         function stepClass(step) {
@@ -216,7 +295,7 @@
         function renderDonut(data) {
             var total = Number(data.totalCustomers || 0);
             if (total <= 0) {
-                if ($sub) { $sub.text('0% ' + label('VAS_136_Complete', 'complete')); }
+                if ($sub) { $sub.text(formatPercent(0) + ' ' + label('VAS_136_Complete', 'complete')); }
                 renderState(label('VAS_136_NothingHere', 'Nothing here right now.'));
                 return;
             }
@@ -230,7 +309,7 @@
             var pct = Number(data.completionPercent || 0);
             if (!isFinite(pct) || pct < 0) { pct = 0; }
             if (pct > 100) { pct = 100; }
-            if ($sub) { $sub.text(Math.round(pct) + '% ' + label('VAS_136_Complete', 'complete')); }
+            if ($sub) { $sub.text(formatPercent(Math.round(pct)) + ' ' + label('VAS_136_Complete', 'complete')); }
             // Arc length = completion reached; the base ring shows what is left.
             var dashOffset = RING_CIRC * (1 - pct / 100);
 
@@ -240,7 +319,7 @@
                     '<circle class="vas136-ring-val" cx="48" cy="48" r="' + RING_RADIUS + '" fill="none" stroke-width="10" stroke-linecap="round"' +
                         ' stroke-dasharray="' + RING_CIRC.toFixed(2) + '" stroke-dashoffset="' + dashOffset.toFixed(2) + '"></circle>' +
                 '</svg>' +
-                '<div class="vas136-ring-mid"><b>' + Math.round(pct) + '%</b><span>' + escapeHtml(label('VAS_136_Complete', 'complete')) + '</span></div>' +
+                '<div class="vas136-ring-mid"><b>' + formatPercent(Math.round(pct)) + '</b><span>' + escapeHtml(label('VAS_136_Complete', 'complete')) + '</span></div>' +
             '</div>';
 
             var legend = '<div class="vas136-legend">' +
@@ -311,7 +390,7 @@
                         '<span class="vas136-row-meta" title="' + escapeHtml(meta) + '">' + escapeHtml(meta) + '</span>' +
                     '</span>' +
                     '<span class="vas136-tag ' + stepClass(c.onbStep) + '">' + escapeHtml(c.onbStep) + '</span>' +
-                    '<span class="vas136-row-pct">' + progress + '%</span>' +
+                    '<span class="vas136-row-pct">' + formatPercent(progress, 2) + '</span>' +
                 '</button>';
             }).join('');
 
@@ -323,8 +402,8 @@
                left, compact prev · "N of M" · next right. The control stays put
                on a single page with both arrows disabled. */
             var of = label('VAS_136_Of', 'of');
-            var helper = label('VAS_136_Showing', 'Showing') + ' ' + start + '–' + end + ' ' + of + ' ' + formatCount(listTotal);
-            var pageText = (current + 1) + ' ' + of + ' ' + pages;
+            var helper = label('VAS_136_Showing', 'Showing') + ' ' + formatCount(start) + '–' + formatCount(end) + ' ' + of + ' ' + formatCount(listTotal);
+            var pageText = formatCount(current + 1) + ' ' + of + ' ' + formatCount(pages);
 
             $listBody.html('<div class="vas136-list">' + rows + '</div>');
             $listPager.html(
@@ -516,6 +595,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createListDialog();
             createDetailDialog();

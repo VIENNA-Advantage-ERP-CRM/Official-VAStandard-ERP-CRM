@@ -135,8 +135,8 @@
                 $root.find('.vasso-retry').remove();
                 if ($root.css('position') === 'static') { $root.css('position', 'relative'); }
                 var text = '';
-                try { text = VIS.Msg.getMsg('VAS_SO_Retry'); } catch (e) { text = ''; }
-                if (!text || text === 'VAS_SO_Retry' || text === '[VAS_SO_Retry]') { text = 'Retry'; }
+                try { text = VIS.Msg.translate(VIS.Env.getCtx(), 'VAS_SO_Retry'); } catch (e) { text = ''; }
+                if (!text || typeof text !== 'string' || text === 'VAS_SO_Retry' || text.charAt(0) === '[') { text = 'Retry'; }
                 $('<button type="button" class="vasso-retry"></button>').text(text)
                     .attr('title', text)
                     .on('click', function (e) {
@@ -152,7 +152,6 @@
 
     var MAX_ROWS_PER_PAGE = 10;
     var MIN_ROWS_PER_PAGE = 2;
-    var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     var ZOOM_WINDOW_NAME = 'VAS_SalesQuotation';
 
     /* design.md §Widget Header / §Measurement Setup: keep --dash-inline-size on
@@ -195,8 +194,33 @@
         var docsState = { page: 0, size: MAX_ROWS_PER_PAGE, total: 0, rows: [] };
         var zoomWindowId = 0;
 
+        var translatedTexts = null;   // message-key -> translated text (see loadMessages)
+
+        // Every message key used by this widget, translated in ONE call.
+        function loadMessages() {
+            var elements = [
+                'VAS_276_Title', 'VAS_276_OfSuffix', 'VAS_276_QuotationsConvertedSuffix', 'VAS_276_SideLabelLine1',
+                'VAS_276_SideLabelLine2', 'VAS_276_ZeroState', 'VAS_276_ErrorState', 'VAS_276_ModalSubtitlePrefix',
+                'VAS_276_StatQuotationsIssued', 'VAS_276_StatConverted', 'VAS_276_StatConversionRate',
+                'VAS_276_StatValueConverted', 'VAS_276_StatValueQuoted', 'VAS_276_StatAvgDaysToConvert',
+                'VAS_276_StatExpiringIn7Days', 'VAS_276_StatLostOrExpired', 'VAS_276_DaysSuffix',
+                'VAS_276_SectionHeading', 'VAS_276_ColQuotation', 'VAS_276_Customer', 'VAS_276_ColSegment',
+                'VAS_276_ColLines', 'VAS_276_ColQuotedQty', 'VAS_276_ColConvertedQty', 'VAS_276_ColConversion',
+                'VAS_276_ColValidTill', 'VAS_276_ColStatus', 'VAS_276_StatusFullyConverted',
+                'VAS_276_StatusPartlyOrdered', 'VAS_276_StatusExpired', 'VAS_276_Close', 'VAS_276_PrevPage',
+                'VAS_276_NextPage', 'VAS_276_Of', 'VAS_276_Showing', 'VAS_276_LoadError'
+            ];
+            try { translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {}; }
+            catch (e) { translatedTexts = {}; }
+        }
+
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            if (translatedTexts === null) { loadMessages(); }
+            var text = translatedTexts[key];
+            if (text === undefined || text === null || typeof text !== 'string' || text === '' || text === key || text.charAt(0) === '[') {
+                return fallback;
+            }
+            return text;
         }
 
         function escapeHtml(value) {
@@ -221,17 +245,33 @@
             return '';
         }
 
-        // Indian-numbering display convention (₹ x.xx Cr / ₹ x.xx L / grouped
-        // integer), matching every other widget on this dashboard.
-        function formatINR(value) {
+        // Browser-culture number display: grouping, decimal separator and the compact
+        // scale words (K / M / B, or lakh / crore in Indian locales) all come from the browser locale.
+        // The summary API carries no currency code or symbol, so none is shown.
+        function formatMoney(value) {
             var num = Number(value || 0);
-            if (num >= 1e7) { return '₹ ' + (num / 1e7).toFixed(2) + ' Cr'; }
-            if (num >= 1e5) { return '₹ ' + (num / 1e5).toFixed(2) + ' L'; }
-            return '₹ ' + Math.round(num).toLocaleString('en-IN');
+            try {
+                if (Math.abs(num) >= 1e5) {
+                    return num.toLocaleString(window.navigator.language, { notation: 'compact', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                }
+                return Math.round(num).toLocaleString(window.navigator.language);
+            }
+            catch (e) { return String(Math.round(num)); }
         }
 
         function formatNum(value) {
-            return Math.round(Number(value || 0)).toLocaleString('en-IN');
+            try { return Math.round(Number(value || 0)).toLocaleString(window.navigator.language); }
+            catch (e) { return String(Math.round(Number(value || 0))); }
+        }
+
+        function formatPercent(value) {
+            try { return (Number(value || 0) / 100).toLocaleString(window.navigator.language, { style: 'percent', maximumFractionDigits: 0 }); }
+            catch (e) { return Math.round(Number(value || 0)) + '%'; }
+        }
+
+        function formatDecimal1(value) {
+            try { return Number(value).toLocaleString(window.navigator.language, { minimumFractionDigits: 1, maximumFractionDigits: 1 }); }
+            catch (e) { return String(Math.round(Number(value) * 10) / 10); }
         }
 
         function parseIso(iso) {
@@ -243,13 +283,15 @@
         function formatDateFull(iso) {
             var d = parseIso(iso);
             if (!d) { return ''; }
-            return (d.getDate() < 10 ? '0' : '') + d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+            try { return new Intl.DateTimeFormat(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' }).format(d); }
+            catch (e) { return String(iso); }
         }
 
         function formatMonthYear(iso) {
             var d = parseIso(iso);
             if (!d) { return ''; }
-            return MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+            try { return new Intl.DateTimeFormat(window.navigator.language, { month: 'short', year: 'numeric' }).format(d); }
+            catch (e) { return String(iso); }
         }
 
         function parseResponse(res) {
@@ -335,7 +377,7 @@
             }
 
             $tile.removeAttr('aria-disabled');
-            $sideV.text(formatINR(summary.ValueConverted));
+            $sideV.text(formatMoney(summary.ValueConverted));
 
             if (summary.QuotationsIssued <= 0) {
                 $val.removeClass().addClass('vas276-val ok').text('—');
@@ -344,7 +386,7 @@
             }
 
             var rate = Math.round(100 * summary.Converted / summary.QuotationsIssued);
-            $val.removeClass().addClass('vas276-val ok').text(rate + '%');
+            $val.removeClass().addClass('vas276-val ok').text(formatPercent(rate));
 
             var meta = formatNum(summary.Converted) + ' ' + label('VAS_276_OfSuffix', 'of') + ' ' + formatNum(summary.QuotationsIssued) + ' ' + label('VAS_276_QuotationsConvertedSuffix', 'quotations converted') +
                 ' · ' + formatMonthYear(summary.PeriodStart);
@@ -504,15 +546,15 @@
 
         function renderDocumentsBody() {
             var avgDaysText = (summary.AvgDaysToConvert === null || summary.AvgDaysToConvert === undefined)
-                ? '—' : (Number(summary.AvgDaysToConvert).toFixed(1) + ' ' + label('VAS_276_DaysSuffix', 'days'));
-            var rateText = summary.QuotationsIssued > 0 ? (Math.round(100 * summary.Converted / summary.QuotationsIssued) + '%') : '—';
+                ? '—' : (formatDecimal1(summary.AvgDaysToConvert) + ' ' + label('VAS_276_DaysSuffix', 'days'));
+            var rateText = summary.QuotationsIssued > 0 ? formatPercent(Math.round(100 * summary.Converted / summary.QuotationsIssued)) : '—';
 
             var statsHtml = '<div class="vas276-mstats">' +
                 statTile(label('VAS_276_StatQuotationsIssued', 'Quotations issued'), formatNum(summary.QuotationsIssued)) +
                 statTile(label('VAS_276_StatConverted', 'Converted'), formatNum(summary.Converted)) +
                 statTile(label('VAS_276_StatConversionRate', 'Conversion rate'), rateText) +
-                statTile(label('VAS_276_StatValueConverted', 'Value converted'), formatINR(summary.ValueConverted)) +
-                statTile(label('VAS_276_StatValueQuoted', 'Value quoted'), formatINR(summary.ValueQuoted)) +
+                statTile(label('VAS_276_StatValueConverted', 'Value converted'), formatMoney(summary.ValueConverted)) +
+                statTile(label('VAS_276_StatValueQuoted', 'Value quoted'), formatMoney(summary.ValueQuoted)) +
                 statTile(label('VAS_276_StatAvgDaysToConvert', 'Avg days to convert'), avgDaysText) +
                 statTile(label('VAS_276_StatExpiringIn7Days', 'Expiring in 7 days'), formatNum(summary.ExpiringIn7Days)) +
                 statTile(label('VAS_276_StatLostOrExpired', 'Lost / expired'), formatNum(summary.LostOrExpired)) +
@@ -553,7 +595,7 @@
             '</div>';
 
             var body = docsState.rows.map(function (row) {
-                var conversionText = row.ConversionPercent === null ? '—' : (row.ConversionPercent + '%');
+                var conversionText = row.ConversionPercent === null ? '—' : formatPercent(row.ConversionPercent);
                 var cells = [
                     '<span class="vas276-cell"><button type="button" class="vas276-lnk" data-quo="' + row.QuotationId + '" title="' + escapeHtml(row.QuotationNo) + '">' + escapeHtml(row.QuotationNo) + '</button></span>',
                     cellHtml(row.CustomerName, 'vas276-c-prim'),
@@ -569,13 +611,13 @@
             }).join('');
 
             var start = docsState.page * docsState.size;
-            var showingLabel = label('VAS_276_Showing', 'Showing') + ' ' + (docsState.total ? (start + 1) : 0) + '–' + (start + docsState.rows.length) + ' ' + label('VAS_276_Of', 'of') + ' ' + docsState.total;
+            var showingLabel = label('VAS_276_Showing', 'Showing') + ' ' + formatNum(docsState.total ? (start + 1) : 0) + '–' + formatNum(start + docsState.rows.length) + ' ' + label('VAS_276_Of', 'of') + ' ' + formatNum(docsState.total);
 
             var foot = '<div class="vas276-mtfoot"><span class="vas276-helper">' + escapeHtml(showingLabel) + '</span>' +
                 (pages > 1 ?
                     '<span class="vas276-pager">' +
                         '<button type="button" class="vas276-pbtn" data-dir="-1"' + (docsState.page === 0 ? ' disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_276_PrevPage', 'Previous page')) + '">' + icon('prev') + '</button>' +
-                        '<span class="vas276-ptxt">' + (docsState.page + 1) + ' ' + escapeHtml(label('VAS_276_Of', 'of')) + ' ' + pages + '</span>' +
+                        '<span class="vas276-ptxt">' + formatNum(docsState.page + 1) + ' ' + escapeHtml(label('VAS_276_Of', 'of')) + ' ' + formatNum(pages) + '</span>' +
                         '<button type="button" class="vas276-pbtn" data-dir="1"' + (docsState.page >= pages - 1 ? ' disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_276_NextPage', 'Next page')) + '">' + icon('next') + '</button>' +
                     '</span>' : '<span></span>') +
             '</div>';
@@ -616,6 +658,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createModal();
             bindDocumentLevelEvents();

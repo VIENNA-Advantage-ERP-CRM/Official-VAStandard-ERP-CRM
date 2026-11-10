@@ -90,6 +90,8 @@
  * 49  | of                                                                    | VAS_286_Of
  * 50  | Showing                                                               | VAS_286_Showing
  * 51  | Search is unavailable right now. Try again in a moment.               | VAS_286_LoadError
+ * 52  | {0} orders (all pages)                                                | VAS_286_OrdersAllPages
+ * 53  | d                                                                     | VAS_286_DaysShort
  */
 ; VAS = window.VAS || {};
 
@@ -156,8 +158,8 @@
                 $root.find('.vasso-retry').remove();
                 if ($root.css('position') === 'static') { $root.css('position', 'relative'); }
                 var text = '';
-                try { text = VIS.Msg.getMsg('VAS_SO_Retry'); } catch (e) { text = ''; }
-                if (!text || text === 'VAS_SO_Retry' || text === '[VAS_SO_Retry]') { text = 'Retry'; }
+                try { text = VIS.Msg.translate(VIS.Env.getCtx(), 'VAS_SO_Retry'); } catch (e) { text = ''; }
+                if (!text || text === 'VAS_SO_Retry' || String(text).charAt(0) === '[') { text = 'Retry'; }
                 $('<button type="button" class="vasso-retry"></button>').text(text)
                     .attr('title', text)
                     .on('click', function (e) {
@@ -174,7 +176,6 @@
     var WIDGET_PAGE_SIZE = 6;   // rows per widget page
     var MAX_ROWS_PER_PAGE = 10;
     var MIN_ROWS_PER_PAGE = 2;
-    var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
     // Header row + every body row share this exact grid-template-columns string
     // (design.md §11, with the mock's "Delivered on" column replaced by "Payment
@@ -230,12 +231,45 @@
 
         var lineState = null; // { order, lines, page, size }
 
+        // Translated texts, loaded once per widget instance (see loadMessages()).
+        var translatedTexts = null;
+
+        function loadMessages() {
+            var elements = [
+                'VAS_286_Title', 'VAS_286_Subtitle', 'VAS_286_PrevPage', 'VAS_286_NextPage', 'VAS_286_ColSoNo',
+                'VAS_286_ColSoDate', 'VAS_286_ColCustomer', 'VAS_286_ColWarehouse', 'VAS_286_ColPaymentDue',
+                'VAS_286_ColAmount', 'VAS_286_SortHint', 'VAS_286_ErrorState', 'VAS_286_AllSettledChip',
+                'VAS_286_ZeroState', 'VAS_286_DueSuffix', 'VAS_286_OrdersAllPages', 'VAS_286_OverduePrefix',
+                'VAS_286_DaysShort', 'VAS_286_Showing', 'VAS_286_Of', 'VAS_286_RankedBy', 'VAS_286_ClickRowHint',
+                'VAS_286_Close', 'VAS_286_LoadError', 'VAS_286_DeliveryFull', 'VAS_286_LinePartial',
+                'VAS_286_LineInProcess', 'VAS_286_Customer', 'VAS_286_SoDate', 'VAS_286_DatePromised',
+                'VAS_286_SoValue', 'VAS_286_DeliveryMode', 'VAS_286_DocumentStatus', 'VAS_286_DeliveryStatus',
+                'VAS_286_SalesOrderLines', 'VAS_286_LinesSuffix', 'VAS_286_QtyOrderedSuffix', 'VAS_286_QtyShortSuffix',
+                'VAS_286_OpenRecord', 'VAS_286_ColLine', 'VAS_286_ColProduct', 'VAS_286_ColAttribute',
+                'VAS_286_ColUom', 'VAS_286_ColOrdered', 'VAS_286_ColDelivered', 'VAS_286_ColPending',
+                'VAS_286_ColInStock', 'VAS_286_ColRate', 'VAS_286_ColLineAmount', 'VAS_286_ColLineStatus'
+            ];
+            try { translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {}; }
+            catch (e) { translatedTexts = {}; }
+        }
+
         // Never render a raw "[KEY]": fall back to the English text when the key is missing.
         function label(key, fallback) {
-            var text = '';
-            try { text = VIS.Msg.getMsg(key); } catch (e) { text = ''; }
-            if (!text || text === key || text === '[' + key + ']') { return fallback || key; }
+            if (translatedTexts === null) { loadMessages(); }
+            var text = translatedTexts ? translatedTexts[key] : '';
+            if (!text || text === key || String(text).charAt(0) === '[') { return fallback || key; }
             return text;
+        }
+
+        /* Browser-culture formatting (window.navigator.language). */
+        function fmtDate(d, opts) {
+            try { return new Intl.DateTimeFormat(window.navigator.language, opts).format(d); } catch (e) { return ''; }
+        }
+
+        function fmtNumber(n, minFrac, maxFrac) {
+            try {
+                return Number(n).toLocaleString(window.navigator.language, { minimumFractionDigits: minFrac, maximumFractionDigits: maxFrac });
+            } catch (e) { return String(n); }
         }
 
         function escapeHtml(value) {
@@ -260,15 +294,24 @@
             return '';
         }
 
-        function formatINR(value) {
+        // The widget's API returns bare amounts (no currency ISO / symbol), so none is invented here.
+        // If the backend ever supplies the currency ISO code, return it from this function.
+        function currencyIso() { return ''; }
+
+        function formatAmount(value) {
             var num = Number(value || 0);
-            if (num >= 1e7) { return '₹ ' + (num / 1e7).toFixed(2) + ' Cr'; }
-            if (num >= 1e5) { return '₹ ' + (num / 1e5).toFixed(2) + ' L'; }
-            return '₹ ' + Math.round(num).toLocaleString('en-IN');
+            try {
+                var iso = currencyIso();
+                var compactFrom = VIS.Util.usesIndianNumbering(iso) ? 1e5 : 1e6;
+                if (Math.abs(num) >= compactFrom) {
+                    return (num < 0 ? '-' : '') + VIS.Util.formatCompactAmount(Math.abs(num), iso, 2);
+                }
+            } catch (e) { /* shared compact helper unavailable - use the plain number below */ }
+            return fmtNumber(Math.round(num), 0, 0);
         }
 
         function formatNum(value) {
-            return Math.round(Number(value || 0)).toLocaleString('en-IN');
+            return fmtNumber(Math.round(Number(value || 0)), 0, 0);
         }
 
         function parseIso(iso) {
@@ -280,13 +323,13 @@
         function formatDateShort(iso) {
             var d = parseIso(iso);
             if (!d) { return ''; }
-            return (d.getDate() < 10 ? '0' : '') + d.getDate() + ' ' + MONTHS[d.getMonth()];
+            return fmtDate(d, { day: '2-digit', month: 'short' });
         }
 
         function formatDateFull(iso) {
             var d = parseIso(iso);
             if (!d) { return ''; }
-            return (d.getDate() < 10 ? '0' : '') + d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+            return fmtDate(d, { day: '2-digit', month: 'short', year: 'numeric' });
         }
 
         function parseResponse(res) {
@@ -464,14 +507,14 @@
                 return;
             }
 
-            var chipText = formatINR(docsState.totalDue) + ' ' + label('VAS_286_DueSuffix', 'due');
-            $chip.removeClass('vas286-chip-ok').addClass('vas286-chip-risk').attr('title', chipText + ' · ' + docsState.total + ' orders (all pages)').text(chipText);
+            var chipText = formatAmount(docsState.totalDue) + ' ' + label('VAS_286_DueSuffix', 'due');
+            $chip.removeClass('vas286-chip-ok').addClass('vas286-chip-risk').attr('title', chipText + ' · ' + label('VAS_286_OrdersAllPages', '{0} orders (all pages)').replace('{0}', formatNum(docsState.total))).text(chipText);
 
             var tpl = TABLE_TEMPLATE;
             $tbody.html(docsState.rows.map(function (row) {
                 var dueCell;
                 if (row.IsOverdue) {
-                    var overdueText = label('VAS_286_OverduePrefix', 'Overdue') + ' ' + row.DaysOverdue + 'd';
+                    var overdueText = label('VAS_286_OverduePrefix', 'Overdue') + ' ' + formatNum(row.DaysOverdue) + label('VAS_286_DaysShort', 'd');
                     dueCell = '<span class="vas286-cell" title="' + escapeHtml(overdueText) + '"><span class="vas286-chip vas286-chip-risk">' + escapeHtml(overdueText) + '</span></span>';
                 } else {
                     dueCell = cellHtml(formatDateShort(row.PaymentDueDate) || '—', 'vas286-c-std');
@@ -482,7 +525,7 @@
                     cellHtml(row.CustomerName, 'vas286-c-std') +
                     cellHtml(row.WarehouseName || '—', 'vas286-c-dark') +
                     dueCell +
-                    cellHtml(formatINR(row.Amount), 'vas286-c-emph', 'right') +
+                    cellHtml(formatAmount(row.Amount), 'vas286-c-emph', 'right') +
                 '</button>';
             }).join(''));
 
@@ -614,7 +657,7 @@
                 statTile(label('VAS_286_Customer', 'Customer'), order.CustomerName) +
                 statTile(label('VAS_286_SoDate', 'SO date'), formatDateFull(order.SalesOrderDate)) +
                 statTile(label('VAS_286_DatePromised', 'Date promised'), formatDateFull(order.DatePromised)) +
-                statTile(label('VAS_286_SoValue', 'SO value'), formatINR(order.OrderValue)) +
+                statTile(label('VAS_286_SoValue', 'SO value'), formatAmount(order.OrderValue)) +
                 statTile(label('VAS_286_ColWarehouse', 'Warehouse'), order.WarehouseName) +
                 statTile(label('VAS_286_DeliveryMode', 'Delivery mode'), order.DeliveryMode) +
                 statTile(label('VAS_286_DocumentStatus', 'Document status'), order.DocumentStatus) +
@@ -688,8 +731,8 @@
                     cellHtml(formatNum(line.QtyDelivered), 'vas286-c-std', 'right'),
                     cellHtml(formatNum(line.QtyPending), 'vas286-c-prim', 'right'),
                     cellHtml(formatNum(line.FreeStock), (line.FreeStock < line.QtyPending ? 'vas286-c-short' : 'vas286-c-ok'), 'right'),
-                    cellHtml('₹ ' + formatNum(line.Rate), 'vas286-c-std', 'right'),
-                    cellHtml(formatINR(line.Amount), 'vas286-c-emph', 'right')
+                    cellHtml(formatNum(line.Rate), 'vas286-c-std', 'right'),
+                    cellHtml(formatAmount(line.Amount), 'vas286-c-emph', 'right')
                 ].join('') + '<span class="vas286-cell"><span class="vas286-chip ' + st.cls + '" title="' + escapeHtml(st.text) + '">' + escapeHtml(st.text) + '</span></span>';
                 return '<div class="vas286-mrow" style="grid-template-columns:' + tpl + '">' + cells + '</div>';
             }).join('');
@@ -739,6 +782,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createModal();
             bindDocumentLevelEvents();

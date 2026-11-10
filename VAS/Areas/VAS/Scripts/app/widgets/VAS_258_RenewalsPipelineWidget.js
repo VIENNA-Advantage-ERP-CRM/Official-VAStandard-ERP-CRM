@@ -126,8 +126,42 @@
     var BODY_PAGE = 7;
     var LIST_PAGE = 7;
 
+    var translatedTexts = null;
+
+    /** Loads every message key used by this widget in ONE VIS.Msg.translate call. */
+    function loadMessages() {
+        var elements = [
+            'VAS_258_Title', 'VAS_258_SubLine', 'VAS_258_All', 'VAS_258_LoadError', 'VAS_258_ListTitle',
+            'VAS_258_ContractsCount', 'VAS_258_ColContract', 'VAS_258_ColValue', 'VAS_258_ColEnds',
+            'VAS_258_ColRenewal', 'VAS_258_ColStatus', 'VAS_258_Of', 'VAS_258_PrevPage', 'VAS_258_NextPage',
+            'VAS_258_Empty', 'VAS_258_UnableToLoad', 'VAS_258_Close', 'VAS_258_OpenInBrowser',
+            'VAS_258_ContractTitle', 'VAS_258_OpenRecord', 'VAS_258_Rep', 'VAS_258_Cycles', 'VAS_258_Value',
+            'VAS_258_Status', 'VAS_258_Type', 'VAS_258_Renewal', 'VAS_258_Ends', 'VAS_258_EndsIn',
+            'VAS_258_EndedAgo', 'VAS_258_NoticeDays', 'VAS_258_Billed', 'VAS_258_Unbilled',
+            'VAS_258_NeedsAttention', 'VAS_258_NoOpenActions', 'VAS_258_RenewalNoticeOverdue',
+            'VAS_258_RenewalNoticeDueToday', 'VAS_258_ManualRenewal', 'VAS_258_NoticeOverdueBy',
+            'VAS_258_EndsPrefix', 'VAS_258_BillingOverdue', 'VAS_258_NextPeriodOverdue', 'VAS_258_UnbilledTotal',
+            'VAS_258_BillingSchedule', 'VAS_258_Period', 'VAS_258_Invoiced', 'VAS_258_SchedulePending',
+            'VAS_258_GenerateInvoice', 'VAS_258_Renew', 'VAS_258_ConfirmRenew', 'VAS_258_ConfirmGenerateInvoice',
+            'VAS_258_Working', 'VAS_258_ActionFailed', 'VAS_258_DetailLoadError', 'VAS_258_DaysSuffix',
+            'VAS_258_DaysAgoSuffix', 'VAS_258_AutoRenews', 'VAS_258_NoticeDueIn', 'VAS_258_NoticeOverdue',
+            'VAS_258_Ended', 'VAS_258_ToEnd', 'VAS_258_ValueCaption', 'VAS_258_StatusEnded',
+            'VAS_258_StatusExpiring', 'VAS_258_StatusActive', 'VAS_258_Cancel', 'VAS_258_Ok', 'Loading'
+        ];
+        try {
+            translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {};
+        } catch (e) {
+            translatedTexts = {};
+        }
+    }
+
     function label(key, fallback) {
-        return VIS.Msg.getMsg(key);
+        if (translatedTexts == null) { loadMessages(); }
+        var v = translatedTexts[key];
+        if (v == null || v === '' || v === key || String(v).charAt(0) === '[') {
+            return fallback != null ? fallback : key;
+        }
+        return v;
     }
 
     function escapeHtml(value) {
@@ -150,25 +184,75 @@
         return Math.round(n).toLocaleString(window.navigator.language);
     }
 
+    // Locale-formatted number with a fixed number of fraction digits.
+    function fmtNum(v, digits) {
+        try {
+            return v.toLocaleString(window.navigator.language, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+        } catch (e) { return v.toFixed(digits); }
+    }
+
     function fmtCompact(value, precision) {
         var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
         var p = Number(precision); if (isNaN(p) || p < 0) { p = 2; }
         var abs = Math.abs(n);
         var sign = n < 0 ? '-' : '';
-        if (abs >= 1e9) { return sign + (abs / 1e9).toFixed(2) + 'B'; }
-        if (abs >= 1e6) { return sign + (abs / 1e6).toFixed(2) + 'M'; }
-        if (abs >= 1e3) { return sign + (abs / 1e3).toFixed(2) + 'K'; }
-        return sign + abs.toFixed(p);
+        if (abs >= 1e9) { return sign + fmtNum(abs / 1e9, 2) + 'B'; }
+        if (abs >= 1e6) { return sign + fmtNum(abs / 1e6, 2) + 'M'; }
+        if (abs >= 1e3) { return sign + fmtNum(abs / 1e3, 2) + 'K'; }
+        return sign + fmtNum(abs, p);
+    }
+
+    // Currency symbol + its position for the browser locale (before/after
+    // the number, with the locale's own gap). Null when no ISO / Intl fails.
+    function currencyAffix(iso) {
+        if (!iso) { return null; }
+        try {
+            var parts = new Intl.NumberFormat(window.navigator.language, { style: 'currency', currency: iso }).formatToParts(1);
+            var seenInteger = false;
+            for (var i = 0; i < parts.length; i++) {
+                if (parts[i].type === 'integer') { seenInteger = true; }
+                else if (parts[i].type === 'currency') {
+                    var before = !seenInteger;
+                    var next = before ? parts[i + 1] : parts[i - 1];
+                    return {
+                        symbol: parts[i].value,
+                        before: before,
+                        gap: (next && next.type === 'literal') ? next.value : ''
+                    };
+                }
+            }
+        } catch (e) { /* fall through */ }
+        return null;
     }
 
     function formatMoney(value, iso, symbol, precision) {
         var tag = symbol || iso || '';
+        var affix = currencyAffix(iso);
+        var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
+        var sign = n < 0 ? '-' : '';
+        var num;
         if (window.VIS && VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
-            var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
-            var sign = n < 0 ? '-' : '';
-            return sign + tag + VIS.Util.formatCompactAmount(Math.abs(n), iso || '', precision);
+            num = VIS.Util.formatCompactAmount(Math.abs(n), iso || '', precision);
+        } else {
+            num = fmtCompact(Math.abs(n), precision);
         }
-        return tag + fmtCompact(value, precision);
+        if (affix) {
+            return sign + (affix.before ? affix.symbol + affix.gap + num : num + affix.gap + affix.symbol);
+        }
+        return sign + tag + num;
+    }
+
+    // Date for the browser culture (never numeric month). Date-only
+    // 'yyyy-mm-dd' is parsed as a LOCAL date; invalid/empty -> original text.
+    function formatDate(value) {
+        if (!value) { return ''; }
+        try {
+            var d;
+            var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value));
+            d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(value);
+            if (isNaN(d.getTime())) { return String(value); }
+            return new Intl.DateTimeFormat(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' }).format(d);
+        } catch (e) { return String(value); }
     }
 
     function endsText(days) {
@@ -808,7 +892,7 @@
             var pendingLabel = label('VAS_258_SchedulePending', 'Pending');
 
             var body = rows.map(function (period) {
-                var dateRange = (period.FromDate || period.ToDate) ? ' · ' + escapeHtml(period.FromDate || '') + ' – ' + escapeHtml(period.ToDate || '') : '';
+                var dateRange = (period.FromDate || period.ToDate) ? ' · ' + escapeHtml(formatDate(period.FromDate)) + ' – ' + escapeHtml(formatDate(period.ToDate)) : '';
                 var left = periodLabel + ' ' + period.Period + (period.FrequencyName ? ' · ' + escapeHtml(period.FrequencyName) : '') + dateRange;
                 var badgeClass = period.Invoiced ? 'vas258-band-ok' : 'vas258-band-warn';
                 var badgeText = period.Invoiced ? invoicedLabel : pendingLabel;
@@ -833,7 +917,7 @@
             var band = bandClass(row.LifecycleStatusCode);
             var subtitleParts = [row.DocumentNo, row.ProductName, row.ContactName, row.SalesRepName ? label('VAS_258_Rep', 'rep') + ' ' + row.SalesRepName : '']
                 .filter(function (p) { return p; });
-            var cyclesText = [row.FrequencyName, (row.Cycles != null ? row.Cycles + ' ' + label('VAS_258_Cycles', 'cycles') : '')]
+            var cyclesText = [row.FrequencyName, (row.Cycles != null ? formatCount(row.Cycles) + ' ' + label('VAS_258_Cycles', 'cycles') : '')]
                 .filter(function (p) { return p; }).join(' · ');
 
             var html =
@@ -854,7 +938,7 @@
                     statHtml('VAS_258_Type', 'Type', row.ContractType) +
                     statHtml('VAS_258_Renewal', 'Renewal', row.RenewalType) +
                     statHtml('VAS_258_Ends', 'Ends', endsText(row.DaysToEnd)) +
-                    statHtml('VAS_258_NoticeDays', 'Notice days', row.NoticeDays != null ? row.NoticeDays : '') +
+                    statHtml('VAS_258_NoticeDays', 'Notice days', row.NoticeDays != null ? formatCount(row.NoticeDays) : '') +
                     statHtml('VAS_258_Billed', 'Billed amount', formatMoney(row.Billed, row.CurrencyIso, row.CurrencySymbol, row.CurrencyPrecision)) +
                     statHtml('VAS_258_Unbilled', 'Unbilled amount', formatMoney(row.Unbilled, row.CurrencyIso, row.CurrencySymbol, row.CurrencyPrecision)) +
                 '</div>' +
@@ -932,6 +1016,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createListDialog();
             createDetailDialog();

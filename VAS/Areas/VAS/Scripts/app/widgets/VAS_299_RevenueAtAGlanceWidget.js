@@ -135,8 +135,68 @@
         // zoom and reused afterwards (0 = not resolved yet).
         var zoomWindowId = 0;
 
+        // Translated texts, loaded once per widget instance via VIS.Msg.translate.
+        var translatedTexts = null;
+        function loadMessages() {
+            var elements = [
+                "Loading",
+                "VAS_299_RevenueAtAGlance",
+                "VAS_299_HeaderSub",
+                "VAS_299_OpenPipeline",
+                "VAS_299_OpenProposals",
+                "VAS_299_ContractsLE90",
+                "VAS_299_OverdueAR",
+                "VAS_299_Clients",
+                "VAS_299_Client",
+                "VAS_299_Expiring",
+                "VAS_299_OpenOpportunities",
+                "VAS_299_OpenOpportunity",
+                "VAS_299_ProposalsCount",
+                "VAS_299_ProposalCount",
+                "VAS_299_InvoicesOverdue",
+                "VAS_299_InvoiceOverdue",
+                "VAS_299_ContractsEnds",
+                "VAS_299_ContractEnds",
+                "VAS_299_NoOwner",
+                "VAS_299_NothingHere",
+                "VAS_299_UnableToLoad",
+                "VAS_299_Retry",
+                "VAS_299_Of",
+                "VAS_299_Showing",
+                "VAS_299_PrevPage",
+                "VAS_299_NextPage",
+                "VAS_299_Close",
+                "VAS_299_CustomerDetails",
+                "VAS_299_Tier",
+                "VAS_299_Segment",
+                "VAS_299_Owner",
+                "VAS_299_ARR",
+                "VAS_299_OpenTicketsFact",
+                "VAS_299_Projects",
+                "VAS_299_Pipeline",
+                "VAS_299_Onboarding",
+                "VAS_299_KeyClient",
+                "VAS_299_Signals",
+                "VAS_299_Overdue",
+                "VAS_299_DaysPastDue",
+                "VAS_299_OpenSupportTickets",
+                "VAS_299_KeyPrioritise",
+                "VAS_299_OpenRequests",
+                "VAS_299_OpenRecord"
+            ];
+            try {
+                translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {};
+            } catch (e) {
+                translatedTexts = {};
+            }
+        }
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            if (translatedTexts === null) { loadMessages(); }
+            var text = translatedTexts ? translatedTexts[key] : null;
+            if (!text || text === key || String(text).charAt(0) === '[') {
+                return fallback != null ? fallback : key;
+            }
+            return text;
         }
         function escapeHtml(value) {
             if (value == null) { return ''; }
@@ -155,13 +215,26 @@
             if (!isFinite(n)) { n = 0; }
             return Math.round(n).toLocaleString(window.navigator.language);
         }
+        function formatPercent(value, maxFraction) {
+            var n = Number(value || 0);
+            if (!isFinite(n)) { n = 0; }
+            try {
+                return new Intl.NumberFormat(window.navigator.language, { style: 'percent', maximumFractionDigits: maxFraction }).format(n / 100);
+            } catch (e) {
+                return n + '%';
+            }
+        }
         function formatDate(iso) {
             if (!iso) { return '—'; }
             var parts = String(iso).split('-');
             if (parts.length !== 3) { return iso; }
             var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
             if (isNaN(d.getTime())) { return iso; }
-            return d.toLocaleDateString(window.navigator.language, { year: 'numeric', month: 'short', day: '2-digit' });
+            try {
+                return new Intl.DateTimeFormat(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' }).format(d);
+            } catch (e) {
+                return d.toLocaleDateString(window.navigator.language, { year: 'numeric', month: 'short', day: '2-digit' });
+            }
         }
         function precisionOf(cur) {
             var p = Number(cur && cur.precision);
@@ -177,7 +250,26 @@
             var sign = n < 0 ? '-' : '';
             var iso = (cur && cur.iso) || '';
             var symbol = (cur && (cur.symbol || cur.iso)) || '';
-            return sign + symbol + VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
+            var compact = VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
+            // Currency symbol placed per the browser locale (before / after the number).
+            if (iso) {
+                try {
+                    var parts = new Intl.NumberFormat(window.navigator.language, { style: 'currency', currency: iso }).formatToParts(1);
+                    var ci = -1, ni = -1;
+                    parts.forEach(function (p, i) {
+                        if (p.type === 'currency' && ci < 0) { ci = i; }
+                        if (p.type === 'integer' && ni < 0) { ni = i; }
+                    });
+                    if (ci >= 0 && ni >= 0) {
+                        var sym = parts[ci].value;
+                        if (ci < ni) {
+                            return sign + sym + (parts[ci + 1] && parts[ci + 1].type === 'literal' ? parts[ci + 1].value : '') + compact;
+                        }
+                        return sign + compact + (parts[ci - 1] && parts[ci - 1].type === 'literal' ? parts[ci - 1].value : '') + sym;
+                    }
+                } catch (e) { /* fall back to the server symbol in front */ }
+            }
+            return sign + symbol + compact;
         }
         function projectText(name, count, dash) {
             if (!name) { return dash; }
@@ -341,8 +433,8 @@
             var pages = Math.max(1, Math.ceil(listTotal / LIST_PAGE));
             var current = Math.floor(listOffset / LIST_PAGE);
             var of = label('VAS_299_Of', 'of');
-            var helper = label('VAS_299_Showing', 'Showing') + ' ' + start + '–' + end + ' ' + of + ' ' + formatCount(listTotal);
-            var pageText = (current + 1) + ' ' + of + ' ' + pages;
+            var helper = label('VAS_299_Showing', 'Showing') + ' ' + formatCount(start) + '–' + formatCount(end) + ' ' + of + ' ' + formatCount(listTotal);
+            var pageText = formatCount(current + 1) + ' ' + of + ' ' + formatCount(pages);
 
             $listBody.html('<div class="vas299-list">' + rows + '</div>');
             $listPager.html(
@@ -437,7 +529,7 @@
                 fact(label('VAS_299_OpenTicketsFact', 'Open tickets'), escapeHtml(formatCount(data.openTickets || 0))) +
                 fact(label('VAS_299_Projects', 'Projects'), projectText(data.projectName, projects, dash)) +
                 fact(label('VAS_299_Pipeline', 'Pipeline'), pipeline > 0 ? escapeHtml(formatMoney(pipeline, detailCurrency)) : dash) +
-                fact(label('VAS_299_Onboarding', 'Onboarding'), data.onboardingPercent == null ? dash : escapeHtml(formatCount(data.onboardingPercent) + '%')) +
+                fact(label('VAS_299_Onboarding', 'Onboarding'), data.onboardingPercent == null ? dash : escapeHtml(formatPercent(Math.round(Number(data.onboardingPercent) || 0), 0))) +
             '</div>';
 
             var signals = '';
@@ -536,6 +628,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createListDialog();
             createDetailDialog();
