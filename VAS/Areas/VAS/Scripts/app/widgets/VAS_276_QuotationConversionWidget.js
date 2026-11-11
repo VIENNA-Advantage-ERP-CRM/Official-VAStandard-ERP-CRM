@@ -191,6 +191,7 @@
         var instanceTag = 'i' + Math.random().toString(36).slice(2, 9);
 
         var summary = null;           // last fetched GetSummary payload
+        var currency = { iso: '', symbol: '', precision: null }; // VAS163: base currency from GetSummary
         var summaryState = 'loading'; // 'loading' | 'ready' | 'error'
         var docsState = { page: 0, size: MAX_ROWS_PER_PAGE, total: 0, rows: [] };
         var zoomWindowId = 0;
@@ -221,35 +222,55 @@
             return '';
         }
 
-        // Indian-numbering display convention (₹ x.xx Cr / ₹ x.xx L / grouped
-        // integer), matching every other widget on this dashboard.
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        // Base (accounting-schema) currency sent by the server with the summary payload.
+        function applyCurrency(data) {
+            if (!data) { return; }
+            currency.iso = data.CurrencyIso || '';
+            currency.symbol = data.CurrencySymbol || '';
+            currency.precision = (typeof data.CurrencyPrecision === 'number') ? data.CurrencyPrecision : null;
+        }
+
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        // Compact amount in the base currency (shared helper picks Cr/L/K or K/M/B by ISO).
         function formatINR(value) {
             var num = Number(value || 0);
-            if (num >= 1e7) { return '₹ ' + (num / 1e7).toFixed(2) + ' Cr'; }
-            if (num >= 1e5) { return '₹ ' + (num / 1e5).toFixed(2) + ' L'; }
-            return '₹ ' + Math.round(num).toLocaleString('en-IN');
+            var sym = currency.symbol || currency.iso || '';
+            var text = (num < 0 ? '-' : '') + VIS.Util.formatCompactAmount(Math.abs(num), currency.iso, currency.precision);
+            return sym ? sym + ' ' + text : text;
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatNum(value) {
-            return Math.round(Number(value || 0)).toLocaleString('en-IN');
+            return Math.round(Number(value || 0)).toLocaleString(window.navigator.language);
         }
 
+        // VAS163 2026-11-11: row 70 quantity in the line's selected UOM (up to 2 decimals).
+        function formatQty(value) {
+            return Number(value || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 2 });
+        }
+
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        // yyyy-MM-dd parsed by parts (local date, no UTC shift).
         function parseIso(iso) {
-            if (!iso) { return null; }
-            var d = new Date(iso + 'T00:00:00');
+            var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+            if (!m) { return null; }
+            var d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
             return isNaN(d.getTime()) ? null : d;
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatDateFull(iso) {
             var d = parseIso(iso);
             if (!d) { return ''; }
-            return (d.getDate() < 10 ? '0' : '') + d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+            return d.toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' });
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatMonthYear(iso) {
             var d = parseIso(iso);
             if (!d) { return ''; }
-            return MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+            return new Date(d.getFullYear(), d.getMonth(), 1).toLocaleDateString(window.navigator.language, { month: 'short', year: 'numeric' });
         }
 
         function parseResponse(res) {
@@ -343,8 +364,8 @@
                 return;
             }
 
-            var rate = Math.round(100 * summary.Converted / summary.QuotationsIssued);
-            $val.removeClass().addClass('vas276-val ok').text(rate + '%');
+            // VAS163 2026-11-11: row 72 conversion rate = converted qty / quoted qty x 100 (server ConversionRate).
+            $val.removeClass().addClass('vas276-val ok').text(conversionRateText());
 
             var meta = formatNum(summary.Converted) + ' ' + label('VAS_276_OfSuffix', 'of') + ' ' + formatNum(summary.QuotationsIssued) + ' ' + label('VAS_276_QuotationsConvertedSuffix', 'quotations converted') +
                 ' · ' + formatMonthYear(summary.PeriodStart);
@@ -361,7 +382,7 @@
                 success: function (res) {
                     var parsed = parseResponse(res);
                     if (parsed.Error) { summaryState = 'error'; summary = null; }
-                    else { summaryState = 'ready'; summary = parsed; }
+                    else { summaryState = 'ready'; summary = parsed; applyCurrency(parsed); }
                     renderTile();
                     if (done) { done(!!summary); }
                 },
@@ -487,6 +508,13 @@
             });
         }
 
+        // VAS163 2026-11-11: row 72 Conversion rate card = (sum converted qty / sum quoted qty) x 100,
+        // computed on the server (ConversionRate); partially ordered quotations count only their ordered qty.
+        function conversionRateText() {
+            if (!summary || summary.ConversionRate === null || summary.ConversionRate === undefined) { return '—'; }
+            return Number(summary.ConversionRate).toLocaleString(window.navigator.language, { maximumFractionDigits: 1 }) + '%';
+        }
+
         function normalizeQuotationRow(row) {
             return {
                 QuotationId: Number(row.QuotationId) || 0,
@@ -505,7 +533,7 @@
         function renderDocumentsBody() {
             var avgDaysText = (summary.AvgDaysToConvert === null || summary.AvgDaysToConvert === undefined)
                 ? '—' : (Number(summary.AvgDaysToConvert).toFixed(1) + ' ' + label('VAS_276_DaysSuffix', 'days'));
-            var rateText = summary.QuotationsIssued > 0 ? (Math.round(100 * summary.Converted / summary.QuotationsIssued) + '%') : '—';
+            var rateText = conversionRateText(); // VAS163 2026-11-11: row 72 quantity-based rate
 
             var statsHtml = '<div class="vas276-mstats">' +
                 statTile(label('VAS_276_StatQuotationsIssued', 'Quotations issued'), formatNum(summary.QuotationsIssued)) +
@@ -559,8 +587,9 @@
                     cellHtml(row.CustomerName, 'vas276-c-prim'),
                     cellHtml(row.SegmentName || '—', 'vas276-c-std'),
                     cellHtml(formatNum(row.LineCount), 'vas276-c-std', 'right'),
-                    cellHtml(formatNum(row.QuotedQty), 'vas276-c-std', 'right'),
-                    cellHtml(row.ConvertedQty > 0 ? formatNum(row.ConvertedQty) : '—', 'vas276-c-std', 'right'),
+                    // VAS163 2026-11-11: row 70 selected-UOM quantities can be fractional - keep up to 2 decimals.
+                    cellHtml(formatQty(row.QuotedQty), 'vas276-c-std', 'right'),
+                    cellHtml(row.ConvertedQty > 0 ? formatQty(row.ConvertedQty) : '—', 'vas276-c-std', 'right'),
                     cellHtml(conversionText, 'vas276-c-emph', 'right'),
                     cellHtml(row.ValidTill ? formatDateFull(row.ValidTill) : '—', 'vas276-c-std'),
                     '<span class="vas276-cell" title="' + escapeHtml(row.Status) + '"><span class="vas276-chip ' + statusChipClass(row.Status) + '">' + escapeHtml(row.Status) + '</span></span>'

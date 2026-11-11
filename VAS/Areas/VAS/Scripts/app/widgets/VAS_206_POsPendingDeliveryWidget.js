@@ -128,11 +128,9 @@
         var sym = curSymbol || curIso || '';
 
         // Format compact if very large
-        if (Math.abs(val) >= 10000000) {
-            return sym + ' ' + (val / 10000000).toFixed(2) + ' Cr';
-        }
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         if (Math.abs(val) >= 100000) {
-            return sym + ' ' + (val / 100000).toFixed(2) + ' L';
+            return sym + ' ' + (val < 0 ? '-' : '') + VIS.Util.formatCompactAmount(Math.abs(val), curIso || '', precision);
         }
 
         var formatted = val.toLocaleString(window.navigator.language, {
@@ -143,7 +141,15 @@
         return sym ? (sym + ' ' + formatted) : formatted;
     }
 
-    var ICON_LINES = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>';
+    // VAS163 2026-11-10: browser locale (6-Nov retest2).
+    function formatIsoDate(iso) {
+        var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+        if (!m) { return ''; }
+        return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+            .toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
+    var ICON_LINES ='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>';
     var ICON_BACK = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>';
     var ICON_CLOSE = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
     var ICON_PREV = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>';
@@ -652,13 +658,13 @@
                 return [
                     { icon: p.PurchaseOrderNo, id: p.PurchaseOrderID },
                     { link: p.PurchaseOrderNo, id: p.PurchaseOrderID },
-                    p.OrderDateDisplay || p.OrderDate,
+                    formatIsoDate(p.OrderDate), // VAS163 2026-11-10: browser locale (6-Nov retest2).
                     p.VendorName,
                     p.WarehouseName || '—',
                     formatNumber(p.OrderedQty),
                     formatNumber(p.PendingQty),
                     pValueFormatted,
-                    p.PromisedDateDisplay || p.PromisedDate || '—',
+                    formatIsoDate(p.PromisedDate) || '—',
                     { chip: delivChip, text: delivText }
                 ];
             });
@@ -683,7 +689,7 @@
         function openLinesModal(poId, poNo) {
             var po = (kpiData.records || []).find(function (r) { return r.PurchaseOrderID === poId; });
             var vendor = po ? po.VendorName : '';
-            var dateDisplay = po ? (po.OrderDateDisplay || po.OrderDate) : '';
+            var dateDisplay = po ? formatIsoDate(po.OrderDate) : ''; // VAS163 2026-11-10: browser locale (6-Nov retest2).
             var delivStatus = po ? (po.DeliveryStatus === 'Partial' ? lbl('VAS_Partial', 'Partial') : lbl('VAS_Pending', 'Pending')) : '';
 
             // Load lines via AJAX
@@ -807,10 +813,12 @@
                     var hdr = data.header || {};
 
                     var vendor = hdr.VendorName || (po ? po.VendorName : '');
-                    var dateDisplay = hdr.OrderDateDisplay || (po ? po.OrderDateDisplay : '');
-                    var expDateDisplay = hdr.PromisedDateDisplay || (po ? po.PromisedDateDisplay : '—');
+                    // VAS163 2026-11-10: browser locale (6-Nov retest2).
+                    var dateDisplay = formatIsoDate(hdr.OrderDate) || (po ? formatIsoDate(po.OrderDate) : '');
+                    var expDateDisplay = formatIsoDate(hdr.PromisedDate) || (po ? (formatIsoDate(po.PromisedDate) || '—') : '—');
                     var whName = hdr.WarehouseName || (po ? po.WarehouseName : '—');
-                    var createdBy = (hdr.CreatedBy || '') + (hdr.CreatedOn ? (' · ' + hdr.CreatedOn) : '');
+                    var createdOnDisp = formatIsoDate(hdr.CreatedOnIso);
+                    var createdBy = (hdr.CreatedBy || '') + (createdOnDisp ? (' · ' + createdOnDisp) : '');
                     var docStatusTxt = lbl('VAS_Completed', 'Completed');
                     var delivStatusTxt = (po && po.DeliveryStatus === 'Partial') ? lbl('VAS_Partial', 'Partial') : lbl('VAS_Pending', 'Pending');
 

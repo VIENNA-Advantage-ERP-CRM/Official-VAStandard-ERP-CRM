@@ -261,8 +261,9 @@ namespace VIS.Controllers
 
         private static object GetCurrencyInfo(Ctx ctx)
         {
-            string iso = "INR";
-            string symbol = "₹";
+            // VAS163 2026-11-10: browser locale (6-Nov retest2) - no hard-coded INR/₹ default.
+            string iso = "";
+            string symbol = "";
 
             if (ctx == null)
             {

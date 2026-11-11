@@ -452,7 +452,7 @@ namespace VAS.Areas.VAS.Controllers
                         {
                             OrderId = orderId,
                             DocumentNo = docNo,
-                            DateOrdered = orderDate.ToString("yyyy-MM-dd"),
+                            DateOrdered = orderDate.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), // VAS163 2026-11-10: browser locale (6-Nov retest2).
                             DateOrderedFull = orderDate.ToString("dd MMM yyyy"),
                             DateOrderedShort = orderDate.ToString("dd MMM"),
                             Vendor = !string.IsNullOrEmpty(vendor) ? vendor : "—",
@@ -585,7 +585,9 @@ namespace VAS.Areas.VAS.Controllers
                             OrderId = orderId,
                             DocumentNo = Util.GetValueOfString(dr["DocumentNo"]),
                             DateOrdered = orderDate.ToString("dd MMM yyyy"),
-                            Vendor = Util.GetValueOfString(dr["VendorName"]),
+                            // VAS163 2026-11-10: browser locale (6-Nov retest2). The widget formats DateOrderedIso itself.
+                            DateOrderedIso = orderDate.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+                            Vendor =Util.GetValueOfString(dr["VendorName"]),
                             Warehouse = Util.GetValueOfString(dr["WarehouseName"]),
                             CreatedBy = Util.GetValueOfString(dr["CreatedByName"]),
                             CreatedOn = createdDate.ToString("dd MMM yyyy"),
@@ -853,6 +855,7 @@ namespace VAS.Areas.VAS.Controllers
             public int OrderId { get; set; }
             public string DocumentNo { get; set; }
             public string DateOrdered { get; set; }
+            public string DateOrderedIso { get; set; } // VAS163 2026-11-10: browser locale (6-Nov retest2).
             public string Vendor { get; set; }
             public string Warehouse { get; set; }
             public string CreatedBy { get; set; }

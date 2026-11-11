@@ -838,7 +838,8 @@
             // Activity comes LAST: it is the longest section (it pages, and grows
             // for the life of the document), so anything under it was pushed off
             // the bottom of the panel.
-            renderActivity();
+            // VAS163 2026-11-10: Activity section commented out (6-Nov retest2, All Right Panels).
+            // renderActivity();
         }
 
         // ----------------------------------------------------------------- //
@@ -1245,7 +1246,16 @@
                 $chips.append($con);
                 any = true;
             }
+            // VAS163 2026-11-10: a manual order (no origin at all) no longer gets a
+            // Created From strip holding one "Manual" chip; it wears a "Manual" tag
+            // beside the status pills at the top of the panel instead. An order
+            // with any reference keeps the strip unchanged.
             if (!any) {
+                var $hdrPills = $body.find(".vas_106-hdrPills").first();
+                if ($hdrPills.length) {
+                    $hdrPills.append(headerPill(getMsg("VAS_106_Manual", "Manual"), "neutral", "pencil", false));
+                    return;
+                }
                 $chips.append(originChip("pencil", getMsg("VAS_106_Manual", "Manual"), null, null, "info", null, 0));
             }
 

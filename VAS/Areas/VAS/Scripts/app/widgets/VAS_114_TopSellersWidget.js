@@ -84,31 +84,23 @@
             return INDIAN_NUMBERING_CURRENCIES.indexOf(String(iso || '').toUpperCase()) >= 0;
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function currencyLocale(iso) {
-            return usesIndianNumbering(iso) ? 'en-IN' : 'en-US';
+            return window.navigator.language;
         }
 
         function trimZeros(text) {
             return text.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatCompactNumber(value) {
             var number = Number(value || 0);
-            var abs = Math.abs(number);
-            if (usesIndianNumbering(currencyIso)) {
-                if (abs >= 10000000) { return trimZeros((number / 10000000).toFixed(2)) + ' Cr'; }
-                if (abs >= 100000) { return trimZeros((number / 100000).toFixed(2)) + ' L'; }
-                if (abs >= 1000) { return trimZeros((number / 1000).toFixed(1)) + 'K'; }
-            } else {
-                if (abs >= 1000000000) { return trimZeros((number / 1000000000).toFixed(1)) + 'B'; }
-                if (abs >= 1000000) { return trimZeros((number / 1000000).toFixed(1)) + 'M'; }
-                if (abs >= 1000) { return trimZeros((number / 1000).toFixed(1)) + 'K'; }
-            }
-            return number.toLocaleString(currencyLocale(currencyIso), { maximumFractionDigits: 2 });
+            return (number < 0 ? '-' : '') + VIS.Util.formatCompactAmount(Math.abs(number), currencyIso || '', stdPrecision);
         }
 
         function formatCompactAmount(value) {
-            return (currencySymbol || currencyIso) + formatCompactNumber(value);
+            return (currencySymbol || currencyIso || '') + formatCompactNumber(value);
         }
 
         function formatFullAmount(value) {

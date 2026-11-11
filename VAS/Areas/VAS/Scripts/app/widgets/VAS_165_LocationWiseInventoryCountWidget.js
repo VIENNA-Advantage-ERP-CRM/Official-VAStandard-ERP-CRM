@@ -145,9 +145,9 @@
             $monthSelect = $('<select class="vas-locwisecount-select">');
             $yearSelect = $('<select class="vas-locwisecount-select">');
 
-            var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-            for (var m = 0; m < months.length; m++) {
-                var $opt = $('<option value="' + (m + 1) + '">' + months[m] + '</option>');
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            for (var m = 0; m < 12; m++) {
+                var $opt = $('<option value="' + (m + 1) + '">' + new Date(2000, m, 1).toLocaleDateString(window.navigator.language, { month: 'short' }) + '</option>');
                 if (m + 1 === selectedMonth) {
                     $opt.attr('selected', 'selected');
                 }
@@ -257,9 +257,9 @@
         }
 
         function loadSummary() {
-            var monthsFull = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-            var mName = monthsFull[selectedMonth - 1] || "";
-            $subtitle.text(lbl("VAS_165_LocationsActiveCounts") + " · " + mName + " " + selectedYear);
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            var periodLabel = new Date(Number(selectedYear), Number(selectedMonth) - 1, 1).toLocaleDateString(window.navigator.language, { month: 'long', year: 'numeric' });
+            $subtitle.text(lbl("VAS_165_LocationsActiveCounts") + " · " + periodLabel);
 
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_165_LocationWiseInventoryCountWidget/GetLocationSummary?month=" + selectedMonth + "&year=" + selectedYear,
@@ -427,8 +427,8 @@
                 $modalOverlay.remove();
             }
 
-            var monthsFull = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-            var monthName = monthsFull[selectedMonth - 1] || "";
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            var periodLabel = new Date(Number(selectedYear), Number(selectedMonth) - 1, 1).toLocaleDateString(window.navigator.language, { month: 'long', year: 'numeric' });
 
             var $overlay = $('<div class="vas-locwisecount-modal-overlay">');
             var $dialog = $('<div class="vas-locwisecount-modal-dialog" role="dialog" aria-modal="true">');
@@ -443,7 +443,7 @@
                without it those headings would read "Locator" with nothing after it. */
             var locName = escapeHtml(locItem.locatorName || locItem.locator);
             var $title = $('<h3 class="vas-locwisecount-modal-title" title="' + locName + '">' + escapeHtml(lbl('M_Locator_ID', 'Locator')) + ' ' + locName + '</h3>');
-            var $subtitle = $('<span class="vas-locwisecount-modal-subtitle">' + locItem.warehouse + ' · ' + monthName + ' ' + selectedYear + '</span>');
+            var $subtitle = $('<span class="vas-locwisecount-modal-subtitle">' + locItem.warehouse + ' · ' + periodLabel + '</span>');
             $headerLeft.append($title).append($subtitle);
 
             var $closeBtn = $('<button type="button" class="vas-locwisecount-modal-close" aria-label="' + lbl("VAS_165_CloseModal") + '">&times;</button>');
@@ -478,7 +478,7 @@
                 dataType: "json",
                 success: function (res) {
                     if (res && res.lines && res.lines.length > 0) {
-                        $subtitle.text(locItem.warehouse + ' · ' + monthName + ' ' + selectedYear + ' · ' + res.lines.length + ' ' + lbl("VAS_165_RecordsSuffix"));
+                        $subtitle.text(locItem.warehouse + ' · ' + periodLabel + ' · ' + res.lines.length + ' ' + lbl("VAS_165_RecordsSuffix"));
                         renderModalGrid($body, res);
                     } else {
                         $body.html('<div class="vas-locwisecount-message">' + lbl("VAS_165_NoCountLinesFoundLocation") + '</div>');

@@ -1075,7 +1075,16 @@
                 any = true;
             }
 
+            // VAS163 2026-11-10: a manual requisition (no origin at all) no longer
+            // gets a Generated From strip holding one "Manual" chip; it wears a
+            // "Manual" tag beside the status tags at the top of the panel instead.
+            // A requisition with any reference keeps the strip unchanged.
             if (!any) {
+                var $hdrPills = $body.find(".vas_098-hdrPills").first();
+                if ($hdrPills.length) {
+                    $hdrPills.append(tag(msg("Manual", "Manual"), "vas_098-draft"));
+                    return;
+                }
                 $chips.append(originChip("pencil", msg("Manual", "Manual"),
                     null, "muted", null, 0));
             }
@@ -1751,8 +1760,9 @@
                 $body.append($notes);
             }
 
-            sectionHead(msg("Activity"), activity.length + " " + msg("Updates", "updates"));
-            $body.append(renderActivityPanel(activity));
+            // VAS163 2026-11-10: Activity section commented out (6-Nov retest2, All Right Panels).
+            // sectionHead(msg("Activity"), activity.length + " " + msg("Updates", "updates"));
+            // $body.append(renderActivityPanel(activity));
         }
 
         // Section header: title on the left, optional summary on the right.
@@ -2481,12 +2491,14 @@
         //  Formatting                                                        //
         // ----------------------------------------------------------------- //
 
-        function currencySymbol() { return data && data.CurSymbol ? data.CurSymbol : "$"; }
+        // VAS163 2026-11-10: no hard-coded "$" fallback (6-Nov retest2).
+        function currencySymbol() { return (data && (data.CurSymbol || data.ISO_Code)) || ""; }
 
         // Whole-currency display to match the reference design.
         function money(value) {
             var v = Math.round(+value || 0);
-            return currencySymbol() + " " + v.toLocaleString(window.navigator.language);
+            var sym = currencySymbol();
+            return (sym ? sym + " " : "") + v.toLocaleString(window.navigator.language);
         }
 
         // The same, kept to the currency's own precision — for a per-unit rate,
@@ -2494,7 +2506,8 @@
         // tidying it (0.75 an EA would print as 1).
         function moneyPrecise(value) {
             var p = (+data.StdPrecision >= 0) ? +data.StdPrecision : 2;
-            return currencySymbol() + " " + formatNumber(value, p);
+            var sym = currencySymbol();
+            return (sym ? sym + " " : "") + formatNumber(value, p);
         }
 
         function formatNumber(value, precision) {

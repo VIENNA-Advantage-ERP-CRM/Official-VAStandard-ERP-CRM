@@ -132,9 +132,9 @@
             $monthSelect = $('<select class="vas-whwisecount-select">');
             $yearSelect = $('<select class="vas-whwisecount-select">');
 
-            var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-            for (var m = 0; m < months.length; m++) {
-                var $opt = $('<option value="' + (m + 1) + '">' + months[m] + '</option>');
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            for (var m = 0; m < 12; m++) {
+                var $opt = $('<option value="' + (m + 1) + '">' + new Date(2000, m, 1).toLocaleDateString(window.navigator.language, { month: 'short' }) + '</option>');
                 if (m + 1 === selectedMonth) {
                     $opt.attr('selected', 'selected');
                 }
@@ -244,9 +244,9 @@
         }
 
         function loadSummary() {
-            var monthsFull = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-            var mName = monthsFull[selectedMonth - 1] || "";
-            $subtitle.text(lbl("VAS_161_WarehousesActiveLocators") + " · " + mName + " " + selectedYear);
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            var periodLabel = new Date(Number(selectedYear), Number(selectedMonth) - 1, 1).toLocaleDateString(window.navigator.language, { month: 'long', year: 'numeric' });
+            $subtitle.text(lbl("VAS_161_WarehousesActiveLocators") + " · " + periodLabel);
 
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_161_WHWiseCountWidget/GetWarehouseSummary?month=" + selectedMonth + "&year=" + selectedYear,
@@ -423,8 +423,8 @@
                 $modalOverlay.remove();
             }
 
-            var monthsFull = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-            var monthName = monthsFull[selectedMonth - 1] || "";
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            var periodLabel = new Date(Number(selectedYear), Number(selectedMonth) - 1, 1).toLocaleDateString(window.navigator.language, { month: 'long', year: 'numeric' });
 
             var $overlay = $('<div class="vas-whwisecount-modal-overlay">');
             var $dialog = $('<div class="vas-whwisecount-modal-dialog" role="dialog" aria-modal="true">');
@@ -433,7 +433,7 @@
             var $header = $('<div class="vas-whwisecount-modal-header">');
             var $headerLeft = $('<div class="vas-whwisecount-modal-header-left">');
             var $title = $('<h3 class="vas-whwisecount-modal-title" title="' + whItem.warehouseName + '">' + whItem.warehouseName + '</h3>');
-            var $subtitle = $('<span class="vas-whwisecount-modal-subtitle">' + whItem.warehouseCode + ' · ' + monthName + ' ' + selectedYear + '</span>');
+            var $subtitle = $('<span class="vas-whwisecount-modal-subtitle">' + whItem.warehouseCode + ' · ' + periodLabel + '</span>');
             $headerLeft.append($title).append($subtitle);
 
             var $closeBtn = $('<button type="button" class="vas-whwisecount-modal-close" aria-label="' + lbl("VAS_161_CloseModal") + '">&times;</button>');
@@ -468,7 +468,7 @@
                 dataType: "json",
                 success: function (res) {
                     if (res && res.lines && res.lines.length > 0) {
-                        $subtitle.text(whItem.warehouseCode + ' · ' + monthName + ' ' + selectedYear + ' · ' + (res.locatorCount || 0) + ' ' + lbl("VAS_161_LocatorsSuffix"));
+                        $subtitle.text(whItem.warehouseCode + ' · ' + periodLabel + ' · ' + (res.locatorCount || 0) + ' ' + lbl("VAS_161_LocatorsSuffix"));
                         renderModalGrid($body, res);
                     } else {
                         $body.html('<div class="vas-whwisecount-message">' + lbl("VAS_161_NoCountLinesFoundWarehouse") + '</div>');

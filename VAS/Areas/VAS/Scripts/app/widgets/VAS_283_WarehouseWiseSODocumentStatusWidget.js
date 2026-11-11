@@ -206,13 +206,17 @@
         var $self = this;
         var $root = $('<div class="vas283-root">');
         var $shell, $tbody, $helper, $pageTxt, $prevBtn, $nextBtn, $monthSel, $yearSel;
-        var $mask, $modal, $mHead, $mTitle, $mSub, $mBack, $mBody, $mFoot;
+        var $mask, $modal, $mHead, $mTitle, $mSub, $mBack, $mBody, $mFoot, $mClose;
 
         var SELF_ENDPOINT = 'VAS_283_WarehouseWiseSODocumentStatusWidget/';
+        // VAS163 2026-11-11: Row 115 - per-instance event-namespace suffix (as VAS_279 Sr 8.28):
+        // disposing an old instance must not unbind the handlers of a re-created one.
+        var instanceTag = 'i' + Math.random().toString(36).slice(2, 9);
         var ZOOM_WINDOW_NAME = 'VAS_SalesOrder';   // same Sales Order window VAS_268 / VAS_286 open
         var zoomWindowId = 0;
 
         var listState = 'loading'; // 'loading' | 'ready' | 'error'
+        var currency = { iso: '', symbol: '', precision: null }; // VAS163: base currency from GetWarehouseStatus
         var docsState = { page: 0, size: WIDGET_PAGE_SIZE, total: 0, rows: [], grandTotal: 0 };
 
         var whState = null;      // { warehouseId, warehouseName, summary, docs:{page,size,total,rows} }
@@ -256,31 +260,63 @@
             return '';
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        function applyCurrency(data) {
+            if (!data) { return; }
+            currency.iso = data.CurrencyIso || '';
+            currency.symbol = data.CurrencySymbol || '';
+            currency.precision = (typeof data.CurrencyPrecision === 'number') ? data.CurrencyPrecision : null;
+        }
+
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatINR(value) {
             var num = Number(value || 0);
-            if (num >= 1e7) { return '₹ ' + (num / 1e7).toFixed(2) + ' Cr'; }
-            if (num >= 1e5) { return '₹ ' + (num / 1e5).toFixed(2) + ' L'; }
-            return '₹ ' + Math.round(num).toLocaleString('en-IN');
+            var sym = currency.symbol || currency.iso || '';
+            var text = (num < 0 ? '-' : '') + VIS.Util.formatCompactAmount(Math.abs(num), currency.iso, currency.precision);
+            return sym ? sym + ' ' + text : text;
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatNum(value) {
-            return Math.round(Number(value || 0)).toLocaleString('en-IN');
+            return Math.round(Number(value || 0)).toLocaleString(window.navigator.language);
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        function formatMoney(value, symbol, precision) {
+            var prec = (typeof precision === 'number' && precision >= 0) ? precision : 2;
+            var text = Number(value || 0).toLocaleString(window.navigator.language, { minimumFractionDigits: prec, maximumFractionDigits: prec });
+            return symbol ? symbol + ' ' + text : text;
+        }
+
+        // VAS163 2026-11-11: Row 117 - quantities in the line's UOM can be fractional (e.g. ml).
+        function formatQty(value) {
+            return Number(value || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 2 });
+        }
+
+        // VAS163 2026-11-11: Row 121 - a description made only of blanks / separators is not
+        // an attribute value (same rule as VAS_270 / VAS_274).
+        function hasAttributeValue(text) {
+            return !!text && /[^\s\-‐-―_.,:;()\[\]\/\\|]/.test(String(text));
+        }
+
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function parseIso(iso) {
-            if (!iso) { return null; }
-            var d = new Date(iso + 'T00:00:00');
+            var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+            if (!m) { return null; }
+            var d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
             return isNaN(d.getTime()) ? null : d;
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatDateFull(iso) {
             var d = parseIso(iso);
             if (!d) { return ''; }
-            return (d.getDate() < 10 ? '0' : '') + d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+            return d.toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' });
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function periodLabel() {
-            return MONTHS[selectedMonth()] + ' ' + selectedYear();
+            return new Date(selectedYear(), selectedMonth(), 1).toLocaleDateString(window.navigator.language, { month: 'short', year: 'numeric' });
         }
 
         function selectedMonth() { return $monthSel && $monthSel.length ? Number($monthSel.val()) : new Date().getMonth(); }
@@ -304,10 +340,12 @@
         /* ============================================================
          * Widget shell: header (title + Month/Year filter) + cross-tab table + pager
          * ============================================================ */
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function fillMonthSelect($sel) {
             var curM = new Date().getMonth();
             $sel.html(MONTHS.map(function (m, i) {
-                return '<option value="' + i + '"' + (i === curM ? ' selected' : '') + '>' + m + '</option>';
+                m = new Date(2000, i, 1).toLocaleDateString(window.navigator.language, { month: 'short' });
+                return '<option value="' + i + '"' + (i === curM ? ' selected' : '') + '>' + escapeHtml(m) + '</option>';
             }).join(''));
         }
 
@@ -363,19 +401,36 @@
 
             $shell.append($head, $tbl, $foot);
             $root.append($shell);
+            bindWidgetEvents();
+        }
 
-            $monthSel.on('click', function (event) { event.stopPropagation(); });
-            $yearSel.on('click', function (event) { event.stopPropagation(); });
-            $monthSel.on('change', function () { loadWarehouseStatus(0); });
-            $yearSel.on('change', function () { loadWarehouseStatus(0); });
+        /* VAS163 2026-11-11: Row 115 - (re)binds the widget's own handlers. Run on init AND
+           on every refresh (same fix as VAS_270 / VAS_279 / VAS_285 "refresh all"): the
+           mosaic refresh can detach / strip jQuery handlers from the widget's DOM, which
+           left a widget that showed nothing until the page was reloaded. off() first keeps
+           it to one handler each. */
+        function bindWidgetEvents() {
+            if (!$shell) { return; }
+            $monthSel.off('.vas283').on('click.vas283', function (event) { event.stopPropagation(); })
+                .on('change.vas283', function () { loadWarehouseStatus(0); });
+            $yearSel.off('.vas283').on('click.vas283', function (event) { event.stopPropagation(); })
+                .on('change.vas283', function () { loadWarehouseStatus(0); });
 
-            $prevBtn.on('click', function () { turnWidgetPage(-1); });
-            $nextBtn.on('click', function () { turnWidgetPage(1); });
+            $prevBtn.off('click.vas283').on('click.vas283', function () { turnWidgetPage(-1); });
+            $nextBtn.off('click.vas283').on('click.vas283', function () { turnWidgetPage(1); });
 
-            $tbody.on('click', function (event) {
+            $tbody.off('click.vas283').on('click.vas283', function (event) {
                 var row = event.target.closest ? event.target.closest('[data-whid]') : null;
                 if (row) { openWarehouseModal(Number(row.getAttribute('data-whid')), row.getAttribute('data-whname')); }
             });
+        }
+
+        // VAS163 2026-11-11: Row 115 - a table of THIS instance's modal, looked up inside its
+        // own body (as VAS_270 tableEl) - never document.getElementById: a modal left on <body>
+        // by an earlier instance (re-created by a refresh without disposing) carries the same
+        // ids and would be found first, so the new pop-up stayed empty.
+        function tableEl(id) {
+            return $mBody ? $mBody.find('#' + id)[0] : null;
         }
 
         function skeletonRows() {
@@ -407,6 +462,7 @@
                     if (parsed.Error) { listState = 'error'; }
                     else {
                         listState = 'ready';
+                        applyCurrency(parsed);
                         docsState.page = page;
                         docsState.total = Number(parsed.Total || 0);
                         docsState.grandTotal = Number(parsed.GrandTotal || 0);
@@ -504,10 +560,18 @@
             $modal.append($mHead, $mBody, $mFoot);
             $mask.append($modal);
             $('body').append($mask);
+            $mClose = $closeBtn;
+            bindModal();
+        }
 
-            $closeBtn.on('click', closeModal);
-            $mBack.on('click', backModal);
-            $mBody.on('click', function (event) {
+        /* VAS163 2026-11-11: Row 115 - the modal's own handlers are (re)bound here under one
+           namespace, off() first, on init AND on every refresh (VAS_270 bindModal pattern). */
+        function bindModal() {
+            if (!$mBody) { return; }
+            var ns = '.vas283m-' + instanceTag;
+            $mClose.off(ns).on('click' + ns, closeModal);
+            $mBack.off(ns).on('click' + ns, backModal);
+            $mBody.off(ns).on('click' + ns, function (event) {
                 var pageBtn = event.target.closest ? event.target.closest('[data-dir]') : null;
                 if (pageBtn) { turnPage(pageBtn.getAttribute('data-table'), Number(pageBtn.getAttribute('data-dir'))); return; }
                 // 5-Nov row 29: a document number opens that SO on the Sales Order screen.
@@ -519,9 +583,10 @@
         }
 
         function bindDocumentLevelEvents() {
-            var ns = '.vas283-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget');
+            // VAS163 2026-11-11: Row 115 - instance-tagged namespace.
+            var ns = '.vas283-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '-' + instanceTag;
 
-            $(window).on('resize' + ns, function () {
+            $(window).off('resize' + ns).on('resize' + ns, function () {
                 if ($mask.hasClass('is-open')) { fitAllTables(); }
             });
         }
@@ -618,7 +683,12 @@
                 WarehouseName: row.WarehouseName || '',
                 RepresentativeName: row.RepresentativeName || '',
                 OrderValue: Number(row.OrderValue) || 0,
+                // VAS163 2026-11-11: Row 93 - document (price list) currency of OrderValue.
+                CurrencySymbol: row.CurrencySymbol || '',
+                CurrencyPrecision: (typeof row.CurrencyPrecision === 'number') ? row.CurrencyPrecision : 2,
                 DocumentStatus: row.DocumentStatus || '',
+                // VAS163 2026-11-11: Row 116 - raw DocStatus for the badge colour.
+                DocumentStatusCode: row.DocumentStatusCode || '',
                 DeliveryStatus: row.DeliveryStatus || '',
                 DeliveryStatusCode: row.DeliveryStatusCode || 'PENDING'
             };
@@ -628,6 +698,11 @@
             if (code === 'FULL') { return 'vas283-mchip-info'; }
             if (code === 'PARTIAL') { return 'vas283-mchip-warn'; }
             return 'vas283-mchip-neutral';
+        }
+
+        // VAS163 2026-11-11: Row 116 - Drafted / In Progress status badges in orange (as VAS_272).
+        function docStatusChipClass(code) {
+            return (code === 'DR' || code === 'IP') ? 'vas283-mchip-orange' : 'vas283-mchip-ok';
         }
 
         function renderWarehouseBody() {
@@ -668,7 +743,7 @@
         ];
 
         function drawDocumentsTable() {
-            var el = document.getElementById('vas283-docstbl');
+            var el = tableEl('vas283-docstbl'); // VAS163 2026-11-11: Row 115
             if (!el || !whState) { return; }
             var docs = whState.docs;
             var tpl = DOC_COLS.map(function (c) { return 'minmax(0,' + c.w + 'fr)'; }).join(' ');
@@ -686,9 +761,11 @@
                     mcellHtml(row.CustomerName, 'vas283-c-prim'),
                     mcellHtml(row.WarehouseName || '—', 'vas283-c-std'),
                     mcellHtml(row.RepresentativeName || '—', 'vas283-c-std'),
-                    mcellHtml(formatINR(row.OrderValue), 'vas283-c-emph', 'right'),
+                    // VAS163 2026-11-11: Rows 93/124 - ex-tax order value with the price-list currency symbol.
+                    mcellHtml(formatMoney(row.OrderValue, row.CurrencySymbol, row.CurrencyPrecision), 'vas283-c-emph', 'right'),
                     '<span class="vas283-mcell" title="' + escapeHtml(row.DeliveryStatus) + '"><span class="vas283-mchip ' + deliveryChipClass(row.DeliveryStatusCode) + '">' + escapeHtml(row.DeliveryStatus) + '</span></span>',
-                    '<span class="vas283-mcell" title="' + escapeHtml(row.DocumentStatus) + '"><span class="vas283-mchip vas283-mchip-ok">' + escapeHtml(row.DocumentStatus) + '</span></span>'
+                    // VAS163 2026-11-11: Row 116 - Drafted / In Progress badges orange.
+                    '<span class="vas283-mcell" title="' + escapeHtml(row.DocumentStatus) + '"><span class="vas283-mchip ' + docStatusChipClass(row.DocumentStatusCode) + '">' + escapeHtml(row.DocumentStatus) + '</span></span>'
                 ];
                 return '<div class="vas283-mrow" style="grid-template-columns:' + tpl + '">' + cells.join('') + '</div>';
             }).join('');
@@ -796,7 +873,9 @@
                 statTile(label('VAS_283_Customer', 'Customer'), order.CustomerName) +
                 statTile(label('VAS_283_SoDate', 'SO date'), formatDateFull(order.SalesOrderDate)) +
                 statTile(label('VAS_283_DatePromised', 'Date promised'), formatDateFull(order.DatePromised)) +
-                statTile(label('VAS_283_SoValue', 'SO value'), formatINR(order.OrderValue)) +
+                // VAS163 2026-11-11: Rows 122/123/124 - SO value in full (not K/L/Cr), ex-tax,
+                // in the order's price-list currency.
+                statTile(label('VAS_283_SoValue', 'SO value'), formatMoney(order.OrderValue, order.CurrencySymbol, order.CurrencyPrecision)) +
                 statTile(label('VAS_283_ShipFrom', 'Ship from'), order.WarehouseName) +
                 statTile(label('VAS_283_DeliveryMode', 'Delivery mode'), order.DeliveryMode) +
                 statTile(label('VAS_283_DocumentStatus', 'Document status'), order.DocumentStatus) +
@@ -817,17 +896,18 @@
         }
 
         function lineFootHtml(order, lines) {
+            // VAS163 2026-11-11: Rows 117/120 - Item lines only, quantities in the line's UOM;
+            // shortage stated by the server in the line's UOM (stock never negative).
             var qtyOrdered = 0, qtyShort = 0;
             lines.forEach(function (line) {
+                if (!line.IsItem) { return; }
                 qtyOrdered += Number(line.QtyOrdered) || 0;
-                var pending = Number(line.QtyPending) || 0;
-                var freeStock = Number(line.FreeStock) || 0;
-                if (pending > freeStock) { qtyShort += (pending - freeStock); }
+                qtyShort += Math.max(0, Number(line.QtyShort) || 0);
             });
             var footNote = lines.length + ' ' + label('VAS_283_LinesSuffix', 'lines') +
-                ' · ' + formatNum(qtyOrdered) + ' ' + label('VAS_283_QtyOrderedSuffix', 'qty ordered') +
+                ' · ' + formatQty(qtyOrdered) + ' ' + label('VAS_283_QtyOrderedSuffix', 'qty ordered') +
                 ' · ' + order.DeliveryStatus +
-                (qtyShort > 0 ? ' · ' + formatNum(qtyShort) + ' ' + label('VAS_283_QtyShortSuffix', 'qty short of stock') : '');
+                (qtyShort > 0 ? ' · ' + formatQty(qtyShort) + ' ' + label('VAS_283_QtyShortSuffix', 'qty short of stock') : '');
 
             return '<span class="vas283-foot-note">' + escapeHtml(footNote) + '</span>' +
                 '<span><button type="button" class="vas283-btn" id="vas283-mback">' + escapeHtml(label('VAS_283_Back', 'Back')) + '</button> ' +
@@ -852,8 +932,14 @@
         }
 
         function renderLinesBody(order, lines) {
+            // VAS163 2026-11-11: Rows 117/120 - the quantity cards count Item-type product lines
+            // only (other product types and charges excluded), in the lines' selected UOM.
             var qtyOrdered = 0, qtyPending = 0;
-            lines.forEach(function (l) { qtyOrdered += Number(l.QtyOrdered) || 0; qtyPending += Number(l.QtyPending) || 0; });
+            lines.forEach(function (l) {
+                if (!l.IsItem) { return; }
+                qtyOrdered += Number(l.QtyOrdered) || 0;
+                qtyPending += Number(l.QtyPending) || 0;
+            });
 
             var breadcrumb = '<div class="vas283-polink">' + escapeHtml(label('VAS_283_SalesOrderPrefix', 'Sales order')) +
                 ' <button type="button" class="vas283-lnk" data-so="' + order.SalesOrderId + '">' + escapeHtml(order.SalesOrderNumber) + '</button>' +
@@ -861,9 +947,10 @@
 
             var stats = '<div class="vas283-mstats">' +
                 statTile(label('VAS_283_ColLine', 'Line') + 's', String(lines.length)) +
-                statTile(label('VAS_283_SoValue', 'SO value'), formatINR(order.OrderValue)) +
-                statTile(label('VAS_283_ColOrdered', 'Ordered'), formatNum(qtyOrdered)) +
-                statTile(label('VAS_283_ColPending', 'Pending'), formatNum(qtyPending)) +
+                // VAS163 2026-11-11: Rows 122/123/124 - SO value in full, ex-tax, order's currency.
+                statTile(label('VAS_283_SoValue', 'SO value'), formatMoney(order.OrderValue, order.CurrencySymbol, order.CurrencyPrecision)) +
+                statTile(label('VAS_283_ColOrdered', 'Ordered'), formatQty(qtyOrdered)) +
+                statTile(label('VAS_283_ColPending', 'Pending'), formatQty(qtyPending)) +
             '</div>';
 
             var secHtml = '<div class="vas283-msec">' + escapeHtml(label('VAS_283_SalesOrderLines', 'Sales order lines')) + '</div>';
@@ -891,34 +978,58 @@
             { key: 'status', label: label('VAS_283_ColLineStatus', 'Line status'), w: 1 }
         ];
 
+        // VAS163 2026-11-11: In stock is in the product's base UOM; its name is shown when
+        // the line was entered in another UOM (as VAS_270 / VAS_274). Never negative.
+        function inStockText(line) {
+            var text = formatQty(Math.max(0, Number(line.FreeStock) || 0));
+            if (line.BaseUomName && line.BaseUomName !== line.UomName) { text += ' ' + line.BaseUomName; }
+            return text;
+        }
+
         function drawLineTable(tableId) {
-            var el = document.getElementById(tableId);
+            var el = tableEl(tableId); // VAS163 2026-11-11: Row 115
             if (!el || !lineState) { return; }
 
-            var tpl = LINE_COLS.map(function (c) { return 'minmax(0,' + c.w + 'fr)'; }).join(' ');
+            // VAS163 2026-11-11: Row 121 - the Attribute column only when at least one line of
+            // the order has an attribute value (decided over all lines, not per page).
+            var showAttribute = lineState.lines.some(function (l) { return hasAttributeValue(l.AttributeText); });
+            var cols = LINE_COLS.filter(function (c) { return showAttribute || c.key !== 'attr'; });
+            // VAS163 2026-11-11: Row 123 - document (price list) currency in front of Rate / Amount.
+            var cur = lineState.order.CurrencySymbol;
+            var prec = lineState.order.CurrencyPrecision;
+
+            var tpl = cols.map(function (c) { return 'minmax(0,' + c.w + 'fr)'; }).join(' ');
             var pages = Math.max(1, Math.ceil(lineState.lines.length / lineState.size));
             if (lineState.page > pages - 1) { lineState.page = pages - 1; }
             var start = lineState.page * lineState.size;
             var slice = lineState.lines.slice(start, start + lineState.size);
 
             var head = '<div class="vas283-mrow vas283-mhead-row" style="grid-template-columns:' + tpl + '">' +
-                LINE_COLS.map(function (c) { return '<span class="vas283-mcell' + (c.align === 'right' ? ' right' : '') + '" title="' + escapeHtml(c.label) + '">' + escapeHtml(c.label) + '</span>'; }).join('') +
+                cols.map(function (c) { return '<span class="vas283-mcell' + (c.align === 'right' ? ' right' : '') + '" title="' + escapeHtml(c.label) + '">' + escapeHtml(c.label) + '</span>'; }).join('') +
             '</div>';
 
             var body = slice.map(function (line) {
-                var st = lineStatus(line);
+                // VAS163 2026-11-11: Row 120 - Ordered / Delivered / Pending / In stock / Line
+                // status only for Item-type products; other product types and charges show "-".
+                var isItem = !!line.IsItem;
+                var st = isItem ? lineStatus(line) : null;
                 var cells = [
                     mcellHtml(String(line.LineNo), 'vas283-c-std', 'right'),
+                    // VAS163 2026-11-11: Row 118 - charge lines carry the charge name (server).
                     mcellHtml(line.ProductName, 'vas283-c-prim'),
-                    mcellHtml(line.AttributeText, 'vas283-c-std'),
+                    showAttribute ? mcellHtml(hasAttributeValue(line.AttributeText) ? line.AttributeText : '', 'vas283-c-std') : '',
                     mcellHtml(line.UomName, 'vas283-c-std'),
-                    mcellHtml(formatNum(line.QtyOrdered), 'vas283-c-std', 'right'),
-                    mcellHtml(formatNum(line.QtyDelivered), 'vas283-c-std', 'right'),
-                    mcellHtml(formatNum(line.QtyPending), 'vas283-c-prim', 'right'),
-                    mcellHtml(formatNum(line.FreeStock), (line.FreeStock < line.QtyPending ? 'vas283-c-short' : 'vas283-c-ok'), 'right'),
-                    mcellHtml('₹ ' + formatNum(line.Rate), 'vas283-c-std', 'right'),
-                    mcellHtml(formatINR(line.Amount), 'vas283-c-emph', 'right')
-                ].join('') + '<span class="vas283-mcell"><span class="vas283-mchip ' + st.cls + '" title="' + escapeHtml(st.text) + '">' + escapeHtml(st.text) + '</span></span>';
+                    // VAS163 2026-11-11: Row 117 - quantities in the line's selected UOM (server).
+                    mcellHtml(isItem ? formatQty(line.QtyOrdered) : '-', 'vas283-c-std', 'right'),
+                    mcellHtml(isItem ? formatQty(line.QtyDelivered) : '-', 'vas283-c-std', 'right'),
+                    mcellHtml(isItem ? formatQty(line.QtyPending) : '-', 'vas283-c-prim', 'right'),
+                    mcellHtml(isItem ? inStockText(line) : '-', (isItem && Number(line.QtyShort) > 0 ? 'vas283-c-short' : 'vas283-c-ok'), 'right'),
+                    // VAS163 2026-11-11: Rows 123/124 - ex-tax Rate / Amount in the order's currency.
+                    mcellHtml(formatMoney(line.Rate, cur, 2), 'vas283-c-std', 'right'),
+                    mcellHtml(formatMoney(line.Amount, cur, prec), 'vas283-c-emph', 'right')
+                ].join('') + (st
+                    ? '<span class="vas283-mcell"><span class="vas283-mchip ' + st.cls + '" title="' + escapeHtml(st.text) + '">' + escapeHtml(st.text) + '</span></span>'
+                    : '<span class="vas283-mcell">-</span>');
                 return '<div class="vas283-mrow" style="grid-template-columns:' + tpl + '">' + cells + '</div>';
             }).join('');
 
@@ -939,7 +1050,7 @@
         /* Sizes each visible table's rows-per-page to the space actually left in
            the modal body, so the body never grows an inner scrollbar. */
         function fitTable(id, currentSize, onResize) {
-            var el = document.getElementById(id);
+            var el = tableEl(id); // VAS163 2026-11-11: Row 115
             if (!el) { return; }
             var avail = el.clientHeight;
             if (avail < 40) { return; }
@@ -987,14 +1098,31 @@
         this.getRoot = function () { return $root; };
 
         this.disposeComponent = function () {
-            var ns = '.vas283-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget');
+            var ns = '.vas283-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '-' + instanceTag;
             $(document).off(ns);
             $(window).off(ns);
             if ($mask) { $mask.remove(); }
             $root.remove();
         };
 
-        this.refreshWidget = function () { loadWarehouseStatus(0); };
+        /* VAS163 2026-11-11: Row 115 - bug: refresh only re-ran the request. After the
+           mosaic / dashboard "refresh" the host can detach the widget's content and strip
+           its jQuery handlers (and remove the body-level modal), so the data was rendered
+           into detached nodes and the widget stayed empty until a page reload. Now the
+           refresh re-attaches the shell (and the root to the frame's content grid),
+           re-creates the modal if it was removed, re-binds every handler and then reloads
+           the first page of the selected period (same pattern as VAS_270 / VAS_279 /
+           VAS_285). */
+        this.refreshWidget = function () {
+            if (!$mask || !$.contains(document.body, $mask[0])) { createModal(); }
+            if ($shell && !$.contains($root[0], $shell[0])) { $root.append($shell); }
+            if (!$.contains(document.body, $root[0]) && $self.frame && $self.frame.getContentGrid) {
+                try { $self.frame.getContentGrid().append($root); } catch (e) { /* host grid not available */ }
+            }
+            bindWidgetEvents();
+            bindModal();
+            loadWarehouseStatus(0);
+        };
     };
 
     VAS.VAS_283_WarehouseWiseSODocumentStatusWidget.prototype.widgetFirevalueChanged = function (value) {

@@ -187,15 +187,17 @@
 
         // Sr 8.7: amounts in the order's (price list's) own currency, with that
         // currency's precision - not a hard-coded rupee sign.
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatMoney(value, symbol, precision) {
             var prec = (typeof precision === 'number' && precision >= 0) ? precision : 2;
-            var text = Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: prec, maximumFractionDigits: prec });
+            var text = Number(value || 0).toLocaleString(window.navigator.language, { minimumFractionDigits: prec, maximumFractionDigits: prec });
             return symbol ? symbol + ' ' + text : text;
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         // Sr 7.6: quantities are in the line's selected UOM and can be fractional.
         function formatQty(value) {
-            return Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+            return Number(value || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 2 });
         }
 
         // An attribute set instance with no values can still carry a description made
@@ -206,11 +208,13 @@
         }
 
         var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatDateShort(iso) {
             if (!iso) { return ''; }
-            var d = new Date(iso + 'T00:00:00');
+            var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso));
+            var d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(NaN);
             if (isNaN(d.getTime())) { return iso; }
-            return (d.getDate() < 10 ? '0' : '') + d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+            return d.toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' });
         }
 
         this.Initalize = function () {
@@ -228,7 +232,7 @@
                         '<span class="vas268-icon">' + icon('search') + '</span>' +
                         '<input class="vas268-input" type="text" autocomplete="off" aria-label="' + escapeHtml(placeholder) + '" placeholder="' + escapeHtml(placeholder) + '">' +
                         '<button type="button" class="vas268-clear" tabindex="-1" hidden aria-label="' + escapeHtml(label('VAS_268_Clear', 'Clear')) + '" title="' + escapeHtml(label('VAS_268_Clear', 'Clear')) + '">' + icon('close') + '</button>' +
-                        '<span class="vas268-kbd">' + escapeHtml(label('VAS_268_EscHint', 'Esc')) + '</span>' +
+                        // VAS163 2026-11-11: row 12 removed the "Esc" keyboard-hint badge (VAS_268_EscHint); Esc key still closes the results.
                     '</div>' +
                     '<div class="vas268-results" role="listbox"></div>' +
                 '</div>'

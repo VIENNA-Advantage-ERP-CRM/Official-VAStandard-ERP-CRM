@@ -106,23 +106,19 @@
 
         /* Compact number body (Indian Lakh/Crore or K/M/B) without the currency
            symbol - shared by the compact amount and the modal's compact units. */
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function compactNumber(value) {
             var number = Number(value || 0);
-            var abs = Math.abs(number);
-            if (usesIndianNumbering(currencyIso)) {
-                if (abs >= 10000000) { return trimZeros((number / 10000000).toFixed(2)) + ' Cr'; }
-                if (abs >= 100000) { return trimZeros((number / 100000).toFixed(2)) + ' L'; }
-                if (abs >= 1000) { return trimZeros((number / 1000).toFixed(1)) + 'K'; }
-                return number.toLocaleString('en-IN', { maximumFractionDigits: 2 });
-            }
-            if (abs >= 1000000000) { return trimZeros((number / 1000000000).toFixed(1)) + 'B'; }
-            if (abs >= 1000000) { return trimZeros((number / 1000000).toFixed(1)) + 'M'; }
-            if (abs >= 1000) { return trimZeros((number / 1000).toFixed(1)) + 'K'; }
-            return number.toLocaleString('en-US', { maximumFractionDigits: 2 });
+            return (number < 0 ? '-' : '') + VIS.Util.formatCompactAmount(Math.abs(number), currencyIso || '', stdPrecision);
+        }
+
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        function compactUnits(value) {
+            return Number(value || 0).toLocaleString(window.navigator.language, { notation: 'compact', maximumFractionDigits: 1 });
         }
 
         function formatCompactAmount(value) {
-            return (currencySymbol || currencyIso) + ' ' + compactNumber(value);
+            return (currencySymbol || currencyIso || '') + ' ' + compactNumber(value);
         }
 
         function formatFullAmount(value) {
@@ -487,7 +483,7 @@
                 return '<div class="MPC-hsp-yoy-row">' +
                     '<span class="MPC-hsp-yoy-label">' + escapeHtml(labelText) + '</span>' +
                     '<span class="MPC-hsp-yoy-track"><span class="MPC-hsp-yoy-fill ' + colorClass + '" style="width:' + width + '%"></span></span>' +
-                    '<span class="MPC-hsp-yoy-value" title="' + escapeHtml(formatFullAmount(revenue)) + '">' + escapeHtml(formatCompactAmount(revenue)) + '<small>' + escapeHtml(compactNumber(units) + ' ' + uomName) + '</small></span>' +
+                    '<span class="MPC-hsp-yoy-value" title="' + escapeHtml(formatFullAmount(revenue)) + '">' + escapeHtml(formatCompactAmount(revenue)) + '<small>' + escapeHtml(compactUnits(units) + ' ' + uomName) + '</small></span>' +
                 '</div>';
             }
 

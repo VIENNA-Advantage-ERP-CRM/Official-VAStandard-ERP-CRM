@@ -150,8 +150,9 @@
 
         var INDIAN_NUMBERING_CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function currencyLocale(iso) {
-            return INDIAN_NUMBERING_CURRENCIES.indexOf(String(iso || '').toUpperCase()) >= 0 ? 'en-IN' : 'en-US';
+            return window.navigator.language;
         }
 
         /* "ISO 1,234.56" - the ISO code comes from the document currency (or

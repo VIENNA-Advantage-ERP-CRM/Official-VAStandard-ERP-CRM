@@ -419,6 +419,14 @@
             }
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2). yyyy-MM-dd parsed by parts (no UTC shift).
+        function fmtIsoDateParts(v) {
+            var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v || ""));
+            if (!m) { return v || ""; }
+            return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+                .toLocaleDateString(window.navigator.language, { day: "2-digit", month: "short", year: "numeric" });
+        }
+
         function fieldHtml(label, value, strong, rawHtml) {
             var shown = value == null || value === "" ? "-" : value;
             return '<div class="vas-ra-field">' +
@@ -1397,7 +1405,7 @@
                 grnLinkFieldHtml(lbl("VAS_090_SourceGRN", "Source GRN"), header.grnNo, header.grnId) +
                 fieldHtml(lbl("VAS_090_Vendor", "Vendor"), header.supplier) +
                 fieldHtml(lbl("VAS_090_Warehouse", "Warehouse"), header.warehouseName) +
-                fieldHtml(lbl("VAS_090_MovementDate", "Movement Date"), header.docDate) +
+                fieldHtml(lbl("VAS_090_MovementDate", "Movement Date"), fmtIsoDateParts(header.docDate)) +
                 '</div>' +
                 '<div class="vas-ra-lines-title">' + escapeHtml(lbl("VAS_090_ConfirmationLines", "Confirmation Lines")) + '</div>' +
                 '<div class="vas-ra-gc-list vas-ra-gc-compact">';

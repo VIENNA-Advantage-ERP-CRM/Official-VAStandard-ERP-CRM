@@ -125,9 +125,9 @@
 
             // 3-letter month labels in the select (matches VAS_165_LocationWiseInventoryCountWidget) -
             // full names overflowed the fixed-width control ("Septemb").
-            var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-            for (var m = 0; m < months.length; m++) {
-                var $opt = $('<option value="' + (m + 1) + '">' + months[m] + '</option>');
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            for (var m = 0; m < 12; m++) {
+                var $opt = $('<option value="' + (m + 1) + '">' + new Date(2000, m, 1).toLocaleDateString(window.navigator.language, { month: 'short' }) + '</option>');
                 if (m + 1 === selectedMonth) {
                     $opt.attr('selected', 'selected');
                 }
@@ -348,8 +348,8 @@
                 $modalOverlay.remove();
             }
 
-            var months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-            var monthName = months[selectedMonth - 1] || "";
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            var periodLabel = new Date(Number(selectedYear), Number(selectedMonth) - 1, 1).toLocaleDateString(window.navigator.language, { month: 'long', year: 'numeric' });
 
             var $overlay = $('<div class="vas-adjwisecount-modal-overlay">');
             var $dialog = $('<div class="vas-adjwisecount-modal-dialog" role="dialog" aria-modal="true">');
@@ -358,7 +358,7 @@
             var $header = $('<div class="vas-adjwisecount-modal-header">');
             var $headerLeft = $('<div class="vas-adjwisecount-modal-header-left">');
             var $title = $('<h3 class="vas-adjwisecount-modal-title">' + typeTitle + '</h3>');
-            var $subtitle = $('<span class="vas-adjwisecount-modal-subtitle">' + monthName + ' ' + selectedYear + '</span>');
+            var $subtitle = $('<span class="vas-adjwisecount-modal-subtitle">' + periodLabel + '</span>');
             $headerLeft.append($title).append($subtitle);
 
             var $closeBtn = $('<button type="button" class="vas-adjwisecount-modal-close" aria-label="' + lbl("VAS_162_CloseModal") + '">&times;</button>');
@@ -390,7 +390,7 @@
                 dataType: "json",
                 success: function (res) {
                     if (res && res.details && res.details.length > 0) {
-                        $subtitle.text(monthName + ' ' + selectedYear + ' · ' + res.details.length + ' ' + lbl("VAS_162_RecordsSuffix"));
+                        $subtitle.text(periodLabel + ' · ' + res.details.length + ' ' + lbl("VAS_162_RecordsSuffix"));
                         renderDetailGrid($body, res.details);
                     } else {
                         // Render the grid with no rows rather than replacing the body: the popup

@@ -304,7 +304,8 @@
             // Notes and Activity close the panel: both are commentary on
             // everything above them, so they read last.
             renderNotes();
-            renderActivity();
+            // VAS163 2026-11-10: Activity section commented out (6-Nov retest2, All Right Panels).
+            // renderActivity();
         }
 
         // ----------------------------------------------------------------- //
@@ -351,7 +352,8 @@
         }
 
         function currencyToken() {
-            return (data && (data.CurSymbol || data.ISO_Code)) || "₹";
+            // VAS163 2026-11-10: no hard-coded currency fallback (6-Nov retest2).
+            return (data && (data.CurSymbol || data.ISO_Code)) || "";
         }
 
         // ---------- Status map (DocStatus code -> label + tone) ---------- //
@@ -561,7 +563,6 @@
         // ---------- Generated from (origin chips) ---------- //
 
         function renderGeneratedFrom() {
-            var $sec = section(VIS.Msg.getMsg("VAS_103_GeneratedFrom"), null);
             var $row = $('<div class="vas_103-origins"></div>');
 
             // A chip is only drawn for an origin the transfer actually has, and it
@@ -583,11 +584,21 @@
                 any = true;
             }
             if (!any) {
+                // VAS163 2026-11-10: a manual transfer (no origin at all) no longer
+                // gets a Generated From section holding one "Raised manually" chip;
+                // it wears that as a tag beside the status pills at the top of the
+                // panel instead. A transfer with any reference keeps the section.
+                var $hdrPills = $body.find(".vas_103-hdrPills").first();
+                if ($hdrPills.length) {
+                    $hdrPills.append(headerPill(getMsg("VAS_103_ManualTransfer", "Raised manually"), "neutral", "pencil", false));
+                    return;
+                }
                 $row.append($('<span class="vas_103-originChip vas_103-is-muted"></span>')
                     .append(svgIcon("link"))
                     .append($('<span class="vas_103-originLbl"></span>')
                         .text(getMsg("VAS_103_ManualTransfer", "Raised manually"))));
             }
+            var $sec = section(VIS.Msg.getMsg("VAS_103_GeneratedFrom"), null);
             $sec.append($row);
         }
 

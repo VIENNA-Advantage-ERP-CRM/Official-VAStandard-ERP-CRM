@@ -544,7 +544,8 @@
             renderNotes();
             // Activity comes LAST — it is the longest section and it pages, so
             // anything under it would be pushed off the bottom of the panel.
-            renderActivity();
+            // VAS163 2026-11-10: Activity section commented out (6-Nov retest2, All Right Panels).
+            // renderActivity();
         }
 
         // ----------------------------------------------------------------- //
@@ -599,9 +600,10 @@
                 : value;
         }
 
-        // The currency token: prefer the linked order's symbol / ISO, else INR.
+        // The currency token: the linked order's symbol, else its ISO code.
+        // VAS163 2026-11-10: no hard-coded "₹" fallback (6-Nov retest2).
         function currencyToken() {
-            return (data && (data.CurSymbol || data.ISO_Code)) || "₹";
+            return (data && (data.CurSymbol || data.ISO_Code)) || "";
         }
 
         // hasLines() is gone with the condition it served. It gated the Delivery
@@ -861,7 +863,16 @@
                 any = true;
             }
 
+            // VAS163 2026-11-10: a manual delivery order (no origin at all) no
+            // longer gets a Reference strip holding one "Manual" chip; it wears a
+            // "Manual" tag beside the status pills at the top of the panel
+            // instead. A DO with any reference keeps the strip unchanged.
             if (!any) {
+                var $hdrPills = $body.find(".vas_100-hdrPills").first();
+                if ($hdrPills.length) {
+                    $hdrPills.append(headerPill(msg("VAS_100_Manual", "Manual"), "neutral", "pencil", false));
+                    return;
+                }
                 $chips.append(originChip("pencil", msg("VAS_100_Manual", "Manual"),
                     null, null, "info", null, 0));
             }

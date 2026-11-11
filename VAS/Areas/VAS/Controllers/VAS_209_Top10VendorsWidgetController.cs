@@ -448,7 +448,7 @@ namespace VIS.Controllers
                             po = docNo,
                             dateShort = dateOrdered.HasValue ? dateOrdered.Value.ToString("dd MMM") : "",
                             dateFull = dateOrdered.HasValue ? dateOrdered.Value.ToString("dd MMM yyyy") : "",
-                            dateIso = dateOrdered.HasValue ? dateOrdered.Value.ToString("yyyy-MM-dd") : "",
+                            dateIso = dateOrdered.HasValue ? dateOrdered.Value.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) : "", // VAS163 2026-11-10: browser locale (6-Nov retest2).
                             vendor = vendorName,
                             wh = string.IsNullOrEmpty(whName) ? "—" : whName,
                             rep = string.IsNullOrEmpty(repName) ? "—" : repName,
@@ -563,7 +563,9 @@ namespace VIS.Controllers
                             createdBy = Util.GetValueOfString(dr["CreatedByName"]),
                             createdOn = dtCreated.HasValue ? dtCreated.Value.ToString("dd MMM yyyy") : "",
                             dateFull = dtOrd.HasValue ? dtOrd.Value.ToString("dd MMM yyyy") : "",
-                            expFull = dtProm.HasValue ? dtProm.Value.ToString("dd MMM yyyy") : "—"
+                            expFull = dtProm.HasValue ? dtProm.Value.ToString("dd MMM yyyy") : "—",
+                            // VAS163 2026-11-10: browser locale (6-Nov retest2). The widget formats dateIso itself.
+                            dateIso = dtOrd.HasValue ? dtOrd.Value.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) : ""
                         };
                     }
                 }

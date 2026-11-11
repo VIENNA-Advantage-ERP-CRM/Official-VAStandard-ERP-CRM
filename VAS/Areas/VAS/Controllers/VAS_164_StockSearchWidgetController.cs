@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Globalization;
 using System.Web.Mvc;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
@@ -341,6 +342,9 @@ namespace VAS.Controllers
                         documentNo = Util.GetValueOfString(dr["DocumentNo"]),
                         movementDate = (movementDate.HasValue && movementDate.Value != DateTime.MinValue)
                             ? movementDate.Value.ToString("dd MMM yyyy") : "",
+                        // VAS163 2026-11-10: browser locale (6-Nov retest2) - client formats this ISO date.
+                        movementDateIso = (movementDate.HasValue && movementDate.Value != DateTime.MinValue)
+                            ? movementDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                         docStatus = Util.GetValueOfString(dr["DocStatus"]),
                         warehouse = Util.GetValueOfString(dr["WarehouseName"]),
                         locator = Util.GetValueOfString(dr["LocatorCode"]),

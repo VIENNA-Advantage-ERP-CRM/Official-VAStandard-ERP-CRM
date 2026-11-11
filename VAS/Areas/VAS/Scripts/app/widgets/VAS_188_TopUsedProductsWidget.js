@@ -142,25 +142,11 @@
             var sign = val < 0 ? '-' : '';
             var absVal = Math.abs(val);
 
-            if (isIndianISO(currencyIso)) {
-                if (absVal >= 10000000) {
-                    return sign + prefix + (absVal / 10000000).toFixed(1) + 'Cr';
-                } else if (absVal >= 100000) {
-                    return sign + prefix + (absVal / 100000).toFixed(1) + 'L';
-                } else if (absVal >= 1000) {
-                    return sign + prefix + (absVal / 1000).toFixed(1) + 'k';
-                }
-                return sign + prefix + absVal.toLocaleString('en-IN');
-            } else {
-                if (absVal >= 1000000000) {
-                    return sign + prefix + (absVal / 1000000000).toFixed(1) + 'B';
-                } else if (absVal >= 1000000) {
-                    return sign + prefix + (absVal / 1000000).toFixed(1) + 'M';
-                } else if (absVal >= 1000) {
-                    return sign + prefix + (absVal / 1000).toFixed(1) + 'k';
-                }
-                return sign + prefix + absVal.toLocaleString(window.navigator.language || 'en-US');
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            if (absVal >= 1000) {
+                return sign + prefix + VIS.Util.formatCompactAmount(absVal, currencyIso || '');
             }
+            return sign + prefix + absVal.toLocaleString(window.navigator.language);
         }
 
         function formatCurrencyFull(value) {
@@ -171,11 +157,8 @@
             var sign = val < 0 ? '-' : '';
             var absVal = Math.abs(val);
 
-            if (isIndianISO(currencyIso)) {
-                return sign + prefix + absVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            } else {
-                return sign + prefix + absVal.toLocaleString(window.navigator.language || 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            }
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            return sign + prefix + absVal.toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 // ===== NEW CODE END — currency format =====
 // ----- OLD CODE (kept for rollback, do not delete) -----
@@ -190,9 +173,21 @@
 //      }
 // ----- END OLD CODE -----
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatMonthName(m) {
-            var monthNames = label("VAS_188_Months", "Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec").split(',');
-            return monthNames[Math.max(0, Math.min(11, m - 1))];
+            return new Date(2000, Math.max(0, Math.min(11, Number(m) - 1)), 1).toLocaleDateString(window.navigator.language, { month: 'short' });
+        }
+
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        function formatMonthYear(m, y) {
+            return new Date(Number(y), Math.max(0, Math.min(11, Number(m) - 1)), 1).toLocaleDateString(window.navigator.language, { month: 'short', year: 'numeric' });
+        }
+
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        function formatIsoDate(iso, fallback) {
+            var p = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+            if (!p) { return fallback || ''; }
+            return new Date(Number(p[1]), Number(p[2]) - 1, Number(p[3])).toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' });
         }
 
         function getRankBadge(rank) {
@@ -273,7 +268,7 @@
             if (pageNo > totalPages) { pageNo = totalPages; }
 
             if (productsData.length === 0) {
-                $body.html('<div class="vas-tup-empty">' + escapeHtml(label("VAS_188_NoProductsConsumedIn", "No products consumed in") + ' ' + formatMonthName(selectedMonth) + ' ' + selectedYear + '.') + '</div>');
+                $body.html('<div class="vas-tup-empty">' + escapeHtml(label("VAS_188_NoProductsConsumedIn", "No products consumed in") + ' ' + formatMonthYear(selectedMonth, selectedYear) + '.') + '</div>');
                 if ($footHelper) { $footHelper.text('0 ' + label("VAS_188_Of", "of") + ' 0'); }
                 if ($pagerText) { $pagerText.text('1 ' + label("VAS_188_Of", "of") + ' 1'); }
                 if ($prevBtn) { $prevBtn.prop('disabled', true); }
@@ -379,7 +374,7 @@
         function openProductUsageDetailModal(pid, pname, categoryName, uomName, totalQty, totalValue) {
             $(document).off("keydown.vas-tup-modal"); if ($modal) { $modal.remove(); }
 
-            var monthFull = formatMonthName(selectedMonth) + ' ' + selectedYear;
+            var monthFull = formatMonthYear(selectedMonth, selectedYear);
 
             // Unit price of the product's selected UOM (e.g. price per millilitre): the consumed
             // value divided by the converted consumed quantity. The controller already reports
@@ -489,7 +484,7 @@
                             ? '<button type="button" class="vas-tup-m-doclink" data-invid="' + rec.inventoryId + '">' + escapeHtml(rec.documentNo) + '</button>'
                             : escapeHtml(rec.documentNo)) +
                         '</td>' +
-                        '<td>' + escapeHtml(rec.movementDate) + '</td>' +
+                        '<td>' + escapeHtml(formatIsoDate(rec.movementDateIso, rec.movementDate)) + '</td>' +
                         '<td title="' + escapeHtml(rec.whLoc) + '">' + escapeHtml(rec.whLoc) + '</td>' +
                         '<td>' + escapeHtml(formatQty(rec.qty)) + '</td>' +
                         '<td>' + escapeHtml(rec.uomName || label("VAS_188_UomFallback", "Nos")) + '</td>' +
@@ -630,9 +625,9 @@
             $qtyPill = $card.find('.vas-tup-qty-pill');
             $valPill = $card.find('.vas-tup-val-pill');
 
-            var monthNames = label("VAS_188_Months", "Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec").split(',');
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
             for (var m = 1; m <= 12; m++) {
-                $monthSelect.append('<option value="' + m + '" ' + (m === selectedMonth ? 'selected' : '') + '>' + escapeHtml(monthNames[m - 1]) + '</option>');
+                $monthSelect.append('<option value="' + m + '" ' + (m === selectedMonth ? 'selected' : '') + '>' + escapeHtml(formatMonthName(m)) + '</option>');
             }
 
             var currentYear = DateTimeNowYear();

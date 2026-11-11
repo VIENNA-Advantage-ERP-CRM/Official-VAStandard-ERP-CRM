@@ -544,7 +544,8 @@
             // pushed off the bottom of the panel.
             renderRelatedDocuments();
             renderNotes();
-            renderActivity();
+            // VAS163 2026-11-10: Activity section commented out (6-Nov retest2, All Right Panels).
+            // renderActivity();
         }
 
         // ----------------------------------------------------------------- //
@@ -591,7 +592,8 @@
         }
 
         function currencyToken() {
-            return (data && (data.CurSymbol || data.ISO_Code)) || "₹";
+            // VAS163 2026-11-10: no hard-coded currency fallback (6-Nov retest2).
+            return (data && (data.CurSymbol || data.ISO_Code)) || "";
         }
 
         // ---------- Status map (code -> label + tone) ---------- //

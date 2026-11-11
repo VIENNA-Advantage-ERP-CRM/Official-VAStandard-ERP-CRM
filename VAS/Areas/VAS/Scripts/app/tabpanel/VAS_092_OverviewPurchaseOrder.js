@@ -1270,7 +1270,16 @@
                 any = true;
             }
 
+            // VAS163 2026-11-10: a manual PO (no origin at all) no longer gets a
+            // Generated From strip holding one "Manual" chip; it wears a "Manual"
+            // tag beside the status pills at the top of the panel instead. A PO
+            // with any reference keeps the strip unchanged.
             if (!any) {
+                var $hdrPills = $body.find(".vas_092-hdrPills").first();
+                if ($hdrPills.length) {
+                    $hdrPills.append(headerPill(getMsg("VAS_092_Manual"), "neutral", "pencil", false));
+                    return;
+                }
                 $chips.append(originChip("pencil", getMsg("VAS_092_Manual"), null, null, "info", null, 0));
             }
 
@@ -2454,7 +2463,8 @@
             // already lists them (type "email", with the same subject / recipient
             // row and click-to-open body), so a separate Emails section repeated
             // the same records twice in the panel.
-            if (activity.length) renderActivity($stack, activity);
+            // VAS163 2026-11-10: Activity section commented out (6-Nov retest2, All Right Panels).
+            // if (activity.length) renderActivity($stack, activity);
         }
 
         // ---------- Notes ---------- //

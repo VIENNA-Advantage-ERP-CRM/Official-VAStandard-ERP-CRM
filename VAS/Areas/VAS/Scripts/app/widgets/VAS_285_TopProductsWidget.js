@@ -221,6 +221,7 @@
         var instanceTag = 'i' + Math.random().toString(36).slice(2, 9);
 
         var rankState = 'loading'; // 'loading' | 'ready' | 'error'
+        var currency = { iso: '', symbol: '', precision: null }; // VAS163: base currency from GetTopProducts
         var products = [];         // up to 4 rows for the current period
 
         var prodState = null;      // { productId, productName, sku, summary, docs:{page,size,total,rows} }
@@ -261,19 +262,48 @@
         }
 
         // List rows show the full amount (not a mix of "₹ 1.37 L" and "₹ 42,240") so values in one list compare at a glance.
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatINRFull(value) {
-            return '₹ ' + Math.round(Number(value || 0)).toLocaleString('en-IN');
+            var sym = currency.symbol || currency.iso || '';
+            var text = Math.round(Number(value || 0)).toLocaleString(window.navigator.language, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+            return sym ? sym + ' ' + text : text;
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        function applyCurrency(data) {
+            if (!data) { return; }
+            currency.iso = data.CurrencyIso || '';
+            currency.symbol = data.CurrencySymbol || '';
+            currency.precision = (typeof data.CurrencyPrecision === 'number') ? data.CurrencyPrecision : null;
+        }
+
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatINR(value) {
             var num = Number(value || 0);
-            if (num >= 1e7) { return '₹ ' + (num / 1e7).toFixed(2) + ' Cr'; }
-            if (num >= 1e5) { return '₹ ' + (num / 1e5).toFixed(2) + ' L'; }
-            return '₹ ' + Math.round(num).toLocaleString('en-IN');
+            var sym = currency.symbol || currency.iso || '';
+            var text = (num < 0 ? '-' : '') + VIS.Util.formatCompactAmount(Math.abs(num), currency.iso, currency.precision);
+            return sym ? sym + ' ' + text : text;
         }
 
+        // VAS163 2026-11-11: Row 93 compact amount in a document's own currency (falls back to base) - as VAS_270.
+        function formatDocAmount(value, iso, symbol, precision) {
+            if (!iso && !symbol) { return formatINR(value); }
+            var num = Number(value || 0);
+            var sym = symbol || iso || '';
+            var text = (num < 0 ? '-' : '') + VIS.Util.formatCompactAmount(Math.abs(num), iso, precision);
+            return sym ? sym + ' ' + text : text;
+        }
+
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatNum(value) {
-            return Math.round(Number(value || 0)).toLocaleString('en-IN');
+            return Math.round(Number(value || 0)).toLocaleString(window.navigator.language);
+        }
+
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        function formatMoney(value, symbol, precision) {
+            var prec = (typeof precision === 'number' && precision >= 0) ? precision : 2;
+            var text = Number(value || 0).toLocaleString(window.navigator.language, { minimumFractionDigits: prec, maximumFractionDigits: prec });
+            return symbol ? symbol + ' ' + text : text;
         }
 
         function formatPercent(value) {
@@ -281,20 +311,24 @@
             return Math.round(Number(value)) + '%';
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function parseIso(iso) {
-            if (!iso) { return null; }
-            var d = new Date(iso + 'T00:00:00');
+            var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+            if (!m) { return null; }
+            var d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
             return isNaN(d.getTime()) ? null : d;
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatDateFull(iso) {
             var d = parseIso(iso);
             if (!d) { return ''; }
-            return (d.getDate() < 10 ? '0' : '') + d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+            return d.toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' });
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function periodLabel() {
-            return MONTHS[selectedMonth()] + ' ' + selectedYear();
+            return new Date(selectedYear(), selectedMonth(), 1).toLocaleDateString(window.navigator.language, { month: 'short', year: 'numeric' });
         }
 
         function selectedMonth() { return $monthSel && $monthSel.length ? Number($monthSel.val()) : CUR_M; }
@@ -318,9 +352,11 @@
         /* ============================================================
          * Widget shell: header (title/subtitle + Month/Year filter) + bar list
          * ============================================================ */
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function fillMonthSelect($sel) {
             $sel.html(MONTHS.map(function (m, i) {
-                return '<option value="' + i + '"' + (i === CUR_M ? ' selected' : '') + '>' + m + '</option>';
+                m = new Date(CUR_Y, i, 1).toLocaleDateString(window.navigator.language, { month: 'short' });
+                return '<option value="' + i + '"' + (i === CUR_M ? ' selected' : '') + '>' + escapeHtml(m) + '</option>';
             }).join(''));
         }
 
@@ -393,7 +429,7 @@
                 success: function (res) {
                     var parsed = parseResponse(res);
                     if (parsed.Error || !parsed.Products) { rankState = 'error'; products = []; }
-                    else { rankState = 'ready'; products = parsed.Products; }
+                    else { rankState = 'ready'; applyCurrency(parsed); products = parsed.Products; }
                     renderList();
                 },
                 error: function () {
@@ -599,6 +635,10 @@
                 WarehouseName: row.WarehouseName || '',
                 RepresentativeName: row.RepresentativeName || '',
                 OrderValue: Number(row.OrderValue) || 0,
+                // VAS163 2026-11-11: Row 93 - document (price list) currency of OrderValue.
+                CurrencySymbol: row.CurrencySymbol || '',
+                CurrencyIso: row.CurrencyIso || '',
+                CurrencyPrecision: (typeof row.CurrencyPrecision === 'number') ? row.CurrencyPrecision : 2,
                 DocumentStatus: row.DocumentStatus || '',
                 DeliveryStatus: row.DeliveryStatus || '',
                 DeliveryStatusCode: row.DeliveryStatusCode || 'PENDING'
@@ -660,7 +700,8 @@
                     cellHtml(row.CustomerName, 'vas285-c-prim'),
                     cellHtml(row.WarehouseName || '—', 'vas285-c-std'),
                     cellHtml(row.RepresentativeName || '—', 'vas285-c-std'),
-                    cellHtml(formatINR(row.OrderValue), 'vas285-c-emph', 'right'),
+                    // VAS163 2026-11-11: Row 93 - Value with the order's price-list currency.
+                    cellHtml(formatDocAmount(row.OrderValue, row.CurrencyIso, row.CurrencySymbol, row.CurrencyPrecision), 'vas285-c-emph', 'right'),
                     '<span class="vas285-cell" title="' + escapeHtml(row.DeliveryStatus) + '"><span class="vas285-chip ' + deliveryChipClass(row.DeliveryStatusCode) + '">' + escapeHtml(row.DeliveryStatus) + '</span></span>',
                     '<span class="vas285-cell" title="' + escapeHtml(row.DocumentStatus) + '"><span class="vas285-chip vas285-chip-ok">' + escapeHtml(row.DocumentStatus) + '</span></span>'
                 ];
@@ -869,7 +910,7 @@
                     cellHtml(formatNum(line.QtyDelivered), 'vas285-c-std', 'right'),
                     cellHtml(formatNum(line.QtyPending), 'vas285-c-prim', 'right'),
                     cellHtml(formatNum(line.FreeStock), (line.FreeStock < line.QtyPending ? 'vas285-c-short' : 'vas285-c-ok'), 'right'),
-                    cellHtml('₹ ' + formatNum(line.Rate), 'vas285-c-std', 'right'),
+                    cellHtml(formatMoney(line.Rate, currency.symbol || currency.iso || '', 2), 'vas285-c-std', 'right'),
                     cellHtml(formatINR(line.Amount), 'vas285-c-emph', 'right')
                 ].join('') + '<span class="vas285-cell"><span class="vas285-chip ' + st.cls + '" title="' + escapeHtml(st.text) + '">' + escapeHtml(st.text) + '</span></span>';
                 return '<div class="vas285-mrow" style="grid-template-columns:' + tpl + '">' + cells + '</div>';

@@ -330,7 +330,8 @@
 
         function formatQty(value, precision) {
             var p = Math.max(0, Math.min(10, Number(precision) || 0));
-            return roundTo(value, p).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: p });
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            return roundTo(value, p).toLocaleString(window.navigator.language, { minimumFractionDigits: 0, maximumFractionDigits: p });
         }
 
         /* QA 8.75: rate with exactly two decimals. */
@@ -371,38 +372,55 @@
             return '';
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        // The SO-to-be's currency (header, else the form defaults = quotation price list's
+        // currency) from GetOrderFormDefaults' Currencies list; {} when not known yet.
+        function wizardCurrency() {
+            if (!wizard) { return {}; }
+            var id = (wizard.header && wizard.header.currencyId) || (wizard.formDefaults && wizard.formDefaults.CurrencyId);
+            return ((wizard.formOptions && wizard.formOptions.Currencies) || []).filter(function (x) { return x.Id === id; })[0] || {};
+        }
+
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatINR(value) {
+            var cur = wizardCurrency();
             var num = Number(value || 0);
-            if (num >= 1e7) { return '₹ ' + (num / 1e7).toFixed(2) + ' Cr'; }
-            if (num >= 1e5) { return '₹ ' + (num / 1e5).toFixed(2) + ' L'; }
-            return '₹ ' + Math.round(num).toLocaleString('en-IN');
+            var sym = String(cur.Symbol || cur.Code || '').trim();
+            var text = (num < 0 ? '-' : '') + VIS.Util.formatCompactAmount(Math.abs(num), cur.Code || '');
+            return sym ? sym + ' ' + text : text;
         }
 
         function formatNum(value) {
             return Math.round(Number(value || 0) * 100) / 100;
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatNumDisplay(value) {
             var n = Number(value || 0);
-            return (Math.round(n * 100) / 100).toLocaleString('en-IN');
+            return (Math.round(n * 100) / 100).toLocaleString(window.navigator.language);
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        // yyyy-MM-dd parsed by parts (local date, no UTC shift).
         function parseIso(iso) {
-            if (!iso) { return null; }
-            var d = new Date(iso + 'T00:00:00');
+            var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+            if (!m) { return null; }
+            var d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
             return isNaN(d.getTime()) ? null : d;
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatDateShort(iso) {
             var d = parseIso(iso);
             if (!d) { return '—'; }
-            return (d.getDate() < 10 ? '0' : '') + d.getDate() + ' ' + MONTHS[d.getMonth()];
+            return d.toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short' });
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatDateFull(iso) {
             var d = parseIso(iso);
             if (!d) { return '—'; }
-            return (d.getDate() < 10 ? '0' : '') + d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+            return d.toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' });
         }
 
         function parseResponse(res) {
@@ -1604,9 +1622,10 @@
                 '<span>' + escapeHtml(label('VAS_289_TotalsOrderTotal', 'Order total')) + '</span><b>' + escapeHtml(formatAmount(subtotal + tax)) + '</b>';
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatAmount(value) {
             var code = currencyCode(wizard.header.currencyId);
-            var text = (Number(value) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            var text = (Number(value) || 0).toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             return code ? code + ' ' + text : text;
         }
 

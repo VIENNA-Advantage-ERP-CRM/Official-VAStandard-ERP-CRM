@@ -73,11 +73,13 @@
         return lbl('VAS_172_Months', 'Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec').split(',');
     }
 
+    // VAS163 2026-11-10: browser locale (6-Nov retest2).
     function formatDate(iso) {
         if (!iso) { return '—'; }
-        var d = new Date(iso);
+        var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso));
+        var d = m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(iso);
         if (isNaN(d)) { return iso; }
-        return d.getDate() + ' ' + monthNames()[d.getMonth()] + ' ' + d.getFullYear();
+        return d.toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' });
     }
 
     // ===== NEW CODE START — currency format (agent C06, 2026-08-19) =====
@@ -379,10 +381,8 @@
                         '</div>' +
                         '<div class="vas-172-modal-body">' +
                             '<div class="vas-172-field-grid">' +
-                                '<div class="vas-172-field">' +
-                                    '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_DocumentNumber', 'Document Number')) + '</div>' +
-                                    '<div class="vas-172-field-value">' + escapeHtml(confirmNo(tr)) + '</div>' +
-                                '</div>' +
+                                // VAS163 2026-11-11: Row 10 the confirmation Document Number field is removed (the number is
+                                // already in the pop-up title); the 4 remaining fields fill the 2-column grid evenly.
                                 '<div class="vas-172-field">' +
                                     '<div class="vas-172-field-label">' + escapeHtml(lbl('VAS_172_MaterialTransfer', 'Material Transfer')) + '</div>' +
                                     '<div class="vas-172-field-value">' + (transferLink(tr) || '—') + '</div>' +

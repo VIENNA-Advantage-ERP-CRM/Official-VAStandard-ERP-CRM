@@ -162,20 +162,9 @@
         var sym = curSymbol || curIso || '';
 
         // Compact formatting for high values
-        if (curIso === 'INR' || sym === '₹') {
-            if (Math.abs(val) >= 10000000) {
-                return sym + ' ' + (val / 10000000).toFixed(2) + ' Cr';
-            }
-            if (Math.abs(val) >= 100000) {
-                return sym + ' ' + (val / 100000).toFixed(2) + ' L';
-            }
-        } else {
-            if (Math.abs(val) >= 1000000) {
-                return sym + ' ' + (val / 1000000).toFixed(2) + ' M';
-            }
-            if (Math.abs(val) >= 10000) {
-                return sym + ' ' + (val / 1000).toFixed(2) + ' k';
-            }
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        if (Math.abs(val) >= (VIS.Util.usesIndianNumbering(curIso) ? 100000 : 10000)) {
+            return sym + ' ' + (val < 0 ? '-' : '') + VIS.Util.formatCompactAmount(Math.abs(val), curIso || '', p);
         }
 
         var formatted = val.toLocaleString(window.navigator.language, {
@@ -186,7 +175,16 @@
         return sym ? (sym + ' ' + formatted) : formatted;
     }
 
-    var ICON_BACK = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>';
+    // VAS163 2026-11-10: browser locale (6-Nov retest2). opts default: dd MMM yyyy.
+    function formatIsoDate(iso, opts) {
+        var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+        if (!m) { return ''; }
+        return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+            .toLocaleDateString(window.navigator.language, opts || { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+    var SHORT_DATE = { day: '2-digit', month: 'short' };
+
+    var ICON_BACK ='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>';
     var ICON_CLOSE = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
     var ICON_PREV = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>';
     var ICON_NEXT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>';
@@ -478,17 +476,21 @@
             for (var i = 0; i < pageRecords.length; i++) {
                 var p = pageRecords[i];
                 var poNo = p.PurchaseOrderNo || ('PO-' + p.PurchaseOrderID);
-                var poDateDisplay = p.OrderDateShort || p.OrderDateDisplay || p.OrderDate;
+                // VAS163 2026-11-10: browser locale (6-Nov retest2).
+                var poDateDisplay = formatIsoDate(p.OrderDate, SHORT_DATE);
+                var poDateFull = formatIsoDate(p.OrderDate);
                 var vendor = p.VendorName || '—';
                 var wh = p.WarehouseName || '—';
-                var recdOn = p.ReceivedOnShort || p.ReceivedOnDisplay || p.ReceivedOn || '—';
+                var recdOn = formatIsoDate(p.ReceivedOn, SHORT_DATE) || '—';
+                var recdOnFull = formatIsoDate(p.ReceivedOn);
+                var dueFull = formatIsoDate(p.PaymentDue);
 
                 var dueCellHtml = '';
                 if (p.IsOverdue) {
                     var overdueLabel = lbl('VAS_214_Overdue', 'Overdue') + ' ' + p.OverdueDays + 'd';
                     dueCellHtml = '<span class="vas-214-chip vas-214-chip-risk" title="' + esc(overdueLabel) + '">' + esc(overdueLabel) + '</span>';
                 } else {
-                    var dueText = p.PaymentDueShort || p.PaymentDueDisplay || p.PaymentDue || '—';
+                    var dueText = formatIsoDate(p.PaymentDue, SHORT_DATE) || '—';
                     dueCellHtml = '<span class="vas-214-c-std" title="' + esc(dueText) + '">' + esc(dueText) + '</span>';
                 }
 
@@ -503,11 +505,11 @@
                                 esc(poNo) +
                             '</button>' +
                         '</span>' +
-                        '<span class="vas-214-cell vas-214-c-std" title="' + esc(p.OrderDateDisplay || poDateDisplay) + '">' + esc(poDateDisplay) + '</span>' +
+                        '<span class="vas-214-cell vas-214-c-std" title="' + esc(poDateFull || poDateDisplay) + '">' + esc(poDateDisplay) + '</span>' +
                         '<span class="vas-214-cell vas-214-c-std" title="' + esc(vendor) + '">' + esc(vendor) + '</span>' +
                         '<span class="vas-214-cell vas-214-c-dark" title="' + esc(wh) + '">' + esc(wh) + '</span>' +
-                        '<span class="vas-214-cell vas-214-c-std" title="' + esc(p.ReceivedOnDisplay || recdOn) + '">' + esc(recdOn) + '</span>' +
-                        '<span class="vas-214-cell" title="' + esc(p.PaymentDueDisplay || '') + '">' + dueCellHtml + '</span>' +
+                        '<span class="vas-214-cell vas-214-c-std" title="' + esc(recdOnFull || recdOn) + '">' + esc(recdOn) + '</span>' +
+                        '<span class="vas-214-cell" title="' + esc(dueFull) + '">' + dueCellHtml + '</span>' +
                         '<div class="vas-214-cell vas-214-right">' +
                             '<span class="vas-214-c-emph" title="' + esc(balFormatted) + '">' + esc(balFormatted) + '</span>' +
                             '<div class="vas-214-sub-txt" title="' + esc(paidText) + '">' + esc(paidText) + '</div>' +
@@ -839,14 +841,16 @@
                     var hdr = data.header || {};
 
                     var vendor = hdr.VendorName || (po ? po.VendorName : '—');
-                    var dateDisplay = hdr.OrderDateDisplay || (po ? po.OrderDateDisplay : '—');
+                    // VAS163 2026-11-10: browser locale (6-Nov retest2).
+                    var dateDisplay = formatIsoDate(hdr.OrderDate) || (po ? (formatIsoDate(po.OrderDate) || '—') : '—');
                     var whName = hdr.WarehouseName || (po ? po.WarehouseName : '—');
-                    var createdBy = (hdr.CreatedBy || '') + (hdr.CreatedOn ? (' · ' + hdr.CreatedOn) : '');
+                    var createdOnDisp = formatIsoDate(hdr.CreatedOnIso);
+                    var createdBy = (hdr.CreatedBy || '') + (createdOnDisp ? (' · ' + createdOnDisp) : '');
 
                     var totalPayableFmt = po ? formatMoney(po.TotalPayable, po.CurrencySymbol, po.CurrencyISO, po.StdPrecision) : '—';
                     var paidFmt = po ? formatMoney(po.PaidAmount, po.CurrencySymbol, po.CurrencyISO, po.StdPrecision) : '—';
                     var balFmt = po ? formatMoney(po.BalanceDue, po.CurrencySymbol, po.CurrencyISO, po.StdPrecision) : '—';
-                    var dueDisplay = po ? (po.PaymentDueDisplay || po.PaymentDueShort || '—') : '—';
+                    var dueDisplay = po ? (formatIsoDate(po.PaymentDue) || '—') : '—';
 
                     // Fetch PO line items
                     $.ajax({

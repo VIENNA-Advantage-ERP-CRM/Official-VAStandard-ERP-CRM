@@ -133,32 +133,12 @@
             if (isNaN(val)) { val = 0; }
             var sym = currencySymbol || currencyIso || "";
             var iso = (currencyIso || "").toUpperCase();
-            var isIndian = isIndianIso(iso);
-
-            var formatted = "";
             var absVal = Math.abs(val);
 
-            if (isIndian) {
-                if (absVal >= 10000000) {
-                    formatted = (val / 10000000).toFixed(1) + 'Cr';
-                } else if (absVal >= 100000) {
-                    formatted = (val / 100000).toFixed(1) + 'L';
-                } else if (absVal >= 1000) {
-                    formatted = (val / 1000).toFixed(1) + 'k';
-                } else {
-                    formatted = val.toLocaleString('en-IN');
-                }
-            } else {
-                if (absVal >= 1000000000) {
-                    formatted = (val / 1000000000).toFixed(1) + 'B';
-                } else if (absVal >= 1000000) {
-                    formatted = (val / 1000000).toFixed(1) + 'M';
-                } else if (absVal >= 1000) {
-                    formatted = (val / 1000).toFixed(1) + 'k';
-                } else {
-                    formatted = val.toLocaleString(window.navigator.language);
-                }
-            }
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            var formatted = absVal >= 1000
+                ? (val < 0 ? '-' : '') + VIS.Util.formatCompactAmount(absVal, iso)
+                : val.toLocaleString(window.navigator.language);
 
             if (sym) {
                 return sym + (sym.length > 1 && !sym.match(/^[₹$€£¥]$/) ? " " : "") + formatted;
@@ -171,8 +151,8 @@
             if (isNaN(val)) { val = 0; }
             var sym = currencySymbol || currencyIso || "";
             var iso = (currencyIso || "").toUpperCase();
-            var isIndian = isIndianIso(iso);
-            var formatted = isIndian ? val.toLocaleString('en-IN') : val.toLocaleString(window.navigator.language);
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            var formatted = val.toLocaleString(window.navigator.language);
             if (sym) {
                 return sym + (sym.length > 1 && !sym.match(/^[₹$€£¥]$/) ? " " : "") + formatted;
             }
@@ -196,9 +176,21 @@
 //        }
 // ----- END OLD CODE -----
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatMonthName(m) {
-            var monthNames = label("VAS_186_Months", "Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec").split(',');
-            return monthNames[Math.max(0, Math.min(11, m - 1))];
+            return new Date(2000, Math.max(0, Math.min(11, Number(m) - 1)), 1).toLocaleDateString(window.navigator.language, { month: 'short' });
+        }
+
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        function formatMonthYear(m, y) {
+            return new Date(Number(y), Math.max(0, Math.min(11, Number(m) - 1)), 1).toLocaleDateString(window.navigator.language, { month: 'short', year: 'numeric' });
+        }
+
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        function formatIsoDate(iso, fallback) {
+            var p = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+            if (!p) { return fallback || ''; }
+            return new Date(Number(p[1]), Number(p[2]) - 1, Number(p[3])).toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' });
         }
 
         function showBusy(show) {
@@ -292,7 +284,7 @@
             if (!$body) { return; }
 
             if (categoriesData.length === 0) {
-                $body.html('<div class="vas-pcu-empty">' + escapeHtml(label("VAS_186_NoUsageRecordedFor", "No usage recorded for") + ' ' + formatMonthName(selectedMonth) + ' ' + selectedYear + '.') + '</div>');
+                $body.html('<div class="vas-pcu-empty">' + escapeHtml(label("VAS_186_NoUsageRecordedFor", "No usage recorded for") + ' ' + formatMonthYear(selectedMonth, selectedYear) + '.') + '</div>');
                 if ($footnote) { $footnote.addClass('vas-pcu-hidden'); }
                 if ($pager) { $pager.addClass('vas-pcu-hidden'); }
                 return;
@@ -502,7 +494,7 @@
         function openCategoryDrilldownModal(categoryId, categoryName) {
             $(document).off("keydown.vas-pcu-modal"); if ($modal) { $modal.remove(); }
 
-            var monthFull = formatMonthName(selectedMonth) + ' ' + selectedYear;
+            var monthFull = formatMonthYear(selectedMonth, selectedYear);
 
             var showingNone = '0 ' + label("VAS_186_Of", "of") + ' 0 ' + label("VAS_186_Lines", "lines");
 
@@ -601,7 +593,7 @@
                             ? '<button type="button" class="vas-pcu-m-doclink" data-invid="' + rec.inventoryId + '">' + escapeHtml(rec.documentNo) + '</button>'
                             : escapeHtml(rec.documentNo)) +
                         '</td>' +
-                        '<td>' + escapeHtml(rec.movementDate) + '</td>' +
+                        '<td>' + escapeHtml(formatIsoDate(rec.movementDateIso, rec.movementDate)) + '</td>' +
                         '<td title="' + escapeHtml(rec.productName) + '">' +
                         '<span class="vas-pcu-m-product">' + escapeHtml(rec.productName) + '</span>' +
                         (rec.attribute ? ('<span class="vas-pcu-m-attr">' + escapeHtml(rec.attribute) + '</span>') : '') +
@@ -730,9 +722,9 @@
             $qtyPill = $card.find('.vas-pcu-qty-pill');
             $valPill = $card.find('.vas-pcu-val-pill');
 
-            var monthNames = label("VAS_186_Months", "Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec").split(',');
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
             for (var m = 1; m <= 12; m++) {
-                $monthSelect.append('<option value="' + m + '" ' + (m === selectedMonth ? 'selected' : '') + '>' + escapeHtml(monthNames[m - 1]) + '</option>');
+                $monthSelect.append('<option value="' + m + '" ' + (m === selectedMonth ? 'selected' : '') + '>' + escapeHtml(formatMonthName(m)) + '</option>');
             }
 
             var currentYear = DateTimeNowYear();

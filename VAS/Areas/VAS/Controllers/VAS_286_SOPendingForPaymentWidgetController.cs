@@ -104,7 +104,9 @@ namespace VAS.Controllers
 
             try
             {
-                string json = JsonConvert.SerializeObject(GetPendingPaymentData(ctx, page, size, sortBy, sortDir));
+                PendingPaymentResult data = GetPendingPaymentData(ctx, page, size, sortBy, sortDir);
+                FillBaseCurrency(ctx, data);
+                string json = JsonConvert.SerializeObject(data);
                 return Json(json, JsonRequestBehavior.AllowGet);
             }
             catch (Exception ex)
@@ -157,6 +159,7 @@ namespace VAS.Controllers
                        o.M_Warehouse_ID AS Warehouse_Id,
                        o.C_PaymentTerm_ID AS Payment_Term_Id,
                        o.GrandTotal AS Grand_Total,
+                       o.C_Currency_ID AS Currency_Id,
                        o.DocStatus AS Doc_Status_Code
                   FROM C_Order o
                  WHERE o.AD_Client_ID = @AD_Client_ID
@@ -238,6 +241,7 @@ namespace VAS.Controllers
                         bo.BPartner_Id AS BPartner_Id,
                         bo.Warehouse_Id AS Warehouse_Id,
                         bo.Grand_Total AS Grand_Total,
+                        bo.Currency_Id AS Currency_Id,
                         bo.Doc_Status_Code AS Doc_Status_Code,
                         -- 5-Nov row 31: advance term = VA009_Advance on the payment term
                         -- itself OR on any of its active payment schedule rows.
@@ -277,6 +281,9 @@ namespace VAS.Controllers
                     CASE WHEN c.Invoice_Order_Id IS NOT NULL THEN c.Invoice_Open_Amount
                          ELSE (c.Grand_Total - c.Received_Amount)
                     END AS Amount,
+                    cur.CurSymbol AS Currency_Symbol,
+                    cur.ISO_Code AS Currency_Code,
+                    cur.StdPrecision AS Currency_Precision,
                     COUNT(1) OVER () AS Total_Rows,
                     SUM(
                         CASE WHEN c.Invoice_Order_Id IS NOT NULL THEN c.Invoice_Open_Amount
@@ -286,6 +293,7 @@ namespace VAS.Controllers
                   FROM candidate c
                   INNER JOIN C_BPartner bp ON ( bp.C_BPartner_ID = c.BPartner_Id )
                   LEFT OUTER JOIN M_Warehouse w ON ( w.M_Warehouse_ID = c.Warehouse_Id )
+                  LEFT OUTER JOIN C_Currency cur ON ( cur.C_Currency_ID = c.Currency_Id )
                  WHERE c.Invoice_Open_Amount > 0
                     OR (
                         c.Invoice_Order_Id IS NULL
@@ -321,6 +329,10 @@ namespace VAS.Controllers
 
                     bool isOverdue = paymentDueDate.HasValue && paymentDueDate.Value.Date < today;
                     int daysOverdue = isOverdue ? (today - paymentDueDate.Value.Date).Days : 0;
+                    // VAS163 2026-11-11: Row 93 - amount shown with the order's (price list) currency.
+                    string rowCurIso = (Util.GetValueOfString(dr["Currency_Code"]) ?? "").Trim();
+                    string rowCurSymbol = (Util.GetValueOfString(dr["Currency_Symbol"]) ?? "").Trim();
+                    if (string.IsNullOrWhiteSpace(rowCurSymbol)) { rowCurSymbol = rowCurIso; }
 
                     result.Rows.Add(new PendingPaymentRow
                     {
@@ -333,7 +345,10 @@ namespace VAS.Controllers
                         PaymentDueDate = paymentDueDate.HasValue ? paymentDueDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                         IsOverdue = isOverdue,
                         DaysOverdue = daysOverdue,
-                        Amount = dr["Amount"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Amount"])
+                        Amount = dr["Amount"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Amount"]),
+                        CurrencySymbol = rowCurSymbol,
+                        CurrencyIso = rowCurIso,
+                        CurrencyPrecision = dr["Currency_Precision"] == DBNull.Value ? 2 : Util.GetValueOfInt(dr["Currency_Precision"])
                     });
                 }
                 result.Total = total;
@@ -427,7 +442,7 @@ namespace VAS.Controllers
             if (hasLines && allDelivered) { deliveryStatusKey = "VAS_286_DeliveryFull"; deliveryStatusFallback = "Delivered"; }
             else if (anyDelivered) { deliveryStatusKey = "VAS_286_DeliveryPartial"; deliveryStatusFallback = "Partially delivered"; }
             else { deliveryStatusKey = "VAS_286_DeliveryNone"; deliveryStatusFallback = "Not delivered"; }
-            result.Order.DeliveryStatus = Msg.GetMsg(ctx, deliveryStatusKey) ?? deliveryStatusFallback;
+            result.Order.DeliveryStatus = Msg.GetMsg(ctx, deliveryStatusKey, true) ?? deliveryStatusFallback; // VAS163 2026-11-11: text-only label (3-arg GetMsg, no tip appended)
 
             return result;
         }
@@ -484,7 +499,8 @@ namespace VAS.Controllers
                         QtyOrdered = qtyOrdered,
                         QtyDelivered = qtyDelivered,
                         QtyPending = qtyOrdered - qtyDelivered,
-                        FreeStock = ResolveFreeStock(ctx, productId, warehouseId),
+                        // VAS163 2026-11-11: row 58 In stock never negative - show 0.
+                        FreeStock = Math.Max(0m, ResolveFreeStock(ctx, productId, warehouseId)),
                         Rate = dr["Price_Actual"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Price_Actual"]),
                         Amount = dr["Line_Net_Amt"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Line_Net_Amt"])
                     });
@@ -620,14 +636,52 @@ namespace VAS.Controllers
             reader.Dispose();
         }
 
+        /// <summary>
+        /// VAS163 2026-11-10: base currency of the login client's primary accounting schema
+        /// (AD_ClientInfo.C_AcctSchema1_ID -> C_AcctSchema.C_Currency_ID, same lookup as
+        /// VAS_205) so the widget labels its amounts with it instead of a hard-coded rupee.
+        /// Left empty (client shows no symbol) when it cannot be resolved.
+        /// </summary>
+        private static void FillBaseCurrency(Ctx ctx, CurrencyPayload target)
+        {
+            if (ctx == null || target == null) { return; }
+            try
+            {
+                DataSet ds = DB.ExecuteDataset(@"
+                    SELECT c.ISO_Code AS Currency_Code, c.CurSymbol AS Currency_Symbol, c.StdPrecision AS Currency_Precision
+                      FROM AD_ClientInfo ci
+                     INNER JOIN C_AcctSchema cs ON ( cs.C_AcctSchema_ID = ci.C_AcctSchema1_ID )
+                     INNER JOIN C_Currency c ON ( c.C_Currency_ID = cs.C_Currency_ID )
+                     WHERE ci.AD_Client_ID = @AD_Client_ID",
+                    new[] { new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()) }, null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) { return; }
+                DataRow r = ds.Tables[0].Rows[0];
+                target.CurrencyIso = (Util.GetValueOfString(r["Currency_Code"]) ?? string.Empty).Trim();
+                target.CurrencySymbol = (Util.GetValueOfString(r["Currency_Symbol"]) ?? string.Empty).Trim();
+                if (r["Currency_Precision"] != DBNull.Value) { target.CurrencyPrecision = Util.GetValueOfInt(r["Currency_Precision"]); }
+            }
+            catch (Exception ex)
+            {
+                Log.Log(Level.WARNING, "FillBaseCurrency", ex);
+            }
+        }
+
+        /// <summary>VAS163 2026-11-10: base (accounting-schema) currency carried by the widget's first payload.</summary>
+        private class CurrencyPayload
+        {
+            public string CurrencyIso { get; set; } = string.Empty;
+            public string CurrencySymbol { get; set; } = string.Empty;
+            public int? CurrencyPrecision { get; set; }
+        }
+
         private JsonResult ErrorResult(Ctx ctx)
         {
-            string message = Msg.GetMsg(ctx, "Error") ?? "Error";
+            string message = Msg.GetMsg(ctx, "Error", true) ?? "Error"; // VAS163 2026-11-11: text-only label (3-arg GetMsg, no tip appended)
             string json = JsonConvert.SerializeObject(new { Error = message });
             return Json(json, JsonRequestBehavior.AllowGet);
         }
 
-        private class PendingPaymentResult
+        private class PendingPaymentResult : CurrencyPayload
         {
             public decimal TotalDue { get; set; }
             public int Total { get; set; }
@@ -646,6 +700,10 @@ namespace VAS.Controllers
             public bool IsOverdue { get; set; }
             public int DaysOverdue { get; set; }
             public decimal Amount { get; set; }
+            /// <summary>VAS163 2026-11-11: Row 93 - document (price list) currency of Amount.</summary>
+            public string CurrencySymbol { get; set; }
+            public string CurrencyIso { get; set; }
+            public int CurrencyPrecision { get; set; }
         }
 
         private class OrderDetailResult

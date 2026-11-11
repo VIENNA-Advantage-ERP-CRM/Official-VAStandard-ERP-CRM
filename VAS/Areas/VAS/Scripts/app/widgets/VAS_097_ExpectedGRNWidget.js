@@ -131,8 +131,9 @@
            Precision and symbol are read from the system (never hard-coded). */
         var INDIAN_NUMBERING_CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function currencyLocale(isoCode) {
-            return INDIAN_NUMBERING_CURRENCIES.indexOf(String(isoCode || '').toUpperCase()) >= 0 ? 'en-IN' : 'en-US';
+            return window.navigator.language;
         }
 
         function formatMoney(value, precision, symbol, isoCode) {
