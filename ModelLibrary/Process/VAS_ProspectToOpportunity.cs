@@ -40,15 +40,29 @@ using ViennaAdvantage.Model;
 *     Completion message tells whether a Lead was linked; no Location is reported.
 * VAI052 30-Oct-26 : Prospect without a User: the Opportunity is still created (no contact, no Lead link)
 *     and the message says the contact is not linked.
+* VAI052 12-Nov-26 : New process parameter M_PriceList_Version_ID - set on the new Opportunity; its M_PriceList_ID
+*     (read from M_PriceList_Version) is set on the Prospect (a Customer is left unchanged).
 */
 namespace ModelLibrary.Process
 {
     public class VAS_ProspectToOpportunity : SvrProcess
     {
         int _C_Lead_ID;
+        //VAI052-Price List Version chosen in the process dialog (optional)
+        private int _priceListVersionID = 0;
         protected override void Prepare()
         {
-
+            ProcessInfoParameter[] para = GetParameter();
+            if (para != null)
+            {
+                foreach (ProcessInfoParameter element in para)
+                {
+                    if (element.GetParameterName().Equals("M_PriceList_Version_ID"))
+                    {
+                        _priceListVersionID = Util.GetValueOfInt(element.GetParameter());
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -121,6 +135,12 @@ namespace ModelLibrary.Process
                 opp.SetC_EnquiryRdate(lead.GetC_EnquiryRdate());
             }
             opp.SetIsOpportunity(true);
+            //VAI052-Price List Version selected in the process goes on the new Opportunity; its Price List
+            //(read from M_PriceList_Version) goes on the Prospect below, in the Prospect's existing save
+            if (_priceListVersionID > 0)
+            {
+                opp.SetM_PriceList_Version_ID(_priceListVersionID);
+            }
             opp.SkipAIAssistantThreadUpdate = true;
             if (!opp.Save())
             {
@@ -150,6 +170,15 @@ namespace ModelLibrary.Process
                 VAS_CommonMethod.SendInfoToAI(lead.Get_Table_ID(), lead.Get_ID(), Get_Trx(), GetCtx());
             }
             partner.SetCreateProject("Y");
+            // A Customer keeps its own Price List - only a Prospect is updated (same object, same save)
+            if (_priceListVersionID > 0 && !partner.IsCustomer())
+            {
+                int priceListID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT M_PriceList_ID FROM M_PriceList_Version WHERE M_PriceList_Version_ID=" + _priceListVersionID, null, Get_TrxName()));
+                if (priceListID > 0)
+                {
+                    partner.SetM_PriceList_ID(priceListID);
+                }
+            }
             // Send opp Data to Knowledge Base
             VAS_CommonMethod.SendInfoToAI(opp.Get_Table_ID(), opp.Get_ID(), Get_Trx(), GetCtx());
             if (!partner.Save())
