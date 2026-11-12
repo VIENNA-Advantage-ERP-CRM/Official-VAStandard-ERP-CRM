@@ -73,7 +73,7 @@ namespace ModelLibrary.Process
                     {
                         _C_Lead_ID = element.GetParameterAsInt();
                     }
-                    else if (name.Equals("VA061_CompanyName"))
+                    else if (name.Equals("BPName"))
                     {
                         _companyName = Util.GetValueOfString(element.GetParameter());
                     }
