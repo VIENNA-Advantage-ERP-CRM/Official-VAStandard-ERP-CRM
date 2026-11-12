@@ -50,6 +50,8 @@ using ViennaAdvantage.Model;
 *     every lead save is checked and a failure is returned with its error message.
 * VAI052 29-Oct-26 : Completion message (GetCompletionMessage) tells whether the Prospect / User / Address
 *     were created or an existing Customer / Prospect was used, with the Opportunity, Lead and Prospect IDs.
+* VAI052 12-Nov-26 : New process parameter M_PriceList_Version_ID - set on the new Opportunity; its M_PriceList_ID
+*     (read from M_PriceList_Version) is set on the Prospect (an existing Customer is left unchanged).
 */
 namespace ModelLibrary.Process
 {
@@ -59,6 +61,8 @@ namespace ModelLibrary.Process
         bool IsProspectCreated = false;
         private string _companyName = "";
         private int _bpGroupID = 0;
+        //VAI052-Price List Version chosen in the process dialog (optional)
+        private int _priceListVersionID = 0;
         VAdvantage.Model.MLead lead = null;
         protected override void Prepare()
         {
@@ -80,6 +84,10 @@ namespace ModelLibrary.Process
                     else if (name.Equals("C_BP_Group_ID"))
                     {
                         _bpGroupID = Util.GetValueOfInt(element.GetParameter());
+                    }
+                    else if (name.Equals("M_PriceList_Version_ID"))
+                    {
+                        _priceListVersionID = Util.GetValueOfInt(element.GetParameter());
                     }
                 }
             }
@@ -123,6 +131,11 @@ namespace ModelLibrary.Process
                 {
                     throw new Exception(Msg.GetMsg(GetCtx(), "SelectBPGroup"));
                 }
+                //VAI052-the new Prospect gets the selected Price List in its own (single) save
+                if (_priceListVersionID > 0)
+                {
+                    lead.ProspectPriceListID = GetPriceListID();
+                }
                 callprospect();
                 //VAI050-This flag used to check the status of prospect
                 IsProspectCreated = true;
@@ -162,6 +175,29 @@ namespace ModelLibrary.Process
 
             opp.SetName(bp.GetName());
             opp.SetC_BPartner_Location_ID(lead.GetC_BPartner_Location_ID());
+
+            //VAI052-Price List Version selected in the process: set it on the new Opportunity and
+            //its Price List (read from M_PriceList_Version) on the Prospect
+            if (_priceListVersionID > 0)
+            {
+                opp.SetM_PriceList_Version_ID(_priceListVersionID);
+
+                // An existing Customer keeps its own Price List - only a Prospect is updated
+                if (ExCustomer == 0)
+                {
+                    // bp is the Prospect already loaded above; a Prospect created in this run already carries
+                    // the Price List (set by MLead.CreateBP), so this only saves for a pre-existing Prospect
+                    int priceListID = GetPriceListID();
+                    if (priceListID > 0 && bp.GetM_PriceList_ID() != priceListID)
+                    {
+                        bp.SetM_PriceList_ID(priceListID);
+                        if (!bp.Save())
+                        {
+                            return GetRetrievedError(bp, "SaveError");
+                        }
+                    }
+                }
+            }
 
             opp.SetIsOpportunity(true);
             opp.Set_Value("C_EnquiryRdate", lead.GetC_EnquiryRdate());
@@ -212,6 +248,15 @@ namespace ModelLibrary.Process
                 //return Msg.GetMsg(GetCtx(), "OpprtunityGenerateNotDone");
 
             }
+        }
+
+        /// <summary>
+        /// M_PriceList_ID of the Price List Version selected in the process.
+        /// </summary>
+        /// <returns>Price List ID, 0 when none</returns>
+        private int GetPriceListID()
+        {
+            return Util.GetValueOfInt(DB.ExecuteScalar("SELECT M_PriceList_ID FROM M_PriceList_Version WHERE M_PriceList_Version_ID=" + _priceListVersionID, null, Get_TrxName()));
         }
 
         /// <summary>
