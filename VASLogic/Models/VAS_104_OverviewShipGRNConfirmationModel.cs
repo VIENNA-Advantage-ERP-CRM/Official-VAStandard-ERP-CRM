@@ -239,7 +239,8 @@ namespace VASLogic.Models
 
             // ----- Notes + activity -----
             result.Notes    = LoadNotes(M_InOutConfirm_ID);
-            result.Activity = LoadActivity(M_InOutConfirm_ID);
+            // VAS163 2026-11-10: Activity section commented out (6-Nov retest2, All Right Panels).
+            // result.Activity = LoadActivity(M_InOutConfirm_ID);
 
             return result;
         }

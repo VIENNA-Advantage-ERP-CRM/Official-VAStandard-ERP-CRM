@@ -128,6 +128,9 @@
 
 .vas273-modal {
     width: min(1240px, 94vw);
+    /* VAS163 2026-11-11: Row 46 fixed height - the pop-up keeps one size for the
+       documents list and the lines view, and on "Back" (same as VAS_270/271). */
+    height: min(880px, 90dvh);
     max-height: min(880px, 90dvh);
     background: #FFFFFF;
     border: 1px solid #D9E2EB;

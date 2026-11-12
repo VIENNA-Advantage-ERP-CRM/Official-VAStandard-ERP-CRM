@@ -108,22 +108,11 @@
             return text.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatCompactAmount(value) {
             var number = Number(value || 0);
-            var abs = Math.abs(number);
-            var body;
-            if (usesIndianNumbering(currencyIso)) {
-                if (abs >= 10000000) { body = trimZeros((number / 10000000).toFixed(2)) + ' Cr'; }
-                else if (abs >= 100000) { body = trimZeros((number / 100000).toFixed(2)) + ' L'; }
-                else if (abs >= 1000) { body = trimZeros((number / 1000).toFixed(1)) + 'K'; }
-                else { body = number.toLocaleString('en-IN', { maximumFractionDigits: 2 }); }
-            } else {
-                if (abs >= 1000000000) { body = trimZeros((number / 1000000000).toFixed(1)) + 'B'; }
-                else if (abs >= 1000000) { body = trimZeros((number / 1000000).toFixed(1)) + 'M'; }
-                else if (abs >= 1000) { body = trimZeros((number / 1000).toFixed(1)) + 'K'; }
-                else { body = number.toLocaleString('en-US', { maximumFractionDigits: 2 }); }
-            }
-            return (currencySymbol || currencyIso) + ' ' + body;
+            var body = (number < 0 ? '-' : '') + VIS.Util.formatCompactAmount(Math.abs(number), currencyIso || '', stdPrecision);
+            return (currencySymbol || currencyIso || '') + ' ' + body;
         }
 
         function formatFullAmount(value) {

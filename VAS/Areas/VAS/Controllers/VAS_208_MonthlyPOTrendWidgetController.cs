@@ -504,7 +504,8 @@ namespace VAS.Areas.VAS.Controllers
                         {
                             orderId = orderId,
                             poNo = docNo,
-                            orderDate = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd") : "",
+                            // VAS163 2026-11-10: browser locale (6-Nov retest2). The widget formats orderDate (ISO) itself.
+                            orderDate = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) : "",
                             orderDateFormatted = orderDate.HasValue ? orderDate.Value.ToString("dd MMM yyyy") : "—",
                             vendor = string.IsNullOrEmpty(vendor) ? "—" : vendor,
                             warehouse = string.IsNullOrEmpty(warehouse) ? "—" : warehouse,

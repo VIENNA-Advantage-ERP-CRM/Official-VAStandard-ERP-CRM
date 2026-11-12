@@ -423,7 +423,8 @@ namespace VIS.Controllers
 
         private CurrencyInfo GetAccountingCurrency(Ctx ctx, int clientId)
         {
-            CurrencyInfo info = new CurrencyInfo { CurrencyId = 0, Symbol = "₹", IsoCode = "INR", Precision = 2 };
+            // VAS163 2026-11-10: no hard-coded rupee default (6-Nov retest2) - empty when unresolved.
+            CurrencyInfo info = new CurrencyInfo { CurrencyId = 0, Symbol = "", IsoCode = "", Precision = 2 };
 
             string sql = @"
                 SELECT cs.C_Currency_ID, c.CurSymbol, c.ISO_Code, COALESCE(c.StdPrecision, 2) AS StdPrecision

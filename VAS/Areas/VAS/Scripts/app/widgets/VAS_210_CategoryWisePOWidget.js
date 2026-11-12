@@ -101,8 +101,8 @@
 
         var categoriesData = [];
         var monthTotalValue = 0;
-        var curSymbol = "₹";
-        var curIso = "INR";
+        var curSymbol = ""; // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        var curIso = "";
         var stdPrecision = 2;
 
         var modalStack = [];
@@ -137,29 +137,11 @@
             return data || {};
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatCurrency(val) {
             var num = Number(val || 0);
             var sym = curSymbol ? (curSymbol + " ") : "";
-            if (curSymbol === "₹" || curIso === "INR") {
-                if (num >= 10000000) {
-                    return sym + (num / 10000000).toFixed(2) + " Cr";
-                } else if (num >= 100000) {
-                    return sym + (num / 100000).toFixed(2) + " L";
-                } else if (num >= 1000) {
-                    return sym + (num / 1000).toFixed(1) + " k";
-                }
-                return sym + Math.round(num).toLocaleString(window.navigator.language);
-            } else {
-                if (num >= 1000000) {
-                    return sym + (num / 1000000).toFixed(2) + " M";
-                } else if (num >= 1000) {
-                    return sym + (num / 1000).toFixed(1) + " k";
-                }
-                return sym + num.toLocaleString(window.navigator.language, {
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: stdPrecision
-                });
-            }
+            return sym + (num < 0 ? "-" : "") + VIS.Util.formatCompactAmount(Math.abs(num), curIso || "", stdPrecision);
         }
 
         function formatNumber(val) {
@@ -167,9 +149,17 @@
             return num.toLocaleString(window.navigator.language);
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function periodLabel() {
-            var mName = monthNamesShort[selectedMonth - 1] || "";
-            return mName + " " + selectedYear;
+            return new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString(window.navigator.language, { month: 'short', year: 'numeric' });
+        }
+
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        function formatIsoDate(iso) {
+            var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ""));
+            if (!m) { return ""; }
+            return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+                .toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' });
         }
 
         function showBusy(show) {
@@ -232,7 +222,7 @@
 
             // Populate Month selector with full month names for arrow-less standard
             for (var m = 1; m <= 12; m++) {
-                var mLabel = monthNamesFull[m - 1];
+                var mLabel = new Date(2000, m - 1, 1).toLocaleDateString(window.navigator.language, { month: 'long' }); // VAS163 2026-11-10: browser locale (6-Nov retest2).
                 $monthSelect.append('<option value="' + m + '" ' + (m === selectedMonth ? 'selected' : '') + '>' + escapeHtml(mLabel) + '</option>');
             }
 
@@ -270,8 +260,8 @@
                     var data = parseResponse(res);
                     categoriesData = data.categories || [];
                     monthTotalValue = Number(data.totalValue || 0);
-                    curSymbol = data.curSymbol || "₹";
-                    curIso = data.curIso || "INR";
+                    curSymbol = data.curSymbol || data.curIso || ""; // VAS163 2026-11-10: browser locale (6-Nov retest2).
+                    curIso = data.curIso || "";
                     stdPrecision = data.stdPrecision != null ? data.stdPrecision : 2;
                     renderDonut();
                 },
@@ -551,7 +541,7 @@
                         '  <span class="vas-cpow-cell vas-cpow-col-pono">' +
                         '    <button type="button" class="vas-cpow-lnk" data-orderid="' + p.OrderId + '" title="' + escapeHtml(lbl("VAS_210_OpenRecord")) + ' ' + escapeHtml(p.DocumentNo) + '">' + escapeHtml(p.DocumentNo) + '</button>' +
                         '  </span>' +
-                        '  <span class="vas-cpow-cell c-std vas-cpow-col-podate" title="' + escapeHtml(p.DateOrderedFull) + '">' + escapeHtml(p.DateOrderedFull) + '</span>' +
+                        '  <span class="vas-cpow-cell c-std vas-cpow-col-podate" title="' + escapeHtml(formatIsoDate(p.DateOrdered)) + '">' + escapeHtml(formatIsoDate(p.DateOrdered)) + '</span>' +
                         '  <span class="vas-cpow-cell c-std vas-cpow-col-vendor" title="' + escapeHtml(p.Vendor) + '">' + escapeHtml(p.Vendor) + '</span>' +
                         '  <span class="vas-cpow-cell c-std vas-cpow-col-wh" title="' + escapeHtml(p.Warehouse) + '">' + escapeHtml(p.Warehouse) + '</span>' +
                         '  <span class="vas-cpow-cell c-std vas-cpow-col-rep" title="' + escapeHtml(p.Representative) + '">' + escapeHtml(p.Representative) + '</span>' +
@@ -646,13 +636,13 @@
 
         function renderPOLinesModalContent($m, header, lines) {
             $m.find('.vas-cpow-m-title').text(lbl("VAS_210_Lines", "Lines") + ' · ' + (header.DocumentNo || ''));
-            $m.find('.vas-cpow-m-sub').text((header.Vendor || '') + ' · ' + (header.DateOrdered || '') + ' · ' + (header.DeliveryStatus || ''));
+            $m.find('.vas-cpow-m-sub').text((header.Vendor || '') + ' · ' + formatIsoDate(header.DateOrderedIso) + ' · ' + (header.DeliveryStatus || ''));
 
             var polinkHtml =
                 '<div class="vas-cpow-polink">' +
                 '  ' + escapeHtml(lbl("VAS_210_PurchaseOrder", "Purchase order")) + ' ' +
                 '  <button type="button" class="vas-cpow-lnk vas-cpow-open-po" data-orderid="' + header.OrderId + '">' + escapeHtml(header.DocumentNo) + '</button>' +
-                '  · ' + escapeHtml(header.DateOrdered || '') + ' · ' + escapeHtml(header.DocStatusLabel || header.DocStatus || '') +
+                '  · ' + escapeHtml(formatIsoDate(header.DateOrderedIso)) + ' · ' + escapeHtml(header.DocStatusLabel || header.DocStatus || '') +
                 '</div>';
 
             var statStripHtml =

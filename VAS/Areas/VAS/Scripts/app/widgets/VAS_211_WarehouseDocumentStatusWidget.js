@@ -170,8 +170,8 @@
     function getLocalizedMonthName(monthIndex) {
         try {
             var d = new Date(2026, monthIndex, 1);
-            var lang = (VIS && VIS.Env) ? VIS.Env.getLanguage() : (window.navigator.language || 'en-US');
-            return d.toLocaleString(lang, { month: 'long' });
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            return d.toLocaleDateString(window.navigator.language, { month: 'long' });
         } catch (e) {
             return MONTH_NAMES[monthIndex] || (lbl('Month', 'Month') + ' ' + (monthIndex + 1));
         }
@@ -448,8 +448,9 @@
            MODAL DRILL-DOWN SYSTEM (Warehouse POs & PO Lines)
            ============================================================ */
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function getPeriodLabel() {
-            return MONTH_SHORT[selectedMonth - 1] + ' ' + selectedYear;
+            return new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString(window.navigator.language, { month: 'short', year: 'numeric' });
         }
 
         function ensureModalShell() {

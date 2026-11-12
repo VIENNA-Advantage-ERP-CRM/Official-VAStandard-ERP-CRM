@@ -83,7 +83,7 @@
 
         // widget list state
         var pageNo = 1;
-        var pageSize = 4;   // 4 roomier rows per page (CSS grid reserves 4 tracks)
+        var pageSize = 3;   // VAS163 2026-11-11: Row 8 3 records per page so each record's details are fully visible (CSS grid reserves 3 tracks)
         var totalPages = 0;
         var totalRecords = 0;
         var fulfilments = [];
@@ -120,8 +120,9 @@
             return data || {};
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatQty(value) {
-            return Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+            return Number(value || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 2 });
         }
 
         /* UOM precision (C_UOM.StdPrecision) of a line: 0 -> whole numbers only,
@@ -152,9 +153,10 @@
         // returned by the controller) instead of a hardcoded rupee. Falls back to a
         // plain grouped number if the currency is unavailable. Compact 0-decimal
         // grouping - the values are large summary totals.
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatMoney(value) {
             var n = Number(value || 0);
-            var num = n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+            var num = n.toLocaleString(window.navigator.language, { maximumFractionDigits: 0 });
             var token = currency.iso || currency.symbol || '';
             return token ? (token + ' ' + num) : num;
         }

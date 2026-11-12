@@ -109,8 +109,14 @@
             return data || {};
         }
 
-        function monthsShort() { return lbl('VAS_154_SHM_MonthsShort', 'Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec').split(','); }
-        function monthsFull() { return lbl('VAS_154_SHM_MonthsFull', 'January,February,March,April,May,June,July,August,September,October,November,December').split(','); }
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        function browserMonths(style) {
+            var list = [];
+            for (var i = 0; i < 12; i++) { list.push(new Date(2000, i, 1).toLocaleDateString(window.navigator.language, { month: style })); }
+            return list;
+        }
+        function monthsShort() { return browserMonths('short'); }
+        function monthsFull() { return browserMonths('long'); }
         function methodName(code) { for (var i = 0; i < METHODS.length; i++) { if (METHODS[i].code === code) { return lbl(METHODS[i].key, METHODS[i].fb); } } return code; }
 
         var currency = {};
@@ -130,8 +136,9 @@
         // Formats an amount in the system currency (session base currency, returned
         // by the controller) instead of a hardcoded rupee. Falls back to a plain
         // grouped number if the currency is unavailable.
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatMoney(value) {
-            var num = Number(value || 0).toLocaleString(usesIndianNumbering() ? 'en-IN' : 'en-US', { maximumFractionDigits: 0 });
+            var num = Number(value || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 0 });
             var token = currency.iso || currency.symbol || '';
             return token ? (token + ' ' + num) : num;
         }
@@ -139,31 +146,22 @@
         // Compact amount for the tight legend column (e.g. "IQD 1.4M", "IQD 185.5K",
         // or "INR 12.5L" / "INR 1.2Cr" when the system currency uses Indian
         // numbering) so the shipping-method name keeps its space.
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatMoneyShort(value) {
             var n = Number(value || 0);
-            var abs = Math.abs(n);
-            var num;
-            if (usesIndianNumbering()) {
-                if (abs >= 1e7) { num = trimZeros((n / 1e7).toFixed(2)) + 'Cr'; }
-                else if (abs >= 1e5) { num = trimZeros((n / 1e5).toFixed(2)) + 'L'; }
-                else if (abs >= 1e3) { num = trimZeros((n / 1e3).toFixed(1)) + 'K'; }
-                else { num = String(Math.round(n)); }
-            } else {
-                if (abs >= 1e9) { num = trimZeros((n / 1e9).toFixed(1)) + 'B'; }
-                else if (abs >= 1e6) { num = trimZeros((n / 1e6).toFixed(1)) + 'M'; }
-                else if (abs >= 1e3) { num = trimZeros((n / 1e3).toFixed(1)) + 'K'; }
-                else { num = String(Math.round(n)); }
-            }
+            var num = (n < 0 ? '-' : '') + VIS.Util.formatCompactAmount(Math.abs(n), currency.iso || '');
             var token = currency.iso || currency.symbol || '';
             return token ? (token + ' ' + num) : num;
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatDate(iso) {
             if (!iso) { return '-'; }
             var p = String(iso).split('-');
             if (p.length !== 3) { return iso; }
-            var mi = parseInt(p[1], 10) - 1;
-            return p[2] + ' ' + (monthsShort()[mi] || p[1]) + ' ' + p[0];
+            var d = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
+            if (isNaN(d.getTime())) { return iso; }
+            return d.toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' });
         }
 
         /* ================= WIDGET ================= */
@@ -180,17 +178,18 @@
                 '<div class="vas-shm-head-l">' +
                 '<span class="vas-shm-ico">' + truckIcon() + '</span>' +
                 '<div class="vas-shm-titles">' +
+                // VAS163 2026-11-11: Row 7 Month / Year filters inline right after the title (same line as the
+                // widget name, left-aligned, never shrinking); the subtitle sits on the line below.
+                '<div class="vas-shm-titlerow">' +
                 '<div class="vas-shm-title" title="' + escapeHtml(lbl('VAS_154_SHM_Title', 'Shipping Method')) + '">' + escapeHtml(lbl('VAS_154_SHM_Title', 'Shipping Method')) + '</div>' +
-                '<div class="vas-shm-sub" title="' + escapeHtml(lbl('VAS_154_SHM_Subtitle', 'Delivery orders by fulfillment type')) + '">' + escapeHtml(lbl('VAS_154_SHM_Subtitle', 'Delivery orders by fulfillment type')) + '</div>' +
-                '</div>' +
-                '</div>' +
-                '</div>' +
-                // Month / Year filters on their own row under the title, flush
-                // with the widget's left edge (5-Nov retest: next to the long
-                // subtitle they were pushed to the far right of the header).
                 '<div class="vas-shm-filters">' +
                 '<span class="vas-shm-sel"><select class="vas-shm-month vas-shm-month-sel" aria-label="' + escapeHtml(lbl('VAS_154_SHM_FilterByMonth', 'Filter by month')) + '"></select></span>' +
                 '<span class="vas-shm-sel"><select class="vas-shm-year vas-shm-year-sel" aria-label="' + escapeHtml(lbl('VAS_154_SHM_FilterByYear', 'Filter by year')) + '"></select></span>' +
+                '</div>' +
+                '</div>' +
+                '<div class="vas-shm-sub" title="' + escapeHtml(lbl('VAS_154_SHM_Subtitle', 'Delivery orders by fulfillment type')) + '">' + escapeHtml(lbl('VAS_154_SHM_Subtitle', 'Delivery orders by fulfillment type')) + '</div>' +
+                '</div>' +
+                '</div>' +
                 '</div>' +
                 '<div class="vas-shm-body">' +
                 '<div class="vas-shm-donut"></div>' +

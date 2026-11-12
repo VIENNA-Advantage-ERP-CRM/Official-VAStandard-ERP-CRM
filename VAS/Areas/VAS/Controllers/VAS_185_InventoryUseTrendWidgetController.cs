@@ -175,6 +175,9 @@ namespace VIS.Controllers
                         key = key,
                         label = labelName,
                         fullMonth = GetMonthShortName(dt.Month) + " " + dt.Year,
+                        // VAS163 2026-11-10: browser locale (6-Nov retest2) - client builds label/fullMonth from these.
+                        year = dt.Year,
+                        month = dt.Month,
                         qty = qty,
                         val = val,
                         docs = docs

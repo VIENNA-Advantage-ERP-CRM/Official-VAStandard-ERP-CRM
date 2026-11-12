@@ -137,7 +137,7 @@
         var fromIdx = toIdx - 11; // 12 months rolling window
 
         var trendSeries = [];
-        var currencyInfo = { symbol: '₹', iso: 'INR', precision: 2 };
+        var currencyInfo = { symbol: '', iso: '', precision: 2 }; // VAS163 2026-11-10: browser locale (6-Nov retest2).
         // Months that actually hold PO data, as [{ y, m }] from the server.
         // Null until the first load: the pickers then fall back to the calendar range.
         var availableMonths = null;
@@ -154,24 +154,39 @@
             return { year: y, month: m };
         }
 
-        function idxToLabel(idx) {
-            var ym = idxToYearMonth(idx);
-            return MONTH_SHORT[ym.month - 1] + ' ' + ym.year;
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        function ymLabel(year, month) {
+            return new Date(year, month - 1, 1).toLocaleDateString(window.navigator.language, { month: 'short', year: 'numeric' });
+        }
+        function ymShort(year, month) {
+            return new Date(year, month - 1, 1).toLocaleDateString(window.navigator.language, { month: 'short' });
         }
 
+        function idxToLabel(idx) {
+            var ym = idxToYearMonth(idx);
+            return ymLabel(ym.year, ym.month);
+        }
+
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatCompactMoney(val, curSym) {
-            var sym = curSym || currencyInfo.symbol || '';
+            var sym = curSym || currencyInfo.symbol || currencyInfo.iso || '';
             var v = Number(val || 0);
-            if (v >= 1e7) {
-                return sym + ' ' + (v / 1e7).toFixed(2) + ' Cr';
-            }
-            if (v >= 1e5) {
-                return sym + ' ' + (v / 1e5).toFixed(2) + ' L';
-            }
-            if (v >= 1e3) {
-                return sym + ' ' + (v / 1e3).toFixed(1) + ' k';
-            }
-            return sym + ' ' + v.toLocaleString(window.navigator.language, { maximumFractionDigits: 2 });
+            var prec = (typeof currencyInfo.precision === 'number') ? currencyInfo.precision : undefined;
+            return sym + ' ' + (v < 0 ? '-' : '') + VIS.Util.formatCompactAmount(Math.abs(v), currencyInfo.iso || '', prec);
+        }
+
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        function formatIsoDate(iso) {
+            var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+            if (!m) { return ''; }
+            return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+                .toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' });
+        }
+
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        function formatRate(val) {
+            var p = (typeof currencyInfo.precision === 'number') ? currencyInfo.precision : 2;
+            return Number(val || 0).toLocaleString(window.navigator.language, { minimumFractionDigits: p, maximumFractionDigits: p });
         }
 
         function formatNumber(val) {
@@ -384,7 +399,7 @@
         function renderChart() {
             if (!$plot || !$axis) { return; }
 
-            var curSym = currencyInfo.symbol || '₹';
+            var curSym = currencyInfo.symbol || currencyInfo.iso || ''; // VAS163 2026-11-10: browser locale (6-Nov retest2).
             var fromLabel = idxToLabel(fromIdx);
             var toLabel = idxToLabel(toIdx);
             var monthCount = trendSeries.length || 1;
@@ -418,12 +433,13 @@
                 var heightPct = maxVal > 0 ? Math.round((item.value / scaleCeiling) * 100) : 0;
                 if (item.value > 0 && heightPct < 4) { heightPct = 4; } // minimum legible height
 
-                var valDisplay = item.value >= 1e7 ? (item.value / 1e7).toFixed(1) + 'Cr' :
-                                 item.value >= 1e5 ? (item.value / 1e5).toFixed(1) + 'L' :
-                                 item.value >= 1e3 ? (item.value / 1e3).toFixed(0) + 'k' :
-                                 item.value > 0 ? Math.round(item.value).toString() : '0';
+                // VAS163 2026-11-10: browser locale (6-Nov retest2). Bar value and month labels built client-side.
+                var valDisplay = item.value >= 1e3 ? VIS.Util.formatCompactAmount(item.value, currencyInfo.iso || '', 1) :
+                                 item.value > 0 ? Math.round(item.value).toLocaleString(window.navigator.language) : '0';
+                var itemLabel = ymLabel(item.year, item.month);
+                var itemShort = ymShort(item.year, item.month);
 
-                var tip = item.label + ' — ' + formatCompactMoney(item.value, curSym);
+                var tip = itemLabel + ' — ' + formatCompactMoney(item.value, curSym);
 
                 plotHtml +=
                     '<button type="button" class="vas-mpt-colwrap" data-year="' + item.year + '" data-month="' + item.month + '" title="' + escapeHtml(tip) + '">' +
@@ -431,7 +447,7 @@
                         '<span class="vas-mpt-col" style="height:' + heightPct + '%; background:' + palette[0] + '; border-top-color:' + palette[1] + '"></span>' +
                     '</button>';
 
-                axisHtml += '<span title="' + escapeHtml(item.label) + '">' + escapeHtml(item.shortName) + '</span>';
+                axisHtml += '<span title="' + escapeHtml(itemLabel) + '">' + escapeHtml(itemShort) + '</span>';
             }
 
             $plot.html(plotHtml);
@@ -558,7 +574,7 @@
 
         /* Drill-down: Month PO List */
         function openMonthPODrilldown(year, month) {
-            var monthLabel = MONTH_SHORT[month - 1] + ' ' + year;
+            var monthLabel = ymLabel(year, month); // VAS163 2026-11-10: browser locale (6-Nov retest2).
             var title = lbl("VAS_PurchaseOrders", "Purchase Orders") + ' — ' + monthLabel;
             var sub = lbl("VAS_208_AllPOsRaisedInSelectedMonth", "All POs raised in the selected month");
 
@@ -646,7 +662,7 @@
                             '<div class="vas-mpt-mrow" style="grid-template-columns: minmax(0, 0.32fr) minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.7fr) minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 0.9fr) minmax(0, 1.05fr) minmax(0, 1.1fr);">' +
                                 '<span class="vas-mpt-cell center"><button type="button" class="vas-mpt-iconbtn vas-mpt-lines-btn" data-id="' + p.orderId + '" data-no="' + escapeHtml(p.poNo) + '" title="' + escapeHtml(lbl("VAS_Lines", "Lines")) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></button></span>' +
                                 '<span class="vas-mpt-cell"><button type="button" class="vas-mpt-lnk vas-mpt-zoom-btn" data-id="' + p.orderId + '" title="' + escapeHtml(p.poNo) + '">' + escapeHtml(p.poNo) + '</button></span>' +
-                                '<span class="vas-mpt-cell vas-mpt-c-std" title="' + escapeHtml(p.orderDateFormatted) + '">' + escapeHtml(p.orderDateFormatted) + '</span>' +
+                                '<span class="vas-mpt-cell vas-mpt-c-std" title="' + escapeHtml(formatIsoDate(p.orderDate) || '—') + '">' + escapeHtml(formatIsoDate(p.orderDate) || '—') + '</span>' +
                                 '<span class="vas-mpt-cell vas-mpt-c-std" title="' + escapeHtml(p.vendor) + '">' + escapeHtml(p.vendor) + '</span>' +
                                 '<span class="vas-mpt-cell vas-mpt-c-std" title="' + escapeHtml(p.warehouse) + '">' + escapeHtml(p.warehouse) + '</span>' +
                                 '<span class="vas-mpt-cell vas-mpt-c-std" title="' + escapeHtml(p.rep) + '">' + escapeHtml(p.rep) + '</span>' +
@@ -808,7 +824,8 @@
                                 '<span class="vas-mpt-cell right" title="' + formatNumber(l.qtyOrdered) + '">' + formatNumber(l.qtyOrdered) + '</span>' +
                                 '<span class="vas-mpt-cell right" title="' + nsDash(l, formatNumber(l.qtyDelivered)) + '">' + nsDash(l, formatNumber(l.qtyDelivered)) + '</span>' +
                                 '<span class="vas-mpt-cell right vas-mpt-c-prim" title="' + nsDash(l, formatNumber(l.qtyPending)) + '">' + nsDash(l, formatNumber(l.qtyPending)) + '</span>' +
-                                '<span class="vas-mpt-cell right" title="' + formatNumber(l.rate) + '">' + curSym + ' ' + formatNumber(l.rate) + '</span>' +
+                                // VAS163 2026-11-10: browser locale (6-Nov retest2).
+                                '<span class="vas-mpt-cell right" title="' + formatRate(l.rate) + '">' + curSym + ' ' + formatRate(l.rate) + '</span>' +
                                 '<span class="vas-mpt-cell right vas-mpt-c-emph" title="' + formatCompactMoney(l.amount, curSym) + '">' + formatCompactMoney(l.amount, curSym) + '</span>' +
                                 '<span class="vas-mpt-cell"><span class="vas-mpt-chip ' + l.statusChip + '" title="' + escapeHtml(nsDash(l, l.status)) + '">' + escapeHtml(nsDash(l, l.status)) + '</span></span>' +
                             '</div>';

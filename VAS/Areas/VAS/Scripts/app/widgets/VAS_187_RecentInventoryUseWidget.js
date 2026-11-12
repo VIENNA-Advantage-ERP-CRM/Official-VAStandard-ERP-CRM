@@ -116,6 +116,13 @@
             return n.toLocaleString(window.navigator.language);
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        function formatIsoDate(iso, fallback) {
+            var p = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+            if (!p) { return fallback || ''; }
+            return new Date(Number(p[1]), Number(p[2]) - 1, Number(p[3])).toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' });
+        }
+
 // ===== NEW CODE START — currency format (agent A09, 2026-08-19) =====
         /**
          * Formats currency values according to organization locale/currency settings.
@@ -128,46 +135,23 @@
             symbol = symbol || '';
             iso = (iso || '').toUpperCase();
 
-            var indianIsos = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
-            var isIndian = indianIsos.indexOf(iso) !== -1;
-            var formattedVal = '';
-
-            if (isIndian) {
-                var absVal = Math.abs(num);
-                if (absVal >= 10000000) {
-                    formattedVal = (num / 10000000).toFixed(2).replace(/\.00$/, '') + ' Cr';
-                } else if (absVal >= 100000) {
-                    formattedVal = (num / 100000).toFixed(2).replace(/\.00$/, '') + ' L';
-                } else if (absVal >= 1000) {
-                    formattedVal = (num / 1000).toFixed(1).replace(/\.0$/, '') + ' k';
-                } else {
-                    formattedVal = formatIndianGrouping(num);
-                }
-            } else {
-                var absVal = Math.abs(num);
-                if (absVal >= 1000000000) {
-                    formattedVal = (num / 1000000000).toFixed(2).replace(/\.00$/, '') + ' B';
-                } else if (absVal >= 1000000) {
-                    formattedVal = (num / 1000000).toFixed(2).replace(/\.00$/, '') + ' M';
-                } else if (absVal >= 1000) {
-                    formattedVal = (num / 1000).toFixed(1).replace(/\.0$/, '') + ' K';
-                } else {
-                    formattedVal = num.toLocaleString();
-                }
-            }
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            var absVal = Math.abs(num);
+            var formattedVal = absVal >= 1000
+                ? (num < 0 ? '-' : '') + VIS.Util.formatCompactAmount(absVal, iso)
+                : num.toLocaleString(window.navigator.language);
 
             return symbol ? (symbol + ' ' + formattedVal) : formattedVal;
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatFullCurrency(val, iso, symbol) {
             var num = parseFloat(val);
             if (isNaN(num)) { num = 0; }
             symbol = symbol || '';
             iso = (iso || '').toUpperCase();
 
-            var indianIsos = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
-            var isIndian = indianIsos.indexOf(iso) !== -1;
-            var fullStr = isIndian ? formatIndianGrouping(num) : num.toLocaleString();
+            var fullStr = num.toLocaleString(window.navigator.language);
             return symbol ? (symbol + ' ' + fullStr) : fullStr;
         }
 
@@ -350,7 +334,7 @@
 // ===== NEW CODE START — currency format (agent A09, 2026-08-19) =====
             for (var i = 0; i < recordsData.length; i++) {
                 var item = recordsData[i];
-                var metaStr = (item.warehouseName || label("VAS_187_WarehouseFallback", "Warehouse")) + ' · ' + item.movementDate;
+                var metaStr = (item.warehouseName || label("VAS_187_WarehouseFallback", "Warehouse")) + ' · ' + formatIsoDate(item.movementDateIso, item.movementDate);
                 var formattedCompactVal = formatCurrencyAmount(item.totalValue, currencyIso, currencySymbol);
                 var formattedFullVal = formatFullCurrency(item.totalValue, currencyIso, currencySymbol);
 

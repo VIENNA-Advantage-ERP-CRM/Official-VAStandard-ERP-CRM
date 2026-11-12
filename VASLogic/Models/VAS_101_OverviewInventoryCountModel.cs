@@ -320,7 +320,8 @@ namespace VASLogic.Models
             // Silent on an install without VA075 (see LoadVA075WorkOrder).
             LoadVA075WorkOrder(M_Inventory_ID, result);
             result.Notes    = LoadNotes(M_Inventory_ID, result.Description);
-            result.Activity = LoadActivity(M_Inventory_ID, result.StatusCode);
+            // VAS163 2026-11-10: Activity section commented out (6-Nov retest2, All Right Panels).
+            // result.Activity = LoadActivity(M_Inventory_ID, result.StatusCode);
 
             return result;
         }

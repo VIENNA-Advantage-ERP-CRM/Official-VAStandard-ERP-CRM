@@ -45,9 +45,10 @@
         return isNaN(d) ? null : { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate() };
     }
 
+    // VAS163 2026-11-10: browser locale (6-Nov retest2).
     function formatDate(iso) {
         var p = ymd(iso);
-        return p ? (p.d + ' ' + MONTHS[p.m - 1] + ' ' + p.y) : '—';
+        return p ? new Date(p.y, p.m - 1, p.d).toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
     }
 
     function formatQty(v) {

@@ -118,7 +118,14 @@ namespace VAdvantage.Model
                 {
                     base.SetAD_User_ID(_user.GetAD_User_ID());
                     if (GetC_BPartner_ID() == 0)
+                    {
                         SetC_BPartner_ID(_user.GetC_BPartner_ID());
+                        if (GetC_BP_Group_ID() == 0)
+                        {
+                            MBPartner bPartner = new MBPartner(GetCtx(), _user.GetC_BPartner_ID(), Get_TrxName());
+                            SetC_BP_Group_ID(bPartner.GetC_BP_Group_ID());
+                        }
+                    } 
                     else if (_user.GetC_BPartner_ID() != GetC_BPartner_ID())
                     {
                         log.Warning("@C_BPartner_ID@ (ID=" + GetC_BPartner_ID()

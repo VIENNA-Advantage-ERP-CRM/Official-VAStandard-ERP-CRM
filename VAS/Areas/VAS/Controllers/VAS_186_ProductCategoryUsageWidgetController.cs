@@ -3,6 +3,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Globalization;
 using System.Web.Mvc;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
@@ -345,7 +346,9 @@ namespace VIS.Controllers
                             qty = Util.GetValueOfDecimal(dr["QtyEntered"]),
                             qtyBase = Util.GetValueOfDecimal(dr["QtyBase"]),
                             value = Util.GetValueOfDecimal(dr["LineValue"]),
-                            movementDate = Convert.ToDateTime(dr["MovementDate"]).ToString("dd MMM yyyy")
+                            movementDate = Convert.ToDateTime(dr["MovementDate"]).ToString("dd MMM yyyy"),
+                            // VAS163 2026-11-10: browser locale (6-Nov retest2) - client formats this ISO date.
+                            movementDateIso = Convert.ToDateTime(dr["MovementDate"]).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
                         });
                     }
                 }

@@ -679,6 +679,9 @@
                     // Discard stale responses: a newer fetchData call has already started.
                     if (mySeq !== fetchSeq) { if (isPageChange) showBusy(false); return; }
                     var data = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
+                    // Reload of the SAME order (e.g. after a header save): the unsaved panel
+                    // work must survive it. Capture the previous lines before they are rebuilt.
+                    var prevLines = (!isPageChange && parent && data && +parent.C_Order_ID === +data.C_Order_ID) ? lines : null;
                     parent = data || null;
                     linesTotal = (parent && parent.LinesTotal) || 0;
                     linePage = (parent && +parent.LinePage) || 0;
@@ -715,6 +718,7 @@
                     _mlookupCache = {};
                     lines = [];
                     if (parent && parent.Lines) for (var j = 0; j < parent.Lines.length; j++) lines.push(fromServerRow(parent.Lines[j]));
+                    if (prevLines) lines = mergeReloadedLines(prevLines, lines);
                     editing = null; morePopoverFor = null;
                     render();
                     if ($root && $root[0]) $root.scrollTop(0);
@@ -751,6 +755,39 @@
                 render();
             }
         };
+
+        /* True when the freshly loaded server copy of a line differs from the snapshot taken
+           when the panel last loaded/saved it, i.e. someone changed the line on the server. */
+        function serverChangedSince(fresh, old) {
+            if (!old || !old._saved) return false;
+            var a = fresh.values, b = old._saved.values;
+            for (var k in a) {
+                if (!a.hasOwnProperty(k)) continue;
+                var x = a[k], y = b[k];
+                if ((x == null || x === "") && (y == null || y === "")) continue;
+                if (String(x) !== String(y)) return true;
+            }
+            return false;
+        }
+
+        /* Merge a server reload of the SAME order with the panel's unsaved work (header-save
+           reload must not lose lines):
+           - brand-new unsaved lines are kept;
+           - a saved line edited in the panel keeps the panel edit when the server copy is
+             unchanged, and takes the server copy when the server changed it. */
+        function mergeReloadedLines(prev, fresh) {
+            var dirtyById = {};
+            prev.forEach(function (l) {
+                var id = l.values.C_OrderLine_ID || 0;
+                if (id > 0 && l.dirty) dirtyById[id] = l;
+            });
+            var newKeep = prev.filter(function (l) { return (l.values.C_OrderLine_ID || 0) <= 0; });
+            var merged = fresh.map(function (f) {
+                var old = dirtyById[f.values.C_OrderLine_ID];
+                return (old && !serverChangedSince(f, old)) ? old : f;
+            });
+            return newKeep.concat(merged);
+        }
 
         function fromServerRow(r) {
             // Start from the full column bag (every C_OrderLine column) so the
@@ -5197,6 +5234,7 @@
         }; }
 
         this.getRoot = function () { return $root; };
+        this.getParentId = function () { return parent ? +parent.C_Order_ID : 0; };
 
         /* A parked duplicate takes over from the panel that was live for its window (that
            one has been disposed): shown, listening, and loaded with whatever record it was
@@ -5257,6 +5295,9 @@
             this._parkedRecord = (recordID > 0) ? recordID : (selectedRow !== undefined ? 0 : -1);
             return;
         }
+        // Header-edit/save signal for the record already shown: keep the lines (and any
+        // unsaved panel work) instead of blanking the panel.
+        if (selectedRow == undefined && recordID > 0 && this.getParentId && this.getParentId() === +recordID) return;
         if (selectedRow == undefined || recordID <= 0) {
             // Pass true when a row exists in the grid but the order has no DB ID yet
             // (new unsaved record), so the panel can show a more helpful message.

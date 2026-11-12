@@ -113,47 +113,19 @@
         }
 
 // ===== NEW CODE START — currency format (agent A05, 2026-08-19) =====
-        var currencyInfo = { iso: "INR", symbol: "₹" };
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        var currencyInfo = { iso: "", symbol: "" };
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatCurrency(value) {
             var val = Number(value || 0);
             var absVal = Math.abs(val);
             var sign = val < 0 ? "-" : "";
-            var symbol = currencyInfo.symbol || currencyInfo.iso || "₹";
-            var iso = (currencyInfo.iso || "INR").toUpperCase();
-            var indianIsos = ["INR", "PKR", "BDT", "NPR", "BTN", "LKR"];
+            var symbol = currencyInfo.symbol || currencyInfo.iso || "";
+            var iso = (currencyInfo.iso || "").toUpperCase();
 
-            function trimFixed(num, decimals) {
-                var str = num.toFixed(decimals);
-                return str.replace(/\.?0+$/, "");
-            }
-
-            var compact = "";
-            var exact = "";
-
-            if (indianIsos.indexOf(iso) !== -1) {
-                exact = sign + symbol + val.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                if (absVal >= 10000000) {
-                    compact = sign + symbol + trimFixed(absVal / 10000000, 2) + 'Cr';
-                } else if (absVal >= 100000) {
-                    compact = sign + symbol + trimFixed(absVal / 100000, 2) + 'L';
-                } else if (absVal >= 1000) {
-                    compact = sign + symbol + trimFixed(absVal / 1000, 1) + 'K';
-                } else {
-                    compact = sign + symbol + absVal.toLocaleString('en-IN');
-                }
-            } else {
-                exact = sign + symbol + val.toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                if (absVal >= 1000000000) {
-                    compact = sign + symbol + trimFixed(absVal / 1000000000, 2) + 'B';
-                } else if (absVal >= 1000000) {
-                    compact = sign + symbol + trimFixed(absVal / 1000000, 2) + 'M';
-                } else if (absVal >= 1000) {
-                    compact = sign + symbol + trimFixed(absVal / 1000, 1) + 'K';
-                } else {
-                    compact = sign + symbol + absVal.toLocaleString(window.navigator.language);
-                }
-            }
+            var exact = sign + symbol + val.toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            var compact = sign + symbol + VIS.Util.formatCompactAmount(absVal, iso, 2);
 
             return { compact: compact, exact: exact };
         }
@@ -176,10 +148,10 @@
 */
 // ----- END OLD CODE -----
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatMonthLabel(m, y) {
-            var monthNames = label("VAS_183_Months", "Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec").split(',');
-            var name = monthNames[Math.max(0, Math.min(11, m - 1))];
-            return name + ' ' + y;
+            var monthIndex = Math.max(0, Math.min(11, Number(m) - 1));
+            return new Date(Number(y), monthIndex, 1).toLocaleDateString(window.navigator.language, { month: 'short', year: 'numeric' });
         }
 
         function showBusy(show) {
