@@ -84,6 +84,7 @@
  * 54  | Search is unavailable right now. Try again in a moment.               | VAS_278_LoadError
  * 55  | Month                                                                 | VAS_278_Month
  * 56  | Year                                                                  | VAS_278_Year
+ * 57  | Lines                                                                 | VAS_278_StatLines
  */
 ; VAS = window.VAS || {};
 
@@ -150,8 +151,8 @@
                 $root.find('.vasso-retry').remove();
                 if ($root.css('position') === 'static') { $root.css('position', 'relative'); }
                 var text = '';
-                try { text = VIS.Msg.getMsg('VAS_SO_Retry'); } catch (e) { text = ''; }
-                if (!text || text === 'VAS_SO_Retry') { text = 'Retry'; }
+                try { text = VIS.Msg.translate(VIS.Env.getCtx(), 'VAS_SO_Retry'); } catch (e) { text = ''; }
+                if (!text || typeof text !== 'string' || text === 'VAS_SO_Retry' || text.charAt(0) === '[') { text = 'Retry'; }
                 $('<button type="button" class="vasso-retry"></button>').text(text)
                     .attr('title', text)
                     .on('click', function (e) {
@@ -169,7 +170,6 @@
     var MIN_ROWS_PER_PAGE = 2;
     var WIDGET_PAGE_SIZE = 5;   // rows visible per widget page (client-side, no refetch)
     var TOP_COUNT = 10;
-    var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     var MIN_YEAR = 2024;
     var YEAR_SPAN = 3; // MIN_YEAR .. MIN_YEAR + YEAR_SPAN - 1, covers "current + 1"
 
@@ -222,8 +222,35 @@
         var cfgStack = [];
         var currentCfg = null;
 
+        var translatedTexts = null;   // message-key -> translated text (see loadMessages)
+
+        // Every message key used by this widget, translated in ONE call.
+        function loadMessages() {
+            var elements = [
+                'VAS_278_Title', 'VAS_278_Subtitle', 'VAS_278_RankedBy', 'VAS_278_ZeroStatePrefix', 'VAS_278_ErrorState',
+                'VAS_278_SubtitlePrefix', 'VAS_278_StatOrderValue', 'VAS_278_StatOpenOrders', 'VAS_278_StatPendingDelivery',
+                'VAS_278_StatOnTime', 'VAS_278_SectionHeading', 'VAS_278_ClickRowHint', 'VAS_278_ColSoNo', 'VAS_278_SoDate',
+                'VAS_278_Customer', 'VAS_278_ColWarehouse', 'VAS_278_Representative', 'VAS_278_ColValue', 'VAS_278_ColDelivery',
+                'VAS_278_ColStatus', 'VAS_278_Back', 'VAS_278_Close', 'VAS_278_DatePromised', 'VAS_278_SoValue',
+                'VAS_278_ShipFrom', 'VAS_278_DeliveryMode', 'VAS_278_DocumentStatus', 'VAS_278_DeliveryStatus',
+                'VAS_278_SalesOrderLines', 'VAS_278_ColLine', 'VAS_278_ColProduct', 'VAS_278_ColAttribute', 'VAS_278_ColUom',
+                'VAS_278_ColOrdered', 'VAS_278_ColDelivered', 'VAS_278_ColPending', 'VAS_278_ColInStock', 'VAS_278_ColRate',
+                'VAS_278_ColAmount', 'VAS_278_ColLineStatus', 'VAS_278_DeliveryFull', 'VAS_278_LinePartial',
+                'VAS_278_LineInProcess', 'VAS_278_SalesOrderPrefix', 'VAS_278_LinesSuffix', 'VAS_278_QtyOrderedSuffix',
+                'VAS_278_QtyShortSuffix', 'VAS_278_PrevPage', 'VAS_278_NextPage', 'VAS_278_Of', 'VAS_278_Showing',
+                'VAS_278_LoadError', 'VAS_278_Month', 'VAS_278_Year', 'VAS_278_StatLines'
+            ];
+            try { translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {}; }
+            catch (e) { translatedTexts = {}; }
+        }
+
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            if (translatedTexts === null) { loadMessages(); }
+            var text = translatedTexts[key];
+            if (text === undefined || text === null || typeof text !== 'string' || text === '' || text === key || text.charAt(0) === '[') {
+                return fallback;
+            }
+            return text;
         }
 
         function escapeHtml(value) {
@@ -307,7 +334,8 @@
         function formatPercent(value) {
             if (value === null || value === undefined) { return '—'; }
             var num = Number(value);
-            return (Math.round(num * 10) / 10) + '%';
+            try { return (num / 100).toLocaleString(window.navigator.language, { style: 'percent', maximumFractionDigits: 1 }); }
+            catch (e) { return (Math.round(num * 10) / 10) + '%'; }
         }
 
         // VAS163 2026-11-10: browser locale (6-Nov retest2).
@@ -496,13 +524,13 @@
                 var color = BAR_COLORS[(start + i) % BAR_COLORS.length];
                 return '<button type="button" class="vas278-hrow" data-cid="' + c.CustomerId + '" data-cname="' + escapeHtml(c.CustomerName) + '">' +
                     '<span class="vas278-line"><span class="vas278-nm" title="' + escapeHtml(c.CustomerName) + '">' + escapeHtml(c.CustomerName) + '</span>' +
-                    '<span class="vas278-vl" title="' + escapeHtml(formatINRFull(c.OrderValue)) + '">' + escapeHtml(formatINRFull(c.OrderValue)) + '</span></span>' +
+                    '<span class="vas278-vl" title="' + escapeHtml(formatMoneyFull(c.OrderValue)) + '">' + escapeHtml(formatMoneyFull(c.OrderValue)) + '</span></span>' +
                     '<span class="vas278-track"><span class="vas278-fill" style="width:' + pct + '%;background:' + color + '"></span></span></button>';
             }).join(''));
 
-            var helperText = label('VAS_278_Showing', 'Showing') + ' ' + (start + 1) + '–' + (start + slice.length) + ' ' + label('VAS_278_Of', 'of') + ' ' + customers.length + ' · ' + label('VAS_278_RankedBy', 'ranked by SO value');
+            var helperText = label('VAS_278_Showing', 'Showing') + ' ' + formatNum(start + 1) + '–' + formatNum(start + slice.length) + ' ' + label('VAS_278_Of', 'of') + ' ' + formatNum(customers.length) + ' · ' + label('VAS_278_RankedBy', 'ranked by SO value');
             $helper.attr('title', helperText).text(helperText);
-            $pageTxt.text((widgetPage + 1) + ' ' + label('VAS_278_Of', 'of') + ' ' + pages);
+            $pageTxt.text(formatNum(widgetPage + 1) + ' ' + label('VAS_278_Of', 'of') + ' ' + formatNum(pages));
             $prevBtn.prop('disabled', widgetPage === 0);
             $nextBtn.prop('disabled', widgetPage >= pages - 1);
         }
@@ -696,7 +724,7 @@
         function renderCustomerBody() {
             var summary = custState.summary;
             var statsHtml = '<div class="vas278-mstats">' +
-                statTile(label('VAS_278_StatOrderValue', 'SO value'), formatINR(summary.OrderValue)) +
+                statTile(label('VAS_278_StatOrderValue', 'SO value'), formatMoney(summary.OrderValue)) +
                 statTile(label('VAS_278_StatOpenOrders', 'Open SOs'), formatNum(summary.OpenOrders)) +
                 statTile(label('VAS_278_StatPendingDelivery', 'Pending delivery'), formatNum(summary.PendingDelivery)) +
                 statTile(label('VAS_278_StatOnTime', 'On-time %'), formatPercent(summary.OnTimePercent)) +
@@ -751,13 +779,13 @@
             }).join('');
 
             var start = docs.page * docs.size;
-            var showingLabel = label('VAS_278_Showing', 'Showing') + ' ' + (docs.total ? (start + 1) : 0) + '–' + (start + docs.rows.length) + ' ' + label('VAS_278_Of', 'of') + ' ' + docs.total + ' · ' + label('VAS_278_ClickRowHint', 'click a row to open the record');
+            var showingLabel = label('VAS_278_Showing', 'Showing') + ' ' + formatNum(docs.total ? (start + 1) : 0) + '–' + formatNum(start + docs.rows.length) + ' ' + label('VAS_278_Of', 'of') + ' ' + formatNum(docs.total) + ' · ' + label('VAS_278_ClickRowHint', 'click a row to open the record');
 
             var foot = '<div class="vas278-mtfoot"><span class="vas278-helper">' + escapeHtml(showingLabel) + '</span>' +
                 (pages > 1 ?
                     '<span class="vas278-pager">' +
                         '<button type="button" class="vas278-pbtn" data-table="docs" data-dir="-1"' + (docs.page === 0 ? ' disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_278_PrevPage', 'Previous page')) + '">' + icon('prev') + '</button>' +
-                        '<span class="vas278-ptxt">' + (docs.page + 1) + ' ' + escapeHtml(label('VAS_278_Of', 'of')) + ' ' + pages + '</span>' +
+                        '<span class="vas278-ptxt">' + formatNum(docs.page + 1) + ' ' + escapeHtml(label('VAS_278_Of', 'of')) + ' ' + formatNum(pages) + '</span>' +
                         '<button type="button" class="vas278-pbtn" data-table="docs" data-dir="1"' + (docs.page >= pages - 1 ? ' disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_278_NextPage', 'Next page')) + '">' + icon('next') + '</button>' +
                     '</span>' : '<span></span>') +
             '</div>';
@@ -994,13 +1022,13 @@
                 return '<div class="vas278-mrow" style="grid-template-columns:' + tpl + '">' + cells + '</div>';
             }).join('');
 
-            var showingLabel = label('VAS_278_Showing', 'Showing') + ' ' + (lineState.lines.length ? (start + 1) : 0) + '–' + (start + slice.length) + ' ' + label('VAS_278_Of', 'of') + ' ' + lineState.lines.length;
+            var showingLabel = label('VAS_278_Showing', 'Showing') + ' ' + formatNum(lineState.lines.length ? (start + 1) : 0) + '–' + formatNum(start + slice.length) + ' ' + label('VAS_278_Of', 'of') + ' ' + formatNum(lineState.lines.length);
 
             var foot = '<div class="vas278-mtfoot"><span class="vas278-helper">' + escapeHtml(showingLabel) + '</span>' +
                 (pages > 1 ?
                     '<span class="vas278-pager">' +
                         '<button type="button" class="vas278-pbtn" data-table="lines" data-dir="-1"' + (lineState.page === 0 ? ' disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_278_PrevPage', 'Previous page')) + '">' + icon('prev') + '</button>' +
-                        '<span class="vas278-ptxt">' + (lineState.page + 1) + ' ' + escapeHtml(label('VAS_278_Of', 'of')) + ' ' + pages + '</span>' +
+                        '<span class="vas278-ptxt">' + formatNum(lineState.page + 1) + ' ' + escapeHtml(label('VAS_278_Of', 'of')) + ' ' + formatNum(pages) + '</span>' +
                         '<button type="button" class="vas278-pbtn" data-table="lines" data-dir="1"' + (lineState.page >= pages - 1 ? ' disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_278_NextPage', 'Next page')) + '">' + icon('next') + '</button>' +
                     '</span>' : '<span></span>') +
             '</div>';
@@ -1050,6 +1078,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createModal();
             bindDocumentLevelEvents();

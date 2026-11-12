@@ -73,6 +73,7 @@
  * 31  | Choose a target segment.           | VAS_302_ChooseSegment
  * 32  | Added to segment.                  | VAS_302_AddedToast
  * 33  | Customers segmented.               | VAS_302_BulkAddedToast
+ * 34  | Assign {0} to a target list.       | VAS_302_AssignOneHintNamed
  * ──────────────────────────────────────────────────────────────────────────
  */
 ; VAS = window.VAS || {};
@@ -135,8 +136,59 @@
         // zoom and reused afterwards (0 = not resolved yet).
         var zoomWindowId = 0;
 
+        // Translated texts, loaded once per widget instance via VIS.Msg.translate.
+        var translatedTexts = null;
+        function loadMessages() {
+            var elements = [
+                "Loading",
+                "VAS_302_NotSegmentedYet",
+                "VAS_302_NotInAnyList",
+                "VAS_302_SegmentAll",
+                "VAS_302_Segment",
+                "VAS_302_ARR",
+                "VAS_302_NoOwner",
+                "VAS_302_NothingHere",
+                "VAS_302_UnableToLoad",
+                "VAS_302_Retry",
+                "VAS_302_Of",
+                "VAS_302_Showing",
+                "VAS_302_PrevPage",
+                "VAS_302_NextPage",
+                "VAS_302_Close",
+                "VAS_302_CustomerDetails",
+                "VAS_302_Tier",
+                "VAS_302_SegmentFact",
+                "VAS_302_Owner",
+                "VAS_302_OpenTicketsFact",
+                "VAS_302_KeyClient",
+                "VAS_302_OpenRecord",
+                "VAS_302_AddToSegment",
+                "VAS_302_TargetSegment",
+                "VAS_302_AssignOneHint",
+                "VAS_302_Cancel",
+                "VAS_302_SegmentCustomers",
+                "VAS_302_UnsegmentedCount",
+                "VAS_302_AddSelectedToSegment",
+                "VAS_302_TopUnsegmented",
+                "VAS_302_SelectAtLeastOne",
+                "VAS_302_ChooseSegment",
+                "VAS_302_AddedToast",
+                "VAS_302_BulkAddedToast",
+                "VAS_302_AssignOneHintNamed"
+            ];
+            try {
+                translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {};
+            } catch (e) {
+                translatedTexts = {};
+            }
+        }
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            if (translatedTexts === null) { loadMessages(); }
+            var text = translatedTexts ? translatedTexts[key] : null;
+            if (!text || text === key || String(text).charAt(0) === '[') {
+                return fallback != null ? fallback : key;
+            }
+            return text;
         }
         function escapeHtml(value) {
             if (value == null) { return ''; }
@@ -168,7 +220,26 @@
             var sign = n < 0 ? '-' : '';
             var iso = (cur && cur.iso) || '';
             var symbol = (cur && (cur.symbol || cur.iso)) || '';
-            return sign + symbol + VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
+            var compact = VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
+            // Currency symbol placed per the browser locale (before / after the number).
+            if (iso) {
+                try {
+                    var parts = new Intl.NumberFormat(window.navigator.language, { style: 'currency', currency: iso }).formatToParts(1);
+                    var ci = -1, ni = -1;
+                    parts.forEach(function (p, i) {
+                        if (p.type === 'currency' && ci < 0) { ci = i; }
+                        if (p.type === 'integer' && ni < 0) { ni = i; }
+                    });
+                    if (ci >= 0 && ni >= 0) {
+                        var sym = parts[ci].value;
+                        if (ci < ni) {
+                            return sign + sym + (parts[ci + 1] && parts[ci + 1].type === 'literal' ? parts[ci + 1].value : '') + compact;
+                        }
+                        return sign + compact + (parts[ci - 1] && parts[ci - 1].type === 'literal' ? parts[ci - 1].value : '') + sym;
+                    }
+                } catch (e) { /* fall back to the server symbol in front */ }
+            }
+            return sign + symbol + compact;
         }
 
         var AVATAR_COLORS = ['#1F83FF', '#5F4AA6', '#0B6B45', '#D78B10', '#0083DA', '#A33F3F'];
@@ -271,8 +342,8 @@
             var current = Math.floor(offset / size);
             var end = Math.min(offset + size, total);
             var of = label('VAS_302_Of', 'of');
-            var helper = label('VAS_302_Showing', 'Showing') + ' ' + start + '–' + end + ' ' + of + ' ' + formatCount(total);
-            var pageText = (current + 1) + ' ' + of + ' ' + pages;
+            var helper = label('VAS_302_Showing', 'Showing') + ' ' + formatCount(start) + '–' + formatCount(end) + ' ' + of + ' ' + formatCount(total);
+            var pageText = formatCount(current + 1) + ' ' + of + ' ' + formatCount(pages);
             return '<div class="vas302-pager">' +
                 '<span class="vas302-pglabel">' + escapeHtml(helper) + '</span>' +
                 '<span class="vas302-pgctl">' +
@@ -438,7 +509,7 @@
             $('body').addClass('vas302-modal-open');
             $one.find('.vas302-ptitle').text(label('VAS_302_AddToSegment', 'Add to segment'));
             $oneBody.html(
-                '<div class="vas302-onehint">' + escapeHtml(label('VAS_302_AssignOneHint', 'Assign this customer to a target list.').replace('this customer', custName || 'this customer')) + '</div>' +
+                '<div class="vas302-onehint">' + escapeHtml(custName ? label('VAS_302_AssignOneHintNamed', 'Assign {0} to a target list.').replace('{0}', custName) : label('VAS_302_AssignOneHint', 'Assign this customer to a target list.')) + '</div>' +
                 '<div class="vas302-field"><label>' + escapeHtml(label('VAS_302_TargetSegment', 'Target segment')) + '</label><select class="vas302-segselect"></select></div>'
             );
             ensureSegments(function (segments) {
@@ -630,6 +701,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createDetailDialog();
             createOneDialog();

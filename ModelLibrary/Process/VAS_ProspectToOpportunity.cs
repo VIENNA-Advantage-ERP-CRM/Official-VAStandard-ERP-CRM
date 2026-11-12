@@ -127,10 +127,11 @@ namespace ModelLibrary.Process
                 return GetRetrievedError(opp, "OpprtunityGenerateNotDone");
             }
 
-            //Save history chat data form prospect window to opportunity window
-            int FromTableID = partner.Get_Table_ID();
-            int ToTableID = opp.Get_Table_ID();
-            VAS_CommonMethod.CopyHistorRecordData(FromTableID, ToTableID, opp.GetVAS_Opportunity_ID(), GetRecord_ID(), Get_TrxName(), GetCtx());
+            // History data (AI chat, tasks, mails, attachments) and DMS documents of the prospect are not copied
+            // to the opportunity. To copy them again, enable the lines below.
+            //int FromTableID = partner.Get_Table_ID();
+            //int ToTableID = opp.Get_Table_ID();
+            //VAS_CommonMethod.CopyHistorRecordData(FromTableID, ToTableID, opp.GetVAS_Opportunity_ID(), GetRecord_ID(), Get_TrxName(), GetCtx());
 
             if (lead != null)
             {

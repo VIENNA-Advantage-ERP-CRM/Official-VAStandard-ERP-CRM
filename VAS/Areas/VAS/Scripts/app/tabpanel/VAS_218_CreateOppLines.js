@@ -6,6 +6,15 @@
 // Date    : 21-Aug-2026
 // Chronological development:
 //   NT   21-Aug-2026  Created (adapted from VAS_107)
+//        04-Nov-2026  Product/charge dropdown now follows its input on scroll/resize instead of staying put
+//        04-Nov-2026  Qty / Planned Price inputs: field-length cap (16 fallback) and instant clamp to the max value
+//        04-Nov-2026  Row Undo icon moved into its own last grid column, plain amber icon (matches VAS_107)
+//        04-Nov-2026  Refresh / page change only warn about unsaved lines that have a Product or Charge selected
+//        04-Nov-2026  Saved line with no attribute shows "---" instead of "Set attribute…" (matches VAS_107)
+//        04-Nov-2026  Choosing an attribute re-prices the line (attribute price from the price list) instead of zeroing it
+//        04-Nov-2026  Save is ignored while a save is in flight (repeated clicks inserted duplicate lines)
+//        04-Nov-2026  Delete refreshes the header record (was save only); own refresh echo no longer reloads the grid
+//        10-Nov-2026  Texts via VIS.Msg.translate (loadMessages); amounts, quantities and counts formatted in the browser culture
 
 ;VAS = window.VAS || {};
 (function (VAS, $) {
@@ -164,31 +173,92 @@
 
         // ── Utility helpers ──────────────────────────────────────────────────
 
+        // Browser culture used for every number / currency format in this panel
+        var lang = (window.navigator && window.navigator.language) ? window.navigator.language : undefined;
+
+        // All message keys used by this panel, translated once via VIS.Msg.translate
+        var translatedTexts = null;
+
         /**
-         * Translates a message key using VIS.Msg.getMsg with a fallback to the key itself.
-         * @param {string} key - Message key (e.g. "VAS_218_NoLines").
-         * @returns {string} Translated text.
+         * Loads every message key used by the panel with a single VIS.Msg.translate call.
+         * The result is an object keyed by message key; on failure it is an empty object so
+         * the English fallback texts are shown.
          */
-        function msg(key) {
-            if (VIS && VIS.Msg && VIS.Msg.getMsg) {
-                var t = VIS.Msg.getMsg(key);
-                return (t && t !== key) ? t : key;
+        function loadMessages() {
+            var elements = [
+                "GrandTotal",
+                "VAS_218_Add", "VAS_218_AddDescription", "VAS_218_AdditionalInfo", "VAS_218_AddProductCharge",
+                "VAS_218_Calculating", "VAS_218_Cancel", "VAS_218_Charge", "VAS_218_Code",
+                "VAS_218_ConfirmDelete", "VAS_218_Delete", "VAS_218_DeleteError", "VAS_218_Desc",
+                "VAS_218_GrpDimension", "VAS_218_GuaranteeDate", "VAS_218_LoadError", "VAS_218_Loading",
+                "VAS_218_More", "VAS_218_NoLines", "VAS_218_NoMatches", "VAS_218_NoOpportunity",
+                "VAS_218_NothingToUndo", "VAS_218_Of", "VAS_218_Ok", "VAS_218_OppLinesSummary",
+                "VAS_218_PlannedAmt", "VAS_218_PlannedPrice", "VAS_218_PlannedQtyUOM", "VAS_218_PluralS",
+                "VAS_218_Product", "VAS_218_ProductRequired", "VAS_218_Qty", "VAS_218_QtyOnHand",
+                "VAS_218_QtyRequired", "VAS_218_Refresh", "VAS_218_RefreshWithUnsaved", "VAS_218_Save",
+                "VAS_218_SaveError", "VAS_218_SaveSuccess", "VAS_218_SaveTabChangesFirst", "VAS_218_Saving",
+                "VAS_218_SearchProduct", "VAS_218_SelectAll", "VAS_218_SelectLine", "VAS_218_SelectRowToDelete",
+                "VAS_218_SetAttribute", "VAS_218_Showing", "VAS_218_UndoChanges", "VAS_218_UndoNewLine",
+                "VAS_218_UnsavedChanges", "VAS_218_UOM"
+            ];
+            try {
+                translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {};
+            } catch (e) {
+                translatedTexts = {};
             }
-            return key;
         }
 
         /**
-         * Translates a label key; returns def when VIS.Msg is unavailable.
+         * Returns the translated text for a key, or "" when it is missing
+         * (empty, equal to the key itself, or in the "[Key]" form).
+         * A key that was not part of loadMessages() (e.g. an error key sent by the server)
+         * is looked up with a single VIS.Msg.translate call.
+         * @param {string} key
+         * @returns {string}
+         */
+        function translated(key) {
+            if (translatedTexts === null) loadMessages();
+            var t = translatedTexts ? translatedTexts[key] : undefined;
+            if (t === undefined && key) {
+                try {
+                    t = VIS.Msg.translate(VIS.Env.getCtx(), key);
+                } catch (e) {
+                    t = "";
+                }
+                if (translatedTexts) translatedTexts[key] = t || "";
+            }
+            if (!t || t === key || String(t).charAt(0) === "[") return "";
+            return String(t);
+        }
+
+        /**
+         * Translates a message key; falls back to def (when given) or the key itself.
+         * @param {string} key - Message key (e.g. "VAS_218_NoLines").
+         * @param {string} [def] - Optional English fallback text.
+         * @returns {string} Translated text.
+         */
+        function msg(key, def) {
+            return translated(key) || def || key;
+        }
+
+        /**
+         * Translates a label key; returns def when the key has no translation.
          * @param {string} key - Message key.
          * @param {string} def - Default/fallback text.
          * @returns {string}
          */
         function lbl(key, def) {
-            if (VIS && VIS.Msg && VIS.Msg.getMsg) {
-                var t = VIS.Msg.getMsg(key);
-                return (t && t !== key) ? t : (def || key);
-            }
-            return def || key;
+            return translated(key) || def || key;
+        }
+
+        /**
+         * Formats a whole number (counts, page numbers) in the browser culture.
+         * @param {number} n
+         * @returns {string}
+         */
+        function fmtInt(n) {
+            var v = +n || 0;
+            try { return v.toLocaleString(lang); } catch (e) { return String(v); }
         }
 
         /**
@@ -239,25 +309,107 @@
         }
 
         /**
-         * Formats a number as a money string with two decimal places.
+         * Limits a numeric text input (Qty / Planned Price) while the user types or pastes:
+         *  - at most the column's field length (AD_Column.FieldLength; 16 when the metadata is
+         *    missing, which is the length on the tab) — the maxlength attribute alone is not
+         *    enough, it is skipped when the metadata is not loaded and a paste can bypass it;
+         *  - only digits, one decimal point (and thousands commas);
+         *  - a value above the largest storable number (AMOUNT_MAX_VALUE) turns into that number
+         *    at once — e.g. typing the 11th digit gives 2147483647 — so the stored value always
+         *    equals what the grid displays.
+         * @param {jQuery} $inp
+         * @param {string} col - ColumnName used to look up the field length.
+         */
+        function limitNumericInput($inp, col) {
+            var maxLen = colFieldLength(col) || 16;
+            $inp.attr("maxlength", maxLen);
+            $inp.on("input", function () {
+                var s = this.value;
+                var t = s.replace(/[^0-9.,]/g, "");
+                var dot = t.indexOf(".");
+                if (dot >= 0) t = t.slice(0, dot + 1) + t.slice(dot + 1).replace(/\./g, "");
+                if (t.length > maxLen) t = t.slice(0, maxLen);
+                if (parseNum(t) > AMOUNT_MAX_VALUE) t = String(AMOUNT_MAX_VALUE);
+                if (t !== s) this.value = t;
+            });
+        }
+
+        /**
+         * Formats a number as a money string with two decimal places, in the browser culture
+         * (grouping / decimal separators follow the locale). Display only - the editable
+         * Price input uses fmtMoneyEdit so parseNum can read it back.
          * @param {number} n
          * @returns {string}
          */
         function fmtMoney(n) {
-            if (n == null || isNaN(n)) return "0.00";
-            var v = parseFloat(n);
+            var v = (n == null || isNaN(n)) ? 0 : parseFloat(n);
             if (Math.abs(v) > AMOUNT_MAX_VALUE) v = AMOUNT_MAX_VALUE;
-            return v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+            try {
+                return v.toLocaleString(lang, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            } catch (e) {
+                return v.toFixed(2);
+            }
         }
 
         /**
-         * Formats a quantity value showing at least 2 decimal places (up to 6),
-         * stripping trailing zeros beyond the 2nd place.
-         * Examples: 8 → "8.00", 8.5 → "8.50", 8.1234 → "8.1234"
+         * Plain "1234.50" text for the editable Price input (decimal point, no grouping).
+         * The input only accepts digits and "." and is read back with parseNum.
+         * @param {number} n
+         * @returns {string}
+         */
+        function fmtMoneyEdit(n) {
+            var v = (n == null || isNaN(n)) ? 0 : parseFloat(n);
+            if (Math.abs(v) > AMOUNT_MAX_VALUE) v = AMOUNT_MAX_VALUE;
+            return v.toFixed(2);
+        }
+
+        /**
+         * Formats an amount with the opportunity's currency in the browser culture
+         * (symbol position follows the locale). Falls back to the server-supplied symbol
+         * in front of the number when no ISO code is available.
+         * @param {number} n
+         * @returns {string}
+         */
+        function fmtCurrency(n) {
+            var iso = (parent && parent.CurISO) ? String(parent.CurISO) : "";
+            if (iso) {
+                try {
+                    var v = (n == null || isNaN(n)) ? 0 : parseFloat(n);
+                    if (Math.abs(v) > AMOUNT_MAX_VALUE) v = AMOUNT_MAX_VALUE;
+                    return new Intl.NumberFormat(lang, {
+                        style: "currency", currency: iso,
+                        minimumFractionDigits: 2, maximumFractionDigits: 2
+                    }).format(v);
+                } catch (e) { /* fall through to symbol + number */ }
+            }
+            var sym = (parent && parent.CurSymbol) ? parent.CurSymbol + " " : "";
+            return sym + fmtMoney(n);
+        }
+
+        /**
+         * Formats a quantity value showing at least 2 decimal places (up to 6), in the
+         * browser culture. Display only - the editable Qty input uses fmtQtyEdit.
+         * Examples (en): 8 → "8.00", 8.5 → "8.50", 8.1234 → "8.1234"
          * @param {number} n
          * @returns {string}
          */
         function fmtQty(n) {
+            var v = (n == null || isNaN(n)) ? 0 : parseFloat(n);
+            if (Math.abs(v) > AMOUNT_MAX_VALUE) v = AMOUNT_MAX_VALUE;
+            try {
+                return v.toLocaleString(lang, { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+            } catch (e) {
+                return v.toFixed(2);
+            }
+        }
+
+        /**
+         * Plain "8.50" text for the editable Qty input (decimal point, no grouping): at least
+         * 2 decimal places (up to 6), trailing zeros beyond the 2nd place stripped.
+         * @param {number} n
+         * @returns {string}
+         */
+        function fmtQtyEdit(n) {
             if (n == null || isNaN(n)) return "0.00";
             var v = parseFloat(n);
             if (Math.abs(v) > AMOUNT_MAX_VALUE) v = AMOUNT_MAX_VALUE;
@@ -858,9 +1010,9 @@
             $row.append('<div class="vas-ol-cell vas-ol-cell--right" role="columnheader">' + esc(lbl("VAS_218_PlannedQtyUOM", "Qty / UOM")) + '</div>');
             $row.append('<div class="vas-ol-cell vas-ol-cell--right" role="columnheader">' + esc(lbl("VAS_218_PlannedPrice", "Planned Price")) + '</div>');
             $row.append('<div class="vas-ol-cell vas-ol-cell--right" role="columnheader">' + esc(lbl("VAS_218_PlannedAmt", "Planned Amt")) + '</div>');
-            // No --more column header: opportunity lines have no Additional Info modal, so the
-            // action cell (Undo button) is absolutely positioned over the row instead of occupying
-            // a dedicated grid column.
+            // Last (blank) header cell: the row Undo icon has its own grid column, as in the
+            // Create Order panel. Opportunity lines have no Additional Info modal, so no "..." here.
+            $row.append('<div class="vas-ol-cell vas-ol-cell--more" role="columnheader"></div>');
             return $row;
         }
 
@@ -874,9 +1026,7 @@
             $totalsRow.empty();
             var amt = otherAmt;
             for (var i = 0; i < lines.length; i++) amt += +lineVal(lines[i], "PlannedAmt") || 0;
-            var sym = (parent && parent.CurSymbol) ? parent.CurSymbol + " " : "";
-            function fmt(n) { return sym + fmtMoney(n); }
-            $totalsRow.append(totalsRow(lbl("GrandTotal", "Planned Amount") + ":", fmt(amt), true));
+            $totalsRow.append(totalsRow(lbl("GrandTotal", "Planned Amount") + ":", fmtCurrency(amt), true));
         }
 
         /**
@@ -906,8 +1056,8 @@
             var totalPages = Math.ceil(totalLineCount / LINE_PAGE_SIZE);
             var from       = (linePage - 1) * LINE_PAGE_SIZE + 1;
             var to         = Math.min(linePage * LINE_PAGE_SIZE, totalLineCount);
-            var showing    = lbl("VAS_218_Showing", "Showing") + " " + from + "–" + to + " " + lbl("VAS_218_Of", "of") + " " + totalLineCount;
-            var pageInfo   = linePage + " / " + totalPages;
+            var showing    = lbl("VAS_218_Showing", "Showing") + " " + fmtInt(from) + "–" + fmtInt(to) + " " + lbl("VAS_218_Of", "of") + " " + fmtInt(totalLineCount);
+            var pageInfo   = fmtInt(linePage) + " / " + fmtInt(totalPages);
 
             $pager.html(
                 '<span class="vas-ol-linepager__showing">' + esc(showing) + '</span>' +
@@ -920,7 +1070,7 @@
 
             $pager.find("[data-act='lp-prev']").on("click", function () {
                 if (linePage <= 1) return;
-                if (hasDirtyLines()) {
+                if (hasUnsavedLineWithItem()) {
                     showConfirmDialog(msg("VAS_218_UnsavedChanges"), function () {
                         fetchData(parent && parent.VAS_Opportunity_ID, linePage - 1);
                     });
@@ -930,7 +1080,7 @@
             });
             $pager.find("[data-act='lp-next']").on("click", function () {
                 if (linePage >= totalPages) return;
-                if (hasDirtyLines()) {
+                if (hasUnsavedLineWithItem()) {
                     showConfirmDialog(msg("VAS_218_UnsavedChanges"), function () {
                         fetchData(parent && parent.VAS_Opportunity_ID, linePage + 1);
                     });
@@ -1092,6 +1242,22 @@
         function hasDirtyLines() {
             for (var i = 0; i < lines.length; i++) {
                 if (lines[i]._dirty || lines[i]._isNew) return true;
+            }
+            return false;
+        }
+
+        /**
+         * Returns true when an unsaved line holds real work, i.e. a Product or Charge is selected.
+         * A blank new row (no product / charge yet) has nothing to save, so Refresh and page
+         * changes just discard it instead of warning "save or discard your changes".
+         * @returns {boolean}
+         */
+        function hasUnsavedLineWithItem() {
+            for (var i = 0; i < lines.length; i++) {
+                var l = lines[i];
+                if (!(l._dirty || l._isNew)) continue;
+                var v = l.values || {};
+                if ((parseInt(v.M_Product_ID, 10) || 0) > 0 || (parseInt(v.C_Charge_ID, 10) || 0) > 0) return true;
             }
             return false;
         }
@@ -1420,6 +1586,8 @@
             // Append to body so the popup is never clipped by the panel's overflow:auto.
             // position:fixed (CSS) lets positionCatalog() place it relative to the viewport.
             $("body").append(catalog.$pop);
+            // Keep the popover glued to its input while the grid / window scrolls or resizes.
+            followCatalog();
             // Defer positioning: the row may not be in the DOM yet (buildRow is called as
             // part of renderAll before $linesBody.append). setTimeout(0) fires after the
             // synchronous DOM operations complete so getBoundingClientRect() returns real
@@ -1462,10 +1630,53 @@
         }
 
         /**
+         * The popover is position:fixed on <body>, so it does not move when the grid, the panel or
+         * the window scrolls. While it is open, re-place it on every scroll (capture phase, so the
+         * scrolling of ANY ancestor is seen) and on resize. When the input has been scrolled out of
+         * its scroll container the popover is hidden rather than left floating over other content.
+         */
+        var _catalogFollow = null;
+
+        function followCatalog() {
+            unfollowCatalog();
+            var onMove = function (e) {
+                if (!catalog.$pop || !catalog.$inp || !catalog.$inp.length) return;
+                // Scrolling the popover's own list (paging through results) must not re-place it.
+                if (e && e.target && catalog.$pop[0] && (e.target === catalog.$pop[0] || catalog.$pop[0].contains(e.target))) return;
+                var inp = catalog.$inp[0];
+                var r   = inp.getBoundingClientRect();
+                // Clip rectangle = the input's nearest scrollable ancestor (falls back to the viewport).
+                var top = 0, bottom = window.innerHeight;
+                for (var el = inp.parentElement; el && el !== document.body; el = el.parentElement) {
+                    var cs = window.getComputedStyle(el);
+                    if (/(auto|scroll|hidden)/.test(cs.overflowY) && el.scrollHeight > el.clientHeight) {
+                        var cr = el.getBoundingClientRect();
+                        top = Math.max(top, cr.top); bottom = Math.min(bottom, cr.bottom);
+                        break;
+                    }
+                }
+                var visible = r.bottom > top && r.top < bottom;
+                catalog.$pop.css("visibility", visible ? "" : "hidden");
+                if (visible) positionCatalog();
+            };
+            window.addEventListener("scroll", onMove, true);
+            window.addEventListener("resize", onMove);
+            _catalogFollow = onMove;
+        }
+
+        function unfollowCatalog() {
+            if (!_catalogFollow) return;
+            window.removeEventListener("scroll", _catalogFollow, true);
+            window.removeEventListener("resize", _catalogFollow);
+            _catalogFollow = null;
+        }
+
+        /**
          * Removes the popover and resets loading state immediately.
          * Called before committing a selection so the row's busy-opacity doesn't bleed through.
          */
         function closeCatalog() {
+            unfollowCatalog();
             if (catalog.debounce) { clearTimeout(catalog.debounce); catalog.debounce = null; }
             if (catalog.$pop) { catalog.$pop.remove(); catalog.$pop = null; }
             catalog.$inp = null;
@@ -1670,8 +1881,13 @@
                     { placeholder: msg("VAS_218_AddProductCharge") }));
                 // Attribute link sub-line for products that carry an attribute set
                 if (line.values.M_Product_ID > 0 && (disp.attrName || disp.hasAttributeSet)) {
-                    var attrTxt = disp.attrName || msg("VAS_218_SetAttribute");
-                    var $attr   = $('<span class="vas-ol-attr-link"></span>').text(attrTxt).attr("title", attrTxt);
+                    // No attribute yet: "Set attribute…" while the line is unsaved (new or edited),
+                    // a plain "---" once it is saved (same as the Create Order panel). Clicking
+                    // either still opens the picker; the tooltip keeps the "Set attribute…" hint.
+                    var attrTxt = disp.attrName
+                        || ((line._isNew || line._dirty) ? msg("VAS_218_SetAttribute") : "---");
+                    var $attr   = $('<span class="vas-ol-attr-link"></span>').text(attrTxt)
+                                    .attr("title", disp.attrName || msg("VAS_218_SetAttribute"));
                     if (!disp.attrName) $attr.addClass("vas-ol-attr-link--empty");
                     $attr.on("click", (function (ln) { return function (e) { e.stopPropagation(); if (blockedByTabChanges()) return; openAttrDialog(ln); }; })(line));
                     wrap.append($attr);
@@ -1744,9 +1960,8 @@
             // ── Quantity ──
             if (isEditQty) {
                 var $q = $('<input type="text" class="vas-ol-cell-edit__input vas-ol-qtyval" inputmode="decimal" />');
-                $q.val(v.PlannedQty ? fmtQty(v.PlannedQty) : "").css("text-align", "right");
-                var qLen = colFieldLength("PlannedQty");
-                if (qLen > 0) $q.attr("maxlength", qLen);
+                $q.val(v.PlannedQty ? fmtQtyEdit(v.PlannedQty) : "").css("text-align", "right");
+                limitNumericInput($q, "PlannedQty");
                 $q.on("blur", function () {
                     var n = parseNum($q.val());
                     fieldSet(line, "PlannedQty", n);
@@ -1847,9 +2062,8 @@
 
             if (isEditingThis) {
                 var $inp = $('<input type="text" class="vas-ol-cell-edit__input" inputmode="decimal" />');
-                $inp.val(fmtMoney(line.values.PlannedPrice || 0)).css("text-align", "right");
-                var pLen = colFieldLength("PlannedPrice");
-                if (pLen > 0) $inp.attr("maxlength", pLen);
+                $inp.val(fmtMoneyEdit(line.values.PlannedPrice || 0)).css("text-align", "right");
+                limitNumericInput($inp, "PlannedPrice");
                 $inp.on("blur", function () {
                     var n = parseNum($inp.val());
                     // Mark price as manually set so server callouts don't overwrite it.
@@ -1883,7 +2097,7 @@
                 var hasP = line.values.PlannedPrice !== undefined && +line.values.PlannedPrice !== 0;
                 wrap.append(dispInput(line, "price",
                     hasP ? fmtMoney(line.values.PlannedPrice) : "",
-                    { align: "right", placeholder: "0.00" }));
+                    { align: "right", placeholder: fmtMoney(0) }));
             }
             return cell;
         }
@@ -1954,9 +2168,7 @@
             $amtCell.append('<span class="vas-ol-amt">' + esc(fmtMoney(v.PlannedAmt)) + '</span>');
             $row.append($amtCell);
 
-            // Undo action — absolutely positioned over the row's right edge so it does
-            // not occupy a grid track.  Do NOT add style="position:relative" here;
-            // the CSS class already sets position:absolute (inline overrides class).
+            // Undo action — the row's last grid column (same layout as the Create Order panel).
             var $moreCell = $('<div class="vas-ol-cell vas-ol-cell--more" role="cell"></div>');
 
             // Re-apply per-row spinner after a re-render so an in-flight save or callout
@@ -2167,6 +2379,21 @@
          * @param {number} idx
          */
         /**
+         * After an attribute instance is chosen (or cleared) re-prices the line on the server:
+         * the price-list price defined for that attribute — and the price reference fields,
+         * UOM and amount that go with it — fill in automatically; with no attribute price the
+         * product's own price applies. _priceOverride is cleared first so a price typed earlier
+         * does not block the lookup (the server skips PlannedPrice while it is set).
+         * @param {object} line
+         */
+        function applyAttributePricing(line) {
+            line._priceOverride = false;
+            runCallout(line, "M_AttributeSetInstance_ID", function () {
+                renderAll();
+            });
+        }
+
+        /**
          * Opens the attribute-set picker for the given line's product.
          * Accepts a line object directly (matching the VAS_107 pattern).
          * Auto-opens when called from commitCatalogItem if the product has an attribute set.
@@ -2219,23 +2446,7 @@
                         markDirty(line);
                         attrState = null;
                         editing = { rowId: line.rowId, field: "description" };
-                        if (asi > 0) {
-                            // Run callout first so UOM is updated, then force price/amount
-                            // to 0 AFTER applyPatch runs so the server's recalculated values
-                            // do not overwrite the reset. _priceOverride is cleared so the
-                            // user can enter a fresh price after attribute selection.
-                            runCallout(line, "M_AttributeSetInstance_ID", function () {
-                                line._priceOverride = false;
-                                fieldSet(line, "PlannedPrice", 0);
-                                fieldSet(line, "PlannedAmt", 0);
-                                renderAll();
-                            });
-                        } else {
-                            line._priceOverride = false;
-                            fieldSet(line, "PlannedPrice", 0);
-                            fieldSet(line, "PlannedAmt", 0);
-                            renderAll();
-                        }
+                        applyAttributePricing(line);
                     },
                     onClose: function () {
                         attrState = null;
@@ -2258,19 +2469,7 @@
                         markDirty(line);
                         attrState = null;
                         editing = { rowId: line.rowId, field: "description" };
-                        if (asi > 0) {
-                            runCallout(line, "M_AttributeSetInstance_ID", function () {
-                                line._priceOverride = false;
-                                fieldSet(line, "PlannedPrice", 0);
-                                fieldSet(line, "PlannedAmt", 0);
-                                renderAll();
-                            });
-                        } else {
-                            line._priceOverride = false;
-                            fieldSet(line, "PlannedPrice", 0);
-                            fieldSet(line, "PlannedAmt", 0);
-                            renderAll();
-                        }
+                        applyAttributePricing(line);
                     },
                     onCancel: function () {
                         attrState = null;
@@ -2609,6 +2808,9 @@
                             // Re-append draft rows that were not part of the delete operation
                             for (var d = 0; d < preservedDrafts.length; d++) lines.push(preservedDrafts[d]);
                             renderAll();
+                            // The delete changed the opportunity's Planned Amount — refresh the header
+                            // record so the header, the form and the right panel show it at once.
+                            refreshHeaderRecord();
                         } else {
                             showToast(msg("VAS_218_DeleteError"), true);
                             renderAll();
@@ -2684,7 +2886,7 @@
             // editor is active (HTML disabled swallows the event). Mirrors VAS_074 pattern.
             var saveLbl = lbl("VAS_218_Save", "Save row");
             if (dirtyCount > 1) saveLbl += lbl("VAS_218_PluralS", "s");
-            if (dirtyCount > 0) saveLbl += " (" + dirtyCount + ")";
+            if (dirtyCount > 0) saveLbl += " (" + fmtInt(dirtyCount) + ")";
             $saveBtn.find(".vas-ol-save-lbl").text(saveLbl);
             $saveBtn.prop("disabled", locked)
                     .toggleClass("vas-ol-is-disabled", locked || dirtyCount === 0);
@@ -2694,7 +2896,7 @@
                    .toggleClass("vas-ol-is-disabled", locked);
 
             // Delete button: selection count badge
-            $deleteBtn.find(".vas-ol-sel-count").text(selCount > 0 ? "(" + selCount + ")" : "");
+            $deleteBtn.find(".vas-ol-sel-count").text(selCount > 0 ? "(" + fmtInt(selCount) + ")" : "");
             $deleteBtn.prop("disabled", selCount === 0 || locked)
                       .toggleClass("vas-ol-is-disabled", selCount === 0 || locked);
 
@@ -2719,6 +2921,10 @@
         function refreshHeaderRecord() {
             var tab = curTab || (self && self.curTab);
             if (tab && typeof tab.dataRefresh === "function") {
+                // dataRefresh() re-reads the header row, which makes the framework tell every panel
+                // (this one included) to refresh. The grid already holds the server's result, so
+                // that echo must not reload it — it would jump back to page 1 and drop draft rows.
+                ownRefreshUntil = Date.now() + 5000;
                 tab.dataRefresh();
             }
         }
@@ -2739,7 +2945,13 @@
         /**
          * Saves all dirty lines to the server.
          */
+        var saveInFlight = false;   // true from the moment a save starts until its response (or failure) arrives
+        var ownRefreshUntil = 0;    // while Date.now() < this, a framework refresh of the current record is our own echo
+
         function saveRows() {
+            // A save is already running: a second click / Ctrl+Alt+S would collect the SAME new
+            // rows again and insert them a second time.
+            if (saveInFlight) return;
             if (blockedByTabChanges()) return;        // unsaved header edit — save the tab first
             if (!parent || !parent.VAS_Opportunity_ID) {
                 showToast(msg("VAS_218_NoOpportunity"), true);
@@ -2751,6 +2963,7 @@
             // Collect dirty lines
             var dirtyLines = [];
             for (var i = 0; i < lines.length; i++) {
+                if (lines[i]._saving) continue;           // already on its way to the server
                 if (lines[i]._dirty || lines[i]._isNew) {
                     var errMsg = validateLine(lines[i]);
                     if (errMsg) {
@@ -2770,6 +2983,7 @@
 
             // Lock each dirty row with a "Saving…" spinner before the round-trip starts,
             // matching the VAS_107 pattern so the user sees per-row feedback immediately.
+            saveInFlight = true;
             var savingLabel = msg("VAS_218_Saving");
             for (var k = 0; k < dirtyLines.length; k++) {
                 dirtyLines[k]._saving = true;
@@ -2788,6 +3002,7 @@
                     })
                 },
                 function (raw) {
+                    saveInFlight = false;
                     // Clear the per-row saving flags before any render.
                     for (var k = 0; k < dirtyLines.length; k++) {
                         dirtyLines[k]._saving = false;
@@ -2823,6 +3038,7 @@
                     }
                 }
             ).fail(function () {
+                saveInFlight = false;
                 for (var k = 0; k < dirtyLines.length; k++) {
                     dirtyLines[k]._saving = false;
                     dirtyLines[k]._busy   = false;
@@ -3139,7 +3355,7 @@
                 /** Alt+Ctrl+Q — refresh the current page (same as the Refresh button). */
                 onRefresh: function () {
                     if (!parent || !parent.VAS_Opportunity_ID) return;
-                    if (hasDirtyLines()) {
+                    if (hasUnsavedLineWithItem()) {
                         showToast(msg("VAS_218_RefreshWithUnsaved"), true);
                         return;
                     }
@@ -3171,6 +3387,7 @@
          */
         function render(parentRecord, $container, opts) {
             opts     = opts || {};
+            loadMessages();
             parent   = parentRecord || null;
             $self    = $container;
             self     = opts.instance || self;
@@ -3234,7 +3451,7 @@
 
             $refreshBtn.on("click", function () {
                 if (!parent || !parent.VAS_Opportunity_ID) return;
-                if (hasDirtyLines()) {
+                if (hasUnsavedLineWithItem()) {
                     showToast(msg("VAS_218_RefreshWithUnsaved"), true);
                     return;
                 }
@@ -3409,6 +3626,7 @@
              * Called by startPanel; safe to call multiple times (rebuilds shell).
              */
             init: function () {
+                loadMessages();
                 self  = this;
                 $self = $('<div class="vas-ol-root"></div>');
 
@@ -3455,7 +3673,7 @@
                 });
                 $refreshBtn.on("click", function () {
                     if (!parent || !parent.VAS_Opportunity_ID) return;
-                    if (hasDirtyLines()) {
+                    if (hasUnsavedLineWithItem()) {
                         showToast(msg("VAS_218_RefreshWithUnsaved"), true);
                         return;
                     }
@@ -3523,6 +3741,12 @@
                 // Normal record navigation — clear the edit-mode flag before loading fresh data
                 _headerEditMode = false;
                 self = this;
+                // Echo of our own header refresh after a save / delete on this very record: the
+                // grid is already up to date, so keep it (and its page / draft rows) as it is.
+                if (Date.now() < ownRefreshUntil && parent && (+recordID === +parent.VAS_Opportunity_ID)) {
+                    ownRefreshUntil = 0;
+                    return;
+                }
                 fetchData(recordID, 1);
             },
 

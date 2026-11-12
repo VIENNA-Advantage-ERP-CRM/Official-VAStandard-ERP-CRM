@@ -110,6 +110,8 @@ namespace ModelLibrary.Classes
                 {
                     MAppointmentsInfo newAppointment = null;
                     MAppointmentsInfo oldAppointment = null;
+                    // Window of the target screen, for the AD_Window_ID of the copied tasks (looked up once)
+                    int toWindowID = -1;
                     for (int i = 0; i < historyRecordIDs.Length; i++)
                     {
                         oldAppointment = new MAppointmentsInfo(ctx, historyRecordIDs[i], trx);
@@ -126,6 +128,18 @@ namespace ModelLibrary.Classes
                             newAppointment.SetRecord_ID(ToRecordID);
                         if (ToTableID > 0)
                             newAppointment.SetAD_Table_ID(ToTableID);
+
+                        // CopyTo keeps the window of the source screen (e.g. Lead); the copied task belongs
+                        // to the target screen, so its window is saved instead (empty if none is found)
+                        if (ToTableID > 0 && newAppointment.Get_ColumnIndex("AD_Window_ID") >= 0)
+                        {
+                            if (toWindowID < 0)
+                                toWindowID = GetTargetWindowID(ToTableID, trx);
+                            if (toWindowID > 0)
+                                newAppointment.Set_Value("AD_Window_ID", toWindowID);
+                            else
+                                newAppointment.Set_Value("AD_Window_ID", null);
+                        }
 
                         if (!newAppointment.Save())
                             log.SaveError("", Msg.GetMsg(ctx, "VAS_CopyHistoryFailed"));
@@ -255,6 +269,27 @@ namespace ModelLibrary.Classes
         public static void CopyHistorRecordData(int FromTableID, int ToTableID, int ToRecordID, int FromRecordID, Trx trx, Ctx ctx)
         {
             CopyHistorRecordData(FromTableID, ToTableID, ToRecordID, FromRecordID, trx, ctx, "");
+        }
+
+        /// <summary>
+        /// Window of the screen the history is copied to: the CRM window (Prospects, Opportunity) whose
+        /// header tab is on the target table, otherwise the table's default window.
+        /// </summary>
+        /// <param name="ToTableID">target table</param>
+        /// <param name="trx">transaction</param>
+        /// <returns>AD_Window_ID, 0 if none is found</returns>
+        private static int GetTargetWindowID(int ToTableID, Trx trx)
+        {
+            int windowID = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT MIN(w.AD_Window_ID)
+                FROM AD_Window w
+                INNER JOIN AD_Tab t ON (w.AD_Window_ID = t.AD_Window_ID)
+                WHERE w.Name IN ('VAS_Prospects', 'VAS_Opportunity', 'VAS_OpportunityNew') AND w.IsActive = 'Y'
+                AND t.AD_Column_ID IS NULL AND t.AD_Table_ID = " + ToTableID, null, trx));
+            if (windowID <= 0)
+            {
+                windowID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Table WHERE AD_Table_ID = " + ToTableID, null, trx));
+            }
+            return windowID;
         }
 
         #region Reversal Document creation for Amount Dimension Control

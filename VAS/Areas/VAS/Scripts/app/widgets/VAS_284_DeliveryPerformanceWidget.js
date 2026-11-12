@@ -103,6 +103,10 @@
  * 56  | of                                                                   | VAS_284_Of
  * 57  | Showing                                                              | VAS_284_Showing
  * 58  | Search is unavailable right now. Try again in a moment.              | VAS_284_LoadError
+ * 59  | Month                                                                | VAS_284_Month
+ * 60  | Year                                                                 | VAS_284_Year
+ * 61  | pts                                                                  | VAS_284_PtsSuffix
+ * 62  | Lines                                                                | VAS_284_StatLines
  */
 ; VAS = window.VAS || {};
 
@@ -169,8 +173,8 @@
                 $root.find('.vasso-retry').remove();
                 if ($root.css('position') === 'static') { $root.css('position', 'relative'); }
                 var text = '';
-                try { text = VIS.Msg.getMsg('VAS_SO_Retry'); } catch (e) { text = ''; }
-                if (!text || text === 'VAS_SO_Retry') { text = 'Retry'; }
+                try { text = VIS.Msg.translate(VIS.Env.getCtx(), 'VAS_SO_Retry'); } catch (e) { text = ''; }
+                if (!text || text === 'VAS_SO_Retry' || String(text).charAt(0) === '[') { text = 'Retry'; }
                 $('<button type="button" class="vasso-retry"></button>').text(text)
                     .attr('title', text)
                     .on('click', function (e) {
@@ -186,7 +190,6 @@
 
     var MAX_ROWS_PER_PAGE = 10;
     var MIN_ROWS_PER_PAGE = 2;
-    var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     var MIN_YEAR = 2024;
     var YEAR_SPAN = 3;
 
@@ -244,8 +247,47 @@
         var cfgStack = [];
         var currentCfg = null;
 
+        // Translated texts, loaded once per widget instance (see loadMessages()).
+        var translatedTexts = null;
+
+        function loadMessages() {
+            var elements = [
+                'VAS_284_Title', 'VAS_284_Month', 'VAS_284_Year', 'VAS_284_ErrorState', 'VAS_284_EmptyMeta',
+                'VAS_284_KpiMeta', 'VAS_284_PtsSuffix', 'VAS_284_SosSuffix', 'VAS_284_Back', 'VAS_284_Close',
+                'VAS_284_LoadError', 'VAS_284_SubtitlePrefix', 'VAS_284_StatSalesOrders', 'VAS_284_StatShare',
+                'VAS_284_StatOnTimeOverall', 'VAS_284_StatPeriod', 'VAS_284_SectionHeading', 'VAS_284_ZeroState',
+                'VAS_284_ColSoNo', 'VAS_284_Customer', 'VAS_284_ColWarehouse', 'VAS_284_ColPromised',
+                'VAS_284_ColCompleted', 'VAS_284_ColValue', 'VAS_284_ColStatus', 'VAS_284_Showing', 'VAS_284_Of',
+                'VAS_284_PrevPage', 'VAS_284_NextPage', 'VAS_284_DeliveryFull', 'VAS_284_LinePartial',
+                'VAS_284_LineInProcess', 'VAS_284_SoDate', 'VAS_284_DatePromised', 'VAS_284_SoValue',
+                'VAS_284_ShipFrom', 'VAS_284_ColDeliveryMode', 'VAS_284_DocumentStatus', 'VAS_284_DeliveryStatus',
+                'VAS_284_SalesOrderLines', 'VAS_284_LinesSuffix', 'VAS_284_QtyOrderedSuffix', 'VAS_284_QtyShortSuffix',
+                'VAS_284_SalesOrderPrefix', 'VAS_284_StatLines', 'VAS_284_ColOrdered', 'VAS_284_ColPending',
+                'VAS_284_ColLine', 'VAS_284_ColProduct', 'VAS_284_ColAttribute', 'VAS_284_ColUom',
+                'VAS_284_ColDelivered', 'VAS_284_ColInStock', 'VAS_284_ColRate', 'VAS_284_ColAmount',
+                'VAS_284_ColLineStatus'
+            ].concat(BUCKET_ORDER.map(function (k) { return 'VAS_284_Bucket_' + k; }));   // VAS_284_Bucket_<key>, one per bucket
+            try { translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {}; }
+            catch (e) { translatedTexts = {}; }
+        }
+
+        // Never render a raw "[KEY]": fall back to the English text when the key is missing.
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            if (translatedTexts === null) { loadMessages(); }
+            var text = translatedTexts ? translatedTexts[key] : '';
+            if (!text || text === key || String(text).charAt(0) === '[') { return fallback || key; }
+            return text;
+        }
+
+        /* Browser-culture formatting (window.navigator.language). */
+        function fmtDate(d, opts) {
+            try { return new Intl.DateTimeFormat(window.navigator.language, opts).format(d); } catch (e) { return ''; }
+        }
+
+        function fmtNumber(n, minFrac, maxFrac) {
+            try {
+                return Number(n).toLocaleString(window.navigator.language, { minimumFractionDigits: minFrac, maximumFractionDigits: maxFrac });
+            } catch (e) { return String(n); }
         }
 
         function escapeHtml(value) {
@@ -378,8 +420,8 @@
             $htxt.append('<p class="vas284-title">' + escapeHtml(label('VAS_284_Title', 'Delivery Performance')) + '</p>');
 
             var $filter = $('<div class="vas284-mfilter"></div>');
-            $monthSel = $('<select class="vas284-msel" aria-label="Month"></select>');
-            $yearSel = $('<select class="vas284-msel" aria-label="Year"></select>');
+            $monthSel = $('<select class="vas284-msel" aria-label="' + escapeHtml(label('VAS_284_Month', 'Month')) + '"></select>');
+            $yearSel = $('<select class="vas284-msel" aria-label="' + escapeHtml(label('VAS_284_Year', 'Year')) + '"></select>');
             fillMonthSelect($monthSel);
             fillYearSelect($yearSel);
             $filter.append($monthSel, $yearSel);
@@ -472,7 +514,7 @@
             }
 
             var pct = perfData.OnTimePercent;
-            $big.text((pct === null || pct === undefined) ? '—' : Number(pct).toFixed(1) + '%');
+            $big.text((pct === null || pct === undefined) ? '—' : fmtNumber(pct, 1, 1) + '%');
             $meta.text(label('VAS_284_KpiMeta', 'On-time against date promised'));
 
             var points = perfData.ChangePoints;
@@ -481,7 +523,7 @@
             } else {
                 var n = Number(points);
                 var sign = n > 0 ? '+' : (n < 0 ? '' : '±');
-                $chip.text(sign + n.toFixed(1) + ' pts')
+                $chip.text(sign + fmtNumber(n, 1, 1) + ' ' + label('VAS_284_PtsSuffix', 'pts'))
                     .removeClass('vas284-chip-ok vas284-chip-risk')
                     .addClass(n < 0 ? 'vas284-chip-risk' : 'vas284-chip-ok')
                     .prop('hidden', false);
@@ -502,7 +544,7 @@
             $list.html(buckets.map(function (b) {
                 var meta = BUCKET_META[b.Key] || { fallback: b.Label, color: '#D7E3EE' };
                 var name = label('VAS_284_Bucket_' + b.Key, meta.fallback);
-                var valueText = formatNum(b.OrderCount) + ' ' + label('VAS_284_SosSuffix', 'SOs') + ' · ' + Number(b.Percent).toFixed(1) + '%';
+                var valueText = formatNum(b.OrderCount) + ' ' + label('VAS_284_SosSuffix', 'SOs') + ' · ' + fmtNumber(b.Percent, 1, 1) + '%';
                 return '<button type="button" class="vas284-mixrow" data-bucket="' + b.Key + '">' +
                     '<span class="vas284-line"><span class="vas284-n" title="' + escapeHtml(name) + '">' + escapeHtml(name) + '</span>' +
                     '<span class="vas284-v" title="' + escapeHtml(valueText) + '">' + escapeHtml(valueText) + '</span></span>' +
@@ -671,8 +713,8 @@
 
             var statsHtml = '<div class="vas284-mstats">' +
                 statTile(label('VAS_284_StatSalesOrders', 'Sales orders'), formatNum(summary.OrderCount)) +
-                statTile(label('VAS_284_StatShare', 'Share'), Number(summary.SharePercent).toFixed(1) + '%') +
-                statTile(label('VAS_284_StatOnTimeOverall', 'On-time overall'), (overall === null || overall === undefined) ? '—' : Number(overall).toFixed(1) + '%') +
+                statTile(label('VAS_284_StatShare', 'Share'), fmtNumber(summary.SharePercent, 1, 1) + '%') +
+                statTile(label('VAS_284_StatOnTimeOverall', 'On-time overall'), (overall === null || overall === undefined) ? '—' : fmtNumber(overall, 1, 1) + '%') +
                 statTile(label('VAS_284_StatPeriod', 'Period'), periodLabel()) +
             '</div>';
 
@@ -809,7 +851,7 @@
                 statTile(label('VAS_284_Customer', 'Customer'), order.CustomerName) +
                 statTile(label('VAS_284_SoDate', 'SO date'), formatDateFull(order.SalesOrderDate)) +
                 statTile(label('VAS_284_DatePromised', 'Date promised'), formatDateFull(order.DatePromised)) +
-                statTile(label('VAS_284_SoValue', 'SO value'), formatINR(order.OrderValue)) +
+                statTile(label('VAS_284_SoValue', 'SO value'), formatAmount(order.OrderValue)) +
                 statTile(label('VAS_284_ShipFrom', 'Ship from'), order.WarehouseName) +
                 statTile(label('VAS_284_ColDeliveryMode', 'Delivery mode'), order.DeliveryMode) +
                 statTile(label('VAS_284_DocumentStatus', 'Document status'), order.DocumentStatus) +
@@ -873,8 +915,8 @@
                 ' · ' + escapeHtml(formatDateFull(order.SalesOrderDate)) + ' · ' + escapeHtml(order.DocumentStatus) + '</div>';
 
             var stats = '<div class="vas284-mstats">' +
-                statTile(label('VAS_284_ColLine', 'Line') + 's', String(lines.length)) +
-                statTile(label('VAS_284_SoValue', 'SO value'), formatINR(order.OrderValue)) +
+                statTile(label('VAS_284_StatLines', 'Lines'), String(lines.length)) +
+                statTile(label('VAS_284_SoValue', 'SO value'), formatAmount(order.OrderValue)) +
                 statTile(label('VAS_284_ColOrdered', 'Ordered'), formatNum(qtyOrdered)) +
                 statTile(label('VAS_284_ColPending', 'Pending'), formatNum(qtyPending)) +
             '</div>';
@@ -991,6 +1033,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createModal();
             bindDocumentLevelEvents();

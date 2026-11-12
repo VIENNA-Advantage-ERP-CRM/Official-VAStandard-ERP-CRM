@@ -234,8 +234,8 @@
                 $root.find('.vasso-retry').remove();
                 if ($root.css('position') === 'static') { $root.css('position', 'relative'); }
                 var text = '';
-                try { text = VIS.Msg.getMsg('VAS_SO_Retry'); } catch (e) { text = ''; }
-                if (!text || text === 'VAS_SO_Retry') { text = 'Retry'; }
+                try { text = VIS.Msg.translate(VIS.Env.getCtx(), 'VAS_SO_Retry'); } catch (e) { text = ''; }
+                if (!text || text === 'VAS_SO_Retry' || String(text).charAt(0) === '[') { text = 'Retry'; }
                 $('<button type="button" class="vasso-retry"></button>').text(text)
                     .attr('title', text)
                     .on('click', function (e) {
@@ -253,7 +253,6 @@
     var MODAL_MAX_ROWS = 50;    // upper safety cap only - the real page size is measured from the available height (QA 8.39)
     var MODAL_INITIAL_ROWS = 10;
     var MODAL_MIN_ROWS = 2;
-    var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
     // 5-Nov retest: no Status column in the widget list (it is shown on the
     // next pop-up step, as in Open Requisitions).
@@ -299,13 +298,58 @@
         var cfgStack = [];
         var currentCfg = null;
 
+        // Translated texts, loaded once per widget instance (see loadMessages()).
+        var translatedTexts = null;
+
+        function loadMessages() {
+            var elements = [
+                'VAS_289_Title', 'VAS_289_Subtitle', 'VAS_289_ColQuotation', 'VAS_289_ColLines',
+                'VAS_289_ColPendingQty', 'VAS_289_ColValidTill', 'VAS_289_PrevPage', 'VAS_289_NextPage',
+                'VAS_289_ErrorState', 'VAS_289_ReadySuffix', 'VAS_289_ZeroState', 'VAS_289_Showing', 'VAS_289_Of',
+                'VAS_289_RankedBy', 'VAS_289_Back', 'VAS_289_Close', 'VAS_289_LoadError', 'VAS_289_ValidTillLabel',
+                'VAS_289_Step2SubtitleSuffix', 'VAS_289_StatQuotation', 'VAS_289_StatQuotedQty',
+                'VAS_289_StatAlreadyOrdered', 'VAS_289_StatPendingQty', 'VAS_289_StatStatus', 'VAS_289_ColProduct',
+                'VAS_289_ColAttribute', 'VAS_289_ColUom', 'VAS_289_ColQtyToOrder', 'VAS_289_FieldWarehouse',
+                'VAS_289_ColStockQtyBaseUom', 'VAS_289_NoLinesSelected', 'VAS_289_LinesSelectedSuffix',
+                'VAS_289_MultiWarehouseWarning', 'VAS_289_ShortStockWarning', 'VAS_289_StockAvailable',
+                'VAS_289_Continue', 'VAS_289_Step3Title', 'VAS_289_Page1Of2', 'VAS_289_FromQuotationPrefix',
+                'VAS_289_LinesShortSuffix', 'VAS_289_AllLinesCovered', 'VAS_289_StatOrderQty',
+                'VAS_289_StatOrderValue', 'VAS_289_StatStockCover', 'VAS_289_DatePromisedBeforeOrdered',
+                'VAS_289_GroupDocument', 'VAS_289_FieldDocType', 'VAS_289_FieldPOReference', 'VAS_289_DateOrdered',
+                'VAS_289_FieldDatePromised', 'VAS_289_FieldPriority', 'VAS_289_GroupBPartner',
+                'VAS_289_FieldBusinessPartner', 'VAS_289_SearchCustomer', 'VAS_289_Location', 'VAS_289_FieldContact',
+                'VAS_289_FieldSalesRep', 'VAS_289_FieldPaymentTerm', 'VAS_289_FieldPaymentMethod',
+                'VAS_289_GroupShipping', 'VAS_289_FieldShippingRule', 'VAS_289_FieldShippingMethod',
+                'VAS_289_FieldPriceList', 'VAS_289_FieldCurrency', 'VAS_289_FieldRateType', 'VAS_289_FieldIncoTerm',
+                'VAS_289_GroupDescription', 'VAS_289_FieldDescription', 'VAS_289_FillMandatory',
+                'VAS_289_ContinueToLines', 'VAS_289_Step4Title', 'VAS_289_Page2Of2', 'VAS_289_LineWordSuffix',
+                'VAS_289_ColRate', 'VAS_289_ColTax', 'VAS_289_FieldPrintDescription', 'VAS_289_TotalsSubtotal',
+                'VAS_289_TotalsTax', 'VAS_289_TotalsOrderTotal', 'VAS_289_FieldDocStatus', 'VAS_289_BackToDetails',
+                'VAS_289_CreateSalesOrder', 'VAS_289_ConflictLinesAffected', 'VAS_289_SOCreatedDocNo',
+                'VAS_289_SOCompleteFailed'
+            ];
+            try { translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {}; }
+            catch (e) { translatedTexts = {}; }
+        }
+
         function label(key, fallback) {
-            var text = '';
-            try { text = VIS.Msg.getMsg(key); } catch (e) { text = ''; }
+            if (translatedTexts === null) { loadMessages(); }
+            var text = translatedTexts ? translatedTexts[key] : '';
             // VIS.Msg echoes the key back (bare or as "[KEY]") when no message is defined - show
             // the English text then, so a key that is not released yet never renders raw.
-            if (!text || text === key || text === '[' + key + ']') { return fallback !== undefined ? fallback : key; }
+            if (!text || text === key || String(text).charAt(0) === '[') { return fallback !== undefined ? fallback : key; }
             return text;
+        }
+
+        /* Browser-culture formatting (window.navigator.language). */
+        function fmtDate(d, opts) {
+            try { return new Intl.DateTimeFormat(window.navigator.language, opts).format(d); } catch (e) { return ''; }
+        }
+
+        function fmtNumber(n, minFrac, maxFrac) {
+            try {
+                return Number(n).toLocaleString(window.navigator.language, { minimumFractionDigits: minFrac, maximumFractionDigits: maxFrac });
+            } catch (e) { return String(n); }
         }
 
         /* QA 8.49/8.68 and other blocking validations - the framework's info dialog when
@@ -334,7 +378,8 @@
             return roundTo(value, p).toLocaleString(window.navigator.language, { minimumFractionDigits: 0, maximumFractionDigits: p });
         }
 
-        /* QA 8.75: rate with exactly two decimals. */
+        /* QA 8.75: rate with exactly two decimals. This is the machine-format value of the native
+           <input type="number"> (always a dot decimal, never locale text), so toFixed stays. */
         function formatRate(value) {
             return (Number(value) || 0).toFixed(2);
         }
@@ -1081,10 +1126,10 @@
                 } else {
                     var shortCount = selected.filter(isShort).length;
                     if (shortCount > 0) {
-                        noteHtml = escapeHtml(selected.length + ' ' + label('VAS_289_LinesSelectedSuffix', 'lines selected') + ' · ' + escapeHtml(whName) + ' · ' + formatINR(value) + ' · ' + shortCount + ' ' + label('VAS_289_ShortStockWarning', 'lines short of free stock — will backorder'));
+                        noteHtml = escapeHtml(selected.length + ' ' + label('VAS_289_LinesSelectedSuffix', 'lines selected') + ' · ' + escapeHtml(whName) + ' · ' + formatMoneyCompact(value) + ' · ' + shortCount + ' ' + label('VAS_289_ShortStockWarning', 'lines short of free stock — will backorder'));
                         cls = 'vas289-warnnote';
                     } else {
-                        noteHtml = escapeHtml(selected.length + ' ' + label('VAS_289_LinesSelectedSuffix', 'lines selected') + ' · ' + escapeHtml(whName) + ' · ' + formatINR(value) + ' · ' + label('VAS_289_StockAvailable', 'stock available'));
+                        noteHtml = escapeHtml(selected.length + ' ' + label('VAS_289_LinesSelectedSuffix', 'lines selected') + ' · ' + escapeHtml(whName) + ' · ' + formatMoneyCompact(value) + ' · ' + label('VAS_289_StockAvailable', 'stock available'));
                         cls = 'vas289-oknote';
                     }
                     continueEnabled = true;
@@ -1202,7 +1247,7 @@
             return '<div class="vas289-mstats">' +
                 statTile(label('VAS_289_StatQuotation', 'Quotation'), wizard.quotation.DocumentNo) +
                 statTile(label('VAS_289_StatOrderQty', 'Order qty'), formatNumDisplay(orderQty)) +
-                statTile(label('VAS_289_StatOrderValue', 'Order value'), formatINR(orderValue)) +
+                statTile(label('VAS_289_StatOrderValue', 'Order value'), formatMoneyCompact(orderValue)) +
                 statTile(label('VAS_289_StatStockCover', 'Stock cover'), stockCover) +
             '</div>';
         }
@@ -1742,6 +1787,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createModal();
             bindDocumentLevelEvents();

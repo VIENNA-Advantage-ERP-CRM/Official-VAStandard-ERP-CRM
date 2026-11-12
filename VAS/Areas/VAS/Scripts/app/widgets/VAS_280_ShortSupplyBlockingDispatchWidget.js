@@ -89,6 +89,7 @@
  * 58  | Showing                                                               | VAS_280_Showing
  * 59  | Search is unavailable right now. Try again in a moment.               | VAS_280_LoadError
  * 60  | sales orders                                                          | VAS_280_SalesOrdersSuffix
+ * 61  | Lines                                                                 | VAS_280_StatLines
  */
 ; VAS = window.VAS || {};
 
@@ -155,8 +156,8 @@
                 $root.find('.vasso-retry').remove();
                 if ($root.css('position') === 'static') { $root.css('position', 'relative'); }
                 var text = '';
-                try { text = VIS.Msg.getMsg('VAS_SO_Retry'); } catch (e) { text = ''; }
-                if (!text || text === 'VAS_SO_Retry' || text === '[VAS_SO_Retry]') { text = 'Retry'; }
+                try { text = VIS.Msg.translate(VIS.Env.getCtx(), 'VAS_SO_Retry'); } catch (e) { text = ''; }
+                if (!text || typeof text !== 'string' || text === 'VAS_SO_Retry' || text.charAt(0) === '[') { text = 'Retry'; }
                 $('<button type="button" class="vasso-retry"></button>').text(text)
                     .attr('title', text)
                     .on('click', function (e) {
@@ -174,7 +175,6 @@
     var MAX_WIDGET_ROWS = 25;   // upper bound for the height-fitted widget page
     var MAX_ROWS_PER_PAGE = 10;
     var MIN_ROWS_PER_PAGE = 2;
-    var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
     // Header row + every body row share this exact grid-template-columns string
     // (design.md §10): Product / Warehouse / On open SO / Free stock / Short qty /
@@ -228,8 +228,37 @@
         var cfgStack = [];
         var currentCfg = null;
 
+        var translatedTexts = null;   // message-key -> translated text (see loadMessages)
+
+        // Every message key used by this widget, translated in ONE call.
+        function loadMessages() {
+            var elements = [
+                'VAS_280_Title', 'VAS_280_HeldSuffix', 'VAS_280_FullyCoveredChip', 'VAS_280_ZeroState', 'VAS_280_ErrorState',
+                'VAS_280_ColProduct', 'VAS_280_ColWarehouse', 'VAS_280_OnOpenSo', 'VAS_280_FreeStock', 'VAS_280_ShortQty',
+                'VAS_280_ValueBlocked', 'VAS_280_ColSos', 'VAS_280_RankedBy', 'VAS_280_TitlePrefix',
+                'VAS_280_ShortAgainstSuffix', 'VAS_280_StatCoverage', 'VAS_280_StatSosAffected', 'VAS_280_StatRate',
+                'VAS_280_StatShipFrom', 'VAS_280_Note', 'VAS_280_SectionHeading', 'VAS_280_HeldForStockLabel',
+                'VAS_280_ColSoNo', 'VAS_280_SoDate', 'VAS_280_Customer', 'VAS_280_Representative', 'VAS_280_ColValue',
+                'VAS_280_ColDelivery', 'VAS_280_ColStatus', 'VAS_280_Back', 'VAS_280_Close', 'VAS_280_DatePromised',
+                'VAS_280_SoValue', 'VAS_280_DeliveryMode', 'VAS_280_DocumentStatus', 'VAS_280_DeliveryStatus',
+                'VAS_280_SalesOrderLines', 'VAS_280_ColLine', 'VAS_280_ColAttribute', 'VAS_280_ColUom',
+                'VAS_280_ColOrdered', 'VAS_280_ColDelivered', 'VAS_280_ColPending', 'VAS_280_ColInStock',
+                'VAS_280_ColAmount', 'VAS_280_ColLineStatus', 'VAS_280_DeliveryFull', 'VAS_280_LinePartial',
+                'VAS_280_LineInProcess', 'VAS_280_SalesOrderPrefix', 'VAS_280_LinesSuffix', 'VAS_280_QtyOrderedSuffix',
+                'VAS_280_QtyShortSuffix', 'VAS_280_PrevPage', 'VAS_280_NextPage', 'VAS_280_Of', 'VAS_280_Showing',
+                'VAS_280_LoadError', 'VAS_280_SalesOrdersSuffix', 'VAS_280_StatLines'
+            ];
+            try { translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {}; }
+            catch (e) { translatedTexts = {}; }
+        }
+
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            if (translatedTexts === null) { loadMessages(); }
+            var text = translatedTexts[key];
+            if (text === undefined || text === null || typeof text !== 'string' || text === '' || text === key || text.charAt(0) === '[') {
+                return fallback;
+            }
+            return text;
         }
 
         function escapeHtml(value) {
@@ -518,7 +547,7 @@
                 return;
             }
 
-            var chipText = formatINR(docsState.totalValueBlocked) + ' ' + label('VAS_280_HeldSuffix', 'held');
+            var chipText = formatMoney(docsState.totalValueBlocked) + ' ' + label('VAS_280_HeldSuffix', 'held');
             $chip.removeClass('vas280-chip-ok').addClass('vas280-chip-risk').attr('title', chipText).text(chipText);
 
             var tpl = TABLE_TEMPLATE;
@@ -530,16 +559,16 @@
                     '<span class="vas280-cell right vas280-c-dark" title="' + escapeHtml(qtyTitle(row.DemandQty)) + '">' + formatNum(row.DemandQty) + '</span>' +
                     '<span class="vas280-cell right vas280-c-std" title="' + escapeHtml(qtyTitle(row.FreeStock)) + '">' + formatNum(row.FreeStock) + '</span>' +
                     '<span class="vas280-cell right vas280-c-short" title="' + escapeHtml(qtyTitle(row.ShortQty)) + '">' + formatNum(row.ShortQty) + '</span>' +
-                    '<span class="vas280-cell right vas280-c-emph" title="' + escapeHtml(formatINR(row.ValueBlocked)) + '">' + escapeHtml(formatINR(row.ValueBlocked)) + '</span>' +
-                    '<span class="vas280-cell right vas280-c-dark" title="' + row.AffectedOrderCount + ' ' + escapeHtml(label('VAS_280_SalesOrdersSuffix', 'sales orders')) + '">' + row.AffectedOrderCount + '</span>' +
+                    '<span class="vas280-cell right vas280-c-emph" title="' + escapeHtml(formatMoney(row.ValueBlocked)) + '">' + escapeHtml(formatMoney(row.ValueBlocked)) + '</span>' +
+                    '<span class="vas280-cell right vas280-c-dark" title="' + formatNum(row.AffectedOrderCount) + ' ' + escapeHtml(label('VAS_280_SalesOrdersSuffix', 'sales orders')) + '">' + formatNum(row.AffectedOrderCount) + '</span>' +
                 '</button>';
             }).join(''));
 
             var pages = Math.max(1, Math.ceil(docsState.total / docsState.size));
             var start = docsState.page * docsState.size;
-            var helperText = label('VAS_280_Showing', 'Showing') + ' ' + (start + 1) + '–' + (start + docsState.rows.length) + ' ' + label('VAS_280_Of', 'of') + ' ' + docsState.total + ' · ' + label('VAS_280_RankedBy', 'highest value blocked first');
+            var helperText = label('VAS_280_Showing', 'Showing') + ' ' + formatNum(start + 1) + '–' + formatNum(start + docsState.rows.length) + ' ' + label('VAS_280_Of', 'of') + ' ' + formatNum(docsState.total) + ' · ' + label('VAS_280_RankedBy', 'highest value blocked first');
             $helper.attr('title', helperText).text(helperText);
-            $pageTxt.text((docsState.page + 1) + ' ' + label('VAS_280_Of', 'of') + ' ' + pages);
+            $pageTxt.text(formatNum(docsState.page + 1) + ' ' + label('VAS_280_Of', 'of') + ' ' + formatNum(pages));
             $prevBtn.prop('disabled', docsState.page === 0);
             $nextBtn.prop('disabled', docsState.page >= pages - 1);
         }
@@ -780,13 +809,13 @@
             }).join('');
 
             var start = docs.page * docs.size;
-            var showingLabel = label('VAS_280_Showing', 'Showing') + ' ' + (docs.total ? (start + 1) : 0) + '–' + (start + docs.rows.length) + ' ' + label('VAS_280_Of', 'of') + ' ' + docs.total + ' · ' + label('VAS_280_HeldForStockLabel', 'held for stock');
+            var showingLabel = label('VAS_280_Showing', 'Showing') + ' ' + formatNum(docs.total ? (start + 1) : 0) + '–' + formatNum(start + docs.rows.length) + ' ' + label('VAS_280_Of', 'of') + ' ' + formatNum(docs.total) + ' · ' + label('VAS_280_HeldForStockLabel', 'held for stock');
 
             var foot = '<div class="vas280-mtfoot"><span class="vas280-mhelper">' + escapeHtml(showingLabel) + '</span>' +
                 (pages > 1 ?
                     '<span class="vas280-mpager">' +
                         '<button type="button" class="vas280-mpbtn" data-table="docs" data-dir="-1"' + (docs.page === 0 ? ' disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_280_PrevPage', 'Previous page')) + '">' + icon('prev') + '</button>' +
-                        '<span class="vas280-mptxt">' + (docs.page + 1) + ' ' + escapeHtml(label('VAS_280_Of', 'of')) + ' ' + pages + '</span>' +
+                        '<span class="vas280-mptxt">' + formatNum(docs.page + 1) + ' ' + escapeHtml(label('VAS_280_Of', 'of')) + ' ' + formatNum(pages) + '</span>' +
                         '<button type="button" class="vas280-mpbtn" data-table="docs" data-dir="1"' + (docs.page >= pages - 1 ? ' disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_280_NextPage', 'Next page')) + '">' + icon('next') + '</button>' +
                     '</span>' : '<span></span>') +
             '</div>';
@@ -861,7 +890,7 @@
                 statTile(label('VAS_280_Customer', 'Customer'), order.CustomerName) +
                 statTile(label('VAS_280_SoDate', 'SO date'), formatDateFull(order.SalesOrderDate)) +
                 statTile(label('VAS_280_DatePromised', 'Date promised'), formatDateFull(order.DatePromised)) +
-                statTile(label('VAS_280_SoValue', 'SO value'), formatINR(order.OrderValue)) +
+                statTile(label('VAS_280_SoValue', 'SO value'), formatMoney(order.OrderValue)) +
                 statTile(label('VAS_280_StatShipFrom', 'Ship-from warehouse'), order.WarehouseName) +
                 statTile(label('VAS_280_DeliveryMode', 'Delivery mode'), order.DeliveryMode) +
                 statTile(label('VAS_280_DocumentStatus', 'Document status'), order.DocumentStatus) +
@@ -889,7 +918,7 @@
                 var freeStock = Number(line.FreeStock) || 0;
                 if (pending > freeStock) { qtyShort += (pending - freeStock); }
             });
-            var footNote = lines.length + ' ' + label('VAS_280_LinesSuffix', 'lines') +
+            var footNote = formatNum(lines.length) + ' ' + label('VAS_280_LinesSuffix', 'lines') +
                 ' · ' + formatNum(qtyOrdered) + ' ' + label('VAS_280_QtyOrderedSuffix', 'qty ordered') +
                 ' · ' + order.DeliveryStatus +
                 (qtyShort > 0 ? ' · ' + formatNum(qtyShort) + ' ' + label('VAS_280_QtyShortSuffix', 'qty short of stock') : '');
@@ -925,8 +954,8 @@
                 ' · ' + escapeHtml(formatDateFull(order.SalesOrderDate)) + ' · ' + escapeHtml(order.DocumentStatus) + '</div>';
 
             var stats = '<div class="vas280-mstats">' +
-                statTile(label('VAS_280_ColLine', 'Line') + 's', String(lines.length)) +
-                statTile(label('VAS_280_SoValue', 'SO value'), formatINR(order.OrderValue)) +
+                statTile(label('VAS_280_StatLines', 'Lines'), formatNum(lines.length)) +
+                statTile(label('VAS_280_SoValue', 'SO value'), formatMoney(order.OrderValue)) +
                 statTile(label('VAS_280_ColOrdered', 'Ordered'), formatNum(qtyOrdered)) +
                 statTile(label('VAS_280_ColPending', 'Pending'), formatNum(qtyPending)) +
             '</div>';
@@ -987,13 +1016,13 @@
                 return '<div class="vas280-mrow" style="grid-template-columns:' + tpl + '">' + cells + '</div>';
             }).join('');
 
-            var showingLabel = label('VAS_280_Showing', 'Showing') + ' ' + (lineState.lines.length ? (start + 1) : 0) + '–' + (start + slice.length) + ' ' + label('VAS_280_Of', 'of') + ' ' + lineState.lines.length;
+            var showingLabel = label('VAS_280_Showing', 'Showing') + ' ' + formatNum(lineState.lines.length ? (start + 1) : 0) + '–' + formatNum(start + slice.length) + ' ' + label('VAS_280_Of', 'of') + ' ' + formatNum(lineState.lines.length);
 
             var foot = '<div class="vas280-mtfoot"><span class="vas280-mhelper">' + escapeHtml(showingLabel) + '</span>' +
                 (pages > 1 ?
                     '<span class="vas280-mpager">' +
                         '<button type="button" class="vas280-mpbtn" data-table="lines" data-dir="-1"' + (lineState.page === 0 ? ' disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_280_PrevPage', 'Previous page')) + '">' + icon('prev') + '</button>' +
-                        '<span class="vas280-mptxt">' + (lineState.page + 1) + ' ' + escapeHtml(label('VAS_280_Of', 'of')) + ' ' + pages + '</span>' +
+                        '<span class="vas280-mptxt">' + formatNum(lineState.page + 1) + ' ' + escapeHtml(label('VAS_280_Of', 'of')) + ' ' + formatNum(pages) + '</span>' +
                         '<button type="button" class="vas280-mpbtn" data-table="lines" data-dir="1"' + (lineState.page >= pages - 1 ? ' disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_280_NextPage', 'Next page')) + '">' + icon('next') + '</button>' +
                     '</span>' : '<span></span>') +
             '</div>';
@@ -1043,6 +1072,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createModal();
             bindDocumentLevelEvents();

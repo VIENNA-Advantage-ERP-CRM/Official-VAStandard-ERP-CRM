@@ -95,6 +95,7 @@
  * 49  | Couldn't load this contract.          | VAS_244_DetailLoadError
  * 50  | d (days-to-end suffix)                | VAS_244_DaysSuffix
  * 50a | d ago (past days-to-end suffix)       | VAS_244_DaysAgoSuffix
+ * 51  | {0}–{1} of {2}                        | VAS_244_PagerRange
  * ──────────────────────────────────────────────────────────────────────────
  */
 ; VAS = window.VAS || {};
@@ -115,8 +116,87 @@
 
     var LIST_PAGE = 7;
 
+    // Message cache shared by the module-level helpers below (endsText ...)
+    // as well as the widget instance; filled by loadMessages().
+    var translatedTexts = null;
+
+    // Batch-translates every message key this widget uses in a single call.
+    function loadMessages() {
+        var elements = [
+            'VAS_244_Title',
+            'VAS_244_AtStake',
+            'VAS_244_RenewTag',
+            'VAS_244_LoadError',
+            'VAS_244_ListTitle',
+            'VAS_244_ContractsCount',
+            'VAS_244_ColContract',
+            'VAS_244_ColValue',
+            'VAS_244_ColEnds',
+            'VAS_244_ColRenewal',
+            'VAS_244_ColStatus',
+            'VAS_244_StatusExpiring',
+            'VAS_244_Of',
+            'VAS_244_PrevPage',
+            'VAS_244_NextPage',
+            'VAS_244_NoContracts',
+            'VAS_244_UnableToLoad',
+            'VAS_244_Close',
+            'VAS_244_OpenInBrowser',
+            'VAS_244_ContractTitle',
+            'VAS_244_OpenRecord',
+            'VAS_244_Rep',
+            'VAS_244_Cycles',
+            'VAS_244_Value',
+            'VAS_244_Status',
+            'VAS_244_Type',
+            'VAS_244_Renewal',
+            'VAS_244_Ends',
+            'VAS_244_EndsIn',
+            'VAS_244_EndedAgo',
+            'VAS_244_NoticeDays',
+            'VAS_244_Billed',
+            'VAS_244_Unbilled',
+            'VAS_244_NeedsAttention',
+            'VAS_244_BillingOverdue',
+            'VAS_244_NextPeriodOverdue',
+            'VAS_244_UnbilledTotal',
+            'VAS_244_OpenTickets',
+            'VAS_244_BillingSchedule',
+            'VAS_244_Period',
+            'VAS_244_Invoiced',
+            'VAS_244_ScheduleUnbilled',
+            'VAS_244_GenerateInvoice',
+            'VAS_244_Renew',
+            'VAS_244_ConfirmRenew',
+            'VAS_244_ConfirmGenerateInvoice',
+            'VAS_244_Working',
+            'VAS_244_ActionFailed',
+            'VAS_244_DetailLoadError',
+            'VAS_244_DaysSuffix',
+            'VAS_244_DaysAgoSuffix',
+            'VAS_244_Cancel',
+            'VAS_244_Ok',
+            'VAS_244_RenewalNoticeOverdue',
+            'VAS_244_RenewalNoticeDueToday',
+            'VAS_244_ManualRenewal',
+            'VAS_244_NoticeOverdueBy',
+            'VAS_244_EndsPrefix',
+            'VAS_244_NoOpenActions',
+            'VAS_244_SchedulePending',
+            'VAS_244_PagerRange',
+            'Loading'
+        ];
+        try {
+            translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {};
+        } catch (e) {
+            translatedTexts = {};
+        }
+    }
+
     function label(key, fallback) {
-        return VIS.Msg.getMsg(key);
+        if (translatedTexts === null) { loadMessages(); }
+        var t = translatedTexts[key];
+        return (t && t !== key && t.charAt(0) !== '[') ? t : fallback;
     }
 
     function escapeHtml(value) {
@@ -139,25 +219,75 @@
         return Math.round(n).toLocaleString(window.navigator.language);
     }
 
+    // Locale-formatted number with a fixed number of fraction digits.
+    function fmtNum(v, digits) {
+        try {
+            return v.toLocaleString(window.navigator.language, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+        } catch (e) { return String(v); }
+    }
+
     function fmtCompact(value, precision) {
         var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
         var p = Number(precision); if (isNaN(p) || p < 0) { p = 2; }
         var abs = Math.abs(n);
         var sign = n < 0 ? '-' : '';
-        if (abs >= 1e9) { return sign + (abs / 1e9).toFixed(2) + 'B'; }
-        if (abs >= 1e6) { return sign + (abs / 1e6).toFixed(2) + 'M'; }
-        if (abs >= 1e3) { return sign + (abs / 1e3).toFixed(2) + 'K'; }
-        return sign + abs.toFixed(p);
+        if (abs >= 1e9) { return sign + fmtNum(abs / 1e9, 2) + 'B'; }
+        if (abs >= 1e6) { return sign + fmtNum(abs / 1e6, 2) + 'M'; }
+        if (abs >= 1e3) { return sign + fmtNum(abs / 1e3, 2) + 'K'; }
+        return sign + fmtNum(abs, p);
+    }
+
+    // Currency symbol + its position for the browser locale (before/after the
+    // number, with the locale's own gap). Null when no ISO / Intl fails.
+    function currencyAffix(iso) {
+        if (!iso) { return null; }
+        try {
+            var parts = new Intl.NumberFormat(window.navigator.language, { style: 'currency', currency: iso }).formatToParts(1);
+            var seenInteger = false;
+            for (var i = 0; i < parts.length; i++) {
+                if (parts[i].type === 'integer') { seenInteger = true; }
+                else if (parts[i].type === 'currency') {
+                    var before = !seenInteger;
+                    var next = before ? parts[i + 1] : parts[i - 1];
+                    return {
+                        symbol: parts[i].value,
+                        before: before,
+                        gap: (next && next.type === 'literal') ? next.value : ''
+                    };
+                }
+            }
+        } catch (e) { /* fall through */ }
+        return null;
     }
 
     function formatMoney(value, iso, symbol, precision) {
         var tag = symbol || iso || '';
+        var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
+        var sign = n < 0 ? '-' : '';
+        var num;
         if (window.VIS && VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
-            var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
-            var sign = n < 0 ? '-' : '';
-            return sign + tag + VIS.Util.formatCompactAmount(Math.abs(n), iso || '', precision);
+            num = VIS.Util.formatCompactAmount(Math.abs(n), iso || '', precision);
+        } else {
+            num = fmtCompact(Math.abs(n), precision);
         }
-        return tag + fmtCompact(value, precision);
+        var affix = currencyAffix(iso);
+        if (affix) {
+            return sign + (affix.before ? affix.symbol + affix.gap + num : num + affix.gap + affix.symbol);
+        }
+        return sign + tag + num;
+    }
+
+    // 'yyyy-mm-dd' (server date-only string) -> locale date, e.g. 10 Nov 2026.
+    // Parsed as a LOCAL date so no timezone shift; invalid/empty values are
+    // returned unchanged.
+    function formatDate(value) {
+        if (!value) { return ''; }
+        try {
+            var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value));
+            var d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(value);
+            if (isNaN(d.getTime())) { return String(value); }
+            return new Intl.DateTimeFormat(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' }).format(d);
+        } catch (e) { return String(value); }
     }
 
     function endsText(days) {
@@ -454,10 +584,11 @@
             var start = listOffset + 1, end = listOffset + rows.length;
             var pages = Math.max(1, Math.ceil(listTotal / LIST_PAGE));
             var current = Math.floor(listOffset / LIST_PAGE);
-            var of = label('VAS_244_Of', 'of');
+            var rangeText = label('VAS_244_PagerRange', '{0}–{1} of {2}')
+                .replace('{0}', formatCount(start)).replace('{1}', formatCount(end)).replace('{2}', formatCount(listTotal));
 
             $listPager.html(
-                '<span class="vas244-pglabel">' + escapeHtml(start + '–' + end + ' ' + of + ' ' + formatCount(listTotal)) + '</span>' +
+                '<span class="vas244-pglabel">' + escapeHtml(rangeText) + '</span>' +
                 '<span class="vas244-pgctl">' +
                     '<button type="button" class="vas244-pgbtn" data-dir="prev" aria-label="' + escapeHtml(label('VAS_244_PrevPage', 'Previous page')) + '" ' + (current <= 0 ? 'disabled' : '') + '>' + icon('chevL') + '</button>' +
                     '<button type="button" class="vas244-pgbtn" data-dir="next" aria-label="' + escapeHtml(label('VAS_244_NextPage', 'Next page')) + '" ' + (current >= pages - 1 ? 'disabled' : '') + '>' + icon('chev') + '</button>' +
@@ -681,7 +812,7 @@
             var pendingLabel = label('VAS_244_SchedulePending', 'Pending');
 
             var body = rows.map(function (period) {
-                var dateRange = (period.FromDate || period.ToDate) ? ' · ' + escapeHtml(period.FromDate || '') + ' – ' + escapeHtml(period.ToDate || '') : '';
+                var dateRange = (period.FromDate || period.ToDate) ? ' · ' + escapeHtml(formatDate(period.FromDate)) + ' – ' + escapeHtml(formatDate(period.ToDate)) : '';
                 var left = periodLabel + ' ' + period.Period + (period.FrequencyName ? ' · ' + escapeHtml(period.FrequencyName) : '') + dateRange;
                 var badgeClass = period.Invoiced ? 'vas244-band-ok' : 'vas244-band-warn';
                 var badgeText = period.Invoiced ? invoicedLabel : pendingLabel;
@@ -706,7 +837,7 @@
             var band = bandClass(row.LifecycleStatusCode);
             var subtitleParts = [row.DocumentNo, row.ProductName, row.ContactName, row.SalesRepName ? label('VAS_244_Rep', 'rep') + ' ' + row.SalesRepName : '']
                 .filter(function (p) { return p; });
-            var cyclesText = [row.FrequencyName, (row.Cycles != null ? row.Cycles + ' ' + label('VAS_244_Cycles', 'cycles') : '')]
+            var cyclesText = [row.FrequencyName, (row.Cycles != null ? formatCount(row.Cycles) + ' ' + label('VAS_244_Cycles', 'cycles') : '')]
                 .filter(function (p) { return p; }).join(' · ');
 
             var html =
@@ -727,7 +858,7 @@
                     statHtml('VAS_244_Type', 'Type', row.ContractType) +
                     statHtml('VAS_244_Renewal', 'Renewal', row.RenewalType) +
                     statHtml('VAS_244_Ends', 'Ends', endsText(row.DaysToEnd)) +
-                    statHtml('VAS_244_NoticeDays', 'Notice days', row.NoticeDays != null ? row.NoticeDays : '') +
+                    statHtml('VAS_244_NoticeDays', 'Notice days', row.NoticeDays != null ? formatCount(row.NoticeDays) : '') +
                     statHtml('VAS_244_Billed', 'Billed amount', formatMoney(row.Billed, row.CurrencyIso, row.CurrencySymbol, row.CurrencyPrecision)) +
                     statHtml('VAS_244_Unbilled', 'Unbilled amount', formatMoney(row.Unbilled, row.CurrencyIso, row.CurrencySymbol, row.CurrencyPrecision)) +
                 '</div>' +
@@ -807,6 +938,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createListDialog();
             createDetailDialog();

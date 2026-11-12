@@ -9,6 +9,9 @@
  *                  (always through MTable.GetPO() — no generated M-class required).
  * Chronological  : Development
  *   VAI154         Created  21-Aug-2026
+ *                  04-Nov-2026  New lines are numbered server-side above the opportunity's highest line no.;
+ *                               a save that adds a line returns page 1 so the latest line shows on top
+ *                  04-Nov-2026  Line callout prices by the selected attribute instance (MProductPricing)
  ******************************************************/
 
 using ModelLibrary.Model;
@@ -756,7 +759,7 @@ namespace VASLogic.Models
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "ol", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             if (page < 0) page = 0;
-            sql += " ORDER BY ol.VAS_LineNo DESC" + PagingSuffix(LINE_PAGE_SIZE, page * LINE_PAGE_SIZE);
+            sql += " ORDER BY ol.VAS_LineNo DESC, ol.VAS_OppLines_ID DESC" + PagingSuffix(LINE_PAGE_SIZE, page * LINE_PAGE_SIZE);
 
             DataSet ds;
             try
@@ -787,7 +790,7 @@ namespace VASLogic.Models
                    WHERE ol.VAS_Opportunity_ID = @VAS_Opportunity_ID
                      AND ol.IsActive = 'Y'";
                 fallbackSql = MRole.GetDefault(ctx).AddAccessSQL(fallbackSql, "ol", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-                fallbackSql += " ORDER BY ol.VAS_LineNo DESC" + PagingSuffix(LINE_PAGE_SIZE, page * LINE_PAGE_SIZE);
+                fallbackSql += " ORDER BY ol.VAS_LineNo DESC, ol.VAS_OppLines_ID DESC" + PagingSuffix(LINE_PAGE_SIZE, page * LINE_PAGE_SIZE);
                 ds = DB.ExecuteDataset(fallbackSql,
                     new SqlParameter[] { new SqlParameter("@VAS_Opportunity_ID", VAS_Opportunity_ID) }, null);
             }
@@ -1200,6 +1203,16 @@ namespace VASLogic.Models
                 if (M_PriceList_Version_ID > 0)
                 {
                     OppProductPrices prices = GetProductPricesFromList(ctx, req.M_Product_ID, M_PriceList_Version_ID);
+                    // An attribute instance was picked: price the line by that instance (a price
+                    // defined for the attribute on the price list wins over the product's plain
+                    // price), exactly as the Create Order panel does via MProductPricing.
+                    if (req.M_AttributeSetInstance_ID > 0)
+                    {
+                        OppProductPrices attrPrices = GetAttributePricesFromList(ctx, req.VAS_Opportunity_ID,
+                            req.M_Product_ID, M_PriceList_Version_ID, req.M_AttributeSetInstance_ID, uomId, req.PlannedQty);
+                        if (attrPrices != null && (attrPrices.PriceStd > 0 || attrPrices.PriceList > 0 || attrPrices.PriceLimit > 0))
+                            prices = attrPrices;
+                    }
                     if (!req.PriceOverride && prices.PriceStd > 0)
                         plannedPrice = prices.PriceStd;
 
@@ -1331,6 +1344,44 @@ namespace VASLogic.Models
                 result.PriceLimit = Util.GetValueOfDecimal(r["PriceLimit"]);
             }
             return result;
+        }
+
+        /// <summary>
+        /// Prices a product for a specific attribute-set instance from the opportunity's price list
+        /// version (MProductPricing, the same engine the Create Order panel uses): the price list's
+        /// entry for that attribute instance, falling back to the product's own entry. Returns null
+        /// when the engine fails, so the caller keeps the plain product price.
+        /// </summary>
+        private OppProductPrices GetAttributePricesFromList(Ctx ctx, int VAS_Opportunity_ID, int M_Product_ID,
+            int M_PriceList_Version_ID, int M_AttributeSetInstance_ID, int C_UOM_ID, decimal qty)
+        {
+            try
+            {
+                int bpId = Util.GetValueOfInt(DB.ExecuteScalar(
+                    "SELECT C_BPartner_ID FROM VAS_Opportunity WHERE VAS_Opportunity_ID = @id",
+                    new SqlParameter[] { new SqlParameter("@id", VAS_Opportunity_ID) }, null));
+
+                MProductPricing pp = new MProductPricing(ctx.GetAD_Client_ID(), ctx.GetAD_Org_ID(),
+                    M_Product_ID, bpId, qty > 0 ? qty : 1, true);
+                pp.SetM_PriceList_Version_ID(M_PriceList_Version_ID);
+                pp.SetM_AttributeSetInstance_ID(M_AttributeSetInstance_ID);
+                pp.SetPriceDate(DateTime.Now);
+                if (C_UOM_ID > 0 && Env.IsModuleInstalled("ED011_"))
+                    pp.SetC_UOM_ID(C_UOM_ID);
+
+                return new OppProductPrices
+                {
+                    PriceList  = pp.GetPriceList(),
+                    PriceStd   = pp.GetPriceStd(),
+                    PriceLimit = pp.GetPriceLimit()
+                };
+            }
+            catch (Exception ex)
+            {
+                log.Warning("VAS_218 attribute pricing failed (product " + M_Product_ID + ", ASI "
+                    + M_AttributeSetInstance_ID + "): " + ex.Message);
+                return null;
+            }
         }
 
         /// <summary>
@@ -1720,6 +1771,41 @@ namespace VASLogic.Models
                 return res;
             }
 
+            // New lines must land ABOVE every existing line (the grid lists VAS_LineNo DESC). The
+            // client only knows the line numbers on the page it has loaded, so on page 2+ its
+            // "max + 10" can be lower than lines it cannot see. Number new lines here instead:
+            // after the opportunity's real highest line no., keeping the order the user added them
+            // in (the client numbers them ascending in add order).
+            bool savedNewLine = false;
+            Dictionary<OppLineInput, int> newLineNo = new Dictionary<OppLineInput, int>();
+            {
+                List<OppLineInput> newInputs = new List<OppLineInput>();
+                foreach (OppLineInput ni in rows)
+                {
+                    if (ni.VAS_OppLines_ID <= 0 && (ni.M_Product_ID > 0 || ni.C_Charge_ID > 0))
+                        newInputs.Add(ni);
+                }
+                if (newInputs.Count > 0)
+                {
+                    int maxNo = Util.GetValueOfInt(DB.ExecuteScalar(
+                        "SELECT COALESCE(MAX(VAS_LineNo), 0) FROM VAS_OppLines WHERE VAS_Opportunity_ID = @VAS_Opportunity_ID",
+                        new SqlParameter[] { new SqlParameter("@VAS_Opportunity_ID", VAS_Opportunity_ID) }, null));
+                    // Stable ascending sort by the client's number (List.Sort is not stable).
+                    for (int a = 1; a < newInputs.Count; a++)
+                    {
+                        OppLineInput cur = newInputs[a];
+                        int b = a - 1;
+                        while (b >= 0 && newInputs[b].Line > cur.Line) { newInputs[b + 1] = newInputs[b]; b--; }
+                        newInputs[b + 1] = cur;
+                    }
+                    foreach (OppLineInput ni in newInputs)
+                    {
+                        maxNo += 10;
+                        newLineNo[ni] = maxNo;
+                    }
+                }
+            }
+
             Trx trx = Trx.GetTrx(Trx.CreateTrxName("VAS218Save_" + VAS_Opportunity_ID));
             try
             {
@@ -1775,7 +1861,13 @@ namespace VASLogic.Models
                     // PlannedAmt = PlannedQty * PlannedPrice (no tax).
                     line.Set_Value("PlannedAmt", decimal.Multiply(qty, input.PlannedPrice));
 
-                    if (input.Line > 0)
+                    int assignedNo;
+                    if (input.VAS_OppLines_ID <= 0 && newLineNo.TryGetValue(input, out assignedNo))
+                    {
+                        line.Set_Value("VAS_LineNo", assignedNo);
+                        savedNewLine = true;
+                    }
+                    else if (input.Line > 0)
                         line.Set_Value("VAS_LineNo", input.Line);
 
                     line.Set_Value("Description", input.Description ?? "");
@@ -1833,6 +1925,9 @@ namespace VASLogic.Models
 
             res.Success = true;
             if (page < 0) page = 0;
+            // A newly added line has the highest line no., i.e. it is first on page 1 — show that
+            // page so the latest saved line is visible at the top.
+            if (savedNewLine) page = 0;
             int total;
             res.Lines = LoadLines(ctx, VAS_Opportunity_ID, ResolveOppLineTabs(AD_Window_ID), page, out total);
             res.LinesTotal = total;

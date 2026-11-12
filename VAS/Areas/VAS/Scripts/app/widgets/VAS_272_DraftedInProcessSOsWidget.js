@@ -157,8 +157,8 @@
                 $root.find('.vasso-retry').remove();
                 if ($root.css('position') === 'static') { $root.css('position', 'relative'); }
                 var text = '';
-                try { text = VIS.Msg.getMsg('VAS_SO_Retry'); } catch (e) { text = ''; }
-                if (!text || text === 'VAS_SO_Retry' || text === '[VAS_SO_Retry]') { text = 'Retry'; }
+                try { text = VIS.Msg.translate(VIS.Env.getCtx(), 'VAS_SO_Retry'); } catch (e) { text = ''; }
+                if (!text || text === 'VAS_SO_Retry' || String(text).charAt(0) === '[') { text = 'Retry'; }
                 $('<button type="button" class="vasso-retry"></button>').text(text)
                     .attr('title', text)
                     .on('click', function (e) {
@@ -222,9 +222,39 @@
         var cfgStack = [];
         var currentCfg = null;
 
-        function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+        var translatedTexts = null;
+
+        /** Loads every message key this widget uses with a single VIS.Msg.translate call. */
+        function loadMessages() {
+            var elements = [
+                'VAS_272_Title', 'VAS_272_SideLabelLine1', 'VAS_272_SideLabelInProgress', 'VAS_272_ErrorState',
+                'VAS_272_ZeroState', 'VAS_272_Back', 'VAS_272_Close', 'VAS_272_LoadError',
+                'VAS_272_StatTotalDocuments', 'VAS_272_StatDrafted', 'VAS_272_StatInProgress', 'VAS_272_StatValue',
+                'VAS_272_SectionHeading', 'VAS_272_ColSoNo', 'VAS_272_SoDate', 'VAS_272_Customer',
+                'VAS_272_Representative', 'VAS_272_ColLines', 'VAS_272_ColValue', 'VAS_272_ColStage',
+                'VAS_272_Showing', 'VAS_272_Of', 'VAS_272_NewestFirst', 'VAS_272_PrevPage', 'VAS_272_NextPage',
+                'VAS_272_LineDrafted', 'VAS_272_DeliveryFull', 'VAS_272_LinePartial', 'VAS_272_LineInProgress',
+                'VAS_272_DatePromised', 'VAS_272_SoValue', 'VAS_272_ShipFrom', 'VAS_272_DeliveryMode',
+                'VAS_272_DocumentStatus', 'VAS_272_DeliveryStatus', 'VAS_272_SalesOrderLines',
+                'VAS_272_LinesSuffix', 'VAS_272_QtyOrderedSuffix', 'VAS_272_QtyShortSuffix',
+                'VAS_272_SalesOrderPrefix', 'VAS_272_ColLine', 'VAS_272_ColOrdered', 'VAS_272_ColPending',
+                'VAS_272_ColProduct', 'VAS_272_ColAttribute', 'VAS_272_ColUom', 'VAS_272_ColDelivered',
+                'VAS_272_ColInStock', 'VAS_272_ColRate', 'VAS_272_ColAmount', 'VAS_272_ColLineStatus'
+            ];
+            try { translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {}; }
+            catch (e) { translatedTexts = {}; }
         }
+
+        // A missing message key must never render raw ("[KEY]") - fall back to the English text.
+        function label(key, fallback) {
+            if (translatedTexts === null) { loadMessages(); }
+            var text = translatedTexts[key];
+            if (!text || text === key || String(text).charAt(0) === '[') { return fallback || key; }
+            return text;
+        }
+
+        // Browser culture drives every date / number format (window.navigator.language).
+        function lang() { return window.navigator.language; }
 
         function escapeHtml(value) {
             return String(value == null ? '' : value)
@@ -403,7 +433,7 @@
                 return;
             }
 
-            var meta = formatINR(summary.TotalValue);
+            var meta = formatAmount(summary.TotalValue);
             $meta.attr('title', meta).text(meta);
         }
 
@@ -554,7 +584,7 @@
          * Documents list (top-level modal)
          * ============================================================ */
         function buildDocsCfg() {
-            return { title: label('VAS_272_Title', 'Drafted / In-Process SOs'), subtitle: formatINR(summary.TotalValue), size: '', render: renderDocumentsBody };
+            return { title: label('VAS_272_Title', 'Drafted / In-Process SOs'), subtitle: formatAmount(summary.TotalValue), size: '', render: renderDocumentsBody };
         }
 
         function openDocumentsModal() {
@@ -619,7 +649,7 @@
                 statTile(label('VAS_272_StatTotalDocuments', 'Total documents'), formatNum(summary.TotalCount)) +
                 statTile(label('VAS_272_StatDrafted', 'Drafted'), formatNum(summary.DraftedCount)) +
                 statTile(label('VAS_272_StatInProgress', 'In Progress'), formatNum(summary.InProcessCount)) +
-                statTile(label('VAS_272_StatValue', 'Value'), formatINR(summary.TotalValue)) +
+                statTile(label('VAS_272_StatValue', 'Value'), formatAmount(summary.TotalValue)) +
             '</div>';
 
             var secHtml = '<div class="vas272-msec">' + escapeHtml(label('VAS_272_SectionHeading', 'Documents')) + '</div>';
@@ -670,13 +700,13 @@
             }).join('');
 
             var start = docsState.page * docsState.size;
-            var showingLabel = label('VAS_272_Showing', 'Showing') + ' ' + (docsState.total ? (start + 1) : 0) + '–' + (start + docsState.rows.length) + ' ' + label('VAS_272_Of', 'of') + ' ' + docsState.total + ' · ' + label('VAS_272_NewestFirst', 'newest first');
+            var showingLabel = label('VAS_272_Showing', 'Showing') + ' ' + formatNum(docsState.total ? (start + 1) : 0) + '–' + formatNum(start + docsState.rows.length) + ' ' + label('VAS_272_Of', 'of') + ' ' + formatNum(docsState.total) + ' · ' + label('VAS_272_NewestFirst', 'newest first');
 
             var foot = '<div class="vas272-mtfoot"><span class="vas272-helper">' + escapeHtml(showingLabel) + '</span>' +
                 (pages > 1 ?
                     '<span class="vas272-pager">' +
                         '<button type="button" class="vas272-pbtn" data-table="docs" data-dir="-1"' + (docsState.page === 0 ? ' disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_272_PrevPage', 'Previous page')) + '">' + icon('prev') + '</button>' +
-                        '<span class="vas272-ptxt">' + (docsState.page + 1) + ' ' + escapeHtml(label('VAS_272_Of', 'of')) + ' ' + pages + '</span>' +
+                        '<span class="vas272-ptxt">' + formatNum(docsState.page + 1) + ' ' + escapeHtml(label('VAS_272_Of', 'of')) + ' ' + formatNum(pages) + '</span>' +
                         '<button type="button" class="vas272-pbtn" data-table="docs" data-dir="1"' + (docsState.page >= pages - 1 ? ' disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_272_NextPage', 'Next page')) + '">' + icon('next') + '</button>' +
                     '</span>' : '<span></span>') +
             '</div>';
@@ -805,7 +835,7 @@
             var breadcrumb = '';
 
             var stats = '<div class="vas272-mstats">' +
-                statTile(label('VAS_272_ColLine', 'Line') + 's', String(lines.length)) +
+                statTile(label('VAS_272_ColLines', 'Lines'), formatNum(lines.length)) +
                 statTile(label('VAS_272_SoValue', 'SO value'), formatMoney(order.OrderValue, order.CurrencySymbol, order.CurrencyPrecision)) +
                 statTile(label('VAS_272_ColOrdered', 'Ordered'), formatQty(qtyOrdered)) +
                 statTile(label('VAS_272_ColPending', 'Pending'), formatQty(qtyPending)) +
@@ -883,7 +913,7 @@
                 return '<div class="vas272-mrow" style="grid-template-columns:' + tpl + '">' + cells + '</div>';
             }).join('');
 
-            var showingLabel = label('VAS_272_Showing', 'Showing') + ' ' + (lineState.lines.length ? (start + 1) : 0) + '–' + (start + slice.length) + ' ' + label('VAS_272_Of', 'of') + ' ' + lineState.lines.length;
+            var showingLabel = label('VAS_272_Showing', 'Showing') + ' ' + formatNum(lineState.lines.length ? (start + 1) : 0) + '–' + formatNum(start + slice.length) + ' ' + label('VAS_272_Of', 'of') + ' ' + formatNum(lineState.lines.length);
 
             // VAS163 2026-11-11: Row 24 Back / Close on the right of the pager row.
             var foot = '<div class="vas272-mtfoot"><span class="vas272-helper">' + escapeHtml(showingLabel) + '</span>' +
@@ -891,7 +921,7 @@
                 (pages > 1 ?
                     '<span class="vas272-pager">' +
                         '<button type="button" class="vas272-pbtn" data-table="lines" data-dir="-1"' + (lineState.page === 0 ? ' disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_272_PrevPage', 'Previous page')) + '">' + icon('prev') + '</button>' +
-                        '<span class="vas272-ptxt">' + (lineState.page + 1) + ' ' + escapeHtml(label('VAS_272_Of', 'of')) + ' ' + pages + '</span>' +
+                        '<span class="vas272-ptxt">' + formatNum(lineState.page + 1) + ' ' + escapeHtml(label('VAS_272_Of', 'of')) + ' ' + formatNum(pages) + '</span>' +
                         '<button type="button" class="vas272-pbtn" data-table="lines" data-dir="1"' + (lineState.page >= pages - 1 ? ' disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_272_NextPage', 'Next page')) + '">' + icon('next') + '</button>' +
                     '</span>' : '') +
                 lineActionsHtml() + '</span>' +
@@ -939,6 +969,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createModal();
             bindDocumentLevelEvents();

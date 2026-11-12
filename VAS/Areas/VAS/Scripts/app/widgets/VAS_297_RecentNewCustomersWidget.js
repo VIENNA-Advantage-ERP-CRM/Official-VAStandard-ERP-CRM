@@ -82,6 +82,7 @@
  * 38  | Completed                       | VAS_297_StateCompleted
  * 39  | Due                             | VAS_297_Due
  * 40  | activities                      | VAS_297_Activities
+ * 41  | {0}d                            | VAS_297_DaysShort
  * ──────────────────────────────────────────────────────────────────────────
  */
 ; VAS = window.VAS || {};
@@ -143,8 +144,66 @@
         // zoom and reused afterwards (0 = not resolved yet).
         var zoomWindowId = 0;
 
+        // Translated texts, loaded once per widget instance via VIS.Msg.translate.
+        var translatedTexts = null;
+        function loadMessages() {
+            var elements = [
+                "Loading",
+                "VAS_297_RecentNewCustomers",
+                "VAS_297_JoinedIn45Days",
+                "VAS_297_Joined",
+                "VAS_297_NoOwner",
+                "VAS_297_Onboarded",
+                "VAS_297_Today",
+                "VAS_297_Yesterday",
+                "VAS_297_Ago",
+                "VAS_297_NothingHere",
+                "VAS_297_UnableToLoad",
+                "VAS_297_Of",
+                "VAS_297_Showing",
+                "VAS_297_PrevPage",
+                "VAS_297_NextPage",
+                "VAS_297_Close",
+                "VAS_297_CustomerDetails",
+                "VAS_297_Tier",
+                "VAS_297_Segment",
+                "VAS_297_Owner",
+                "VAS_297_ARR",
+                "VAS_297_OpenTicketsFact",
+                "VAS_297_Projects",
+                "VAS_297_Pipeline",
+                "VAS_297_Onboarding",
+                "VAS_297_KeyClient",
+                "VAS_297_Signals",
+                "VAS_297_Overdue",
+                "VAS_297_DaysPastDue",
+                "VAS_297_OpenSupportTickets",
+                "VAS_297_KeyPrioritise",
+                "VAS_297_OpenRequests",
+                "VAS_297_OpenRecord",
+                "VAS_297_ActiveProjects",
+                "VAS_297_StateDelayed",
+                "VAS_297_StateOnTime",
+                "VAS_297_StateOngoing",
+                "VAS_297_StateUpcoming",
+                "VAS_297_StateCompleted",
+                "VAS_297_Due",
+                "VAS_297_Activities",
+                "VAS_297_DaysShort"
+            ];
+            try {
+                translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {};
+            } catch (e) {
+                translatedTexts = {};
+            }
+        }
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            if (translatedTexts === null) { loadMessages(); }
+            var text = translatedTexts ? translatedTexts[key] : null;
+            if (!text || text === key || String(text).charAt(0) === '[') {
+                return fallback != null ? fallback : key;
+            }
+            return text;
         }
 
         function escapeHtml(value) {
@@ -166,20 +225,33 @@
             if (!isFinite(n)) { n = 0; }
             return Math.round(n).toLocaleString(window.navigator.language);
         }
+        function formatPercent(value, maxFraction) {
+            var n = Number(value || 0);
+            if (!isFinite(n)) { n = 0; }
+            try {
+                return new Intl.NumberFormat(window.navigator.language, { style: 'percent', maximumFractionDigits: maxFraction }).format(n / 100);
+            } catch (e) {
+                return n + '%';
+            }
+        }
         function formatDate(iso) {
             if (!iso) { return '—'; }
             var parts = String(iso).split('-');
             if (parts.length !== 3) { return iso; }
             var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
             if (isNaN(d.getTime())) { return iso; }
-            return d.toLocaleDateString(window.navigator.language, { year: 'numeric', month: 'short', day: '2-digit' });
+            try {
+                return new Intl.DateTimeFormat(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' }).format(d);
+            } catch (e) {
+                return d.toLocaleDateString(window.navigator.language, { year: 'numeric', month: 'short', day: '2-digit' });
+            }
         }
         // "today" / "yesterday" / "Nd ago" for the joined-date meta line.
         function daysAgo(days) {
             var n = Number(days || 0);
             if (n === 0) { return label('VAS_297_Today', 'today'); }
             if (n === 1) { return label('VAS_297_Yesterday', 'yesterday'); }
-            return formatCount(n) + 'd ' + label('VAS_297_Ago', 'ago');
+            return label('VAS_297_DaysShort', '{0}d').replace('{0}', formatCount(n)) + ' ' + label('VAS_297_Ago', 'ago');
         }
 
         // Standard precision of the supplied base-currency descriptor, falling back to
@@ -199,7 +271,26 @@
             var sign = n < 0 ? '-' : '';
             var iso = (cur && cur.iso) || '';
             var symbol = (cur && (cur.symbol || cur.iso)) || '';
-            return sign + symbol + VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
+            var compact = VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
+            // Currency symbol placed per the browser locale (before / after the number).
+            if (iso) {
+                try {
+                    var parts = new Intl.NumberFormat(window.navigator.language, { style: 'currency', currency: iso }).formatToParts(1);
+                    var ci = -1, ni = -1;
+                    parts.forEach(function (p, i) {
+                        if (p.type === 'currency' && ci < 0) { ci = i; }
+                        if (p.type === 'integer' && ni < 0) { ni = i; }
+                    });
+                    if (ci >= 0 && ni >= 0) {
+                        var sym = parts[ci].value;
+                        if (ci < ni) {
+                            return sign + sym + (parts[ci + 1] && parts[ci + 1].type === 'literal' ? parts[ci + 1].value : '') + compact;
+                        }
+                        return sign + compact + (parts[ci - 1] && parts[ci - 1].type === 'literal' ? parts[ci - 1].value : '') + sym;
+                    }
+                } catch (e) { /* fall back to the server symbol in front */ }
+            }
+            return sign + symbol + compact;
         }
         // Projects fact: name the customer's delivery project rather than only
         // counting it (matches VAS_138/295/296).
@@ -264,6 +355,15 @@
             if (state === 'upcoming') { return label('VAS_297_StateUpcoming', 'Upcoming'); }
             return label('VAS_297_StateCompleted', 'Completed');
         }
+        // Translated text for a project status coming from the server; unknown values are shown as received.
+        function projStatusText(status) {
+            if (status === 'Delayed') { return stateLabel('delayed'); }
+            if (status === 'On time') { return stateLabel('ontime'); }
+            if (status === 'Ongoing') { return stateLabel('ongoing'); }
+            if (status === 'Upcoming') { return stateLabel('upcoming'); }
+            if (status === 'Completed') { return stateLabel('completed'); }
+            return status;
+        }
         function projStatusClass(status) {
             if (status === 'Delayed') { return 'vas297-tag-delayed'; }
             if (status === 'Ongoing') { return 'vas297-tag-ongoing'; }
@@ -322,8 +422,8 @@
             var current = Math.floor(offset / size);
             var end = Math.min(offset + size, total);
             var of = label('VAS_297_Of', 'of');
-            var helper = label('VAS_297_Showing', 'Showing') + ' ' + start + '–' + end + ' ' + of + ' ' + formatCount(total);
-            var pageText = (current + 1) + ' ' + of + ' ' + pages;
+            var helper = label('VAS_297_Showing', 'Showing') + ' ' + formatCount(start) + '–' + formatCount(end) + ' ' + of + ' ' + formatCount(total);
+            var pageText = formatCount(current + 1) + ' ' + of + ' ' + formatCount(pages);
             return '<div class="vas297-pager">' +
                 '<span class="vas297-pglabel">' + escapeHtml(helper) + '</span>' +
                 '<span class="vas297-pgctl">' +
@@ -408,7 +508,7 @@
                 fact(label('VAS_297_OpenTicketsFact', 'Open tickets'), escapeHtml(formatCount(data.openTickets || 0))) +
                 fact(label('VAS_297_Projects', 'Projects'), projectText(data.projectName, projects, dash)) +
                 fact(label('VAS_297_Pipeline', 'Pipeline'), pipeline > 0 ? escapeHtml(formatMoney(pipeline, detailCurrency)) : dash) +
-                fact(label('VAS_297_Onboarding', 'Onboarding'), data.onboardingPercent == null ? dash : escapeHtml(formatCount(data.onboardingPercent) + '%')) +
+                fact(label('VAS_297_Onboarding', 'Onboarding'), data.onboardingPercent == null ? dash : escapeHtml(formatPercent(Math.round(Number(data.onboardingPercent) || 0), 0))) +
             '</div>';
 
             var signals = '';
@@ -420,7 +520,7 @@
                 var pct = Math.max(0, Math.min(100, Number(onbPct)));
                 var stepText = currentDetailOnbStep ? ' · ' + escapeHtml(currentDetailOnbStep) : '';
                 signals += '<div class="vas297-signal"><span class="vas297-sig-ic" style="color:#0083DA;background:#0083DA1f">' + icon('rocket') + '</span>' +
-                    '<div class="vas297-sig-main"><div class="vas297-sig-name">' + escapeHtml(label('VAS_297_Onboarding', 'Onboarding')) + ' ' + formatCount(pct) + '%' + stepText + '</div>' +
+                    '<div class="vas297-sig-main"><div class="vas297-sig-name">' + escapeHtml(label('VAS_297_Onboarding', 'Onboarding')) + ' ' + escapeHtml(formatPercent(Math.round(pct), 0)) + stepText + '</div>' +
                     '<div class="vas297-onbbar"><div style="width:' + pct + '%"></div></div></div></div>';
             }
             var overdue = Number(data.overdueAmount || 0);
@@ -535,12 +635,12 @@
             return '<div class="vas297-proj">' +
                 '<div class="vas297-proj-head">' +
                     '<span class="vas297-proj-name" title="' + escapeHtml(project.name) + '">' + escapeHtml(project.name) + '</span>' +
-                    '<span class="vas297-tag ' + projStatusClass(project.status) + '">' + escapeHtml(project.status) + '</span>' +
+                    '<span class="vas297-tag ' + projStatusClass(project.status) + '">' + escapeHtml(projStatusText(project.status)) + '</span>' +
                 '</div>' +
                 (breakdown ? '<div class="vas297-proj-bd">' + breakdown + '</div>' : '') +
                 '<div class="vas297-bar"><div style="width:' + Math.max(0, Math.min(100, progress)) + '%"></div></div>' +
                 '<div class="vas297-proj-foot">' +
-                    '<span>' + formatCount(project.completed) + '/' + formatCount(total) + ' ' + escapeHtml(label('VAS_297_Activities', 'activities')) + ' · ' + progress + '%</span>' +
+                    '<span>' + formatCount(project.completed) + '/' + formatCount(total) + ' ' + escapeHtml(label('VAS_297_Activities', 'activities')) + ' · ' + escapeHtml(formatPercent(progress, 2)) + '</span>' +
                     '<span>' + escapeHtml(label('VAS_297_Due', 'Due')) + ' ' + escapeHtml(formatDate(project.dueDate)) + '</span>' +
                 '</div>' +
             '</div>';
@@ -640,6 +740,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createDetailDialog();
             createProjectsDialog();

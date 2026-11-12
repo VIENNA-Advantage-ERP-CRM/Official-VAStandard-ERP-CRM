@@ -19,7 +19,7 @@
  *           each with a bar `.track` tinted by row index (blue/teal/amber/lilac/rose
  *           cycling every 5 rows). The one difference: the value cell carries a
  *           compound string, value first then order count after a middle dot
- *           (`₹ 1.58 Cr · 47`) - the count is deliberately unlabelled in the cell
+ *           (e.g. `1,582,000 · 47`) - the count is deliberately unlabelled in the cell
  *           (the widget subtitle already establishes what these rows are) but fully
  *           labelled in the cell's `title` tooltip. Row click opens the
  *           representative's drill-down: a 4-card stat strip (SO value, SOs booked,
@@ -95,6 +95,9 @@
  * 55  | Showing                                                              | VAS_287_Showing
  * 56  | Search is unavailable right now. Try again in a moment.              | VAS_287_LoadError
  * 57  | SOs                                                                   | VAS_287_SosSuffix
+ * 58  | Month                                                                 | VAS_287_Month
+ * 59  | Year                                                                  | VAS_287_Year
+ * 60  | Lines                                                                 | VAS_287_StatLines
  */
 ; VAS = window.VAS || {};
 
@@ -161,8 +164,8 @@
                 $root.find('.vasso-retry').remove();
                 if ($root.css('position') === 'static') { $root.css('position', 'relative'); }
                 var text = '';
-                try { text = VIS.Msg.getMsg('VAS_SO_Retry'); } catch (e) { text = ''; }
-                if (!text || text === 'VAS_SO_Retry') { text = 'Retry'; }
+                try { text = VIS.Msg.translate(VIS.Env.getCtx(), 'VAS_SO_Retry'); } catch (e) { text = ''; }
+                if (!text || text === 'VAS_SO_Retry' || String(text).charAt(0) === '[') { text = 'Retry'; }
                 $('<button type="button" class="vasso-retry"></button>').text(text)
                     .attr('title', text)
                     .on('click', function (e) {
@@ -182,7 +185,6 @@
     var ZOOM_WINDOW_NAME = 'VAS_SalesOrder';
     var WIDGET_PAGE_SIZE = 5;   // rows visible per widget page (client-side, no refetch)
     var TOP_COUNT = 10;
-    var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     var MIN_YEAR = 2024;
     var YEAR_SPAN = 3; // MIN_YEAR .. MIN_YEAR + YEAR_SPAN - 1, covers "current + 1"
 
@@ -237,8 +239,48 @@
         var currentCfg = null;
         var zoomWindowId = 0;      // VAS163 2026-11-11: Row 125 - resolved Sales Order window id
 
+        // Translated texts, loaded once per widget instance (see loadMessages()).
+        var translatedTexts = null;
+
+        function loadMessages() {
+            var elements = [
+                'VAS_287_DaysSuffix', 'VAS_287_Title', 'VAS_287_Subtitle', 'VAS_287_Month', 'VAS_287_Year',
+                'VAS_287_PrevPage', 'VAS_287_NextPage', 'VAS_287_ErrorState', 'VAS_287_ZeroStatePrefix',
+                'VAS_287_SosSuffix', 'VAS_287_Showing', 'VAS_287_Of', 'VAS_287_RankedBy', 'VAS_287_RestrictedHelper',
+                'VAS_287_Back', 'VAS_287_Close', 'VAS_287_LoadError', 'VAS_287_SubtitlePrefix',
+                'VAS_287_StatOrderValue', 'VAS_287_StatOrderCount', 'VAS_287_StatPendingDelivery',
+                'VAS_287_StatAvgCycle', 'VAS_287_SectionHeading', 'VAS_287_ColSoNo', 'VAS_287_SoDate',
+                'VAS_287_Customer', 'VAS_287_ColWarehouse', 'VAS_287_Representative', 'VAS_287_ColValue',
+                'VAS_287_ColDelivery', 'VAS_287_ColStatus', 'VAS_287_ClickRowHint', 'VAS_287_DeliveryFull',
+                'VAS_287_LinePartial', 'VAS_287_LineInProcess', 'VAS_287_DatePromised', 'VAS_287_SoValue',
+                'VAS_287_ShipFrom', 'VAS_287_DeliveryMode', 'VAS_287_DocumentStatus', 'VAS_287_DeliveryStatus',
+                'VAS_287_SalesOrderLines', 'VAS_287_LinesSuffix', 'VAS_287_QtyOrderedSuffix', 'VAS_287_QtyShortSuffix',
+                'VAS_287_SalesOrderPrefix', 'VAS_287_StatLines', 'VAS_287_ColOrdered', 'VAS_287_ColPending',
+                'VAS_287_ColLine', 'VAS_287_ColProduct', 'VAS_287_ColAttribute', 'VAS_287_ColUom',
+                'VAS_287_ColDelivered', 'VAS_287_ColInStock', 'VAS_287_ColRate', 'VAS_287_ColAmount',
+                'VAS_287_ColLineStatus'
+            ];
+            try { translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {}; }
+            catch (e) { translatedTexts = {}; }
+        }
+
+        // Never render a raw "[KEY]": fall back to the English text when the key is missing.
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            if (translatedTexts === null) { loadMessages(); }
+            var text = translatedTexts ? translatedTexts[key] : '';
+            if (!text || text === key || String(text).charAt(0) === '[') { return fallback || key; }
+            return text;
+        }
+
+        /* Browser-culture formatting (window.navigator.language). */
+        function fmtDate(d, opts) {
+            try { return new Intl.DateTimeFormat(window.navigator.language, opts).format(d); } catch (e) { return ''; }
+        }
+
+        function fmtNumber(n, minFrac, maxFrac) {
+            try {
+                return Number(n).toLocaleString(window.navigator.language, { minimumFractionDigits: minFrac, maximumFractionDigits: maxFrac });
+            } catch (e) { return String(n); }
         }
 
         function escapeHtml(value) {
@@ -321,7 +363,7 @@
 
         function formatAvgCycle(value) {
             if (value === null || value === undefined) { return '—'; }
-            return Number(value).toFixed(1) + ' ' + label('VAS_287_DaysSuffix', 'days');
+            return fmtNumber(value, 1, 1) + ' ' + label('VAS_287_DaysSuffix', 'days');
         }
 
         // VAS163 2026-11-10: browser locale (6-Nov retest2).
@@ -397,8 +439,8 @@
             $htxt.append('<p class="vas287-sub">' + escapeHtml(label('VAS_287_Subtitle', 'SO value booked by sales representative')) + '</p>');
 
             var $filter = $('<div class="vas287-mfilter"></div>');
-            $monthSel = $('<select class="vas287-msel" aria-label="Month"></select>');
-            $yearSel = $('<select class="vas287-msel" aria-label="Year"></select>');
+            $monthSel = $('<select class="vas287-msel" aria-label="' + escapeHtml(label('VAS_287_Month', 'Month')) + '"></select>');
+            $yearSel = $('<select class="vas287-msel" aria-label="' + escapeHtml(label('VAS_287_Year', 'Year')) + '"></select>');
             fillMonthSelect($monthSel);
             fillYearSelect($yearSel);
             $filter.append($monthSel, $yearSel);
@@ -507,8 +549,8 @@
             $list.html(slice.map(function (r, i) {
                 var pct = topValue > 0 ? Math.max(2, Math.round((Number(r.OrderValue || 0) / topValue) * 100)) : 0;
                 var color = BAR_COLORS[(start + i) % BAR_COLORS.length];
-                var compactValue = formatINRFull(r.OrderValue) + ' · ' + formatNum(r.OrderCount);
-                var fullValue = formatINRFull(r.OrderValue) + ' · ' + formatNum(r.OrderCount) + ' ' + label('VAS_287_SosSuffix', 'SOs');
+                var compactValue = formatAmountFull(r.OrderValue) + ' · ' + formatNum(r.OrderCount);
+                var fullValue = formatAmountFull(r.OrderValue) + ' · ' + formatNum(r.OrderCount) + ' ' + label('VAS_287_SosSuffix', 'SOs');
                 return '<button type="button" class="vas287-hrow" data-rid="' + r.RepId + '" data-rname="' + escapeHtml(r.RepName) + '">' +
                     '<span class="vas287-line"><span class="vas287-nm" title="' + escapeHtml(r.RepName) + '">' + escapeHtml(r.RepName) + '</span>' +
                     '<span class="vas287-vl" title="' + escapeHtml(fullValue) + '">' + escapeHtml(compactValue) + '</span></span>' +
@@ -734,7 +776,7 @@
         function renderRepresentativeBody() {
             var summary = repState.summary;
             var statsHtml = '<div class="vas287-mstats">' +
-                statTile(label('VAS_287_StatOrderValue', 'SO value'), formatINR(summary.OrderValue)) +
+                statTile(label('VAS_287_StatOrderValue', 'SO value'), formatAmount(summary.OrderValue)) +
                 statTile(label('VAS_287_StatOrderCount', 'SOs booked'), formatNum(summary.OrderCount)) +
                 statTile(label('VAS_287_StatPendingDelivery', 'Pending delivery'), formatNum(summary.PendingDelivery)) +
                 statTile(label('VAS_287_StatAvgCycle', 'Avg cycle'), formatAvgCycle(summary.AvgCycleDays)) +
@@ -1080,6 +1122,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createModal();
             bindDocumentLevelEvents();

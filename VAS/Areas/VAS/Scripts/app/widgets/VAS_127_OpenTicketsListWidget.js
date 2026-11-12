@@ -21,6 +21,8 @@
  *           grid in place (widgetFirevalueChanged); on the Home / landing dashboard
  *           (windowNo < 0) there is no host grid, so the record is opened in the
  *           standard Customer window via VAS.ZoomUtil.
+ *           2026-11-10 - Messages via VIS.Msg.translate (single batched lookup); amounts and
+ *           pager numbers formatted with the browser culture (Intl, symbol placed per locale).
  *
  * ── Labels / Message Keys ─────────────────────────────────────────────────
  *  #  | Current Text                       | Message Key
@@ -106,8 +108,76 @@
         // zoom and reused afterwards (0 = not resolved yet).
         var zoomWindowId = 0;
 
+        var translatedTexts = null;
+
+        /* Loads every message key used by this widget in ONE VIS.Msg.translate call. */
+        function loadMessages() {
+            var elements = [
+                'Loading',
+                'VAS_127_OpenTickets',
+                'VAS_127_Open',
+                'VAS_127_KeyClientsAffected',
+                'VAS_127_KeyClientAffected',
+                'VAS_127_All',
+                'VAS_127_View',
+                'VAS_127_Key',
+                'VAS_127_NoOwner',
+                'VAS_127_NothingHere',
+                'VAS_127_NotConfigured',
+                'VAS_127_UnableToLoad',
+                'VAS_127_Retry',
+                'VAS_127_Of',
+                'VAS_127_Showing',
+                'VAS_127_PrevPage',
+                'VAS_127_NextPage',
+                'VAS_127_AllTitle',
+                'VAS_127_SearchPlaceholder',
+                'VAS_127_Close',
+                'VAS_127_CustomerDetails',
+                'VAS_127_Tier',
+                'VAS_127_Segment',
+                'VAS_127_Owner',
+                'VAS_127_ARR',
+                'VAS_127_OpenTicketsFact',
+                'VAS_127_Projects',
+                'VAS_127_Pipeline',
+                'VAS_127_Onboarding',
+                'VAS_127_OpenSupportTickets',
+                'VAS_127_KeyPrioritise',
+                'VAS_127_OpenRequests',
+                'VAS_127_Overdue',
+                'VAS_127_DaysPastDue',
+                'VAS_127_Signals',
+                'VAS_127_OpenRecord'
+            ];
+            try {
+                translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {};
+            } catch (e) { translatedTexts = {}; }
+        }
+
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            if (translatedTexts === null) { loadMessages(); }
+            var v = translatedTexts ? translatedTexts[key] : null;
+            if (!v || v === key || String(v).charAt(0) === '[') { return fallback || key; }
+            return v;
+        }
+
+        // Currency symbol split into the text that goes before / after the number for
+        // the browser culture (e.g. "$" + n in en-US, n + " €" in de-DE). Falls back to
+        // the server-supplied symbol in front when no ISO code is available.
+        function currencyAffixes(symbol, isoCode) {
+            var fallback = { before: symbol || isoCode || '', after: '' };
+            if (!isoCode) { return fallback; }
+            try {
+                var parts = new Intl.NumberFormat(window.navigator.language, { style: 'currency', currency: isoCode }).formatToParts(1);
+                var before = '', after = '', seenInteger = false;
+                for (var i = 0; i < parts.length; i++) {
+                    if (parts[i].type === 'integer') { seenInteger = true; continue; }
+                    if (parts[i].type === 'decimal' || parts[i].type === 'fraction') { continue; }
+                    if (seenInteger) { after += parts[i].value; } else { before += parts[i].value; }
+                }
+                return { before: before, after: after };
+            } catch (e) { return fallback; }
         }
 
         function escapeHtml(value) {
@@ -273,12 +343,12 @@
                on a single page with both arrows disabled, so the widget's row
                grid never shifts height between pages. */
             var of = label('VAS_127_Of', 'of');
-            var helper = label('VAS_127_Showing', 'Showing') + ' ' + start + '–' + end + ' ' + of + ' ' + formatCount(listTotal);
+            var helper = label('VAS_127_Showing', 'Showing') + ' ' + formatCount(start) + '–' + formatCount(end) + ' ' + of + ' ' + formatCount(listTotal);
             var pager = '<div class="vas127-pager">' +
                 '<span class="vas127-pglabel">' + escapeHtml(helper) + '</span>' +
                 '<span class="vas127-pgctl">' +
                     '<button type="button" class="vas127-pgbtn" data-dir="prev" aria-label="' + escapeHtml(label('VAS_127_PrevPage', 'Previous page')) + '" ' + (current <= 0 ? 'disabled' : '') + '>' + icon('chevL') + '</button>' +
-                    '<span class="vas127-pgtext">' + escapeHtml((current + 1) + ' ' + of + ' ' + pages) + '</span>' +
+                    '<span class="vas127-pgtext">' + escapeHtml(formatCount(current + 1) + ' ' + of + ' ' + formatCount(pages)) + '</span>' +
                     '<button type="button" class="vas127-pgbtn" data-dir="next" aria-label="' + escapeHtml(label('VAS_127_NextPage', 'Next page')) + '" ' + (current >= pages - 1 ? 'disabled' : '') + '>' + icon('chev') + '</button>' +
                 '</span>' +
             '</div>';
@@ -340,10 +410,10 @@
             var current = Math.floor(allOffset / ALL_PAGE);
             var allOf = label('VAS_127_Of', 'of');
             $allPager.html(
-                '<span class="vas127-pglabel">' + escapeHtml(label('VAS_127_Showing', 'Showing') + ' ' + start + '–' + end + ' ' + allOf + ' ' + formatCount(allTotal)) + '</span>' +
+                '<span class="vas127-pglabel">' + escapeHtml(label('VAS_127_Showing', 'Showing') + ' ' + formatCount(start) + '–' + formatCount(end) + ' ' + allOf + ' ' + formatCount(allTotal)) + '</span>' +
                 '<span class="vas127-pgctl">' +
                     '<button type="button" class="vas127-pgbtn" data-alldir="prev" aria-label="' + escapeHtml(label('VAS_127_PrevPage', 'Previous page')) + '" ' + (current <= 0 ? 'disabled' : '') + '>' + icon('chevL') + '</button>' +
-                    '<span class="vas127-pgtext">' + escapeHtml((current + 1) + ' ' + allOf + ' ' + pages) + '</span>' +
+                    '<span class="vas127-pgtext">' + escapeHtml(formatCount(current + 1) + ' ' + allOf + ' ' + formatCount(pages)) + '</span>' +
                     '<button type="button" class="vas127-pgbtn" data-alldir="next" aria-label="' + escapeHtml(label('VAS_127_NextPage', 'Next page')) + '" ' + (current >= pages - 1 ? 'disabled' : '') + '>' + icon('chev') + '</button>' +
                 '</span>'
             );
@@ -409,8 +479,8 @@
         function formatArr(value) {
             var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
             var sign = n < 0 ? '-' : '';
-            var symbol = searchCurrency.symbol || searchCurrency.iso || '';
-            return sign + symbol + VIS.Util.formatCompactAmount(n, searchCurrency.iso, currencyPrecision());
+            var affix = currencyAffixes(searchCurrency.symbol, searchCurrency.iso);
+            return sign + affix.before + VIS.Util.formatCompactAmount(Math.abs(n), searchCurrency.iso, currencyPrecision()) + affix.after;
         }
 
         function openCustomer(bpId) {
@@ -565,6 +635,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createAllDialog();
             createDetailDialog();

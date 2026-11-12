@@ -13,6 +13,9 @@
  *                        than re-fetching. The stat strip above the rail still
  *                        counts every touch, and an account with 10 or fewer shows
  *                        no controls at all.
+ *   Localization 2026-11-10  All messages are read through one VIS.Msg.translate call
+ *                        (VAS_105_ keys for previously hard-coded text); dates, times,
+ *                        amounts and counts follow the browser culture (Intl).
  ******************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -87,40 +90,182 @@
                 .replace(/'/g,'&#039;');
         }
         function toNum(v) { var n = Number(v); return isFinite(n) ? n : 0; }
-        function msg(k) {
-            var v = (VIS && VIS.Msg && VIS.Msg.getMsg) ? VIS.Msg.getMsg(k) : '';
-            // VIS.Msg.getMsg returns '[KeyName]' (truthy) when the AD_Message row is missing,
-            // so the normal || fallback never fires. Detect the bracket pattern and fall back to k.
-            if (!v || (v.charAt(0) === '[' && v.charAt(v.length - 1) === ']')) return k;
+        // ── Message lookup (one VIS.Msg.translate call for every key this panel uses) ──
+        var translatedTexts = null;
+        function loadMessages() {
+            var elements = [
+                'Active', 'AddNew', 'Amount', 'Appointment',
+                'Budget', 'Business', 'Call', 'CC',
+                'Close', 'CompanyInfo', 'Competition', 'Customer',
+                'Daily', 'Date', 'Details', 'Downloaded',
+                'DueDate', 'Email', 'EMail', 'Error',
+                'From', 'Invoice', 'InvoiceNo', 'Invoices',
+                'IsAllDay', 'IsPrivate', 'Lead', 'Letter',
+                'Monthly', 'Never', 'None', 'Note',
+                'Notes', 'of', 'Open', 'Order',
+                'Orders', 'People', 'Priority', 'Product',
+                'Project', 'Save', 'Send', 'Sent',
+                'StartDate', 'Status', 'Subject', 'Task',
+                'Title', 'To', 'Transcript', 'Type',
+                'VAS_040_Showing', 'VAS_105_AccountID', 'VAS_105_AddNote', 'VAS_105_AgeInStage',
+                'VAS_105_AllTouches', 'VAS_105_AnnualRevenue', 'VAS_105_Approved', 'VAS_105_AssignedTo',
+                'VAS_105_Attended', 'VAS_105_AttrDesc', 'VAS_105_BillDate', 'VAS_105_Call',
+                'VAS_105_Calls', 'VAS_105_Cancelled', 'VAS_105_Chat', 'VAS_105_Closed',
+                'VAS_105_CloseDate', 'VAS_105_CloseDialog', 'VAS_105_Completed', 'VAS_105_Connected',
+                'VAS_105_ContactsRoles', 'VAS_105_Contract', 'VAS_105_ContractDate', 'VAS_105_ContractDetails',
+                'VAS_105_Contracts', 'VAS_105_Countries', 'VAS_105_CustomerMaster', 'VAS_105_DaysShort',
+                'VAS_105_Direction', 'VAS_105_Draft', 'VAS_105_Due', 'VAS_105_DueToday',
+                'VAS_105_Duration', 'VAS_105_DurationPlaceholder', 'VAS_105_EmailInOut', 'VAS_105_Emails',
+                'VAS_105_Employees', 'VAS_105_EngagementTimeline', 'VAS_105_ExtNotAvail', 'VAS_105_Fulfilled',
+                'VAS_105_HealthScore', 'VAS_105_HoursShort', 'VAS_105_Incoming', 'VAS_105_Industry',
+                'VAS_105_InProgress', 'VAS_105_InvoiceDetail', 'VAS_105_Items', 'VAS_105_Last30Days',
+                'VAS_105_LoadError', 'VAS_105_Loading', 'VAS_105_LoadingPhases', 'VAS_105_Location',
+                'VAS_105_Locations', 'VAS_105_LogActivity', 'VAS_105_Lost', 'VAS_105_MarkDone',
+                'VAS_105_Meeting', 'VAS_105_Meetings', 'VAS_105_MeetingUrl', 'VAS_105_MeetingURL',
+                'VAS_105_MinutesShort', 'VAS_105_NewTask', 'VAS_105_NextStep', 'VAS_105_NoContacts',
+                'VAS_105_NoContracts', 'VAS_105_NoEngagement', 'VAS_105_NoInvoices', 'VAS_105_NoLocations',
+                'VAS_105_NoNotes', 'VAS_105_NoOpps', 'VAS_105_NoOrders', 'VAS_105_NoPastTickets',
+                'VAS_105_NoProjects', 'VAS_105_NoTasks', 'VAS_105_NoTickets', 'VAS_105_OpenContract',
+                'VAS_105_Opened', 'VAS_105_OpenOpportunity', 'VAS_105_OpenOpps', 'VAS_105_OpenProject',
+                'VAS_105_OpenRecord', 'VAS_105_Opportunities', 'VAS_105_OpportunityDetails', 'VAS_105_OrderDate',
+                'VAS_105_OrderNo', 'VAS_105_Other', 'VAS_105_Outgoing', 'VAS_105_Owner',
+                'VAS_105_Paid', 'VAS_105_Partial', 'VAS_105_PastTickets', 'VAS_105_PayStatus',
+                'VAS_105_People', 'VAS_105_Perpetual', 'VAS_105_PhaseProgress', 'VAS_105_Phases',
+                'VAS_105_Pinned', 'VAS_105_PostNote', 'VAS_105_PrimaryContact', 'VAS_105_PriorityHigh',
+                'VAS_105_PriorityLow', 'VAS_105_PriorityMedium', 'VAS_105_Probability', 'VAS_105_Processing',
+                'VAS_105_ProjectDetails', 'VAS_105_Projects', 'VAS_105_Region', 'VAS_105_Remove',
+                'VAS_105_RenewalIn', 'VAS_105_RenewalType', 'VAS_105_Reply', 'VAS_105_ReplyReceived',
+                'VAS_105_ReportedBy', 'VAS_105_Required', 'VAS_105_Resolved', 'VAS_105_Reversed',
+                'VAS_105_SaveTxt', 'VAS_105_ScheduleMeeting', 'VAS_105_SelectAccount', 'VAS_105_SentForApproval',
+                'VAS_105_ServiceContract', 'VAS_105_Sites', 'VAS_105_SLA', 'VAS_105_Stage',
+                'VAS_105_SupportTickets', 'VAS_105_Tasks', 'VAS_105_Term', 'VAS_105_Terminated',
+                'VAS_105_TicketDetails', 'VAS_105_TouchPoint', 'VAS_105_TypeMessage', 'VAS_105_Upcoming',
+                'VAS_105_ViewAllInvoices', 'VAS_105_ViewAllOrders', 'VAS_105_ViewAllProjects', 'VAS_105_ViewPastTickets',
+                'VAS_105_VisibleToTeam', 'VAS_105_Visit', 'VAS_105_Website', 'VAS_105_WhatsApp',
+                'VAS_105_When', 'VAS_105_With', 'VAS_105_Won', 'VAS_Cancel',
+                'VAS_Email', 'VAS_OrderDetails', 'VAS_Value', 'Vendor',
+                'VIS_Close', 'VIS_Days', 'VIS_InvoiceDate', 'VIS_Name',
+                'VIS_NoData', 'VIS_OverDue', 'VIS_Previous', 'VIS_StatusDraft',
+                'VIS_Submit', 'Weekly', 'When', 'Yearly'
+            ];
+            try {
+                translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {};
+            } catch (e) {
+                translatedTexts = {};
+            }
+        }
+        // fb = English fallback shown when the message is missing; when omitted the key itself
+        // is returned (previous behaviour). A missing row comes back empty, as the key itself,
+        // or as '[KeyName]' — all of these count as "not translated".
+        function msg(k, fb) {
+            if (translatedTexts === null) loadMessages();
+            var v = translatedTexts ? translatedTexts[k] : '';
+            if (!v || typeof v !== 'string' || v === k || v.charAt(0) === '[') return (fb != null ? fb : k);
             return v;
+        }
+        // Substitutes {0}, {1}... tokens in a translated sentence.
+        function fmtMsg(text) {
+            for (var i = 1; i < arguments.length; i++) text = text.split('{' + (i - 1) + '}').join(String(arguments[i]));
+            return text;
+        }
+
+        // ── Browser-culture formatting helpers ──
+        function getLang() { return window.navigator.language; }
+        function fmtNum(v, opts) {
+            var n = toNum(v);
+            try { return n.toLocaleString(getLang(), opts); } catch (e) { return String(n); }
+        }
+        function fmtDays(n)  { return fmtMsg(msg('VAS_105_DaysShort', '{0}d'), fmtNum(n)); }
+        function fmtMins(n)  { return fmtMsg(msg('VAS_105_MinutesShort', '{0}m'), fmtNum(n)); }
+        function fmtHours(n) { return fmtMsg(msg('VAS_105_HoursShort', '{0}h'), fmtNum(n)); }
+        // Minutes -> "48m" or "1h 30m" (units come from translated patterns)
+        function fmtDuration(totalMins) {
+            var dh = Math.floor(totalMins / 60), dm = totalMins % 60;
+            return dh > 0 ? (fmtHours(dh) + (dm > 0 ? ' ' + fmtMins(dm) : '')) : fmtMins(dm);
         }
 
         function getSym()  { var d = sectionState.overview.data; return (d && d.currencySymbol) ? String(d.currencySymbol) : ''; }
+        function getIso()  { var d = sectionState.overview.data; return (d && d.currencyIso) ? String(d.currencyIso) : ''; }
         function getPrec() { var d = sectionState.overview.data; return (d && d.precision != null) ? Math.max(0, parseInt(d.precision, 10) || 0) : 2; }
 
-        function fmtM(v, sym, prec) {
-            var s = (sym != null ? sym : getSym());
-            var p = (prec != null ? Math.max(0, parseInt(prec, 10) || 0) : getPrec());
-            var abs = Math.abs(v);
-            if (abs >= 1e6) return s + (v / 1e6).toFixed(Math.min(p, 1)).replace(/\.0$/, '') + 'M';
-            // K: always 2 decimal places, strip trailing zeros (e.g. 318,577.48 → 318.58K, 5,000 → 5K)
-            if (abs >= 1e3) return s + (v / 1e3).toFixed(2).replace(/\.?0+$/, '') + 'K';
-            return s + toNum(v).toFixed(p).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        // Places the currency symbol before/after the number as the browser locale does.
+        // Without an ISO code the symbol supplied by the server is put in front.
+        function withCurrency(sym, iso, numStr) {
+            if (iso) {
+                try {
+                    var parts = new Intl.NumberFormat(getLang(), { style: 'currency', currency: iso }).formatToParts(1);
+                    var ci = -1, ii = -1;
+                    for (var i = 0; i < parts.length; i++) {
+                        if (parts[i].type === 'currency') ci = i;
+                        else if (parts[i].type === 'integer' && ii < 0) ii = i;
+                    }
+                    if (ci >= 0 && ii >= 0) {
+                        if (ci < ii) {
+                            return parts[ci].value + ((ci + 1 < parts.length && parts[ci + 1].type === 'literal') ? parts[ci + 1].value : '') + numStr;
+                        }
+                        return numStr + ((ci > 0 && parts[ci - 1].type === 'literal') ? parts[ci - 1].value : '') + parts[ci].value;
+                    }
+                } catch (e) { /* fall through to the server symbol */ }
+            }
+            return (sym || '') + numStr;
         }
 
         // Full exact amount — no K/M/B suffix; used in single-record detail views.
-        function fmtFull(v, sym, prec) {
+        // iso: currency code of the amount; undefined = overview currency, '' = none (server symbol only).
+        function fmtFull(v, sym, prec, iso) {
             var s = (sym != null ? sym : getSym());
             var p = (prec != null ? Math.max(0, parseInt(prec, 10) || 0) : getPrec());
-            return s + toNum(v).toFixed(p).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            var code = (iso != null ? iso : getIso());
+            var n = toNum(v);
+            try {
+                if (code) {
+                    return new Intl.NumberFormat(getLang(), { style: 'currency', currency: code, minimumFractionDigits: p, maximumFractionDigits: p }).format(n);
+                }
+                return s + n.toLocaleString(getLang(), { minimumFractionDigits: p, maximumFractionDigits: p });
+            } catch (e) {
+                return s + n.toFixed(p).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            }
+        }
+
+        // Compact amount (K/M/B or L/Cr per currency) via the shared locale-aware helper.
+        function fmtM(v, sym, prec, iso) {
+            var s = (sym != null ? sym : getSym());
+            var p = (prec != null ? Math.max(0, parseInt(prec, 10) || 0) : getPrec());
+            var code = (iso != null ? iso : getIso());
+            try {
+                if (VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
+                    var num = VIS.Util.formatCompactAmount(Math.abs(toNum(v)), code, p);
+                    return (toNum(v) < 0 ? '-' : '') + withCurrency(s, code, num);
+                }
+            } catch (e) { /* fall back to the full amount */ }
+            return fmtFull(v, s, p, code);
+        }
+
+        // Currency code for a list row: the row's own ISO, or the response/overview ISO
+        // when the row carries no currency of its own.
+        function rowIso(row, data) {
+            if (row && row.currencyIso) return String(row.currencyIso);
+            if (row && row.currencySymbol) return '';
+            return (data && data.currencyIso) ? String(data.currencyIso) : getIso();
+        }
+
+        // Date-only 'yyyy-mm-dd' -> local Date (no timezone shift); anything else -> null
+        function parseLocalDate(s) {
+            var m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(String(s));
+            if (!m) return null;
+            var d = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+            return isNaN(d.getTime()) ? null : d;
+        }
+        function fmtDateWith(d, opts) {
+            return new Intl.DateTimeFormat(getLang(), opts).format(d);
         }
 
         function fmtDate(iso) {
             if (!iso) return '';
             // iso is YYYY-MM-DD
-            var parts = String(iso).split('-');
-            if (parts.length === 3) return parts[2] + ' ' + ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(parts[1],10)-1] + ' ' + parts[0];
-            return iso;
+            var d = parseLocalDate(iso);
+            if (!d) return iso;
+            try { return fmtDateWith(d, { day: '2-digit', month: 'short', year: 'numeric' }); } catch (e) { return iso; }
         }
 
         function fmtEngTs(ts) {
@@ -128,7 +273,6 @@
             var p = String(ts).split(' ');
             if (p.length < 2) return ts;
             var d = p[0].split('-'), t = p[1].split(':');
-            var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
             // TO_CHAR on the server returns the DB server's local time string — parse as local,
             // not UTC. Using Date.UTC() was incorrectly double-applying the timezone offset
             // (server local → treated as UTC → getHours() re-adds local offset).
@@ -136,21 +280,18 @@
                 parseInt(d[0], 10), parseInt(d[1], 10) - 1, parseInt(d[2], 10),
                 parseInt(t[0], 10), parseInt(t[1], 10)
             );
-            var h = dt.getHours(), mi = dt.getMinutes();
-            var miStr = (mi < 10 ? '0' : '') + mi;
-            var ampm = h >= 12 ? 'pm' : 'am';
-            if (h > 12) h -= 12; else if (h === 0) h = 12;
-            return months[dt.getMonth()] + ' ' + dt.getDate() + ', ' + h + ':' + miStr + ampm;
+            if (isNaN(dt.getTime())) return ts;
+            try {
+                return fmtDateWith(dt, { day: '2-digit', month: 'short', hour: 'numeric', minute: '2-digit' });
+            } catch (e) { return ts; }
         }
 
         // Date-only variant of fmtEngTs — used for meetings where only the date is relevant.
         function fmtEngDate(ts) {
             if (!ts) return '';
-            var datePart = String(ts).split(' ')[0]; // YYYY-MM-DD
-            var d = datePart.split('-');
-            if (d.length < 3) return ts;
-            var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-            return months[parseInt(d[1], 10) - 1] + ' ' + parseInt(d[2], 10);
+            var d = parseLocalDate(String(ts).split(' ')[0]); // YYYY-MM-DD
+            if (!d) return ts;
+            try { return fmtDateWith(d, { day: '2-digit', month: 'short' }); } catch (e) { return ts; }
         }
 
         function initials(name) {
@@ -475,10 +616,10 @@
 
             var ini  = initials(data.name);
             var arr  = toNum(data.annualRevenue);
-            var arrStr = fmtM(arr, sym, prec);
+            var arrStr = fmtM(arr, sym, prec, data.currencyIso ? String(data.currencyIso) : '');
 
             var rnDays = data.renewalInDays;
-            var renewalStr   = (rnDays != null && rnDays !== '') ? (String(rnDays) + ' ' + msg('VIS_Days')) : '';
+            var renewalStr   = (rnDays != null && rnDays !== '') ? (fmtNum(rnDays) + ' ' + msg('VIS_Days')) : '';
             var renewalStyle = (rnDays != null && toNum(rnDays) < 90 && toNum(rnDays) >= 0) ? 'color:#9A6500;' : '';
 
             var tierKey = { 'Platinum': 'vas_105_acct-tier--platinum', 'Gold': 'vas_105_acct-tier--gold' };
@@ -513,7 +654,7 @@
                   '<div><div class="vas_105_acct-kpi__lbl">' + esc(msg('VAS_105_HealthScore')) + '</div>' +
                        '<div class="vas_105_acct-kpi__val" style="line-height:1;">' + ratingStars(data.tier) + '</div></div>' +
                   '<div><div class="vas_105_acct-kpi__lbl">' + esc(msg('VAS_105_OpenOpps')) + '</div>' +
-                       '<div class="vas_105_acct-kpi__val" id="vas_105_opp_kpi_' + widgetID + '">' + esc(String(data.openOpportunities || 0)) + '</div></div>' +
+                       '<div class="vas_105_acct-kpi__val" id="vas_105_opp_kpi_' + widgetID + '">' + esc(fmtNum(data.openOpportunities || 0)) + '</div></div>' +
                   (renewalStr
                       ? '<div><div class="vas_105_acct-kpi__lbl">' + esc(msg('VAS_105_RenewalIn')) + '</div>' +
                              '<div class="vas_105_acct-kpi__val" style="' + renewalStyle + '">' + esc(renewalStr) + '</div></div>'
@@ -524,7 +665,7 @@
                   '<div class="vas_105_acct-sectitle">' + esc(msg('CompanyInfo')) + '</div>' +
                   '<div class="vas_105_acct-pairgrid" style="margin-top:0.625em;">' +
                     pairRow(msg('VAS_105_Industry'), data.industry, false) +
-                    pairRow(msg('VAS_105_Employees'), data.employees ? Number(data.employees).toLocaleString() : '', false) +
+                    pairRow(msg('VAS_105_Employees'), data.employees ? fmtNum(data.employees) : '', false) +
                     pairRow(msg('VAS_105_AccountID'), data.accountCode, false) +
                     pairRow(msg('VAS_105_Region'), data.region, false) +
                     pairRowLink(msg('VAS_105_Website'), data.website, data.website ? (/^https?:\/\//i.test(data.website) ? data.website : 'https://' + data.website) : '') +
@@ -545,7 +686,7 @@
 
             // Update count badge
             var cntEl = document.getElementById(secId('contacts') + '_cnt');
-            if (cntEl) cntEl.textContent = allItems.length > 0 ? String(allItems.length) : '';
+            if (cntEl) cntEl.textContent = allItems.length > 0 ? fmtNum(allItems.length) : '';
 
             if (!allItems.length) { el.innerHTML = emptyState('VAS_105_NoContacts'); return; }
 
@@ -640,10 +781,10 @@
                         var cname = allItems[ci].country;
                         if (cname && !countrySet[cname]) { countrySet[cname] = true; distinctCountries++; }
                     }
-                    var cntHtml = esc(String(allItems.length) + ' ' + msg('VAS_105_Sites'));
+                    var cntHtml = esc(fmtNum(allItems.length) + ' ' + msg('VAS_105_Sites'));
                     if (distinctCountries > 1) {
                         cntHtml += '<span class="vas_105_acct-ctrbadge">' +
-                                       esc(String(distinctCountries) + ' ' + msg('VAS_105_Countries')) +
+                                       esc(fmtNum(distinctCountries) + ' ' + msg('VAS_105_Countries')) +
                                    '</span>';
                     }
                     cntEl.innerHTML = cntHtml;
@@ -709,11 +850,11 @@
             var chevR = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
             return '<div class="vas_105_acct-secpager">' +
                      '<span class="vas_105_acct-secpager__info">' +
-                       esc(msg('VAS_040_Showing')) + ' <b>' + start + ' &ndash; ' + end + '</b> ' + esc(msg('of')) + ' <b>' + totalItems + '</b>' +
+                       esc(msg('VAS_040_Showing')) + ' <b>' + esc(fmtNum(start)) + ' &ndash; ' + esc(fmtNum(end)) + '</b> ' + esc(msg('of')) + ' <b>' + esc(fmtNum(totalItems)) + '</b>' +
                      '</span>' +
                      '<nav class="vas_105_acct-secpager__nav" role="navigation">' +
                        '<button type="button" class="vas_105_acct-secpager__btn" id="vas_105_' + secKey + 'prev_' + widgetID + '"' + (prevDisabled ? ' disabled' : '') + '>' + chevL + '</button>' +
-                       '<span class="vas_105_acct-secpager__page"><b>' + (currentPage + 1) + '</b>&nbsp;' + esc(msg('of')) + '&nbsp;' + totalPages + '</span>' +
+                       '<span class="vas_105_acct-secpager__page"><b>' + esc(fmtNum(currentPage + 1)) + '</b>&nbsp;' + esc(msg('of')) + '&nbsp;' + esc(fmtNum(totalPages)) + '</span>' +
                        '<button type="button" class="vas_105_acct-secpager__btn" id="vas_105_' + secKey + 'next_' + widgetID + '"' + (nextDisabled ? ' disabled' : '') + '>' + chevR + '</button>' +
                      '</nav>' +
                    '</div>';
@@ -752,12 +893,12 @@
         }
         function stageLabel(code) {
             var map = {
-                'DR': 'Draft',
-                'IP': 'In Progress',
-                'CO': 'Won',
-                'CL': 'Closed',
-                'VO': 'Lost',
-                'RE': 'Reversed'
+                'DR': msg('VAS_105_Draft', 'Draft'),
+                'IP': msg('VAS_105_InProgress', 'In Progress'),
+                'CO': msg('VAS_105_Won', 'Won'),
+                'CL': msg('VAS_105_Closed', 'Closed'),
+                'VO': msg('VAS_105_Lost', 'Lost'),
+                'RE': msg('VAS_105_Reversed', 'Reversed')
             };
             return map[code] || (code || '—');
         }
@@ -779,11 +920,11 @@
 
             var cntEl = document.getElementById(secId('opps') + '_cnt');
             if (cntEl) {
-                cntEl.textContent = open > 0 ? (String(open) + ' ' + msg('Open')) : '';
+                cntEl.textContent = open > 0 ? (fmtNum(open) + ' ' + msg('Open')) : '';
             }
             // Overwrite the server-supplied KPI value so the header always matches the section badge
             var kpiEl = document.getElementById('vas_105_opp_kpi_' + widgetID);
-            if (kpiEl) kpiEl.textContent = String(open);
+            if (kpiEl) kpiEl.textContent = fmtNum(open);
 
             if (!allItems.length) { el.innerHTML = emptyState('VAS_105_NoOpps'); return; }
 
@@ -806,6 +947,7 @@
                 var o    = items[i];
                 var iSym  = o.currencySymbol || sym;
                 var iPrec = (o.currencyPrecision != null) ? parseInt(o.currencyPrecision, 10) : prec;
+                var iIso  = rowIso(o, data);
                 html +=
                     '<div class="vas_105_acct-clickrow" style="grid-template-columns:2.25em 1.7fr 1fr 0.9fr 1fr;gap:0.75em;" data-opp-idx="' + i + '">' +
                       '<span class="vas_105_acct-wicon vas_105_acct-wicon--blue">' + SVG_OPP + '</span>' +
@@ -815,7 +957,7 @@
                         '<span class="vas_105_acct-clamp2">' + esc(o.name || '') + '</span>' +
                       '</span>' +
                       '<span><span class="vas_105_acct-stage ' + stageClass(o.stageCode, o.stageName) + '">' + esc(o.stageName || stageLabel(o.stageCode)) + '</span></span>' +
-                      '<span style="font-size:0.875em;font-weight:700;color:var(--acct-text);text-align:right;">' + esc(fmtFull(toNum(o.value), iSym, iPrec)) + '</span>' +
+                      '<span style="font-size:0.875em;font-weight:700;color:var(--acct-text);text-align:right;">' + esc(fmtFull(toNum(o.value), iSym, iPrec, iIso)) + '</span>' +
                       '<span style="font-size:0.8125em;color:var(--acct-text-2);text-align:right;">' + esc(fmtDate(o.closeDate)) + '</span>' +
                     '</div>';
             }
@@ -887,9 +1029,9 @@
                 // Other: overdue, expired, terminated, sent-for-approval, or any unrecognised status
                 var other  = allItems.length - active - inProg;
                 var parts  = [];
-                if (active) parts.push(String(active) + ' ' + msg('Active'));
-                if (inProg) parts.push(String(inProg) + ' ' + msg('VAS_105_InProgress'));
-                if (other  > 0) parts.push(String(other) + ' ' + msg('VAS_105_Other'));
+                if (active) parts.push(fmtNum(active) + ' ' + msg('Active'));
+                if (inProg) parts.push(fmtNum(inProg) + ' ' + msg('VAS_105_InProgress'));
+                if (other  > 0) parts.push(fmtNum(other) + ' ' + msg('VAS_105_Other'));
                 cntEl.textContent = parts.join(' · ');
             }
 
@@ -908,9 +1050,10 @@
                 var isOverdue   = (c.statusCode === 'Y' || c.statusCode === 'ARD') && c.endDate && c.endDate < today;
                 var statusCls   = isOverdue ? 'vas_105_acct-ctstatus--expired' : contractStatusClass(c.statusCode);
                 var statusLabel = isOverdue ? msg('VIS_OverDue')                : contractStatusLabel(c.statusCode);
-                var term = [fmtDate(c.startDate), c.endDate ? fmtDate(c.endDate) : 'Perpetual'].filter(Boolean).join(' – ');
+                var term = [fmtDate(c.startDate), c.endDate ? fmtDate(c.endDate) : msg('VAS_105_Perpetual', 'Perpetual')].filter(Boolean).join(' – ');
                 var cSym  = c.currencySymbol || sym;
                 var cPrec = (c.currencyPrecision != null) ? parseInt(c.currencyPrecision, 10) : prec;
+                var cIso  = rowIso(c, data);
                 html +=
                     '<div class="vas_105_acct-ctrow" data-ct-idx="' + i + '">' +
                       '<span class="vas_105_acct-wicon vas_105_acct-wicon--teal">' + SVG_CONTRACT + '</span>' +
@@ -924,7 +1067,7 @@
                         (c.productName ? '<div style="margin-top:0.1em;font-size:0.75em;color:var(--acct-text-2);">' + esc(c.productName) + '</div>' : (c.description ? '<div style="margin-top:0.1em;font-size:0.75em;color:var(--acct-text-2);">' + esc(c.description) + '</div>' : '')) +
                         (c.attributeDesc ? '<div style="margin-top:0.1em;font-size:0.75em;color:var(--acct-text-2);">' + esc(c.attributeDesc) + '</div>' : '') +
                       '</div>' +
-                      '<div style="font-size:0.875em;font-weight:700;color:var(--acct-text);white-space:nowrap;">' + esc(fmtFull(toNum(c.value), cSym, cPrec)) + '</div>' +
+                      '<div style="font-size:0.875em;font-weight:700;color:var(--acct-text);white-space:nowrap;">' + esc(fmtFull(toNum(c.value), cSym, cPrec, cIso)) + '</div>' +
                     '</div>';
             }
 
@@ -957,7 +1100,10 @@
 
         // ── renderTickets ─────────────────────────────────────────────────────
         function prioLabel(code) {
-            var map = {'1':'High','2':'Medium','3':'Low','High':'High','Medium':'Medium','Low':'Low'};
+            var map = {
+                '1': msg('VAS_105_PriorityHigh', 'High'), '2': msg('VAS_105_PriorityMedium', 'Medium'), '3': msg('VAS_105_PriorityLow', 'Low'),
+                'High': msg('VAS_105_PriorityHigh', 'High'), 'Medium': msg('VAS_105_PriorityMedium', 'Medium'), 'Low': msg('VAS_105_PriorityLow', 'Low')
+            };
             return map[code] || code || '—';
         }
         // Priority colour tone — one palette shared by the ticket list pill and the
@@ -998,7 +1144,7 @@
             for (var i = 0; i < items.length; i++) {
                 var t = items[i];
                 // Age + the ticket's real status (R_Status), not a hard-coded "Open".
-                var age = (t.ageDays != null ? String(t.ageDays) + 'd' : '') + (t.status ? ' ' + t.status : '');
+                var age = (t.ageDays != null ? fmtDays(t.ageDays) : '') + (t.status ? ' ' + t.status : '');
                 var isAlert = t.isOverdue || t.isInactive;
                 var dotColor = slaDotColor(t.dateNextAction);
                 var pt = prioTone(t.priorityCode, t.priorityName);
@@ -1047,11 +1193,11 @@
             return 'vas_105_acct-odstatus--processing';
         }
         function orderStatusLabel(code) {
-            if (code === 'CO') return 'Fulfilled';
-            if (code === 'VO') return 'Cancelled';
-            if (code === 'DR') return 'Draft';
-            if (code === 'IP') return 'Processing';
-            if (code === 'CL') return 'Closed';
+            if (code === 'CO') return msg('VAS_105_Fulfilled', 'Fulfilled');
+            if (code === 'VO') return msg('VAS_105_Cancelled', 'Cancelled');
+            if (code === 'DR') return msg('VAS_105_Draft', 'Draft');
+            if (code === 'IP') return msg('VAS_105_Processing', 'Processing');
+            if (code === 'CL') return msg('VAS_105_Closed', 'Closed');
             return code || '—';
         }
 
@@ -1077,6 +1223,7 @@
                 var o = items[i];
                 var oSym  = o.currencySymbol || sym;
                 var oPrec = (o.currencyPrecision != null) ? parseInt(o.currencyPrecision, 10) : prec;
+                var oIso  = rowIso(o, data);
                 html +=
                     '<div class="vas_105_acct-clickrow" style="grid-template-columns:2.25em 1fr 1.2fr 1fr 0.8fr;gap:0.75em;" data-ord-idx="' + i + '">' +
                       '<span class="vas_105_acct-wicon vas_105_acct-wicon--blue">' + SVG_ORDER + '</span>' +
@@ -1089,7 +1236,7 @@
                       '<span class="vas_105_acct-tip" data-tip="' + esc(o.items || '') + '">' +
                         '<span style="display:block;font-size:0.8125em;color:var(--acct-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(o.items || '') + '</span>' +
                       '</span>' +
-                      '<span style="font-size:0.875em;font-weight:700;color:var(--acct-text);text-align:right;">' + esc(fmtFull(toNum(o.amount), oSym, oPrec)) + '</span>' +
+                      '<span style="font-size:0.875em;font-weight:700;color:var(--acct-text);text-align:right;">' + esc(fmtFull(toNum(o.amount), oSym, oPrec, oIso)) + '</span>' +
                       '<span style="text-align:right;"><span class="vas_105_acct-odstatus ' + orderStatusClass(o.statusCode) + '">' + esc(orderStatusLabel(o.statusCode)) + '</span></span>' +
                     '</div>';
             }
@@ -1125,6 +1272,14 @@
                         'Partial':'vas_105_acct-ivstatus--partial' };
             return map[code] || 'vas_105_acct-ivstatus--open';
         }
+        // Display text for the invoice pay status (the code itself drives the CSS class above)
+        function ivStatusLabel(code) {
+            if (code === 'Paid')    return msg('VAS_105_Paid', 'Paid');
+            if (code === 'Overdue') return msg('VIS_OverDue', 'Overdue');
+            if (code === 'Partial') return msg('VAS_105_Partial', 'Partial');
+            if (!code || code === 'Open') return msg('Open', 'Open');
+            return code;
+        }
 
         function renderInvoices(el, data) {
             var items = (data && data.items) ? data.items : [];
@@ -1149,6 +1304,7 @@
                 var inv = items[i];
                 var iSym  = inv.currencySymbol || sym;
                 var iPrec = (inv.currencyPrecision != null) ? parseInt(inv.currencyPrecision, 10) : prec;
+                var iIso  = rowIso(inv, data);
                 html +=
                     '<div class="vas_105_acct-clickrow" style="grid-template-columns:2.25em 1fr 0.9fr 0.9fr 1fr 0.8fr;gap:0.75em;" data-inv-idx="' + i + '">' +
                       '<span class="vas_105_acct-wicon vas_105_acct-wicon--amber">' + SVG_INVOICE + '</span>' +
@@ -1156,12 +1312,12 @@
                         '<span style="font-size:0.8125em;font-weight:700;color:var(--acct-text);">' + esc(inv.invoiceNo || '') + '</span>' +
                         '<span style="font-size:0.75em;color:var(--acct-text-2);">' + esc(fmtDate(inv.invoiceDate)) + '</span>' +
                       '</div>' +
-                      '<span style="font-size:0.875em;font-weight:700;color:var(--acct-text);text-align:right;">' + esc(fmtFull(toNum(inv.amount), iSym, iPrec)) + '</span>' +
+                      '<span style="font-size:0.875em;font-weight:700;color:var(--acct-text);text-align:right;">' + esc(fmtFull(toNum(inv.amount), iSym, iPrec, iIso)) + '</span>' +
                       '<span style="font-size:0.875em;color:var(--acct-text-2);text-align:right;">' +
-                        esc((inv.payStatus === 'Paid' || inv.payStatus === 'Partial') ? fmtFull(toNum(inv.paid), iSym, iPrec) : '—') +
+                        esc((inv.payStatus === 'Paid' || inv.payStatus === 'Partial') ? fmtFull(toNum(inv.paid), iSym, iPrec, iIso) : '—') +
                       '</span>' +
                       '<span style="font-size:0.8125em;color:var(--acct-text-2);text-align:right;">' + esc(fmtDate(inv.dueDate)) + '</span>' +
-                      '<span style="text-align:right;"><span class="vas_105_acct-ivstatus ' + ivStatusClass(inv.payStatus) + '">' + esc(inv.payStatus || 'Open') + '</span></span>' +
+                      '<span style="text-align:right;"><span class="vas_105_acct-ivstatus ' + ivStatusClass(inv.payStatus) + '">' + esc(ivStatusLabel(inv.payStatus)) + '</span></span>' +
                     '</div>';
             }
 
@@ -1303,12 +1459,7 @@
         }
 
         function fmtDateLong(s) {
-            if (!s) return '';
-            var p = String(s).split('-');
-            if (p.length < 3) return s;
-            var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-            var mon = months[parseInt(p[1], 10) - 1] || p[1];
-            return p[2] + ' ' + mon + ' ' + p[0];
+            return fmtDate(s);
         }
 
         function renderTaskList(tasks) {
@@ -1339,7 +1490,7 @@
                 var metaItems = [];
                 if (avHtml)  metaItems.push(avHtml);
                 if (dueHtml) metaItems.push(dueHtml);
-                metaItems.push('<span>' + pct + '%</span>');
+                metaItems.push('<span>' + esc(fmtNum(pct)) + '%</span>');
                 var metaHtml = metaItems.join('<span class="vas_105_dot">&middot;</span>');
 
                 html += [
@@ -1364,7 +1515,7 @@
             var upcoming = items.filter(function (t) { return !(t.isClosed === true || t.isClosed === 'true'); });
             var previous = items.filter(function (t) { return   t.isClosed === true || t.isClosed === 'true';  });
             var cntEl = document.getElementById(secId('tasks') + '_cnt');
-            if (cntEl) cntEl.textContent = upcoming.length > 0 ? (String(upcoming.length) + ' ' + msg('Open')) : '';
+            if (cntEl) cntEl.textContent = upcoming.length > 0 ? (fmtNum(upcoming.length) + ' ' + msg('Open')) : '';
             _bpSectionCounts['tasks'] = items.length;
             applyAddBtnState();
 
@@ -1458,7 +1609,7 @@
             for (var i = 0; i < items.length; i++) {
                 if (items[i].touchType === 'EMAIL') { if (items[i].direction === 'in') inCnt++; else outCnt++; }
             }
-            var emailSub = inCnt + ' in · ' + outCnt + ' out';
+            var emailSub = fmtMsg(msg('VAS_105_EmailInOut', '{0} in · {1} out'), fmtNum(inCnt), fmtNum(outCnt));
 
             var totalMeetingMins  = counts.totalMeetingMins  || 0;
             var meetingAttendees  = counts.meetingAttendees   || 0;
@@ -1466,13 +1617,13 @@
             var connectedCalls    = counts.connectedCalls     || 0;
 
             var mtgParts = [];
-            if (totalMeetingMins > 0) mtgParts.push(totalMeetingMins + 'm');
-            if (meetingAttendees > 0) mtgParts.push(meetingAttendees + ' ' + msg('VAS_105_Attended'));
+            if (totalMeetingMins > 0) mtgParts.push(fmtMins(totalMeetingMins));
+            if (meetingAttendees > 0) mtgParts.push(fmtNum(meetingAttendees) + ' ' + msg('VAS_105_Attended'));
             var mtgSub = mtgParts.length ? mtgParts.join(' · ') : msg('Transcript');
 
             var callParts = [];
-            if (totalCallMins > 0) callParts.push(totalCallMins + 'm');
-            if (connectedCalls > 0) callParts.push(connectedCalls + ' ' + msg('VAS_105_Connected'));
+            if (totalCallMins > 0) callParts.push(fmtMins(totalCallMins));
+            if (connectedCalls > 0) callParts.push(fmtNum(connectedCalls) + ' ' + msg('VAS_105_Connected'));
             var callSub = callParts.length ? callParts.join(' · ') : msg('VAS_105_Connected');
 
             function statCard(svgIcon, count, labelKey, sub, action) {
@@ -1481,7 +1632,7 @@
                 return [
                     '<div class="', cls, '"', attrs, '>',
                     '  <div class="vas_105_eng-statcard-icon">', svgIcon, '</div>',
-                    '  <div class="vas_105_eng-statcard-count">', count, '</div>',
+                    '  <div class="vas_105_eng-statcard-count">', esc(fmtNum(count)), '</div>',
                     '  <div class="vas_105_eng-statcard-label">', esc(msg(labelKey)), '</div>',
                     '  <div class="vas_105_eng-statcard-sub">', esc(sub), '</div>',
                     '</div>'
@@ -1532,8 +1683,7 @@
                 } else if (item.touchType === 'MEETING') {
                     var durStr = '';
                     if (item.durationMins > 0) {
-                        var dh = Math.floor(item.durationMins / 60), dm = item.durationMins % 60;
-                        durStr = dh > 0 ? (dh + 'h' + (dm > 0 ? ' ' + dm + 'm' : '')) : (dm + 'm');
+                        durStr = fmtDuration(item.durationMins);
                     }
                     // Meeting time sits beside the heading; the card's top-right
                     // timestamp is the appointment's created time.
@@ -1639,7 +1789,7 @@
                         listHtml +=
                             '<div class="vas_105_acct-pinned" style="margin-bottom:0.625em;">' +
                               '<div style="display:flex;align-items:center;gap:0.5em;">' +
-                                '<span class="vas_105_acct-pinned__tag">PINNED</span>' +
+                                '<span class="vas_105_acct-pinned__tag">' + esc(msg('VAS_105_Pinned', 'PINNED')) + '</span>' +
                                 '<span style="font-size:0.75em;color:var(--acct-text-2);">' + esc(n.author||'') + ' · ' + esc(n.created||'') + '</span>' +
                               '</div>' +
                               '<div style="margin-top:0.375em;font-size:0.8125em;color:var(--acct-text);line-height:1.5;">' + esc(n.noteText||'') + '</div>' +
@@ -1748,7 +1898,7 @@
                   'border:0.0625em solid #E4EDF4;border-radius:0.5em;">' + esc(o.description) + '</p>'
                 : '';
 
-            var ageStr = (o.ageInStage != null) ? (String(o.ageInStage) + ' ' + msg('VIS_Days')) : '';
+            var ageStr = (o.ageInStage != null) ? (fmtNum(o.ageInStage) + ' ' + msg('VIS_Days')) : '';
 
             var body =
                 // ── Opp code (small) + Opp name + Stage badge ───────────────────
@@ -1767,7 +1917,7 @@
                   '</div>' +
                   '<div>' +
                     '<div style="font-size:0.75em;color:#5F7283;margin-bottom:0.25em;">' + esc(msg('VAS_105_Probability')) + '</div>' +
-                    '<div style="font-size:1.125em;font-weight:700;color:var(--acct-text);">' + esc(o.probability ? (String(o.probability) + '%') : '—') + '</div>' +
+                    '<div style="font-size:1.125em;font-weight:700;color:var(--acct-text);">' + esc(o.probability ? (fmtNum(o.probability) + '%') : '—') + '</div>' +
                   '</div>' +
                   '<div>' +
                     '<div style="font-size:0.75em;color:#5F7283;margin-bottom:0.25em;">' + esc(msg('VAS_105_CloseDate')) + '</div>' +
@@ -1834,7 +1984,7 @@
 
             // Date label varies by source: service contract = Bill Date; contract master = Contract Date
             var dateLbl = isCC ? msg('VAS_105_BillDate') : msg('VAS_105_ContractDate');
-            var endHtml = c.endDate ? esc(fmtDate(c.endDate)) : '<em style="color:var(--acct-muted);">Perpetual</em>';
+            var endHtml = c.endDate ? esc(fmtDate(c.endDate)) : '<em style="color:var(--acct-muted);">' + esc(msg('VAS_105_Perpetual', 'Perpetual')) + '</em>';
 
             var body =
                 // ── Heading: document no + status badge + source badge ─────────
@@ -1975,13 +2125,13 @@
                 var diff = Math.round((d - today) / 86400000);
                 if (diff < 0) {
                     return '<span style="color:#D14545;font-weight:700;">' +
-                           esc(fmtDate(t.dateNextAction)) + ' (' + String(-diff) + 'd ' + esc(msg('VIS_OverDue')) + ')</span>';
+                           esc(fmtDate(t.dateNextAction)) + ' (' + esc(fmtDays(-diff)) + ' ' + esc(msg('VIS_OverDue')) + ')</span>';
                 }
                 if (diff === 0) {
                     return '<span style="color:#9A6500;font-weight:700;">' +
                            esc(fmtDate(t.dateNextAction)) + ' (' + esc(msg('VAS_105_DueToday')) + ')</span>';
                 }
-                return esc(fmtDate(t.dateNextAction)) + ' (' + diff + 'd)';
+                return esc(fmtDate(t.dateNextAction)) + ' (' + esc(fmtDays(diff)) + ')';
             }
 
             var lStyle = 'font-size:0.75em;color:#5F7283;font-weight:400;white-space:nowrap;align-self:center;';
@@ -1996,7 +2146,7 @@
                   '<span style="' + vStyle + '">' + prioBadge(t.priorityCode, t.priorityName) + '</span>' +
                   '<span style="' + lStyle + '">' + esc(msg('Status')) + '</span>' +
                   '<span style="' + vStyle + '">' + esc(t.status || '—') +
-                      (t.ageDays ? ' &middot;&nbsp;' + String(t.ageDays) + 'd' : '') + '</span>' +
+                      (t.ageDays ? ' &middot;&nbsp;' + esc(fmtDays(t.ageDays)) : '') + '</span>' +
 
                   '<span style="' + lStyle + '">' + esc(msg('VAS_105_ReportedBy')) + '</span>' +
                   '<span style="' + vStyle + '">' + esc(t.contact || '—') + '</span>' +
@@ -2060,7 +2210,7 @@
                        detailRow(msg('DueDate'), fmtDate(inv.dueDate)) +
                        detailRow(msg('Amount'), fmtFull(toNum(inv.amount), sym, prec)) +
                        detailRow(msg('VAS_105_Paid'), fmtFull(toNum(inv.paid), sym, prec)) +
-                       detailRow(msg('VAS_105_PayStatus'), inv.payStatus);
+                       detailRow(msg('VAS_105_PayStatus'), inv.payStatus ? ivStatusLabel(inv.payStatus) : '');
             showModal(inv.invoiceNo || msg('Invoice'), msg('VAS_105_InvoiceDetail'), body, detailFoot(), false);
             var btn = document.getElementById('vas_105_openrec_' + widgetID);
             // Use openInvoiceInWindow so the AR Invoice window is opened by name ('VAS_ARInvoice').
@@ -2212,9 +2362,8 @@
                             }
                             var noteEl = document.getElementById(noteId);
                             if (noteEl && inProgressIdx >= 0) {
-                                var noteText = msg('Phase') + ' ' + phases[inProgressIdx].seqNo +
-                                               ' ' + msg('of') + ' ' + phases.length +
-                                               ' ' + msg('VAS_105_InProgress') + '.';
+                                var noteText = fmtMsg(msg('VAS_105_PhaseProgress', 'Phase {0} of {1} In Progress.'),
+                                                      fmtNum(phases[inProgressIdx].seqNo), fmtNum(phases.length));
                                 noteEl.innerHTML =
                                     '<span style="display:inline-block;background:#1E3A8A;color:#fff;' +
                                     'border-radius:0.3em;padding:0.1em 0.55em;font-size:0.8em;' +
@@ -2253,8 +2402,8 @@
                         // Show the ticket's actual R_Status (Resolved, Closed, …) instead of a
                         // fixed "Resolved". Closed-type statuses get a neutral slate tone;
                         // everything else keeps the green resolved tone.
-                        var pStatus  = t.status || 'Resolved';
-                        var isClosed = /clos/i.test(pStatus);
+                        var pStatus  = t.status || msg('VAS_105_Resolved', 'Resolved');
+                        var isClosed = /clos/i.test(t.status || '');
                         var pDot     = isClosed ? '#5F7283' : '#0B6B45';
                         var pPill    = isClosed ? ' style="background:#E8EDF2;color:#46586A;"' : '';
                         h += '<div class="vas_105_acct-tickrow">' +
@@ -2368,7 +2517,7 @@
                     // Append order count to the modal meta once data is available
                     var metaEl = document.getElementById('vas_105_mmeta_' + widgetID);
                     if (metaEl && bpName && total > 0) {
-                        metaEl.textContent = bpName + ' · ' + total + ' ' + msg('Orders');
+                        metaEl.textContent = bpName + ' · ' + fmtNum(total) + ' ' + msg('Orders');
                     }
                     if (!items.length) { listEl.innerHTML = emptyState('VAS_105_NoOrders'); return; }
                     // Grid: OrderNo+Date stacked | Description | Amount | Status
@@ -2487,7 +2636,7 @@
                              '<span style="font-size:0.8125em;font-weight:700;color:var(--acct-text);">' + esc(inv.invoiceNo||'') + '</span>' +
                              '<span style="font-size:0.875em;font-weight:700;text-align:right;">' + esc(fmtFull(toNum(inv.amount), sym, prec)) + '</span>' +
                              '<span style="font-size:0.8125em;color:var(--acct-text-2);text-align:right;">' + esc(fmtDate(inv.dueDate)) + '</span>' +
-                             '<span style="text-align:right;"><span class="vas_105_acct-ivstatus ' + ivStatusClass(inv.payStatus) + '">' + esc(inv.payStatus||'Open') + '</span></span>' +
+                             '<span style="text-align:right;"><span class="vas_105_acct-ivstatus ' + ivStatusClass(inv.payStatus) + '">' + esc(ivStatusLabel(inv.payStatus)) + '</span></span>' +
                              '</div>';
                     }
                     listEl.innerHTML = h;
@@ -2567,8 +2716,9 @@
                 '<div class="vas_105_acct-ftypes" id="vas_105_ftypes_' + widgetID + '">' +
                   ['Call','Note','Visit'].map(function(t,i) {
                       var icons = ['ti-phone','ti-note','ti-map-pin'];
+                      var typeLbls = [msg('Call', 'Call'), msg('Note', 'Note'), msg('VAS_105_Visit', 'Visit')];
                       return '<button class="vas_105_acct-ftype' + (i===0?' vas_105_acct-ftype--sel':'') + '" data-atype="' + t + '" type="button">' +
-                             '<i class="ti ' + icons[i] + '" style="font-size:1.25em;"></i>' + esc(t) + '</button>';
+                             '<i class="ti ' + icons[i] + '" style="font-size:1.25em;"></i>' + esc(typeLbls[i]) + '</button>';
                   }).join('') +
                 '</div>' +
                 '<div class="vas_105_acct-field"><label>' + esc(msg('Subject')) + '</label>' +
@@ -2577,7 +2727,7 @@
                   '<div class="vas_105_acct-field"><label>' + esc(msg('Date')) + '</label>' +
                   '<input type="date" id="vas_105_act_date_' + widgetID + '" /></div>' +
                   '<div class="vas_105_acct-field"><label>' + esc(msg('VAS_105_Duration')) + '</label>' +
-                  '<input type="text" id="vas_105_act_dur_' + widgetID + '" placeholder="e.g. 30 min" /></div>' +
+                  '<input type="text" id="vas_105_act_dur_' + widgetID + '" placeholder="' + esc(msg('VAS_105_DurationPlaceholder', 'e.g. 30 min')) + '" /></div>' +
                 '</div>';
 
             var foot =
@@ -2658,7 +2808,7 @@
                     '<span class="vas_105_apt-icon">' + ICO_PENCIL + '</span>' +
                     '<input type="text" class="vas_105_apt-input" id="vas_105_apt_title_' + widgetID + '"' +
                     ' placeholder="' + esc(msg('Title')) + '" />' +
-                    '<span class="vas_105_apt-reqmark" title="Required">&#9679;</span>' +
+                    '<span class="vas_105_apt-reqmark" title="' + esc(msg('VAS_105_Required', 'Required')) + '">&#9679;</span>' +
                   '</div>' +
                   // Location
                   '<div class="vas_105_apt-row">' +
@@ -2750,7 +2900,7 @@
                     (function (email, idx) {
                         var chip = document.createElement('span');
                         chip.className = 'vas_105_apt-chip';
-                        chip.innerHTML = esc(email) + '<button type="button" class="vas_105_apt-chip__remove" aria-label="Remove">&#x2715;</button>';
+                        chip.innerHTML = esc(email) + '<button type="button" class="vas_105_apt-chip__remove" aria-label="' + esc(msg('VAS_105_Remove', 'Remove')) + '">&#x2715;</button>';
                         chip.querySelector('.vas_105_apt-chip__remove').onclick = function (e) {
                             if (e) { e.stopPropagation(); e.stopImmediatePropagation(); }
                             aptContacts.splice(idx, 1);
@@ -2989,7 +3139,7 @@
                     // email.js hard-codes "Contacts" in the title when called outside a window frame;
                     // patch it to show the Customer Master window name instead.
                     email.getRoot().find('.vis-awindow-header p').first()
-                        .text(VIS.Msg.getMsg('EMail') + ' (' + msg('VAS_105_CustomerMaster') + ')');
+                        .text(msg('EMail') + ' (' + msg('VAS_105_CustomerMaster') + ')');
                 });
             });
         }
@@ -3020,8 +3170,7 @@
                 // Duration string: "48m" or "1h 30m"
                 var durStr = '';
                 if (data.durationMins > 0) {
-                    var dh = Math.floor(data.durationMins / 60), dm = data.durationMins % 60;
-                    durStr = dh > 0 ? (dh + 'h' + (dm > 0 ? ' ' + dm + 'm' : '')) : (dm + 'm');
+                    durStr = fmtDuration(data.durationMins);
                 }
 
                 // Attendee list and count
@@ -3034,7 +3183,7 @@
                 var detailParts = [];
                 if (data.location)    detailParts.push(esc(data.location));
                 if (durStr)           detailParts.push(esc(durStr));
-                if (attendeeCount)    detailParts.push(attendeeCount + ' ' + esc(msg('VAS_105_Attended')));
+                if (attendeeCount)    detailParts.push(esc(fmtNum(attendeeCount)) + ' ' + esc(msg('VAS_105_Attended')));
                 var detailsHtml = detailParts.join(' &middot; ') || '&mdash;';
 
                 // Transcript block
@@ -3190,7 +3339,7 @@
             c.show();
             email.initializeComponent();
             email.getRoot().find('.vis-awindow-header p').first()
-                .text(VIS.Msg.getMsg('EMail') + ' (' + msg('VAS_105_CustomerMaster') + ')');
+                .text(msg('EMail') + ' (' + msg('VAS_105_CustomerMaster') + ')');
         }
 
         // Opens the standard VIS Email compose window pre-addressed to a contact
@@ -3206,7 +3355,7 @@
             c.show();
             email.initializeComponent();
             email.getRoot().find('.vis-awindow-header p').first()
-                .text(VIS.Msg.getMsg('EMail') + ' (' + msg('VAS_105_CustomerMaster') + ')');
+                .text(msg('EMail') + ' (' + msg('VAS_105_CustomerMaster') + ')');
         }
 
         function openEngagementEmailReply(emailId) {
@@ -3226,7 +3375,7 @@
                 c.show();
                 email.initializeComponent();
                 email.getRoot().find('.vis-awindow-header p').first()
-                    .text(VIS.Msg.getMsg('EMail') + ' (' + msg('VAS_105_CustomerMaster') + ')');
+                    .text(msg('EMail') + ' (' + msg('VAS_105_CustomerMaster') + ')');
             });
         }
 
@@ -3879,6 +4028,7 @@
 
         // ── Initialize ────────────────────────────────────────────────────────
         this.Initialize = function () {
+            loadMessages();
             widgetID = (this.widgetInfo && this.widgetInfo.AD_UserHomeWidgetID)
                 ? this.widgetInfo.AD_UserHomeWidgetID
                 : ($self.windowNo || 0);
@@ -3899,7 +4049,7 @@
                           '<span class="vas_105_acct-modal__title" id="vas_105_mtitle_' + wid + '"></span>' +
                           '<span class="vas_105_acct-modal__meta"  id="vas_105_mmeta_'  + wid + '"></span>' +
                         '</div>' +
-                        '<button class="vas_105_acct-iconbtn" id="vas_105_mclose_' + wid + '" aria-label="Close dialog">' +
+                        '<button class="vas_105_acct-iconbtn" id="vas_105_mclose_' + wid + '" aria-label="' + esc(msg('VAS_105_CloseDialog', 'Close dialog')) + '">' +
                           '<i class="ti ti-x" style="font-size:1.25em;"></i>' +
                         '</button>' +
                       '</div>' +

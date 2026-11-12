@@ -111,8 +111,49 @@
             { key: 'D61_90', labelKey: 'VAS_140_D6190', labelText: '61–90d', color: '#0083DA' }
         ];
 
+        var translatedTexts = null;
+
+        /** Loads every message key used by this widget in one VIS.Msg.translate call. */
+        function loadMessages() {
+            var elements = [
+                'Loading',
+                'VAS_140_ContractsExpiring',
+                'VAS_140_Next90Days',
+                'VAS_140_HighValue',
+                'VAS_140_HighValueLink',
+                'VAS_140_Expiring',
+                'VAS_140_Value',
+                'VAS_140_Le30',
+                'VAS_140_D3160',
+                'VAS_140_D6190',
+                'VAS_140_Of',
+                'VAS_140_Showing',
+                'VAS_140_PrevPage',
+                'VAS_140_NextPage',
+                'VAS_140_NoContracts',
+                'VAS_140_UnableToLoad',
+                'VAS_140_Retry',
+                'VAS_140_Close',
+                'VAS_140_HighValueTitle',
+                'VAS_140_All90Title',
+                'VAS_140_RenewalA',
+                'VAS_140_RenewalM',
+                'VAS_140_NoOwner',
+                'VAS_140_Days'
+            ];
+            try {
+                translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {};
+            } catch (e) {
+                translatedTexts = {};
+            }
+        }
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            if (translatedTexts === null) { loadMessages(); }
+            var v = translatedTexts ? translatedTexts[key] : null;
+            if (v == null || v === '' || v === key || String(v).charAt(0) === '[') {
+                return fallback == null ? key : fallback;
+            }
+            return v;
         }
         function escapeHtml(value) {
             if (value == null) { return ''; }
@@ -131,6 +172,25 @@
             if (!isFinite(n)) { n = 0; }
             return Math.round(n).toLocaleString(window.navigator.language);
         }
+        // Currency symbol placement for the browser locale: returns { symbol, before, space }.
+        // With no ISO available the server-supplied symbol is kept, in front.
+        function currencyAffix(iso, serverSymbol) {
+            var fallback = { symbol: serverSymbol || iso || '', before: true, space: '' };
+            if (!iso) { return fallback; }
+            try {
+                var parts = new Intl.NumberFormat(window.navigator.language, { style: 'currency', currency: iso }).formatToParts(1);
+                var ci = -1, ii = -1, i;
+                for (i = 0; i < parts.length; i++) {
+                    if (parts[i].type === 'currency' && ci < 0) { ci = i; }
+                    if (parts[i].type === 'integer' && ii < 0) { ii = i; }
+                }
+                if (ci < 0) { return fallback; }
+                var before = ii < 0 || ci < ii;
+                var adj = before ? parts[ci + 1] : parts[ci - 1];
+                var space = adj && adj.type === 'literal' ? adj.value : '';
+                return { symbol: parts[ci].value, before: before, space: space };
+            } catch (e) { return fallback; }
+        }
         // Standard precision of the supplied base-currency descriptor, falling back to
         // the session context when the endpoint did not send one.
         function precisionOf(cur) {
@@ -148,8 +208,9 @@
             var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
             var sign = n < 0 ? '-' : '';
             var iso = (cur && cur.iso) || '';
-            var symbol = (cur && (cur.symbol || cur.iso)) || '';
-            return sign + symbol + VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
+            var aff = currencyAffix(iso, cur && cur.symbol);
+            var compact = VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
+            return sign + (aff.before ? aff.symbol + aff.space + compact : compact + aff.space + aff.symbol);
         }
         function renewalLabel(code) {
             // VAS Contract Master uses ATC/MNL; core C_Contract used A/M.
@@ -312,12 +373,12 @@
                left, compact prev · "N of M" · next right. The control stays put
                on a single page with both arrows disabled. */
             var of = label('VAS_140_Of', 'of');
-            var helper = label('VAS_140_Showing', 'Showing') + ' ' + start + '–' + end + ' ' + of + ' ' + formatCount(listTotal);
+            var helper = label('VAS_140_Showing', 'Showing') + ' ' + formatCount(start) + '–' + formatCount(end) + ' ' + of + ' ' + formatCount(listTotal);
             $listPager.html(
                 '<span class="vas140-pglabel">' + escapeHtml(helper) + '</span>' +
                 '<span class="vas140-pgctl">' +
                     '<button type="button" class="vas140-pgbtn" data-dir="prev" aria-label="' + escapeHtml(label('VAS_140_PrevPage', 'Previous page')) + '" ' + (current <= 0 ? 'disabled' : '') + '>' + icon('chevL') + '</button>' +
-                    '<span class="vas140-pgtext">' + escapeHtml((current + 1) + ' ' + of + ' ' + pages) + '</span>' +
+                    '<span class="vas140-pgtext">' + escapeHtml(formatCount(current + 1) + ' ' + of + ' ' + formatCount(pages)) + '</span>' +
                     '<button type="button" class="vas140-pgbtn" data-dir="next" aria-label="' + escapeHtml(label('VAS_140_NextPage', 'Next page')) + '" ' + (current >= pages - 1 ? 'disabled' : '') + '>' + icon('chev') + '</button>' +
                 '</span>'
             );
@@ -398,6 +459,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createListDialog();
             loadBuckets();

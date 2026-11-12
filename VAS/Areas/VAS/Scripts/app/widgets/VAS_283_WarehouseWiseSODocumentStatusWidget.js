@@ -85,6 +85,9 @@
  * 53  | of                                                                    | VAS_283_Of
  * 54  | Showing                                                               | VAS_283_Showing
  * 55  | Search is unavailable right now. Try again in a moment.               | VAS_283_LoadError
+ * 56  | Month                                                                 | VAS_283_Month
+ * 57  | Year                                                                  | VAS_283_Year
+ * 58  | Lines                                                                 | VAS_283_StatLines
  */
 ; VAS = window.VAS || {};
 
@@ -151,8 +154,8 @@
                 $root.find('.vasso-retry').remove();
                 if ($root.css('position') === 'static') { $root.css('position', 'relative'); }
                 var text = '';
-                try { text = VIS.Msg.getMsg('VAS_SO_Retry'); } catch (e) { text = ''; }
-                if (!text || text === 'VAS_SO_Retry') { text = 'Retry'; }
+                try { text = VIS.Msg.translate(VIS.Env.getCtx(), 'VAS_SO_Retry'); } catch (e) { text = ''; }
+                if (!text || text === 'VAS_SO_Retry' || String(text).charAt(0) === '[') { text = 'Retry'; }
                 $('<button type="button" class="vasso-retry"></button>').text(text)
                     .attr('title', text)
                     .on('click', function (e) {
@@ -169,7 +172,6 @@
     var WIDGET_PAGE_SIZE = 7;   // warehouse rows per widget page
     var MAX_ROWS_PER_PAGE = 10;
     var MIN_ROWS_PER_PAGE = 2;
-    var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     var MIN_YEAR = 2024;
     var YEAR_SPAN = 3;
 
@@ -224,12 +226,47 @@
         var cfgStack = [];
         var currentCfg = null;
 
+        // Translated texts, loaded once per widget instance (see loadMessages()).
+        var translatedTexts = null;
+
+        function loadMessages() {
+            var elements = [
+                'VAS_283_Title', 'VAS_283_ColWarehouse', 'VAS_283_ColDrafted', 'VAS_283_ColInProcess',
+                'VAS_283_ColPartlyDelivered', 'VAS_283_ColCompleted', 'VAS_283_ColTotal', 'VAS_283_PrevPage',
+                'VAS_283_NextPage', 'VAS_283_ErrorState', 'VAS_283_ZeroStatePrefix', 'VAS_283_Showing',
+                'VAS_283_Of', 'VAS_283_OpenSosSuffix', 'VAS_283_Back', 'VAS_283_Close', 'VAS_283_LoadError',
+                'VAS_283_SubtitlePrefix', 'VAS_283_StatTotalSos', 'VAS_283_SectionHeading', 'VAS_283_ColSoNo',
+                'VAS_283_SoDate', 'VAS_283_Customer', 'VAS_283_Representative', 'VAS_283_ColValue',
+                'VAS_283_ColDelivery', 'VAS_283_ColStatus', 'VAS_283_DeliveryFull', 'VAS_283_LinePartial',
+                'VAS_283_LineInProcess', 'VAS_283_DatePromised', 'VAS_283_SoValue', 'VAS_283_ShipFrom',
+                'VAS_283_DeliveryMode', 'VAS_283_DocumentStatus', 'VAS_283_DeliveryStatus',
+                'VAS_283_SalesOrderLines', 'VAS_283_LinesSuffix', 'VAS_283_QtyOrderedSuffix',
+                'VAS_283_QtyShortSuffix', 'VAS_283_SalesOrderPrefix', 'VAS_283_ColLine', 'VAS_283_ColOrdered',
+                'VAS_283_ColPending', 'VAS_283_ColProduct', 'VAS_283_ColAttribute', 'VAS_283_ColUom',
+                'VAS_283_ColDelivered', 'VAS_283_ColInStock', 'VAS_283_ColRate', 'VAS_283_ColAmount',
+                'VAS_283_ColLineStatus', 'VAS_283_Month', 'VAS_283_Year', 'VAS_283_StatLines'
+            ];
+            try { translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {}; }
+            catch (e) { translatedTexts = {}; }
+        }
+
         // Never render a raw "[KEY]": fall back to the English text when the key is missing.
         function label(key, fallback) {
-            var text = '';
-            try { text = VIS.Msg.getMsg(key); } catch (e) { text = ''; }
-            if (!text || text === key || text === '[' + key + ']') { return fallback || key; }
+            if (translatedTexts === null) { loadMessages(); }
+            var text = translatedTexts ? translatedTexts[key] : '';
+            if (!text || text === key || String(text).charAt(0) === '[') { return fallback || key; }
             return text;
+        }
+
+        /* Browser-culture formatting (window.navigator.language). */
+        function fmtDate(d, opts) {
+            try { return new Intl.DateTimeFormat(window.navigator.language, opts).format(d); } catch (e) { return ''; }
+        }
+
+        function fmtNumber(n, minFrac, maxFrac) {
+            try {
+                return Number(n).toLocaleString(window.navigator.language, { minimumFractionDigits: minFrac, maximumFractionDigits: maxFrac });
+            } catch (e) { return String(n); }
         }
 
         function escapeHtml(value) {
@@ -366,8 +403,8 @@
             $htxt.append('<p class="vas283-title">' + escapeHtml(label('VAS_283_Title', 'Warehouse Wise SO · Document Status')) + '</p>');
 
             var $filter = $('<div class="vas283-mfilter"></div>');
-            $monthSel = $('<select class="vas283-msel" aria-label="Month"></select>');
-            $yearSel = $('<select class="vas283-msel" aria-label="Year"></select>');
+            $monthSel = $('<select class="vas283-msel" aria-label="' + escapeHtml(label('VAS_283_Month', 'Month')) + '"></select>');
+            $yearSel = $('<select class="vas283-msel" aria-label="' + escapeHtml(label('VAS_283_Year', 'Year')) + '"></select>');
             fillMonthSelect($monthSel);
             fillYearSelect($yearSel);
             $filter.append($monthSel, $yearSel);
@@ -1089,6 +1126,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createModal();
             bindDocumentLevelEvents();

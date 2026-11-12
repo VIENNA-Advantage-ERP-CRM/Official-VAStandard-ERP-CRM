@@ -136,8 +136,8 @@
                 $root.find('.vasso-retry').remove();
                 if ($root.css('position') === 'static') { $root.css('position', 'relative'); }
                 var text = '';
-                try { text = VIS.Msg.getMsg('VAS_SO_Retry'); } catch (e) { text = ''; }
-                if (!text || text === 'VAS_SO_Retry' || text === '[VAS_SO_Retry]') { text = 'Retry'; }
+                try { text = VIS.Msg.translate(VIS.Env.getCtx(), 'VAS_SO_Retry'); } catch (e) { text = ''; }
+                if (!text || typeof text !== 'string' || text === 'VAS_SO_Retry' || text.charAt(0) === '[') { text = 'Retry'; }
                 $('<button type="button" class="vasso-retry"></button>').text(text)
                     .attr('title', text)
                     .on('click', function (e) {
@@ -200,8 +200,32 @@
         var tileState = { rows: [], page: 0, size: 3 }; // preview rows on the tile
         var zoomWindowId = 0; // VAS163 2026-11-11: Row 114 - resolved Sales Order window id
 
+        var translatedTexts = null;   // message-key -> translated text (see loadMessages)
+
+        // Every message key used by this widget, translated in ONE call.
+        function loadMessages() {
+            var elements = [
+                'VAS_279_Title', 'VAS_279_SubtitlePrefix', 'VAS_279_Next7Suffix', 'VAS_279_ZeroStateMetaPrefix',
+                'VAS_279_ZeroStateList', 'VAS_279_ErrorState', 'VAS_279_Customer', 'VAS_279_SoDate', 'VAS_279_DatePromised',
+                'VAS_279_SoValue', 'VAS_279_ShipFrom', 'VAS_279_DeliveryMode', 'VAS_279_DocumentStatus',
+                'VAS_279_DeliveryStatus', 'VAS_279_SalesOrderLines', 'VAS_279_ColLine', 'VAS_279_ColProduct',
+                'VAS_279_ColAttribute', 'VAS_279_ColUom', 'VAS_279_ColOrdered', 'VAS_279_ColDelivered', 'VAS_279_ColPending',
+                'VAS_279_ColInStock', 'VAS_279_ColRate', 'VAS_279_ColAmount', 'VAS_279_ColLineStatus',
+                'VAS_279_DeliveryFull', 'VAS_279_LinePartial', 'VAS_279_LineInProcess', 'VAS_279_LinesSuffix',
+                'VAS_279_QtyOrderedSuffix', 'VAS_279_QtyShortSuffix', 'VAS_279_Close', 'VAS_279_PrevPage',
+                'VAS_279_NextPage', 'VAS_279_Of', 'VAS_279_Showing', 'VAS_279_LoadError', 'VAS_279_OverdueTag'
+            ];
+            try { translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true) || {}; }
+            catch (e) { translatedTexts = {}; }
+        }
+
         function label(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            if (translatedTexts === null) { loadMessages(); }
+            var text = translatedTexts[key];
+            if (text === undefined || text === null || typeof text !== 'string' || text === '' || text === key || text.charAt(0) === '[') {
+                return fallback;
+            }
+            return text;
         }
 
         /* Sr 8.31b: the "Overdue" tag showed its raw key in brackets ("[VAS_279_OverdueTag]")
@@ -209,8 +233,8 @@
            bare key. A missing message is detected in either form (bare key, or the key
            wrapped in brackets) and the English text is used until the key is added. */
         function messageOr(key, fallback) {
-            var text = '';
-            try { text = VIS.Msg.getMsg(key); } catch (e) { text = ''; }
+            if (translatedTexts === null) { loadMessages(); }
+            var text = translatedTexts[key];
             text = String(text == null ? '' : text).trim();
             if (!text || text === key || text === '[' + key + ']' || /^\[[^\]]*\]$/.test(text)) { return fallback; }
             return text;
@@ -445,7 +469,7 @@
                 return;
             }
 
-            var meta = formatINR(summary.DueThisMonthValue) + ' · ' + formatNum(summary.DueNext7DaysCount) + ' ' + label('VAS_279_Next7Suffix', 'due in the next 7 days');
+            var meta = formatMoney(summary.DueThisMonthValue) + ' · ' + formatNum(summary.DueNext7DaysCount) + ' ' + label('VAS_279_Next7Suffix', 'due in the next 7 days');
             $kpiMeta.attr('title', meta).text(meta);
 
             tileState.rows = summary.Preview || [];
@@ -475,6 +499,7 @@
             var start = tileState.page * tileState.size;
             var slice = rows.slice(start, start + tileState.size);
 
+            var todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
             $list.html(slice.map(function (row) {
                 var meta2 = escapeHtml(firstWord(row.CustomerName)) + ' · ' + escapeHtml(formatDateShort(row.PromisedDate));
                 // A promised date already behind us is flagged so the row is not mistaken for an upcoming delivery.
@@ -492,12 +517,12 @@
                     '<span class="vas279-mval" title="' + escapeHtml(rowValue) + '">' + escapeHtml(rowValue) + '</span></button>';
             }).join(''));
 
-            var showing = label('VAS_279_Showing', 'Showing') + ' ' + (start + 1) + '–' + (start + slice.length) + ' ' + label('VAS_279_Of', 'of') + ' ' + rows.length;
+            var showing = label('VAS_279_Showing', 'Showing') + ' ' + formatNum(start + 1) + '–' + formatNum(start + slice.length) + ' ' + label('VAS_279_Of', 'of') + ' ' + formatNum(rows.length);
             $tileFoot.removeAttr('hidden').html('<span class="vas279-helper" title="' + escapeHtml(showing) + '">' + escapeHtml(showing) + '</span>' +
                 (pages > 1 ?
                     '<span class="vas279-pager">' +
                         '<button type="button" class="vas279-pbtn" data-dir="-1"' + (tileState.page === 0 ? ' disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_279_PrevPage', 'Previous page')) + '">' + icon('prev') + '</button>' +
-                        '<span class="vas279-ptxt">' + (tileState.page + 1) + ' ' + escapeHtml(label('VAS_279_Of', 'of')) + ' ' + pages + '</span>' +
+                        '<span class="vas279-ptxt">' + formatNum(tileState.page + 1) + ' ' + escapeHtml(label('VAS_279_Of', 'of')) + ' ' + formatNum(pages) + '</span>' +
                         '<button type="button" class="vas279-pbtn" data-dir="1"' + (tileState.page >= pages - 1 ? ' disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_279_NextPage', 'Next page')) + '">' + icon('next') + '</button>' +
                     '</span>' : '<span></span>'));
         }
@@ -715,13 +740,13 @@
                 return '<div class="vas279-mrow" style="grid-template-columns:' + tpl + '">' + cells + '</div>';
             }).join('');
 
-            var showingLabel = label('VAS_279_Showing', 'Showing') + ' ' + (lineState.lines.length ? (start + 1) : 0) + '–' + (start + slice.length) + ' ' + label('VAS_279_Of', 'of') + ' ' + lineState.lines.length;
+            var showingLabel = label('VAS_279_Showing', 'Showing') + ' ' + formatNum(lineState.lines.length ? (start + 1) : 0) + '–' + formatNum(start + slice.length) + ' ' + label('VAS_279_Of', 'of') + ' ' + formatNum(lineState.lines.length);
 
             var foot = '<div class="vas279-mtfoot"><span class="vas279-helper">' + escapeHtml(showingLabel) + '</span>' +
                 (pages > 1 ?
                     '<span class="vas279-pager">' +
                         '<button type="button" class="vas279-pbtn" data-dir="-1"' + (lineState.page === 0 ? ' disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_279_PrevPage', 'Previous page')) + '">' + icon('prev') + '</button>' +
-                        '<span class="vas279-ptxt">' + (lineState.page + 1) + ' ' + escapeHtml(label('VAS_279_Of', 'of')) + ' ' + pages + '</span>' +
+                        '<span class="vas279-ptxt">' + formatNum(lineState.page + 1) + ' ' + escapeHtml(label('VAS_279_Of', 'of')) + ' ' + formatNum(pages) + '</span>' +
                         '<button type="button" class="vas279-pbtn" data-dir="1"' + (lineState.page >= pages - 1 ? ' disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_279_NextPage', 'Next page')) + '">' + icon('next') + '</button>' +
                     '</span>' : '<span></span>') +
             '</div>';
@@ -760,6 +785,7 @@
         }
 
         this.Initalize = function () {
+            loadMessages();
             createWidget();
             createModal();
             bindDocumentLevelEvents();
