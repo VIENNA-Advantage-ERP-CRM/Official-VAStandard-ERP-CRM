@@ -824,6 +824,10 @@
                     try {
                         // Controller double-serialises: jQuery parses outer JSON, we parse inner.
                         var res = (typeof raw === "string") ? JSON.parse(raw) : raw;
+                        // Reload of the SAME opportunity page (e.g. after a header save): keep
+                        // the unsaved panel work. Capture the previous lines before rebuild.
+                        var prevLines  = (parent && res && +parent.VAS_Opportunity_ID === +res.VAS_Opportunity_ID
+                                          && (reqPage + 1) === linePage) ? lines : null;
                         parent         = res || null;
                         var cols       = (parent && parent.Columns) || [];
                         columnMeta     = [];
@@ -835,6 +839,7 @@
                         lines          = [];
                         var rows       = (parent && parent.Lines) || [];
                         for (var i = 0; i < rows.length; i++) lines.push(fromServerRow(rows[i]));
+                        if (prevLines) lines = mergeReloadedLines(prevLines, lines);
                         renderAll();
                     } catch (e) {
                         if (VIS && VIS.log) VIS.log.severe("VAS_218 fetchData parse error: " + e);
@@ -846,6 +851,45 @@
                     showToast(msg("VAS_218_LoadError"), true);
                 }
             });
+        }
+
+        /**
+         * True when the fresh server copy of a line differs from the snapshot taken when the
+         * panel last loaded/saved it, i.e. the line was changed on the server meanwhile.
+         */
+        function serverChangedSince(fresh, old) {
+            if (!old || !old._saved) return false;
+            var a = fresh.values, b = old._saved.values;
+            for (var k in a) {
+                if (!a.hasOwnProperty(k)) continue;
+                var x = a[k], y = b[k];
+                if ((x == null || x === "") && (y == null || y === "")) continue;
+                if (String(x) !== String(y)) return true;
+            }
+            return false;
+        }
+
+        /**
+         * Merges a server reload of the same opportunity with the panel's unsaved work:
+         * new unsaved lines are kept; a saved line edited in the panel keeps the panel edit
+         * when the server copy is unchanged, and takes the server copy when it changed.
+         * @param {Array} prev  - lines held by the panel before the reload
+         * @param {Array} fresh - lines built from the server response
+         * @returns {Array}
+         */
+        function mergeReloadedLines(prev, fresh) {
+            var dirtyById = {}, newKeep = [];
+            for (var i = 0; i < prev.length; i++) {
+                var id = prev[i].values.VAS_OppLines_ID || 0;
+                if (!id) newKeep.push(prev[i]);
+                else if (prev[i]._dirty) dirtyById[id] = prev[i];
+            }
+            var merged = [];
+            for (var j = 0; j < fresh.length; j++) {
+                var old = dirtyById[fresh[j].values.VAS_OppLines_ID];
+                merged.push((old && !serverChangedSince(fresh[j], old)) ? old : fresh[j]);
+            }
+            return newKeep.concat(merged);
         }
 
         /**
@@ -1270,9 +1314,12 @@
          * cannot override it and flash an empty panel on new/unsaved records.
          * @param {boolean} show
          */
-        function applyTabVisibility(show) {
+        function applyTabVisibility(show, blankNew) {
             if (!$self || !$self.length) return;
             $self.toggleClass("vas-ol-tab-hidden", !show);
+            // New unsaved record (mirrors VAS_107): panel stays visible but blank,
+            // with the line actions hidden until the record is saved.
+            $self.find(".vas-ol-panel__actions").toggle(!blankNew);
             // Hide the framework title bar (immediate previous sibling) permanently —
             // the panel has its own "Opportunity Lines" header.
             var $head = $self.prev(".vis-ad-w-p-ap-tp-body-head");
@@ -3174,11 +3221,14 @@
                         for (var s = 0; s < serverRows.length; s++) {
                             var sr  = serverRows[s];
                             var sid = parseInt(sr.VAS_OppLines_ID || sr.vas_opplines_id, 10) || 0;
-                            if (sid && existingById[sid] && existingById[sid]._dirty) {
-                                // Keep the locally-edited version
+                            var freshLine = fromServerRow(sr);
+                            if (sid && existingById[sid] && existingById[sid]._dirty
+                                && !serverChangedSince(freshLine, existingById[sid])) {
+                                // Keep the locally-edited version (server copy unchanged)
                                 newLines.push(existingById[sid]);
                             } else {
-                                newLines.push(fromServerRow(sr));
+                                // Server copy wins when the line changed on the server
+                                newLines.push(freshLine);
                             }
                         }
 
@@ -3735,7 +3785,9 @@
                         showToast(msg("VAS_218_SaveTabChangesFirst"));
                         return;
                     }
-                    this.clear();
+                    // Pass true when a row exists but the record has no DB ID yet (new
+                    // unsaved record) so the bottom panel still shows, blank (VAS_107).
+                    this.clear(selectedRow !== undefined && selectedRow !== null && recordID <= 0);
                     return;
                 }
                 // Normal record navigation — clear the edit-mode flag before loading fresh data
@@ -3761,7 +3813,7 @@
              * always hides; the early return in refreshPanelData handles the case where
              * an existing record's header is in edit mode (panel stays visible).
              */
-            clear: function () {
+            clear: function (isNewRecord) {
                 lines = []; parent = null; activeCell = null; editing = null;
                 _headerEditMode = false;
                 closeCatalog();
@@ -3772,7 +3824,7 @@
                 if ($pager)     $pager.empty().hide();
                 $linesBody = null;
                 $selectAll = null;
-                applyTabVisibility(false);
+                applyTabVisibility(!!isNewRecord, !!isNewRecord);
             }
 
         }; // end return (prototype)
