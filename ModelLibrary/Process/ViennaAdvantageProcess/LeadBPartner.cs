@@ -7,6 +7,7 @@
  * Deepak           09-Dec-2009
  * VAI052           26-Oct-2026   Clear, translatable error messages (VAS_LeadToBP*)
  * VAI052           29-Oct-2026   Reuse existing Prospect (same company name) with its User and Address; completion message tells what was created / reused
+ * VAI052           12-Nov-2026   New parameter M_PriceList_Version_ID - its M_PriceList_ID is set on the Prospect
   ******************************************************/
 using System;
 using System.Collections;
@@ -35,6 +36,8 @@ namespace ViennaAdvantage.Process
         int C_BpID = 0;
         private string _companyName = "";
         private int _bpGroupID = 0;
+        //VAI052-Price List Version chosen in the process dialog (optional)
+        private int _priceListVersionID = 0;
 
         /// <summary>
         /// Prepare
@@ -58,6 +61,10 @@ namespace ViennaAdvantage.Process
                     else if (name.Equals("C_BP_Group_ID"))
                     {
                         _bpGroupID = Util.GetValueOfInt(element.GetParameter());
+                    }
+                    else if (name.Equals("M_PriceList_Version_ID"))
+                    {
+                        _priceListVersionID = Util.GetValueOfInt(element.GetParameter());
                     }
                 }
                 if (_C_Lead_ID == 0 && para.Length > 1)
@@ -134,6 +141,12 @@ namespace ViennaAdvantage.Process
                 throw new Exception(Msg.GetMsg(GetCtx(), "VAS_LeadToBPLeadNotFound") + " ID=" + _C_Lead_ID);
             }
             //
+            //VAI052-Price List Version selected in the process: its M_PriceList_ID (read from M_PriceList_Version)
+            //is handed to the lead, which sets it on the Prospect it creates / reuses (a Customer is left unchanged)
+            if (_priceListVersionID > 0)
+            {
+                lead.ProspectPriceListID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT M_PriceList_ID FROM M_PriceList_Version WHERE M_PriceList_Version_ID=" + _priceListVersionID, null, Get_TrxName()));
+            }
             //VAI052-reuse the Prospect (and its User / Address) that already exists for this company name
             String retValue = lead.CreateBP(true);
             if (retValue != null)

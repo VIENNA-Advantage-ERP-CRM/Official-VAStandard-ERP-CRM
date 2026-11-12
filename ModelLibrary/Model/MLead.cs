@@ -44,6 +44,11 @@ namespace VAdvantage.Model
         private bool _reuseExisting = false;
         #endregion
 
+        #region CreateBP input
+        /** VAI052-Price List (M_PriceList_ID) the calling process wants on the Prospect; 0 = none (the BP Group's Price List is used for a new Prospect) */
+        public int ProspectPriceListID { get; set; }
+        #endregion
+
         #region CreateBP outcome (filled by CreateBP, read by the calling process to build its message)
         /** Existing Prospect found (same company name) and mapped to the Lead */
         public bool BPartnerReused { get; private set; }
@@ -122,7 +127,7 @@ namespace VAdvantage.Model
                         SetC_BPartner_ID(_user.GetC_BPartner_ID());
                         if (GetC_BP_Group_ID() == 0)
                         {
-                            MBPartner bPartner = new MBPartner(GetCtx(), _user.GetC_BPartner_ID(), Get_TrxName());
+                            MBPartner bPartner =  MBPartner.Get(GetCtx(), _user.GetC_BPartner_ID());
                             SetC_BP_Group_ID(bPartner.GetC_BP_Group_ID());
                         }
                     } 
@@ -360,6 +365,21 @@ namespace VAdvantage.Model
         }
 
         /**
+         * 	VAI052 - Put ProspectPriceListID on the already loaded (reused) Prospect held in _bp.
+         *	A newly created Prospect gets it before its single save instead.
+         *	@return error message, null when nothing to do or saved
+         */
+        private string ApplyProspectPriceList()
+        {
+            if (ProspectPriceListID <= 0 || _bp == null || _bp.GetM_PriceList_ID() == ProspectPriceListID)
+                return null;
+            _bp.SetM_PriceList_ID(ProspectPriceListID);
+            if (!_bp.Save())
+                return GetSaveErrorMessage("VAS_LeadCreateBPFailed");
+            return null;
+        }
+
+        /**
          * 	Create BP, Contact, Location from Lead
          *	@param reuseExisting if true, an existing Prospect with the same company name (and its
          *	User and Address matching the Lead) is mapped to the Lead instead of creating a new one.
@@ -394,6 +414,9 @@ namespace VAdvantage.Model
                             _bp = new MBPartner(GetCtx(), _user.GetC_BPartner_ID(), Get_TrxName());
                             BPartnerReused = true;
                             UserReused = true;
+                            string priceListError = ApplyProspectPriceList();
+                            if (priceListError != null)
+                                return priceListError;
                         }
                         return CreateBPLocation();
                     }
@@ -408,6 +431,9 @@ namespace VAdvantage.Model
                         _bp = new MBPartner(GetCtx(), existingBPartnerID, Get_TrxName());
                         BPartnerReused = true;
                         log.Info("Existing Prospect found for company name '" + GetBPName() + "' - " + _bp);
+                        string priceListError = ApplyProspectPriceList();
+                        if (priceListError != null)
+                            return priceListError;
                     }
                 }
 
@@ -435,7 +461,8 @@ namespace VAdvantage.Model
                         _bp.SetC_BP_Group_ID(GetC_BP_Group_ID());
                     }
                     MBPGroup gp = new MBPGroup(GetCtx(), GetC_BP_Group_ID(), Get_TrxName());
-                    _bp.SetM_PriceList_ID(gp.GetM_PriceList_ID());
+                    //VAI052-Price List chosen by the calling process wins over the BP Group's (saved once, with the new Prospect)
+                    _bp.SetM_PriceList_ID(ProspectPriceListID > 0 ? ProspectPriceListID : gp.GetM_PriceList_ID());
                     if (GetC_BP_Size_ID() != 0)
                         _bp.SetC_BP_Size_ID(GetC_BP_Size_ID());
                     if (GetURL() != null)
