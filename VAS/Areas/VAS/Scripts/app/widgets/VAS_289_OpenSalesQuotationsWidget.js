@@ -374,7 +374,8 @@
 
         function formatQty(value, precision) {
             var p = Math.max(0, Math.min(10, Number(precision) || 0));
-            return fmtNumber(roundTo(value, p), 0, p);
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            return roundTo(value, p).toLocaleString(window.navigator.language, { minimumFractionDigits: 0, maximumFractionDigits: p });
         }
 
         /* QA 8.75: rate with exactly two decimals. This is the machine-format value of the native
@@ -416,84 +417,55 @@
             return '';
         }
 
-        /* Currency of the order being converted: the quotation's currency, replaced by the
-           selected price list's currency on the Details step. Resolved to the ISO code through
-           the currency list the server sends with the order-form options ('' until loaded). */
-        function activeCurrency() {
-            if (!wizard) { return null; }
-            var id = (wizard.header && wizard.header.currencyId) ||
-                (wizard.formDefaults && wizard.formDefaults.CurrencyId) ||
-                (wizard.quotation && wizard.quotation.CurrencyId) || 0;
-            var list = (wizard.formOptions && wizard.formOptions.Currencies) || [];
-            return list.filter(function (c) { return c.Id === id; })[0] || null;
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        // The SO-to-be's currency (header, else the form defaults = quotation price list's
+        // currency) from GetOrderFormDefaults' Currencies list; {} when not known yet.
+        function wizardCurrency() {
+            if (!wizard) { return {}; }
+            var id = (wizard.header && wizard.header.currencyId) || (wizard.formDefaults && wizard.formDefaults.CurrencyId);
+            return ((wizard.formOptions && wizard.formOptions.Currencies) || []).filter(function (x) { return x.Id === id; })[0] || {};
         }
 
-        /* Puts the currency symbol on the side (and with the spacing) the browser culture uses for
-           that currency. Without an ISO code the symbol the server supplied goes in front; without
-           either, the plain number is returned. */
-        function withCurrencySymbol(text, cur) {
-            var iso = cur ? cur.Code : '';
-            var symbol = cur ? (cur.Symbol || '') : '';
-            var before = true, gap = '';
-            if (iso) {
-                try {
-                    var parts = new Intl.NumberFormat(window.navigator.language, { style: 'currency', currency: iso }).formatToParts(1);
-                    var ci = -1, ii = -1;
-                    parts.forEach(function (p, i) {
-                        if (p.type === 'currency' && ci < 0) { ci = i; }
-                        if (p.type === 'integer' && ii < 0) { ii = i; }
-                    });
-                    if (ci >= 0) {
-                        symbol = parts[ci].value;
-                        before = ii < 0 || ci < ii;
-                        var next = before ? parts[ci + 1] : parts[ci - 1];
-                        gap = (next && next.type === 'literal') ? next.value : '';
-                    }
-                } catch (e) { /* keep the server-supplied symbol */ }
-            }
-            if (!symbol) { return text; }
-            return before ? symbol + gap + text : text + gap + symbol;
-        }
-
-        function formatMoneyCompact(value) {
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        function formatINR(value) {
+            var cur = wizardCurrency();
             var num = Number(value || 0);
-            var cur = activeCurrency();
-            var text;
-            try {
-                var iso = cur ? cur.Code : '';
-                var compactFrom = VIS.Util.usesIndianNumbering(iso) ? 1e5 : 1e6;
-                text = Math.abs(num) >= compactFrom
-                    ? (num < 0 ? '-' : '') + VIS.Util.formatCompactAmount(Math.abs(num), iso, 2)
-                    : fmtNumber(Math.round(num), 0, 0);
-            } catch (e) { text = fmtNumber(Math.round(num), 0, 0); }
-            return withCurrencySymbol(text, cur);
+            var sym = String(cur.Symbol || cur.Code || '').trim();
+            var text = (num < 0 ? '-' : '') + VIS.Util.formatCompactAmount(Math.abs(num), cur.Code || '');
+            return sym ? sym + ' ' + text : text;
         }
 
         function formatNum(value) {
             return Math.round(Number(value || 0) * 100) / 100;
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatNumDisplay(value) {
             var n = Number(value || 0);
-            return fmtNumber(Math.round(n * 100) / 100, 0, 2);
+            return (Math.round(n * 100) / 100).toLocaleString(window.navigator.language);
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        // yyyy-MM-dd parsed by parts (local date, no UTC shift).
         function parseIso(iso) {
-            if (!iso) { return null; }
-            var d = new Date(iso + 'T00:00:00');
+            var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+            if (!m) { return null; }
+            var d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
             return isNaN(d.getTime()) ? null : d;
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatDateShort(iso) {
             var d = parseIso(iso);
             if (!d) { return '—'; }
-            return fmtDate(d, { day: '2-digit', month: 'short' }) || '—';
+            return d.toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short' });
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatDateFull(iso) {
             var d = parseIso(iso);
             if (!d) { return '—'; }
-            return fmtDate(d, { day: '2-digit', month: 'short', year: 'numeric' }) || '—';
+            return d.toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' });
         }
 
         function parseResponse(res) {
@@ -1695,15 +1667,11 @@
                 '<span>' + escapeHtml(label('VAS_289_TotalsOrderTotal', 'Order total')) + '</span><b>' + escapeHtml(formatAmount(subtotal + tax)) + '</b>';
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatAmount(value) {
             var code = currencyCode(wizard.header.currencyId);
-            var n = Number(value) || 0;
-            if (code) {
-                try {
-                    return new Intl.NumberFormat(window.navigator.language, { style: 'currency', currency: code, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
-                } catch (e) { /* unknown ISO code - plain number below */ }
-            }
-            return fmtNumber(n, 2, 2);
+            var text = (Number(value) || 0).toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            return code ? code + ' ' + text : text;
         }
 
         /* 5-Nov rows 25/40: the Document Status (Drafted / Completed) of the SO to create is

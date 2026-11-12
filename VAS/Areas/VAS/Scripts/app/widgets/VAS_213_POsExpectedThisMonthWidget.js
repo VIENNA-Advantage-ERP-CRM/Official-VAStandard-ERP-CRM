@@ -133,15 +133,10 @@
         if (!isFinite(val)) { val = 0; }
 
         var p = precision != null ? precision : 2;
-        var sym = curSymbol || curIso || '₹';
+        var sym = curSymbol || curIso || ''; // VAS163 2026-11-10: browser locale (6-Nov retest2).
 
-        if (curIso === 'INR' || sym === '₹') {
-            if (Math.abs(val) >= 1e7) {
-                return sym + ' ' + (val / 1e7).toFixed(2) + ' Cr';
-            }
-            if (Math.abs(val) >= 1e5) {
-                return sym + ' ' + (val / 1e5).toFixed(2) + ' L';
-            }
+        if (Math.abs(val) >= 1e5) {
+            return sym + ' ' + (val < 0 ? '-' : '') + VIS.Util.formatCompactAmount(Math.abs(val), curIso || '', p);
         }
 
         var formatted = val.toLocaleString(window.navigator.language, {
@@ -152,8 +147,16 @@
         return sym ? (sym + ' ' + formatted) : formatted;
     }
 
+    // VAS163 2026-11-10: browser locale (6-Nov retest2). opts default: dd MMM yyyy.
+    function formatIsoDate(iso, opts) {
+        var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+        if (!m) { return ''; }
+        return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+            .toLocaleDateString(window.navigator.language, opts || { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
     var MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    var MONTH_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    var MONTH_FULL =['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
     var ICON_LINES = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>';
     var ICON_BACK = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>';
@@ -195,7 +198,7 @@
             totalOpenPendingPOs: 0,
             targetMonth: currentMonth,
             targetYear: currentYear,
-            baseCurrency: { CurrencyID: 0, CurSymbol: '₹', ISO_Code: 'INR', StdPrecision: 2 },
+            baseCurrency: { CurrencyID: 0, CurSymbol: '', ISO_Code: '', StdPrecision: 2 }, // VAS163 2026-11-10: browser locale (6-Nov retest2).
             records: []
         };
 
@@ -238,7 +241,8 @@
         function getPeriodLabel(m, y) {
             var mIdx = (m >= 1 && m <= 12) ? (m - 1) : (currentMonth - 1);
             var yr = y || currentYear;
-            return MONTH_SHORT[mIdx] + ' ' + yr;
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            return new Date(yr, mIdx, 1).toLocaleDateString(window.navigator.language, { month: 'short', year: 'numeric' });
         }
 
         function createWidgetHtml() {
@@ -394,7 +398,7 @@
                         var p = records[i];
                         var pVal = formatMoney(p.POValue, p.CurrencySymbol, p.CurrencyISO);
                         var vendorShort = p.ShortVendorName || p.VendorName || '—';
-                        var expDateDisplay = p.PromisedDateShort || p.PromisedDateDisplay || p.PromisedDate || '—';
+                        var expDateDisplay = formatIsoDate(p.PromisedDate, { day: '2-digit', month: 'short' }) || '—'; // VAS163 2026-11-10: browser locale (6-Nov retest2).
 
                         html +=
                             '<button type="button" class="vas-213-hrow" data-po-id="' + p.PurchaseOrderID + '" data-po-no="' + esc(p.PurchaseOrderNo) + '" title="' + esc(lbl('VAS_PurchaseOrder', 'Purchase order') + ' ' + p.PurchaseOrderNo) + '">' +
@@ -751,7 +755,7 @@
                 return [
                     { icon: p.PurchaseOrderNo, id: p.PurchaseOrderID },
                     { link: p.PurchaseOrderNo, id: p.PurchaseOrderID },
-                    p.OrderDateDisplay || p.OrderDate,
+                    formatIsoDate(p.OrderDate), // VAS163 2026-11-10: browser locale (6-Nov retest2).
                     p.VendorName,
                     p.WarehouseName || '—',
                     p.RepresentativeName || '—',
@@ -781,7 +785,7 @@
         function openLinesModal(poId, poNo) {
             var po = (widgetData.records || []).find(function (r) { return r.PurchaseOrderID === poId; });
             var vendor = po ? po.VendorName : '';
-            var dateDisplay = po ? (po.OrderDateDisplay || po.OrderDate) : '';
+            var dateDisplay = po ? formatIsoDate(po.OrderDate) : ''; // VAS163 2026-11-10: browser locale (6-Nov retest2).
             var docStatusDisplay = po ? po.DocStatusText : '';
 
             showBusy(true);
@@ -859,7 +863,7 @@
                         '<div class="vas-213-polink">' +
                             esc(lbl('VAS_PurchaseOrder', 'Purchase order')) + ' ' +
                             '<button type="button" class="vas-213-lnk" data-po-id="' + poId + '" data-po-no="' + esc(poNo) + '">' + esc(poNo) + '</button>' +
-                            ' · ' + esc(dateDisplay || data.orderDateFormatted) + ' · ' + esc(docStatusDisplay || data.documentStatus) +
+                            ' · ' + esc(dateDisplay || formatIsoDate(data.orderDateIso)) + ' · ' + esc(docStatusDisplay || data.documentStatus) +
                         '</div>';
 
                     var bodyHtml =
@@ -872,7 +876,7 @@
                         child: true,
                         size: 'md',
                         title: lbl('VAS_Lines', 'Lines') + ' · ' + poNo,
-                        subtitle: (vendor || data.vendorName) + ' · ' + (dateDisplay || data.orderDateFormatted) + ' · ' + (data.deliveryStatus || lbl('VAS_Pending', 'Pending')),
+                        subtitle: (vendor || data.vendorName) + ' · ' + (dateDisplay || formatIsoDate(data.orderDateIso)) + ' · ' + (data.deliveryStatus || lbl('VAS_Pending', 'Pending')),
                         body: bodyHtml,
                         foot: '<span class="vas-213-foot-note">' + esc(poNo) + ' · ' + esc(vendor || data.vendorName) + '</span>' +
                               '<span><button type="button" class="vas-213-btn" data-vas-close="1">' + esc(lbl('VAS_Close', 'Close')) + '</button></span>'
@@ -912,18 +916,21 @@
                             var lData = parseResponse(resLines);
                             var lines = lData.lines || [];
 
-                            var curSym = header.CurrencySymbol || lData.currencySymbol || '₹';
-                            var curIso = header.CurrencyISO || lData.currencyIso || 'INR';
+                            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+                            var curIso = header.CurrencyISO || lData.currencyIso || '';
+                            var curSym = header.CurrencySymbol || lData.currencySymbol || curIso || '';
                             var precision = header.StdPrecision != null ? header.StdPrecision : (lData.stdPrecision || 2);
                             var valFormatted = formatMoney(header.GrandTotal || lData.totalAmount, curSym, curIso, precision);
+                            var hdrOrderDate = formatIsoDate(header.OrderDate) || formatIsoDate(lData.orderDateIso);
+                            var hdrCreatedOn = formatIsoDate(header.CreatedOnIso);
 
                             var statStrip = mstatsHtml([
                                 { l: lbl('VAS_Vendor', 'Vendor'), v: header.VendorName || lData.vendorName || '—' },
-                                { l: lbl('VAS_PODate', 'PO date'), v: header.OrderDateDisplay || lData.orderDateFormatted || '—' },
-                                { l: lbl('VAS_ExpectedOn', 'Expected on'), v: header.PromisedDateDisplay || lData.promisedDateFormatted || '—' },
+                                { l: lbl('VAS_PODate', 'PO date'), v: hdrOrderDate || '—' },
+                                { l: lbl('VAS_ExpectedOn', 'Expected on'), v: formatIsoDate(header.PromisedDate) || formatIsoDate(lData.promisedDateIso) || '—' },
                                 { l: lbl('VAS_POValue', 'PO value'), v: valFormatted },
                                 { l: lbl('VAS_Warehouse', 'Warehouse'), v: header.WarehouseName || lData.warehouseName || '—' },
-                                { l: lbl('VAS_CreatedBy', 'Created by'), v: (header.CreatedBy || '—') + (header.CreatedOn ? (' · ' + header.CreatedOn) : '') },
+                                { l: lbl('VAS_CreatedBy', 'Created by'), v: (header.CreatedBy || '—') + (hdrCreatedOn ? (' · ' + hdrCreatedOn) : '') },
                                 { l: lbl('VAS_DocumentStatus', 'Document status'), v: header.DocStatusDisplay || lData.documentStatus || '—' },
                                 { l: lbl('VAS_DeliveryStatus', 'Delivery status'), v: lData.deliveryStatus || lbl('VAS_Pending', 'Pending') }
                             ]);
@@ -982,7 +989,7 @@
                             openModal({
                                 child: true,
                                 title: header.PurchaseOrderNo || poNo,
-                                subtitle: (header.VendorName || lData.vendorName || '') + ' · ' + (header.OrderDateDisplay || lData.orderDateFormatted || '') + ' · ' + (header.DocStatusDisplay || lData.documentStatus || ''),
+                                subtitle: (header.VendorName || lData.vendorName || '') + ' · ' + (hdrOrderDate || '') + ' · ' + (header.DocStatusDisplay || lData.documentStatus || ''),
                                 body: bodyHtml,
                                 foot: '<span class="vas-213-foot-note">' + lines.length + ' ' + esc(lbl('VAS_Lines', 'lines')) + ' · ' + formatNumber(totalOrd) + ' ' + esc(lbl('VAS_QtyOrdered', 'qty ordered')) + ' · ' + esc(lData.deliveryStatus || lbl('VAS_Pending', 'Pending')) + '</span>' +
                                       '<span><button type="button" class="vas-213-btn vas-213-btn-primary" id="vas201_open_window_btn">' + ICON_OPEN_EXT + ' ' + esc(lbl('VAS_OpenInWindow', 'Open in Window')) + '</button> ' +

@@ -56,6 +56,14 @@
             return Number(value || 0).toLocaleString(window.navigator.language);
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        function formatIsoDate(iso, fallback) {
+            var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+            if (!m) { return fallback || ''; }
+            var d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+            return d.toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short' });
+        }
+
         function escapeHtml(value) {
             return String(value == null ? "" : value)
                 .replace(/&/g, "&amp;")
@@ -227,7 +235,7 @@
                     '<div class="vas-counted-mtd-grid-row vas-counted-mtd-data-row" data-invid="' + Number(r.InventoryId) + '">' +
                     '<div class="vas-counted-mtd-cell vas-counted-mtd-cell-doc" title="' + escapeHtml(r.DocumentNo) + '">' + escapeHtml(r.DocumentNo) + '</div>' +
                     '<div class="vas-counted-mtd-cell" title="' + escapeHtml(r.Warehouse) + '">' + escapeHtml(r.Warehouse) + '</div>' +
-                    '<div class="vas-counted-mtd-cell">' + escapeHtml(r.MovementDate) + '</div>' +
+                    '<div class="vas-counted-mtd-cell">' + escapeHtml(formatIsoDate(r.MovementDateIso, r.MovementDate)) + '</div>' +
                     '<div class="vas-counted-mtd-cell vas-counted-mtd-cell-num">' + formatCount(r.Lines) + '</div>' +
                     '<div class="vas-counted-mtd-cell vas-counted-mtd-cell-num">' + formatCount(r.Products) + '</div>' +
                     '<div class="vas-counted-mtd-cell"><span class="vas-counted-mtd-status-chip">' + escapeHtml(statusLabel(r.DocStatus)) + '</span></div>' +

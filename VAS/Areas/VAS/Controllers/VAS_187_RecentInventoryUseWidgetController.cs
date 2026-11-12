@@ -3,6 +3,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Globalization;
 using System.Web.Mvc;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
@@ -204,6 +205,8 @@ namespace VIS.Controllers
                             inventoryId = Util.GetValueOfInt(dr["M_Inventory_ID"]),
                             documentNo = Util.GetValueOfString(dr["DocumentNo"]),
                             movementDate = Convert.ToDateTime(dr["MovementDate"]).ToString("dd MMM yyyy"),
+                            // VAS163 2026-11-10: browser locale (6-Nov retest2) - client formats this ISO date.
+                            movementDateIso = Convert.ToDateTime(dr["MovementDate"]).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                             docStatus = Util.GetValueOfString(dr["DocStatus"]),
                             orgName = Util.GetValueOfString(dr["OrgName"]),
                             warehouseName = Util.GetValueOfString(dr["WarehouseName"]),

@@ -105,7 +105,9 @@ namespace VAS.Controllers
 
             try
             {
-                string json = JsonConvert.SerializeObject(GetSummaryData(ctx));
+                SummaryResult data = GetSummaryData(ctx);
+                FillBaseCurrency(ctx, data);
+                string json = JsonConvert.SerializeObject(data);
                 return Json(json, JsonRequestBehavior.AllowGet);
             }
             catch (Exception ex)
@@ -182,21 +184,30 @@ namespace VAS.Controllers
         /// </summary>
         private static string BuildBaseOrdersSql()
         {
+            // VAS163 2026-11-11: rows 15/62-68 new cohort. Effective credit level from
+            // C_BPartner.CreditStatusSettingOn ('CL' Location Level -> the order's
+            // C_BPartner_Location, otherwise 'CH' Customer Level -> C_BPartner).
+            // Only SOCreditStatus = 'H' (Credit Hold) and only the CreditValidation
+            // codes that stop the Sales Order: 'A' Stop SO, 'D' Stop All, 'E' Stop SO &
+            // Shipment ('J' Warning on All and the shipment/invoice-only codes B/C/F list
+            // nothing). Those orders cannot be completed, so the cohort is now the
+            // Drafted orders only ('DR'), as the 11-Nov sheet rows 63-65 specify.
+            // Credit_Level / Bpartner_Location_Id let the list compute Outstanding and
+            // Overdue invoices for the row's own customer or location.
             return @"
                 SELECT o.C_Order_ID AS C_Order_ID,
                        o.DocumentNo AS Document_No,
                        o.DateOrdered AS Date_Ordered,
                        o.C_BPartner_ID AS Bpartner_Id,
+                       o.C_BPartner_Location_ID AS Bpartner_Location_Id,
                        o.TotalLines AS Order_Value,
+                       o.C_Currency_ID AS Currency_Id,
                        COALESCE(bp.Name, N'') AS Customer_Name,
+                       CASE WHEN bp.CreditStatusSettingOn = 'CL' THEN 'CL' ELSE 'CH' END AS Credit_Level,
                        CASE
                            WHEN bp.CreditStatusSettingOn = 'CL' THEN COALESCE(bpl.SO_CreditLimit, 0)
                            ELSE COALESCE(bp.SO_CreditLimit, 0)
                        END AS Credit_Limit,
-                       CASE
-                           WHEN bp.CreditStatusSettingOn = 'CL' THEN COALESCE(bpl.TotalOpenBalance, bpl.SO_CreditUsed, 0)
-                           ELSE COALESCE(bp.TotalOpenBalance, bp.SO_CreditUsed, 0)
-                       END AS Outstanding,
                        CASE WHEN COALESCE(pt.VA009_Advance, 'N') = 'Y' THEN 'Y' ELSE 'N' END AS Advance_Term_Flag
                   FROM C_Order o
                   INNER JOIN C_BPartner bp ON ( bp.C_BPartner_ID = o.C_BPartner_ID )
@@ -207,7 +218,7 @@ namespace VAS.Controllers
                    AND o.IsSOTrx = 'Y'
                    AND COALESCE(o.IsReturnTrx, 'N') = 'N'
                    AND EXISTS (SELECT 1 FROM C_DocType dt WHERE dt.C_DocType_ID = o.C_DocTypeTarget_ID AND dt.DocSubTypeSO IN ('SO', 'WR', 'BO'))
-                   AND o.DocStatus = 'CO'
+                   AND o.DocStatus = 'DR'
                    AND (
                          CASE
                              WHEN bp.CreditStatusSettingOn = 'CL' THEN bpl.SOCreditStatus
@@ -219,7 +230,7 @@ namespace VAS.Controllers
                              WHEN bp.CreditStatusSettingOn = 'CL' THEN bpl.CreditValidation
                              ELSE bp.CreditValidation
                          END
-                       ) IN ('B', 'D', 'E', 'F')";
+                       ) IN ('A', 'D', 'E')";
         }
 
         private SummaryResult GetSummaryData(Ctx ctx)
@@ -285,13 +296,29 @@ namespace VAS.Controllers
             // AR invoice (completed/closed, non-return, VA009_OpenAmount > 0) whose due
             // date - the earliest UNPAID schedule (VA009_IsPaid='N'), else the invoice's
             // DueDate, else DateInvoiced - is before today. Count + open amount are returned.
+            // VAS163 2026-11-11: rows 15/62-68 Outstanding / Overdue invoices / Hold reason
+            // are now computed for the row's OWN effective credit level: Customer level
+            // -> all open AR invoices of the order's customer; Location level -> only
+            // the open AR invoices of the order's C_BPartner_Location. Outstanding is
+            // the open AR invoice amount (VA009_OpenAmount) of that customer/location
+            // converted to the base (accounting-schema) currency, the overdue amount the
+            // same for invoices past due. (It used to be the customer header's
+            // TotalOpenBalance even for location-level customers, so every row of a
+            // customer repeated the same customer-level figures.)
+            int baseCurrencyId = GetBaseCurrencyId(ctx);
+
             string sql = @"
                 WITH base_orders AS (" + baseOrdersSql + @"),
                 open_inv AS (
                     SELECT
                         i.C_Invoice_ID AS C_Invoice_ID,
                         i.C_BPartner_ID AS C_BPartner_ID,
-                        COALESCE(i.VA009_OpenAmount, 0) AS Open_Amount,
+                        i.C_BPartner_Location_ID AS C_BPartner_Location_ID,
+                        COALESCE(
+                            CASE
+                                WHEN i.C_Currency_ID = @Base_Currency_ID THEN COALESCE(i.VA009_OpenAmount, 0)
+                                ELSE CurrencyConvert(COALESCE(i.VA009_OpenAmount, 0), i.C_Currency_ID, @Base_Currency_ID, i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID)
+                            END, 0) AS Open_Amount,
                         COALESCE(
                             (SELECT MIN(ips.DueDate)
                                FROM C_InvoicePaySchedule ips
@@ -310,16 +337,28 @@ namespace VAS.Controllers
                        AND COALESCE(i.VA009_OpenAmount, 0) > 0
                        AND i.C_BPartner_ID IN (SELECT bo0.Bpartner_Id FROM base_orders bo0)
                 ),
-                ar_overdue AS (
+                inv_loc AS (
                     SELECT
                         oi.C_BPartner_ID AS C_BPartner_ID,
-                        COUNT(1) AS Overdue_Invoice_Count,
-                        SUM(oi.Open_Amount) AS Overdue_Amount,
+                        oi.C_BPartner_Location_ID AS C_BPartner_Location_ID,
+                        SUM(oi.Open_Amount) AS Open_Amount,
+                        SUM(CASE WHEN oi.Due_Date < @Today THEN 1 ELSE 0 END) AS Overdue_Invoice_Count,
+                        SUM(CASE WHEN oi.Due_Date < @Today THEN oi.Open_Amount ELSE 0 END) AS Overdue_Amount,
                         SUM(CASE WHEN oi.Due_Date <= @Overdue_60_Cutoff THEN 1 ELSE 0 END) AS Overdue_60_Count,
                         SUM(CASE WHEN oi.Due_Date <= @Overdue_30_Cutoff THEN 1 ELSE 0 END) AS Overdue_30_Count
                       FROM open_inv oi
-                     WHERE oi.Due_Date < @Today
-                     GROUP BY oi.C_BPartner_ID
+                     GROUP BY oi.C_BPartner_ID, oi.C_BPartner_Location_ID
+                ),
+                inv_bp AS (
+                    SELECT
+                        il0.C_BPartner_ID AS C_BPartner_ID,
+                        SUM(il0.Open_Amount) AS Open_Amount,
+                        SUM(il0.Overdue_Invoice_Count) AS Overdue_Invoice_Count,
+                        SUM(il0.Overdue_Amount) AS Overdue_Amount,
+                        SUM(il0.Overdue_60_Count) AS Overdue_60_Count,
+                        SUM(il0.Overdue_30_Count) AS Overdue_30_Count
+                      FROM inv_loc il0
+                     GROUP BY il0.C_BPartner_ID
                 ),
                 order_receipt AS (
                     SELECT
@@ -340,18 +379,23 @@ namespace VAS.Controllers
                     bo.Date_Ordered AS Date_Ordered,
                     bo.Customer_Name AS Customer_Name,
                     bo.Credit_Limit AS Credit_Limit,
-                    bo.Outstanding AS Outstanding,
+                    COALESCE(il.Open_Amount, ib.Open_Amount, 0) AS Outstanding,
                     bo.Order_Value AS Order_Value,
+                    cur.CurSymbol AS Currency_Symbol,
+                    cur.ISO_Code AS Currency_Code,
+                    cur.StdPrecision AS Currency_Precision,
                     bo.Advance_Term_Flag AS Advance_Term_Flag,
-                    COALESCE(ao.Overdue_Invoice_Count, 0) AS Overdue_Invoice_Count,
-                    COALESCE(ao.Overdue_Amount, 0) AS Overdue_Amount,
-                    COALESCE(ao.Overdue_60_Count, 0) AS Overdue_60_Count,
-                    COALESCE(ao.Overdue_30_Count, 0) AS Overdue_30_Count,
+                    COALESCE(il.Overdue_Invoice_Count, ib.Overdue_Invoice_Count, 0) AS Overdue_Invoice_Count,
+                    COALESCE(il.Overdue_Amount, ib.Overdue_Amount, 0) AS Overdue_Amount,
+                    COALESCE(il.Overdue_60_Count, ib.Overdue_60_Count, 0) AS Overdue_60_Count,
+                    COALESCE(il.Overdue_30_Count, ib.Overdue_30_Count, 0) AS Overdue_30_Count,
                     COALESCE(rc.Receipt_Count, 0) AS Receipt_Count,
                     COUNT(1) OVER () AS Total_Rows
                   FROM base_orders bo
-                  LEFT OUTER JOIN ar_overdue ao ON ( ao.C_BPartner_ID = bo.Bpartner_Id )
+                  LEFT OUTER JOIN inv_loc il ON ( bo.Credit_Level = 'CL' AND il.C_BPartner_ID = bo.Bpartner_Id AND il.C_BPartner_Location_ID = bo.Bpartner_Location_Id )
+                  LEFT OUTER JOIN inv_bp ib ON ( bo.Credit_Level <> 'CL' AND ib.C_BPartner_ID = bo.Bpartner_Id )
                   LEFT OUTER JOIN order_receipt rc ON ( rc.C_Order_ID = bo.C_Order_ID )
+                  LEFT OUTER JOIN C_Currency cur ON ( cur.C_Currency_ID = bo.Currency_Id )
                  ORDER BY bo.Order_Value DESC, bo.Date_Ordered ASC
                  OFFSET @Row_Offset ROWS FETCH NEXT @Page_Size ROWS ONLY";
 
@@ -363,13 +407,19 @@ namespace VAS.Controllers
                 // (base_orders, open_inv, order_receipt) and ar_overdue references
                 // "@Overdue_60_Cutoff", "@Overdue_30_Cutoff" then "@Today" - every
                 // occurrence needs its own array entry, in that exact order.
+                // VAS163 2026-11-11: positional order after the rows 15/62-68 rework:
+                // base_orders client, open_inv base currency x2 + client, inv_loc
+                // today x2 + 60d + 30d cutoffs, order_receipt client, paging.
                 dr = DB.ExecuteReader(sql, new[]
                 {
                     new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
+                    new SqlParameter("@Base_Currency_ID", baseCurrencyId),
+                    new SqlParameter("@Base_Currency_ID", baseCurrencyId),
                     new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
+                    new SqlParameter("@Today", today),
+                    new SqlParameter("@Today", today),
                     new SqlParameter("@Overdue_60_Cutoff", overdue60Cutoff),
                     new SqlParameter("@Overdue_30_Cutoff", overdue30Cutoff),
-                    new SqlParameter("@Today", today),
                     new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
                     new SqlParameter("@Row_Offset", page * size),
                     new SqlParameter("@Page_Size", size)
@@ -388,6 +438,10 @@ namespace VAS.Controllers
                     int overdueCount = dr["Overdue_Invoice_Count"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr["Overdue_Invoice_Count"]);
                     decimal creditLimit = dr["Credit_Limit"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Credit_Limit"]);
                     decimal outstanding = dr["Outstanding"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Outstanding"]);
+                    // VAS163 2026-11-11: Row 93 - Order value in the document (price list) currency.
+                    string rowCurIso = (Util.GetValueOfString(dr["Currency_Code"]) ?? "").Trim();
+                    string rowCurSymbol = (Util.GetValueOfString(dr["Currency_Symbol"]) ?? "").Trim();
+                    if (string.IsNullOrWhiteSpace(rowCurSymbol)) { rowCurSymbol = rowCurIso; }
 
                     // 5-Nov row 37: the reason now explains WHY the customer's credit status
                     // is Hold, in this priority: (1) the open balance is above the credit
@@ -432,6 +486,9 @@ namespace VAS.Controllers
                         CreditLimit = creditLimit,
                         Outstanding = outstanding,
                         OrderValue = dr["Order_Value"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Order_Value"]),
+                        CurrencySymbol = rowCurSymbol,
+                        CurrencyIso = rowCurIso,
+                        CurrencyPrecision = dr["Currency_Precision"] == DBNull.Value ? 2 : Util.GetValueOfInt(dr["Currency_Precision"]),
                         OverdueInvoiceCount = overdueCount,
                         OverdueAmount = dr["Overdue_Amount"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Overdue_Amount"]),
                         HoldReason = GetText(ctx, holdReasonKey, holdReasonFallback)
@@ -538,7 +595,7 @@ namespace VAS.Controllers
             {
                 deliveryStatusKey = "VAS_275_DeliveryNone"; deliveryStatusFallback = "Not delivered";
             }
-            result.Order.DeliveryStatus = Msg.GetMsg(ctx, deliveryStatusKey) ?? deliveryStatusFallback;
+            result.Order.DeliveryStatus = Msg.GetMsg(ctx, deliveryStatusKey, true) ?? deliveryStatusFallback; // VAS163 2026-11-11: text-only label (3-arg GetMsg, no tip appended)
 
             return result;
         }
@@ -600,7 +657,8 @@ namespace VAS.Controllers
                         QtyOrdered = qtyOrdered,
                         QtyDelivered = qtyDelivered,
                         QtyPending = qtyOrdered - qtyDelivered,
-                        FreeStock = ResolveFreeStock(ctx, productId, warehouseId),
+                        // VAS163 2026-11-11: row 58 In stock never negative - show 0.
+                        FreeStock = Math.Max(0m, ResolveFreeStock(ctx, productId, warehouseId)),
                         Rate = dr["Price_Actual"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Price_Actual"]),
                         Amount = dr["Line_Net_Amt"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Line_Net_Amt"])
                     });
@@ -745,7 +803,7 @@ namespace VAS.Controllers
         /// <summary>Message text for a key, or the English fallback when the key is not released (never a raw "[KEY]").</summary>
         private static string GetText(Ctx ctx, string key, string fallback)
         {
-            string text = Msg.GetMsg(ctx, key);
+            string text = Msg.GetMsg(ctx, key, true); // VAS163 2026-11-11: text-only label (3-arg GetMsg, no tip appended)
             if (string.IsNullOrEmpty(text) || text == key || text == "[" + key + "]") { return fallback; }
             return text;
         }
@@ -757,14 +815,69 @@ namespace VAS.Controllers
             reader.Dispose();
         }
 
+        /// <summary>
+        /// VAS163 2026-11-10: base currency of the login client's primary accounting schema
+        /// (AD_ClientInfo.C_AcctSchema1_ID -> C_AcctSchema.C_Currency_ID, same lookup as
+        /// VAS_205) so the widget labels its amounts with it instead of a hard-coded rupee.
+        /// Left empty (client shows no symbol) when it cannot be resolved.
+        /// </summary>
+        private static void FillBaseCurrency(Ctx ctx, CurrencyPayload target)
+        {
+            if (ctx == null || target == null) { return; }
+            try
+            {
+                DataSet ds = DB.ExecuteDataset(@"
+                    SELECT c.ISO_Code AS Currency_Code, c.CurSymbol AS Currency_Symbol, c.StdPrecision AS Currency_Precision
+                      FROM AD_ClientInfo ci
+                     INNER JOIN C_AcctSchema cs ON ( cs.C_AcctSchema_ID = ci.C_AcctSchema1_ID )
+                     INNER JOIN C_Currency c ON ( c.C_Currency_ID = cs.C_Currency_ID )
+                     WHERE ci.AD_Client_ID = @AD_Client_ID",
+                    new[] { new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()) }, null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) { return; }
+                DataRow r = ds.Tables[0].Rows[0];
+                target.CurrencyIso = (Util.GetValueOfString(r["Currency_Code"]) ?? string.Empty).Trim();
+                target.CurrencySymbol = (Util.GetValueOfString(r["Currency_Symbol"]) ?? string.Empty).Trim();
+                if (r["Currency_Precision"] != DBNull.Value) { target.CurrencyPrecision = Util.GetValueOfInt(r["Currency_Precision"]); }
+            }
+            catch (Exception ex)
+            {
+                Log.Log(Level.WARNING, "FillBaseCurrency", ex);
+            }
+        }
+
+        /// <summary>
+        /// VAS163 2026-11-11: rows 15/62-68 C_Currency_ID of the login client's primary
+        /// accounting schema (same lookup as <see cref="FillBaseCurrency"/>), used to convert
+        /// open invoice amounts. Falls back to the login context currency.
+        /// </summary>
+        private static int GetBaseCurrencyId(Ctx ctx)
+        {
+            int currencyId = Util.GetValueOfInt(DB.ExecuteScalar(@"
+                SELECT cs.C_Currency_ID
+                  FROM AD_ClientInfo ci
+                 INNER JOIN C_AcctSchema cs ON ( cs.C_AcctSchema_ID = ci.C_AcctSchema1_ID )
+                 WHERE ci.AD_Client_ID = @AD_Client_ID",
+                new[] { new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()) }, null));
+            if (currencyId <= 0) { currencyId = ctx.GetContextAsInt("$C_Currency_ID"); }
+            return currencyId;
+        }
+
+        /// <summary>VAS163 2026-11-10: base (accounting-schema) currency carried by the widget's first payload.</summary>
+        private class CurrencyPayload
+        {
+            public string CurrencyIso { get; set; } = string.Empty;
+            public string CurrencySymbol { get; set; } = string.Empty;
+            public int? CurrencyPrecision { get; set; }
+        }
+
         private JsonResult ErrorResult(Ctx ctx)
         {
-            string message = Msg.GetMsg(ctx, "Error") ?? "Error";
+            string message = Msg.GetMsg(ctx, "Error", true) ?? "Error"; // VAS163 2026-11-11: text-only label (3-arg GetMsg, no tip appended)
             string json = JsonConvert.SerializeObject(new { Error = message });
             return Json(json, JsonRequestBehavior.AllowGet);
         }
 
-        private class SummaryResult
+        private class SummaryResult : CurrencyPayload
         {
             public int HeldCount { get; set; }
             public decimal BlockedValue { get; set; }
@@ -787,6 +900,10 @@ namespace VAS.Controllers
             public decimal CreditLimit { get; set; }
             public decimal Outstanding { get; set; }
             public decimal OrderValue { get; set; }
+            /// <summary>VAS163 2026-11-11: Row 93 - document (price list) currency of OrderValue.</summary>
+            public string CurrencySymbol { get; set; }
+            public string CurrencyIso { get; set; }
+            public int CurrencyPrecision { get; set; }
             public int OverdueInvoiceCount { get; set; }
             public decimal OverdueAmount { get; set; }
             public string HoldReason { get; set; }

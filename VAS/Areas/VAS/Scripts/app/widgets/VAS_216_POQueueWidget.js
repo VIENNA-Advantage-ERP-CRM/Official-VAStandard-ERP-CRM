@@ -123,11 +123,9 @@
         var p = precision != null ? precision : 2;
         var sym = curSymbol || curIso || '';
 
-        if (Math.abs(val) >= 10000000) {
-            return (sym ? sym + ' ' : '') + (val / 10000000).toFixed(2) + ' Cr';
-        }
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         if (Math.abs(val) >= 100000) {
-            return (sym ? sym + ' ' : '') + (val / 100000).toFixed(2) + ' L';
+            return (sym ? sym + ' ' : '') + (val < 0 ? '-' : '') + VIS.Util.formatCompactAmount(Math.abs(val), curIso || '', p);
         }
 
         var formatted = val.toLocaleString(window.navigator.language, {
@@ -138,22 +136,26 @@
         return sym ? (sym + ' ' + formatted) : formatted;
     }
 
-    function formatDateShort(dateStr) {
-        if (!dateStr) { return '—'; }
-        var dt = new Date(dateStr);
-        if (isNaN(dt.getTime())) { return dateStr; }
-        var day = ('0' + dt.getDate()).slice(-2);
-        var mName = dt.toLocaleString(window.navigator.language || 'default', { month: 'short' });
-        return day + ' ' + mName;
+    // VAS163 2026-11-10: browser locale (6-Nov retest2). A bare yyyy-MM-dd is parsed by parts (no UTC shift).
+    function parseDateStr(dateStr) {
+        var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateStr));
+        return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(dateStr);
     }
 
+    // VAS163 2026-11-10: browser locale (6-Nov retest2).
+    function formatDateShort(dateStr) {
+        if (!dateStr) { return '—'; }
+        var dt = parseDateStr(dateStr);
+        if (isNaN(dt.getTime())) { return dateStr; }
+        return dt.toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short' });
+    }
+
+    // VAS163 2026-11-10: browser locale (6-Nov retest2).
     function formatDateFull(dateStr) {
         if (!dateStr) { return '—'; }
-        var dt = new Date(dateStr);
+        var dt = parseDateStr(dateStr);
         if (isNaN(dt.getTime())) { return dateStr; }
-        var day = ('0' + dt.getDate()).slice(-2);
-        var mName = dt.toLocaleString(window.navigator.language || 'default', { month: 'short' });
-        return day + ' ' + mName + ' ' + dt.getFullYear();
+        return dt.toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' });
     }
 
     function getDocStatusInfo(docStatus) {

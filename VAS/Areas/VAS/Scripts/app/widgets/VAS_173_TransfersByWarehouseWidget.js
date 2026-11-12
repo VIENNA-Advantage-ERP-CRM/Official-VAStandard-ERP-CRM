@@ -36,15 +36,20 @@
             .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
     }
 
+    // VAS163 2026-11-10: browser locale (6-Nov retest2).
     function monthNames() {
-        return lbl('VAS_173_Months', 'Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec').split(',');
+        var list = [];
+        for (var i = 0; i < 12; i++) { list.push(new Date(2000, i, 1).toLocaleDateString(window.navigator.language, { month: 'short' })); }
+        return list;
     }
 
+    // VAS163 2026-11-10: browser locale (6-Nov retest2).
     function formatDate(iso) {
         if (!iso) { return '—'; }
-        var d = new Date(iso);
+        var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso));
+        var d = m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(iso);
         if (isNaN(d)) { return iso; }
-        return d.getDate() + ' ' + monthNames()[d.getMonth()] + ' ' + d.getFullYear();
+        return d.toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' });
     }
 
 // ===== NEW CODE START — currency format (agent C07, 2026-08-19) =====

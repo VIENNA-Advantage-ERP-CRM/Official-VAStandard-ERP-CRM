@@ -374,7 +374,8 @@
             }
             if ($prevBtn) { $prevBtn.prop('disabled', loading || pageNo <= 1); }
             if ($nextBtn) { $nextBtn.prop('disabled', loading || totalPages <= 1 || pageNo >= totalPages); }
-            if ($footer) { $footer.toggleClass('vas-mrr-hidden', totalRecords <= 0); }
+            // VAS163 2026-11-11: Row 6 the pager footer shows only when the records exceed one page.
+            if ($footer) { $footer.toggleClass('vas-mrr-hidden', totalRecords <= 0 || totalPages <= 1 || totalRecords <= loadedPageSize); }
         }
 
         /* ── Detail modal ── */

@@ -714,7 +714,8 @@ namespace VASLogic.Models
             result.Documents = LoadDocuments(M_InOut_ID);
 
             // ----- Audit trail -----
-            result.Activity = LoadActivity(M_InOut_ID, result.StatusCode);
+            // VAS163 2026-11-10: Activity section commented out (6-Nov retest2, All Right Panels).
+            // result.Activity = LoadActivity(M_InOut_ID, result.StatusCode);
 
             return result;
         }

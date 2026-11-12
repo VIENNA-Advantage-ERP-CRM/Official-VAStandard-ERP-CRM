@@ -104,29 +104,9 @@
             var sign = val < 0 ? '-' : '';
             var sym = currencySymbol || '';
 
-            if (typeof VIS !== 'undefined' && VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
-                var compactStr = VIS.Util.formatCompactAmount(val, currencyIso, 1);
-                return sign + sym + compactStr;
-            }
-
-            if (isIndianIso(currencyIso)) {
-                if (absVal >= 10000000) {
-                    return sign + sym + (absVal / 10000000).toFixed(1) + 'Cr';
-                } else if (absVal >= 100000) {
-                    return sign + sym + (absVal / 100000).toFixed(1) + 'L';
-                } else if (absVal >= 1000) {
-                    return sign + sym + (absVal / 1000).toFixed(1) + 'k';
-                }
-            } else {
-                if (absVal >= 1000000000) {
-                    return sign + sym + (absVal / 1000000000).toFixed(1) + 'B';
-                } else if (absVal >= 1000000) {
-                    return sign + sym + (absVal / 1000000).toFixed(1) + 'M';
-                } else if (absVal >= 1000) {
-                    return sign + sym + (absVal / 1000).toFixed(1) + 'k';
-                }
-            }
-            return sign + sym + absVal.toLocaleString(window.navigator.language);
+            // VAS163 2026-11-10: browser locale (6-Nov retest2). VIS.Util (CurrencyFormat.js) is
+            // bundled in VAS.all.min.js, so the hand-made K/L/Cr fallback was dropped.
+            return sign + sym + VIS.Util.formatCompactAmount(absVal, currencyIso || '', 1);
         }
 
         function formatFullValue(value) {
@@ -166,16 +146,27 @@
             if (v === 0) { return sym + '0'; }
             var sign = v < 0 ? '-' : '';
             var absV = Math.abs(v);
-            if (isIndianIso(currencyIso)) {
-                if (absV >= 10000000) { return sign + sym + Math.round(absV / 10000000) + 'Cr'; }
-                if (absV >= 100000) { return sign + sym + Math.round(absV / 100000) + 'L'; }
-                if (absV >= 1000) { return sign + sym + Math.round(absV / 1000) + 'K'; }
-            } else {
-                if (absV >= 1000000000) { return sign + sym + Math.round(absV / 1000000000) + 'B'; }
-                if (absV >= 1000000) { return sign + sym + Math.round(absV / 1000000) + 'M'; }
-                if (absV >= 1000) { return sign + sym + Math.round(absV / 1000) + 'K'; }
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            return sign + sym + VIS.Util.formatCompactAmount(absV, currencyIso || '', 0);
+        }
+
+        // VAS163 2026-11-10: browser locale (6-Nov retest2). The server sends year/month numbers
+        // (and key "yyyy-MM"); x-axis label and tooltip/popover fullMonth are built here.
+        function applyLocaleMonthLabels(series) {
+            var lang = window.navigator.language;
+            var withYear = series.length === 12;
+            for (var i = 0; i < series.length; i++) {
+                var it = series[i];
+                var y = Number(it.year), m = Number(it.month);
+                if (!y || !m) {
+                    var p = /^(\d{4})-(\d{2})/.exec(String(it.key || ''));
+                    if (!p) { continue; }
+                    y = Number(p[1]); m = Number(p[2]);
+                }
+                var d = new Date(y, m - 1, 1);
+                it.label = d.toLocaleDateString(lang, withYear ? { month: 'short', year: '2-digit' } : { month: 'short' });
+                it.fullMonth = d.toLocaleDateString(lang, { month: 'short', year: 'numeric' });
             }
-            return sign + sym + absV.toLocaleString(window.navigator.language);
         }
 
         // Left (Quantity) axis tick label - whole number, thousands separator.
@@ -275,6 +266,7 @@
 // ===== NEW CODE START — currency format (agent A07, 2026-08-19) =====
                     var data = parseResponse(res);
                     seriesData = data.series || [];
+                    applyLocaleMonthLabels(seriesData);
                     if (data.currency) {
                         currencyIso = data.currency.iso || '';
                         currencySymbol = data.currency.symbol || '';

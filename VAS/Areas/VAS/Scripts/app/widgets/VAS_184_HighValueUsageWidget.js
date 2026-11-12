@@ -81,7 +81,7 @@
         var pageSize = 4;
         var totalPages = 1;
         var isRefitting = false;
-        var currencyInfo = { iso: "INR", symbol: "₹", stdPrecision: 2 };
+        var currencyInfo = { iso: "", symbol: "", stdPrecision: 2 }; // VAS163 2026-11-10: browser locale (6-Nov retest2).
 
         // NOTE (2026-09-17): label/escapeHtml/parseResponse/formatQty/formatINR were called
         // throughout this file but never defined anywhere in it - a pre-existing bug that made
@@ -126,39 +126,18 @@
             var val = Number(value);
             if (isNaN(val) || value === null || value === undefined || value === '') { val = 0; }
 
-            var iso = (currencyInfo && currencyInfo.iso ? currencyInfo.iso : "INR").toUpperCase();
-            var sym = (currencyInfo && currencyInfo.symbol) ? currencyInfo.symbol : (iso || "₹");
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            var iso = (currencyInfo && currencyInfo.iso ? currencyInfo.iso : "").toUpperCase();
+            var sym = (currencyInfo && currencyInfo.symbol) ? currencyInfo.symbol : (iso || "");
             var prec = (currencyInfo && typeof currencyInfo.stdPrecision === 'number') ? currencyInfo.stdPrecision : 2;
             var space = sym.length > 1 ? ' ' : '';
-            var isIndian = ["INR", "PKR", "BDT", "NPR", "BTN", "LKR"].indexOf(iso) !== -1;
             var absVal = Math.abs(val);
 
-            if (isCompact && absVal > 0) {
-                if (isIndian) {
-                    if (absVal >= 10000000) {
-                        return sym + space + (val / 10000000).toFixed(2).replace(/\.?0+$/, '') + ' Cr';
-                    }
-                    if (absVal >= 100000) {
-                        return sym + space + (val / 100000).toFixed(2).replace(/\.?0+$/, '') + ' Lakh';
-                    }
-                    if (absVal >= 1000) {
-                        return sym + space + (val / 1000).toFixed(2).replace(/\.?0+$/, '') + 'k';
-                    }
-                } else {
-                    if (absVal >= 1000000000) {
-                        return sym + space + (val / 1000000000).toFixed(2).replace(/\.?0+$/, '') + 'B';
-                    }
-                    if (absVal >= 1000000) {
-                        return sym + space + (val / 1000000).toFixed(2).replace(/\.?0+$/, '') + 'M';
-                    }
-                    if (absVal >= 1000) {
-                        return sym + space + (val / 1000).toFixed(2).replace(/\.?0+$/, '') + 'k';
-                    }
-                }
+            if (isCompact && absVal >= 1000) {
+                return sym + space + (val < 0 ? '-' : '') + VIS.Util.formatCompactAmount(absVal, iso, prec);
             }
 
-            var locale = isIndian ? 'en-IN' : 'en-US';
-            var numStr = val.toLocaleString(locale, { minimumFractionDigits: 0, maximumFractionDigits: prec });
+            var numStr = val.toLocaleString(window.navigator.language, { minimumFractionDigits: 0, maximumFractionDigits: prec });
             return sym + space + numStr;
         }
 
@@ -178,9 +157,21 @@
 //        }
 // ----- END OLD CODE -----
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatMonthName(m) {
-            var monthNames = label("VAS_184_Months", "Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec").split(',');
-            return monthNames[Math.max(0, Math.min(11, m - 1))];
+            return new Date(2000, Math.max(0, Math.min(11, Number(m) - 1)), 1).toLocaleDateString(window.navigator.language, { month: 'short' });
+        }
+
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        function formatMonthYear(m, y) {
+            return new Date(Number(y), Math.max(0, Math.min(11, Number(m) - 1)), 1).toLocaleDateString(window.navigator.language, { month: 'short', year: 'numeric' });
+        }
+
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        function formatIsoDate(iso, fallback) {
+            var p = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+            if (!p) { return fallback || ''; }
+            return new Date(Number(p[1]), Number(p[2]) - 1, Number(p[3])).toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' });
         }
 
         function showBusy(show) {
@@ -320,7 +311,7 @@
             if (pageNo > totalPages) { pageNo = totalPages; }
 
             if (productsData.length === 0) {
-                $body.html('<div class="vas-hvu-empty">' + escapeHtml(label("VAS_184_NoUsageForPeriod", "No usage for") + ' ' + formatMonthName(selectedMonth) + ' ' + selectedYear + '.') + '</div>');
+                $body.html('<div class="vas-hvu-empty">' + escapeHtml(label("VAS_184_NoUsageForPeriod", "No usage for") + ' ' + formatMonthYear(selectedMonth, selectedYear) + '.') + '</div>');
                 if ($footHelper) { $footHelper.text('0 ' + label("VAS_184_Of", "of") + ' 0'); }
                 if ($pagerText) { $pagerText.text('1 ' + label("VAS_184_Of", "of") + ' 1'); }
                 if ($prevBtn) { $prevBtn.prop('disabled', true); }
@@ -391,7 +382,7 @@
         function openProductIssuesModal(pid, pname, cost, attr, uom, uomId, issuedQty, issuedValue) {
             if ($modal) { $modal.remove(); }
 
-            var monthFull = formatMonthName(selectedMonth) + ' ' + selectedYear;
+            var monthFull = formatMonthYear(selectedMonth, selectedYear);
 
 // ===== NEW CODE START — currency format (agent A06, 2026-08-19) =====
             var mCompactCost = formatMoney(cost, true);
@@ -519,7 +510,7 @@
                             ? '<button type="button" class="vas-hvu-m-doclink" data-invid="' + rec.inventoryId + '">' + escapeHtml(rec.documentNo) + '</button>'
                             : escapeHtml(rec.documentNo)) +
                         '</td>' +
-                        '<td>' + escapeHtml(rec.movementDate) + '</td>' +
+                        '<td>' + escapeHtml(formatIsoDate(rec.movementDateIso, rec.movementDate)) + '</td>' +
                         '<td title="' + escapeHtml(rec.warehouseLoc) + '">' + escapeHtml(rec.warehouseLoc) + '</td>' +
                         '<td>' + escapeHtml(formatQty(rec.qty)) + '</td>' +
                         '<td title="' + escapeHtml(recValFormatted) + '">' + escapeHtml(recValFormatted) + '</td>' +
@@ -649,9 +640,9 @@
             $monthSelect = $card.find('.vas-hvu-m-sel');
             $yearSelect = $card.find('.vas-hvu-y-sel');
 
-            var monthNames = label("VAS_184_Months", "Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec").split(',');
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
             for (var m = 1; m <= 12; m++) {
-                $monthSelect.append('<option value="' + m + '" ' + (m === selectedMonth ? 'selected' : '') + '>' + escapeHtml(monthNames[m - 1]) + '</option>');
+                $monthSelect.append('<option value="' + m + '" ' + (m === selectedMonth ? 'selected' : '') + '>' + escapeHtml(formatMonthName(m)) + '</option>');
             }
 
             var currentYear = DateTimeNowYear();

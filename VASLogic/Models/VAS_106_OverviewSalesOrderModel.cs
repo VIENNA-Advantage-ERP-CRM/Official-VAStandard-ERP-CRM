@@ -576,7 +576,8 @@ namespace VASLogic.Models
             // One flat list for the Documents section, built from the two above
             // plus the receipts allocated to those invoices.
             result.Documents        = LoadDocuments(C_Order_ID, result.Deliveries, result.Invoices);
-            result.Activity         = LoadActivity(C_Order_ID, result.C_BPartner_ID);
+            // VAS163 2026-11-10: Activity section commented out (6-Nov retest2, All Right Panels).
+            // result.Activity         = LoadActivity(C_Order_ID, result.C_BPartner_ID);
             result.Notes            = LoadNotes(C_Order_ID);
             // Frequencies are no longer loaded: they populated the panel's inline
             // contract form, which is gone — the Contract cell is read-only now.

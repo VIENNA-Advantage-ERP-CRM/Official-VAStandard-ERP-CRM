@@ -370,6 +370,10 @@
             var cfg = GROUPS[item.groupKey] || GROUPS[groupName] || GROUPS['Purchase order'];
             var label = msg(cfg.key, cfg.fallback);
             var hasZoom = VIS.Utility.Util.getValueOfInt(item.orderId) > 0;
+            // VAS163 2026-11-10: browser locale (6-Nov retest2). Subtitle date and amount built client-side.
+            var subtitle = (item.documentNo || '') + ' · ' + fmtIsoDate(item.orderDate) + ' · ' + (item.vendorName || '') + ' · ' + (item.statusLabel || '');
+            var amountText = fmtMoney(item.amount, item.currencySymbol, item.currencyCode,
+                (typeof item.currencyPrecision === 'number') ? item.currencyPrecision : 2).trim();
 
             return (
                 '<div class="vas-dssrch-row' + (hasZoom ? '' : ' vas-dssrch-nozoom') + '"' +
@@ -381,10 +385,10 @@
                         '<div class="vas-dssrch-docline">' +
                             '<span class="vas-dssrch-docno" title="' + dsEsc(item.fullTitle || item.title || '') + '">' + dsEsc(item.title || '') + '</span>' +
                         '</div>' +
-                        '<div class="vas-dssrch-title" title="' + dsEsc(item.subtitle || '') + '">' + dsEsc(item.subtitle || '') + '</div>' +
+                        '<div class="vas-dssrch-title" title="' + dsEsc(subtitle) + '">' + dsEsc(subtitle) + '</div>' +
                     '</div>' +
                     '<div class="vas-dssrch-meta">' +
-                        '<div class="vas-dssrch-amount">' + dsEsc(item.value || '') + '</div>' +
+                        '<div class="vas-dssrch-amount">' + dsEsc(amountText) + '</div>' +
                     '</div>' +
                 '</div>'
             );
@@ -471,6 +475,15 @@
             if (!sym && iso) { sym = iso; }
             var prec = (typeof precision === 'number' && precision >= 0) ? precision : 2;
             return sym + ' ' + num.toLocaleString(window.navigator.language, { minimumFractionDigits: 0, maximumFractionDigits: prec });
+        }
+
+
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        function fmtIsoDate(iso) {
+            var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+            if (!m) { return ''; }
+            var d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+            return d.toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' });
         }
 
 
@@ -610,7 +623,7 @@
             $detailModal.find('.vas-203-dtl-title').text(title);
             $detailModal.find('.vas-203-dtl-title').attr('title', title);
             $detailModal.find('.vas-203-dtl-sub').text(
-                (header.vendorName || '—') + ' · ' + (header.orderDateDisplay || '—') + ' · ' + (header.docStatusLabel || ''));
+                (header.vendorName || '—') + ' · ' + (fmtIsoDate(header.orderDate) || '—') /* VAS163 2026-11-10: browser locale (6-Nov retest2). */ + ' · ' + (header.docStatusLabel || ''));
 
             var totalOrdered = 0, totalPending = 0, totalAmount = 0;
             var k, ln;

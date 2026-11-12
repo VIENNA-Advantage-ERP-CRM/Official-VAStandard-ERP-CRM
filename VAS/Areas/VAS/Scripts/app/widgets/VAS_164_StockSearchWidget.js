@@ -77,6 +77,14 @@
             .replace(/'/g, "&#039;");
     }
 
+    // VAS163 2026-11-10: browser locale (6-Nov retest2).
+    function formatIsoDate(iso, fallback) {
+        var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+        if (!m) { return fallback || ''; }
+        var d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+        return d.toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
     function lbl(key) {
         return VIS.Msg.getMsg(key);
     }
@@ -526,7 +534,7 @@
                 var $tr = $(
                     '<tr class="vas-stocksearch-count-row" data-invid="' + Number(c.inventoryId) + '" title="' + esc(lbl("VAS_164_OpenCountDocument")) + '">' +
                     '<td class="loc-code">' + esc(c.documentNo) + '</td>' +
-                    '<td>' + esc(c.movementDate) + '</td>' +
+                    '<td>' + esc(formatIsoDate(c.movementDateIso, c.movementDate)) + '</td>' +
                     '<td class="wh-name" title="' + esc(c.warehouse) + '">' + esc(c.warehouse) + '</td>' +
                     (hasAttribute ? '<td class="attr-val" title="' + esc(attrText) + '">' + esc(attrText) + '</td>' : '') +
                     '<td class="qty-val">' + esc(Number(c.qtyBook || 0).toLocaleString()) + '</td>' +

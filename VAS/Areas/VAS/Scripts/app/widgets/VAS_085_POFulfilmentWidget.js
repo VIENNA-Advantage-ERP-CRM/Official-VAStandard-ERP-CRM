@@ -74,7 +74,11 @@
            change is a percentage-POINT difference (current % − last month's %), so it is
            labelled "pts", not "%" (Book1 row 3, Sr. 5 - label pending confirmation). */
         function formatPoints(value) {
-            return Number(value || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 1 }) + " " + lbl("VAS_085_PointsShort", "pts");
+            // VAS163 2026-11-11: Row 5 the change is percentage POINTS - a message text of "%" (or blank) would
+            // relabel it as a percent ("▲ 15% vs last month"), so "pts" is kept in that case.
+            var unit = $.trim(lbl("VAS_085_PointsShort", "pts"));
+            if (!unit || unit.indexOf('%') >= 0) { unit = "pts"; }
+            return Number(value || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 1 }) + " " + unit;
         }
 
         function metaText(change) {

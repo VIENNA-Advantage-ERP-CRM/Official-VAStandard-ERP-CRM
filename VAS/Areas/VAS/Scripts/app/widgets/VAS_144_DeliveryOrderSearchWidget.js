@@ -198,8 +198,8 @@
            precision, WITHOUT any currency symbol/code - line Price / Total. */
         function formatNumberFull(value, order) {
             var precision = amountPrecision(order);
-            var locale = usesIndianNumbering(order && order.currencyCode) ? 'en-IN' : window.navigator.language;
-            return Number(value || 0).toLocaleString(locale, {
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            return Number(value || 0).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: precision,
                 maximumFractionDigits: precision
             });

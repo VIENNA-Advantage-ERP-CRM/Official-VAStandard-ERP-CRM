@@ -197,8 +197,9 @@
             return INDIAN_NUMBERING_CURRENCIES.indexOf(String(isoCode || '').toUpperCase()) >= 0;
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function currencyLocale(isoCode) {
-            return usesIndianNumbering(isoCode) ? 'en-IN' : 'en-US';
+            return window.navigator.language;
         }
 
         function detailIso() {
@@ -235,9 +236,11 @@
             return formatCompactNumber(value, detailIso());
         }
 
-        function formatCompactAmount(value, symbol, isoCode) {
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        function formatCompactAmount(value, symbol, isoCode, precision) {
             var currency = symbol || isoCode || '';
-            return currency + formatCompactNumber(value, isoCode);
+            var number = Number(value || 0);
+            return currency + (number < 0 ? '-' : '') + VIS.Util.formatCompactAmount(Math.abs(number), isoCode || '', getPrecision(precision));
         }
 
         function getPrecision(value) {
@@ -273,7 +276,7 @@
             if (!value) { return '-'; }
             var date = new Date(value.replace(' ', 'T'));
             if (isNaN(date.getTime())) { return value; }
-            return date.toLocaleDateString(window.navigator.language || 'en-IN', {
+            return date.toLocaleDateString(window.navigator.language, { // VAS163 2026-11-10: browser locale (6-Nov retest2).
                 year: 'numeric',
                 month: 'short',
                 day: '2-digit'
@@ -766,7 +769,7 @@
             var statsContent = '';
             if (isItem) {
                 statsContent += statTile(label('VAS_078_OnHandQty', 'On Hand Qty'), formatCompactQty(productDetail.OnHandQty), '');
-                statsContent += statTile(label('VAS_078_StockValue', 'Stock Value'), formatCompactAmount(productDetail.StockValue, productDetail.CurrencySymbol, productDetail.CurrencyIso), '');
+                statsContent += statTile(label('VAS_078_StockValue', 'Stock Value'), formatCompactAmount(productDetail.StockValue, productDetail.CurrencySymbol, productDetail.CurrencyIso, productDetail.StdPrecision), '');
                 statsContent += statTile(label('VAS_078_ReorderPoint', 'Reorder Pt'), formatQty(productDetail.ReorderPoint), 'is-warning');
             }
             statsContent += statTile(label('Status', 'Status'), status, productDetail.Status === 'Y' ? 'is-success' : 'is-warning');

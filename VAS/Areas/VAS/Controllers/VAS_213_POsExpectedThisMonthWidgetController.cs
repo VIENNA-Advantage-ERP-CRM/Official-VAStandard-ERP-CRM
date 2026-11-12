@@ -14,6 +14,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Globalization;
 using System.Web.Mvc;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
@@ -297,9 +298,9 @@ namespace VIS.Controllers
                         {
                             PurchaseOrderID = poId,
                             PurchaseOrderNo = poNo,
-                            OrderDate = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd") : "",
+                            OrderDate = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                             OrderDateDisplay = orderDate.HasValue ? orderDate.Value.ToString("dd MMM yyyy") : "",
-                            PromisedDate = promisedDate.HasValue ? promisedDate.Value.ToString("yyyy-MM-dd") : "",
+                            PromisedDate = promisedDate.HasValue ? promisedDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                             PromisedDateDisplay = promisedDate.HasValue ? promisedDate.Value.ToString("dd MMM yyyy") : "",
                             PromisedDateShort = promisedDate.HasValue ? promisedDate.Value.ToString("dd MMM") : "",
                             VendorName = string.IsNullOrEmpty(vendorName) ? "—" : vendorName,
@@ -640,6 +641,9 @@ namespace VIS.Controllers
                     vendorName = vendor,
                     orderDateFormatted = orderDate.HasValue ? orderDate.Value.ToString("dd MMM yyyy") : "",
                     promisedDateFormatted = promisedDate.HasValue ? promisedDate.Value.ToString("dd MMM yyyy") : "",
+                    // VAS163 2026-11-10: browser locale (6-Nov retest2). The widget formats the ISO dates itself.
+                    orderDateIso = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
+                    promisedDateIso = promisedDate.HasValue ? promisedDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                     warehouseName = warehouse,
                     representativeName = repName,
                     documentStatus = docStatusText,
@@ -730,9 +734,9 @@ namespace VIS.Controllers
                         {
                             PurchaseOrderID = Util.GetValueOfInt(hdrDr["purchase_order_id"]),
                             PurchaseOrderNo = Util.GetValueOfString(hdrDr["purchase_order_number"]),
-                            OrderDate = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd") : "",
+                            OrderDate = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                             OrderDateDisplay = orderDate.HasValue ? orderDate.Value.ToString("dd MMM yyyy") : "",
-                            PromisedDate = promisedDate.HasValue ? promisedDate.Value.ToString("yyyy-MM-dd") : "",
+                            PromisedDate = promisedDate.HasValue ? promisedDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                             PromisedDateDisplay = promisedDate.HasValue ? promisedDate.Value.ToString("dd MMM yyyy") : "",
                             DocStatus = rawDocStatus,
                             DocStatusDisplay = docStatusDisplay,
@@ -741,6 +745,7 @@ namespace VIS.Controllers
                             WarehouseName = Util.GetValueOfString(hdrDr["warehouse_name"]),
                             CreatedBy = Util.GetValueOfString(hdrDr["created_by_name"]),
                             CreatedOn = createdOn.HasValue ? createdOn.Value.ToString("dd MMM yyyy") : "",
+                            CreatedOnIso = createdOn.HasValue ? createdOn.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "", // VAS163 2026-11-10: browser locale (6-Nov retest2).
                             PaymentTerm = Util.GetValueOfString(hdrDr["payment_term_name"]),
                             CurrencySymbol = Util.GetValueOfString(hdrDr["cur_symbol"]),
                             CurrencyISO = Util.GetValueOfString(hdrDr["cur_iso"]),

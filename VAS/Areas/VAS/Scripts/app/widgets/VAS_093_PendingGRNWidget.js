@@ -133,10 +133,11 @@
                 || INDIAN_CURRENCY_SYMBOLS.indexOf(value) >= 0;
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatMoney(value, symbolOrIso, precision) {
             var p = Number(precision);
             if (!isFinite(p) || p < 0) { p = 2; }
-            return Number(value || 0).toLocaleString(usesIndianNumbering(symbolOrIso) ? 'en-IN' : 'en-US', {
+            return Number(value || 0).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: p,
                 maximumFractionDigits: p
             });

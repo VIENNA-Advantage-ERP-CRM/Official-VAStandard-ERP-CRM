@@ -448,6 +448,20 @@
     flex: none;
 }
 
+/* VAS163 2026-11-11: Row 3 the drill-down column header rows are rendered with the classes
+   "vas-w205-trow ... mhead thead" (not "vas-w205-thead"), so the rule above never applied and the
+   header inherited the dialog's full 1em size. Same small, muted style as sibling modal headers. */
+.vas-w205-trow.mhead {
+    font-size: 0.72em;
+    font-weight: 500;
+    color: #5F7283;
+    text-transform: none;
+    padding: 0.5em 0.5em;
+    border-bottom: 1px solid #C5D2DD;
+    background: #FFFFFF;
+    flex: none;
+}
+
 .vas-w205-tbody {
     display: flex;
     flex-direction: column;

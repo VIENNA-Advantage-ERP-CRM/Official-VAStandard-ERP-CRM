@@ -106,11 +106,11 @@
         var vendorsData = [];
         var totalMonthValue = 0;
         var totalMonthPOs = 0;
-        var curSymbol = "₹";
+        var curSymbol = ""; // VAS163 2026-11-10: browser locale (6-Nov retest2).
         // Currency of the PO whose lines popup is open (its own price-list currency); empty = accounting currency.
         var lineCurSymbol = '';
         var lineCurIso = '';
-        var curIso = "INR";
+        var curIso = "";
         var stdPrecision = 2;
 
         var currentPage = 0; // 0-indexed
@@ -143,39 +143,35 @@
 
         // symOverride / isoOverride: format in another currency (a PO's own, price-list currency,
         // e.g. dollars) instead of the widget's accounting currency.
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function fmtMoney(v, symOverride, isoOverride) {
             var val = Number(v || 0);
-            var sym = symOverride || curSymbol || '₹';
             var iso = symOverride ? (isoOverride || '') : curIso;
-            if (iso === 'INR' || sym === '₹') {
-                if (Math.abs(val) >= 1e7) {
-                    return sym + ' ' + (val / 1e7).toFixed(2) + ' Cr';
-                }
-                if (Math.abs(val) >= 1e5) {
-                    return sym + ' ' + (val / 1e5).toFixed(2) + ' L';
-                }
-                return sym + ' ' + Math.round(val).toLocaleString('en-IN');
-            } else {
-                if (Math.abs(val) >= 1e6) {
-                    return sym + ' ' + (val / 1e6).toFixed(2) + ' M';
-                }
-                if (Math.abs(val) >= 1e3) {
-                    return sym + ' ' + (val / 1e3).toFixed(1) + ' k';
-                }
-                return sym + ' ' + Math.round(val).toLocaleString();
+            var sym = symOverride || curSymbol || iso || '';
+            var indian = VIS.Util.usesIndianNumbering(iso);
+            if (Math.abs(val) >= (indian ? 1e5 : 1e3)) {
+                return sym + ' ' + (val < 0 ? '-' : '') + VIS.Util.formatCompactAmount(Math.abs(val), iso || '', symOverride ? undefined : stdPrecision);
             }
+            return sym + ' ' + Math.round(val).toLocaleString(window.navigator.language);
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function num(v) {
             var val = Number(v || 0);
-            return (curIso === 'INR' || curSymbol === '₹')
-                ? Math.round(val).toLocaleString('en-IN')
-                : Math.round(val).toLocaleString();
+            return Math.round(val).toLocaleString(window.navigator.language);
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function getPeriodLabel() {
-            var mName = MONTH_SHORT[selectedMonth - 1] || "";
-            return mName + " " + selectedYear;
+            return new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString(window.navigator.language, { month: 'short', year: 'numeric' });
+        }
+
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        function formatIsoDate(iso) {
+            var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+            if (!m) { return ''; }
+            return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+                .toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' });
         }
 
         this.Initalize = function () {
@@ -211,7 +207,8 @@
             $yearSelect = $('<select class="vas-t10v-sel vas-t10v-sel-year" aria-label="' + esc(lbl('VAS_Year', 'Year')) + '"></select>');
 
             for (var m = 1; m <= 12; m++) {
-                var mOpt = $('<option value="' + m + '">' + MONTH_NAMES[m - 1] + '</option>');
+                // VAS163 2026-11-10: browser locale (6-Nov retest2).
+                var mOpt = $('<option value="' + m + '">' + esc(new Date(2000, m - 1, 1).toLocaleDateString(window.navigator.language, { month: 'long' })) + '</option>');
                 if (m === selectedMonth) mOpt.prop('selected', true);
                 $monthSelect.append(mOpt);
             }
@@ -310,8 +307,8 @@
                 success: function (res) {
                     var data = parseResponse(res);
                     if (data && data.success) {
-                        curSymbol = data.curSymbol || "₹";
-                        curIso = data.curIso || "INR";
+                        curSymbol = data.curSymbol || data.curIso || ""; // VAS163 2026-11-10: browser locale (6-Nov retest2).
+                        curIso = data.curIso || "";
                         stdPrecision = data.stdPrecision || 2;
                         totalMonthValue = data.totalMonthValue || 0;
                         totalMonthPOs = data.totalMonthPOs || 0;
@@ -676,7 +673,7 @@
                     var $row = $('<div class="vas-t10v-mrow" style="grid-template-columns: minmax(0, 0.35fr) minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.6fr) minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1.1fr);">' +
                         '<span class="vas-t10v-cell vas-t10v-center"><button type="button" class="vas-t10v-iconbtn" data-order-id="' + p.orderId + '" title="' + esc(lbl('VAS_LinesOf', 'Lines of') + ' ' + p.po) + '">' + iconLinesSvg + '</button></span>' +
                         '<span class="vas-t10v-cell"><button type="button" class="vas-t10v-lnk" data-order-id="' + p.orderId + '" title="' + esc(p.po) + '">' + esc(p.po) + '</button></span>' +
-                        '<span class="vas-t10v-cell" title="' + esc(p.dateFull) + '">' + esc(p.dateFull) + '</span>' +
+                        '<span class="vas-t10v-cell" title="' + esc(formatIsoDate(p.dateIso)) + '">' + esc(formatIsoDate(p.dateIso)) + '</span>' +
                         '<span class="vas-t10v-cell" title="' + esc(p.vendor) + '">' + esc(p.vendor) + '</span>' +
                         '<span class="vas-t10v-cell" title="' + esc(p.wh) + '">' + esc(p.wh) + '</span>' +
                         '<span class="vas-t10v-cell" title="' + esc(p.rep) + '">' + esc(p.rep) + '</span>' +
@@ -779,7 +776,7 @@
 
                     var poNo = header.po || ('PO #' + orderId);
                     var poVendor = header.vendor || '—';
-                    var poDate = header.dateFull || '—';
+                    var poDate = formatIsoDate(header.dateIso) || '—'; // VAS163 2026-11-10: browser locale (6-Nov retest2).
 
                     var totalOrdered = 0;
                     var totalPending = 0;

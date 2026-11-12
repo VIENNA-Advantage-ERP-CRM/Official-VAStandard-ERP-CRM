@@ -113,20 +113,29 @@
         }
 
         function formatNumber(num) {
-            return Number(num || 0).toLocaleString(window.navigator.language || 'en-IN');
+            return Number(num || 0).toLocaleString(window.navigator.language); // VAS163 2026-11-10: browser locale (6-Nov retest2).
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatCurrency(val, symbol, iso) {
             var v = Number(val || 0);
-            var sym = symbol || '₹';
-            if (iso === 'INR' || sym === '₹') {
-                if (v >= 1e7) { return sym + ' ' + (v / 1e7).toFixed(2) + ' Cr'; }
-                if (v >= 1e5) { return sym + ' ' + (v / 1e5).toFixed(2) + ' L'; }
-                return sym + ' ' + Math.round(v).toLocaleString('en-IN');
+            var sym = symbol || iso || '';
+            var indian = VIS.Util.usesIndianNumbering(iso);
+            if (Math.abs(v) >= (indian ? 1e5 : 1e3)) {
+                return sym + ' ' + (v < 0 ? '-' : '') + VIS.Util.formatCompactAmount(Math.abs(v), iso || '', 2);
             }
-            if (v >= 1e6) { return sym + ' ' + (v / 1e6).toFixed(2) + ' M'; }
-            if (v >= 1e3) { return sym + ' ' + (v / 1e3).toFixed(2) + ' K'; }
-            return sym + ' ' + v.toLocaleString(window.navigator.language || 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            if (indian) {
+                return sym + ' ' + Math.round(v).toLocaleString(window.navigator.language);
+            }
+            return sym + ' ' + v.toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        function formatIsoDate(iso) {
+            var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+            if (!m) { return ''; }
+            return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+                .toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' });
         }
 
         function showBusy(show) {
@@ -240,8 +249,8 @@
             var drafted = Number(data.draftedCount || 0);
             var inProgress = Number(data.inProgressCount || 0);
             var totalVal = Number(data.totalValue || 0);
-            var sym = data.currencySymbol || '₹';
-            var iso = data.currencyIso || 'INR';
+            var sym = data.currencySymbol || data.currencyIso || ''; // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            var iso = data.currencyIso || '';
 
             if ($kpiVal) {
                 $kpiVal.text(formatNumber(totalDocs));
@@ -300,8 +309,8 @@
             modalStack = [];
             modalCurrentPage = 0;
 
-            var sym = cachedData.currencySymbol || '₹';
-            var iso = cachedData.currencyIso || 'INR';
+            var sym = cachedData.currencySymbol || cachedData.currencyIso || ''; // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            var iso = cachedData.currencyIso || '';
             var formattedTotal = formatCurrency(cachedData.totalValue, sym, iso);
 
             var $overlay = $('<div class="vas-207-mask" role="dialog" aria-modal="true"></div>');
@@ -390,8 +399,8 @@
             $foot.find('.vas-207-back-btn').hide();
             $dialog.removeClass('vas-207-modal-md');
 
-            var sym = cachedData.currencySymbol || '₹';
-            var iso = cachedData.currencyIso || 'INR';
+            var sym = cachedData.currencySymbol || cachedData.currencyIso || ''; // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            var iso = cachedData.currencyIso || '';
             var formattedTotal = formatCurrency(cachedData.totalValue, sym, iso);
 
             // Undo the clickable "open record" state the Lines view puts on the title
@@ -475,8 +484,8 @@
 
             // Body Rows
             var $mbody = $('<div class="vas-207-mbody"></div>');
-            var sym = cachedData.currencySymbol || '₹';
-            var iso = cachedData.currencyIso || 'INR';
+            var sym = cachedData.currencySymbol || cachedData.currencyIso || ''; // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            var iso = cachedData.currencyIso || '';
 
             for (var i = 0; i < pageRows.length; i++) {
                 var r = pageRows[i];
@@ -498,7 +507,7 @@
                                 esc(r.PurchaseOrderNumber) +
                             '</button>' +
                         '</span>' +
-                        '<span class="vas-207-cell vas-207-w-date vas-207-c-std" title="' + esc(r.OrderDateFormatted) + '">' + esc(r.OrderDateFormatted) + '</span>' +
+                        '<span class="vas-207-cell vas-207-w-date vas-207-c-std" title="' + esc(formatIsoDate(r.OrderDate)) + '">' + esc(formatIsoDate(r.OrderDate)) + '</span>' +
                         '<span class="vas-207-cell vas-207-w-vendor vas-207-c-std" title="' + esc(r.VendorName) + '">' + esc(r.VendorName) + '</span>' +
                         '<span class="vas-207-cell vas-207-w-rep vas-207-c-std" title="' + esc(r.RepresentativeName) + '">' + esc(r.RepresentativeName) + '</span>' +
                         '<span class="vas-207-cell vas-207-w-lines vas-207-right vas-207-c-std" title="' + formatNumber(r.LineCount) + '">' + formatNumber(r.LineCount) + '</span>' +
@@ -583,12 +592,12 @@
             // The pop-up keeps one size across the documents list, the line details, their
             // pages and Back (no narrower "md" dialog for the lines view).
 
-            var sym = cachedData.currencySymbol || '₹';
-            var iso = cachedData.currencyIso || 'INR';
+            var sym = cachedData.currencySymbol || cachedData.currencyIso || ''; // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            var iso = cachedData.currencyIso || '';
             var formattedVal = formatCurrency(poRec.ConvertedValue, sym, iso);
 
             $header.find('.vas-207-mtitle').text(lbl("VAS_Lines", "Lines") + ' · ' + poRec.PurchaseOrderNumber);
-            $header.find('.vas-207-msub').text(poRec.VendorName + ' · ' + poRec.OrderDateFormatted + ' · ' + poRec.DocStatusName);
+            $header.find('.vas-207-msub').text(poRec.VendorName + ' · ' + formatIsoDate(poRec.OrderDate) + ' · ' + poRec.DocStatusName);
 
             $body.empty();
             $body.html('<div class="vas-207-empty-msg"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
@@ -641,8 +650,8 @@
             for (var a = 0; a < lines.length; a++) {
                 linesAmount += Number(lines[a].LineNetAmt || 0);
             }
-            var sym = (lines[0] && lines[0].CurrencySymbol) || cachedData.currencySymbol || '₹';
-            var iso = (lines[0] && lines[0].CurrencyIso) || cachedData.currencyIso || 'INR';
+            var sym = (lines[0] && lines[0].CurrencySymbol) || cachedData.currencySymbol || cachedData.currencyIso || ''; // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            var iso = (lines[0] && lines[0].CurrencyIso) || cachedData.currencyIso || '';
             var formattedVal = formatCurrency(linesAmount, sym, iso);
 
             // The "Purchase order 800080 · date · status" link row that used to sit here
@@ -730,8 +739,8 @@
 
             var $mbody = $('<div class="vas-207-mbody vas-207-lines-body"></div>');
             // Line rates / amounts are in the order's own currency
-            var sym = (lines[0] && lines[0].CurrencySymbol) || cachedData.currencySymbol || '₹';
-            var iso = (lines[0] && lines[0].CurrencyIso) || cachedData.currencyIso || 'INR';
+            var sym = (lines[0] && lines[0].CurrencySymbol) || cachedData.currencySymbol || cachedData.currencyIso || ''; // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            var iso = (lines[0] && lines[0].CurrencyIso) || cachedData.currencyIso || '';
 
             for (var i = 0; i < pageRows.length; i++) {
                 var l = pageRows[i];
@@ -739,7 +748,7 @@
                 if (l.LineStatus === 'Received') { chipClass = 'vas-207-chip-ok'; }
                 else if (l.LineStatus === 'Partial received') { chipClass = 'vas-207-chip-warn'; }
 
-                var formattedRate = sym + ' ' + formatNumber(l.PriceActual);
+                var formattedRate = sym + ' ' + Number(l.PriceActual || 0).toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); // VAS163 2026-11-10: browser locale (6-Nov retest2).
                 var formattedAmount = formatCurrency(l.LineNetAmt, sym, iso);
 
                 var $row = $(

@@ -764,7 +764,8 @@
             drawSection("lines",    renderLines);
             drawSection("documents", renderDocuments);
             drawSection("notes",    renderNotes);
-            drawSection("activity", renderActivity);
+            // VAS163 2026-11-10: Activity section commented out (6-Nov retest2, All Right Panels).
+            // drawSection("activity", renderActivity);
             // The action bar (Complete GRN / Generate Invoice) is gone — both
             // actions belong to the receipt's own screen, which is where they
             // carry the document's full validation and where a reader expects to
@@ -862,9 +863,10 @@
             return t.length > 1 && t.charAt(0) === "[" && t.charAt(t.length - 1) === "]";
         }
 
-        // The currency token: prefer the linked order's symbol / ISO, else INR.
+        // The currency token: the linked order's symbol, else its ISO code.
+        // VAS163 2026-11-10: no hard-coded "₹" fallback (6-Nov retest2).
         function currencyToken() {
-            return (data && (data.CurSymbol || data.ISO_Code)) || "₹";
+            return (data && (data.CurSymbol || data.ISO_Code)) || "";
         }
 
         // ---------- Status / priority maps (codes -> label + tone) ---------- //
@@ -1052,6 +1054,14 @@
                 // An invoice-only origin is a real origin, shown in Documents —
                 // so there is nothing to add here and nothing to call Manual.
                 if (data.ReferenceInvoice || data.ReferenceInvoiceId > 0) return;
+                // VAS163 2026-11-10: a manual receipt no longer gets a Generated
+                // From strip holding one "Manual" chip; it wears a "Manual" tag
+                // beside the status pills at the top of the panel instead.
+                var $hdrPills = $body.find(".vas_099-hdrPills").first();
+                if ($hdrPills.length) {
+                    $hdrPills.append(headerPill(msg("VAS_099_Manual", "Manual"), "neutral", "pencil", false));
+                    return;
+                }
                 $chips.append(originChip("pencil", msg("VAS_099_Manual", "Manual"),
                     null, null, "info", null, 0));
             }

@@ -279,7 +279,8 @@
             // Notes and Activity close the panel: both are commentary on
             // everything above them, so they read last.
             renderNotes();
-            renderActivity();
+            // VAS163 2026-11-10: Activity section commented out (6-Nov retest2, All Right Panels).
+            // renderActivity();
         }
 
         // ----------------------------------------------------------------- //

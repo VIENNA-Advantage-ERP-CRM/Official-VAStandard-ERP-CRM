@@ -133,7 +133,7 @@ namespace VAS.Controllers
                         o.DateOrdered AS order_date,
                         o.DocStatus AS document_status,
                         bp.Name AS vendor_name,
-                        CASE WHEN COALESCE((SELECT pl.IsTaxIncluded FROM M_PriceList pl WHERE pl.M_PriceList_ID = o.M_PriceList_ID), 'N') = 'Y' THEN COALESCE(o.TotalLines, 0) - (SELECT COALESCE(SUM(COALESCE(tl.TaxAmt, 0)), 0) FROM C_OrderTax tl WHERE tl.C_Order_ID = o.C_Order_ID AND tl.IsActive = 'Y') ELSE COALESCE(o.TotalLines, 0) END AS total_amount, -- Sub total (excl. taxes; TotalLines already holds the tax on a tax-inclusive price list, so the extracted tax of the order (C_OrderTax) is taken off - the line TaxAmt is not maintained on every line)
+                        CASE WHEN COALESCE(o.IsTaxIncluded, 'N') = 'Y' OR COALESCE((SELECT pl.IsTaxIncluded FROM M_PriceList pl WHERE pl.M_PriceList_ID = o.M_PriceList_ID), 'N') = 'Y' THEN COALESCE(o.TotalLines, 0) - (SELECT COALESCE(SUM(COALESCE(tl.TaxAmt, 0)), 0) FROM C_OrderTax tl WHERE tl.C_Order_ID = o.C_Order_ID AND tl.IsActive = 'Y') ELSE COALESCE(o.TotalLines, 0) END AS total_amount, -- VAS163 2026-11-11: Row 2 order OR price-list IsTaxIncluded = 'Y' (as VAS_268). Sub total (excl. taxes; TotalLines already holds the tax on a tax-inclusive price list, so the extracted tax of the order (C_OrderTax) is taken off - the line TaxAmt is not maintained on every line)
                         curr.ISO_Code AS currency_code,
                         curr.CurSymbol AS currency_symbol,
                         curr.StdPrecision AS currency_precision
@@ -189,7 +189,10 @@ namespace VAS.Controllers
                         currencyCode = currencyCode,
                         docStatus = docStatus,
                         statusLabel = statusLabel,
-                        orderDate = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : ""
+                        orderDate = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
+                        // VAS163 2026-11-10: browser locale (6-Nov retest2). Raw parts for the client-built subtitle / amount.
+                        vendorName = vendorName,
+                        currencyPrecision = currencyPrecision
                     });
 
                     count++;
@@ -245,7 +248,7 @@ namespace VAS.Controllers
                         p.Value AS product_code,
                         p.SKU AS product_sku,
                         r.DocumentNo AS requisition_number,
-                        CASE WHEN COALESCE((SELECT pl.IsTaxIncluded FROM M_PriceList pl WHERE pl.M_PriceList_ID = o.M_PriceList_ID), 'N') = 'Y' THEN COALESCE(o.TotalLines, 0) - (SELECT COALESCE(SUM(COALESCE(tl.TaxAmt, 0)), 0) FROM C_OrderTax tl WHERE tl.C_Order_ID = o.C_Order_ID AND tl.IsActive = 'Y') ELSE COALESCE(o.TotalLines, 0) END AS total_amount, -- Sub total (excl. taxes; TotalLines already holds the tax on a tax-inclusive price list, so the extracted tax of the order (C_OrderTax) is taken off - the line TaxAmt is not maintained on every line)
+                        CASE WHEN COALESCE(o.IsTaxIncluded, 'N') = 'Y' OR COALESCE((SELECT pl.IsTaxIncluded FROM M_PriceList pl WHERE pl.M_PriceList_ID = o.M_PriceList_ID), 'N') = 'Y' THEN COALESCE(o.TotalLines, 0) - (SELECT COALESCE(SUM(COALESCE(tl.TaxAmt, 0)), 0) FROM C_OrderTax tl WHERE tl.C_Order_ID = o.C_Order_ID AND tl.IsActive = 'Y') ELSE COALESCE(o.TotalLines, 0) END AS total_amount, -- VAS163 2026-11-11: Row 2 order OR price-list IsTaxIncluded = 'Y' (as VAS_268). Sub total (excl. taxes; TotalLines already holds the tax on a tax-inclusive price list, so the extracted tax of the order (C_OrderTax) is taken off - the line TaxAmt is not maintained on every line)
                         curr.ISO_Code AS currency_code,
                         curr.CurSymbol AS currency_symbol,
                         curr.StdPrecision AS currency_precision
@@ -338,7 +341,9 @@ namespace VAS.Controllers
                             DocStatus = docStatus,
                             StatusLabel = statusLabel,
                             OrderDate = orderDate,
-                            OrderDateIso = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : ""
+                            OrderDateIso = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
+                            VendorName = vendorName,
+                            CurrencyPrecision = currencyPrecision
                         });
                     }
 
@@ -362,7 +367,9 @@ namespace VAS.Controllers
                             DocStatus = docStatus,
                             StatusLabel = statusLabel,
                             OrderDate = orderDate,
-                            OrderDateIso = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : ""
+                            OrderDateIso = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
+                            VendorName = vendorName,
+                            CurrencyPrecision = currencyPrecision
                         });
                     }
 
@@ -390,7 +397,9 @@ namespace VAS.Controllers
                             DocStatus = docStatus,
                             StatusLabel = statusLabel,
                             OrderDate = orderDate,
-                            OrderDateIso = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : ""
+                            OrderDateIso = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
+                            VendorName = vendorName,
+                            CurrencyPrecision = currencyPrecision
                         });
                     }
 
@@ -414,7 +423,9 @@ namespace VAS.Controllers
                             DocStatus = docStatus,
                             StatusLabel = statusLabel,
                             OrderDate = orderDate,
-                            OrderDateIso = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : ""
+                            OrderDateIso = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
+                            VendorName = vendorName,
+                            CurrencyPrecision = currencyPrecision
                         });
                     }
 
@@ -438,7 +449,9 @@ namespace VAS.Controllers
                             DocStatus = docStatus,
                             StatusLabel = statusLabel,
                             OrderDate = orderDate,
-                            OrderDateIso = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : ""
+                            OrderDateIso = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
+                            VendorName = vendorName,
+                            CurrencyPrecision = currencyPrecision
                         });
                     }
 
@@ -462,7 +475,9 @@ namespace VAS.Controllers
                             DocStatus = docStatus,
                             StatusLabel = statusLabel,
                             OrderDate = orderDate,
-                            OrderDateIso = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : ""
+                            OrderDateIso = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
+                            VendorName = vendorName,
+                            CurrencyPrecision = currencyPrecision
                         });
                     }
 
@@ -486,7 +501,9 @@ namespace VAS.Controllers
                             DocStatus = docStatus,
                             StatusLabel = statusLabel,
                             OrderDate = orderDate,
-                            OrderDateIso = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : ""
+                            OrderDateIso = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
+                            VendorName = vendorName,
+                            CurrencyPrecision = currencyPrecision
                         });
                     }
 
@@ -512,7 +529,9 @@ namespace VAS.Controllers
                             DocStatus = docStatus,
                             StatusLabel = statusLabel,
                             OrderDate = orderDate,
-                            OrderDateIso = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : ""
+                            OrderDateIso = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
+                            VendorName = vendorName,
+                            CurrencyPrecision = currencyPrecision
                         });
                     }
 
@@ -536,7 +555,9 @@ namespace VAS.Controllers
                             DocStatus = docStatus,
                             StatusLabel = statusLabel,
                             OrderDate = orderDate,
-                            OrderDateIso = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : ""
+                            OrderDateIso = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
+                            VendorName = vendorName,
+                            CurrencyPrecision = currencyPrecision
                         });
                     }
                 }
@@ -568,7 +589,10 @@ namespace VAS.Controllers
                     currencyCode = c.CurrencyCode,
                     docStatus = c.DocStatus,
                     statusLabel = c.StatusLabel,
-                    orderDate = c.OrderDateIso
+                    orderDate = c.OrderDateIso,
+                    // VAS163 2026-11-10: browser locale (6-Nov retest2). Raw parts for the client-built subtitle / amount.
+                    vendorName = c.VendorName,
+                    currencyPrecision = c.CurrencyPrecision
                 }).ToList();
 
                 return Ok(new
@@ -629,7 +653,7 @@ namespace VAS.Controllers
                         curr.CurSymbol,
                         curr.ISO_Code,
                         COALESCE(curr.StdPrecision, 2) AS StdPrecision,
-                        COALESCE(pl.IsTaxIncluded, 'N') AS PriceListTaxIncluded
+                        CASE WHEN COALESCE(o.IsTaxIncluded, 'N') = 'Y' OR COALESCE(pl.IsTaxIncluded, 'N') = 'Y' THEN 'Y' ELSE 'N' END AS PriceListTaxIncluded -- VAS163 2026-11-11: Row 2 order OR price-list IsTaxIncluded (as VAS_268)
                     FROM C_Order o
                     INNER JOIN C_BPartner bp ON bp.C_BPartner_ID = o.C_BPartner_ID
                     LEFT JOIN M_Warehouse wh ON wh.M_Warehouse_ID = o.M_Warehouse_ID
@@ -889,7 +913,10 @@ namespace VAS.Controllers
                     }
                 }
 
-                DataSet ds = DB.ExecuteDataset(@"SELECT ot.C_Tax_ID, COALESCE(SUM(ot.TaxBaseAmt), 0) AS TaxBaseAmt
+                // VAS163 2026-11-11: Row 2 net ratio = (gross - C_OrderTax.TaxAmt) / gross, the exact VAS_268/270
+                // approach. TaxBaseAmt was used before; where it is stored WITH the tax the ratio came out as 1 and
+                // the gross stayed in the line amounts.
+                DataSet ds = DB.ExecuteDataset(@"SELECT ot.C_Tax_ID, COALESCE(SUM(ot.TaxAmt), 0) AS TaxAmt
                                                    FROM C_OrderTax ot
                                                   WHERE ot.C_Order_ID = @OrderID
                                                     AND ot.IsActive = 'Y'
@@ -900,11 +927,11 @@ namespace VAS.Controllers
                     foreach (DataRow row in ds.Tables[0].Rows)
                     {
                         int taxId = Util.GetValueOfInt(row["C_Tax_ID"]);
-                        decimal taxBase = Util.GetValueOfDecimal(row["TaxBaseAmt"]);
+                        decimal taxAmt = Util.GetValueOfDecimal(row["TaxAmt"]);
                         decimal gross;
-                        if (taxBase > 0m && grossByTax.TryGetValue(taxId, out gross) && gross > 0m && taxBase <= gross)
+                        if (grossByTax.TryGetValue(taxId, out gross) && gross > 0m && taxAmt >= 0m && taxAmt < gross)
                         {
-                            ratios[taxId] = taxBase / gross;
+                            ratios[taxId] = (gross - taxAmt) / gross;
                         }
                     }
                 }
@@ -1023,6 +1050,9 @@ namespace VAS.Controllers
             public string StatusLabel { get; set; }
             public DateTime? OrderDate { get; set; }
             public string OrderDateIso { get; set; }
+            // VAS163 2026-11-10: browser locale (6-Nov retest2). The widget builds the subtitle / amount itself.
+            public string VendorName { get; set; }
+            public int CurrencyPrecision { get; set; }
         }
     }
 }
