@@ -45,6 +45,7 @@ namespace VIS.Controllers
         {
             string iso = "";
             string symbol = "";
+            int stdPrecision = 2; // VAS163 2026-11-12: currency precision sent to the UI (C_Currency.StdPrecision)
             int currencyId = ctx.GetContextAsInt("$C_Currency_ID");
             if (currencyId == 0)
             {
@@ -55,7 +56,7 @@ namespace VIS.Controllers
             {
                 if (currencyId > 0)
                 {
-                    string sql = "SELECT ISO_Code, CurSymbol FROM C_Currency WHERE C_Currency_ID = @param1 AND IsActive = 'Y'";
+                    string sql = "SELECT ISO_Code, CurSymbol, StdPrecision FROM C_Currency WHERE C_Currency_ID = @param1 AND IsActive = 'Y'";
                     SqlParameter[] param = new SqlParameter[]
                     {
                         new SqlParameter("@param1", currencyId)
@@ -66,6 +67,7 @@ namespace VIS.Controllers
                         {
                             iso = Util.GetValueOfString(dr["ISO_Code"]);
                             symbol = Util.GetValueOfString(dr["CurSymbol"]);
+                            stdPrecision = Util.GetValueOfInt(dr["StdPrecision"]);
                         }
                     }
                 }
@@ -73,8 +75,8 @@ namespace VIS.Controllers
                 if (string.IsNullOrEmpty(iso))
                 {
                     int clientId = ctx.GetAD_Client_ID();
-                    string sqlFallback = @"SELECT c.ISO_Code, c.CurSymbol 
-                                           FROM C_AcctSchema a 
+                    string sqlFallback = @"SELECT c.ISO_Code, c.CurSymbol, c.StdPrecision
+                                           FROM C_AcctSchema a
                                            INNER JOIN C_Currency c ON c.C_Currency_ID = a.C_Currency_ID 
                                            WHERE a.AD_Client_ID = @param1 AND a.IsActive = 'Y' 
                                            ORDER BY a.C_AcctSchema_ID";
@@ -88,6 +90,7 @@ namespace VIS.Controllers
                         {
                             iso = Util.GetValueOfString(dr["ISO_Code"]);
                             symbol = Util.GetValueOfString(dr["CurSymbol"]);
+                            stdPrecision = Util.GetValueOfInt(dr["StdPrecision"]);
                         }
                     }
                 }
@@ -97,7 +100,7 @@ namespace VIS.Controllers
                 Log.Log(Level.SEVERE, "VAS_186_ProductCategoryUsageWidget.GetCurrencyInfoData", ex);
             }
 
-            return new { iso = iso, symbol = symbol };
+            return new { iso = iso, symbol = symbol, stdPrecision = stdPrecision };
         }
         /// <summary>
         /// The product's CURRENT cost price, as a derived table (M_Product_ID, CurrentCostPrice).
@@ -181,17 +184,19 @@ namespace VIS.Controllers
                     SELECT
                       pc.M_Product_Category_ID,
                       pc.Name AS CategoryName,
-                      SUM(line.QtyInternalUse * " + UomToProductFactorSql + @") AS TotalQty,
-                      SUM(line.QtyInternalUse * COALESCE(NULLIF(line.CurrentCostPrice, 0), NULLIF(line.PriceCost, 0), NULLIF(line.VA024_CostPrice, 0), pcst.CurrentCostPrice, 0)) AS TotalValue
+                      -- VAS163 2026-11-13: rows 23/45/46/52/53/76 one Inventory Use rule - qty in the line's
+                      -- selected UOM (QtyEntered; QtyInternalUse x UOM factor double-converted), value =
+                      -- QtyInternalUse (base) x M_InventoryLine.CurrentCostPrice (no fallback chain).
+                      SUM(line.QtyEntered) AS TotalQty,
+                      SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, 0)) AS TotalValue
                     FROM M_InventoryLine line
                     INNER JOIN (" + invAccessSql + @") ai ON ai.M_Inventory_ID = line.M_Inventory_ID
                     INNER JOIN M_Product p ON p.M_Product_ID = line.M_Product_ID
                     INNER JOIN M_Product_Category pc ON pc.M_Product_Category_ID = p.M_Product_Category_ID
-                    LEFT JOIN (" + ProductCurrentCostSql + @") pcst ON pcst.M_Product_ID = line.M_Product_ID
                     WHERE line.IsActive = 'Y'
                       AND COALESCE(line.QtyInternalUse, 0) > 0
                     GROUP BY pc.M_Product_Category_ID, pc.Name
-                    ORDER BY SUM(line.QtyInternalUse) DESC";
+                    ORDER BY SUM(line.QtyEntered) DESC";
 
                 using (IDataReader dr = DB.ExecuteReader(sql, null, null))
                 {
@@ -315,8 +320,10 @@ namespace VIS.Controllers
                       wh.Name AS WarehouseName,
                       " + locatorSql + @" AS LocatorCode,
                       line.QtyEntered,
-                      (line.QtyInternalUse * " + UomToProductFactorSql + @") AS QtyBase,
-                      (line.QtyInternalUse * COALESCE(NULLIF(line.CurrentCostPrice, 0), NULLIF(line.PriceCost, 0), NULLIF(line.VA024_CostPrice, 0), pcst.CurrentCostPrice, 0)) AS LineValue,
+                      -- VAS163 2026-11-13: rows 23/45/46/52/53/76 QtyInternalUse is already the base-UOM qty;
+                      -- value = QtyInternalUse x M_InventoryLine.CurrentCostPrice (same as the tile).
+                      line.QtyInternalUse AS QtyBase,
+                      (line.QtyInternalUse * COALESCE(line.CurrentCostPrice, 0)) AS LineValue,
                       ai.MovementDate
                     FROM M_InventoryLine line
                     INNER JOIN (" + invAccessSql + @") ai ON ai.M_Inventory_ID = line.M_Inventory_ID
@@ -325,7 +332,6 @@ namespace VIS.Controllers
                     LEFT JOIN M_AttributeSetInstance asi ON asi.M_AttributeSetInstance_ID = line.M_AttributeSetInstance_ID
                     LEFT JOIN M_Locator loc ON loc.M_Locator_ID = line.M_Locator_ID
                     LEFT JOIN M_Warehouse wh ON wh.M_Warehouse_ID = loc.M_Warehouse_ID
-                    LEFT JOIN (" + ProductCurrentCostSql + @") pcst ON pcst.M_Product_ID = line.M_Product_ID
                     WHERE line.IsActive = 'Y'
                       AND COALESCE(line.QtyInternalUse, 0) > 0
                       AND p.M_Product_Category_ID = " + categoryId + @"

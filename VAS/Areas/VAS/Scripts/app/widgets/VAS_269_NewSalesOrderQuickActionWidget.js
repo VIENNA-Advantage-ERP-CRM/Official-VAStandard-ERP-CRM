@@ -37,7 +37,7 @@
        (same window VAS_268 Global Sales Search targets for "Open Record"). */
     var ZOOM_TABLE = 'C_Order';
     var ZOOM_WINDOW_NAME_NEW = 'VAS_SalesOrder';
-    var ZOOM_WINDOW_NAME_OLD = 'VAS_SalesOrder';
+    var ZOOM_WINDOW_NAME_OLD = 'Sales Order'; // VAS163 2026-11-12: real legacy window name as the util's fallback
 
     /* design.md §Widget Header / §Measurement Setup: keep --dash-inline-size on
        :root equal to the dashboard container's current pixel width so the widget

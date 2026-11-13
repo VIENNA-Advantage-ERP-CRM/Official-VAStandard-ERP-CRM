@@ -349,6 +349,10 @@
             // Framework calls fetchData(recordID) on record load -> reset to page 0; the
             // pager calls it with an explicit page. Server returns LinePageSize (10) rows.
             var reqPage = (typeof page === "number" && page >= 0) ? page : 0;
+            // VAS163 2026-11-12: keep panel lines on header-save reload - a framework reload
+            // (no page) of the header already on the panel, with unsaved lines on it, re-reads
+            // the page the panel is on, so the edited lines it keeps are on the page returned.
+            if (typeof page !== "number" && takeKeptLines(recordID, linePage).length) reqPage = linePage;
             // Capture a monotonic token before the AJAX call so a stale response arriving
             // after the user navigated to a different record can be silently discarded.
             var mySeq = ++fetchSeq;
@@ -371,6 +375,9 @@
                     if (isPageChange) showBusy(false);
                     // Discard stale responses: a newer fetchData call has already started.
                     if (mySeq !== fetchSeq) return;
+                    // VAS163 2026-11-12: keep panel lines on header-save reload - the unsaved
+                    // lines of this same header / page, taken before parent is replaced.
+                    var keptLines = takeKeptLines(recordID, reqPage);
                     var data = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     parent = data || null;
                     newRecordMode = false;
@@ -404,7 +411,9 @@
                     // instead of serving the prior document's list.
                     _mlookupCache = {};
                     lines = [];
+                    // VAS163 2026-11-12: keep panel lines on header-save reload
                     if (parent && parent.Lines) for (var j = 0; j < parent.Lines.length; j++) lines.push(fromServerRow(parent.Lines[j]));
+                    lines = mergeKeptLines(lines, keptLines);
                     editing = null; morePopoverFor = null;
                     lastLockState = null;   // the first data-status event after a load re-baselines
                     render();
@@ -417,6 +426,82 @@
             });
         };
 
+        /* ---------- VAS163 2026-11-12: keep panel lines on header-save reload ----------
+           The framework re-loads the panel (refreshPanelData -> fetchData) whenever the
+           header is saved: from the window toolbar, after the "save the header first"
+           prompt, and through refreshHeaderRecord after a line save. That reload used to
+           repaint from the server and throw away every line not yet saved on the panel.
+           A reload of the SAME header, on the page the panel shows, now folds the unsaved
+           work back into the fresh server rows (mergeKeptLines):
+             - new lines (no line id) stay as entered, still new, in their order, where
+               the panel keeps new lines (on top, as mergeSavedLines does);
+             - a saved line edited on the panel keeps the edit only while its server row
+               is unchanged since the panel loaded / saved it (line._saved snapshot): the
+               row's Updated stamp when both copies carry it (the line bag holds every
+               column), otherwise every column both copies carry. Server changed -> the
+               server row wins (the edit is dropped, the snapshot is the fresh one);
+               a row that is gone from a document that fits one page was deleted -> dropped;
+               off a multi-page document it cannot be told from "moved", so it is kept;
+             - every other line takes the server values.
+           Another record, New Record, a page change and clear() start from scratch, as
+           before - nothing is merged across records. */
+        var KEEP_HDR_KEY = "M_Movement_ID", KEEP_LINE_KEY = "M_MovementLine_ID";
+
+        /* The panel's unsaved lines when a reload of recordID / reqPage is the header and
+           the page the panel already shows; [] otherwise. A line whose own save is in
+           flight is kept too (its save answer refreshes it). */
+        function takeKeptLines(recordID, reqPage) {
+            var curId = +(parent && parent[KEEP_HDR_KEY]) || 0;
+            if (!(curId > 0) || curId !== (+recordID || 0) || reqPage !== linePage) return [];
+            return lines.filter(function (l) { return l.status === "new" || l.dirty || l._saving; });
+        }
+
+        /* Case-insensitive read of a server column bag (PostgreSQL lowercases keys). */
+        function keepBagVal(bag, col) {
+            if (!bag) return undefined;
+            if (bag.hasOwnProperty(col)) return bag[col];
+            var lc = col.toLowerCase();
+            for (var k in bag) if (bag.hasOwnProperty(k) && k.toLowerCase() === lc) return bag[k];
+            return undefined;
+        }
+        function keepSameVal(a, b) {
+            var ea = (a == null || a === ""), eb = (b == null || b === "");
+            if (ea || eb) return ea && eb;
+            if (typeof a === "number" || typeof b === "number") return +a === +b;
+            if (typeof a === "object" || typeof b === "object") return JSON.stringify(a) === JSON.stringify(b);
+            return String(a) === String(b);
+        }
+
+        /* True when the fresh server row differs from the snapshot the kept line was
+           loaded / saved with - i.e. someone (a header save's line update, another user)
+           changed the line on the server since. */
+        function serverRowChanged(kept, fresh) {
+            var a = kept._saved && kept._saved.values, b = fresh._saved && fresh._saved.values;
+            if (!a || !b) return true;
+            var ua = keepBagVal(a, "Updated"), ub = keepBagVal(b, "Updated");
+            if (ua != null && ub != null) return !keepSameVal(ua, ub);
+            for (var k in b) if (b.hasOwnProperty(k) && a.hasOwnProperty(k) && !keepSameVal(a[k], b[k])) return true;
+            return false;
+        }
+
+        /* fresh: lines just built from the server page; kept: takeKeptLines' answer. */
+        function mergeKeptLines(fresh, kept) {
+            if (!kept || !kept.length) return fresh;
+            var byId = {}, newOnes = [];
+            kept.forEach(function (l) {
+                var id = +l.values[KEEP_LINE_KEY] || 0;
+                if (id > 0) byId[id] = l; else newOnes.push(l);
+            });
+            var merged = fresh.map(function (f) {
+                var id = +f.values[KEEP_LINE_KEY] || 0, k = byId[id];
+                if (!k) return f;
+                delete byId[id];
+                return (k._saving || !serverRowChanged(k, f)) ? k : f;
+            });
+            var onePage = linePage === 0 && (linesTotal || 0) <= (linePageSize || 0);
+            var strays = onePage ? [] : Object.keys(byId).map(function (id) { return byId[id]; });
+            return newOnes.concat(merged, strays);
+        }
         this.clear = function (isNewRecord) {
             // Bump fetchSeq so any in-flight GetPanelData response is discarded — the panel
             // is being cleared and rendering stale data would overwrite the blank state.

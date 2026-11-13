@@ -801,3 +801,42 @@
     background: #EFEEFF;
     color: #5F4AA6;
 }
+
+/* VAS163 2026-11-13: Rows 268/269/280 - Month / Year filters LEFT-aligned in the widget header (own line
+   under the title, starting at the left edge) and ONE fixed size for every PO widget: 30px high, 13px / 500,
+   left-aligned text. Fixed px (not em) so the size no longer follows each widget's container width. */
+.vas-t10v-head {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    align-items: flex-start;
+}
+
+.vas-t10v-head-txt {
+    flex: 1 1 100%;
+}
+
+.vas-t10v-mfilter {
+    flex: 0 0 auto;
+    justify-content: flex-start;
+    gap: 6px;
+    margin: 0;
+}
+
+.vas-t10v-sel {
+    font-size: 13px !important;
+    font-weight: 500;
+    height: 30px;
+    line-height: 28px;
+    padding: 0 10px;
+    max-width: none;
+    text-align: left;
+    text-align-last: left;
+    box-sizing: border-box;
+}
+.vas-t10v-sel-month {
+    min-width: 120px;
+}
+
+.vas-t10v-sel-year {
+    min-width: 80px;
+}

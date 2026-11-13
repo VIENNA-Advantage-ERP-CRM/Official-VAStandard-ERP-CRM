@@ -265,9 +265,11 @@ namespace VAS.Controllers
                         COALESCE(bp.Name, N'—') AS VendorName,
                         w.Name          AS WarehouseName,
                         COALESCE(usr.Name, N'—') AS SalesRepName,
-                        COALESCE(o.TotalLines, 0) AS OrderTotal, -- Sub total (excl. taxes) per specification
+                        " + PoValueExclTaxSql("o") + @" AS OrderTotal, -- Sub total (excl. taxes) per specification; VAS163 2026-11-13: Row 315 - also on a tax-inclusive price list
                         o.DocStatus     AS DocStatus,
                         COALESCE(c.CurSymbol, c.ISO_Code, N'') AS CurrencySymbol,
+                        COALESCE(c.StdPrecision, 2)     AS StdPrecision, -- VAS163 2026-11-12: currency precision for client-side formatting
+                        c.ISO_Code      AS CurrencyIso, -- VAS163 2026-11-12: document currency ISO for client-side formatting
                         COALESCE(lines.QtyOrdered, 0)   AS QtyOrdered,
                         COALESCE(lines.QtyDelivered, 0) AS QtyDelivered,
                         COALESCE(lines.LineCount, 0)    AS LineCount
@@ -371,13 +373,17 @@ namespace VAS.Controllers
                     {
                         orderId        = Util.GetValueOfInt(dr["OrderID"]),
                         documentNo     = Util.GetValueOfString(dr["DocumentNo"]),
-                        dateOrdered    = Util.GetValueOfDateTime(dr["DateOrdered"]),
-                        datePromised   = Util.GetValueOfDateTime(dr["DatePromised"]),
+                        // VAS163 2026-11-12: dates as ISO 'yyyy-MM-dd' text (formatted in the browser
+                        // locale client-side); a serialized DateTime shifted a day across time zones.
+                        dateOrdered    = (dr["DateOrdered"] == DBNull.Value) ? "" : Convert.ToDateTime(dr["DateOrdered"]).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+                        datePromised   = (dr["DatePromised"] == DBNull.Value) ? "" : Convert.ToDateTime(dr["DatePromised"]).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
                         vendorName     = Util.GetValueOfString(dr["VendorName"]),
                         warehouseName  = Util.GetValueOfString(dr["WarehouseName"]),
                         salesRepName   = Util.GetValueOfString(dr["SalesRepName"]),
                         orderTotal     = Util.GetValueOfDecimal(dr["OrderTotal"]),
                         currencySymbol = Util.GetValueOfString(dr["CurrencySymbol"]),
+                        currencyIso    = Util.GetValueOfString(dr["CurrencyIso"]), // VAS163 2026-11-12
+                        stdPrecision   = Util.GetValueOfInt(dr["StdPrecision"]),
                         docStatusCode  = docStatus,
                         docStatusName  = docStatusName,
                         docStatusChip  = docStatusChip,
@@ -446,12 +452,14 @@ namespace VAS.Controllers
                         o.DateOrdered   AS DateOrdered,
                         o.DatePromised  AS DatePromised,
                         o.Created       AS CreatedOn,
-                        COALESCE(o.TotalLines, 0) AS SubTotal, -- Sub total (excl. taxes) per specification
+                        " + PoValueExclTaxSql("o") + @" AS SubTotal, -- Sub total (excl. taxes) per specification; VAS163 2026-11-13: Row 315 - also on a tax-inclusive price list
                         o.DocStatus     AS DocStatus,
                         COALESCE(bp.Name, N'—') AS VendorName,
                         w.Name          AS WarehouseName,
                         COALESCE(uCreated.Name, N'—') AS CreatedByName,
-                        COALESCE(c.CurSymbol, c.ISO_Code, N'') AS CurrencySymbol
+                        COALESCE(c.CurSymbol, c.ISO_Code, N'') AS CurrencySymbol,
+                        COALESCE(c.StdPrecision, 2) AS StdPrecision, -- VAS163 2026-11-12: currency precision for client-side formatting
+                        c.ISO_Code      AS CurrencyIso -- VAS163 2026-11-12: document currency ISO for client-side formatting
                     FROM C_Order o
                     INNER JOIN M_Warehouse w ON (w.M_Warehouse_ID = o.M_Warehouse_ID)
                     LEFT JOIN C_BPartner bp  ON (bp.C_BPartner_ID = o.C_BPartner_ID)
@@ -501,6 +509,8 @@ namespace VAS.Controllers
                         warehouseName  = Util.GetValueOfString(dr["WarehouseName"]),
                         createdByName  = Util.GetValueOfString(dr["CreatedByName"]),
                         currencySymbol = Util.GetValueOfString(dr["CurrencySymbol"]),
+                        currencyIso    = Util.GetValueOfString(dr["CurrencyIso"]), // VAS163 2026-11-12
+                        stdPrecision   = Util.GetValueOfInt(dr["StdPrecision"]),
                         docStatusCode  = parentDocStatus,
                         docStatusName  = docStatusName,
                         docStatusChip  = docStatusChip
@@ -530,11 +540,14 @@ namespace VAS.Controllers
                         COALESCE(ol.QtyOrdered, 0)   AS QtyOrdered,
                         COALESCE(ol.QtyDelivered, 0) AS QtyDelivered,
                         COALESCE(ol.PriceActual, 0)  AS PriceActual,
-                        COALESCE(ol.LineNetAmt, 0)   AS LineNetAmt,
+                        COALESCE(ol.LineNetAmt, 0)   AS LineGrossAmt,
+                        -- VAS163 2026-11-13: Row 315 - line amount without tax (tax-inclusive price list).
+                        " + LineAmtExclTaxSql("o", "ol") + @" AS LineNetAmt,
                         CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0 THEN 'Y'
                              WHEN ol.M_Product_ID IS NOT NULL AND COALESCE(p.ProductType, 'I') <> 'I' THEN 'Y'
                              ELSE 'N' END            AS IsNonStock
                     FROM C_OrderLine ol
+                    INNER JOIN C_Order o ON (o.C_Order_ID = ol.C_Order_ID)
                     LEFT JOIN M_Product p ON (p.M_Product_ID = ol.M_Product_ID)
                     LEFT JOIN C_Charge ch ON (ch.C_Charge_ID = ol.C_Charge_ID)
                     LEFT JOIN M_AttributeSetInstance asi ON (asi.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID)
@@ -613,7 +626,7 @@ namespace VAS.Controllers
                         qtyOrdered    = orderedInUom,
                         qtyDelivered  = deliveredInUom,
                         qtyPending    = pendingInUom,
-                        priceActual   = Util.GetValueOfDecimal(dr["PriceActual"]),
+                        priceActual   = ExTaxRate(Util.GetValueOfDecimal(dr["PriceActual"]), Util.GetValueOfDecimal(dr["LineNetAmt"]), Util.GetValueOfDecimal(dr["LineGrossAmt"])), // VAS163 2026-11-13: Row 315
                         lineNetAmt    = Util.GetValueOfDecimal(dr["LineNetAmt"]),
                         lineStatus    = lineStatus,
                         lineChip      = lineChip,
@@ -660,6 +673,45 @@ namespace VAS.Controllers
                 deliveryStatus    = delStatus,
                 deliveryChip      = delChip
             }, JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>
+        /// VAS163 2026-11-13: Rows 304/315/331/369/471 - PO value WITHOUT tax (the "Sub total" of the PO
+        /// screen), same rule as VAS_273: when the order or its price list is tax-inclusive, TotalLines
+        /// holds the gross, so the order's extracted tax (C_OrderTax.TaxAmt) is taken off.
+        /// </summary>
+        private static string PoValueExclTaxSql(string o)
+        {
+            return "(CASE WHEN " + TaxIncludedSql(o) + " = 'Y' "
+                + "THEN COALESCE(" + o + ".TotalLines, 0) - (SELECT COALESCE(SUM(COALESCE(ot.TaxAmt, 0)), 0) FROM C_OrderTax ot "
+                + "WHERE ot.C_Order_ID = " + o + ".C_Order_ID AND ot.IsActive = 'Y') "
+                + "ELSE COALESCE(" + o + ".TotalLines, 0) END)";
+        }
+
+        /// <summary>
+        /// VAS163 2026-11-13: Rows 304/315/331/369/471 - PO line amount WITHOUT tax: on a tax-inclusive
+        /// order / price list LineNetAmt is gross, so the line's own TaxAmt is taken off.
+        /// </summary>
+        private static string LineAmtExclTaxSql(string o, string ol)
+        {
+            return "(CASE WHEN " + TaxIncludedSql(o) + " = 'Y' "
+                + "THEN COALESCE(" + ol + ".LineNetAmt, 0) - COALESCE(" + ol + ".TaxAmt, 0) "
+                + "ELSE COALESCE(" + ol + ".LineNetAmt, 0) END)";
+        }
+
+        /// <summary>VAS163 2026-11-13: 'Y' when the order's own flag or its price list's flag is tax-inclusive.</summary>
+        private static string TaxIncludedSql(string o)
+        {
+            return "(CASE WHEN COALESCE(" + o + ".IsTaxIncluded, 'N') = 'Y' "
+                + "OR COALESCE((SELECT pl.IsTaxIncluded FROM M_PriceList pl WHERE pl.M_PriceList_ID = " + o + ".M_PriceList_ID), 'N') = 'Y' "
+                + "THEN 'Y' ELSE 'N' END)";
+        }
+
+        /// <summary>VAS163 2026-11-13: Row 315 - rate restated ex-tax in the same proportion as the line amount.</summary>
+        private static decimal ExTaxRate(decimal rate, decimal netAmt, decimal grossAmt)
+        {
+            if (grossAmt == 0m || netAmt == grossAmt) { return rate; }
+            return Math.Round(rate * netAmt / grossAmt, 6, MidpointRounding.AwayFromZero);
         }
 
         private class WarehouseStatusRow

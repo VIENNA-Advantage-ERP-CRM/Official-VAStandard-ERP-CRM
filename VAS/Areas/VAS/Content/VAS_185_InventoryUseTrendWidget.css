@@ -86,7 +86,7 @@
    dashboard regardless of this widget's own internal em scale. */
 .vas-iut-title {
     font-family: 'Roboto', sans-serif;
-    font-weight: 400;
+    font-weight: 700; /* VAS163 2026-11-13: row 32 - bold title, same as every Inventory Use widget (was 400) */
     font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
     color: #102C3F;
     line-height: 1.2;

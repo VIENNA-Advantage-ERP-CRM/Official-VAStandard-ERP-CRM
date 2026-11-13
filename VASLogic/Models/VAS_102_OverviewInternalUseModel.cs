@@ -421,9 +421,12 @@ namespace VASLogic.Models
                                   : (result.HasRequisition ? "REQUISITION"
                                   : (result.HasProject ? "PROJECT" : "MANUAL")));
 
-            // Issued value is expressed in the accounting currency; the panel
-            // renders INR (₹) with standard 2-dp precision.
+            // Issued value is expressed in the accounting currency.
+            // VAS163 2026-11-12: send that currency (ISO_Code / CurSymbol / StdPrecision of the
+            // client's primary accounting schema) instead of a fixed 2-dp precision; the panel
+            // formats it in the browser culture.
             result.StdPrecision = 2;
+            LoadBaseCurrency(ctx, result);
 
             // ----- Reference documents (References section) -----
             result.Requisitions = LoadRequisitions(M_Inventory_ID);
@@ -513,6 +516,35 @@ namespace VASLogic.Models
             // result.Activity = LoadActivity(M_Inventory_ID, result.StatusCode);
 
             return result;
+        }
+
+        /// <summary>
+        /// VAS163 2026-11-12: base (primary accounting schema) currency of the client -
+        /// ISO code, symbol and standard precision - for the panel's amount formatting.
+        /// Leaves the defaults untouched when the client has no accounting schema.
+        /// </summary>
+        private static void LoadBaseCurrency(Ctx ctx, InternalUseOverviewData result)
+        {
+            try
+            {
+                string sql = @"SELECT c.ISO_Code, c.CurSymbol, c.StdPrecision
+                                 FROM AD_ClientInfo ci
+                                 INNER JOIN C_AcctSchema a ON (a.C_AcctSchema_ID = ci.C_AcctSchema1_ID)
+                                 INNER JOIN C_Currency c ON (c.C_Currency_ID = a.C_Currency_ID)
+                                WHERE ci.AD_Client_ID = @AD_Client_ID";
+                DataSet ds = DB.ExecuteDataset(sql, new SqlParameter[] { new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()) }, null);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    DataRow c = ds.Tables[0].Rows[0];
+                    result.ISO_Code     = Util.GetValueOfString(c["ISO_Code"]);
+                    result.CurSymbol    = Util.GetValueOfString(c["CurSymbol"]);
+                    result.StdPrecision = Util.GetValueOfInt(c["StdPrecision"]);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadBaseCurrency: " + ex.Message);
+            }
         }
 
         /// <summary>
@@ -2314,6 +2346,9 @@ namespace VASLogic.Models
 
             // Currency
             public int       StdPrecision   { get; set; }
+            // VAS163 2026-11-12: base currency ISO code / symbol for the panel (formatted client side).
+            public string    ISO_Code       { get; set; }
+            public string    CurSymbol      { get; set; }
 
             // KPI aggregates
             public int       LineCount    { get; set; }

@@ -80,7 +80,11 @@
         var $pageText = null;
 
         var currentPage = 1;
-        var currentPageSize = 8;
+        /* VAS163 2026-11-13: row 252 - fixed number of lines per page (same as VAS_159), the dialog
+           body is sized from it in CSS (--vas-rows), so the pop-up keeps one size for 1..7 rows.
+           MUST stay in step with --vas-rows in VAS_160_NegativeVarianceQtyWidget.css. */
+        var MODAL_PAGE_ROWS = 7;
+        var currentPageSize = MODAL_PAGE_ROWS;
         var currentTotalRows = 0;
         var isModalOpen = false;
 
@@ -232,13 +236,17 @@
             $root.focus();
         }
 
+        // VAS163 2026-11-13: row 252 - page size no longer derived from the viewport (made the pop-up
+        // height depend on window size and row count); fixed like VAS_159.
         function calculateAdaptivePageSize() {
-            var vh = $(window).height();
-            var availableHeight = vh - 172;
-            var approxRowHeight = 36;
-            var calcRows = Math.floor(availableHeight / approxRowHeight);
+            currentPageSize = MODAL_PAGE_ROWS;
+        }
 
-            currentPageSize = Math.max(3, Math.min(8, calcRows));
+        /* VAS163 2026-11-13: row 252 - invisible spacers so a short page occupies the same height as a full one. */
+        function appendFillerRows(count) {
+            for (var f = 0; f < count; f++) {
+                $modalBody.append('<div class="vas-neg-var-row vas-neg-var-filler" aria-hidden="true">&nbsp;</div>');
+            }
         }
 
         function buildModalDOM() {
@@ -382,7 +390,8 @@
                     '  <span class="vas-neg-var-cell vas-neg-var-attr" title="' + escapeHtml(attributeDisplay) + '">' + escapeHtml(attributeDisplay) + '</span>' +
                     '  <span class="vas-neg-var-cell" title="' + escapeHtml(item.warehouse) + '">' + escapeHtml(item.warehouse) + '</span>' +
                     '  <span class="vas-neg-var-cell" title="' + escapeHtml(locatorDisplay) + '">' + escapeHtml(locatorDisplay) + '</span>' +
-                    '  <span class="vas-neg-var-cell vas-neg-var-tr" title="' + item.qtyCount + '">' + Number(item.qtyCount).toLocaleString() + '</span>' +
+                    // VAS163 2026-11-12: explicit browser locale (was toLocaleString() with no locale); tooltip too (was raw value).
+                    '  <span class="vas-neg-var-cell vas-neg-var-tr" title="' + Number(item.qtyCount).toLocaleString(window.navigator.language, { maximumFractionDigits: 10 }) + '">' + Number(item.qtyCount).toLocaleString(window.navigator.language, { maximumFractionDigits: 4 }) + '</span>' +
                     '  <span class="vas-neg-var-cell-diff vas-neg-var-tr" title="' + formatQty(item.differenceQty) + '">' + escapeHtml(formatQty(item.differenceQty)) + '</span>' +
                     '</div>'
                 );
@@ -409,6 +418,9 @@
                 $modalBody.append($row);
             }
 
+            // VAS163 2026-11-13: row 252 - hold the pop-up at MODAL_PAGE_ROWS lines whatever this page holds.
+            appendFillerRows(Math.max(0, currentPageSize - rows.length));
+
             var startIdx = ((currentPage - 1) * currentPageSize) + 1;
             var endIdx = Math.min(currentTotalRows, currentPage * currentPageSize);
             $modalFooterHelper.text(lbl("VAS_160_Showing") + " " + startIdx + "–" + endIdx + " " + lbl("VAS_160_Of") + " " + currentTotalRows);
@@ -420,6 +432,7 @@
 
         function renderModalEmpty() {
             $modalBody.html('<div class="vas-neg-var-empty">' + escapeHtml(lbl("VAS_160_NoNegVarLinesMonth", "No negative variance lines this month")) + '</div>');
+            appendFillerRows(Math.max(0, currentPageSize - 1)); // VAS163 2026-11-13: row 252 same size when empty
             $modalFooterHelper.text(lbl("VAS_160_Showing") + " 0 " + lbl("VAS_160_Of") + " 0");
             $pageText.text("1 " + lbl("VAS_160_Of") + " 1");
             $btnPrev.prop('disabled', true);

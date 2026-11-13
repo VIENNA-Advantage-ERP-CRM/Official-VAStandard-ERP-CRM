@@ -402,6 +402,7 @@ namespace VAS.Controllers
                     OrderValue = dr["Order_Value"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Order_Value"]),
                     // VAS163 2026-11-11: Row 109 - document (price list) currency of the SO value / lines.
                     CurrencySymbol = (currencySymbol ?? "").Trim(),
+                    CurrencyIso = (Util.GetValueOfString(dr["Currency_Code"]) ?? "").Trim(), // VAS163 2026-11-12: document currency ISO for client-side Intl formatting
                     CurrencyPrecision = stdPrecision,
                     WarehouseName = Util.GetValueOfString(dr["Warehouse_Name"]),
                     DeliveryMode = DecodeLabel(GetDecodeMap("C_Order", "DeliveryViaRule", language), Util.GetValueOfString(dr["Delivery_Via_Rule"]))
@@ -639,9 +640,10 @@ namespace VAS.Controllers
         {
             if (productId <= 0 || warehouseId <= 0) { return 0m; }
 
+            // VAS163 2026-11-13: rows 1029/1064 one In-stock definition in every SO lines pop-up (same as VAS_270/271/272):
+            // on-hand of the order's warehouse in the base UOM (the reservation already holds this order), clamped at 0 by the caller.
             string sql = @"
-                SELECT COALESCE(SUM(COALESCE(s.QtyOnHand, 0) - COALESCE(s.QtyReserved, 0)
-                              - COALESCE(s.QtyDedicated, 0) - COALESCE(s.QtyAllocated, 0)), 0) AS Free_Stock
+                SELECT COALESCE(SUM(COALESCE(s.QtyOnHand, 0)), 0) AS Free_Stock
                   FROM M_Storage s
                   INNER JOIN M_Locator loc ON ( loc.M_Locator_ID = s.M_Locator_ID )
                  WHERE s.M_Product_ID = @M_Product_ID
@@ -837,6 +839,7 @@ namespace VAS.Controllers
             public string DocumentStatus { get; set; }
             public decimal OrderValue { get; set; }
             /// <summary>VAS163 2026-11-11: Row 109 - document (price list) currency of the SO value / lines.</summary>
+            public string CurrencyIso { get; set; } // VAS163 2026-11-12
             public string CurrencySymbol { get; set; }
             public int CurrencyPrecision { get; set; }
             public string WarehouseName { get; set; }

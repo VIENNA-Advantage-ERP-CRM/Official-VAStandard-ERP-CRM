@@ -281,6 +281,8 @@ namespace VASLogic.Models
                               " + rmaIdSel + @"       AS RmaId,
                               " + rmaNoSel + @"       AS RmaDocNo,
                               refio.DocumentNo AS RefInOutDocNo,
+                              refio.IsReturnTrx AS Ref_IsReturnTrx,
+                              so.IsReturnTrx   AS SO_IsReturnTrx,
                               pj.Value         AS ProjectValue,
                               pj.Name          AS ProjectName,
                               so.DocumentNo    AS SO_DocumentNo,
@@ -399,6 +401,9 @@ namespace VASLogic.Models
             result.RefInOutDocNo  = Util.GetValueOfString(r["RefInOutDocNo"]);
             result.M_RMA_ID       = Util.GetValueOfInt(r["RmaId"]);
             result.RmaDocNo       = Util.GetValueOfString(r["RmaDocNo"]);
+            // VAS163 2026-11-12: return flags for the panel's zoom-window choice.
+            result.SOIsReturnTrx  = Util.GetValueOfString(r["SO_IsReturnTrx"]) == "Y";
+            result.RefIsReturnTrx = Util.GetValueOfString(r["Ref_IsReturnTrx"]) == "Y";
 
             // ----- Customer -----
             result.CustomerName         = Util.GetValueOfString(r["CustomerName"]);
@@ -2000,6 +2005,11 @@ namespace VASLogic.Models
             public string    RefInOutDocNo  { get; set; }
             public int       M_RMA_ID       { get; set; }   // 0 when M_RMA is absent
             public string    RmaDocNo       { get; set; }
+            // VAS163 2026-11-12: return flags so the panel zooms to the right
+            // document-type window (Sales Order vs Customer RMA, Delivery Order
+            // vs Customer Return).
+            public bool      SOIsReturnTrx  { get; set; }
+            public bool      RefIsReturnTrx { get; set; }
 
             // Customer
             public string    CustomerName         { get; set; }

@@ -172,7 +172,7 @@ namespace VIS.Controllers
                         o.DateOrdered AS order_date,
                         o.DatePromised AS promised_date,
                         o.DocStatus AS document_status,
-                        COALESCE(o.TotalLines, 0) AS po_value, -- Sub total (excl. taxes), matches the PO value card
+                        " + PoValueExclTaxSql("o") + @" AS po_value, -- Sub total (excl. taxes), matches the PO value card; VAS163 2026-11-13: Row 331 - also on a tax-inclusive price list
                         o.C_Currency_ID AS currency_id,
                         c.CurSymbol AS doc_cur_symbol,
                         c.ISO_Code AS doc_cur_iso,
@@ -418,7 +418,7 @@ namespace VIS.Controllers
                         o.DateOrdered AS order_date,
                         o.DatePromised AS promised_date,
                         o.DocStatus AS document_status,
-                        COALESCE(o.TotalLines, 0) AS po_value, -- Sub total (excl. taxes) per specification
+                        " + PoValueExclTaxSql("o") + @" AS po_value, -- Sub total (excl. taxes) per specification; VAS163 2026-11-13: Row 331 - also on a tax-inclusive price list
                         o.C_Currency_ID AS currency_id,
                         c.CurSymbol AS doc_cur_symbol,
                         c.ISO_Code AS doc_cur_iso,
@@ -623,11 +623,17 @@ namespace VIS.Controllers
                         COALESCE(ol.QtyDelivered, 0) AS received_qty,
                         COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) AS pending_qty,
                         COALESCE(ol.PriceActual, 0) AS rate,
-                        COALESCE(ol.LineNetAmt, 0) AS line_amount,
+                        -- VAS163 2026-11-13: Row 331 - line amount without tax on a tax-inclusive order / price list
+                        -- (price list is joined instead of a nested query, so the role access parser stays happy).
+                        CASE WHEN COALESCE(o.IsTaxIncluded, 'N') = 'Y' OR COALESCE(plx.IsTaxIncluded, 'N') = 'Y'
+                             THEN COALESCE(ol.LineNetAmt, 0) - COALESCE(ol.TaxAmt, 0)
+                             ELSE COALESCE(ol.LineNetAmt, 0) END AS line_amount,
+                        COALESCE(ol.LineNetAmt, 0) AS line_gross_amount,
                         ol.DatePromised AS promised_date,
                         o.DocStatus AS doc_status
                     FROM C_OrderLine ol
                     INNER JOIN C_Order o ON o.C_Order_ID = ol.C_Order_ID
+                    LEFT JOIN M_PriceList plx ON plx.M_PriceList_ID = o.M_PriceList_ID
                     LEFT JOIN M_Product p ON p.M_Product_ID = ol.M_Product_ID
                     LEFT JOIN C_Charge ch ON (ch.C_Charge_ID = ol.C_Charge_ID)
                     LEFT JOIN M_AttributeSetInstance asi ON asi.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID
@@ -696,7 +702,7 @@ namespace VIS.Controllers
                             OrderedQty = ordered,
                             ReceivedQty = received,
                             PendingQty = pending,
-                            Rate = Util.GetValueOfDecimal(dr["rate"]),
+                            Rate = ExTaxRate(Util.GetValueOfDecimal(dr["rate"]), Util.GetValueOfDecimal(dr["line_amount"]), Util.GetValueOfDecimal(dr["line_gross_amount"])), // VAS163 2026-11-13: Row 331
                             LineAmount = Util.GetValueOfDecimal(dr["line_amount"]),
                             PromisedDate = Util.GetValueOfDateTime(dr["promised_date"]),
                             // Charge / non-Item lines are never received - the client renders dashes
@@ -722,6 +728,28 @@ namespace VIS.Controllers
                 _log.Severe("Error in GetPOLines: " + ex.Message);
                 return Json(new { error = ex.Message, success = false }, JsonRequestBehavior.AllowGet);
             }
+        }
+
+        /// <summary>
+        /// VAS163 2026-11-13: Rows 304/315/331/369/471 - PO value WITHOUT tax (the "Sub total" of the PO
+        /// screen), same rule as VAS_273: when the order or its price list is tax-inclusive, TotalLines
+        /// holds the gross, so the order's extracted tax (C_OrderTax.TaxAmt) is taken off.
+        /// </summary>
+        private static string PoValueExclTaxSql(string o)
+        {
+            return "(CASE WHEN (CASE WHEN COALESCE(" + o + ".IsTaxIncluded, 'N') = 'Y' "
+                + "OR COALESCE((SELECT pl.IsTaxIncluded FROM M_PriceList pl WHERE pl.M_PriceList_ID = " + o + ".M_PriceList_ID), 'N') = 'Y' "
+                + "THEN 'Y' ELSE 'N' END) = 'Y' "
+                + "THEN COALESCE(" + o + ".TotalLines, 0) - (SELECT COALESCE(SUM(COALESCE(ot.TaxAmt, 0)), 0) FROM C_OrderTax ot "
+                + "WHERE ot.C_Order_ID = " + o + ".C_Order_ID AND ot.IsActive = 'Y') "
+                + "ELSE COALESCE(" + o + ".TotalLines, 0) END)";
+        }
+
+        /// <summary>VAS163 2026-11-13: Row 331 - rate restated ex-tax in the same proportion as the line amount.</summary>
+        private static decimal ExTaxRate(decimal rate, decimal netAmt, decimal grossAmt)
+        {
+            if (grossAmt == 0m || netAmt == grossAmt) { return rate; }
+            return Math.Round(rate * netAmt / grossAmt, 6, MidpointRounding.AwayFromZero);
         }
 
         #region Helper DTO Classes

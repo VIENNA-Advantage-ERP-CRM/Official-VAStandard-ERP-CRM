@@ -495,9 +495,11 @@ namespace VAS.Controllers
                             WHEN COALESCE(bi.IsPaid, 'N') = 'Y' THEN 'Completed'
                             WHEN COALESCE(bi.VA009_PaidAmount, 0) > 0 THEN 'Partially Paid'
                             ELSE 'Raised'
-                        END AS StatusLabel
+                        END AS StatusLabel,
+                        cur.ISO_Code AS CurIso, cur.CurSymbol AS CurSym, cur.StdPrecision AS CurPrec
                     FROM base_invoice bi
                     JOIN ref_choice rc ON (rc.C_Invoice_ID = bi.C_Invoice_ID)
+                    LEFT JOIN C_Currency cur ON (cur.C_Currency_ID = bi.C_Currency_ID)
                     LEFT JOIN M_InOut dio ON (dio.M_InOut_ID = rc.DirectDO_ID)
                     LEFT JOIN C_Order so ON (so.C_Order_ID = rc.SO_ID)
                     LEFT JOIN C_Order anyso ON (anyso.C_Order_ID = rc.AnySO_ID)
@@ -506,7 +508,8 @@ namespace VAS.Controllers
                 SELECT COUNT(*) OVER() AS total_count,
                        InvoiceNo AS invoice_no, InvoiceDate AS invoice_date,
                        RefNo AS ref_no, RefType AS ref_type, RefDate AS ref_date,
-                       CustomerName AS customer_name, Amount AS amount, StatusLabel AS status
+                       CustomerName AS customer_name, Amount AS amount, StatusLabel AS status,
+                       CurIso AS cur_iso, CurSym AS cur_symbol, CurPrec AS cur_precision
                 FROM rows_base
                 ORDER BY InvoiceDate DESC, InvoiceNo DESC
                 OFFSET @Offset1 ROWS FETCH NEXT @Size1 ROWS ONLY";
@@ -545,6 +548,10 @@ namespace VAS.Controllers
                         refDate = refDate.HasValue ? refDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                         customerName = Util.GetValueOfString(dr["customer_name"]),
                         amount = Util.GetValueOfDecimal(dr["amount"]),
+                        // VAS163 2026-11-12: the invoice's own currency for the row amount.
+                        currencyIso = Util.GetValueOfString(dr["cur_iso"]),
+                        currencySymbol = Util.GetValueOfString(dr["cur_symbol"]),
+                        currencyPrecision = Util.GetValueOfInt(dr["cur_precision"]),
                         status = Util.GetValueOfString(dr["status"])
                     });
                 }
@@ -584,6 +591,7 @@ namespace VAS.Controllers
         {
             string iso = "";
             string symbol = "";
+            int precision = 2; // VAS163 2026-11-12: StdPrecision sent too
             int currencyId = ctx.GetContextAsInt("$C_Currency_ID");
             if (currencyId > 0)
             {
@@ -591,17 +599,18 @@ namespace VAS.Controllers
                 try
                 {
                     cdr = DB.ExecuteReader(
-                        "SELECT ISO_Code, CurSymbol FROM C_Currency WHERE C_Currency_ID = @Cur",
+                        "SELECT ISO_Code, CurSymbol, StdPrecision FROM C_Currency WHERE C_Currency_ID = @Cur",
                         new SqlParameter[] { new SqlParameter("@Cur", currencyId) });
                     if (cdr != null && cdr.Read())
                     {
                         iso = Util.GetValueOfString(cdr["ISO_Code"]);
                         symbol = Util.GetValueOfString(cdr["CurSymbol"]);
+                        precision = Util.GetValueOfInt(cdr["StdPrecision"]);
                     }
                 }
                 finally { if (cdr != null) { cdr.Close(); cdr.Dispose(); } }
             }
-            return new { iso = iso, symbol = symbol };
+            return new { iso = iso, symbol = symbol, precision = precision };
         }
 
         /// <summary>Wraps a success payload as a serialized JSON result.</summary>

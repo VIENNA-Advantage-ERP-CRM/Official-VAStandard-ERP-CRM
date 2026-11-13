@@ -487,6 +487,7 @@ namespace VAS.Controllers
                         RepresentativeName = Util.GetValueOfString(dr2["Representative_Name"]),
                         OrderValue = dr2["Order_Value"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr2["Order_Value"]),
                         CurrencySymbol = rowCurrencySymbol,
+                        CurrencyIso = (Util.GetValueOfString(dr2["Currency_Code"]) ?? "").Trim(), // VAS163 2026-11-12: document currency ISO for client-side Intl formatting
                         CurrencyPrecision = dr2["Currency_Precision"] == DBNull.Value ? 2 : Util.GetValueOfInt(dr2["Currency_Precision"]),
                         DocumentStatus = DecodeLabel(docStatusMap, docStatusCode),
                         // VAS163 2026-11-11: Row 116 - raw DocStatus so the client colours DR / IP orange.
@@ -576,6 +577,7 @@ namespace VAS.Controllers
                     OrderValue = dr["Order_Value"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Order_Value"]),
                     // VAS163 2026-11-11: Row 123 - document (price list) currency of the SO value / lines.
                     CurrencySymbol = (currencySymbol ?? "").Trim(),
+                    CurrencyIso = (Util.GetValueOfString(dr["Currency_Code"]) ?? "").Trim(), // VAS163 2026-11-12: document currency ISO for client-side Intl formatting
                     CurrencyPrecision = stdPrecision,
                     // VAS163 2026-11-11: Row 116 - raw DocStatus so the client colours DR / IP orange.
                     DocumentStatusCode = docStatusCode,
@@ -815,9 +817,10 @@ namespace VAS.Controllers
         {
             if (productId <= 0 || warehouseId <= 0) { return 0m; }
 
+            // VAS163 2026-11-13: rows 1029/1064 one In-stock definition in every SO lines pop-up (same as VAS_270/271/272):
+            // on-hand of the order's warehouse in the base UOM (the reservation already holds this order), clamped at 0 by the caller.
             string sql = @"
-                SELECT COALESCE(SUM(COALESCE(s.QtyOnHand, 0) - COALESCE(s.QtyReserved, 0)
-                              - COALESCE(s.QtyDedicated, 0) - COALESCE(s.QtyAllocated, 0)), 0) AS Free_Stock
+                SELECT COALESCE(SUM(COALESCE(s.QtyOnHand, 0)), 0) AS Free_Stock
                   FROM M_Storage s
                   INNER JOIN M_Locator loc ON ( loc.M_Locator_ID = s.M_Locator_ID )
                  WHERE s.M_Product_ID = @M_Product_ID
@@ -1020,6 +1023,7 @@ namespace VAS.Controllers
             public string RepresentativeName { get; set; }
             public decimal OrderValue { get; set; }
             /// <summary>VAS163 2026-11-11: Row 93 - document (price list) currency of OrderValue.</summary>
+            public string CurrencyIso { get; set; } // VAS163 2026-11-12
             public string CurrencySymbol { get; set; }
             public int CurrencyPrecision { get; set; }
             public string DocumentStatus { get; set; }
@@ -1045,6 +1049,7 @@ namespace VAS.Controllers
             public string DocumentStatus { get; set; }
             public decimal OrderValue { get; set; }
             /// <summary>VAS163 2026-11-11: Row 123 - document (price list) currency of the SO value / lines.</summary>
+            public string CurrencyIso { get; set; } // VAS163 2026-11-12
             public string CurrencySymbol { get; set; }
             public int CurrencyPrecision { get; set; }
             /// <summary>VAS163 2026-11-11: Row 116 - raw C_Order.DocStatus (DR / IP / CO).</summary>

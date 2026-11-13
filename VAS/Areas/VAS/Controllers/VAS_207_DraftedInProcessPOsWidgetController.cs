@@ -300,7 +300,8 @@ namespace VIS.Controllers
                         COALESCE(ol.LineNetAmt, 0)    AS line_net_amt,
                         o.DocStatus                   AS doc_status,
                         cur.CurSymbol                 AS cur_symbol,
-                        cur.ISO_Code                  AS cur_iso
+                        cur.ISO_Code                  AS cur_iso,
+                        cur.StdPrecision              AS cur_precision
                     FROM C_OrderLine ol
                     INNER JOIN C_Order o ON o.C_Order_ID = ol.C_Order_ID
                     LEFT JOIN M_Product p ON p.M_Product_ID = ol.M_Product_ID
@@ -397,7 +398,9 @@ namespace VIS.Controllers
                             isNonStock = Util.GetValueOfString(dr["IsNonStock"]) == "Y",
                             LineStatus = lineStatus,
                             CurrencySymbol = Util.GetValueOfString(dr["cur_symbol"]),
-                            CurrencyIso = Util.GetValueOfString(dr["cur_iso"])
+                            CurrencyIso = Util.GetValueOfString(dr["cur_iso"]),
+                            // VAS163 2026-11-12: document currency precision for the client-side amount format.
+                            CurrencyPrecision = dr["cur_precision"] == DBNull.Value ? 2 : Util.GetValueOfInt(dr["cur_precision"])
                         });
                     }
                 }

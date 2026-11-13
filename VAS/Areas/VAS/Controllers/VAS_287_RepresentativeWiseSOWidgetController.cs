@@ -401,17 +401,18 @@ namespace VAS.Controllers
             // order (CO and CL) with at least one shippable Item line (M_Product.ProductType = 'I',
             // no charge) where QtyOrdered > QtyDelivered counts - not delivered AND partly
             // delivered orders. Same Item-only rule as the list's Delivery chip and Avg cycle.
+            // VAS163 2026-11-13: row 1102 the card left out booked orders the list shows as
+            // "Pending" (e.g. Henry Garrick's Closed SO 50211 with no Item quantity left: 12 counted
+            // of 14, expected 13). Now it excludes ONLY fully delivered orders, with exactly the
+            // list's Delivery-chip rule (Item lines, no charge: ordered > 0 and delivered >= ordered
+            // = fully delivered); every other booked order (pending or partly delivered) counts.
             string baseOrdersSql2 = MRole.GetDefault(ctx).AddAccessSQL(BuildBaseOrdersSql(true), "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             string pendingSql = @"
                 WITH base_orders AS (" + baseOrdersSql2 + @"),
                 line_stats AS (
                     SELECT bo.C_Order_ID AS C_Order_ID,
-                           SUM(
-                               CASE WHEN COALESCE(ol.QtyOrdered, 0) > COALESCE(ol.QtyDelivered, 0)
-                                    THEN COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0)
-                                    ELSE 0
-                               END
-                           ) AS Pending_Qty
+                           SUM(COALESCE(ol.QtyOrdered, 0)) AS Qty_Ordered,
+                           SUM(COALESCE(ol.QtyDelivered, 0)) AS Qty_Delivered
                       FROM base_orders bo
                       INNER JOIN C_OrderLine ol ON ( ol.C_Order_ID = bo.C_Order_ID AND ol.IsActive = 'Y' )
                       INNER JOIN M_Product p ON ( p.M_Product_ID = ol.M_Product_ID )
@@ -420,8 +421,10 @@ namespace VAS.Controllers
                      GROUP BY bo.C_Order_ID
                 )
                 SELECT
-                    SUM(CASE WHEN Pending_Qty > 0 THEN 1 ELSE 0 END) AS Pending_Delivery
-                  FROM line_stats";
+                    SUM(CASE WHEN COALESCE(ls.Qty_Ordered, 0) > 0 AND COALESCE(ls.Qty_Delivered, 0) >= COALESCE(ls.Qty_Ordered, 0)
+                             THEN 0 ELSE 1 END) AS Pending_Delivery
+                  FROM base_orders bo
+                  LEFT OUTER JOIN line_stats ls ON ( ls.C_Order_ID = bo.C_Order_ID )";
 
             IDataReader dr1 = null;
             try
@@ -928,9 +931,10 @@ namespace VAS.Controllers
         {
             if (productId <= 0 || warehouseId <= 0) { return 0m; }
 
+            // VAS163 2026-11-13: rows 1029/1064 one In-stock definition in every SO lines pop-up (same as VAS_270/271/272):
+            // on-hand of the order's warehouse in the base UOM (the reservation already holds this order), clamped at 0 by the caller.
             string sql = @"
-                SELECT COALESCE(SUM(COALESCE(s.QtyOnHand, 0) - COALESCE(s.QtyReserved, 0)
-                              - COALESCE(s.QtyDedicated, 0) - COALESCE(s.QtyAllocated, 0)), 0) AS Free_Stock
+                SELECT COALESCE(SUM(COALESCE(s.QtyOnHand, 0)), 0) AS Free_Stock
                   FROM M_Storage s
                   INNER JOIN M_Locator loc ON ( loc.M_Locator_ID = s.M_Locator_ID )
                  WHERE s.M_Product_ID = @M_Product_ID

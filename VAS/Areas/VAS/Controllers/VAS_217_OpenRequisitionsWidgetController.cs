@@ -747,7 +747,7 @@ namespace VIS.Controllers
                 // 9. Currencies
                 List<object> currencies = new List<object>();
                 string curSql = @"
-                    SELECT C_Currency_ID AS id, ISO_Code AS code, CurSymbol AS symbol
+                    SELECT C_Currency_ID AS id, ISO_Code AS code, CurSymbol AS symbol, StdPrecision AS std_precision
                     FROM C_Currency
                     WHERE IsActive='Y'
                     ORDER BY ISO_Code ASC";
@@ -759,7 +759,9 @@ namespace VIS.Controllers
                         {
                             id = Util.GetValueOfInt(dr["id"]),
                             code = Util.GetValueOfString(dr["code"]),
-                            symbol = Util.GetValueOfString(dr["symbol"])
+                            symbol = Util.GetValueOfString(dr["symbol"]),
+                            // VAS163 2026-11-12: currency precision for the client-side amount format.
+                            precision = dr["std_precision"] == DBNull.Value ? 2 : Util.GetValueOfInt(dr["std_precision"])
                         });
                     }
                 }

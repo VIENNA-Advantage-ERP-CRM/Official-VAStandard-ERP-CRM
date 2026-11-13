@@ -138,6 +138,7 @@ namespace VASLogic.Models
                               M_InOut.M_InOut_ID    AS SourceInOutID,
                               M_InOut.DocumentNo    AS SourceDocumentNo,
                               M_InOut.IsSOTrx       AS SourceIsSales,
+                              M_InOut.IsReturnTrx   AS SourceIsReturn, /* VAS163 2026-11-12: return windows for zoom */
                               M_InOut.MovementDate  AS MovementDate,
                               C_BPartner.Name          AS PartyName,
                               wh.Name          AS WarehouseName,
@@ -209,6 +210,8 @@ namespace VASLogic.Models
             result.SourceDocumentNo  = Util.GetValueOfString(r["SourceDocumentNo"]);
             // Sales trx => outbound Shipment; else inbound Goods Receipt.
             result.SourceTypeCode    = Util.GetValueOfString(r["SourceIsSales"]) == "Y" ? "SHP" : "GRN";
+            // VAS163 2026-11-12: a Customer / Vendor Return opens in its own window.
+            result.SourceIsReturn    = Util.GetValueOfString(r["SourceIsReturn"]) == "Y";
             result.MovementDate      = Stamp(r["MovementDate"]);
             result.PartyName         = Util.GetValueOfString(r["PartyName"]);
             result.WarehouseName     = Util.GetValueOfString(r["WarehouseName"]);
@@ -1260,6 +1263,7 @@ namespace VASLogic.Models
             public int       SourceInOutID     { get; set; }
             public string    SourceDocumentNo  { get; set; }
             public string    SourceTypeCode    { get; set; }   // GRN | SHP
+            public bool      SourceIsReturn    { get; set; }   // VAS163 2026-11-12: M_InOut.IsReturnTrx
             public DateTime? MovementDate      { get; set; }
             public string    PartyName         { get; set; }
             public string    WarehouseName     { get; set; }

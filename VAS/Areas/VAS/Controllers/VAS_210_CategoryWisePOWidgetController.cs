@@ -77,9 +77,14 @@ namespace VAS.Areas.VAS.Controllers
                         o.AD_Org_ID,
                         COALESCE(pc.M_Product_Category_ID, 0) AS M_Product_Category_ID,
                         COALESCE(pc.Name, N'Uncategorised') AS CategoryName,
-                        SUM(COALESCE(ol.LineNetAmt, 0)) AS CategoryLineNetAmt
+                        -- VAS163 2026-11-13: Row 471 - category value WITHOUT tax: on a tax-inclusive order /
+                        -- price list LineNetAmt is gross, so the line's own TaxAmt is taken off.
+                        SUM(CASE WHEN COALESCE(o.IsTaxIncluded, 'N') = 'Y' OR COALESCE(plx.IsTaxIncluded, 'N') = 'Y'
+                                 THEN COALESCE(ol.LineNetAmt, 0) - COALESCE(ol.TaxAmt, 0)
+                                 ELSE COALESCE(ol.LineNetAmt, 0) END) AS CategoryLineNetAmt
                     FROM C_Order o
                     INNER JOIN C_OrderLine ol ON (ol.C_Order_ID = o.C_Order_ID AND ol.IsActive = 'Y')
+                    LEFT JOIN M_PriceList plx ON (plx.M_PriceList_ID = o.M_PriceList_ID)
                     LEFT JOIN M_Product p ON (p.M_Product_ID = ol.M_Product_ID)
                     LEFT JOIN M_Product_Category pc ON (pc.M_Product_Category_ID = p.M_Product_Category_ID)
                     WHERE o.AD_Client_ID = " + clientId + @"
@@ -324,7 +329,8 @@ namespace VAS.Areas.VAS.Controllers
                         o.C_ConversionType_ID,
                         o.AD_Client_ID,
                         o.AD_Org_ID,
-                        COALESCE(o.TotalLines, 0) AS PoSubTotal, -- PO sub total (excl. taxes)
+                        -- VAS163 2026-11-13: Row 471 - PO sub total WITHOUT tax also on a tax-inclusive price list.
+                        " + PoValueExclTaxSql("o") + @" AS PoSubTotal, -- PO sub total (excl. taxes)
                         SUM(COALESCE(ol.LineNetAmt, 0)) AS CategoryLineNetAmt,
                         -- Ordered / delivered count Item-type products only (no charges, services), and
                         -- are in each line's own entered UOM: QtyEntered, with QtyDelivered scaled by the
@@ -361,7 +367,9 @@ namespace VAS.Areas.VAS.Controllers
                         o.C_ConversionType_ID,
                         o.AD_Client_ID,
                         o.AD_Org_ID,
-                        o.TotalLines
+                        o.TotalLines,
+                        o.IsTaxIncluded,
+                        o.M_PriceList_ID
                     ORDER BY o.DateOrdered DESC, o.DocumentNo DESC";
 
                 List<PurchaseOrderRecord> records = new List<PurchaseOrderRecord>();
@@ -526,7 +534,8 @@ namespace VAS.Areas.VAS.Controllers
                         o.C_Currency_ID,
                         o.C_ConversionType_ID,
                         o.AD_Org_ID,
-                        COALESCE(o.TotalLines, 0) AS TotalOrderAmt, -- PO sub total (excl. taxes)
+                        -- VAS163 2026-11-13: Row 471 - PO sub total WITHOUT tax also on a tax-inclusive price list.
+                        " + PoValueExclTaxSql("o") + @" AS TotalOrderAmt, -- PO sub total (excl. taxes)
                         -- Item-type products only, in each line's entered UOM (see GetCategoryPODrillDown).
                         SUM(CASE WHEN p.ProductType = 'I' THEN COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) ELSE 0 END) AS TotalQtyOrdered,
                         SUM(CASE WHEN p.ProductType = 'I' AND COALESCE(ol.QtyOrdered, 0) <> 0
@@ -553,7 +562,9 @@ namespace VAS.Areas.VAS.Controllers
                         o.C_Currency_ID,
                         o.C_ConversionType_ID,
                         o.AD_Org_ID,
-                        o.TotalLines";
+                        o.TotalLines,
+                        o.IsTaxIncluded,
+                        o.M_PriceList_ID";
 
                 POHeaderDetails header = null;
 
@@ -618,32 +629,64 @@ namespace VAS.Areas.VAS.Controllers
                              ELSE N'' END AS Attribute,
                         COALESCE(uom.Name, uom.UOMSymbol) AS UomName,
                         COALESCE(ol.QtyOrdered, 0) AS QtyOrdered,
+                        -- VAS163 2026-11-13: Row 467 - QtyEntered is in the line's selected UOM (ol.C_UOM_ID).
+                        COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) AS QtyEntered,
                         COALESCE(ol.QtyDelivered, 0) AS QtyDelivered,
                         COALESCE(ol.PriceActual, 0) AS PriceActual,
-                        COALESCE(ol.LineNetAmt, 0) AS LineNetAmt,
-                        o.DocStatus
+                        COALESCE(ol.LineNetAmt, 0) AS LineGrossAmt,
+                        -- VAS163 2026-11-13: Row 471 - line amount without tax (tax-inclusive price list).
+                        " + LineAmtExclTaxSql("o", "ol") + @" AS LineNetAmt,
+                        o.DocStatus,
+                        dcur.ISO_Code AS DocCurIso,
+                        dcur.CurSymbol AS DocCurSymbol,
+                        dcur.StdPrecision AS DocCurPrecision
                     FROM C_OrderLine ol
                     INNER JOIN C_Order o ON (o.C_Order_ID = ol.C_Order_ID)
                     LEFT JOIN M_Product p ON (p.M_Product_ID = ol.M_Product_ID)
                     LEFT JOIN C_Charge ch ON (ch.C_Charge_ID = ol.C_Charge_ID)
                     LEFT JOIN M_AttributeSetInstance asi ON (asi.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID)
                     LEFT JOIN C_UOM uom ON (uom.C_UOM_ID = ol.C_UOM_ID)
+                    LEFT JOIN C_Currency dcur ON (dcur.C_Currency_ID = o.C_Currency_ID)
                     WHERE ol.C_Order_ID = " + orderId + @"
                       AND ol.IsActive = 'Y'
                     ORDER BY ol.Line, ol.C_OrderLine_ID";
 
                 List<POLineRecord> lines = new List<POLineRecord>();
+                // VAS163 2026-11-12: line rate / amount are in the order's own currency - sent so the client
+                // formats them with that currency (they were shown with the accounting currency).
+                string docCurIso = "";
+                string docCurSymbol = "";
+                int docCurPrecision = currency.StdPrecision;
 
                 using (IDataReader dr = DB.ExecuteReader(linesSql, null, null))
                 {
                     int lineIdx = 1;
                     while (dr != null && dr.Read())
                     {
+                        if (lineIdx == 1)
+                        {
+                            docCurIso = Util.GetValueOfString(dr["DocCurIso"]);
+                            docCurSymbol = Util.GetValueOfString(dr["DocCurSymbol"]);
+                            if (dr["DocCurPrecision"] != DBNull.Value) { docCurPrecision = Util.GetValueOfInt(dr["DocCurPrecision"]); }
+                        }
                         decimal qtyOrdered = Util.GetValueOfDecimal(dr["QtyOrdered"]);
                         decimal qtyDelivered = Util.GetValueOfDecimal(dr["QtyDelivered"]);
+                        // VAS163 2026-11-13: Row 467 - quantities in the line's selected UOM (same as Rep wise /
+                        // Warehouse wise): QtyOrdered / QtyDelivered are in the base UOM, so both are scaled by
+                        // the line's own entered/ordered ratio.
+                        decimal enteredQtyUom = Util.GetValueOfDecimal(dr["QtyEntered"]);
+                        decimal uomRatio = (qtyOrdered != 0) ? (enteredQtyUom / qtyOrdered) : 1m;
+                        qtyOrdered = enteredQtyUom;
+                        qtyDelivered = qtyDelivered * uomRatio;
                         decimal qtyPending = Math.Max(0, qtyOrdered - qtyDelivered);
                         decimal rate = Util.GetValueOfDecimal(dr["PriceActual"]);
                         decimal amount = Util.GetValueOfDecimal(dr["LineNetAmt"]);
+                        // VAS163 2026-11-13: Row 471 - rate restated ex-tax in the same proportion as the amount.
+                        decimal lineGross = Util.GetValueOfDecimal(dr["LineGrossAmt"]);
+                        if (lineGross != 0m && amount != lineGross)
+                        {
+                            rate = Math.Round(rate * amount / lineGross, 6, MidpointRounding.AwayFromZero);
+                        }
                         string pStatus = Util.GetValueOfString(dr["DocStatus"]);
 
                         // Line status rule:
@@ -709,6 +752,9 @@ namespace VAS.Areas.VAS.Controllers
                     curSymbol = currency.CurSymbol,
                     curIso = currency.ISO_Code,
                     stdPrecision = currency.StdPrecision,
+                    docCurIso = docCurIso,             // VAS163 2026-11-12
+                    docCurSymbol = docCurSymbol,
+                    docCurPrecision = docCurPrecision,
                     success = true
                 };
 
@@ -727,10 +773,12 @@ namespace VAS.Areas.VAS.Controllers
         {
             var info = new CurrencyInfo
             {
+                // VAS163 2026-11-12: no hard-coded INR/₹ fallback - without an accounting schema currency the
+                // client shows plain locale numbers instead of guessing a currency.
                 CurrencyId = 0,
-                CurSymbol = "₹",
+                CurSymbol = "",
                 StdPrecision = 2,
-                ISO_Code = "INR"
+                ISO_Code = ""
             };
 
             string sql = @"
@@ -785,6 +833,38 @@ namespace VAS.Areas.VAS.Controllers
             }
 
             return amount;
+        }
+
+        /// <summary>
+        /// VAS163 2026-11-13: Rows 304/315/331/369/471 - PO value WITHOUT tax (the "Sub total" of the PO
+        /// screen), same rule as VAS_273: when the order or its price list is tax-inclusive, TotalLines
+        /// holds the gross, so the order's extracted tax (C_OrderTax.TaxAmt) is taken off.
+        /// </summary>
+        private static string PoValueExclTaxSql(string o)
+        {
+            return "(CASE WHEN " + TaxIncludedSql(o) + " = 'Y' "
+                + "THEN COALESCE(" + o + ".TotalLines, 0) - (SELECT COALESCE(SUM(COALESCE(ot.TaxAmt, 0)), 0) FROM C_OrderTax ot "
+                + "WHERE ot.C_Order_ID = " + o + ".C_Order_ID AND ot.IsActive = 'Y') "
+                + "ELSE COALESCE(" + o + ".TotalLines, 0) END)";
+        }
+
+        /// <summary>
+        /// VAS163 2026-11-13: Rows 304/315/331/369/471 - PO line amount WITHOUT tax: on a tax-inclusive
+        /// order / price list LineNetAmt is gross, so the line's own TaxAmt is taken off.
+        /// </summary>
+        private static string LineAmtExclTaxSql(string o, string ol)
+        {
+            return "(CASE WHEN " + TaxIncludedSql(o) + " = 'Y' "
+                + "THEN COALESCE(" + ol + ".LineNetAmt, 0) - COALESCE(" + ol + ".TaxAmt, 0) "
+                + "ELSE COALESCE(" + ol + ".LineNetAmt, 0) END)";
+        }
+
+        /// <summary>VAS163 2026-11-13: 'Y' when the order's own flag or its price list's flag is tax-inclusive.</summary>
+        private static string TaxIncludedSql(string o)
+        {
+            return "(CASE WHEN COALESCE(" + o + ".IsTaxIncluded, 'N') = 'Y' "
+                + "OR COALESCE((SELECT pl.IsTaxIncluded FROM M_PriceList pl WHERE pl.M_PriceList_ID = " + o + ".M_PriceList_ID), 'N') = 'Y' "
+                + "THEN 'Y' ELSE 'N' END)";
         }
 
         private static string ToSqlDate(DateTime date)

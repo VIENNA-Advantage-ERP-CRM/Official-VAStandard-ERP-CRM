@@ -71,15 +71,17 @@ namespace VIS.Controllers
             try
             {
                 VAS_ReqCurrency cur = VAS_ReqWidgetData.GetSchemaCurrency(ctx);
-                List<SqlParameter> p = new List<SqlParameter> { new SqlParameter("@RQ_Req", requisitionId) };
-                List<VAS_ReqLine> lines = VAS_ReqWidgetData.LoadLines(ctx, cur, "r.M_Requisition_ID = @RQ_Req", p);
-                if (lines.Count == 0)
+                // VAS163 2026-11-13: row 1120 - the header is read on its own, so a requisition without lines
+                // still opens the popup with its header details (the lines query needs at least one line).
+                VAS_ReqLine h = VAS_ReqWidgetData.LoadHeader(ctx, requisitionId);
+                if (h == null)
                 {
                     return VAS_ReqWidgetData.Error(ctx, "VAS_305_NoRecord", "Requisition not found.");
                 }
+                List<SqlParameter> p = new List<SqlParameter> { new SqlParameter("@RQ_Req", requisitionId) };
+                List<VAS_ReqLine> lines = VAS_ReqWidgetData.LoadLines(ctx, cur, "r.M_Requisition_ID = @RQ_Req", p);
 
-                Dictionary<int, List<object>> docs = VAS_ReqWidgetData.LoadFulfilmentDocs(requisitionId);
-                VAS_ReqLine h = lines[0];
+                Dictionary<int, List<object>> docs = lines.Count > 0 ? VAS_ReqWidgetData.LoadFulfilmentDocs(requisitionId) : new Dictionary<int, List<object>>();
                 DateTime today = DateTime.Now.Date;
                 string status = VAS_ReqWidgetData.SystemStatus(lines);
 
@@ -92,9 +94,11 @@ namespace VIS.Controllers
                     statusCode = status,
                     statusName = VAS_ReqWidgetData.StatusName(ctx, status),
                     dateDoc = VAS_ReqWidgetData.D(h.DateDoc),
+                    // VAS163 2026-11-13: row 1122 - 'Raised' shows the creation date (M_Requisition.Created)
+                    created = VAS_ReqWidgetData.D(h.Created),
                     dateRequired = VAS_ReqWidgetData.D(h.DateRequired),
                     earliestNeedBy = VAS_ReqWidgetData.D(lines.Where(l => l.OpenQty > 0 && l.NeedBy.HasValue).Select(l => l.NeedBy).Min()
-                                                   ?? lines.Select(l => l.NeedBy).Min()),
+                                                   ?? lines.Select(l => l.NeedBy).Min() ?? h.DateRequired),
                     requester = h.RequesterName,
                     warehouse = h.WarehouseName,
                     sourceWarehouse = h.SourceWarehouseName,
@@ -114,6 +118,7 @@ namespace VIS.Controllers
                     product = l.ItemName,
                     productCode = l.ProductValue,
                     category = l.CategoryName,
+                    attribute = l.AttributeName, // VAS163 2026-11-13: row 1130 - attribute set instance description (blank when none)
                     uom = l.UomName,
                     qty = l.Qty,
                     orderedQty = l.OrderedQty,
@@ -152,9 +157,10 @@ namespace VIS.Controllers
     {
         public int RequisitionId, LineId, LineNo, ProductId, ChargeId, OrgId, CurrencyId, UserId, CreatedBy, CategoryId;
         public string DocumentNo, DocStatus, Priority, RequesterName, WarehouseName, SourceWarehouseName, Description,
-            ProductName, ProductValue, ChargeName, UomName, CategoryName, VendorName;
-        public DateTime? DateDoc, DateRequired, LineNeedBy;
-        public decimal Qty, Price, PoQty, PoRcvQty, TrfQty, TrfOpenQty, DeliveredQty;
+            ProductName, ProductValue, ChargeName, UomName, CategoryName, VendorName, AttributeName;
+        public DateTime? DateDoc, DateRequired, LineNeedBy, Created;
+        /// <summary>PoDoneQty: qty on completed / closed POs only (VAS163 2026-11-13: row 1143).</summary>
+        public decimal Qty, Price, PoQty, PoRcvQty, TrfQty, TrfOpenQty, DeliveredQty, PoDoneQty;
         /// <summary>Requisition currency to accounting-schema currency factor.</summary>
         public decimal Rate = 1m;
 
@@ -162,10 +168,19 @@ namespace VIS.Controllers
         public string ItemName { get { return !string.IsNullOrEmpty(ProductName) ? ProductName : (ChargeName ?? ""); } }
         public decimal OrderedQty { get { return PoQty + TrfQty; } }
         public decimal NotOrderedQty { get { return Math.Max(0m, Qty - PoQty - Math.Max(TrfQty, DeliveredQty)); } }
-        public decimal InProgressQty { get { return Math.Max(0m, PoQty - PoRcvQty) + TrfOpenQty; } }
+        // VAS163 2026-11-13: row 1135 - an over-ordered line (e.g. PO 6 + transfer 5 for 6 requested) counted 11 in
+        // progress, so "Still to come" exceeded the total; the in-progress part is capped at what is still missing.
+        public decimal InProgressQty { get { return Math.Min(Math.Max(0m, PoQty - PoRcvQty) + TrfOpenQty, Math.Max(0m, Qty - ReceivedQty - NotOrderedQty)); } }
         public decimal ReceivedQty { get { return Math.Min(Qty, PoRcvQty + DeliveredQty); } }
-        /// <summary>Quantity still to come: not ordered + ordered but not received.</summary>
-        public decimal OpenQty { get { return NotOrderedQty + InProgressQty; } }
+        /// <summary>Quantity still to come: not ordered + ordered but not received; never above requested - received.</summary>
+        public decimal OpenQty { get { return Math.Max(0m, Math.Min(Qty - ReceivedQty, NotOrderedQty + InProgressQty)); } }
+        /// <summary>
+        /// VAS163 2026-11-13: row 1143 - quantity not yet ordered for the STATUS: only completed / closed purchase
+        /// orders and transfers (or delivered qty) count as ordered, so a drafted PO / transfer never shows "Ordered".
+        /// The fulfilment figures above (not ordered, in progress) still count drafts, so "Lines to order" does not
+        /// suggest a second PO for a line already on a draft PO.
+        /// </summary>
+        public decimal StatusNotOrderedQty { get { return Math.Max(0m, Qty - PoDoneQty - Math.Max(TrfQty - TrfOpenQty, DeliveredQty)); } }
 
         public decimal Amount(decimal qty)
         {
@@ -181,8 +196,9 @@ namespace VIS.Controllers
         public string State()
         {
             if (OpenQty <= 0) { return "received"; }
-            if (NotOrderedQty >= Qty) { return "notordered"; }
-            if (NotOrderedQty > 0) { return "partordered"; }
+            // VAS163 2026-11-13: row 1143 - ordered only through completed / closed documents
+            if (StatusNotOrderedQty >= Qty) { return "notordered"; }
+            if (StatusNotOrderedQty > 0) { return "partordered"; }
             return "ordered";
         }
     }
@@ -312,6 +328,7 @@ namespace VIS.Controllers
             bool hasSource = HasColumn("M_Requisition", "DTD001_MWarehouseSource_ID");
             bool hasPoLink = HasColumn("C_OrderLine", "M_RequisitionLine_ID");
             bool hasMoveLink = HasColumn("M_MovementLine", "M_RequisitionLine_ID");
+            bool hasAsi = HasColumn("M_RequisitionLine", "M_AttributeSetInstance_ID"); // VAS163 2026-11-13: row 1130
 
             StringBuilder sql = new StringBuilder();
             sql.Append(@"
@@ -321,7 +338,9 @@ namespace VIS.Controllers
                        rl.Qty, rl.PriceActual, p.Name AS ProductName, p.Value AS ProductValue, ch.Name AS ChargeName,
                        uom.Name AS UomName, pc.M_Product_Category_ID, pc.Name AS CategoryName, vnd.VendorName,
                        COALESCE(po.PoQty, 0) AS PoQty, COALESCE(po.PoRcvQty, 0) AS PoRcvQty,
-                       COALESCE(mv.TrfQty, 0) AS TrfQty, COALESCE(mv.TrfOpenQty, 0) AS TrfOpenQty");
+                       COALESCE(mv.TrfQty, 0) AS TrfQty, COALESCE(mv.TrfOpenQty, 0) AS TrfOpenQty,
+                       COALESCE(po.PoDoneQty, 0) AS PoDoneQty");
+            if (hasAsi) { sql.Append(", asi.Description AS AttributeName"); }
             sql.Append(hasLineDate ? ", rl.DTD001_DateRequired AS LineNeedBy" : ", r.DateRequired AS LineNeedBy");
             sql.Append(hasDelivered ? ", COALESCE(rl.DTD001_DeliveredQty, 0) AS DeliveredQty" : ", 0 AS DeliveredQty");
             sql.Append(hasUser ? ", r.AD_User_ID, u.Name AS RequesterName" : ", 0 AS AD_User_ID, cu.Name AS RequesterName");
@@ -340,6 +359,7 @@ namespace VIS.Controllers
                 : " LEFT JOIN C_UOM uom ON uom.C_UOM_ID = p.C_UOM_ID");
             if (hasUser) { sql.Append(" LEFT JOIN AD_User u ON u.AD_User_ID = r.AD_User_ID"); }
             if (hasSource) { sql.Append(" LEFT JOIN M_Warehouse sw ON sw.M_Warehouse_ID = r.DTD001_MWarehouseSource_ID"); }
+            if (hasAsi) { sql.Append(" LEFT JOIN M_AttributeSetInstance asi ON asi.M_AttributeSetInstance_ID = rl.M_AttributeSetInstance_ID AND asi.M_AttributeSetInstance_ID > 0"); }
             sql.Append(@"
                 LEFT JOIN (SELECT ppo.M_Product_ID, MIN(vbp.Name) AS VendorName
                            FROM M_Product_PO ppo
@@ -349,7 +369,8 @@ namespace VIS.Controllers
             if (hasPoLink)
             {
                 sql.Append(@"
-                LEFT JOIN (SELECT ol.M_RequisitionLine_ID, SUM(ol.QtyOrdered) AS PoQty, SUM(ol.QtyDelivered) AS PoRcvQty
+                LEFT JOIN (SELECT ol.M_RequisitionLine_ID, SUM(ol.QtyOrdered) AS PoQty, SUM(ol.QtyDelivered) AS PoRcvQty,
+                                  SUM(CASE WHEN o.DocStatus IN ('CO', 'CL') THEN ol.QtyOrdered ELSE 0 END) AS PoDoneQty
                            FROM C_OrderLine ol
                            INNER JOIN C_Order o ON o.C_Order_ID = ol.C_Order_ID
                            WHERE o.AD_Client_ID = @RQC_Order AND o.IsSOTrx = 'N' AND o.DocStatus NOT IN ('VO', 'RE')
@@ -358,7 +379,7 @@ namespace VIS.Controllers
             }
             else
             {
-                sql.Append(" LEFT JOIN (SELECT 0 AS M_RequisitionLine_ID, 0 AS PoQty, 0 AS PoRcvQty FROM AD_Client WHERE AD_Client_ID = @RQC_Order) po ON po.M_RequisitionLine_ID = rl.M_RequisitionLine_ID");
+                sql.Append(" LEFT JOIN (SELECT 0 AS M_RequisitionLine_ID, 0 AS PoQty, 0 AS PoRcvQty, 0 AS PoDoneQty FROM AD_Client WHERE AD_Client_ID = @RQC_Order) po ON po.M_RequisitionLine_ID = rl.M_RequisitionLine_ID");
             }
             if (hasMoveLink)
             {
@@ -436,7 +457,9 @@ namespace VIS.Controllers
                     PoRcvQty = Util.GetValueOfDecimal(row["PoRcvQty"]),
                     TrfQty = Util.GetValueOfDecimal(row["TrfQty"]),
                     TrfOpenQty = Util.GetValueOfDecimal(row["TrfOpenQty"]),
-                    DeliveredQty = Util.GetValueOfDecimal(row["DeliveredQty"])
+                    DeliveredQty = Util.GetValueOfDecimal(row["DeliveredQty"]),
+                    PoDoneQty = Util.GetValueOfDecimal(row["PoDoneQty"]),
+                    AttributeName = hasAsi ? Util.GetValueOfString(row["AttributeName"]) : ""
                 };
                 if (string.IsNullOrEmpty(l.RequesterName))
                 {
@@ -450,6 +473,61 @@ namespace VIS.Controllers
                 lines.Add(l);
             }
             return lines;
+        }
+
+        /// <summary>
+        /// VAS163 2026-11-13: row 1120 - header of one requisition (the role may read), without its lines, so a
+        /// requisition that has no line yet still opens the popup. Also carries Created (row 1122). Null when not found.
+        /// </summary>
+        public static VAS_ReqLine LoadHeader(Ctx ctx, int requisitionId)
+        {
+            bool hasUser = HasColumn("M_Requisition", "AD_User_ID");
+            bool hasSource = HasColumn("M_Requisition", "DTD001_MWarehouseSource_ID");
+            StringBuilder sql = new StringBuilder(@"
+                SELECT r.M_Requisition_ID, r.DocumentNo, r.DocStatus, r.DateDoc, r.DateRequired, r.PriorityRule,
+                       r.AD_Org_ID, r.CreatedBy, r.Created, r.Description, w.Name AS WarehouseName, cu.Name AS CreatedByName");
+            sql.Append(hasUser ? ", u.Name AS RequesterName" : ", cu.Name AS RequesterName");
+            sql.Append(hasSource ? ", sw.Name AS SourceWarehouseName" : ", w.Name AS SourceWarehouseName");
+            sql.Append(@"
+                FROM M_Requisition r
+                LEFT JOIN M_Warehouse w ON w.M_Warehouse_ID = r.M_Warehouse_ID
+                LEFT JOIN AD_User cu ON cu.AD_User_ID = r.CreatedBy");
+            if (hasUser) { sql.Append(" LEFT JOIN AD_User u ON u.AD_User_ID = r.AD_User_ID"); }
+            if (hasSource) { sql.Append(" LEFT JOIN M_Warehouse sw ON sw.M_Warehouse_ID = r.DTD001_MWarehouseSource_ID"); }
+            sql.Append(@"
+                WHERE r.M_Requisition_ID = @RQ_Req AND r.AD_Client_ID = @RQC_Client AND r.IsActive = 'Y'
+                  AND r.M_Requisition_ID IN (" + AccessSql(ctx) + ")");
+            DataSet ds = DB.ExecuteDataset(sql.ToString(), new SqlParameter[]
+            {
+                new SqlParameter("@RQ_Req", requisitionId),
+                new SqlParameter("@RQC_Client", ctx.GetAD_Client_ID())
+            }, null);
+            if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+            {
+                return null;
+            }
+            DataRow row = ds.Tables[0].Rows[0];
+            VAS_ReqLine h = new VAS_ReqLine
+            {
+                RequisitionId = Util.GetValueOfInt(row["M_Requisition_ID"]),
+                DocumentNo = Util.GetValueOfString(row["DocumentNo"]),
+                DocStatus = Util.GetValueOfString(row["DocStatus"]),
+                DateDoc = Util.GetValueOfDateTime(row["DateDoc"]),
+                DateRequired = Util.GetValueOfDateTime(row["DateRequired"]),
+                Created = Util.GetValueOfDateTime(row["Created"]),
+                Priority = Util.GetValueOfString(row["PriorityRule"]),
+                OrgId = Util.GetValueOfInt(row["AD_Org_ID"]),
+                CreatedBy = Util.GetValueOfInt(row["CreatedBy"]),
+                Description = Util.GetValueOfString(row["Description"]),
+                WarehouseName = Util.GetValueOfString(row["WarehouseName"]),
+                SourceWarehouseName = Util.GetValueOfString(row["SourceWarehouseName"]),
+                RequesterName = Util.GetValueOfString(row["RequesterName"])
+            };
+            if (string.IsNullOrEmpty(h.RequesterName))
+            {
+                h.RequesterName = Util.GetValueOfString(row["CreatedByName"]);
+            }
+            return h;
         }
 
         /// <summary>Factor from the requisition's price-list currency to the accounting-schema currency.</summary>
@@ -494,7 +572,7 @@ namespace VIS.Controllers
             foreach (VAS_ReqLine l in reqLines)
             {
                 qty += l.Qty;
-                ord += l.Qty - l.NotOrderedQty;
+                ord += l.Qty - l.StatusNotOrderedQty; // VAS163 2026-11-13: row 1143 - drafted PO / transfer is not "Ordered"
                 del += l.ReceivedQty;
             }
             if (del > 0m)
@@ -611,7 +689,10 @@ namespace VIS.Controllers
             };
             if (HasColumn("C_OrderLine", "M_RequisitionLine_ID"))
             {
-                DataSet ds = DB.ExecuteDataset(@"SELECT ol.M_RequisitionLine_ID, o.DocumentNo, o.DocStatus, ol.QtyOrdered, ol.QtyDelivered
+                // VAS163 2026-11-13: row 1142 - a blanket purchase order is listed as such (BPO)
+                bool hasBlanket = HasColumn("C_Order", "IsBlanketTrx");
+                DataSet ds = DB.ExecuteDataset(@"SELECT ol.M_RequisitionLine_ID, o.DocumentNo, o.DocStatus, ol.QtyOrdered, ol.QtyDelivered"
+                        + (hasBlanket ? ", o.IsBlanketTrx" : "") + @"
                         FROM C_OrderLine ol
                         INNER JOIN C_Order o ON o.C_Order_ID = ol.C_Order_ID
                         INNER JOIN M_RequisitionLine rl ON rl.M_RequisitionLine_ID = ol.M_RequisitionLine_ID
@@ -624,7 +705,7 @@ namespace VIS.Controllers
                     {
                         add(Util.GetValueOfInt(r["M_RequisitionLine_ID"]), new
                         {
-                            type = "PO",
+                            type = hasBlanket && Util.GetValueOfString(r["IsBlanketTrx"]) == "Y" ? "BPO" : "PO",
                             documentNo = Util.GetValueOfString(r["DocumentNo"]),
                             docStatus = Util.GetValueOfString(r["DocStatus"]),
                             qty = Util.GetValueOfDecimal(r["QtyOrdered"]),
@@ -655,6 +736,63 @@ namespace VIS.Controllers
                             docStatus = st,
                             qty = q,
                             receivedQty = (st == "CO" || st == "CL") ? q : 0m
+                        });
+                    }
+                }
+            }
+            // VAS163 2026-11-13: row 1142 - Inventory Use (internal use lines) raised from the requisition line
+            if (HasColumn("M_InventoryLine", "M_RequisitionLine_ID"))
+            {
+                DataSet ds = DB.ExecuteDataset(@"SELECT il.M_RequisitionLine_ID, i.DocumentNo, i.DocStatus, il.QtyInternalUse
+                        FROM M_InventoryLine il
+                        INNER JOIN M_Inventory i ON i.M_Inventory_ID = il.M_Inventory_ID
+                        INNER JOIN M_RequisitionLine rl ON rl.M_RequisitionLine_ID = il.M_RequisitionLine_ID
+                        WHERE rl.M_Requisition_ID = @RQ_Req AND i.IsInternalUse = 'Y' AND i.DocStatus NOT IN ('VO', 'RE') AND il.IsActive = 'Y'
+                        ORDER BY i.DocumentNo",
+                    new SqlParameter[] { new SqlParameter("@RQ_Req", requisitionId) }, null);
+                if (ds != null && ds.Tables.Count > 0)
+                {
+                    foreach (DataRow r in ds.Tables[0].Rows)
+                    {
+                        string st = Util.GetValueOfString(r["DocStatus"]);
+                        decimal q = Util.GetValueOfDecimal(r["QtyInternalUse"]);
+                        add(Util.GetValueOfInt(r["M_RequisitionLine_ID"]), new
+                        {
+                            type = "IU",
+                            documentNo = Util.GetValueOfString(r["DocumentNo"]),
+                            docStatus = st,
+                            qty = q,
+                            receivedQty = (st == "CO" || st == "CL") ? q : 0m
+                        });
+                    }
+                }
+            }
+            // VAS163 2026-11-13: row 1142 - RFQ lines raised from the requisition line
+            if (HasColumn("C_RfQLine", "M_RequisitionLine_ID"))
+            {
+                bool hasRfqStatus = HasColumn("C_RfQ", "DocStatus");
+                DataSet ds = DB.ExecuteDataset(@"SELECT q.M_RequisitionLine_ID, f.DocumentNo, f.Processed"
+                        + (hasRfqStatus ? ", f.DocStatus" : "") + @"
+                        FROM C_RfQLine q
+                        INNER JOIN C_RfQ f ON f.C_RfQ_ID = q.C_RfQ_ID
+                        INNER JOIN M_RequisitionLine rl ON rl.M_RequisitionLine_ID = q.M_RequisitionLine_ID
+                        WHERE rl.M_Requisition_ID = @RQ_Req AND q.IsActive = 'Y' AND f.IsActive = 'Y'
+                        ORDER BY f.DocumentNo",
+                    new SqlParameter[] { new SqlParameter("@RQ_Req", requisitionId) }, null);
+                if (ds != null && ds.Tables.Count > 0)
+                {
+                    foreach (DataRow r in ds.Tables[0].Rows)
+                    {
+                        string st = hasRfqStatus ? Util.GetValueOfString(r["DocStatus"]) : "";
+                        if (string.IsNullOrEmpty(st)) { st = Util.GetValueOfString(r["Processed"]) == "Y" ? "CO" : "DR"; }
+                        if (st == "VO" || st == "RE") { continue; }
+                        add(Util.GetValueOfInt(r["M_RequisitionLine_ID"]), new
+                        {
+                            type = "RFQ",
+                            documentNo = Util.GetValueOfString(r["DocumentNo"]),
+                            docStatus = st,
+                            qty = 0m,
+                            receivedQty = 0m
                         });
                     }
                 }

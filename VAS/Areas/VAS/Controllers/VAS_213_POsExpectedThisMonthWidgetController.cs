@@ -153,6 +153,7 @@ namespace VIS.Controllers
                         rep.Name AS representative_name,
                         c.CurSymbol AS doc_cur_symbol,
                         c.ISO_Code AS doc_cur_iso,
+                        c.StdPrecision AS doc_cur_precision,
                         -- PO value excludes taxes: on a tax-inclusive order TotalLines carries the
                         -- gross, so the extracted tax (C_OrderTax) is taken off to get the sub total.
                         " + PO_VALUE_EXCL_TAX_SQL + @" AS po_value,
@@ -230,6 +231,8 @@ namespace VIS.Controllers
                         string repName = Util.GetValueOfString(row["representative_name"]);
                         string docCurSymbol = Util.GetValueOfString(row["doc_cur_symbol"]);
                         string docCurIso = Util.GetValueOfString(row["doc_cur_iso"]);
+                        // VAS163 2026-11-12: document currency precision for the client-side amount format.
+                        int docCurPrecision = row["doc_cur_precision"] == DBNull.Value ? 2 : Util.GetValueOfInt(row["doc_cur_precision"]);
                         decimal poValue = Util.GetValueOfDecimal(row["po_value"]);
                         decimal orderedQty = Util.GetValueOfDecimal(row["ordered_qty"]);
                         decimal deliveredQty = Util.GetValueOfDecimal(row["delivered_qty"]);
@@ -312,6 +315,7 @@ namespace VIS.Controllers
                             CurrencyID = orderCurId,
                             CurrencySymbol = docCurSymbol,
                             CurrencyISO = docCurIso,
+                            StdPrecision = docCurPrecision, // VAS163 2026-11-12
                             OrderedQty = orderedQty,
                             DeliveredQty = deliveredQty,
                             PendingQty = pendingQty,

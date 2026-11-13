@@ -43,6 +43,9 @@
         return list;
     }
 
+    // VAS163 2026-11-12: counts in browser-locale grouping.
+    function fmtInt(n) { return (Number(n) || 0).toLocaleString(window.navigator.language); }
+
     // VAS163 2026-11-10: browser locale (6-Nov retest2).
     function formatDate(iso) {
         if (!iso) { return '—'; }
@@ -53,35 +56,18 @@
     }
 
 // ===== NEW CODE START — currency format (agent C07, 2026-08-19) =====
+    // VAS163 2026-11-12: no '$' fallback, fixed 'en-IN'/'en-US', own Cr/L/B/M tiers or toFixed -
+    // server currency, browser culture via the shared helper.
     function formatCurrency(val, currencyObj) {
-        var num = parseFloat(val);
-        if (isNaN(num) || num === null || num === undefined) { num = 0; }
-        var iso = (currencyObj && currencyObj.iso) ? currencyObj.iso.toUpperCase() : '';
-        var symbol = (currencyObj && currencyObj.symbol) ? currencyObj.symbol : (iso || '$');
+        var c = currencyObj || {};
+        return VAS.formatAmountByBrowser(val, c.iso || '', c.precision, { compact: true, symbol: c.symbol || '' });
+    }
 
-        var isIndian = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'].indexOf(iso) !== -1;
-        var formattedNum = '';
-
-        var absVal = Math.abs(num);
-        if (isIndian) {
-            if (absVal >= 10000000) {
-                formattedNum = (num / 10000000).toFixed(2) + ' Cr';
-            } else if (absVal >= 100000) {
-                formattedNum = (num / 100000).toFixed(2) + ' L';
-            } else {
-                formattedNum = num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            }
-        } else {
-            if (absVal >= 1000000000) {
-                formattedNum = (num / 1000000000).toFixed(2) + ' B';
-            } else if (absVal >= 1000000) {
-                formattedNum = (num / 1000000).toFixed(2) + ' M';
-            } else {
-                formattedNum = num.toLocaleString(window.navigator.language || 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            }
-        }
-
-        return symbol + ' ' + formattedNum;
+    // VAS163 2026-11-12: quantities / percents / period in the browser culture.
+    function fmtQty(n) { return (Number(n) || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 4 }); }
+    function fmtPct(n) { return (Number(n) || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 1 }) + '%'; }
+    function periodText(m, y) {
+        return new Date(y, m - 1, 1).toLocaleDateString(window.navigator.language, { month: 'short', year: 'numeric' });
     }
 // ===== NEW CODE END — currency format =====
 
@@ -117,7 +103,7 @@
         var YEAR_MIN = 2024;
 
         function buildWidget() {
-            var monthLabel = monthNames()[selMonth - 1] + ' ' + selYear;
+            var monthLabel = periodText(selMonth, selYear);
             $root.html(
                 '<div class="vas-173-header-row">' +
                     '<div class="vas-173-left-cluster">' +
@@ -199,7 +185,7 @@
         }
 
         function updatePeriodLabel() {
-            var text = monthNames()[selMonth - 1] + ' ' + selYear;
+            var text = periodText(selMonth, selYear);
             $root.find('#vas173-sub').text(lbl('VAS_173_StockMoved', 'Stock moved') + ' · ' + text + ' (qty)');
         }
 
@@ -211,7 +197,7 @@
             currentPage = Math.min(currentPage, totalPages);
 
             if (total === 0) {
-                $body.html('<div class="vas-173-empty">' + escapeHtml(lbl('VAS_173_NoTransfers', 'No transfers in') + ' ' + monthNames()[selMonth - 1] + ' ' + selYear) + '</div>');
+                $body.html('<div class="vas-173-empty">' + escapeHtml(lbl('VAS_173_NoTransfers', 'No transfers in') + ' ' + periodText(selMonth, selYear)) + '</div>');
                 $footer.empty(); // nothing to page - no pagination on an empty widget
                 return;
             }
@@ -224,7 +210,7 @@
             for (var i = 0; i < slice.length; i++) {
                 var wh = slice[i];
                 var color = PALETTE[wh.PaletteIndex % PALETTE.length];
-                var movesTxt = wh.Moves === 1 ? ('1 ' + lbl('VAS_173_Move', 'move')) : (wh.Moves + ' ' + lbl('VAS_173_Moves', 'moves'));
+                var movesTxt = wh.Moves === 1 ? (fmtInt(1) + ' ' + lbl('VAS_173_Move', 'move')) : (fmtInt(wh.Moves) + ' ' + lbl('VAS_173_Moves', 'moves'));
 
                 html += '<button type="button" class="vas-173-row" data-idx="' + (start + i) + '">' +
                     '<span class="vas-173-dot" style="background-color:' + color + '"></span>' +
@@ -232,8 +218,8 @@
                     '<span class="vas-173-moves-meta">' + escapeHtml(movesTxt) + '</span>' +
                     '<div class="vas-173-bar-track"><div class="vas-173-bar-fill" style="width:' + (wh.BarFill || 0) + '%; background-color:' + color + '"></div></div>' +
                     '<div class="vas-173-qty-share">' +
-                        '<span class="vas-173-qty-val">' + Number(wh.TotalQty || 0).toLocaleString(window.navigator.language) + '</span>' +
-                        '<span class="vas-173-share-pct">' + (wh.Share || 0) + '%</span>' +
+                        '<span class="vas-173-qty-val">' + fmtQty(wh.TotalQty) + '</span>' +
+                        '<span class="vas-173-share-pct">' + fmtPct(wh.Share) + '</span>' +
                     '</div>' +
                 '</button>';
             }
@@ -250,12 +236,12 @@
 
         function renderFooter($footer, s, e, total, page, totalPages) {
             var showingTxt = total === 0 ? '' :
-                lbl('VAS_173_Showing', 'Showing') + ' ' + s + '–' + e + ' ' + lbl('VAS_173_Of', 'of') + ' ' + total;
+                lbl('VAS_173_Showing', 'Showing') + ' ' + fmtInt(s) + '–' + fmtInt(e) + ' ' + lbl('VAS_173_Of', 'of') + ' ' + fmtInt(total); // VAS163 2026-11-12: locale counts
             $footer.html(
                 '<span class="vas-173-footer-helper">' + escapeHtml(showingTxt) + '</span>' +
                 '<span class="vas-173-pager">' +
                     '<button type="button" class="vas-173-pager-btn" id="vas173-prev"' + (page <= 1 ? ' disabled' : '') + '>&#8249;</button>' +
-                    '<span class="vas-173-pager-label">' + page + ' ' + lbl('VAS_173_Of', 'of') + ' ' + totalPages + '</span>' +
+                    '<span class="vas-173-pager-label">' + fmtInt(page) + ' ' + lbl('VAS_173_Of', 'of') + ' ' + fmtInt(totalPages) + '</span>' +
                     '<button type="button" class="vas-173-pager-btn" id="vas173-next"' + (page >= totalPages ? ' disabled' : '') + '>&#8250;</button>' +
                 '</span>'
             );
@@ -313,7 +299,7 @@
         function renderModal() {
             var wh = activeWH;
             var color = PALETTE[wh.PaletteIndex % PALETTE.length];
-            var periodTxt = monthNames()[selMonth - 1] + ' ' + selYear;
+            var periodTxt = periodText(selMonth, selYear);
             var transfers = wh.Transfers || [];
             var totalLines = transfers.length;
             var totalPages = Math.max(1, Math.ceil(totalLines / modalPageSize));
@@ -333,15 +319,15 @@
                             '<div class="vas-173-loc-sub">' + escapeHtml((t.FromLocator || '') + ' → ' + (t.ToLocator || '')) + '</div>' +
                         '</td>' +
                         '<td style="text-align:left;">' + escapeHtml(formatDate(t.MoveDate)) + '</td>' +
-                        '<td style="text-align:right;">' + (t.Products || 0) + '</td>' +
-                        '<td style="text-align:right; font-weight:700;">' + Number(t.Qty || 0).toLocaleString(window.navigator.language) + '</td>' +
+                        '<td style="text-align:right;">' + fmtInt(t.Products) + '</td>' +
+                        '<td style="text-align:right; font-weight:700;">' + fmtQty(t.Qty) + '</td>' +
                         '<td style="text-align:left;">' + escapeHtml(t.DoneBy || '—') + '</td>' +
                         '<td style="text-align:left;">' + escapeHtml(t.RequestedBy || '—') + '</td>' +
                     '</tr>';
             }
 
             var showingModalTxt = totalLines === 0 ? '' :
-                lbl('VAS_173_Showing', 'Showing') + ' ' + (start + 1) + '–' + end + ' ' + lbl('VAS_173_Of', 'of') + ' ' + totalLines;
+                lbl('VAS_173_Showing', 'Showing') + ' ' + fmtInt(start + 1) + '–' + fmtInt(end) + ' ' + lbl('VAS_173_Of', 'of') + ' ' + fmtInt(totalLines); // VAS163 2026-11-12: locale counts
 
             var modalHtml =
                 '<div class="vas-173-modal-scrim">' +
@@ -363,11 +349,11 @@
                                 '</div>' +
                                 '<div class="vas-173-sum-cell">' +
                                     '<span class="vas-173-sum-label">' + escapeHtml(lbl('VAS_173_Moves', 'Moves')) + '</span>' +
-                                    '<span class="vas-173-sum-val">' + (wh.Moves || 0) + '</span>' +
+                                    '<span class="vas-173-sum-val">' + fmtInt(wh.Moves) + '</span>' +
                                 '</div>' +
                                 '<div class="vas-173-sum-cell">' +
                                     '<span class="vas-173-sum-label">' + escapeHtml(lbl('VAS_173_TotalQty', 'Total Qty')) + '</span>' +
-                                    '<span class="vas-173-sum-val">' + Number(wh.TotalQty || 0).toLocaleString(window.navigator.language) + '</span>' +
+                                    '<span class="vas-173-sum-val">' + fmtQty(wh.TotalQty) + '</span>' +
                                 '</div>' +
                             '</div>' +
                             '<div class="vas-173-modal-section-heading">' + escapeHtml(lbl('VAS_173_TransferLines', 'Transfer Lines')) + '</div>' +
@@ -398,7 +384,7 @@
                                 '<span class="vas-173-footer-helper">' + escapeHtml(showingModalTxt) + '</span>' +
                                 '<span class="vas-173-pager">' +
                                     '<button type="button" class="vas-173-pager-btn" id="vas173-m-prev"' + (modalPage <= 1 ? ' disabled' : '') + '>&#8249;</button>' +
-                                    '<span class="vas-173-pager-label">' + modalPage + ' ' + lbl('VAS_173_Of', 'of') + ' ' + totalPages + '</span>' +
+                                    '<span class="vas-173-pager-label">' + fmtInt(modalPage) + ' ' + lbl('VAS_173_Of', 'of') + ' ' + fmtInt(totalPages) + '</span>' +
                                     '<button type="button" class="vas-173-pager-btn" id="vas173-m-next"' + (modalPage >= totalPages ? ' disabled' : '') + '>&#8250;</button>' +
                                 '</span>' +
                             '</div>' +
@@ -516,3 +502,78 @@
     };
 
 })(VAS, jQuery);
+/* VAS163 2026-11-12: VAS.formatAmountByBrowser(value, isoCode, precision, { compact, symbol })
+   Amount in the BROWSER culture (window.navigator.language) with the currency the SERVER sent
+   (ISO code + precision; the server symbol only as a fallback). Defined in each widget / panel
+   that uses it - guarded, so the first file loaded defines it - so the shared util/CurrencyFormat.js
+   stays as shipped. Compact amounts keep that file's default scale (VIS.Util.formatCompactAmount:
+   L / Cr for Indian-numbering currencies, K / M / B otherwise, digits in the browser culture);
+   separators, decimals and the position of the currency sign come from the browser culture. */
+; (function () {
+    var V = window.VAS = window.VAS || {};
+    if (typeof V.formatAmountByBrowser === 'function') return;
+    function browserLocale() { try { return window.navigator.language || undefined; } catch (e) { return undefined; } }
+    function resolvePrecision(p) {
+        var n = Number(p);
+        if (p === null || p === undefined || p === '' || isNaN(n) || n < 0) {
+            try { n = VIS.Env.getCtx().getStdPrecision(); } catch (e) { n = 2; }
+        }
+        n = Math.round(Number(n));
+        return (isNaN(n) || n < 0) ? 2 : Math.min(n, 10);
+    }
+    function validIso(c) { c = String(c || '').trim().toUpperCase(); return /^[A-Z]{3}$/.test(c) ? c : ''; }
+    function numberFormat(o) {
+        try { return new Intl.NumberFormat(browserLocale(), o); } catch (e) { }
+        if (o.currencyDisplay === 'narrowSymbol') {
+            o.currencyDisplay = 'symbol';
+            try { return new Intl.NumberFormat(browserLocale(), o); } catch (e2) { }
+        }
+        return null;
+    }
+    /* Currency sign and where the browser culture puts it for this ISO code. */
+    var layoutCache = {};
+    function currencyLayout(iso) {
+        var key = browserLocale() + '|' + iso;
+        if (layoutCache[key]) return layoutCache[key];
+        var out = { sign: '', before: true, gap: '' };
+        var f = iso ? numberFormat({ style: 'currency', currency: iso, currencyDisplay: 'narrowSymbol' }) : null;
+        if (f && typeof f.formatToParts === 'function') {
+            try {
+                var parts = f.formatToParts(1234.5), ci = -1, ni = -1;
+                for (var i = 0; i < parts.length; i++) {
+                    if (parts[i].type === 'currency' && ci < 0) ci = i;
+                    if (parts[i].type === 'integer' && ni < 0) ni = i;
+                }
+                if (ci >= 0) {
+                    out.sign = parts[ci].value;
+                    if (ni >= 0) {
+                        out.before = ci < ni;
+                        var near = out.before ? parts[ci + 1] : parts[ci - 1];
+                        out.gap = (near && near.type === 'literal') ? near.value : '';
+                    }
+                }
+            } catch (e) { }
+        }
+        layoutCache[key] = out;
+        return out;
+    }
+    V.formatAmountByBrowser = function (value, isoCode, precision, options) {
+        options = options || {};
+        var num = Number(value) || 0;
+        var p = resolvePrecision(precision);
+        var iso = validIso(isoCode);
+        var body;
+        if (options.compact && window.VIS && VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
+            body = VIS.Util.formatCompactAmount(Math.abs(num), iso, p);
+        } else {
+            var f = numberFormat({ minimumFractionDigits: p, maximumFractionDigits: p });
+            try { body = f ? f.format(Math.abs(num)) : Math.abs(num).toFixed(p); } catch (e) { body = String(Math.abs(num)); }
+        }
+        var minus = (num < 0 && /[1-9]/.test(body)) ? '-' : '';
+        var lay = currencyLayout(iso);
+        var sign = lay.sign || options.symbol || iso;
+        if (!sign) return minus + body;
+        if (!lay.sign) return minus + sign + ' ' + body;
+        return lay.before ? (minus + sign + lay.gap + body) : (minus + body + lay.gap + sign);
+    };
+})();
