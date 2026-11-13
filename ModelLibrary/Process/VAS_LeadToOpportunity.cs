@@ -52,6 +52,7 @@ using ViennaAdvantage.Model;
 *     were created or an existing Customer / Prospect was used, with the Opportunity, Lead and Prospect IDs.
 * VAI052 12-Nov-26 : New process parameter M_PriceList_Version_ID - set on the new Opportunity; its M_PriceList_ID
 *     (read from M_PriceList_Version) is set on the Prospect (an existing Customer is left unchanged).
+* VAI052 13-Nov-26 : The Currency (M_PriceList.C_Currency_ID) of that Price List is also set on the new Opportunity.
 */
 namespace ModelLibrary.Process
 {
@@ -107,11 +108,11 @@ namespace ModelLibrary.Process
                 return Msg.GetMsg(GetCtx(), "VAS_LeadToOppLeadNotFound");
             }
             //VAI050-Set Bp name and group iD
-            if (Env.IsModuleInstalled("VA061_"))
-            {
+            //if (Env.IsModuleInstalled("VA061_"))
+            //{
                 lead.SetBPName(_companyName);
                 lead.SetC_BP_Group_ID(_bpGroupID);
-            }
+            //}
             //  lead.GetRef_BPartner_ID()))
             int ExCustomer = lead.GetC_BPartner_ID();
             int Pospect = lead.GetRef_BPartner_ID();
@@ -181,6 +182,12 @@ namespace ModelLibrary.Process
             if (_priceListVersionID > 0)
             {
                 opp.SetM_PriceList_Version_ID(_priceListVersionID);
+                // Currency of the Price List (M_PriceList.C_Currency_ID) goes on the new Opportunity
+                int currencyID = GetPriceListCurrencyID();
+                if (currencyID > 0)
+                {
+                    opp.SetC_Currency_ID(currencyID);
+                }
 
                 // An existing Customer keeps its own Price List - only a Prospect is updated
                 if (ExCustomer == 0)
@@ -257,6 +264,15 @@ namespace ModelLibrary.Process
         private int GetPriceListID()
         {
             return Util.GetValueOfInt(DB.ExecuteScalar("SELECT M_PriceList_ID FROM M_PriceList_Version WHERE M_PriceList_Version_ID=" + _priceListVersionID, null, Get_TrxName()));
+        }
+
+        /// <summary>
+        /// C_Currency_ID of the Price List (M_PriceList) of the Price List Version selected in the process.
+        /// </summary>
+        /// <returns>Currency ID, 0 when none</returns>
+        private int GetPriceListCurrencyID()
+        {
+            return Util.GetValueOfInt(DB.ExecuteScalar("SELECT pl.C_Currency_ID FROM M_PriceList pl INNER JOIN M_PriceList_Version plv ON plv.M_PriceList_ID = pl.M_PriceList_ID WHERE plv.M_PriceList_Version_ID=" + _priceListVersionID, null, Get_TrxName()));
         }
 
         /// <summary>
