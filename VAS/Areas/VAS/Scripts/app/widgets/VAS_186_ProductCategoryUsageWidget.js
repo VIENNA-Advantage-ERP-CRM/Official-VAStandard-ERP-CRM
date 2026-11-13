@@ -116,47 +116,25 @@
 // ===== NEW CODE START — currency format (agent A08, 2026-08-19) =====
         var currencyIso = "";
         var currencySymbol = "";
-        var indianIsos = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
-
-        function isIndianIso(iso) {
-            if (!iso) { return false; }
-            return indianIsos.indexOf(String(iso).toUpperCase()) !== -1;
-        }
+        var currencyPrecision; // VAS163 2026-11-12: C_Currency.StdPrecision from the server
 
         function formatQty(value) {
             var n = Number(value || 0);
             return n.toLocaleString(window.navigator.language);
         }
 
+        // VAS163 2026-11-12: server currency (iso + stdPrecision) through VAS.formatAmountByBrowser;
+        // the browser culture places the symbol (was symbol glued by a fixed symbol list, Indian ISO list, fixed 2 dp).
         function formatCurrency(value) {
             var val = Number(value || 0);
             if (isNaN(val)) { val = 0; }
-            var sym = currencySymbol || currencyIso || "";
-            var iso = (currencyIso || "").toUpperCase();
-            var absVal = Math.abs(val);
-
-            // VAS163 2026-11-10: browser locale (6-Nov retest2).
-            var formatted = absVal >= 1000
-                ? (val < 0 ? '-' : '') + VIS.Util.formatCompactAmount(absVal, iso)
-                : val.toLocaleString(window.navigator.language);
-
-            if (sym) {
-                return sym + (sym.length > 1 && !sym.match(/^[₹$€£¥]$/) ? " " : "") + formatted;
-            }
-            return formatted;
+            return VAS.formatAmountByBrowser(val, currencyIso || "", currencyPrecision, { compact: Math.abs(val) >= 1000, symbol: currencySymbol || "" });
         }
 
         function formatCurrencyExact(value) {
             var val = Number(value || 0);
             if (isNaN(val)) { val = 0; }
-            var sym = currencySymbol || currencyIso || "";
-            var iso = (currencyIso || "").toUpperCase();
-            // VAS163 2026-11-10: browser locale (6-Nov retest2).
-            var formatted = val.toLocaleString(window.navigator.language);
-            if (sym) {
-                return sym + (sym.length > 1 && !sym.match(/^[₹$€£¥]$/) ? " " : "") + formatted;
-            }
-            return formatted;
+            return VAS.formatAmountByBrowser(val, currencyIso || "", currencyPrecision, { symbol: currencySymbol || "" });
         }
 // ===== NEW CODE END — currency format =====
 // ----- OLD CODE (kept for rollback, do not delete) -----
@@ -242,6 +220,7 @@
                     if (data.currency) {
                         currencyIso = data.currency.iso || "";
                         currencySymbol = data.currency.symbol || "";
+                        currencyPrecision = data.currency.stdPrecision; // VAS163 2026-11-12: server precision
                     }
                     pageNo = 1;
                     renderCategories();
@@ -339,7 +318,8 @@
                     '<div class="vas-pcu-cat-name" title="' + escapeHtml(cat.categoryName) + '">' + escapeHtml(cat.categoryName) + '</div>' +
                     '<div class="vas-pcu-bar-track"><div class="vas-pcu-bar-fill" style="width:' + barPct + '%;"></div></div>' +
                     '<div class="vas-pcu-measure-num" title="' + escapeHtml(exactMeasureStr) + '">' + escapeHtml(measureStr) + '</div>' +
-                    '<div class="vas-pcu-share-pct">' + sharePct + '%</div>' +
+                    // VAS163 2026-11-12: locale digits for the share percent
+                    '<div class="vas-pcu-share-pct">' + Number(sharePct).toLocaleString(window.navigator.language) + '%</div>' +
                     '</button>';
             }
 
@@ -446,7 +426,8 @@
            once via VAS_178's existing GetMaterialIssueWindowId endpoint (same Inventory Use /
            Internal Use window every widget on this dashboard already targets - reused rather
            than re-deriving the same multi-name AD_Window lookup here). */
-        var INVENTORY_USE_WINDOW_NAME = 'Inventory Use';
+        // VAS163 2026-11-12: real AD_Window name ('Inventory Use' is not a window name).
+        var INVENTORY_USE_WINDOW_NAME = 'VAS_InternalUseInventory';
         var inventoryUseWindowId = 0;
 
         function hostWindowName() {
@@ -473,21 +454,12 @@
                     });
                     return;
                 }
-                if (inventoryUseWindowId > 0) {
-                    if (window.VAS && VAS.ZoomUtil) { VAS.ZoomUtil.zoomToRecord('M_Inventory_ID', Number(inventoryId), inventoryUseWindowId, null, null); }
-                    return;
+                // VAS163 2026-11-12: private GetMaterialIssueWindowId lookup replaced by
+                // VAS.ZoomUtil name resolution (new name first, legacy second); id cached.
+                if (window.VAS && VAS.ZoomUtil) {
+                    VAS.ZoomUtil.zoomToRecord('M_Inventory_ID', Number(inventoryId), inventoryUseWindowId, 'VAS_InternalUseInventory', 'Internal Use Inventory')
+                        .done(function (id) { if (id > 0) { inventoryUseWindowId = id; } });
                 }
-                $.ajax({
-                    url: VIS.Application.contextUrl + 'VAS_178_NewMaterialIssueQuickAction/GetMaterialIssueWindowId',
-                    type: 'GET', dataType: 'json', cache: false,
-                    success: function (res) {
-                        var data = parseResponse(res);
-                        inventoryUseWindowId = Number((data && data.windowId) || 0);
-                        if (inventoryUseWindowId > 0 && window.VAS && VAS.ZoomUtil) {
-                            VAS.ZoomUtil.zoomToRecord('M_Inventory_ID', Number(inventoryId), inventoryUseWindowId, null, null);
-                        }
-                    }
-                });
             } catch (e) { /* best-effort */ }
         }
 
@@ -813,3 +785,78 @@
 
 })(VAS, jQuery);
 
+/* VAS163 2026-11-12: VAS.formatAmountByBrowser(value, isoCode, precision, { compact, symbol })
+   Amount in the BROWSER culture (window.navigator.language) with the currency the SERVER sent
+   (ISO code + precision; the server symbol only as a fallback). Defined in each widget / panel
+   that uses it - guarded, so the first file loaded defines it - so the shared util/CurrencyFormat.js
+   stays as shipped. Compact amounts keep that file's default scale (VIS.Util.formatCompactAmount:
+   L / Cr for Indian-numbering currencies, K / M / B otherwise, digits in the browser culture);
+   separators, decimals and the position of the currency sign come from the browser culture. */
+; (function () {
+    var V = window.VAS = window.VAS || {};
+    if (typeof V.formatAmountByBrowser === 'function') return;
+    function browserLocale() { try { return window.navigator.language || undefined; } catch (e) { return undefined; } }
+    function resolvePrecision(p) {
+        var n = Number(p);
+        if (p === null || p === undefined || p === '' || isNaN(n) || n < 0) {
+            try { n = VIS.Env.getCtx().getStdPrecision(); } catch (e) { n = 2; }
+        }
+        n = Math.round(Number(n));
+        return (isNaN(n) || n < 0) ? 2 : Math.min(n, 10);
+    }
+    function validIso(c) { c = String(c || '').trim().toUpperCase(); return /^[A-Z]{3}$/.test(c) ? c : ''; }
+    function numberFormat(o) {
+        try { return new Intl.NumberFormat(browserLocale(), o); } catch (e) { }
+        if (o.currencyDisplay === 'narrowSymbol') {
+            o.currencyDisplay = 'symbol';
+            try { return new Intl.NumberFormat(browserLocale(), o); } catch (e2) { }
+        }
+        return null;
+    }
+    /* Currency sign and where the browser culture puts it for this ISO code. */
+    var layoutCache = {};
+    function currencyLayout(iso) {
+        var key = browserLocale() + '|' + iso;
+        if (layoutCache[key]) return layoutCache[key];
+        var out = { sign: '', before: true, gap: '' };
+        var f = iso ? numberFormat({ style: 'currency', currency: iso, currencyDisplay: 'narrowSymbol' }) : null;
+        if (f && typeof f.formatToParts === 'function') {
+            try {
+                var parts = f.formatToParts(1234.5), ci = -1, ni = -1;
+                for (var i = 0; i < parts.length; i++) {
+                    if (parts[i].type === 'currency' && ci < 0) ci = i;
+                    if (parts[i].type === 'integer' && ni < 0) ni = i;
+                }
+                if (ci >= 0) {
+                    out.sign = parts[ci].value;
+                    if (ni >= 0) {
+                        out.before = ci < ni;
+                        var near = out.before ? parts[ci + 1] : parts[ci - 1];
+                        out.gap = (near && near.type === 'literal') ? near.value : '';
+                    }
+                }
+            } catch (e) { }
+        }
+        layoutCache[key] = out;
+        return out;
+    }
+    V.formatAmountByBrowser = function (value, isoCode, precision, options) {
+        options = options || {};
+        var num = Number(value) || 0;
+        var p = resolvePrecision(precision);
+        var iso = validIso(isoCode);
+        var body;
+        if (options.compact && window.VIS && VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
+            body = VIS.Util.formatCompactAmount(Math.abs(num), iso, p);
+        } else {
+            var f = numberFormat({ minimumFractionDigits: p, maximumFractionDigits: p });
+            try { body = f ? f.format(Math.abs(num)) : Math.abs(num).toFixed(p); } catch (e) { body = String(Math.abs(num)); }
+        }
+        var minus = (num < 0 && /[1-9]/.test(body)) ? '-' : '';
+        var lay = currencyLayout(iso);
+        var sign = lay.sign || options.symbol || iso;
+        if (!sign) return minus + body;
+        if (!lay.sign) return minus + sign + ' ' + body;
+        return lay.before ? (minus + sign + lay.gap + body) : (minus + body + lay.gap + sign);
+    };
+})();

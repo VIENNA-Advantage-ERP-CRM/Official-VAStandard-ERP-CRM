@@ -522,7 +522,10 @@ namespace VAS.Controllers
                        o.DeliveryViaRule AS Delivery_Via_Rule,
                        o.M_Warehouse_ID AS Warehouse_Id,
                        COALESCE(bp.Name, N'') AS Customer_Name,
-                       COALESCE(w.Name, N'') AS Warehouse_Name
+                       COALESCE(w.Name, N'') AS Warehouse_Name,
+                       (SELECT hc.ISO_Code FROM C_Currency hc WHERE hc.C_Currency_ID = o.C_Currency_ID) AS Header_Currency_Code,
+                       (SELECT hc.CurSymbol FROM C_Currency hc WHERE hc.C_Currency_ID = o.C_Currency_ID) AS Header_Currency_Symbol,
+                       (SELECT hc.StdPrecision FROM C_Currency hc WHERE hc.C_Currency_ID = o.C_Currency_ID) AS Header_Currency_Precision
                   FROM C_Order o
                   INNER JOIN C_BPartner bp ON ( bp.C_BPartner_ID = o.C_BPartner_ID )
                   LEFT OUTER JOIN M_Warehouse w ON ( w.M_Warehouse_ID = o.M_Warehouse_ID )
@@ -553,6 +556,10 @@ namespace VAS.Controllers
 
                 result.Order = new OrderHeader
                 {
+                    // VAS163 2026-11-12: order (document) currency of OrderValue / line amounts.
+                    CurrencyIso = (Util.GetValueOfString(dr["Header_Currency_Code"]) ?? "").Trim(),
+                    CurrencySymbol = (Util.GetValueOfString(dr["Header_Currency_Symbol"]) ?? "").Trim(),
+                    CurrencyPrecision = dr["Header_Currency_Precision"] == DBNull.Value ? 2 : Util.GetValueOfInt(dr["Header_Currency_Precision"]),
                     SalesOrderId = Util.GetValueOfInt(dr["Order_Id"]),
                     SalesOrderNumber = Util.GetValueOfString(dr["Document_No"]),
                     SalesOrderDate = dateOrdered.HasValue ? dateOrdered.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
@@ -680,9 +687,10 @@ namespace VAS.Controllers
         {
             if (productId <= 0 || warehouseId <= 0) { return 0m; }
 
+            // VAS163 2026-11-13: rows 1029/1064 one In-stock definition in every SO lines pop-up (same as VAS_270/271/272):
+            // on-hand of the order's warehouse in the base UOM (the reservation already holds this order), clamped at 0 by the caller.
             string sql = @"
-                SELECT COALESCE(SUM(COALESCE(s.QtyOnHand, 0) - COALESCE(s.QtyReserved, 0)
-                              - COALESCE(s.QtyDedicated, 0) - COALESCE(s.QtyAllocated, 0)), 0) AS Free_Stock
+                SELECT COALESCE(SUM(COALESCE(s.QtyOnHand, 0)), 0) AS Free_Stock
                   FROM M_Storage s
                   INNER JOIN M_Locator loc ON ( loc.M_Locator_ID = s.M_Locator_ID )
                  WHERE s.M_Product_ID = @M_Product_ID
@@ -917,6 +925,10 @@ namespace VAS.Controllers
 
         private class OrderHeader
         {
+            // VAS163 2026-11-12: order (document) currency.
+            public string CurrencyIso { get; set; }
+            public string CurrencySymbol { get; set; }
+            public int CurrencyPrecision { get; set; }
             public int SalesOrderId { get; set; }
             public string SalesOrderNumber { get; set; }
             public string SalesOrderDate { get; set; }

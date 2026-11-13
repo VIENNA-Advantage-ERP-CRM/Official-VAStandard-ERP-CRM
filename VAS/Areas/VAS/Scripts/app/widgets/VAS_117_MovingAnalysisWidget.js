@@ -75,12 +75,14 @@
         }
 
         function formatQty(value) {
-            return Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
+            // VAS163 2026-11-12: explicit browser locale (was undefined).
+            return Number(value || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 2 });
         }
 
         function formatTurns(value) {
             // One-decimal turnover ratio with the conventional "x" suffix (e.g. 11.2x).
-            return Number(value || 0).toFixed(1) + 'x';
+            // VAS163 2026-11-12: locale decimal separator (was toFixed(1)).
+            return Number(value || 0).toLocaleString(window.navigator.language, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + 'x';
         }
 
         // Issue-velocity display: fast movers read per day ("42 /day"); slow

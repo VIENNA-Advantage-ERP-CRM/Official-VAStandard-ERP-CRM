@@ -70,7 +70,8 @@ namespace VIS.Controllers
                             o.AD_Client_ID,
                             o.AD_Org_ID,
                             -- PO value is the order Sub total (excl. taxes), the Sub total field on the PO screen
-                            MAX(COALESCE(o.TotalLines, 0)) AS po_value_document_currency,
+                            -- VAS163 2026-11-13: Row 369 - ex-tax also on a tax-inclusive price list (TotalLines is gross there).
+                            " + PoValueExclTaxSql("o") + @" AS po_value_document_currency,
                             -- Delivery is judged on Item-type product lines only; charge lines and
                             -- other product types carry no stock movement.
                             SUM(CASE WHEN prod.ProductType = 'I' THEN COALESCE(ol.QtyOrdered, 0) ELSE 0 END) AS ordered_qty,
@@ -97,7 +98,10 @@ namespace VIS.Controllers
                             o.C_Currency_ID,
                             o.C_ConversionType_ID,
                             o.AD_Client_ID,
-                            o.AD_Org_ID
+                            o.AD_Org_ID,
+                            o.TotalLines,
+                            o.IsTaxIncluded,
+                            o.M_PriceList_ID
                     )
                     SELECT
                         pd.C_Order_ID AS purchase_order_id,
@@ -304,8 +308,10 @@ namespace VIS.Controllers
                         usr.Name AS SalesRepName,
                         c.CurSymbol AS DocCurSymbol,
                         c.ISO_Code AS DocCurIso,
+                        c.StdPrecision AS DocCurPrecision,
                         -- Order Sub total (excl. taxes), matching the summary card
-                        MAX(COALESCE(o.TotalLines, 0)) AS PoValueDoc,
+                        -- VAS163 2026-11-13: Row 369 - ex-tax also on a tax-inclusive price list.
+                        " + PoValueExclTaxSql("o") + @" AS PoValueDoc,
                         -- Delivery is judged on Item-type product lines only; charge lines and
                         -- other product types carry no stock movement.
                         SUM(CASE WHEN prod.ProductType = 'I' THEN COALESCE(ol.QtyOrdered, 0) ELSE 0 END) AS OrderedQty,
@@ -349,7 +355,11 @@ namespace VIS.Controllers
                         wh.Name,
                         usr.Name,
                         c.CurSymbol,
-                        c.ISO_Code
+                        c.ISO_Code,
+                        c.StdPrecision,
+                        o.TotalLines,
+                        o.IsTaxIncluded,
+                        o.M_PriceList_ID
                     ORDER BY o.DateOrdered DESC, o.DocumentNo DESC";
 
                 SqlParameter[] parameters = new SqlParameter[]
@@ -379,6 +389,8 @@ namespace VIS.Controllers
                         string repName = Util.GetValueOfString(dr["SalesRepName"]);
                         string docCurSymbol = Util.GetValueOfString(dr["DocCurSymbol"]);
                         string docCurIso = Util.GetValueOfString(dr["DocCurIso"]);
+                        // VAS163 2026-11-12: document currency precision for the client-side amount format.
+                        int docCurPrecision = dr["DocCurPrecision"] == DBNull.Value ? 2 : Util.GetValueOfInt(dr["DocCurPrecision"]);
                         decimal docValue = Util.GetValueOfDecimal(dr["PoValueDoc"]);
                         decimal orderedQty = Util.GetValueOfDecimal(dr["OrderedQty"]);
                         decimal deliveredQty = Util.GetValueOfDecimal(dr["DeliveredQty"]);
@@ -458,6 +470,7 @@ namespace VIS.Controllers
                             docValue = docValue,
                             docCurSymbol = docCurSymbol,
                             docCurIso = docCurIso,
+                            docCurPrecision = docCurPrecision, // VAS163 2026-11-12
                             qtyOrdered = orderedQty,
                             qtyDelivered = deliveredQty,
                             qtyPending = Math.Max(0, orderedQty - deliveredQty),
@@ -523,7 +536,8 @@ namespace VIS.Controllers
                         usr.Name AS CreatedByName,
                         o.Created AS CreatedOn,
                         cur.CurSymbol AS DocCurSymbol,
-                        cur.ISO_Code AS DocCurIso
+                        cur.ISO_Code AS DocCurIso,
+                        cur.StdPrecision AS DocCurPrecision
                     FROM C_Order o
                     INNER JOIN C_BPartner bp ON bp.C_BPartner_ID = o.C_BPartner_ID
                     LEFT JOIN M_Warehouse wh ON wh.M_Warehouse_ID = o.M_Warehouse_ID
@@ -541,6 +555,7 @@ namespace VIS.Controllers
                 object orderHeader = null;
                 string docCurSymbolHdr = "";
                 string docCurIsoHdr = "";
+                int docCurPrecisionHdr = 2; // VAS163 2026-11-12
                 string parentDocStatus = "DR";
 
                 using (IDataReader dr = DB.ExecuteReader(orderSql, orderParams, null))
@@ -550,6 +565,8 @@ namespace VIS.Controllers
                         parentDocStatus = Util.GetValueOfString(dr["DocStatus"]);
                         docCurSymbolHdr = Util.GetValueOfString(dr["DocCurSymbol"]);
                         docCurIsoHdr = Util.GetValueOfString(dr["DocCurIso"]);
+                        // VAS163 2026-11-12: document currency precision for the client-side amount format.
+                        docCurPrecisionHdr = dr["DocCurPrecision"] == DBNull.Value ? 2 : Util.GetValueOfInt(dr["DocCurPrecision"]);
                         DateTime? dtOrd = Util.GetValueOfDateTime(dr["DateOrdered"]);
                         DateTime? dtProm = Util.GetValueOfDateTime(dr["DatePromised"]);
                         DateTime? dtCreated = Util.GetValueOfDateTime(dr["CreatedOn"]);
@@ -604,7 +621,8 @@ namespace VIS.Controllers
                         COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) AS QtyEntered,
                         COALESCE(ol.QtyDelivered, 0) AS QtyDelivered,
                         COALESCE(ol.PriceActual, 0) AS PriceActual,
-                        " + NetOfTaxLineAmount() + @" AS LineNetAmt
+                        " + NetOfTaxLineAmount() + @" AS LineNetAmt,
+                        COALESCE(ol.LineNetAmt, 0) AS LineGrossAmt
                     FROM C_OrderLine ol
                     INNER JOIN C_Order o ON o.C_Order_ID = ol.C_Order_ID
                     -- Charge lines have no M_Product, so this must not be an INNER JOIN.
@@ -645,6 +663,12 @@ namespace VIS.Controllers
                         decimal qtyPend = Math.Max(0, qtyOrd - qtyDel);
                         decimal rate = Util.GetValueOfDecimal(dr["PriceActual"]);
                         decimal amount = Util.GetValueOfDecimal(dr["LineNetAmt"]);
+                        // VAS163 2026-11-13: Row 369 - rate restated ex-tax in the same proportion as the amount.
+                        decimal lineGross = Util.GetValueOfDecimal(dr["LineGrossAmt"]);
+                        if (lineGross != 0m && amount != lineGross)
+                        {
+                            rate = Math.Round(rate * amount / lineGross, 6, MidpointRounding.AwayFromZero);
+                        }
 
                         // Line status derivation
                         string lineStatus;
@@ -704,6 +728,7 @@ namespace VIS.Controllers
                     lines = linesList,
                     docCurSymbol = docCurSymbolHdr,
                     docCurIso = docCurIsoHdr,
+                    docCurPrecision = docCurPrecisionHdr, // VAS163 2026-11-12
                     curSymbol = curInfo.CurSymbol,
                     curIso = curInfo.CurIso,
                     stdPrecision = curInfo.StdPrecision
@@ -747,8 +772,30 @@ namespace VIS.Controllers
         private static string NetOfTaxLineAmount()
         {
             string surcharge = HasColumn("C_OrderLine", "SurchargeAmt") ? " - COALESCE(ol.SurchargeAmt, 0)" : "";
-            return "CASE WHEN o.IsTaxIncluded = 'Y' THEN COALESCE(ol.LineNetAmt, 0) - COALESCE(ol.TaxAmt, 0)" + surcharge
+            // VAS163 2026-11-13: Row 369 - the order OR its price list being tax-inclusive decides (same rule as the header value).
+            return "CASE WHEN " + TaxIncludedSql("o") + " = 'Y' THEN COALESCE(ol.LineNetAmt, 0) - COALESCE(ol.TaxAmt, 0)" + surcharge
                 + " ELSE COALESCE(ol.LineNetAmt, 0) END";
+        }
+
+        /// <summary>
+        /// VAS163 2026-11-13: Rows 304/315/331/369/471 - PO value WITHOUT tax (the "Sub total" of the PO
+        /// screen), same rule as VAS_273: when the order or its price list is tax-inclusive, TotalLines
+        /// holds the gross, so the order's extracted tax (C_OrderTax.TaxAmt) is taken off.
+        /// </summary>
+        private static string PoValueExclTaxSql(string o)
+        {
+            return "(CASE WHEN " + TaxIncludedSql(o) + " = 'Y' "
+                + "THEN COALESCE(" + o + ".TotalLines, 0) - (SELECT COALESCE(SUM(COALESCE(ot.TaxAmt, 0)), 0) FROM C_OrderTax ot "
+                + "WHERE ot.C_Order_ID = " + o + ".C_Order_ID AND ot.IsActive = 'Y') "
+                + "ELSE COALESCE(" + o + ".TotalLines, 0) END)";
+        }
+
+        /// <summary>VAS163 2026-11-13: 'Y' when the order's own flag or its price list's flag is tax-inclusive.</summary>
+        private static string TaxIncludedSql(string o)
+        {
+            return "(CASE WHEN COALESCE(" + o + ".IsTaxIncluded, 'N') = 'Y' "
+                + "OR COALESCE((SELECT pl.IsTaxIncluded FROM M_PriceList pl WHERE pl.M_PriceList_ID = " + o + ".M_PriceList_ID), 'N') = 'Y' "
+                + "THEN 'Y' ELSE 'N' END)";
         }
 
         private static bool HasColumn(string tableName, string columnName)

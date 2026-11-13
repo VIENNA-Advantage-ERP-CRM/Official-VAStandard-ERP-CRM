@@ -34,7 +34,8 @@
             .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
     }
 
-    var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    // VAS163 2026-11-12: month names from the browser culture, not a fixed English list.
+    var MONTHS = (function () { var a = []; for (var i = 0; i < 12; i++) { a.push(new Date(2000, i, 1).toLocaleDateString(window.navigator.language, { month: 'short' })); } return a; })();
 
     /* Dates arrive as "YYYY-MM-DDT00:00:00" without a time zone: read the calendar date as written
        (UTC getters would show the previous day in time zones ahead of UTC). */
@@ -47,8 +48,23 @@
 
     function formatDate(iso) {
         var p = ymd(iso);
-        return p ? (p.d + ' ' + MONTHS[p.m - 1] + ' ' + p.y) : '—';
+        // VAS163 2026-11-12: browser-locale date instead of the fixed 'd Mon yyyy' English pattern.
+        return p ? new Date(p.y, p.m - 1, p.d).toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
     }
+
+    // VAS163 2026-11-12: range limits / numeric actual values and counts in the browser locale.
+    function fmtNum(v) {
+        var n = Number(v || 0);
+        return n.toLocaleString(window.navigator.language, { maximumFractionDigits: 4 });
+    }
+
+    // Actual value is free text (or a list value); only a plain invariant number is re-formatted.
+    function fmtActual(v) {
+        var s = String(v == null ? '' : v).trim();
+        return /^-?\d+(\.\d+)?$/.test(s) ? fmtNum(s) : s;
+    }
+
+    function fmtInt(n) { return (Number(n) || 0).toLocaleString(window.navigator.language); }
 
     function formatQty(v) {
         var n = Number(v || 0);
@@ -85,14 +101,14 @@
         var GRID = COLS.map(function (c) { return 'minmax(0,' + c.fr + 'fr)'; }).join(' ');
 
         function rowCells(r) {
-            var range = (Number(r.MinValue) || Number(r.MaxValue)) ? (r.MinValue + ' – ' + r.MaxValue) : '—';
+            var range = (Number(r.MinValue) || Number(r.MaxValue)) ? (fmtNum(r.MinValue) + ' – ' + fmtNum(r.MaxValue)) : '—';
             var res = r.Result || 'Pending';
             var resTxt = lbl('VAS_175_Result' + res, res);
             return [
                 { t: r.TransferNo || r.ConfirmNo || '—', primary: true },
                 { t: r.ProductName || '—' },
                 { t: r.ParameterName || '—' },
-                { t: r.ActualValue || '—', title: (lbl('VAS_175_Range', 'Range') + ': ' + range) },
+                { t: fmtActual(r.ActualValue) || '—', title: (lbl('VAS_175_Range', 'Range') + ': ' + range) },
                 { t: resTxt, html: '<span class="vas-175-pill vas-175-pill--' + res.toLowerCase() + '">' + escapeHtml(resTxt) + '</span>' }
             ];
         }
@@ -100,7 +116,7 @@
         function headerPills() {
             var failed = filtered.filter(function (r) { return r.Result === 'Fail'; }).length;
             var html = '';
-            if (failed) { html += '<span class="vas-175-stat vas-175-stat--danger">' + failed + ' ' + escapeHtml(lbl('VAS_175_Failed', 'failed')) + '</span>'; }
+            if (failed) { html += '<span class="vas-175-stat vas-175-stat--danger">' + fmtInt(failed) + ' ' + escapeHtml(lbl('VAS_175_Failed', 'failed')) + '</span>'; }
             return html;
         }
 
@@ -270,7 +286,7 @@
 
             if (filtered.length > rowsPerPage) {
                 $footer.html(
-                    '<span class="vas-175-footer-helper">' + escapeHtml(lbl('VAS_175_Showing', 'Showing') + ' ' + (start + 1) + '–' + end + ' ' + lbl('VAS_175_Of', 'of') + ' ' + filtered.length) + '</span>' +
+                    '<span class="vas-175-footer-helper">' + escapeHtml(lbl('VAS_175_Showing', 'Showing') + ' ' + fmtInt(start + 1) + '–' + fmtInt(end) + ' ' + lbl('VAS_175_Of', 'of') + ' ' + fmtInt(filtered.length)) /* VAS163 2026-11-12: locale counts */ + '</span>' +
                     '<span class="vas-175-pager">' +
                         '<button type="button" class="vas-175-pager-btn" data-dir="-1"' + (page <= 1 ? ' disabled' : '') + '><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg></button>' +
                         '<span class="vas-175-pager-label">' + page + ' ' + escapeHtml(lbl('VAS_175_Of', 'of')) + ' ' + total + '</span>' +
@@ -278,7 +294,7 @@
                     '</span>'
                 );
             } else {
-                $footer.html('<span class="vas-175-footer-helper">' + escapeHtml(lbl('VAS_175_Showing', 'Showing') + ' 1–' + filtered.length + ' ' + lbl('VAS_175_Of', 'of') + ' ' + filtered.length) + '</span>');
+                $footer.html('<span class="vas-175-footer-helper">' + escapeHtml(lbl('VAS_175_Showing', 'Showing') + ' ' + fmtInt(1) + '–' + fmtInt(filtered.length) + ' ' + lbl('VAS_175_Of', 'of') + ' ' + fmtInt(filtered.length)) /* VAS163 2026-11-12: locale counts */ + '</span>');
             }
         }
 

@@ -64,6 +64,8 @@
         var currentTerm = '';
         var hasMore = false;
         var isLoadingMore = false;
+        // VAS163 2026-11-13: Rows 436/438 - total number of matches reported by the server.
+        var totalCount = 0;
 
         /* Group -> chip tone. The shared stylesheet ships chip-order / -invoice /
            -payment / -receipt / -cash / -gljournal; the purchase-specific groups map
@@ -81,8 +83,15 @@
             'Recent': { chip: 'order', key: 'VAS_203_RecentAcrossPurchase', fallback: 'Recent across purchase' }
         };
 
+        // VAS163 2026-11-13: an unregistered key ("[KEY]" / "KEY") falls back to the English text.
         function msg(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            var txt = '';
+            try { txt = VIS.Msg.getMsg(key); } catch (e) { txt = ''; }
+            if (fallback !== undefined && fallback !== null &&
+                (!txt || txt === key || txt === '[' + key + ']')) {
+                return fallback;
+            }
+            return txt;
         }
 
         function dsEsc(str) {
@@ -247,6 +256,7 @@
                     var payload = res.data || res;
                     if (payload && payload.results) {
                         hasMore = !!payload.hasMore;
+                        totalCount = VIS.Utility.Util.getValueOfInt(payload.totalCount); // VAS163 2026-11-13: Rows 436/438
                         renderResults(payload.results);
                     } else if (res.error || res.success === false) {
                         renderError();
@@ -290,14 +300,17 @@
                     var items = (payload && payload.results) ? payload.results : [];
                     appendResults(items);
                     hasMore = !!(payload && payload.hasMore) && items.length > 0;
+                    if (payload && payload.totalCount) { totalCount = VIS.Utility.Util.getValueOfInt(payload.totalCount); }
                     isLoadingMore = false;
                     showMoreSpinner(false);
                     updateCount();
+                    updateLoadMoreButton();
                 },
                 error: function () {
                     if (mySeq !== requestSeq) { isLoadingMore = false; return; }
                     isLoadingMore = false;
                     showMoreSpinner(false);
+                    updateLoadMoreButton();
                 }
             });
         }
@@ -316,12 +329,25 @@
         }
 
         function updateCount() {
-            var text = currentItems.length + (hasMore ? '+' : '') + ' ' + msg('VAS_DocSearch_Results', 'results');
+            // VAS163 2026-11-13: Rows 436/438 - "25 of 60 results" while more pages remain (was "25+ results").
+            var shown = currentItems.length.toLocaleString(window.navigator.language);
+            var text = (hasMore && totalCount > currentItems.length)
+                ? shown + ' ' + msg('VAS_Of', 'of') + ' ' + totalCount.toLocaleString(window.navigator.language) + ' ' + msg('VAS_DocSearch_Results', 'results')
+                : shown + (hasMore ? '+' : '') + ' ' + msg('VAS_DocSearch_Results', 'results');
             $panel.find('.vas-dssrch-count').text(text);
         }
 
         function showMoreSpinner(on) {
             $panel.find('.vas-dssrch-more').toggleClass('vas-dssrch-more-active', !!on);
+            if (on) { $panel.find('.vas-203-loadmore').hide(); }
+        }
+
+        // VAS163 2026-11-13: Rows 436/438 - an explicit "Load more" button under the list, so every match is
+        // reachable even when the scroll-to-end trigger does not fire (list shorter than the panel, mouse
+        // wheel over a fixed popover, keyboard use).
+        function updateLoadMoreButton() {
+            if (!$panel) { return; }
+            $panel.find('.vas-203-loadmore').toggle(!!hasMore && !isLoadingMore);
         }
 
         /* ---- Rendering (shared vas-dssrch-* markup) ---- */
@@ -356,9 +382,17 @@
                 html += buildRow(items[i], i);
             }
             html += '</div><div class="vas-dssrch-more"><span class="vas-dssrch-more-spin"></span></div>';
+            // VAS163 2026-11-13: Rows 436/438 - explicit load-more control.
+            html += '<button type="button" class="vas-203-loadmore" style="display:none;">' + dsEsc(msg('VAS_203_LoadMore', 'Load more')) + '</button>';
             $panel.html(html);
+            $panel.find('.vas-203-loadmore').on('mousedown', function (e) { e.preventDefault(); }).on('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                loadMore();
+            });
 
             updateCount();
+            updateLoadMoreButton();
 
             bindRowClicks($panel.find('.vas-dssrch-list .vas-dssrch-row'));
             $panel.scrollTop(0);
@@ -373,7 +407,7 @@
             // VAS163 2026-11-10: browser locale (6-Nov retest2). Subtitle date and amount built client-side.
             var subtitle = (item.documentNo || '') + ' · ' + fmtIsoDate(item.orderDate) + ' · ' + (item.vendorName || '') + ' · ' + (item.statusLabel || '');
             var amountText = fmtMoney(item.amount, item.currencySymbol, item.currencyCode,
-                (typeof item.currencyPrecision === 'number') ? item.currencyPrecision : 2).trim();
+                (typeof item.currencyPrecision === 'number') ? item.currencyPrecision : undefined).trim(); // VAS163 2026-11-12: no fixed precision fallback.
 
             return (
                 '<div class="vas-dssrch-row' + (hasZoom ? '' : ' vas-dssrch-nozoom') + '"' +
@@ -450,7 +484,8 @@
                 };
                 $self.widgetFirevalueChanged(windowParam);
             } else {
-                VAS.ZoomUtil.zoomToRecord(TABLE_NAME + "_ID", orderId, poZoomWindowId, WINDOW_NAME, "")
+                // VAS163 2026-11-12: pass the old window name too so the util can fall back.
+                VAS.ZoomUtil.zoomToRecord(TABLE_NAME + "_ID", orderId, poZoomWindowId, WINDOW_NAME, "Purchase Order")
                     .done(function (id) {
                         if (id > 0) { poZoomWindowId = id; }
                     });
@@ -470,11 +505,8 @@
 
 
         function fmtMoney(value, symbol, iso, precision) {
-            var num = Number(value || 0);
-            var sym = symbol || '';
-            if (!sym && iso) { sym = iso; }
-            var prec = (typeof precision === 'number' && precision >= 0) ? precision : 2;
-            return sym + ' ' + num.toLocaleString(window.navigator.language, { minimumFractionDigits: 0, maximumFractionDigits: prec });
+            // VAS163 2026-11-12: server ISO + precision, browser culture places the symbol (no symbol + ' ' concat).
+            return VAS.formatAmountByBrowser(Number(value || 0), iso || '', precision, { symbol: symbol || '' });
         }
 
 
@@ -676,7 +708,10 @@
         function positionPanel() {
             if (!$bar || !$bar[0]) { return; }
             var rect = $bar[0].getBoundingClientRect();
-            $panel.css({ left: Math.round(rect.left) + 'px', top: Math.round(rect.bottom + 6) + 'px', width: Math.round(rect.width) + 'px' });
+            // VAS163 2026-11-13: Rows 436/438 - the popover never runs past the bottom of the window, so its
+            // own scrollbar (and the end of the list that loads the next page) is always reachable.
+            var room = Math.max(200, Math.round((window.innerHeight || document.documentElement.clientHeight) - rect.bottom - 18));
+            $panel.css({ left: Math.round(rect.left) + 'px', top: Math.round(rect.bottom + 6) + 'px', width: Math.round(rect.width) + 'px', maxHeight: room + 'px' });
         }
         function setBusy(on) { $bar.toggleClass('vas-dssrch-busy', !!on); }
 
@@ -740,3 +775,78 @@
     };
 
 })(VAS, jQuery);
+/* VAS163 2026-11-12: VAS.formatAmountByBrowser(value, isoCode, precision, { compact, symbol })
+   Amount in the BROWSER culture (window.navigator.language) with the currency the SERVER sent
+   (ISO code + precision; the server symbol only as a fallback). Defined in each widget / panel
+   that uses it - guarded, so the first file loaded defines it - so the shared util/CurrencyFormat.js
+   stays as shipped. Compact amounts keep that file's default scale (VIS.Util.formatCompactAmount:
+   L / Cr for Indian-numbering currencies, K / M / B otherwise, digits in the browser culture);
+   separators, decimals and the position of the currency sign come from the browser culture. */
+; (function () {
+    var V = window.VAS = window.VAS || {};
+    if (typeof V.formatAmountByBrowser === 'function') return;
+    function browserLocale() { try { return window.navigator.language || undefined; } catch (e) { return undefined; } }
+    function resolvePrecision(p) {
+        var n = Number(p);
+        if (p === null || p === undefined || p === '' || isNaN(n) || n < 0) {
+            try { n = VIS.Env.getCtx().getStdPrecision(); } catch (e) { n = 2; }
+        }
+        n = Math.round(Number(n));
+        return (isNaN(n) || n < 0) ? 2 : Math.min(n, 10);
+    }
+    function validIso(c) { c = String(c || '').trim().toUpperCase(); return /^[A-Z]{3}$/.test(c) ? c : ''; }
+    function numberFormat(o) {
+        try { return new Intl.NumberFormat(browserLocale(), o); } catch (e) { }
+        if (o.currencyDisplay === 'narrowSymbol') {
+            o.currencyDisplay = 'symbol';
+            try { return new Intl.NumberFormat(browserLocale(), o); } catch (e2) { }
+        }
+        return null;
+    }
+    /* Currency sign and where the browser culture puts it for this ISO code. */
+    var layoutCache = {};
+    function currencyLayout(iso) {
+        var key = browserLocale() + '|' + iso;
+        if (layoutCache[key]) return layoutCache[key];
+        var out = { sign: '', before: true, gap: '' };
+        var f = iso ? numberFormat({ style: 'currency', currency: iso, currencyDisplay: 'narrowSymbol' }) : null;
+        if (f && typeof f.formatToParts === 'function') {
+            try {
+                var parts = f.formatToParts(1234.5), ci = -1, ni = -1;
+                for (var i = 0; i < parts.length; i++) {
+                    if (parts[i].type === 'currency' && ci < 0) ci = i;
+                    if (parts[i].type === 'integer' && ni < 0) ni = i;
+                }
+                if (ci >= 0) {
+                    out.sign = parts[ci].value;
+                    if (ni >= 0) {
+                        out.before = ci < ni;
+                        var near = out.before ? parts[ci + 1] : parts[ci - 1];
+                        out.gap = (near && near.type === 'literal') ? near.value : '';
+                    }
+                }
+            } catch (e) { }
+        }
+        layoutCache[key] = out;
+        return out;
+    }
+    V.formatAmountByBrowser = function (value, isoCode, precision, options) {
+        options = options || {};
+        var num = Number(value) || 0;
+        var p = resolvePrecision(precision);
+        var iso = validIso(isoCode);
+        var body;
+        if (options.compact && window.VIS && VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
+            body = VIS.Util.formatCompactAmount(Math.abs(num), iso, p);
+        } else {
+            var f = numberFormat({ minimumFractionDigits: p, maximumFractionDigits: p });
+            try { body = f ? f.format(Math.abs(num)) : Math.abs(num).toFixed(p); } catch (e) { body = String(Math.abs(num)); }
+        }
+        var minus = (num < 0 && /[1-9]/.test(body)) ? '-' : '';
+        var lay = currencyLayout(iso);
+        var sign = lay.sign || options.symbol || iso;
+        if (!sign) return minus + body;
+        if (!lay.sign) return minus + sign + ' ' + body;
+        return lay.before ? (minus + sign + lay.gap + body) : (minus + body + lay.gap + sign);
+    };
+})();

@@ -248,14 +248,56 @@ namespace VAS.Controllers
         // VAS163 2026-11-11: Row 20 on a tax-inclusive order the tax is extracted with the line's
         // tax rate (gross * 100 / (100 + rate), alias "tx" = C_Tax via TaxJoinSql) - the same
         // approach as VAS_270's delivered value; C_OrderLine.TaxAmt is often 0, so the gross stayed in.
+        // VAS163 2026-11-13: rows 894/1032 the list's pending value (SO 50209: 7,697.27) did not
+        // match the pending lines of the lines pop-up (7,667.80): the SQL took the tax out with
+        // 100 / (100 + C_Tax.Rate) while the pop-up (LoadOrderLines) and VAS_274
+        // (GetPendingValuesByOrder) use the order's own C_OrderTax net/gross ratio per tax
+        // (GetOrderTaxNetRatios). Now the same arithmetic: ex-tax line amount = LineNetAmt x
+        // C_OrderTax ratio (fallback line TaxAmt, then rate), rounded to the currency precision,
+        // times the pending share, rounded to the currency precision.
+        private const string CurrencyPrecisionSql = "CAST(COALESCE(pvc.StdPrecision, 2) AS INTEGER)";
+
+        private const string LineAmtExclTaxSql =
+            "(CASE WHEN bo.Tax_Included = 'Y' THEN " +
+            "(CASE WHEN otr.Net_Ratio IS NOT NULL THEN ROUND(COALESCE(ol.LineNetAmt, 0) * otr.Net_Ratio, " + CurrencyPrecisionSql + ") " +
+            "WHEN COALESCE(ol.TaxAmt, 0) <> 0 THEN COALESCE(ol.LineNetAmt, 0) - ol.TaxAmt " +
+            "ELSE COALESCE(ol.LineNetAmt, 0) - ROUND(COALESCE(ol.LineNetAmt, 0) * COALESCE(tx.Rate, 0) / (100 + COALESCE(tx.Rate, 0)), " + CurrencyPrecisionSql + ") END) " +
+            "ELSE COALESCE(ol.LineNetAmt, 0) END)";
+
         private const string PendingValueSql =
             "CASE WHEN COALESCE(ol.QtyOrdered, 0) > COALESCE(ol.QtyDelivered, 0) AND COALESCE(ol.QtyOrdered, 0) <> 0 " +
-            "THEN ROUND((COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0)) * COALESCE(ol.LineNetAmt, 0) / ol.QtyOrdered " +
-            "* (CASE WHEN bo.Tax_Included = 'Y' THEN 100 / (100 + COALESCE(tx.Rate, 0)) ELSE 1 END), 6) ELSE 0 END";
+            "THEN ROUND(" + LineAmtExclTaxSql + " * (COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0)) / ol.QtyOrdered, " + CurrencyPrecisionSql + ") ELSE 0 END";
 
         // VAS163 2026-11-11: Row 20 line tax rate for PendingValueSql.
+        // VAS163 2026-11-13: rows 894/1032 + the order's C_OrderTax net ratio (order_tax_ratio CTE,
+        // OrderTaxRatioCteSql) and the document currency's precision.
         private const string TaxJoinSql =
-            "LEFT OUTER JOIN C_Tax tx ON ( tx.C_Tax_ID = ol.C_Tax_ID )";
+            "LEFT OUTER JOIN C_Tax tx ON ( tx.C_Tax_ID = ol.C_Tax_ID ) " +
+            "LEFT OUTER JOIN order_tax_ratio otr ON ( otr.C_Order_ID = ol.C_Order_ID AND otr.C_Tax_ID = ol.C_Tax_ID ) " +
+            "LEFT OUTER JOIN C_Currency pvc ON ( pvc.C_Currency_ID = bo.Currency_Id )";
+
+        // VAS163 2026-11-13: rows 894/1032 per tax-inclusive order and tax, the share of the lines'
+        // gross that is not tax, from the order's own tax summary (same rule as GetOrderTaxNetRatios:
+        // a tax without a plausible summary row is left out -> line TaxAmt / rate fallback).
+        // Placed right after the base_orders CTE (secondary aggregate, no AddAccessSQL).
+        private const string OrderTaxRatioCteSql = @"
+                order_tax_ratio AS (
+                    SELECT tg.C_Order_ID AS C_Order_ID,
+                           tg.C_Tax_ID AS C_Tax_ID,
+                           ROUND((tg.Gross - ta.Tax_Amt) / tg.Gross, 12) AS Net_Ratio
+                      FROM (SELECT tgl.C_Order_ID AS C_Order_ID, tgl.C_Tax_ID AS C_Tax_ID, SUM(COALESCE(tgl.LineNetAmt, 0)) AS Gross
+                              FROM C_OrderLine tgl
+                              INNER JOIN base_orders tgb ON ( tgb.C_Order_ID = tgl.C_Order_ID AND tgb.Tax_Included = 'Y' )
+                             WHERE tgl.IsActive = 'Y'
+                             GROUP BY tgl.C_Order_ID, tgl.C_Tax_ID) tg
+                      INNER JOIN (SELECT ot.C_Order_ID AS C_Order_ID, ot.C_Tax_ID AS C_Tax_ID, SUM(COALESCE(ot.TaxAmt, 0)) AS Tax_Amt
+                              FROM C_OrderTax ot
+                              INNER JOIN base_orders tab ON ( tab.C_Order_ID = ot.C_Order_ID AND tab.Tax_Included = 'Y' )
+                             WHERE ot.IsActive = 'Y'
+                             GROUP BY ot.C_Order_ID, ot.C_Tax_ID) ta
+                        ON ( ta.C_Order_ID = tg.C_Order_ID AND ta.C_Tax_ID = tg.C_Tax_ID )
+                     WHERE tg.Gross > 0 AND ta.Tax_Amt >= 0 AND ta.Tax_Amt < tg.Gross
+                ),";
 
         private SummaryResult GetSummaryData(Ctx ctx)
         {
@@ -279,7 +321,7 @@ namespace VAS.Controllers
                 : "SUM(Pending_Value)";
 
             string sql = @"
-                WITH base_orders AS (" + baseOrdersSql + @"),
+                WITH base_orders AS (" + baseOrdersSql + @")," + OrderTaxRatioCteSql + @"
                 pending_by_order AS (
                     SELECT
                         bo.C_Order_ID AS C_Order_ID,
@@ -374,7 +416,7 @@ namespace VAS.Controllers
             if (includeStock)
             {
                 sql = @"
-                    WITH base_orders AS (" + baseOrdersSql + @"),
+                    WITH base_orders AS (" + baseOrdersSql + @")," + OrderTaxRatioCteSql + @"
                     free_stock AS (
                         SELECT
                             l.M_Warehouse_ID AS M_Warehouse_ID,
@@ -448,7 +490,7 @@ namespace VAS.Controllers
             else
             {
                 sql = @"
-                    WITH base_orders AS (" + baseOrdersSql + @"),
+                    WITH base_orders AS (" + baseOrdersSql + @")," + OrderTaxRatioCteSql + @"
                     product_pending AS (
                         SELECT
                             bo.C_Order_ID AS C_Order_ID,
@@ -491,10 +533,11 @@ namespace VAS.Controllers
             // (both query variants filter on it), so the label is deterministically
             // "Pending" for this list. Resolved once via message key rather than a
             // literal in the SQL text (Prompt_Instructions "no static text in query").
-            string pendingLabel = Msg.GetMsg(ctx, "VAS_271_DeliveryPendingChip", true) ?? "Pending"; // VAS163 2026-11-11: text-only label (3-arg GetMsg, no tip appended)
+            // VAS163 2026-11-13: row 994 a missing key came back as "[VAS_271_DeliveryPartialChip]"
+            // and was shown raw - MsgOrDefault falls back to the English text for "[KEY]" / KEY / empty.
+            string pendingLabel = MsgOrDefault(ctx, "VAS_271_DeliveryPendingChip", "Pending");
             // VAS163 2026-11-11: Row 25 "Partial" when part of the ordered quantity is already delivered.
-            string partialLabel = Msg.GetMsg(ctx, "VAS_271_DeliveryPartialChip", true); // VAS163 2026-11-11: text-only label (3-arg GetMsg, no tip appended)
-            if (string.IsNullOrEmpty(partialLabel) || partialLabel == "VAS_271_DeliveryPartialChip") { partialLabel = "Partial"; }
+            string partialLabel = MsgOrDefault(ctx, "VAS_271_DeliveryPartialChip", "Partial");
 
             IDataReader dr = null;
             try
@@ -621,6 +664,7 @@ namespace VAS.Controllers
                     DocumentStatusCode = docStatusCode,
                     OrderValue = dr["Order_Value"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Order_Value"]),
                     CurrencySymbol = (currencySymbol ?? "").Trim(),
+                    CurrencyIso = (Util.GetValueOfString(dr["Currency_Code"]) ?? "").Trim(), // VAS163 2026-11-12: document currency ISO for client-side Intl formatting
                     CurrencyPrecision = stdPrecision,
                     WarehouseName = Util.GetValueOfString(dr["Warehouse_Name"]),
                     DeliveryMode = DecodeLabel(GetDecodeMap("C_Order", "DeliveryViaRule", language), Util.GetValueOfString(dr["Delivery_Via_Rule"]))
@@ -659,9 +703,22 @@ namespace VAS.Controllers
             {
                 deliveryStatusKey = "VAS_271_DeliveryNone"; deliveryStatusFallback = "Not delivered";
             }
-            result.Order.DeliveryStatus = Msg.GetMsg(ctx, deliveryStatusKey, true) ?? deliveryStatusFallback; // VAS163 2026-11-11: text-only label (3-arg GetMsg, no tip appended)
+            result.Order.DeliveryStatus = MsgOrDefault(ctx, deliveryStatusKey, deliveryStatusFallback); // VAS163 2026-11-13: row 994 never a raw "[KEY]"
 
             return result;
+        }
+
+        /// <summary>
+        /// VAS163 2026-11-13: row 994 text-only message (3-arg GetMsg, no tip appended); a missing
+        /// key (returned as "[KEY]", the bare key, or empty) falls back to the English text.
+        /// </summary>
+        private static string MsgOrDefault(Ctx ctx, string key, string fallback)
+        {
+            string text = Msg.GetMsg(ctx, key, true);
+            if (string.IsNullOrWhiteSpace(text)) { return fallback; }
+            string trimmed = text.Trim();
+            if (trimmed == key || trimmed == "[" + key + "]") { return fallback; }
+            return text;
         }
 
         /// <summary>
@@ -1124,6 +1181,7 @@ namespace VAS.Controllers
             public string DocumentStatus { get; set; }
             public string DocumentStatusCode { get; set; }
             public decimal OrderValue { get; set; }
+            public string CurrencyIso { get; set; } // VAS163 2026-11-12
             public string CurrencySymbol { get; set; }
             public int CurrencyPrecision { get; set; }
             public string WarehouseName { get; set; }

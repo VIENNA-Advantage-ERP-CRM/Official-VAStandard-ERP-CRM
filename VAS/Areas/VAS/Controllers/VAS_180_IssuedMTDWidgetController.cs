@@ -109,15 +109,19 @@ namespace VIS.Controllers
             // carries count lines (QtyCount/QtyBook), so all three predicates below are needed
             // to match the definition used by VAS_185_InventoryUseTrendWidget. Without the
             // IsInternalUse filter this KPI counted 34 lines for the current month instead of 12.
+            // VAS163 2026-11-13: row 29 - the tile now counts issue DOCUMENTS (not lines), the same unit
+            // and the same predicates the click-through filters the Inventory Use window on (the window
+            // lists documents), so the number and the filtered records always match.
             string sql = @"
-                SELECT COUNT(line.M_InventoryLine_ID)
+                SELECT COUNT(inv.M_Inventory_ID)
                 FROM M_Inventory inv
-                INNER JOIN M_InventoryLine line ON ( line.M_Inventory_ID = inv.M_Inventory_ID )
                 WHERE inv.IsActive = 'Y'
-                  AND line.IsActive = 'Y'
                   AND COALESCE(inv.IsInternalUse, 'N') = 'Y'
                   AND inv.DocStatus IN ('CO', 'CL')
-                  AND COALESCE(line.QtyInternalUse, 0) > 0
+                  AND EXISTS (SELECT 1 FROM M_InventoryLine line
+                              WHERE line.M_Inventory_ID = inv.M_Inventory_ID
+                                AND line.IsActive = 'Y'
+                                AND COALESCE(line.QtyInternalUse, 0) > 0)
                   AND inv.MovementDate >= @MonthStart
                   AND inv.MovementDate < @NextMonthStart";
 

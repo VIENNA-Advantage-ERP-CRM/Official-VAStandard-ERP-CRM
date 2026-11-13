@@ -39,17 +39,18 @@ namespace VIS.Controllers
         }
 
         /// <summary>
-        /// Hours between a timestamp column and the database clock. Created is stamped by the
-        /// database, so both ends share one clock and the result does not depend on the browser's
-        /// or the web server's time zone.
+        /// VAS163 2026-11-13: row 557 - age of a receipt in whole days from its MovementDate
+        /// (date-only) to the database server's current date, returned as hours (days * 24) so the
+        /// existing Age_Hours contract is kept. Created is no longer used: receipt 1000001 was created
+        /// on Jun 04 but has Movement Date Jul 09, and the widget showed 161d instead of ~127d.
         /// </summary>
-        /// <param name="column">Qualified timestamp column.</param>
-        /// <returns>A dialect-appropriate numeric hours expression.</returns>
-        private static string AgeHoursSql(string column)
+        /// <param name="column">Qualified date column (MovementDate).</param>
+        /// <returns>A dialect-appropriate numeric hours expression (multiple of 24).</returns>
+        private static string AgeDaysAsHoursSql(string column)
         {
             return DB.IsPostgreSQL()
-                ? "ROUND(CAST(EXTRACT(EPOCH FROM (LOCALTIMESTAMP - " + column + ")) / 3600 AS NUMERIC), 4)"
-                : "ROUND((SYSDATE - " + column + ") * 24, 4)";
+                ? "((CURRENT_DATE - CAST(" + column + " AS DATE)) * 24)"
+                : "((TRUNC(SYSDATE) - TRUNC(" + column + ")) * 24)";
         }
 
         /// <summary>
@@ -86,7 +87,7 @@ namespace VIS.Controllers
                        InOut.MovementDate AS Received_On,
                        InOut.DocStatus AS Doc_Status,
                        Warehouse.Name AS Warehouse_Name,
-                       " + AgeHoursSql("InOut.Created") + @" AS Age_Hours
+                       " + AgeDaysAsHoursSql("InOut.MovementDate") + @" AS Age_Hours
                 FROM M_InOut InOut
                 INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=InOut.C_BPartner_ID AND BPartner.IsActive='Y')
                 LEFT OUTER JOIN M_Warehouse Warehouse ON (Warehouse.M_Warehouse_ID=InOut.M_Warehouse_ID AND Warehouse.IsActive='Y')
@@ -108,8 +109,8 @@ namespace VIS.Controllers
                - quantity is the received quantity in the unit the lines were entered in (QtyEntered, e.g.
                  2,000 ml); MovementQty is the product UOM. A total is only meaningful when every line shares
                  one UOM, so Uom is NULL for a mixed receipt and the row then shows no total;
-               - time on dock is Age_Hours (database clock minus Created). MovementDate is date-only, so
-                 hours measured from it were wrong; rows are ordered oldest first by that age. */
+               - time on dock is Age_Hours = whole days from MovementDate to the database server date,
+                 times 24 (VAS163 2026-11-13: row 557); rows are ordered oldest first by that age. */
             string sql = @"
                 SELECT AgingData.Receipt_Id,
                        AgingData.GRN_No,

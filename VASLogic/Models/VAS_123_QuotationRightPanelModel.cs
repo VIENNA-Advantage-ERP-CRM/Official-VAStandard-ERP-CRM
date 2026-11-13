@@ -33,6 +33,40 @@ namespace VAS.Models
     {
         private static readonly VLogger _log = VLogger.GetVLogger(typeof(VAS_123_QuotationRightPanelModel).FullName);
 
+        // VAS163 2026-11-12: what is a sales quotation. The Sales Quotation window lists
+        // C_Order rows by TARGET DOCUMENT TYPE (DocBaseType 'SOO', DocSubTypeSO 'ON' / 'OB',
+        // not a return) - C_Order.IsSalesQuotation is not set on every such row (e.g. a
+        // "Non binding offer" or a quotation copied / created through other paths keeps 'N'),
+        // and the panel then showed "Unable to load quotation data". A row is a quotation
+        // when its target doc type is a quotation type OR it is flagged IsSalesQuotation='Y'.
+        private const string QuotationDocTypeIds =
+            "(SELECT qdt.C_DocType_ID FROM C_DocType qdt WHERE qdt.DocBaseType = 'SOO'" +
+            " AND qdt.DocSubTypeSO IN ('ON','OB') AND COALESCE(qdt.IsReturnTrx,'N') = 'N')";
+        /// <summary>SQL predicate: alias o is a sales quotation.</summary>
+        private const string IsQuotationSql =
+            " (o.IsSalesQuotation = 'Y' OR o.C_DocTypeTarget_ID IN " + QuotationDocTypeIds + ") ";
+        /// <summary>SQL predicate: alias so (a converted order) is NOT a quotation document type.</summary>
+        private const string SoNotQuotationDocTypeSql =
+            " COALESCE(so.C_DocTypeTarget_ID, 0) NOT IN " + QuotationDocTypeIds + " ";
+
+        /// <summary>
+        /// VAS163 2026-11-12: true when the order is a sales quotation - same rule as
+        /// <see cref="IsQuotationSql"/> (target doc type SOO / ON|OB, not a return, or the flag).
+        /// </summary>
+        private static bool IsQuotationOrder(Ctx ctx, MOrder order)
+        {
+            if (order == null || !order.IsSOTrx()) return false;
+            if ("Y".Equals(Util.GetValueOfString(order.Get_Value("IsSalesQuotation")))) return true;
+            int docTypeId = order.GetC_DocTypeTarget_ID();
+            if (docTypeId <= 0) return false;
+            MDocType dt = MDocType.Get(ctx, docTypeId);
+            if (dt == null || dt.Get_ID() <= 0) return false;
+            string sub = Util.GetValueOfString(dt.GetDocSubTypeSO());
+            return "SOO".Equals(dt.GetDocBaseType())
+                && ("ON".Equals(sub) || "OB".Equals(sub))
+                && !"Y".Equals(Util.GetValueOfString(dt.Get_Value("IsReturnTrx")));
+        }
+
         // Cached per-deployment flag: null = not yet checked, true/false = exists.
         // Avoids a repeated AD_Column round-trip on every GetHeader call once the
         // column absence is confirmed (common on Oracle deployments that lack SO_CreditStatus).
@@ -112,9 +146,9 @@ namespace VAS.Models
                 COALESCE(cur.StdPrecision, 2) AS CurrencyPrecision,
                 o.Updated AS LastDocumentActionDate,
                 COALESCE(o.CustomerReference, o.POReference, N'') AS CustomerReference,
-                (SELECT MIN(so.C_Order_ID) FROM C_Order so WHERE (so.Ref_Order_ID = o.C_Order_ID OR so.C_Order_ID = o.Ref_Order_ID) AND so.IsActive = 'Y' AND so.IsSOTrx = 'Y' AND COALESCE(so.IsSalesQuotation,'N') = 'N' AND COALESCE(so.IsBlanketTrx,'N') = 'N' AND COALESCE(so.IsReturnTrx,'N') = 'N') AS ConvertedOrder_ID,
-                (SELECT MIN(so.DocumentNo) FROM C_Order so WHERE (so.Ref_Order_ID = o.C_Order_ID OR so.C_Order_ID = o.Ref_Order_ID) AND so.IsActive = 'Y' AND so.IsSOTrx = 'Y' AND COALESCE(so.IsSalesQuotation,'N') = 'N' AND COALESCE(so.IsBlanketTrx,'N') = 'N' AND COALESCE(so.IsReturnTrx,'N') = 'N') AS ConvertedOrderNo,
-                (SELECT MIN(so.DateOrdered) FROM C_Order so WHERE (so.Ref_Order_ID = o.C_Order_ID OR so.C_Order_ID = o.Ref_Order_ID) AND so.IsActive = 'Y' AND so.IsSOTrx = 'Y' AND COALESCE(so.IsSalesQuotation,'N') = 'N' AND COALESCE(so.IsBlanketTrx,'N') = 'N' AND COALESCE(so.IsReturnTrx,'N') = 'N') AS ConvertedOrderDate
+                (SELECT MIN(so.C_Order_ID) FROM C_Order so WHERE (so.Ref_Order_ID = o.C_Order_ID OR so.C_Order_ID = o.Ref_Order_ID) AND so.IsActive = 'Y' AND so.IsSOTrx = 'Y' AND COALESCE(so.IsSalesQuotation,'N') = 'N' AND" + SoNotQuotationDocTypeSql + @" AND COALESCE(so.IsBlanketTrx,'N') = 'N' AND COALESCE(so.IsReturnTrx,'N') = 'N') AS ConvertedOrder_ID,
+                (SELECT MIN(so.DocumentNo) FROM C_Order so WHERE (so.Ref_Order_ID = o.C_Order_ID OR so.C_Order_ID = o.Ref_Order_ID) AND so.IsActive = 'Y' AND so.IsSOTrx = 'Y' AND COALESCE(so.IsSalesQuotation,'N') = 'N' AND" + SoNotQuotationDocTypeSql + @" AND COALESCE(so.IsBlanketTrx,'N') = 'N' AND COALESCE(so.IsReturnTrx,'N') = 'N') AS ConvertedOrderNo,
+                (SELECT MIN(so.DateOrdered) FROM C_Order so WHERE (so.Ref_Order_ID = o.C_Order_ID OR so.C_Order_ID = o.Ref_Order_ID) AND so.IsActive = 'Y' AND so.IsSOTrx = 'Y' AND COALESCE(so.IsSalesQuotation,'N') = 'N' AND" + SoNotQuotationDocTypeSql + @" AND COALESCE(so.IsBlanketTrx,'N') = 'N' AND COALESCE(so.IsReturnTrx,'N') = 'N') AS ConvertedOrderDate
                 FROM C_Order o
                 INNER JOIN C_BPartner bp ON (bp.C_BPartner_ID = o.C_BPartner_ID)
                 LEFT OUTER JOIN AD_User ct ON (ct.AD_User_ID = o.AD_User_ID)
@@ -124,7 +158,7 @@ namespace VAS.Models
                 WHERE o.C_Order_ID = @orderId
                 AND o.IsActive = 'Y'
                 AND o.IsSOTrx = 'Y'
-                AND o.IsSalesQuotation = 'Y'";
+                AND" + IsQuotationSql;   // VAS163 2026-11-12: doc-type based (was o.IsSalesQuotation = 'Y')
 
             string accessSql = MRole.GetDefault(ctx).AddAccessSQL(
                 baseSql, "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
@@ -609,7 +643,7 @@ namespace VAS.Models
                     response.error = "not_completed";
                     return response;
                 }
-                if (!quotation.IsSOTrx() || !"Y".Equals(Util.GetValueOfString(quotation.Get_Value("IsSalesQuotation"))))
+                if (!IsQuotationOrder(ctx, quotation))   // VAS163 2026-11-12: doc-type based
                 {
                     response.error = "not_a_quotation";
                     return response;
@@ -706,7 +740,7 @@ namespace VAS.Models
                     FROM C_Order so
                     WHERE (so.Ref_Order_ID = @orderId OR so.C_Order_ID = (SELECT q.Ref_Order_ID FROM C_Order q WHERE q.C_Order_ID = @orderId AND q.IsActive = 'Y'))
                     AND so.IsActive = 'Y'
-                    AND COALESCE(so.IsSalesQuotation,'N') = 'N'
+                    AND COALESCE(so.IsSalesQuotation,'N') = 'N' AND" + SoNotQuotationDocTypeSql + @"
                     AND COALESCE(so.IsBlanketTrx,'N') = 'N'
                     AND COALESCE(so.IsReturnTrx,'N') = 'N'
                     AND so.IsSOTrx = 'Y'";
@@ -842,7 +876,7 @@ namespace VAS.Models
                 WHERE (";
             const string salesOrderOnly = @")
                 AND so.IsSOTrx = 'Y'
-                AND COALESCE(so.IsSalesQuotation,'N') = 'N'
+                AND COALESCE(so.IsSalesQuotation,'N') = 'N' AND" + SoNotQuotationDocTypeSql + @"
                 AND COALESCE(so.IsBlanketTrx,'N') = 'N'
                 AND COALESCE(so.IsReturnTrx,'N') = 'N'
                 AND so.IsActive = 'Y'";
@@ -940,7 +974,7 @@ namespace VAS.Models
             sb.Append("  LEFT OUTER JOIN VAS_Opportunity op ON (op.VAS_Opportunity_ID = o.VAS_Opportunity_ID AND op.IsActive = 'Y')");
             sb.Append("  LEFT OUTER JOIN AD_User rep ON (rep.AD_User_ID = op.SalesRep_ID AND rep.IsActive = 'Y')");
             sb.Append(" WHERE o.C_Order_ID = @orderId");
-            sb.Append("   AND o.IsSalesQuotation = 'Y'");
+            sb.Append("   AND" + IsQuotationSql);   // VAS163 2026-11-12: doc-type based
             sb.Append("   AND o.IsActive = 'Y'");
 
             string accessSql = MRole.GetDefault(ctx).AddAccessSQL(
@@ -1292,8 +1326,8 @@ namespace VAS.Models
                 LEFT OUTER JOIN C_BPartner_Location billbpl ON (billbpl.C_BPartner_Location_ID = o.Bill_Location_ID AND billbpl.IsActive = 'Y')
                 LEFT OUTER JOIN C_Location bill ON (bill.C_Location_ID = billbpl.C_Location_ID AND bill.IsActive = 'Y')
                 WHERE o.C_Order_ID = @orderId
-                AND o.IsSalesQuotation = 'Y'
-                AND o.IsActive = 'Y'";
+                AND" + IsQuotationSql + @"
+                AND o.IsActive = 'Y'";   // VAS163 2026-11-12: doc-type based
 
             string accessSql = MRole.GetDefault(ctx).AddAccessSQL(
                 baseSql, "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
@@ -1381,7 +1415,7 @@ namespace VAS.Models
                 sb.Append(" WHERE o.C_Order_ID = @orderId");
                 sb.Append("   AND o.IsActive = 'Y'");
                 sb.Append("   AND o.IsSOTrx = 'Y'");
-                sb.Append("   AND o.IsSalesQuotation = 'Y'");
+                sb.Append("   AND" + IsQuotationSql);   // VAS163 2026-11-12: doc-type based
 
                 string accessSql = MRole.GetDefault(ctx).AddAccessSQL(
                     sb.ToString(), "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
@@ -1587,7 +1621,7 @@ namespace VAS.Models
                     sb.Append("  LEFT OUTER JOIN C_BPartner bp ON (bp.C_BPartner_ID = o.C_BPartner_ID AND bp.IsActive = 'Y')");
                     sb.Append("  LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID = o.C_Currency_ID)");
                     sb.Append(" WHERE " + linkPredicate);
-                    sb.Append("   AND o.IsSalesQuotation = 'Y'");
+                    sb.Append("   AND" + IsQuotationSql);   // VAS163 2026-11-12: doc-type based
                     sb.Append("   AND o.IsActive = 'Y'");
 
                     string accessSql = MRole.GetDefault(ctx).AddAccessSQL(
@@ -1669,7 +1703,7 @@ namespace VAS.Models
                 }
 
                 // Verify the record is indeed a quotation before modifying it
-                if (!"Y".Equals(Util.GetValueOfString(order.Get_Value("IsSalesQuotation"))))
+                if (!IsQuotationOrder(ctx, order))   // VAS163 2026-11-12: doc-type based
                 {
                     response.error = "not_a_quotation";
                     return response;

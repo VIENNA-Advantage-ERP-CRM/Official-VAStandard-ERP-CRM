@@ -108,48 +108,9 @@
             var amount = Number(val || 0);
             if (isNaN(amount)) { amount = 0; }
             var cur = currencyObj || currencyInfo || {};
-            var symbol = cur.symbol || "";
-            var iso = (cur.iso || "").toUpperCase();
-
-            var indianISOs = ["INR", "PKR", "BDT", "NPR", "BTN", "LKR"];
-            var formattedNum = "";
-
-            if (indianISOs.indexOf(iso) !== -1) {
-                var absAmt = Math.abs(amount);
-                var sign = amount < 0 ? "-" : "";
-                if (absAmt >= 10000000) {
-                    formattedNum = sign + (absAmt / 10000000).toFixed(2).replace(/\.00$/, '') + ' Cr';
-                } else if (absAmt >= 100000) {
-                    formattedNum = sign + (absAmt / 100000).toFixed(2).replace(/\.00$/, '') + ' L';
-                } else {
-                    var parts = absAmt.toFixed(2).split('.');
-                    var numStr = parts[0];
-                    var decStr = parts[1];
-                    if (numStr.length > 3) {
-                        var last3 = numStr.substring(numStr.length - 3);
-                        var otherDigits = numStr.substring(0, numStr.length - 3);
-                        formattedNum = otherDigits.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + "," + last3;
-                    } else {
-                        formattedNum = numStr;
-                    }
-                    if (decStr && decStr !== "00") {
-                        formattedNum += "." + decStr;
-                    }
-                    formattedNum = sign + formattedNum;
-                }
-            } else {
-                var absAmt = Math.abs(amount);
-                var sign = amount < 0 ? "-" : "";
-                if (absAmt >= 1000000000) {
-                    formattedNum = sign + (absAmt / 1000000000).toFixed(2).replace(/\.00$/, '') + 'B';
-                } else if (absAmt >= 1000000) {
-                    formattedNum = sign + (absAmt / 1000000).toFixed(2).replace(/\.00$/, '') + 'M';
-                } else {
-                    formattedNum = amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-                }
-            }
-
-            return symbol ? (symbol + " " + formattedNum).trim() : formattedNum;
+            // VAS163 2026-11-12: server currency + browser culture via VAS.formatAmountByBrowser
+            // (was "symbol + ' ' + compact number" with a fixed 2-dp precision).
+            return VAS.formatAmountByBrowser(amount, cur.iso || "", cur.stdPrecision, { compact: true, symbol: cur.symbol || "" });
         }
 
         function formatCount(value) {
@@ -212,13 +173,25 @@
             // including IsInternalUse, or the drilled-through list shows physical inventory
             // documents the KPI never counted.
             var where = "M_Inventory.IsActive = 'Y' AND M_Inventory.IsInternalUse = 'Y' AND M_Inventory.DocStatus IN ('DR', 'IP', 'WC', 'IN')";
+            // VAS163 2026-11-12: Home page (windowNo < 0) has no host to relay the filter to, so
+            // the click did nothing - open the Inventory Use window via VAS.ZoomUtil instead.
+            if ($self.windowNo < 0) {
+                if (window.VAS && VAS.ZoomUtil) {
+                    VAS.ZoomUtil.zoomToRecord('M_Inventory_ID', 0, inventoryUseWindowId, 'VAS_InternalUseInventory', 'Internal Use Inventory')
+                        .done(function (id) { if (id > 0) { inventoryUseWindowId = id; } });
+                }
+                return;
+            }
             var windowParam = {
                 "TabWhereClause": where,
                 "TabLayout": "N",
-                "TabIndex": "0"
+                "TabIndex": "0",
+                "ActionName": "VAS_InternalUseInventory",
+                "ActionType": "W"
             };
             $self.widgetFirevalueChanged(windowParam);
         }
+        var inventoryUseWindowId = 0; // VAS163 2026-11-12: cached by VAS.ZoomUtil
 
         function createWidget() {
             var title = label("VAS_179_OpenMaterialIssues", "Open Issues");
@@ -282,3 +255,78 @@
     };
 
 })(VAS, jQuery);
+/* VAS163 2026-11-12: VAS.formatAmountByBrowser(value, isoCode, precision, { compact, symbol })
+   Amount in the BROWSER culture (window.navigator.language) with the currency the SERVER sent
+   (ISO code + precision; the server symbol only as a fallback). Defined in each widget / panel
+   that uses it - guarded, so the first file loaded defines it - so the shared util/CurrencyFormat.js
+   stays as shipped. Compact amounts keep that file's default scale (VIS.Util.formatCompactAmount:
+   L / Cr for Indian-numbering currencies, K / M / B otherwise, digits in the browser culture);
+   separators, decimals and the position of the currency sign come from the browser culture. */
+; (function () {
+    var V = window.VAS = window.VAS || {};
+    if (typeof V.formatAmountByBrowser === 'function') return;
+    function browserLocale() { try { return window.navigator.language || undefined; } catch (e) { return undefined; } }
+    function resolvePrecision(p) {
+        var n = Number(p);
+        if (p === null || p === undefined || p === '' || isNaN(n) || n < 0) {
+            try { n = VIS.Env.getCtx().getStdPrecision(); } catch (e) { n = 2; }
+        }
+        n = Math.round(Number(n));
+        return (isNaN(n) || n < 0) ? 2 : Math.min(n, 10);
+    }
+    function validIso(c) { c = String(c || '').trim().toUpperCase(); return /^[A-Z]{3}$/.test(c) ? c : ''; }
+    function numberFormat(o) {
+        try { return new Intl.NumberFormat(browserLocale(), o); } catch (e) { }
+        if (o.currencyDisplay === 'narrowSymbol') {
+            o.currencyDisplay = 'symbol';
+            try { return new Intl.NumberFormat(browserLocale(), o); } catch (e2) { }
+        }
+        return null;
+    }
+    /* Currency sign and where the browser culture puts it for this ISO code. */
+    var layoutCache = {};
+    function currencyLayout(iso) {
+        var key = browserLocale() + '|' + iso;
+        if (layoutCache[key]) return layoutCache[key];
+        var out = { sign: '', before: true, gap: '' };
+        var f = iso ? numberFormat({ style: 'currency', currency: iso, currencyDisplay: 'narrowSymbol' }) : null;
+        if (f && typeof f.formatToParts === 'function') {
+            try {
+                var parts = f.formatToParts(1234.5), ci = -1, ni = -1;
+                for (var i = 0; i < parts.length; i++) {
+                    if (parts[i].type === 'currency' && ci < 0) ci = i;
+                    if (parts[i].type === 'integer' && ni < 0) ni = i;
+                }
+                if (ci >= 0) {
+                    out.sign = parts[ci].value;
+                    if (ni >= 0) {
+                        out.before = ci < ni;
+                        var near = out.before ? parts[ci + 1] : parts[ci - 1];
+                        out.gap = (near && near.type === 'literal') ? near.value : '';
+                    }
+                }
+            } catch (e) { }
+        }
+        layoutCache[key] = out;
+        return out;
+    }
+    V.formatAmountByBrowser = function (value, isoCode, precision, options) {
+        options = options || {};
+        var num = Number(value) || 0;
+        var p = resolvePrecision(precision);
+        var iso = validIso(isoCode);
+        var body;
+        if (options.compact && window.VIS && VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
+            body = VIS.Util.formatCompactAmount(Math.abs(num), iso, p);
+        } else {
+            var f = numberFormat({ minimumFractionDigits: p, maximumFractionDigits: p });
+            try { body = f ? f.format(Math.abs(num)) : Math.abs(num).toFixed(p); } catch (e) { body = String(Math.abs(num)); }
+        }
+        var minus = (num < 0 && /[1-9]/.test(body)) ? '-' : '';
+        var lay = currencyLayout(iso);
+        var sign = lay.sign || options.symbol || iso;
+        if (!sign) return minus + body;
+        if (!lay.sign) return minus + sign + ' ' + body;
+        return lay.before ? (minus + sign + lay.gap + body) : (minus + body + lay.gap + sign);
+    };
+})();

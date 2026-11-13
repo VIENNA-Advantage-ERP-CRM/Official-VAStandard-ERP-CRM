@@ -248,19 +248,21 @@
                         var qtyDiffCount = res.qtyDiffRecordCount || 0;
                         var netDiff = res.netDiffQty || 0;
 
-                        $asOnCountVal.text(asOnCount);
+                        // VAS163 2026-11-12: counts / net qty rendered per browser locale (were raw numbers).
+                        var lng = window.navigator.language;
+                        $asOnCountVal.text(Number(asOnCount).toLocaleString(lng));
                         if (asOnCount === 0) {
                             $asOnCountMeta.text(lbl("VAS_162_NoAdjustmentsThisPeriod"));
                         } else {
-                            $asOnCountMeta.text(asOnCount + " " + lbl("VAS_162_AdjustmentsRecorded"));
+                            $asOnCountMeta.text(Number(asOnCount).toLocaleString(lng) + " " + lbl("VAS_162_AdjustmentsRecorded"));
                         }
 
-                        $qtyDiffVal.text(qtyDiffCount);
+                        $qtyDiffVal.text(Number(qtyDiffCount).toLocaleString(lng));
                         if (qtyDiffCount === 0) {
                             $qtyDiffMeta.text(lbl("VAS_162_NoAdjustmentsThisPeriod"));
                         } else {
                             var signPrefix = netDiff > 0 ? "+" : "";
-                            $qtyDiffMeta.text(lbl("VAS_162_NetDiffQtyLabel") + " " + signPrefix + netDiff);
+                            $qtyDiffMeta.text(lbl("VAS_162_NetDiffQtyLabel") + " " + signPrefix + Number(netDiff).toLocaleString(lng, { maximumFractionDigits: 4 }));
                         }
                     }
                 },
@@ -486,11 +488,13 @@
                     var item = details[i];
                     var diffVal = Number(item.diffQty || 0);
                     var diffClass = "vas-adjwisecount-cell-num";
-                    var diffText = String(diffVal);
+                    // VAS163 2026-11-12: quantities rendered per browser locale (were raw numbers).
+                    var fq = function (v) { return Number(v || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 4 }); };
+                    var diffText = fq(diffVal);
 
                     if (diffVal > 0) {
                         diffClass = "vas-adjwisecount-diff-pos";
-                        diffText = "+" + diffVal;
+                        diffText = "+" + fq(diffVal);
                     } else if (diffVal < 0) {
                         diffClass = "vas-adjwisecount-diff-neg";
                     }
@@ -503,9 +507,9 @@
                         '<div class="vas-adjwisecount-cell vas-adjwisecount-cell-doc vas-adjwisecount-doclink" role="link" tabindex="0" title="' + esc(item.documentNo) + '">' + esc(item.documentNo) + '</div>' +
                         '<div class="vas-adjwisecount-cell vas-adjwisecount-cell-product" title="' + esc(item.product) + '">' + esc(item.product) + '</div>' +
                         '<div class="vas-adjwisecount-cell vas-adjwisecount-cell-attr" title="' + esc(attr) + '">' + esc(attr) + '</div>' +
-                        '<div class="vas-adjwisecount-cell vas-adjwisecount-cell-num" title="' + esc(item.qty) + '">' + esc(item.qty) + '</div>' +
+                        '<div class="vas-adjwisecount-cell vas-adjwisecount-cell-num" title="' + esc(fq(item.qty)) + '">' + esc(fq(item.qty)) + '</div>' +
                         '<div class="vas-adjwisecount-cell ' + diffClass + '" title="' + esc(diffText) + '">' + esc(diffText) + '</div>' +
-                        '<div class="vas-adjwisecount-cell vas-adjwisecount-cell-num" title="' + esc(item.asOnDateCount) + '">' + esc(item.asOnDateCount) + '</div>' +
+                        '<div class="vas-adjwisecount-cell vas-adjwisecount-cell-num" title="' + esc(fq(item.asOnDateCount)) + '">' + esc(fq(item.asOnDateCount)) + '</div>' +
                         '</div>'
                     );
 

@@ -192,7 +192,8 @@ namespace VAS.Controllers
                        io.MovementDate AS Document_Date,
                        io.DocStatus AS Document_Status,
                        COALESCE(__VAS_DO_LINE_VALUE__, 0) AS Delivery_Order_Value,
-                       curr.ISO_Code AS Currency_ISO
+                       curr.ISO_Code AS Currency_ISO,
+                       curr.StdPrecision AS Currency_Precision
                 FROM M_InOut io
                 INNER JOIN C_BPartner bp ON (bp.C_BPartner_ID = io.C_BPartner_ID)
                 LEFT OUTER JOIN C_Order ord ON (ord.C_Order_ID = io.C_Order_ID)
@@ -235,6 +236,10 @@ namespace VAS.Controllers
             string defaultCurrencyIso = Util.GetValueOfString(DB.ExecuteScalar(
                 @"SELECT ISO_Code FROM C_Currency WHERE C_Currency_ID=@Currency_ID",
                 new SqlParameter[] { new SqlParameter("@Currency_ID", ctx.GetContextAsInt("$C_Currency_ID")) }, null));
+            // VAS163 2026-11-12: the currency precision is sent with each row (was a fixed 2 in the widget).
+            int defaultCurrencyPrecision = Util.GetValueOfInt(DB.ExecuteScalar(
+                @"SELECT StdPrecision FROM C_Currency WHERE C_Currency_ID=@Currency_ID",
+                new SqlParameter[] { new SqlParameter("@Currency_ID", ctx.GetContextAsInt("$C_Currency_ID")) }, null));
 
             List<object> items = new List<object>();
             IDataReader dr = null;
@@ -262,7 +267,8 @@ namespace VAS.Controllers
                         documentDate = documentDate.HasValue ? documentDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                         documentStatus = Util.GetValueOfString(dr["Document_Status"]),
                         value = Util.GetValueOfDecimal(dr["Delivery_Order_Value"]),
-                        currencyIso = string.IsNullOrEmpty(currencyIso) ? defaultCurrencyIso : currencyIso
+                        currencyIso = string.IsNullOrEmpty(currencyIso) ? defaultCurrencyIso : currencyIso,
+                        currencyPrecision = string.IsNullOrEmpty(currencyIso) ? defaultCurrencyPrecision : Util.GetValueOfInt(dr["Currency_Precision"])
                     });
                 }
 

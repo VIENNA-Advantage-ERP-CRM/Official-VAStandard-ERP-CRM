@@ -143,9 +143,23 @@
             return _curLayout;
         }
 
+        // VAS163 2026-11-12: the quotation's currency ISO code as sent by the server
+        // (GetHeader -> currencyISO); empty until the header has loaded.
+        function curIso() {
+            var h = state && state.header;
+            return (h && (h.currencyISO || h.currencyIso || h.currencyCode)) || '';
+        }
+
         // Amount in the browser culture: grouping + decimal mark per locale, the
         // server-supplied currency sign placed where that locale puts it.
-        function fmtCurrency(v, sym, prec) {
+        // VAS163 2026-11-12: the currency comes from the server (iso + precision) and the
+        // whole layout from the browser culture via the shared VAS.formatAmountByBrowser
+        // (Intl currency style) - no more symbol placement copied from a fixed 'USD' sample.
+        // The server's symbol is only a fallback for a code the browser cannot render.
+        function fmtCurrency(v, sym, prec, iso) {
+            if (window.VIS && VIS.Util && typeof VAS.formatAmountByBrowser === 'function') {
+                return VAS.formatAmountByBrowser(toNum(v), (iso != null ? iso : curIso()), prec, { symbol: sym || '' });
+            }
             var s = (sym != null ? String(sym) : '');
             var p = (prec != null ? Math.max(0, parseInt(prec, 10) || 0) : 2);
             var n = toNum(v);
@@ -186,8 +200,11 @@
             if (!iso) return '';
             var st = parseStamp(iso);
             if (!st) return String(iso);
-            var dateStr = fmtDate(iso);
-            return st.hasTime ? (dateStr + ', ' + fmtTimeOf(st.date)) : dateStr;
+            if (!st.hasTime) return fmtDate(iso);
+            // VAS163 2026-11-12: one Intl call, so the culture decides how date and time are
+            // joined (no fixed ", " between them).
+            try { return st.date.toLocaleString(VASLocale, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+            catch (e) { return fmtDate(iso) + ' ' + fmtTimeOf(st.date); }
         }
 
         // ── Helper: engagement timestamp → browser culture "day month, time" ──
@@ -198,8 +215,10 @@
             var st = parseStamp(ts);
             if (!st) return ts;
             try {
-                var dStr = st.date.toLocaleDateString(VASLocale, { day: '2-digit', month: 'short' });
-                return st.hasTime ? (dStr + ', ' + fmtTimeOf(st.date)) : dStr;
+                // VAS163 2026-11-12: single Intl call - the culture joins date and time.
+                return st.hasTime
+                    ? st.date.toLocaleString(VASLocale, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+                    : st.date.toLocaleDateString(VASLocale, { day: '2-digit', month: 'short' });
             } catch (e) { return ts; }
         }
 
@@ -1496,7 +1515,9 @@
                             : (h.customerOpenBalance != null) ? h.customerOpenBalance : null;
             var balSym  = (addr && addr.baseCurrSymbol) ? addr.baseCurrSymbol : sym;
             var balPrec = (addr && addr.baseCurrPrec  != null) ? parseInt(addr.baseCurrPrec, 10) : prec;
-            var balText = (openBalance != null) ? fmtCurrency(openBalance, balSym, balPrec) : '';
+            // VAS163 2026-11-12: the balance is in the base currency - pass its server ISO code.
+            var balIso  = (addr && addr.baseCurrIso) ? addr.baseCurrIso : curIso();
+            var balText = (openBalance != null) ? fmtCurrency(openBalance, balSym, balPrec, balIso) : '';
             var balHtml = balText ? esc(balText) : '—';
 
             // ── Bill-to / Ship-to from the separately loaded address record ──
@@ -2924,20 +2945,25 @@
             showModal(title, meta, bodyHtml, footHtml, false);
         }
 
-        // ── Action: Open a Sales Order record in the platform window viewer ───
-        function openOrderRecord(orderId) {
-            if (!orderId || +orderId <= 0 || !window.VIS) return;
+        // ── VAS163 2026-11-12: every record link goes through VAS.ZoomUtil ──────
+        // The window is chosen by document type (VAS window name, old name as fallback),
+        // not by table: ZoomTarget/startWindow could open the wrong C_Order / C_BPartner
+        // window. The resolved id is kept per window name, so the lookup runs once.
+        var zoomWinIds = {};
+        function zoomTo(pkColumn, recordId, newName, oldName) {
+            var id = +recordId || 0;
+            if (id <= 0 || !(window.VAS && VAS.ZoomUtil && typeof VAS.ZoomUtil.zoomToRecord === 'function')) return;
             try {
-                var windowId = 0;
-                if (VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === 'function') {
-                    // isSOTrx = true → Sales Order window (not Purchase Order window)
-                    windowId = VIS.ZoomTarget.getZoomAD_Window_ID('C_Order', 0, null, true) || 0;
-                }
-                if (windowId > 0 && VIS.viewManager && typeof VIS.viewManager.startWindow === 'function') {
-                    var zoomQuery = VIS.Query.prototype.getEqualQuery('C_Order_ID', +orderId);
-                    VIS.viewManager.startWindow(windowId, zoomQuery);
-                }
+                VAS.ZoomUtil.zoomToRecord(pkColumn, id, zoomWinIds[newName] || 0, newName, oldName || '')
+                    .then(function (usedId) { if (+usedId > 0) zoomWinIds[newName] = +usedId; });
             } catch (e) { }
+        }
+
+        // ── Action: Open a Sales Order record in the platform window viewer ───
+        // The converted order is a sales order (IsSOTrx='Y', not quotation/blanket/return
+        // per GetHeader's ConvertedOrder_ID filter) -> the VAS Sales Order window.
+        function openOrderRecord(orderId) {
+            zoomTo('C_Order_ID', orderId, 'VAS_SalesOrder', 'Sales Order');
         }
 
         // ── Instance method: Initialize — builds DOM and wires events ───────────
@@ -3065,12 +3091,10 @@
                 var lId = $(this).data('lineId');
                 if (!lId || !window.VIS) return;
                 closeModal();
-                if (VIS.viewManager && typeof VIS.viewManager.startWindow === 'function') {
-                    var q = (VIS.Query && VIS.Query.prototype && typeof VIS.Query.prototype.getEqualQuery === 'function')
-                        ? VIS.Query.prototype.getEqualQuery('C_OrderLine_ID', lId)
-                        : null;
-                    VIS.viewManager.startWindow('VAS_QuotationLine', q);
-                }
+                // VAS163 2026-11-12: there is no 'VAS_QuotationLine' window (and startWindow takes
+                // an id, not a name), so this never opened anything. The line lives on the
+                // quotation -> open the quotation in the VAS Sales Quotation window.
+                zoomTo('C_Order_ID', currentOrderId, 'VAS_SalesQuotation', 'Sales Quotation');
                 e.stopPropagation();
             });
 
@@ -3081,28 +3105,9 @@
                 var chargeId  = parseInt($btn.data('chargeId')  || 0, 10);
                 if (!window.VIS) return;
                 closeModal();
-                try {
-                    var tableName, pkColumn, recordId;
-                    if (chargeId > 0) {
-                        tableName = 'C_Charge';
-                        pkColumn  = 'C_Charge_ID';
-                        recordId  = chargeId;
-                    } else {
-                        tableName = 'M_Product';
-                        pkColumn  = 'M_Product_ID';
-                        recordId  = productId;
-                    }
-                    var windowId = 0;
-                    if (VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === 'function') {
-                        windowId = VIS.ZoomTarget.getZoomAD_Window_ID(tableName, 0, null, false) || 0;
-                    }
-                    if (windowId > 0 && VIS.viewManager && typeof VIS.viewManager.startWindow === 'function') {
-                        var zoomQuery = (VIS.Query && VIS.Query.prototype && typeof VIS.Query.prototype.getEqualQuery === 'function')
-                            ? VIS.Query.prototype.getEqualQuery(pkColumn, recordId)
-                            : null;
-                        VIS.viewManager.startWindow(windowId, zoomQuery);
-                    }
-                } catch (ex) { }
+                // VAS163 2026-11-12: VAS.ZoomUtil with the VAS windows (was ZoomTarget by table).
+                if (chargeId > 0) zoomTo('C_Charge_ID', chargeId, 'VAS_Charge', 'Charge');
+                else zoomTo('M_Product_ID', productId, 'VAS_ProductMaster', 'Product');
                 e.stopPropagation();
             });
 
@@ -3112,25 +3117,10 @@
                 var bpId = parseInt($(this).data('bpId'), 10);
                 if (!bpId || bpId <= 0) return;
 
-                // Primary: use ZoomUtil (same as all CRM widgets) to resolve the
-                // VAS_CustomerMaster window ID and navigate to the specific record.
-                if (window.VAS && VAS.ZoomUtil && typeof VAS.ZoomUtil.zoomToRecord === 'function') {
-                    VAS.ZoomUtil.zoomToRecord('C_BPartner_ID', bpId, 0, 'VAS_CustomerMaster', 'C_BPartner');
-                    return;
-                }
-
-                // Fallback: resolve window ID via ZoomTarget then open with viewManager
-                if (!window.VIS || !VIS.viewManager || typeof VIS.viewManager.startWindow !== 'function') return;
-                var wid = 0;
-                if (VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === 'function') {
-                    try { wid = VIS.ZoomTarget.getZoomAD_Window_ID('C_BPartner', 0, null, false) || 0; } catch (ex) {}
-                }
-                if (wid > 0) {
-                    var q = (VIS.Query && VIS.Query.prototype && typeof VIS.Query.prototype.getEqualQuery === 'function')
-                        ? VIS.Query.prototype.getEqualQuery('C_BPartner_ID', bpId)
-                        : null;
-                    VIS.viewManager.startWindow(wid, q);
-                }
+                // VAS163 2026-11-12: VAS.ZoomUtil only - the customer of a sales quotation opens in
+                // VAS_CustomerMaster ('Business Partner' as the old-name fallback; 'C_BPartner'
+                // is a table name, not a window). The ZoomTarget/startWindow fallback is gone.
+                zoomTo('C_BPartner_ID', bpId, 'VAS_CustomerMaster', 'Business Partner');
             });
 
             // Click on the linked opportunity row — zoom straight to the VAS_Opportunity record
@@ -3138,18 +3128,8 @@
                 e.stopPropagation();
                 var oppRecId = parseInt($(this).data('opportunityId') || 0, 10);
                 if (!oppRecId || !window.VIS) return;
-                try {
-                    var wid = 0;
-                    if (VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === 'function') {
-                        wid = VIS.ZoomTarget.getZoomAD_Window_ID('VAS_Opportunity', 0, null, false) || 0;
-                    }
-                    if (wid > 0 && VIS.viewManager && typeof VIS.viewManager.startWindow === 'function') {
-                        var q = (VIS.Query && VIS.Query.prototype && typeof VIS.Query.prototype.getEqualQuery === 'function')
-                            ? VIS.Query.prototype.getEqualQuery('VAS_Opportunity_ID', oppRecId)
-                            : null;
-                        VIS.viewManager.startWindow(wid, q);
-                    }
-                } catch (ex) { }
+                // VAS163 2026-11-12: VAS.ZoomUtil - the active opportunity window is VAS_OpportunityNew.
+                zoomTo('VAS_Opportunity_ID', oppRecId, 'VAS_OpportunityNew', 'VAS_Opportunity');
             });
 
             // Add line — directs user to line entry on the main window form
@@ -3654,3 +3634,78 @@
     };
 
 }(VAS, jQuery));
+/* VAS163 2026-11-12: VAS.formatAmountByBrowser(value, isoCode, precision, { compact, symbol })
+   Amount in the BROWSER culture (window.navigator.language) with the currency the SERVER sent
+   (ISO code + precision; the server symbol only as a fallback). Defined in each widget / panel
+   that uses it - guarded, so the first file loaded defines it - so the shared util/CurrencyFormat.js
+   stays as shipped. Compact amounts keep that file's default scale (VIS.Util.formatCompactAmount:
+   L / Cr for Indian-numbering currencies, K / M / B otherwise, digits in the browser culture);
+   separators, decimals and the position of the currency sign come from the browser culture. */
+; (function () {
+    var V = window.VAS = window.VAS || {};
+    if (typeof V.formatAmountByBrowser === 'function') return;
+    function browserLocale() { try { return window.navigator.language || undefined; } catch (e) { return undefined; } }
+    function resolvePrecision(p) {
+        var n = Number(p);
+        if (p === null || p === undefined || p === '' || isNaN(n) || n < 0) {
+            try { n = VIS.Env.getCtx().getStdPrecision(); } catch (e) { n = 2; }
+        }
+        n = Math.round(Number(n));
+        return (isNaN(n) || n < 0) ? 2 : Math.min(n, 10);
+    }
+    function validIso(c) { c = String(c || '').trim().toUpperCase(); return /^[A-Z]{3}$/.test(c) ? c : ''; }
+    function numberFormat(o) {
+        try { return new Intl.NumberFormat(browserLocale(), o); } catch (e) { }
+        if (o.currencyDisplay === 'narrowSymbol') {
+            o.currencyDisplay = 'symbol';
+            try { return new Intl.NumberFormat(browserLocale(), o); } catch (e2) { }
+        }
+        return null;
+    }
+    /* Currency sign and where the browser culture puts it for this ISO code. */
+    var layoutCache = {};
+    function currencyLayout(iso) {
+        var key = browserLocale() + '|' + iso;
+        if (layoutCache[key]) return layoutCache[key];
+        var out = { sign: '', before: true, gap: '' };
+        var f = iso ? numberFormat({ style: 'currency', currency: iso, currencyDisplay: 'narrowSymbol' }) : null;
+        if (f && typeof f.formatToParts === 'function') {
+            try {
+                var parts = f.formatToParts(1234.5), ci = -1, ni = -1;
+                for (var i = 0; i < parts.length; i++) {
+                    if (parts[i].type === 'currency' && ci < 0) ci = i;
+                    if (parts[i].type === 'integer' && ni < 0) ni = i;
+                }
+                if (ci >= 0) {
+                    out.sign = parts[ci].value;
+                    if (ni >= 0) {
+                        out.before = ci < ni;
+                        var near = out.before ? parts[ci + 1] : parts[ci - 1];
+                        out.gap = (near && near.type === 'literal') ? near.value : '';
+                    }
+                }
+            } catch (e) { }
+        }
+        layoutCache[key] = out;
+        return out;
+    }
+    V.formatAmountByBrowser = function (value, isoCode, precision, options) {
+        options = options || {};
+        var num = Number(value) || 0;
+        var p = resolvePrecision(precision);
+        var iso = validIso(isoCode);
+        var body;
+        if (options.compact && window.VIS && VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
+            body = VIS.Util.formatCompactAmount(Math.abs(num), iso, p);
+        } else {
+            var f = numberFormat({ minimumFractionDigits: p, maximumFractionDigits: p });
+            try { body = f ? f.format(Math.abs(num)) : Math.abs(num).toFixed(p); } catch (e) { body = String(Math.abs(num)); }
+        }
+        var minus = (num < 0 && /[1-9]/.test(body)) ? '-' : '';
+        var lay = currencyLayout(iso);
+        var sign = lay.sign || options.symbol || iso;
+        if (!sign) return minus + body;
+        if (!lay.sign) return minus + sign + ' ' + body;
+        return lay.before ? (minus + sign + lay.gap + body) : (minus + body + lay.gap + sign);
+    };
+})();

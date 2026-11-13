@@ -92,7 +92,7 @@
    (400), not bold - was .9em/700 here. */
 .vas-riu-title {
     font-family: 'Roboto', sans-serif;
-    font-weight: 400;
+    font-weight: 700; /* VAS163 2026-11-13: row 32 - bold title, same as every Inventory Use widget (was 400) */
     font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
     color: #102C3F;
     line-height: 1.2;
@@ -456,3 +456,24 @@
    widget stylesheets). It was dead code - no JavaScript referenced those class names, this
    widget uses its own scoped modal classes - and it carried hardcoded px font sizes with
    !important, which breaks the Universal Dynamic Responsive System rule. Removed 2026-08-12. */
+
+/* VAS163 2026-11-13: row 70 - one pager button style on every Inventory Use widget (24 x 24, 1px #D9E2EB, 6px radius). */
+.vas-riu-pager-btn {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    box-sizing: border-box;
+    border: 1px solid #D9E2EB;
+    border-radius: 6px;
+    background: #fff;
+    color: #0083DA;
+    padding: 0;
+    font-size: 14px;
+    line-height: 1;
+}
+
+.vas-riu-pager-btn:disabled {
+    color: #B8C6D2;
+    opacity: 1;
+    cursor: default;
+}

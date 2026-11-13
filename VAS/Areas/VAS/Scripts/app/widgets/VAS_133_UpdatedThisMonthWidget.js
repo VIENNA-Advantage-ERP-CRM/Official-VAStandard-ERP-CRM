@@ -295,9 +295,11 @@
         }
 
         function renderSummary() {
-            els.value.textContent = String(state.updateCount);
-            els.meta.textContent = lbl('VAS_133_UTM_Meta', 'Updates by') + ' ' + state.userCount + ' ' + lbl('VAS_133_UTM_UsersWord', 'users') +
-                ' · ' + state.todayCount + ' ' + lbl('VAS_133_UTM_TodayWord', 'today');
+            // VAS163 2026-11-12: counts grouped per browser locale (was raw number).
+            function n(v) { return Number(v || 0).toLocaleString(window.navigator.language); }
+            els.value.textContent = n(state.updateCount);
+            els.meta.textContent = lbl('VAS_133_UTM_Meta', 'Updates by') + ' ' + n(state.userCount) + ' ' + lbl('VAS_133_UTM_UsersWord', 'users') +
+                ' · ' + n(state.todayCount) + ' ' + lbl('VAS_133_UTM_TodayWord', 'today');
         }
 
         function showSummaryError() {
@@ -453,8 +455,10 @@
             var from = state.offset + 1;
             var to = Math.min(state.offset + state.rows.length, total);
 
-            els.summary.textContent = total + ' ' + lbl('VAS_133_UTM_SectionSummary', 'updates');
-            els.helper.textContent = lbl('VAS_Showing', 'Showing') + ' ' + from + '–' + to + ' ' + lbl('VAS_Of', 'of') + ' ' + total;
+            // VAS163 2026-11-12: counts grouped per browser locale (was raw number).
+            var lng = window.navigator.language;
+            els.summary.textContent = Number(total).toLocaleString(lng) + ' ' + lbl('VAS_133_UTM_SectionSummary', 'updates');
+            els.helper.textContent = lbl('VAS_Showing', 'Showing') + ' ' + Number(from).toLocaleString(lng) + '–' + Number(to).toLocaleString(lng) + ' ' + lbl('VAS_Of', 'of') + ' ' + Number(total).toLocaleString(lng);
             els.pageText.textContent = currentPage + ' ' + lbl('VAS_Of', 'of') + ' ' + pages;
             els.prev.disabled = state.offset <= 0;
             els.next.disabled = (state.offset + PAGE_SIZE) >= total;

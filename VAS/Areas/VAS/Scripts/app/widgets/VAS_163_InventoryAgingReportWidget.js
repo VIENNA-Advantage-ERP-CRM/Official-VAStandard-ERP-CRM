@@ -273,7 +273,8 @@
 
                 var btnObj = $bucketBtns[b.id];
                 if (btnObj) {
-                    btnObj.$countText.text(count.toLocaleString() + " " + lbl("VAS_Qty", "qty"));
+                    // VAS163 2026-11-12: explicit browser locale (was toLocaleString() with no locale).
+                    btnObj.$countText.text(count.toLocaleString(window.navigator.language, { maximumFractionDigits: 4 }) + " " + lbl("VAS_Qty", "qty"));
 
                     var pct = total > 0 ? Math.round((count / total) * 100) : 0;
                     btnObj.$barFill.css("width", pct + "%");
@@ -447,7 +448,8 @@
 
                 for (var i = 0; i < pageItems.length; i++) {
                     var item = pageItems[i];
-                    var formattedQty = Number(item.qty || 0).toLocaleString();
+                    // VAS163 2026-11-12: explicit browser locale (was toLocaleString() with no locale).
+                    var formattedQty = Number(item.qty || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 4 });
 
                     /* Blank when the product has no attribute - no hyphen, no "Standard". Some
                        attribute set instances carry a lone dash ("-"/"–"/"—") as their

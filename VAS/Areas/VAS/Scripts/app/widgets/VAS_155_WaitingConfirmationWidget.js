@@ -140,14 +140,17 @@
         function formatDate(value) {
             if (!value) { return ''; }
             var iso = String(value).replace(' ', 'T');
-            var date = new Date(iso);
+            // VAS163 2026-11-12: bare yyyy-MM-dd parsed by parts as a LOCAL date (no UTC day shift).
+            var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+            var date = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(iso);
             if (isNaN(date.getTime())) { return String(value); }
             return date.toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' });
         }
 
         function formatQty(value) {
             var num = Number(value || 0);
-            return num.toLocaleString(window.navigator.language, { maximumFractionDigits: 6 });
+            // VAS163 2026-11-12: quantities shown with at most 4 decimals (rules: 2..4).
+            return num.toLocaleString(window.navigator.language, { maximumFractionDigits: 4 });
         }
 
         function parseResponse(text) {
@@ -283,8 +286,8 @@
 
             var from = start + 1;
             var to = Math.min(total, start + ROWS_PER_PAGE);
-            $footHelper.text(lbl('VAS_Showing', 'Showing') + ' ' + from + '–' + to + ' ' + lbl('VAS_Of', 'of') + ' ' + total);
-            $pageText.text((state.page + 1) + ' ' + lbl('VAS_Of', 'of') + ' ' + pageCount);
+            $footHelper.text(lbl('VAS_Showing', 'Showing') + ' ' + formatQty(from) + '–' + formatQty(to) + ' ' + lbl('VAS_Of', 'of') + ' ' + formatQty(total)); // VAS163 2026-11-12: locale counts
+            $pageText.text(formatQty(state.page + 1) + ' ' + lbl('VAS_Of', 'of') + ' ' + formatQty(pageCount));
             $prevButton.prop('disabled', state.page <= 0);
             $nextButton.prop('disabled', state.page >= pageCount - 1);
         }
@@ -296,7 +299,7 @@
 
             row.appendChild(el('span', 'MPC-wc-c-primary', item.confirmNo || ''));
             row.appendChild(el('span', 'MPC-wc-c-body', item.customer || ''));
-            row.appendChild(el('span', 'MPC-wc-c-body', String(item.lineCount || 0)));
+            row.appendChild(el('span', 'MPC-wc-c-body', formatQty(item.lineCount)));
             var statusCell = el('span', 'MPC-wc-col-status');
             statusCell.appendChild(statusPill(item.status));
             row.appendChild(statusCell);
@@ -427,14 +430,14 @@
                 var linePager = el('div', 'MPC-wc-line-pager');
                 var lFrom = start + 1;
                 var lTo = Math.min(lines.length, start + LINES_PER_PAGE);
-                linePager.appendChild(el('span', 'MPC-wc-helper', lbl('VAS_Showing', 'Showing') + ' ' + lFrom + '–' + lTo + ' ' + lbl('VAS_Of', 'of') + ' ' + lines.length));
+                linePager.appendChild(el('span', 'MPC-wc-helper', lbl('VAS_Showing', 'Showing') + ' ' + formatQty(lFrom) + '–' + formatQty(lTo) + ' ' + lbl('VAS_Of', 'of') + ' ' + formatQty(lines.length)));
                 var pagerBtns = el('span', 'MPC-wc-pager');
                 var lPrev = el('button', 'MPC-wc-pgbtn');
                 lPrev.type = 'button';
                 lPrev.appendChild(svg('<path d="m15 18-6-6 6-6"/>'));
                 lPrev.disabled = modalState.linePage <= 0;
                 lPrev.addEventListener('click', function () { if (modalState.linePage > 0) { modalState.linePage--; renderDetailView(); } });
-                var lPageText = el('span', 'MPC-wc-pgtext', (modalState.linePage + 1) + ' ' + lbl('VAS_Of', 'of') + ' ' + pageCount);
+                var lPageText = el('span', 'MPC-wc-pgtext', formatQty(modalState.linePage + 1) + ' ' + lbl('VAS_Of', 'of') + ' ' + formatQty(pageCount));
                 var lNext = el('button', 'MPC-wc-pgbtn');
                 lNext.type = 'button';
                 lNext.appendChild(svg('<path d="m9 18 6-6-6-6"/>'));

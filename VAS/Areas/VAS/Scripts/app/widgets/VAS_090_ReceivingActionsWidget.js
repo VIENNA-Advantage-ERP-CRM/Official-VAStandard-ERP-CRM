@@ -766,7 +766,7 @@
             var from = (poPageNo - 1) * poPageSize + 1;
             var to = Math.min(poPageNo * poPageSize, poTotalRecords);
             return '<div class="vas-ra-modal-pager">' +
-                '<span>' + escapeHtml(lbl("VAS_090_Showing", "Showing") + ' ' + from + '-' + to + ' ' + lbl("VAS_090_Of", "of") + ' ' + poTotalRecords) + '</span>' +
+                '<span>' + escapeHtml(lbl("VAS_090_Showing", "Showing") + ' ' + Number(from).toLocaleString(window.navigator.language) + '-' + Number(to).toLocaleString(window.navigator.language) + ' ' + lbl("VAS_090_Of", "of") + ' ' + Number(poTotalRecords).toLocaleString(window.navigator.language)) + '</span>' +
                 '<button type="button" class="vas-ra-pgbtn vas-ra-po-prev"' + (poPageNo <= 1 ? ' disabled' : '') + '>' + icon("chevL") + '</button>' +
                 '<span class="vas-ra-pgtext">' + escapeHtml(poPageNo + ' ' + lbl("VAS_090_Of", "of") + ' ' + poTotalPages) + '</span>' +
                 '<button type="button" class="vas-ra-pgbtn vas-ra-po-next"' + (poPageNo >= poTotalPages ? ' disabled' : '') + '>' + icon("chevR") + '</button>' +
@@ -1302,7 +1302,7 @@
             var from = (gcPageNo - 1) * gcPageSize + 1;
             var to = Math.min(gcPageNo * gcPageSize, gcTotalRecords);
             return '<div class="vas-ra-modal-pager">' +
-                '<span>' + escapeHtml(lbl("VAS_090_Showing", "Showing") + ' ' + from + '-' + to + ' ' + lbl("VAS_090_Of", "of") + ' ' + gcTotalRecords) + '</span>' +
+                '<span>' + escapeHtml(lbl("VAS_090_Showing", "Showing") + ' ' + Number(from).toLocaleString(window.navigator.language) + '-' + Number(to).toLocaleString(window.navigator.language) + ' ' + lbl("VAS_090_Of", "of") + ' ' + Number(gcTotalRecords).toLocaleString(window.navigator.language)) + '</span>' +
                 '<button type="button" class="vas-ra-pgbtn vas-ra-gc-prev"' + (gcPageNo <= 1 ? ' disabled' : '') + '>' + icon("chevL") + '</button>' +
                 '<span class="vas-ra-pgtext">' + escapeHtml(gcPageNo + ' ' + lbl("VAS_090_Of", "of") + ' ' + gcTotalPages) + '</span>' +
                 '<button type="button" class="vas-ra-pgbtn vas-ra-gc-next"' + (gcPageNo >= gcTotalPages ? ' disabled' : '') + '>' + icon("chevR") + '</button>' +
