@@ -755,6 +755,11 @@ namespace VAdvantage.Process
             int mailID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT MAX(MailAttachment1_ID) FROM MailAttachment1 WHERE MailUID='"
                 + mailUID + "' AND FolderName='" + folderName + "'"));
             bool linked = false;
+            // A mail sent from the application was stored when it was sent: its copy in the Sent folder is that mail
+            if (mailID == 0 && attachType == "M" && folderName == "Sent")
+            {
+                mailID = ClaimSentMail(mail);
+            }
             if (mailID == 0)
             {
                 MailTarget first = targets.FirstOrDefault();
@@ -805,6 +810,73 @@ namespace VAdvantage.Process
             {
                 retVal.Append("MailAlreadyAttachedWithParticularRecord");
             }
+        }
+
+        /// <summary>
+        /// A mail sent from the application (Email form, Inbox, processes) is stored as it is sent, without the
+        /// mail server's message id and folder. When its copy is fetched from the Sent folder, that row is the
+        /// same mail: it gets the message id, folder and mailbox of the copy instead of a second row being stored,
+        /// so the mail shows once and later runs find it by its message id.
+        /// Matched on sender, subject and recipients (To and Cc), stored within a day of the send time, not
+        /// fetched before (no message id); of several, the one stored closest to the send time.
+        /// </summary>
+        /// <returns>MailAttachment1_ID of the row taken over, 0 when there is none</returns>
+        private int ClaimSentMail(dynamic mail)
+        {
+            string mailUID = Util.GetValueOfString((object)mail.MessageID);
+            string from = GetAddresses(Util.GetValueOfString((object)mail.From)).FirstOrDefault();
+            string subject = Util.GetValueOfString((object)mail.Subject);
+            DateTime? sent = Util.GetValueOfDateTime((object)mail.EmailDate);
+            if (string.IsNullOrEmpty(mailUID) || string.IsNullOrEmpty(from) || string.IsNullOrEmpty(subject) || sent == null)
+            {
+                return 0;
+            }
+            List<string> recipients = GetAddresses(Util.GetValueOfString((object)mail.To) + ";" + Util.GetValueOfString((object)mail.Cc));
+            recipients.Sort();
+
+            // A day each way: the stored time and the mail server's send time may be in different time zones
+            string sql = "SELECT MailAttachment1_ID, MailAddress, MailAddressCc, Created FROM MailAttachment1"
+                + " WHERE AD_Client_ID = " + AD_Client_ID + " AND AttachmentType = 'M' AND MailUID IS NULL"
+                + " AND LOWER(MailAddressFrom) LIKE '%" + from.Replace("'", "''") + "%'"
+                + " AND Title = '" + subject.Replace("'", "''") + "'"
+                + " AND Created BETWEEN " + GlobalVariable.TO_DATE(sent.Value.AddDays(-1), false)
+                + " AND " + GlobalVariable.TO_DATE(sent.Value.AddDays(1), false);
+            DataSet ds = DB.ExecuteDataset(sql);
+            if (ds == null || ds.Tables.Count == 0)
+            {
+                return 0;
+            }
+
+            int mailID = 0;
+            double closest = double.MaxValue;
+            foreach (DataRow row in ds.Tables[0].Rows)
+            {
+                List<string> stored = GetAddresses(Util.GetValueOfString(row["MailAddress"]) + ";" + Util.GetValueOfString(row["MailAddressCc"]));
+                stored.Sort();
+                if (!stored.SequenceEqual(recipients))
+                {
+                    continue;
+                }
+                DateTime? created = Util.GetValueOfDateTime(row["Created"]);
+                double distance = created == null ? double.MaxValue - 1 : Math.Abs((created.Value - sent.Value).TotalSeconds);
+                if (distance < closest)
+                {
+                    closest = distance;
+                    mailID = Util.GetValueOfInt(row["MailAttachment1_ID"]);
+                }
+            }
+            if (mailID == 0)
+            {
+                return 0;
+            }
+
+            // "MailUID IS NULL": another run may have taken the row meanwhile
+            int updated = DB.ExecuteQuery("UPDATE MailAttachment1 SET MailUID = '" + mailUID.Replace("'", "''") + "'"
+                + ", FolderName = '" + folderName + "'"
+                + ", MailAccount = '" + userAccount.Replace("'", "''") + "'"
+                + ", UserAccount_ID = " + AD_User_ID
+                + " WHERE MailAttachment1_ID = " + mailID + " AND MailUID IS NULL");
+            return updated > 0 ? mailID : 0;
         }
 
         /// <returns>MailAttachment1_ID of the stored mail, 0 when it could not be saved</returns>
