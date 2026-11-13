@@ -42,6 +42,7 @@ using ViennaAdvantage.Model;
 *     and the message says the contact is not linked.
 * VAI052 12-Nov-26 : New process parameter M_PriceList_Version_ID - set on the new Opportunity; its M_PriceList_ID
 *     (read from M_PriceList_Version) is set on the Prospect (a Customer is left unchanged).
+* VAI052 13-Nov-26 : The Currency (M_PriceList.C_Currency_ID) of that Price List is also set on the new Opportunity.
 */
 namespace ModelLibrary.Process
 {
@@ -140,6 +141,12 @@ namespace ModelLibrary.Process
             if (_priceListVersionID > 0)
             {
                 opp.SetM_PriceList_Version_ID(_priceListVersionID);
+                // Currency of the Price List (M_PriceList.C_Currency_ID) goes on the new Opportunity
+                int currencyID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT pl.C_Currency_ID FROM M_PriceList pl INNER JOIN M_PriceList_Version plv ON plv.M_PriceList_ID = pl.M_PriceList_ID WHERE plv.M_PriceList_Version_ID=" + _priceListVersionID, null, Get_TrxName()));
+                if (currencyID > 0)
+                {
+                    opp.SetC_Currency_ID(currencyID);
+                }
             }
             opp.SkipAIAssistantThreadUpdate = true;
             if (!opp.Save())
