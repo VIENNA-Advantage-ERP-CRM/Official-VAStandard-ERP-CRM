@@ -411,14 +411,20 @@
 .MPC-cst-m-row {
     display: grid;
     /* product | code | attribute | qty (5-Nov: attribute values in their own column) */
-    grid-template-columns: 1.8fr 0.9fr 1.4fr 0.9fr;
+    /* VAS163 2026-11-13: row 150 - product | code | attribute | qty | UOM (UOM split out of the qty column). */
+    grid-template-columns: 1.8fr 0.9fr 1.4fr 0.7fr 0.8fr;
     gap: 0.75em;
     align-items: center;
 }
 
 /* No product in the list has an attribute value -> Attributes column omitted. */
 .MPC-cst-m-row.MPC-cst-m-noattrs {
-    grid-template-columns: 1.8fr 0.9fr 0.9fr;
+    grid-template-columns: 1.8fr 0.9fr 0.7fr 0.8fr;
+}
+
+/* VAS163 2026-11-13: row 150 - UOM column header in upper case. */
+.MPC-cst-m-ghead .MPC-cst-m-uomhead {
+    text-transform: uppercase;
 }
 
 .MPC-cst-m-ghead {

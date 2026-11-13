@@ -1108,7 +1108,10 @@
                     $totalsRow.append(totalsRow(esc(taxSummary[i].TaxName) + ":", fmtP(taxSummary[i].TaxAmt), false));
                 }
                 // Surcharge stored on index-0 (total across all lines; separate from base tax).
-                if (+h.TotalSurcharge) $totalsRow.append(totalsRow(lbl("VAS_107_Surcharge", "Surcharge") + ":", fmtP(h.TotalSurcharge), false));
+                // VAS163 2026-11-12: no separate "Surcharge" row. A surcharge tax (C_Tax.Surcharge_Tax_ID)
+                // already has its own C_OrderTax row listed above under its tax name (e.g. "Tax 2%"), so
+                // h.TotalSurcharge (the same money summed off C_OrderLine.SurchargeAmt) showed it twice.
+                // if (+h.TotalSurcharge) $totalsRow.append(totalsRow(lbl("VAS_107_Surcharge", "Surcharge") + ":", fmtP(h.TotalSurcharge), false));
                 if (+h.TCSAmount) $totalsRow.append(totalsRow(lbl("VA106_TaxCollectedAtSource", "TCS") + ":", fmtP(h.TCSAmount), false));
                 // Grand Total = the rows above it, NOT C_Order.GrandTotal (18-Sep-2026).
                 // The framework's two halves read two different Prices-Include-Tax

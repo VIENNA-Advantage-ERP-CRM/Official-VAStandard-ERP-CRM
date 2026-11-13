@@ -132,16 +132,23 @@ namespace VAS.Controllers
             // after the access predicate (ORA-00907 lesson). The item join
             // predicate lives in the ON clause so categories with zero
             // products still appear.
+            // VAS163 2026-11-13: row 144 (retest) - the products decide the count, not the category's
+            // client: 5 Express products point to a 'Standard' category of ANOTHER client (AD_Client 11),
+            // and the old "Category.AD_Client_ID = this client" filter dropped them (258 vs Active Items 263).
+            // Product scope (client + role access) is applied on M_Product above; categories without
+            // products are dropped by the HAVING below, as before.
             string sql = @"
                 SELECT Category.M_Product_Category_ID,
                        Category.Name AS Category_Name,
                        COUNT(Prod.M_Product_ID) AS Active_Items
-                FROM M_Product_Category Category
-                LEFT OUTER JOIN (" + productScopeSql + @") Prod ON (Prod.M_Product_Category_ID=Category.M_Product_Category_ID)
-                WHERE Category.IsActive='Y'
-                  AND Category.AD_Client_ID=@Cat_Client_ID";
+                FROM (" + productScopeSql + @") Prod
+                INNER JOIN M_Product_Category Category ON (Category.M_Product_Category_ID=Prod.M_Product_Category_ID)";
 
-            sql = AddAccessSql(ctx, sql, "Category");
+            // VAS163 2026-11-13: row 144 - same count rule as VAS_109 Active Items: every active product
+            // the role can see (access applied on M_Product above). The extra role/org access and
+            // IsActive filter on the CATEGORY dropped the products whose category sits in an inactive or
+            // non-accessible org (e.g. 'Grossary' / 'Stationery Items' / 'Grossary Products' on Express:
+            // 258 vs 263), so the category is no longer a filter - only the grouping.
             sql += @"
                 GROUP BY Category.M_Product_Category_ID, Category.Name
                 HAVING COUNT(Prod.M_Product_ID) > 0
@@ -149,8 +156,7 @@ namespace VAS.Controllers
 
             SqlParameter[] parameters = new SqlParameter[]
             {
-                new SqlParameter("@Prod_Client_ID", ctx.GetAD_Client_ID()),
-                new SqlParameter("@Cat_Client_ID", ctx.GetAD_Client_ID())
+                new SqlParameter("@Prod_Client_ID", ctx.GetAD_Client_ID())
             };
 
             int total = 0;

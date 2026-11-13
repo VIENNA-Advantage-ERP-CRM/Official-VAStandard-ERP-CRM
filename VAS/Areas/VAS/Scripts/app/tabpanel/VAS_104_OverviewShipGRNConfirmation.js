@@ -380,8 +380,16 @@
         // The window each side of M_InOut opens in — a receipt is a Material
         // Receipt, a shipment a Delivery Order. One table, two screens, which the
         // browser's zoom lookup cannot choose between.
+        // VAS163 2026-11-12: [new, old] window names by IsSOTrx + IsReturnTrx, so a
+        // Customer / Vendor Return opens in its own window rather than DO / GRN.
         function sourceWindowName() {
-            return (data.SourceTypeCode === "SHP") ? "VAS_DeliveryOrder" : "VAS_MaterialReceipt";
+            var isSales = data.SourceTypeCode === "SHP";
+            if (data.SourceIsReturn) {
+                return isSales ? ["VAS_CustomerReturn", "Customer Return"]
+                               : ["VAS_VendorReturn", "Return to Vendor"];
+            }
+            return isSales ? ["VAS_DeliveryOrder", "Shipment (Customer)"]
+                           : ["VAS_MaterialReceipt", "Material Receipt"];
         }
 
         // Number of quality lines that did not pass QC (quality mode only).
@@ -496,8 +504,7 @@
                 $v.addClass("vas_104-is-link")
                   .attr("title", getMsg("VAS_104_OpenSource", "Open") + " " + docNo)
                   .on("click", function () {
-                      openRecord("M_InOut", data.SourceInOutID, sourceWindowName(),
-                                 data.SourceTypeCode === "SHP");
+                      openRecord("M_InOut", data.SourceInOutID, sourceWindowName());
                   });
             }
             $f.append($v);
@@ -541,19 +548,19 @@
 
             // Target qty.
             $snap.append(metricCard("target", "box", VIS.Msg.getMsg("VAS_104_TargetQty"),
-                formatNumber(+data.TargetQty || 0, 0), "", false));
+                formatNumber(+data.TargetQty || 0, QTY_ANY), "", false));
 
             // Confirmed qty.
             $snap.append(metricCard("confirmed", "check", VIS.Msg.getMsg("VAS_104_Confirmed"),
-                formatNumber(+data.ConfirmedQty || 0, 0), "", false));
+                formatNumber(+data.ConfirmedQty || 0, QTY_ANY), "", false));
 
             // Difference qty.
             $snap.append(metricCard("difference", "delta", VIS.Msg.getMsg("VAS_104_Difference"),
-                signedNumber(+data.DifferenceQty || 0, 0), "", false));
+                signedNumber(+data.DifferenceQty || 0, QTY_ANY), "", false));
 
             // Scrapped qty.
             $snap.append(metricCard("scrapped", "trash", VIS.Msg.getMsg("VAS_104_Scrapped"),
-                formatNumber(+data.ScrappedQty || 0, 0), "", false));
+                formatNumber(+data.ScrappedQty || 0, QTY_ANY), "", false));
 
             // QC pass (quality mode only).
             $snap.append(metricCard("qcpass", "shield", VIS.Msg.getMsg("VAS_104_QCPass"),
@@ -633,10 +640,10 @@
 
             // Totals footer
             var $foot = $('<div class="vas_104-tFoot"></div>');
-            $foot.append(footBit(VIS.Msg.getMsg("VAS_104_Target"), formatNumber(totTarget, 0), false));
-            $foot.append(footBit(VIS.Msg.getMsg("VAS_104_Confirmed"), formatNumber(totConfirmed, 0), false));
-            $foot.append(footBit(VIS.Msg.getMsg("VAS_104_Difference"), signedNumber(totDiff, 0), false));
-            $foot.append(footBit(VIS.Msg.getMsg("VAS_104_Scrapped"), formatNumber(totScrap, 0), true));
+            $foot.append(footBit(VIS.Msg.getMsg("VAS_104_Target"), formatNumber(totTarget, QTY_ANY), false));
+            $foot.append(footBit(VIS.Msg.getMsg("VAS_104_Confirmed"), formatNumber(totConfirmed, QTY_ANY), false));
+            $foot.append(footBit(VIS.Msg.getMsg("VAS_104_Difference"), signedNumber(totDiff, QTY_ANY), false));
+            $foot.append(footBit(VIS.Msg.getMsg("VAS_104_Scrapped"), formatNumber(totScrap, QTY_ANY), true));
             $tbl.append($foot);
 
             return $tbl;
@@ -1211,63 +1218,25 @@
 
         // ---------- Opening the source document ---------- //
 
-        // Window name -> AD_Window_ID, resolved once per name and remembered for
-        // the life of the panel. A name the dictionary does not know is cached as
-        // -1 so a failed lookup is not repeated on every click. Ported from
-        // VAS_106.
-        var windowIdByName = {};
+        // VAS163 2026-11-12: zoom goes through VAS.ZoomUtil.zoomToRecord (new window
+        // name, old name as fallback); the private GetWindow_ID lookup, the
+        // VIS.ZoomTarget fallback and the direct startWindow are gone. The id the
+        // util resolves is kept per window name for the life of the panel.
+        var zoomWindowIdByName = {};
 
-        function resolveWindowIdByName(windowName) {
-            if (!windowName) return 0;
-            if (windowIdByName.hasOwnProperty(windowName)) {
-                return windowIdByName[windowName] > 0 ? windowIdByName[windowName] : 0;
-            }
+        // Opens the record in the named [new, old] window. An unresolvable window
+        // leaves the click without navigation (the util no-ops) - no error toast.
+        function openRecord(tableName, recordId, names) {
+            if (!tableName || !recordId || +recordId <= 0 || !names ||
+                !window.VAS || !VAS.ZoomUtil) return;
+            var key = names[0];
             try {
-                if (!(window.VIS && VIS.dataContext &&
-                      typeof VIS.dataContext.getJSONRecord === "function")) {
-                    return 0;
-                }
-                var id = VIS.dataContext.getJSONRecord(
-                    "VAS_104_OverviewShipGRNConfirmation/GetWindow_ID", windowName);
-                id = parseInt(id, 10);
-                if (isNaN(id) || id <= 0) {
-                    windowIdByName[windowName] = -1;
-                    console.log("resolveWindowIdByName: no window named " + windowName);
-                    return 0;
-                }
-                windowIdByName[windowName] = id;
-                return id;
-            } catch (e) {
-                windowIdByName[windowName] = -1;
-                console.log(e);
-                return 0;
-            }
-        }
-
-        // Opens the record's window filtered to that row: the window the caller
-        // NAMES, else the table's zoom target told which side of the trade to
-        // resolve. M_InOut is the case that needs naming — a goods receipt and a
-        // delivery order are two screens on one table. Degrades to a toast so a
-        // click never throws.
-        function openRecord(tableName, recordId, windowName, isSOTrx) {
-            if (!tableName || !recordId || +recordId <= 0 || !window.VIS) return;
-            try {
-                var windowId = resolveWindowIdByName(windowName);
-
-                if (windowId <= 0 &&
-                    VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === "function") {
-                    // 4th arg is IsSOTrx — which side of a dual-purpose table to
-                    // open. M_InOut is one, and the confirmation knows its side.
-                    windowId = VIS.ZoomTarget.getZoomAD_Window_ID(tableName, 0, null, !!isSOTrx) || 0;
-                }
-
-                if (windowId > 0 && VIS.viewManager && typeof VIS.viewManager.startWindow === "function") {
-                    var zoomQuery = VIS.Query.prototype.getEqualQuery(tableName + "_ID", +recordId);
-                    VIS.viewManager.startWindow(windowId, zoomQuery);
-                    return;
-                }
+                VAS.ZoomUtil.zoomToRecord(tableName + "_ID", +recordId,
+                    zoomWindowIdByName[key] || 0, names[0], names[1])
+                    .then(function (usedId) {
+                        if (usedId > 0) zoomWindowIdByName[key] = usedId;
+                    });
             } catch (e) { console.log(e); }
-            toast(getMsg("VAS_104_OpenSource", "Open") + " " + tableName + " #" + recordId, true);
         }
 
         // Lightweight self-contained toast (no dependency on a host toast API).
@@ -1320,7 +1289,17 @@
         //  Formatting helpers                                                //
         // ----------------------------------------------------------------- //
 
+        // VAS163 2026-11-12: precision QTY_ANY (-1) = summed quantities across
+        // uoms, shown with 0..2 decimals instead of being rounded to whole units.
+        var QTY_ANY = -1;
+
         function formatNumber(value, precision) {
+            if (precision === -1) {
+                return (+value || 0).toLocaleString(window.navigator.language, {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 2
+                });
+            }
             var p = (precision >= 0) ? precision : 0;
             return (+value || 0).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: p,
@@ -1338,7 +1317,11 @@
 
         function formatDate(value) {
             if (!value) return "";
-            var d = (value instanceof Date) ? value : new Date(value);
+            // VAS163 2026-11-12: a bare 'yyyy-MM-dd' is parsed by parts as a LOCAL
+            // date (new Date() reads it as UTC and can shift the day).
+            var dOnly = (typeof value === "string") && /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+            var d = (value instanceof Date) ? value
+                  : (dOnly ? new Date(+dOnly[1], +dOnly[2] - 1, +dOnly[3]) : new Date(value));
             if (isNaN(d.getTime())) return "";
             try {
                 return d.toLocaleDateString(window.navigator.language, {

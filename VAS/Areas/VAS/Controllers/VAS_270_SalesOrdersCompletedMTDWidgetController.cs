@@ -272,7 +272,8 @@ namespace VAS.Controllers
                         ol.C_Order_ID AS C_Order_ID,
                         SUM(COALESCE(ol.QtyOrdered, 0)) AS Ordered_Qty,
                         SUM(COALESCE(ol.QtyDelivered, 0)) AS Delivered_Qty,
-                        SUM(" + DeliveredValueSql + @") AS Delivered_Value
+                        SUM(" + DeliveredValueSql + @") AS Delivered_Value,
+                        SUM(CASE WHEN COALESCE(ol.QtyDelivered, 0) < COALESCE(ol.QtyOrdered, 0) THEN 1 ELSE 0 END) AS Pending_Lines
                       FROM base_orders bo
                      INNER JOIN C_OrderLine ol ON ( ol.C_Order_ID = bo.C_Order_ID AND ol.IsActive = 'Y' )
                      INNER JOIN M_Product p ON ( p.M_Product_ID = ol.M_Product_ID AND p.ProductType = 'I' )
@@ -297,6 +298,7 @@ namespace VAS.Controllers
                     COALESCE(ld.Ordered_Qty, 0) AS Ordered_Qty,
                     COALESCE(ld.Delivered_Qty, 0) AS Delivered_Qty,
                     COALESCE(ld.Delivered_Value, 0) AS Delivered_Value,
+                    COALESCE(ld.Pending_Lines, 0) AS Pending_Lines,
                     ls.Last_Shipment_Date AS Last_Shipment_Date
                   FROM base_orders o
                   LEFT OUTER JOIN line_delivery ld ON ( ld.C_Order_ID = o.C_Order_ID )
@@ -330,7 +332,13 @@ namespace VAS.Controllers
                     // the Item lines of every cohort order - fully AND partially delivered
                     // orders contribute their delivered portion; the undelivered rest never
                     // counts. (Supersedes the earlier "fully delivered orders only" rule.)
-                    deliveredValue += dr["Delivered_Value"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Delivered_Value"]);
+                    // VAS163 2026-11-13: row 885 Delivered value sums ONLY fully delivered SOs
+                    // (every Item line delivered); pending and partly delivered SOs are excluded.
+                    decimal pendingLines = dr["Pending_Lines"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Pending_Lines"]);
+                    if (orderedQty > 0m && pendingLines <= 0m)
+                    {
+                        deliveredValue += dr["Delivered_Value"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Delivered_Value"]);
+                    }
 
                     // 5-Nov Row 44: on-time shipment over every SO of this month's cohort.
                     //  - Fully delivered: on time when the last completed DO's movement date
@@ -554,6 +562,7 @@ namespace VAS.Controllers
                     DocumentStatusCode = docStatusCode,
                     OrderValue = dr["Order_Value"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Order_Value"]),
                     CurrencySymbol = (currencySymbol ?? "").Trim(),
+                    CurrencyIso = (Util.GetValueOfString(dr["Currency_Code"]) ?? "").Trim(), // VAS163 2026-11-12: document currency ISO for client-side Intl formatting
                     CurrencyPrecision = stdPrecision,
                     WarehouseName = Util.GetValueOfString(dr["Warehouse_Name"]),
                     DeliveryMode = DecodeLabel(GetDecodeMap("C_Order", "DeliveryViaRule", language), Util.GetValueOfString(dr["Delivery_Via_Rule"]))
@@ -1032,6 +1041,7 @@ namespace VAS.Controllers
             public string DocumentStatus { get; set; }
             public string DocumentStatusCode { get; set; }
             public decimal OrderValue { get; set; }
+            public string CurrencyIso { get; set; } // VAS163 2026-11-12
             public string CurrencySymbol { get; set; }
             public int CurrencyPrecision { get; set; }
             public string WarehouseName { get; set; }

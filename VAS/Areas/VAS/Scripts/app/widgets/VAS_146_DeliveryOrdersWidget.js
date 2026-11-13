@@ -333,8 +333,9 @@
             }
             $tbody.html(html);
 
-            $footHelper.text(label('VAS_Showing', 'Showing') + ' ' + (start + 1) + '–' + end + ' ' + label('VAS_Of', 'of') + ' ' + total);
-            $pageText.text((state.page + 1) + ' ' + label('VAS_Of', 'of') + ' ' + totalPages);
+            // VAS163 2026-11-12: counts in the browser culture.
+            $footHelper.text(label('VAS_Showing', 'Showing') + ' ' + formatNumber(start + 1) + '–' + formatNumber(end) + ' ' + label('VAS_Of', 'of') + ' ' + formatNumber(total));
+            $pageText.text(formatNumber(state.page + 1) + ' ' + label('VAS_Of', 'of') + ' ' + formatNumber(totalPages));
             $prevButton.prop('disabled', state.page === 0);
             $nextButton.prop('disabled', state.page >= totalPages - 1);
         }

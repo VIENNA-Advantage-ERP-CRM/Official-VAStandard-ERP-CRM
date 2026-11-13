@@ -117,7 +117,7 @@
 
         function showSummary(data) {
             var count = data.openDoCount || 0;
-            els.value.textContent = String(count);
+            els.value.textContent = (Number(count) || 0).toLocaleString(window.navigator.language); // VAS163 2026-11-12: locale count
             els.meta.textContent = lbl('VAS_152_ODO_Meta', 'Ready to pick');
             els.card.setAttribute('aria-label', count + ' ' + lbl('VAS_152_ODO_AriaSuffix', 'open delivery orders'));
         }

@@ -333,7 +333,11 @@
             closePanel();
             // Home screen (no host window to relay to): open the Material Receipt window on the record in a new tab.
             if (!$self.listener && window.VAS && VAS.ZoomUtil) {
-                try { VAS.ZoomUtil.zoomToRecord('M_InOut_ID', recordId, 0, 'VAS_MaterialReceipt', 'Material Receipt'); } catch (e) { /* zoom is best-effort */ }
+                // VAS163 2026-11-12: pass the server/cached window id (names stay as fallback) and keep the id used.
+                try {
+                    VAS.ZoomUtil.zoomToRecord('M_InOut_ID', recordId, windowId, ZOOM_WINDOW_NEW, ZOOM_WINDOW_OLD)
+                        .done(function (id) { if (id > 0) { windowId = id; } });
+                } catch (e) { /* zoom is best-effort */ }
                 return;
             }
             // Navigate the CURRENT window's grid to the clicked record (no new window).
@@ -412,9 +416,10 @@
         function formatAmount(number) {
             var n = (typeof number === 'number') ? number : parseFloat(number);
             if (isNaN(n)) { return ''; }
-            var prec = VIS.Env.getCtx().getStdPrecision() || stdPrecision || 2;
-            var formatted = n.toLocaleString(window.navigator.language, { minimumFractionDigits: prec, maximumFractionDigits: prec });
-            return (curSymbol ? curSymbol + ' ' : '') + formatted;
+            // VAS163 2026-11-12: "Amount" is the received QUANTITY (a receipt has no money total,
+            // server sends CurSymbol empty) - quantity format in the browser culture, no "symbol + ' '"
+            // composition and no context currency precision.
+            return n.toLocaleString(window.navigator.language, { maximumFractionDigits: 4 });
         }
         // Received quantity per UOM as entered on the receipt, e.g. "2,000 ml" or "3,000 ml · 21 Ea"
         function formatQuantities(item) {

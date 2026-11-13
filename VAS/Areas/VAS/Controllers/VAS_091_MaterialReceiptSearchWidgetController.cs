@@ -154,7 +154,7 @@ namespace VAS.Areas.VAS.Controllers
                         DocumentNo = docNo,
                         Title      = title,
                         Amount     = Util.GetValueOfDecimal(row["Amount"]),
-                        DocDate    = d.HasValue ? d.Value.ToString("yyyy-MM-dd") : "",
+                        DocDate    = d.HasValue ? d.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "", // VAS163 2026-11-12: ISO in invariant culture
                         DocStatus  = Util.GetValueOfString(row["DocStatus"])
                     });
                 }

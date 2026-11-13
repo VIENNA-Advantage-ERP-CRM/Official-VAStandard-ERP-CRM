@@ -130,19 +130,16 @@
 
         // Review #17: clicking New GRN navigates straight to the Material Receipt
         // (GRN) window - no modal is opened.
+        // VAS163 2026-11-12: window id resolved through the shared VAS.ZoomUtil (new name ->
+        // old name -> zoom config, cached per page) instead of the private GetGrnWindowId lookup.
         function loadGrnWindowId(onReady) {
-            $.ajax({
-                url: VIS.Application.contextUrl + 'VAS_082_NewGRNWidget/GetGrnWindowId',
-                type: 'GET',
-                cache: false,
-                success: function (response) {
-                    var result = parseResponse(response);
-                    grnWindowId = Number((result && result.windowId) || 0);
-                    if (onReady) { onReady(grnWindowId); }
-                },
-                error: function () {
-                    if (onReady) { onReady(0); }
-                }
+            if (!window.VAS || !VAS.ZoomUtil || typeof VAS.ZoomUtil.getWindowId !== 'function') {
+                if (onReady) { onReady(0); }
+                return;
+            }
+            VAS.ZoomUtil.getWindowId('VAS_MaterialReceipt', 'Material Receipt').done(function (id) {
+                grnWindowId = Number(id || 0);
+                if (onReady) { onReady(grnWindowId); }
             });
         }
 
@@ -259,17 +256,10 @@
                 startWindowById(grnWindowId);
                 return;
             }
+            // VAS163 2026-11-12: unresolved window (id 0) -> silent no-op, no error dialog (rules A.3).
             loadGrnWindowId(function (windowId) {
                 if (windowId > 0) {
                     startWindowById(windowId);
-                }
-                else {
-                    VIS.ADialog.error(
-                        'VAS_082_CouldntOpenWindow',
-                        true,
-                        '',
-                        lbl('VAS_082_CouldntOpenWindow', 'Unable to open the GRN window.')
-                    );
                 }
             });
         }
@@ -458,7 +448,7 @@
                     '</div>' +
                     '<div class="vas-ngrn-po-side">' +
                     (po.warehouseName ? '<span class="vas-ngrn-po-wh">' + escapeHtml(po.warehouseName) + '</span>' : '') +
-                    '<span class="vas-ngrn-po-badge">' + escapeHtml(po.openLineCount) + '</span>' +
+                    '<span class="vas-ngrn-po-badge">' + escapeHtml(formatQty(po.openLineCount)) + '</span>' + // VAS163 2026-11-12: locale count
                     '</div>' +
                     '</button>';
             }

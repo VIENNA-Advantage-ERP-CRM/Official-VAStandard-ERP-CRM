@@ -161,7 +161,10 @@
         function formatDate(value) {
             if (!value) { return ''; }
             var iso = String(value).replace(' ', 'T');
-            var date = new Date(iso);
+            // VAS163 2026-11-12: a date-only 'yyyy-MM-dd' is parsed by parts as a LOCAL date
+            // (new Date('yyyy-MM-dd') is UTC and shows the previous day west of GMT).
+            var dOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value));
+            var date = dOnly ? new Date(Number(dOnly[1]), Number(dOnly[2]) - 1, Number(dOnly[3])) : new Date(iso);
             if (isNaN(date.getTime())) {
                 var parts = String(value).split(/[- :]/);
                 if (parts.length >= 3) {

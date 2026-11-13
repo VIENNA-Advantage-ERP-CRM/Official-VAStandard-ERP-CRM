@@ -63,54 +63,11 @@
             return n.toLocaleString(window.navigator.language);
         }
 
+        // VAS163 2026-11-12: no own Cr/Lk/B/M tiers, toFixed or fixed grouping - server currency,
+        // browser culture via the shared helper.
         function formatCurrency(amount, currInfo) {
-            var val = Number(amount || 0);
             var info = currInfo || currencyInfo || {};
-            var iso = (info.iso || '').toUpperCase();
-            var symbol = info.symbol || '';
-
-            var indianISOs = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
-            var isIndian = indianISOs.indexOf(iso) !== -1;
-
-            var formatted = '';
-            var absVal = Math.abs(val);
-
-            if (isIndian) {
-                if (absVal >= 10000000) {
-                    formatted = (val / 10000000).toFixed(2).replace(/\.00$/, '') + ' Cr';
-                } else if (absVal >= 100000) {
-                    formatted = (val / 100000).toFixed(2).replace(/\.00$/, '') + ' Lk';
-                } else {
-                    var parts = val.toFixed(2).replace(/\.00$/, '').split('.');
-                    var integerPart = parts[0];
-                    var decimalPart = parts.length > 1 ? '.' + parts[1] : '';
-                    var isNeg = integerPart.charAt(0) === '-';
-                    if (isNeg) integerPart = integerPart.substring(1);
-
-                    if (integerPart.length > 3) {
-                        var lastThree = integerPart.substring(integerPart.length - 3);
-                        var otherNumbers = integerPart.substring(0, integerPart.length - 3);
-                        otherNumbers = otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ",");
-                        integerPart = otherNumbers + "," + lastThree;
-                    }
-                    formatted = (isNeg ? '-' : '') + integerPart + decimalPart;
-                }
-            } else {
-                if (absVal >= 1000000000) {
-                    formatted = (val / 1000000000).toFixed(2).replace(/\.00$/, '') + 'B';
-                } else if (absVal >= 1000000) {
-                    formatted = (val / 1000000).toFixed(2).replace(/\.00$/, '') + 'M';
-                } else {
-                    var parts = val.toFixed(2).replace(/\.00$/, '').split('.');
-                    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-                    formatted = parts.join('.');
-                }
-            }
-
-            if (symbol) {
-                return symbol + ' ' + formatted;
-            }
-            return formatted;
+            return VAS.formatAmountByBrowser(amount, info.iso || '', info.precision, { compact: true, symbol: info.symbol || '' });
         }
 
         function renderMetric(data) {
@@ -122,7 +79,7 @@
             if ($valueEl) {
                 var formattedVal = formatCount(count);
                 $valueEl.text(formattedVal);
-                $valueEl.attr('title', String(count));
+                $valueEl.attr('title', formattedVal); // VAS163 2026-11-12: tooltip in browser-locale grouping, not raw String(count)
                 $valueEl.attr('aria-live', 'polite');
             }
 
@@ -306,3 +263,78 @@
     };
 
 })(VAS, jQuery);
+/* VAS163 2026-11-12: VAS.formatAmountByBrowser(value, isoCode, precision, { compact, symbol })
+   Amount in the BROWSER culture (window.navigator.language) with the currency the SERVER sent
+   (ISO code + precision; the server symbol only as a fallback). Defined in each widget / panel
+   that uses it - guarded, so the first file loaded defines it - so the shared util/CurrencyFormat.js
+   stays as shipped. Compact amounts keep that file's default scale (VIS.Util.formatCompactAmount:
+   L / Cr for Indian-numbering currencies, K / M / B otherwise, digits in the browser culture);
+   separators, decimals and the position of the currency sign come from the browser culture. */
+; (function () {
+    var V = window.VAS = window.VAS || {};
+    if (typeof V.formatAmountByBrowser === 'function') return;
+    function browserLocale() { try { return window.navigator.language || undefined; } catch (e) { return undefined; } }
+    function resolvePrecision(p) {
+        var n = Number(p);
+        if (p === null || p === undefined || p === '' || isNaN(n) || n < 0) {
+            try { n = VIS.Env.getCtx().getStdPrecision(); } catch (e) { n = 2; }
+        }
+        n = Math.round(Number(n));
+        return (isNaN(n) || n < 0) ? 2 : Math.min(n, 10);
+    }
+    function validIso(c) { c = String(c || '').trim().toUpperCase(); return /^[A-Z]{3}$/.test(c) ? c : ''; }
+    function numberFormat(o) {
+        try { return new Intl.NumberFormat(browserLocale(), o); } catch (e) { }
+        if (o.currencyDisplay === 'narrowSymbol') {
+            o.currencyDisplay = 'symbol';
+            try { return new Intl.NumberFormat(browserLocale(), o); } catch (e2) { }
+        }
+        return null;
+    }
+    /* Currency sign and where the browser culture puts it for this ISO code. */
+    var layoutCache = {};
+    function currencyLayout(iso) {
+        var key = browserLocale() + '|' + iso;
+        if (layoutCache[key]) return layoutCache[key];
+        var out = { sign: '', before: true, gap: '' };
+        var f = iso ? numberFormat({ style: 'currency', currency: iso, currencyDisplay: 'narrowSymbol' }) : null;
+        if (f && typeof f.formatToParts === 'function') {
+            try {
+                var parts = f.formatToParts(1234.5), ci = -1, ni = -1;
+                for (var i = 0; i < parts.length; i++) {
+                    if (parts[i].type === 'currency' && ci < 0) ci = i;
+                    if (parts[i].type === 'integer' && ni < 0) ni = i;
+                }
+                if (ci >= 0) {
+                    out.sign = parts[ci].value;
+                    if (ni >= 0) {
+                        out.before = ci < ni;
+                        var near = out.before ? parts[ci + 1] : parts[ci - 1];
+                        out.gap = (near && near.type === 'literal') ? near.value : '';
+                    }
+                }
+            } catch (e) { }
+        }
+        layoutCache[key] = out;
+        return out;
+    }
+    V.formatAmountByBrowser = function (value, isoCode, precision, options) {
+        options = options || {};
+        var num = Number(value) || 0;
+        var p = resolvePrecision(precision);
+        var iso = validIso(isoCode);
+        var body;
+        if (options.compact && window.VIS && VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
+            body = VIS.Util.formatCompactAmount(Math.abs(num), iso, p);
+        } else {
+            var f = numberFormat({ minimumFractionDigits: p, maximumFractionDigits: p });
+            try { body = f ? f.format(Math.abs(num)) : Math.abs(num).toFixed(p); } catch (e) { body = String(Math.abs(num)); }
+        }
+        var minus = (num < 0 && /[1-9]/.test(body)) ? '-' : '';
+        var lay = currencyLayout(iso);
+        var sign = lay.sign || options.symbol || iso;
+        if (!sign) return minus + body;
+        if (!lay.sign) return minus + sign + ' ' + body;
+        return lay.before ? (minus + sign + lay.gap + body) : (minus + body + lay.gap + sign);
+    };
+})();

@@ -154,16 +154,19 @@
             });
         }
 
+        // VAS163 2026-11-13: row 557 fallback age is whole calendar days from the date-only MovementDate (as hours, days * 24)
         function ageHours(value) {
             if (!value) { return 0; }
             var d = new Date(value);
             if (isNaN(d.getTime())) { return 0; }
-            return Math.max(0, (new Date().getTime() - d.getTime()) / 3600000);
+            var now = new Date();
+            var today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+            var moved = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+            return Math.max(0, Math.round((today - moved) / 86400000) * 24);
         }
 
-        /* Time on dock comes from the server: hours between the receipt's creation and the database
-           clock. The browser used to measure from MovementDate, which is date-only (midnight) and in
-           server time, so the hours were off by up to a day plus the time-zone gap (QA sheet GRN #15). */
+        /* Time on dock comes from the server: whole days from the receipt's MovementDate to the
+           database server date, sent as hours (days * 24). VAS163 2026-11-13: row 557 (was Created). */
         function rowAgeHours(row) {
             if (row && row.ageHours != null && isFinite(Number(row.ageHours))) {
                 return Math.max(0, Number(row.ageHours));
@@ -171,21 +174,16 @@
             return ageHours(row ? row.receivedOn : null);
         }
 
+        // VAS163 2026-11-13: row 557 the server age is whole days since MovementDate (date-only), so it is
+        // always shown in days (a receipt dated today is 0d) - hours from a date-only value were misleading.
         function ageLabel(hours) {
-            if (hours < 24) {
-                return Math.floor(hours) + "h";
-            }
-            return Math.max(1, Math.round(hours / 24)) + "d";
+            var days = Math.max(0, Math.floor((Number(hours) || 0) / 24 + 0.0001));
+            return Number(days).toLocaleString(window.navigator.language) + "d";
         }
 
         function ageLongLabel(hours) {
-            if (hours < 24) {
-                var h = Math.floor(hours);
-                return h + " " + (h === 1 ? lbl("VAS_087_Hour", "hour") : lbl("VAS_087_Hours", "hours"));
-            }
-
-            var days = Math.max(1, Math.round(hours / 24));
-            return days + " " + (days === 1 ? lbl("VAS_087_Day", "day") : lbl("VAS_087_Days", "days"));
+            var days = Math.max(0, Math.floor((Number(hours) || 0) / 24 + 0.0001));
+            return Number(days).toLocaleString(window.navigator.language) + " " + (days === 1 ? lbl("VAS_087_Day", "day") : lbl("VAS_087_Days", "days"));
         }
 
         function ageSeverity(hours) {
@@ -389,13 +387,13 @@
 
         function updatePager() {
             if ($pageText) {
-                $pageText.text(totalPages > 1 ? (pageNo + ' ' + lbl("VAS_087_Of", "of") + ' ' + totalPages) : '');
+                $pageText.text(totalPages > 1 ? (Number(pageNo).toLocaleString(window.navigator.language) + ' ' + lbl("VAS_087_Of", "of") + ' ' + Number(totalPages).toLocaleString(window.navigator.language)) : ''); // VAS163 2026-11-12: locale page numbers
             }
             if ($pageInfo) {
                 if (totalRecords > 0 && totalPages > 1) {
                     var from = (pageNo - 1) * pageSize + 1;
                     var to = Math.min(pageNo * pageSize, totalRecords);
-                    $pageInfo.text(lbl("VAS_087_Showing", "Showing") + ' ' + from + '-' + to + ' ' + lbl("VAS_087_Of", "of") + ' ' + totalRecords);
+                    $pageInfo.text(lbl("VAS_087_Showing", "Showing") + ' ' + Number(from).toLocaleString(window.navigator.language) + '-' + Number(to).toLocaleString(window.navigator.language) + ' ' + lbl("VAS_087_Of", "of") + ' ' + Number(totalRecords).toLocaleString(window.navigator.language)); // VAS163 2026-11-12: locale counts
                 } else {
                     $pageInfo.text('');
                 }
@@ -578,7 +576,7 @@
             if (linePages > 1) {
                 html +=
                     '<div class="vas-rag-lines-pager">' +
-                    '<span>' + escapeHtml(lbl("VAS_087_Showing", "Showing") + ' ' + (firstLine + 1) + '-' + lastLine + ' ' + lbl("VAS_087_Of", "of") + ' ' + totalLines) + '</span>' +
+                    '<span>' + escapeHtml(lbl("VAS_087_Showing", "Showing") + ' ' + Number((firstLine + 1)).toLocaleString(window.navigator.language) + '-' + Number(lastLine).toLocaleString(window.navigator.language) + ' ' + lbl("VAS_087_Of", "of") + ' ' + Number(totalLines).toLocaleString(window.navigator.language)) + '</span>' +
                     '<button type="button" class="vas-rag-pgbtn vas-rag-lines-prev" aria-label="' + escapeHtml(lbl("VAS_087_Previous", "Previous")) + '"' + (detailPage <= 1 ? ' disabled' : '') + '>' + icon("chevL") + '</button>' +
                     '<span>' + detailPage + ' ' + escapeHtml(lbl("VAS_087_Of", "of")) + ' ' + linePages + '</span>' +
                     '<button type="button" class="vas-rag-pgbtn vas-rag-lines-next" aria-label="' + escapeHtml(lbl("VAS_087_Next", "Next")) + '"' + (detailPage >= linePages ? ' disabled' : '') + '>' + icon("chevR") + '</button>' +

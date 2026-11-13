@@ -36,8 +36,12 @@
             .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
     }
 
-    var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    // VAS163 2026-11-12: month names from the browser culture, not a fixed English list.
+    var MONTHS = (function () { var a = []; for (var i = 0; i < 12; i++) { a.push(new Date(2000, i, 1).toLocaleDateString(window.navigator.language, { month: 'short' })); } return a; })();
     var KEY_SEP = '\u0001';
+
+    // VAS163 2026-11-12: counts in browser-locale grouping.
+    function fmtInt(n) { return (Number(n) || 0).toLocaleString(window.navigator.language); }
 
     function formatQty(v) {
         var n = Number(v || 0);
@@ -222,7 +226,7 @@
             });
 
             var colList = cols.map(function (c) { return { key: c.id, name: c.name }; });
-            if (others.length) { colList.push({ key: 'others', name: lbl('VAS_177_Others', 'Others') + ' (' + others.length + ')' }); }
+            if (others.length) { colList.push({ key: 'others', name: lbl('VAS_177_Others', 'Others') + ' (' + fmtInt(others.length) + ')' }); }
 
             var tpl = 'minmax(0,1.3fr) repeat(' + colList.length + ',minmax(0,1fr))';
             var html = '<div class="vas-177-table-header" style="grid-template-columns:' + tpl + '">' +
@@ -241,15 +245,15 @@
                     if (!cell) { html += '<span class="vas-177-cell vas-177-right vas-177-cell--none">–</span>'; return; }
                     var alpha = max > 0 ? (0.08 + 0.34 * (cell.Qty / max)) : 0.08;
                     var colName = c.key === 'others' ? cell.names.join(', ') : c.name;
-                    var tip = r.name + ' → ' + colName + ': ' + formatQty(cell.Qty) + ' (' + cell.Docs + ' ' + lbl('VAS_177_Docs', 'documents') + ')';
+                    var tip = r.name + ' → ' + colName + ': ' + formatQty(cell.Qty) + ' (' + fmtInt(cell.Docs) + ' ' + lbl('VAS_177_Docs', 'documents') + ')';
                     html += '<span class="vas-177-cell vas-177-right vas-177-cell--heat" style="background-color:rgba(0,131,218,' + alpha.toFixed(2) + ')" title="' + escapeHtml(tip) + '">' + escapeHtml(formatQty(cell.Qty)) + '</span>';
                 });
                 html += '</div>';
             });
             $body.html(html);
 
-            var helper = lbl('VAS_177_Showing', 'Showing') + ' ' + (start + 1) + '–' + (start + rows.length) + ' ' + lbl('VAS_177_Of', 'of') + ' ' + allRows.length + ' ' +
-                lbl('VAS_177_FromLocators', 'from-locators') + ' · ' + allCols.length + ' ' + lbl('VAS_177_ToLocators', 'to-locators');
+            var helper = lbl('VAS_177_Showing', 'Showing') + ' ' + fmtInt(start + 1) + '–' + fmtInt(start + rows.length) + ' ' + lbl('VAS_177_Of', 'of') + ' ' + fmtInt(allRows.length) + ' ' + /* VAS163 2026-11-12: locale counts */
+                lbl('VAS_177_FromLocators', 'from-locators') + ' · ' + fmtInt(allCols.length) + ' ' + lbl('VAS_177_ToLocators', 'to-locators');
             var pager = '';
             if (allRows.length > maxRows) {
                 pager = '<span class="vas-177-pager">' +

@@ -230,3 +230,24 @@
     text-align: center;
 }
 [dir="rtl"] .vas-203-dtl-pgbtn svg { transform: scaleX(-1); }
+/* VAS163 2026-11-13: Rows 436/438 - explicit "Load more" control at the end of the results list. */
+.vas-203-loadmore {
+    display: block;
+    margin: 0.35rem auto 0.5rem;
+    padding: 0.35rem 1rem;
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #0083DA;
+    background: #FFFFFF;
+    border: 1px solid #D9E2EB;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.vas-203-loadmore:hover,
+.vas-203-loadmore:focus {
+    background: #EEF8FF;
+    border-color: #0083DA;
+    outline: none;
+}

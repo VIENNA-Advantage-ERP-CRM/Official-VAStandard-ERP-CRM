@@ -347,7 +347,9 @@
 
             for (var i = 0; i < pageItems.length; i++) {
                 var item = pageItems[i];
-                var formattedQty = Number(item.totalQtyCounted || 0).toLocaleString();
+                // VAS163 2026-11-12: explicit browser locale for qty / session count (were toLocaleString() / raw).
+                var formattedQty = Number(item.totalQtyCounted || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 4 });
+                var formattedSessions = Number(item.sessionCount || 0).toLocaleString(window.navigator.language);
 
                 var $row = $(
                     '<button type="button" class="vas-whwisecount-row-btn vas-whwisecount-grid-template" aria-label="' + lbl("VAS_161_OpenCountDetailsFor") + ' ' + item.warehouseName + '">' +
@@ -355,7 +357,7 @@
                     '<div class="vas-whwisecount-wh-title" title="' + item.warehouseName + '">' + item.warehouseName + '</div>' +
                     '<div class="vas-whwisecount-wh-code" title="' + item.warehouseCode + '">' + item.warehouseCode + '</div>' +
                     '</div>' +
-                    '<div class="vas-whwisecount-cell vas-whwisecount-counts-num" title="' + item.sessionCount + '">' + item.sessionCount + '</div>' +
+                    '<div class="vas-whwisecount-cell vas-whwisecount-counts-num" title="' + formattedSessions + '">' + formattedSessions + '</div>' +
                     '<div class="vas-whwisecount-cell vas-whwisecount-qty-num" title="' + formattedQty + '">' + formattedQty + '</div>' +
                     '</button>'
                 );
@@ -512,7 +514,7 @@
                 '<div class="vas-whwisecount-modal-footer">' +
                 '<div class="vas-whwisecount-modal-footer-left">' +
                 '<span class="vas-whwisecount-footer-text vas-modal-helper"></span>' +
-                '<span class="vas-whwisecount-modal-total-qty">' + lbl("VAS_161_TotalQty") + ' ' + Number(totalQty).toLocaleString() + '</span>' +
+                '<span class="vas-whwisecount-modal-total-qty">' + lbl("VAS_161_TotalQty") + ' ' + Number(totalQty).toLocaleString(window.navigator.language, { maximumFractionDigits: 4 }) + '</span>' +
                 '</div>' +
                 '<div class="vas-whwisecount-pager">' +
                 '<button type="button" class="vas-whwisecount-pager-btn vas-m-prev" aria-label="' + lbl("VAS_161_PreviousPage") + '">&lsaquo;</button>' +
@@ -550,7 +552,7 @@
 
                 for (var i = 0; i < paged.length; i++) {
                     var line = paged[i];
-                    var formattedQty = Number(line.qty || 0).toLocaleString();
+                    var formattedQty = Number(line.qty || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 4 });
                     var isCharge = line.inventoryType === 'Charge Account';
                     var chipClass = isCharge ? 'vas-whwisecount-chip-neutral' : 'vas-whwisecount-chip-info';
 

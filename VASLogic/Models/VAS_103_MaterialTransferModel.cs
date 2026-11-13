@@ -269,9 +269,25 @@ namespace VASLogic.Models
             LoadRequisitionOrigin(M_Movement_ID, result);
             LoadWorkOrderOrigin(M_Movement_ID, woExpr, result);
 
-            // Transfer value is expressed in the accounting currency; the panel
-            // renders INR (₹) with standard 2-dp precision.
+            // Transfer value is expressed in the accounting currency.
+            // VAS163 2026-11-12: send that currency (ISO / symbol / precision of the client's
+            // primary accounting schema) instead of a fixed 2-dp; the panel formats it in the
+            // browser culture.
             result.StdPrecision = 2;
+            DataSet curDs = DB.ExecuteDataset(
+                @"SELECT c.ISO_Code, c.CurSymbol, c.StdPrecision
+                    FROM AD_ClientInfo ci
+                    JOIN C_AcctSchema a ON (a.C_AcctSchema_ID = ci.C_AcctSchema1_ID)
+                    JOIN C_Currency c   ON (c.C_Currency_ID   = a.C_Currency_ID)
+                   WHERE ci.AD_Client_ID = @AD_Client_ID",
+                new SqlParameter[] { new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()) }, null);
+            if (curDs != null && curDs.Tables.Count > 0 && curDs.Tables[0].Rows.Count > 0)
+            {
+                DataRow cr = curDs.Tables[0].Rows[0];
+                result.ISO_Code     = Util.GetValueOfString(cr["ISO_Code"]);
+                result.CurSymbol    = Util.GetValueOfString(cr["CurSymbol"]);
+                result.StdPrecision = Util.GetValueOfInt(cr["StdPrecision"]);
+            }
 
             // ----- Transfer lines -----
             result.Lines = LoadLines(M_Movement_ID, rateExpr, woExpr);
@@ -1510,6 +1526,9 @@ namespace VASLogic.Models
 
             // Currency
             public int       StdPrecision   { get; set; }
+            // VAS163 2026-11-12: base (accounting schema) currency of the transfer value.
+            public string    ISO_Code       { get; set; }
+            public string    CurSymbol      { get; set; }
 
             // KPI aggregates
             public int       LineCount         { get; set; }

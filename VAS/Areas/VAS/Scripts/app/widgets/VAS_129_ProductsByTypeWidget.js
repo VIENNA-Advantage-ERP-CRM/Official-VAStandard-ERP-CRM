@@ -300,8 +300,10 @@
             var R = 44, CX = 60, CY = 60, C = 2 * Math.PI * R, STROKE = 17;
             var total = state.total;
 
-            els.donutTotal.textContent = total;
-            els.helper.textContent = total + ' ' + lbl('VAS_129_PBT_Helper', 'products across 4 types');
+            // VAS163 2026-11-12: counts grouped per browser locale (was raw number).
+            var totalText = Number(total || 0).toLocaleString(window.navigator.language);
+            els.donutTotal.textContent = totalText;
+            els.helper.textContent = totalText + ' ' + lbl('VAS_129_PBT_Helper', 'products across 4 types');
 
             var svgHtml = '<circle cx="' + CX + '" cy="' + CY + '" r="' + R + '" fill="none" stroke="#EDF2F6" stroke-width="' + STROKE + '"/>';
             var offset = 0;
@@ -353,7 +355,7 @@
                 var pctSpan = el('span', 'MPC-pt-legend-pct', pct + '%');
                 pctSpan.style.color = t.label;
                 right.appendChild(pctSpan);
-                right.appendChild(el('span', 'MPC-pt-legend-count', String(count)));
+                right.appendChild(el('span', 'MPC-pt-legend-count', Number(count).toLocaleString(window.navigator.language))); // VAS163 2026-11-12: locale count
 
                 row.appendChild(left);
                 row.appendChild(right);

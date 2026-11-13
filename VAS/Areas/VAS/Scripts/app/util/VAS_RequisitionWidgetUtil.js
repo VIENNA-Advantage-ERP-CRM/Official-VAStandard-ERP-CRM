@@ -19,7 +19,9 @@
  * VAS_305_FullyReceived, VAS_305_Late, VAS_305_DueToday, VAS_305_DueIn, VAS_305_OnTime, VAS_305_NotOrdered,
  * VAS_305_PartOrdered, VAS_305_OrderedState, VAS_305_ReceivedState, VAS_305_DaysAgo, VAS_305_InDays,
  * VAS_305_Today, VAS_305_NoVendor, VAS_305_Loading, VAS_305_LoadError, VAS_305_NoRecord, VAS_305_NothingHere,
- * VAS_305_Showing, VAS_305_Of, VAS_305_Requester, VAS_305_Value, VAS_305_PrevPage, VAS_305_NextPage
+ * VAS_305_Showing, VAS_305_Of, VAS_305_Requester, VAS_305_Value, VAS_305_PrevPage, VAS_305_NextPage,
+ * VAS163 2026-11-13: VAS_305_Days, VAS_305_Attribute, VAS_305_UOM, VAS_305_NoLines, VAS_305_DocPO, VAS_305_DocBPO,
+ * VAS_305_DocMT, VAS_305_DocIU, VAS_305_DocRFQ
  */
 ; VAS = window.VAS || {};
 
@@ -115,9 +117,10 @@
     U.needChip = function (iso) {
         var d = U.daysFromToday(iso);
         if (d == null) { return ''; }
-        if (d < 0) { return U.chip('r', U.lbl('VAS_305_Late', 'Late') + ' ' + (-d) + 'd'); }
+        // VAS163 2026-11-13: row 1127 - full day text ('Late 63 days', 'Due in 1 day') instead of '63d'
+        if (d < 0) { return U.chip('r', U.lbl('VAS_305_Late', 'Late') + ' ' + (-d) + ' ' + U.unit(-d, 'VAS_305_Days', 'days')); }
         if (d === 0) { return U.chip('a', U.lbl('VAS_305_DueToday', 'Due today')); }
-        if (d <= 2) { return U.chip('a', U.lbl('VAS_305_DueIn', 'Due in') + ' ' + d + 'd'); }
+        if (d <= 2) { return U.chip('a', U.lbl('VAS_305_DueIn', 'Due in') + ' ' + d + ' ' + U.unit(d, 'VAS_305_Days', 'days')); }
         return U.chip('b', U.lbl('VAS_305_OnTime', 'On time'));
     };
 
@@ -331,7 +334,8 @@
             '<div class="vas-rqw-pb"></div><div class="vas-rqw-pf"></div></div></div>');
         $('body').append($ov);
         $ov.on('click', function (e) {
-            if (e.target === $ov[0]) { U.closeModal(); return; }
+            // VAS163 2026-11-13: row 1121 - a click on the dark backdrop no longer closes the popup (close icon / Close button only)
+            if (e.target === $ov[0]) { return; }
             var act = $(e.target).closest('[data-act]').attr('data-act');
             if (act === 'close') { U.closeModal(); }
             else if (act === 'back') { current = stack.pop(); paint(); }
@@ -424,28 +428,73 @@
         var tone = h.isLate || h.docStatus === 'VO' ? 'risk' : (h.statusCode === 'DE' ? 'ok' : (h.statusCode === 'PO' || h.statusCode === 'PD' || h.statusCode === 'OR') ? 'warn' : '');
         var pillTxt = (h.docStatus === 'CO' ? h.statusName : h.docStatusName) + (h.isLate ? ' · ' + U.lbl('VAS_305_Late', 'Late') : '');
         var ed = U.daysFromToday(h.earliestNeedBy);
-        var edTxt = ed == null ? '' : ed < 0 ? (-ed) + ' ' + U.lbl('VAS_305_DaysAgo', 'days ago') : ed === 0 ? U.lbl('VAS_305_Today', 'Today') : U.lbl('VAS_305_InDays', 'In') + ' ' + ed + 'd';
+        // VAS163 2026-11-13: row 1127 - 'In 5 days' instead of 'In 5d'
+        var edTxt = ed == null ? '' : ed < 0 ? (-ed) + ' ' + U.lbl('VAS_305_DaysAgo', 'days ago') : ed === 0 ? U.lbl('VAS_305_Today', 'Today') : U.lbl('VAS_305_InDays', 'In') + ' ' + ed + ' ' + U.unit(ed, 'VAS_305_Days', 'days');
         var mc = function (l, v, cls, meta) {
             return '<div class="vas-rqw-mc"><div class="ml">' + U.esc(l) + '</div><div class="mv ' + (cls || '') + '" title="' + U.esc(v) + '">' + U.esc(v || '—') + '</div>' +
                 (meta ? '<div class="mm">' + U.esc(meta) + '</div>' : '') + '</div>';
         };
-        var rows = lines.map(function (l) {
-            var docs = (l.documents || []).map(function (x) {
-                var done = x.type === 'PO' ? (x.receivedQty >= x.qty) : (x.docStatus === 'CO' || x.docStatus === 'CL');
-                return U.chip(done ? 'g' : 'n', (x.type === 'PO' ? 'PO ' : 'MT ') + x.documentNo);
-            }).join(' ');
-            return '<div class="vas-rqw-gr"><span class="b" title="' + U.esc(l.product) + '">' + U.esc(l.product) + '</span>' +
-                '<span class="m" title="' + U.esc(l.category) + '">' + U.esc(l.category) + '</span>' +
-                '<span class="vas-rqw-r">' + U.num(l.qty) + ' ' + U.esc(l.uom || '') + '</span>' +
-                '<span class="vas-rqw-r">' + U.date(l.needBy) + '</span>' +
-                '<span class="vas-rqw-r">' + U.amount(l.amount, cur) + '</span>' +
-                '<span class="vas-rqw-r">' + U.num(l.orderedQty) + ' / ' + U.num(l.receivedQty) + '</span>' +
-                '<span class="vas-rqw-docs" style="white-space:normal">' + (docs || '<span class="m">—</span>') + '</span>' +
-                '<span>' + (h.docStatus === 'CO' ? U.stateChip(l.isLate ? 'late' : (l.state === 'ordered' && l.receivedQty > 0 ? 'partreceived' : l.state), l.needBy) : U.statusChip(h.docStatus === 'VO' || h.docStatus === 'RE' || h.docStatus === 'CL' ? 'CL' : 'DR', h.docStatusName)) + '</span></div>';
+        // VAS163 2026-11-13: row 1142 - document types raised from a requisition line (PO, blanket PO, material
+        // transfer, inventory use, RFQ); the chip keeps the short code, its hover title the full type name.
+        var DOC_TYPES = {
+            PO: function () { return U.lbl('VAS_305_DocPO', 'Purchase order'); },
+            BPO: function () { return U.lbl('VAS_305_DocBPO', 'Blanket purchase order'); },
+            MT: function () { return U.lbl('VAS_305_DocMT', 'Material transfer'); },
+            IU: function () { return U.lbl('VAS_305_DocIU', 'Inventory use'); },
+            RFQ: function () { return U.lbl('VAS_305_DocRFQ', 'RFQ'); }
+        };
+        var docOf = function (x) {
+            var done = x.type === 'PO' ? (x.receivedQty >= x.qty) : (x.docStatus === 'CO' || x.docStatus === 'CL');
+            var full = (DOC_TYPES[x.type] ? DOC_TYPES[x.type]() : x.type) + ' ' + x.documentNo;
+            return { html: '<span class="vas-rqw-chip ' + (done ? 'g' : 'n') + '" title="' + U.esc(full) + '">' + U.esc((x.type || '') + ' ' + x.documentNo) + '</span>', text: full };
+        };
+        var textOf = function (html) { return $('<div>').html(html).text(); };
+        var cell = function (cls, html, title) {
+            return '<span' + (cls ? ' class="' + cls + '"' : '') + ' title="' + U.esc(title == null ? textOf(html) : title) + '">' + html + '</span>';
+        };
+        // VAS163 2026-11-13: row 1134 - 'Ord. / Rcvd.' and 'Documents' only when at least one line has a value
+        var showOrd = lines.some(function (l) { return Number(l.orderedQty || 0) !== 0 || Number(l.receivedQty || 0) !== 0; });
+        var showDocs = lines.some(function (l) { return (l.documents || []).length > 0; });
+        // VAS163 2026-11-13: rows 1129 / 1130 / 1131 - separate UOM column (qty without unit), Attribute instead of
+        // Category (blank when the line has no attribute set instance), and a hover title on every value cell.
+        var cols = [
+            { w: 'minmax(0,1.7fr)', head: U.lbl('VAS_305_Product', 'Product'), cell: function (l) { return cell('b', U.esc(l.product), l.product); } },
+            { w: 'minmax(0,1fr)', head: U.lbl('VAS_305_Attribute', 'Attribute'), cell: function (l) { return cell('m', U.esc(l.attribute || ''), l.attribute || ''); } },
+            { w: '4.4em', right: true, head: U.lbl('VAS_305_Qty', 'Qty'), cell: function (l) { return cell('vas-rqw-r', U.esc(U.num(l.qty))); } },
+            { w: 'minmax(3.5em,0.6fr)', head: U.lbl('VAS_305_UOM', 'UOM'), cell: function (l) { return cell('m', U.esc(l.uom || ''), l.uom || ''); } },
+            { w: '4.6em', right: true, head: U.lbl('VAS_305_NeedBy', 'Need by'), cell: function (l) { return cell('vas-rqw-r', U.esc(U.date(l.needBy)), U.dateLong(l.needBy)); } },
+            { w: '5.6em', right: true, head: U.lbl('VAS_305_Amount', 'Amount') + (cur && cur.Symbol ? ' ' + cur.Symbol : ''), cell: function (l) { return cell('vas-rqw-r', U.esc(U.amount(l.amount, cur))); } }
+        ];
+        if (showOrd) {
+            cols.push({ w: '6em', right: true, head: U.lbl('VAS_305_OrderedReceived', 'Ord. / Rcvd.'), cell: function (l) { return cell('vas-rqw-r', U.esc(U.num(l.orderedQty) + ' / ' + U.num(l.receivedQty))); } });
+        }
+        if (showDocs) {
+            cols.push({
+                w: 'minmax(0,1.4fr)', head: U.lbl('VAS_305_Documents', 'Documents'), cell: function (l) {
+                    var ds = (l.documents || []).map(docOf);
+                    return '<span class="vas-rqw-docs" style="white-space:normal" title="' + U.esc(ds.map(function (x) { return x.text; }).join(', ')) + '">' +
+                        (ds.length ? ds.map(function (x) { return x.html; }).join(' ') : '<span class="m">—</span>') + '</span>';
+                }
+            });
+        }
+        cols.push({
+            w: '7.6em', head: U.lbl('VAS_305_Status', 'Status'), cell: function (l) {
+                return cell('', h.docStatus === 'CO' ? U.stateChip(l.isLate ? 'late' : (l.state === 'ordered' && l.receivedQty > 0 ? 'partreceived' : l.state), l.needBy) : U.statusChip(h.docStatus === 'VO' || h.docStatus === 'RE' || h.docStatus === 'CL' ? 'CL' : 'DR', h.docStatusName));
+            }
         });
+        var rows = lines.map(function (l) {
+            return '<div class="vas-rqw-gr">' + cols.map(function (c) { return c.cell(l); }).join('') + '</div>';
+        });
+        var right = [];
+        cols.forEach(function (c, i) { if (c.right) { right.push(i); } });
+        // VAS163 2026-11-13: row 1120 - a requisition without lines shows its header and an empty-lines message
+        var linesHtml = lines.length
+            ? table(cols.map(function (c) { return c.w; }).join(' '), right, cols.map(function (c) { return c.head; }), rows)
+            : '<div class="vas-rqw-msg">' + U.esc(U.lbl('VAS_305_NoLines', 'No lines on this requisition yet')) + '</div>';
         var body =
             '<div class="vas-rqw-hero ' + tone + '"><div class="top"><div><div class="t">' + U.esc(h.documentNo) + '</div>' +
-            '<div class="s">' + U.esc(U.lbl('VAS_305_RaisedBy', 'Raised') + ' ' + U.dateLong(h.dateDoc) + ' · ' + (h.requester || '')) + '</div></div>' +
+            // VAS163 2026-11-13: row 1122 - 'Raised' is the creation date of the requisition (Created), not the document date
+            '<div class="s">' + U.esc(U.lbl('VAS_305_RaisedBy', 'Raised') + ' ' + U.dateLong(h.created || h.dateDoc) + ' · ' + (h.requester || '')) + '</div></div>' +
             '<span class="pl">' + U.esc(pillTxt) + '</span></div>' +
             '<div class="v">' + U.esc(U.money(h.totalAmount, cur)) + '<small>' + U.esc(h.lineCount + ' ' + U.unit(h.lineCount, 'VAS_305_LinesCount', 'lines') + ' · ' +
                 h.receivedLines + ' ' + U.lbl('VAS_305_FullyReceived', 'fully received')) + '</small></div></div>' +
@@ -458,10 +507,7 @@
             mc(U.lbl('VAS_305_EarliestNeedBy', 'Earliest need-by'), U.dateLong(h.earliestNeedBy), h.isLate ? 'risk' : '', edTxt) +
             '</div>' +
             '<div class="vas-rqw-sh"><b>' + U.esc(U.lbl('VAS_305_Lines', 'Lines')) + '</b><span>' + U.esc(lines.length + ' ' + U.unit(lines.length, 'VAS_305_LinesCount', 'lines')) + '</span></div>' +
-            table('minmax(0,1.7fr) minmax(0,1fr) 5.2em 4.4em 5.6em 6em minmax(0,1.4fr) 6.4em', [2, 3, 4, 5],
-                [U.lbl('VAS_305_Product', 'Product'), U.lbl('VAS_305_Category', 'Category'), U.lbl('VAS_305_Qty', 'Qty'), U.lbl('VAS_305_NeedBy', 'Need by'),
-                U.lbl('VAS_305_Amount', 'Amount') + (cur && cur.Symbol ? ' ' + cur.Symbol : ''), U.lbl('VAS_305_OrderedReceived', 'Ord. / Rcvd.'),
-                U.lbl('VAS_305_Documents', 'Documents'), U.lbl('VAS_305_Status', 'Status')], rows) +
+            linesHtml +
             '<div class="vas-rqw-tot"><span>' + U.esc(U.lbl('VAS_305_Total', 'Total')) + ' <b>' + U.esc(U.money(h.totalAmount, cur)) + '</b></span>' +
             '<span>' + U.esc(U.lbl('VAS_305_StillOpen', 'Still to come')) + ' <b>' + U.esc(U.money(h.openAmount, cur)) + '</b></span></div>';
         return {

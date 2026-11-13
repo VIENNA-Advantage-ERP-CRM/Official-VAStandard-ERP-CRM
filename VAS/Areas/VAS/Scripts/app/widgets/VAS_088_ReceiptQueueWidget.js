@@ -156,10 +156,14 @@
             return '<span class="vas-rq-grnlink" role="link" tabindex="0" data-grnid="' + escapeHtml(r.grnId) + '">' + escapeHtml(r.grnNo) + '</span>';
         }
 
+        // VAS163 2026-11-12: keep the resolved Material Receipt window id and pass it next time.
+        var grnZoomWindowId = 0;
+
         function zoomToGrn(grnId) {
             if (!grnId || !window.VAS || !VAS.ZoomUtil) { return; }
             try {
-                VAS.ZoomUtil.zoomToRecord('M_InOut_ID', Number(grnId), 0, 'VAS_MaterialReceipt', 'Material Receipt');
+                VAS.ZoomUtil.zoomToRecord('M_InOut_ID', Number(grnId), grnZoomWindowId, 'VAS_MaterialReceipt', 'Material Receipt')
+                    .done(function (id) { if (id > 0) { grnZoomWindowId = id; } });
             } catch (e) { /* zoom is best-effort */ }
         }
 
@@ -403,13 +407,13 @@
 
         function updatePager() {
             if ($pageText) {
-                $pageText.text(totalPages > 1 ? (pageNo + ' ' + lbl("VAS_088_Of", "of") + ' ' + totalPages) : '');
+                $pageText.text(totalPages > 1 ? (Number(pageNo).toLocaleString(window.navigator.language) + ' ' + lbl("VAS_088_Of", "of") + ' ' + Number(totalPages).toLocaleString(window.navigator.language)) : ''); // VAS163 2026-11-12: locale page numbers
             }
             if ($pageInfo) {
                 if (totalRecords > 0) {
                     var from = (pageNo - 1) * pageSize + 1;
                     var to = Math.min(pageNo * pageSize, totalRecords);
-                    $pageInfo.text(lbl("VAS_088_Showing", "Showing") + ' ' + from + '-' + to + ' ' + lbl("VAS_088_Of", "of") + ' ' + totalRecords);
+                    $pageInfo.text(lbl("VAS_088_Showing", "Showing") + ' ' + Number(from).toLocaleString(window.navigator.language) + '-' + Number(to).toLocaleString(window.navigator.language) + ' ' + lbl("VAS_088_Of", "of") + ' ' + Number(totalRecords).toLocaleString(window.navigator.language)); // VAS163 2026-11-12: locale counts
                 } else {
                     $pageInfo.text('');
                 }
@@ -569,7 +573,7 @@
                 '</tr></thead><tbody>' + body + '</tbody></table>' +
                 (lines.length > LINES_PAGE_SIZE
                     ? '<div class="vas-rq-lines-pager">' +
-                      '<span class="vas-rq-foot-info">' + escapeHtml(lbl("VAS_088_Showing", "Showing") + ' ' + (lineFrom + 1) + '-' + lineTo + ' ' + lbl("VAS_088_Of", "of") + ' ' + lines.length) + '</span>' +
+                      '<span class="vas-rq-foot-info">' + escapeHtml(lbl("VAS_088_Showing", "Showing") + ' ' + Number((lineFrom + 1)).toLocaleString(window.navigator.language) + '-' + Number(lineTo).toLocaleString(window.navigator.language) + ' ' + lbl("VAS_088_Of", "of") + ' ' + Number(lines.length).toLocaleString(window.navigator.language)) + '</span>' +
                       '<div class="vas-rq-pager">' +
                       '<button type="button" class="vas-rq-pgbtn vas-rq-lprev"' + (linesPage <= 1 ? ' disabled' : '') + ' aria-label="' + escapeHtml(lbl("VAS_088_Previous", "Previous")) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>' +
                       '<span class="vas-rq-pgtext">' + linesPage + ' ' + escapeHtml(lbl("VAS_088_Of", "of")) + ' ' + totalLinePages + '</span>' +

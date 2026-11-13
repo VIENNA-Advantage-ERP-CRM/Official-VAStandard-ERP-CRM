@@ -168,7 +168,8 @@ namespace VAS.Controllers
             // where they are out of scope (ORA-00904).
             string sql = @"
                 SELECT io.DocumentNo, bp.Name AS Customer_Name, io.MovementDate, io.DocStatus,
-                    COALESCE(__DO_VALUE__, 0) AS DO_Value
+                    COALESCE(__DO_VALUE__, 0) AS DO_Value,
+                    __DO_CURRENCY__ AS Currency_Id
                 FROM M_InOut io
                 LEFT JOIN C_BPartner bp ON bp.C_BPartner_ID = io.C_BPartner_ID
                 WHERE io.IsActive = 'Y'
@@ -186,6 +187,8 @@ namespace VAS.Controllers
                      FROM M_InOutLine iol
                      LEFT JOIN C_OrderLine ol ON ol.C_OrderLine_ID = iol.C_OrderLine_ID
                      WHERE iol.M_InOut_ID = io.M_InOut_ID AND iol.IsActive = 'Y')");
+            // VAS163 2026-11-12: the linked order's currency, injected after AddAccessSQL like the value.
+            sql = sql.Replace("__DO_CURRENCY__", @"(SELECT o.C_Currency_ID FROM C_Order o WHERE o.C_Order_ID = io.C_Order_ID)");
 
             sql += " ORDER BY io.MovementDate DESC, io.DocumentNo DESC";
 
@@ -196,6 +199,7 @@ namespace VAS.Controllers
 
             List<object> rows = new List<object>();
             decimal totalValue = 0;
+            Dictionary<int, object[]> curCache = new Dictionary<int, object[]>(); // VAS163 2026-11-12
             IDataReader dr = null;
             try
             {
@@ -205,13 +209,19 @@ namespace VAS.Controllers
                     decimal value = Util.GetValueOfDecimal(dr["DO_Value"]);
                     totalValue += value;
                     DateTime? d = Util.GetValueOfDateTime(dr["MovementDate"]);
+                    int curId = Util.GetValueOfInt(dr["Currency_Id"]);
+                    if (!curCache.ContainsKey(curId)) { curCache[curId] = LookupCurrency(curId); }
+                    object[] cur = curCache[curId];
                     rows.Add(new
                     {
                         documentNo = Util.GetValueOfString(dr["DocumentNo"]),
                         customerName = Util.GetValueOfString(dr["Customer_Name"]),
                         movementDate = d.HasValue ? d.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                         docStatus = Util.GetValueOfString(dr["DocStatus"]),
-                        value = value
+                        value = value,
+                        currencyIso = (string)cur[0],
+                        currencySymbol = (string)cur[1],
+                        currencyPrecision = (int)cur[2]
                     });
                 }
             }
@@ -234,26 +244,35 @@ namespace VAS.Controllers
         /// </summary>
         private object GetCurrencyInfo(Ctx ctx)
         {
+            // VAS163 2026-11-12: StdPrecision sent too (the modal showed 0 decimals).
+            object[] cur = LookupCurrency(ctx.GetContextAsInt("$C_Currency_ID"));
+            return new { iso = (string)cur[0], symbol = (string)cur[1], precision = (int)cur[2] };
+        }
+
+        /// <summary>VAS163 2026-11-12: { ISO_Code, CurSymbol, StdPrecision } of a currency; empties / 2 if unavailable.</summary>
+        private object[] LookupCurrency(int currencyId)
+        {
             string iso = "";
             string symbol = "";
-            int currencyId = ctx.GetContextAsInt("$C_Currency_ID");
+            int precision = 2;
             if (currencyId > 0)
             {
                 IDataReader cdr = null;
                 try
                 {
                     cdr = DB.ExecuteReader(
-                        "SELECT ISO_Code, CurSymbol FROM C_Currency WHERE C_Currency_ID = @Cur",
+                        "SELECT ISO_Code, CurSymbol, StdPrecision FROM C_Currency WHERE C_Currency_ID = @Cur",
                         new SqlParameter[] { new SqlParameter("@Cur", currencyId) });
                     if (cdr != null && cdr.Read())
                     {
                         iso = Util.GetValueOfString(cdr["ISO_Code"]);
                         symbol = Util.GetValueOfString(cdr["CurSymbol"]);
+                        precision = Util.GetValueOfInt(cdr["StdPrecision"]);
                     }
                 }
                 finally { if (cdr != null) { cdr.Close(); cdr.Dispose(); } }
             }
-            return new { iso = iso, symbol = symbol };
+            return new object[] { iso, symbol, precision };
         }
 
         /// <summary>Distinct years with Delivery Order activity (desc), with the current year guaranteed present.</summary>

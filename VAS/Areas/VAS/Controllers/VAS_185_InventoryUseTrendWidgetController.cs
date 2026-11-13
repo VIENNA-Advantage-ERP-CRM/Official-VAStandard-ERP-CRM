@@ -119,7 +119,9 @@ namespace VIS.Controllers
                 string sql = @"
                     SELECT
                       TO_CHAR(ai.MovementDate, 'YYYY-MM') AS MonthBucket,
-                      SUM(line.QtyInternalUse) AS TotalQty,
+                      -- VAS163 2026-11-13: rows 45/46 qty in each line's selected UOM (QtyEntered), same rule as
+                      -- the other Inventory Use widgets; value = QtyInternalUse (base) x CurrentCostPrice.
+                      SUM(line.QtyEntered) AS TotalQty,
                       SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, 0)) AS TotalValue,
                       COUNT(DISTINCT ai.M_Inventory_ID) AS DocCount
                     FROM M_InventoryLine line
@@ -205,14 +207,15 @@ namespace VIS.Controllers
         {
             string iso = "";
             string symbol = "";
-            if (ctx == null) { return new { iso = iso, symbol = symbol }; }
+            int stdPrecision = 2; // VAS163 2026-11-12: currency precision sent to the UI (C_Currency.StdPrecision)
+            if (ctx == null) { return new { iso = iso, symbol = symbol, stdPrecision = stdPrecision }; }
 
             int clientId = ctx.GetAD_Client_ID();
             IDataReader cdr = null;
             try
             {
                 cdr = DB.ExecuteReader(
-                    @"SELECT c.ISO_Code, c.CurSymbol
+                    @"SELECT c.ISO_Code, c.CurSymbol, c.StdPrecision
                       FROM AD_ClientInfo ci
                       INNER JOIN C_AcctSchema ac ON (ac.C_AcctSchema_ID = ci.C_AcctSchema1_ID)
                       INNER JOIN C_Currency c ON (c.C_Currency_ID = ac.C_Currency_ID)
@@ -222,11 +225,12 @@ namespace VIS.Controllers
                 {
                     iso = Util.GetValueOfString(cdr["ISO_Code"]);
                     symbol = Util.GetValueOfString(cdr["CurSymbol"]);
+                    stdPrecision = Util.GetValueOfInt(cdr["StdPrecision"]);
                 }
             }
             finally { if (cdr != null) { cdr.Close(); cdr.Dispose(); } }
 
-            return new { iso = iso, symbol = symbol };
+            return new { iso = iso, symbol = symbol, stdPrecision = stdPrecision };
         }
 // ===== NEW CODE END — currency format =====
 

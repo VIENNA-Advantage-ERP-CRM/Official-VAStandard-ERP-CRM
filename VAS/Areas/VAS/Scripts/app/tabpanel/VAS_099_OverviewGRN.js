@@ -518,8 +518,9 @@
         function bindEvents() {
             $root.on("click", ".vas_099-chip.vas_099-is-link, .vas_099-is-link[data-open-table]", function (e) {
                 e.preventDefault();
+                // VAS163 2026-11-12: the return flag picks Vendor RMA over Purchase Order.
                 openRecord($(this).attr("data-open-table"), $(this).attr("data-open-id"),
-                    $(this).attr("data-open-sotrx") === "Y");
+                    $(this).attr("data-open-sotrx") === "Y", $(this).attr("data-open-return") === "Y");
             });
         }
 
@@ -543,77 +544,37 @@
         // now named outright (VAS_PurchaseOrder), and the sales side - the drop-ship
         // Sales Order chip - has its own name in WINDOW_NAME_BY_TABLE_SOTRX, exactly as
         // the VAS_092 Purchase Order overview does.
-        var WINDOW_NAME_BY_TABLE = {
-            "M_InOutConfirm": "VAS_ShipReceiptConfirm",
-            "C_Order":        "VAS_PurchaseOrder"
+        // VAS163 2026-11-12: every zoom goes through VAS.ZoomUtil.zoomToRecord with
+        // the VAS window of the document TYPE (new name, old name as fallback);
+        // the private GetWindow_ID lookup, VIS.ZoomTarget and startWindow are gone.
+        // Key: table, or table + "|SO" (sales side) / "|RET" (purchase-side return).
+        var ZOOM_WINDOW_BY_KEY = {
+            "C_Order":        ["VAS_PurchaseOrder", "Purchase Order"],
+            "C_Order|RET":    ["VAS_VendorRMA", "Vendor RMA"],
+            "C_Order|SO":     ["VAS_SalesOrder", "Sales Order"],
+            "M_InOutConfirm": ["VAS_ShipReceiptConfirm", "Ship/Receipt Confirm"],
+            "C_Invoice":      ["VAS_APInvoice", "Invoice (Vendor)"],     // AP only (IsSOTrx = 'N')
+            "C_Payment":      ["VAS_APPayment", "Payment"]               // AP only (IsReceipt = 'N')
         };
 
-        // The same map for records opened as a SALES transaction; wins when the
-        // record is opened with IsSOTrx.
-        var WINDOW_NAME_BY_TABLE_SOTRX = {
-            "C_Order": "VAS_SalesOrder"
-        };
+        // VAS163 2026-11-12: resolved AD_Window_ID per key, kept for the life of
+        // the panel so the next click skips the name lookup.
+        var zoomWindowIdByKey = {};
 
-        // Window name -> AD_Window_ID, resolved once per name and remembered for
-        // the life of the panel. A name the dictionary does not know is cached as
-        // -1 so a failed lookup is not repeated on every click.
-        var windowIdByName = {};
-
-        // Resolves a window id from its name through the panel's own endpoint.
-        // Returns 0 when it cannot be resolved, which leaves openRecord() to fall
-        // back to the table's zoom target.
-        function resolveWindowIdByName(windowName) {
-            if (!windowName) return 0;
-            if (windowIdByName.hasOwnProperty(windowName)) {
-                return windowIdByName[windowName] > 0 ? windowIdByName[windowName] : 0;
-            }
+        // Opens the record in its document-type window. When the window cannot be
+        // resolved the util does nothing, so the click simply does not navigate.
+        function openRecord(tableName, recordId, isSOTrx, isReturnTrx) {
+            if (!tableName || !recordId || +recordId <= 0 || !window.VAS || !VAS.ZoomUtil) return;
+            var key = tableName + (isSOTrx ? "|SO" : (isReturnTrx ? "|RET" : ""));
+            var names = ZOOM_WINDOW_BY_KEY[key] || ZOOM_WINDOW_BY_KEY[tableName];
+            if (!names) return;
             try {
-                if (!(window.VIS && VIS.dataContext &&
-                      typeof VIS.dataContext.getJSONRecord === "function")) {
-                    return 0;
-                }
-                var id = VIS.dataContext.getJSONRecord(
-                    "VAS_099_OverviewGRN/GetWindow_ID", windowName);
-                id = parseInt(id, 10);
-                if (isNaN(id) || id <= 0) {
-                    windowIdByName[windowName] = -1;
-                    console.log("resolveWindowIdByName: no window named " + windowName);
-                    return 0;
-                }
-                windowIdByName[windowName] = id;
-                return id;
-            } catch (e) {
-                windowIdByName[windowName] = -1;
-                console.log(e);
-                return 0;
-            }
-        }
-
-        // Opens the record's window filtered to that row, using the platform's
-        // zoom API (the same pattern as VAS_092_OverviewPurchaseOrder): the window
-        // named for this table when it has one, else the table's default zoom
-        // target, then start it with an equal-query on the table's key column.
-        // Degrades to a toast so a click never throws.
-        function openRecord(tableName, recordId, isSOTrx) {
-            if (!tableName || !recordId || +recordId <= 0 || !window.VIS) return;
-            try {
-                var windowName = (isSOTrx && WINDOW_NAME_BY_TABLE_SOTRX[tableName])
-                    || WINDOW_NAME_BY_TABLE[tableName];
-                var windowId = resolveWindowIdByName(windowName);
-
-                if (windowId <= 0 &&
-                    VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === "function") {
-                    // The 4th arg (IsSOTrx) picks the sales vs purchase window for
-                    // dual-purpose tables like C_Order.
-                    windowId = VIS.ZoomTarget.getZoomAD_Window_ID(tableName, 0, null, !!isSOTrx) || 0;
-                }
-                if (windowId > 0 && VIS.viewManager && typeof VIS.viewManager.startWindow === "function") {
-                    var zoomQuery = VIS.Query.prototype.getEqualQuery(tableName + "_ID", +recordId);
-                    VIS.viewManager.startWindow(windowId, zoomQuery);
-                    return;
-                }
+                VAS.ZoomUtil.zoomToRecord(tableName + "_ID", +recordId,
+                    zoomWindowIdByKey[key] || 0, names[0], names[1])
+                    .then(function (usedId) {
+                        if (usedId > 0) zoomWindowIdByKey[key] = usedId;
+                    });
             } catch (e) { console.log(e); }
-            toast(msg("VAS_099_OpenRecord", "Open") + " " + tableName + " #" + recordId, false);
         }
 
         function createBusyIndicator() {
@@ -1031,7 +992,7 @@
             if (data.PONo || data.PurchaseOrderId > 0) {
                 $chips.append(originChip("doc", VIS.Msg.getMsg("VAS_099_AgainstPO"),
                     data.PONo || "",
-                    null, "info", "C_Order", data.PurchaseOrderId, false));
+                    null, "info", "C_Order", data.PurchaseOrderId, false, !!data.POIsReturnTrx));
                 any = true;
             }
 
@@ -1073,7 +1034,7 @@
         // Origin chip: leading icon (tinted by iconTone) + grey label + dark value,
         // with an optional trailing status pill. When a table + record id is
         // supplied the chip becomes a link that opens that record.
-        function originChip(icon, label, value, $statusPill, iconTone, tableName, recordId, isSOTrx) {
+        function originChip(icon, label, value, $statusPill, iconTone, tableName, recordId, isSOTrx, isReturnTrx) {
             var $chip = $('<span class="vas_099-chip"></span>').addClass("vas_099-ic-" + (iconTone || "muted"));
             var isLink = tableName && recordId && +recordId > 0;
             if (isLink) {
@@ -1081,6 +1042,8 @@
                     .attr("data-open-table", tableName)
                     .attr("data-open-id", recordId);
                 if (isSOTrx) $chip.attr("data-open-sotrx", "Y");
+                // VAS163 2026-11-12: Vendor RMA zooms to its own window.
+                if (isReturnTrx) $chip.attr("data-open-return", "Y");
             }
             // The chip caps at the strip's width and its value truncates inside
             // it, so one long document number cannot run off the panel — the
@@ -1148,12 +1111,12 @@
 
             // Lines received.
             $snap.append(metricCard("lines", "box", VIS.Msg.getMsg("VAS_099_Lines"),
-                (data.LineCount || 0) + "",
+                formatNumber(+data.LineCount || 0, 0), // VAS163 2026-11-12: locale grouping
                 VIS.Msg.getMsg("VAS_099_LinesReceived")));
 
             // Received quantity (units).
             $snap.append(metricCard("received", "inbox", VIS.Msg.getMsg("VAS_099_ReceivedQty"),
-                formatNumber(+data.ReceivedQty || 0, 0),
+                formatQty(+data.ReceivedQty || 0),
                 VIS.Msg.getMsg("VAS_099_Units")));
 
             // Confirmation Check — whether this receipt's document type asks for a
@@ -1175,7 +1138,7 @@
             if (confirms) {
                 $snap.append(metricCard("accepted", "checkCircle",
                     msg("VAS_099_AcceptedQty", "Accepted Quantity"),
-                    formatNumber(+data.AcceptedQty || 0, 0),
+                    formatQty(+data.AcceptedQty || 0),
                     msg("VAS_099_UnitsConfirmed", "units confirmed")));
 
                 // Difference is target less confirmed — what did not arrive as
@@ -1184,9 +1147,9 @@
                 // together.
                 $snap.append(metricCard("rejected", "xCircle",
                     msg("VAS_099_DifferenceQty", "Difference Quantity"),
-                    formatNumber(+data.DifferenceQty || 0, 0),
+                    formatQty(+data.DifferenceQty || 0),
                     msg("VAS_099_ScrappedQty", "Scrapped Quantity") + ": " +
-                        formatNumber(+data.RejectedQty || 0, 0)));
+                        formatQty(+data.RejectedQty || 0)));
             }
 
             $body.append($snap);
@@ -1388,7 +1351,7 @@
 
             var $sec = section(msg("VAS_099_MaterialLines", "Material Lines"), {
                 summary: (data.LineCount || 0) + " " + msg("VAS_099_Items", "items") + " · " +
-                    formatNumber(+data.ReceivedQty || 0, 0) + " " + msg("VAS_099_Units", "units")
+                    formatQty(+data.ReceivedQty || 0) + " " + msg("VAS_099_Units", "units")
             });
 
             // The Quality column is only meaningful when a quality check actually
@@ -1743,7 +1706,7 @@
             $tr.append($param);
 
             // Quantity to verify.
-            var toVerify = formatNumber(+q.QuantityToVerify || 0, 0);
+            var toVerify = formatQty(+q.QuantityToVerify || 0);
             $tr.append($('<span class="vas_099-ta-r"></span>')
                 .text(toVerify).attr("title", toVerify));
 
@@ -1774,7 +1737,7 @@
             var bits = [];
             appendTipLine(bits, msg("VAS_099_Parameter", "Parameter"), q.ParameterName);
             appendTipLine(bits, msg("VAS_099_ToVerify", "To Verify"),
-                formatNumber(+q.QuantityToVerify || 0, 0));
+                formatQty(+q.QuantityToVerify || 0));
             appendTipLine(bits, msg("VAS_099_AcceptableValue", "Acceptable"), q.AcceptableValue);
             appendTipLine(bits, msg("VAS_099_ActualValue", "Actual Value"), q.ActualValue);
             appendTipLine(bits, msg("VAS_099_QADate", "QA Date"), formatDate(q.QAQCDate));
@@ -2336,15 +2299,21 @@
             });
         }
 
-        function formatAmount(value, cur, precision) {
-            var sign = value < 0 ? "-" : "";
-            var abs = Math.abs(value);
-            var p = (precision >= 0) ? precision : 2;
-            var formatted = abs.toLocaleString(window.navigator.language, {
-                minimumFractionDigits: p,
-                maximumFractionDigits: p
+        // VAS163 2026-11-12: summed / unscaled quantities keep up to 2 decimals in
+        // the browser locale (precision 0 rounded a 2.5 receipt to "3").
+        function formatQty(value) {
+            return (+value || 0).toLocaleString(window.navigator.language, {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 2
             });
-            return sign + (cur ? cur + " " : "") + formatted;
+        }
+
+        // VAS163 2026-11-12: the document currency (ISO_Code / StdPrecision / CurSymbol from the
+        // server) through the shared helper - Intl places the symbol and the sign for the
+        // browser culture instead of "symbol + ' ' + number".
+        function formatAmount(value, cur, precision) {
+            var iso = (data && data.ISO_Code) || "";
+            return VAS.formatAmountByBrowser(+value || 0, iso, precision, { symbol: (data && data.CurSymbol) || cur || "" });
         }
 
         // Parses a .NET/Newtonsoft DB value into a Date.
@@ -2364,6 +2333,10 @@
             if (!value) return null;
             if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
             var s = String(value);
+            // VAS163 2026-11-12: a bare 'yyyy-MM-dd' is parsed by parts as a LOCAL
+            // date - new Date("yyyy-MM-dd") reads it as UTC and can shift the day.
+            var dOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+            if (dOnly) return new Date(+dOnly[1], +dOnly[2] - 1, +dOnly[3]);
             var hasTz = /(z|[+-]\d{2}:?\d{2})$/i.test(s);
             var isDateTime = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(s);
             if (asUtc && isDateTime && !hasTz) {
@@ -2406,9 +2379,9 @@
             var d = parseDbDate(value, true);
             if (!d) return "";
             try {
-                return d.toLocaleDateString(window.navigator.language, {
-                    year: "numeric", month: "short", day: "2-digit"
-                }) + " " + d.toLocaleTimeString(window.navigator.language, {
+                // VAS163 2026-11-12: one Intl call - the culture joins date and time.
+                return d.toLocaleString(window.navigator.language, {
+                    year: "numeric", month: "short", day: "2-digit",
                     hour: "2-digit", minute: "2-digit"
                 });
             } catch (e) {
@@ -2478,3 +2451,78 @@
     };
 
 })(VAS, jQuery);
+/* VAS163 2026-11-12: VAS.formatAmountByBrowser(value, isoCode, precision, { compact, symbol })
+   Amount in the BROWSER culture (window.navigator.language) with the currency the SERVER sent
+   (ISO code + precision; the server symbol only as a fallback). Defined in each widget / panel
+   that uses it - guarded, so the first file loaded defines it - so the shared util/CurrencyFormat.js
+   stays as shipped. Compact amounts keep that file's default scale (VIS.Util.formatCompactAmount:
+   L / Cr for Indian-numbering currencies, K / M / B otherwise, digits in the browser culture);
+   separators, decimals and the position of the currency sign come from the browser culture. */
+; (function () {
+    var V = window.VAS = window.VAS || {};
+    if (typeof V.formatAmountByBrowser === 'function') return;
+    function browserLocale() { try { return window.navigator.language || undefined; } catch (e) { return undefined; } }
+    function resolvePrecision(p) {
+        var n = Number(p);
+        if (p === null || p === undefined || p === '' || isNaN(n) || n < 0) {
+            try { n = VIS.Env.getCtx().getStdPrecision(); } catch (e) { n = 2; }
+        }
+        n = Math.round(Number(n));
+        return (isNaN(n) || n < 0) ? 2 : Math.min(n, 10);
+    }
+    function validIso(c) { c = String(c || '').trim().toUpperCase(); return /^[A-Z]{3}$/.test(c) ? c : ''; }
+    function numberFormat(o) {
+        try { return new Intl.NumberFormat(browserLocale(), o); } catch (e) { }
+        if (o.currencyDisplay === 'narrowSymbol') {
+            o.currencyDisplay = 'symbol';
+            try { return new Intl.NumberFormat(browserLocale(), o); } catch (e2) { }
+        }
+        return null;
+    }
+    /* Currency sign and where the browser culture puts it for this ISO code. */
+    var layoutCache = {};
+    function currencyLayout(iso) {
+        var key = browserLocale() + '|' + iso;
+        if (layoutCache[key]) return layoutCache[key];
+        var out = { sign: '', before: true, gap: '' };
+        var f = iso ? numberFormat({ style: 'currency', currency: iso, currencyDisplay: 'narrowSymbol' }) : null;
+        if (f && typeof f.formatToParts === 'function') {
+            try {
+                var parts = f.formatToParts(1234.5), ci = -1, ni = -1;
+                for (var i = 0; i < parts.length; i++) {
+                    if (parts[i].type === 'currency' && ci < 0) ci = i;
+                    if (parts[i].type === 'integer' && ni < 0) ni = i;
+                }
+                if (ci >= 0) {
+                    out.sign = parts[ci].value;
+                    if (ni >= 0) {
+                        out.before = ci < ni;
+                        var near = out.before ? parts[ci + 1] : parts[ci - 1];
+                        out.gap = (near && near.type === 'literal') ? near.value : '';
+                    }
+                }
+            } catch (e) { }
+        }
+        layoutCache[key] = out;
+        return out;
+    }
+    V.formatAmountByBrowser = function (value, isoCode, precision, options) {
+        options = options || {};
+        var num = Number(value) || 0;
+        var p = resolvePrecision(precision);
+        var iso = validIso(isoCode);
+        var body;
+        if (options.compact && window.VIS && VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
+            body = VIS.Util.formatCompactAmount(Math.abs(num), iso, p);
+        } else {
+            var f = numberFormat({ minimumFractionDigits: p, maximumFractionDigits: p });
+            try { body = f ? f.format(Math.abs(num)) : Math.abs(num).toFixed(p); } catch (e) { body = String(Math.abs(num)); }
+        }
+        var minus = (num < 0 && /[1-9]/.test(body)) ? '-' : '';
+        var lay = currencyLayout(iso);
+        var sign = lay.sign || options.symbol || iso;
+        if (!sign) return minus + body;
+        if (!lay.sign) return minus + sign + ' ' + body;
+        return lay.before ? (minus + sign + lay.gap + body) : (minus + body + lay.gap + sign);
+    };
+})();

@@ -170,10 +170,14 @@
             return '<span class="vas-qah-grnlink" role="link" tabindex="0" data-grnid="' + escapeHtml(r.grnId) + '">' + escapeHtml(r.grnNo) + '</span>';
         }
 
+        // VAS163 2026-11-12: keep the resolved Material Receipt window id and pass it next time.
+        var grnZoomWindowId = 0;
+
         function zoomToGrn(grnId) {
             if (!grnId || !window.VAS || !VAS.ZoomUtil) { return; }
             try {
-                VAS.ZoomUtil.zoomToRecord('M_InOut_ID', Number(grnId), 0, 'VAS_MaterialReceipt', 'Material Receipt');
+                VAS.ZoomUtil.zoomToRecord('M_InOut_ID', Number(grnId), grnZoomWindowId, 'VAS_MaterialReceipt', 'Material Receipt')
+                    .done(function (id) { if (id > 0) { grnZoomWindowId = id; } });
             } catch (e) { /* zoom is best-effort */ }
         }
 
@@ -341,13 +345,13 @@
 
         function updatePager() {
             if ($pageText) {
-                $pageText.text(totalPages > 1 ? (pageNo + ' ' + lbl("VAS_086_Of", "of") + ' ' + totalPages) : '');
+                $pageText.text(totalPages > 1 ? (Number(pageNo).toLocaleString(window.navigator.language) + ' ' + lbl("VAS_086_Of", "of") + ' ' + Number(totalPages).toLocaleString(window.navigator.language)) : ''); // VAS163 2026-11-12: locale page numbers
             }
             if ($pageInfo) {
                 if (totalRecords > 0 && totalPages > 1) {
                     var from = (pageNo - 1) * pageSize + 1;
                     var to = Math.min(pageNo * pageSize, totalRecords);
-                    $pageInfo.text(lbl("VAS_086_Showing", "Showing") + ' ' + from + '-' + to + ' ' + lbl("VAS_086_Of", "of") + ' ' + totalRecords);
+                    $pageInfo.text(lbl("VAS_086_Showing", "Showing") + ' ' + Number(from).toLocaleString(window.navigator.language) + '-' + Number(to).toLocaleString(window.navigator.language) + ' ' + lbl("VAS_086_Of", "of") + ' ' + Number(totalRecords).toLocaleString(window.navigator.language)); // VAS163 2026-11-12: locale counts
                 } else {
                     $pageInfo.text('');
                 }

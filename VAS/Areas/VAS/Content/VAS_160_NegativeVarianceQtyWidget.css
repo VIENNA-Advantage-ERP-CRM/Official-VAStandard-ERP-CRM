@@ -406,3 +406,35 @@
 .vas-neg-var-no-attr .vas-neg-var-row {
     grid-template-columns: minmax(0,1.2fr) minmax(0,1.8fr) minmax(0,1.4fr) minmax(0,1fr) minmax(0,0.7fr) minmax(0,0.7fr);
 }
+
+/* VAS163 2026-11-13: row 252 - POPUP DETERMINISTIC HEIGHT, same rule as VAS_159: the body is
+   exactly --vas-rows lines tall (short pages are padded with .vas-neg-var-filler rows), so the
+   dialog keeps one size whatever the row count. --vas-rows MUST match MODAL_PAGE_ROWS in the JS. */
+.vas-neg-var-dialog {
+    --vas-rows: 7;
+    --vas-row-h: 2.6em;
+    height: auto;
+}
+
+.vas-neg-var-modal-body {
+    flex: 0 0 auto;
+    height: calc(var(--vas-rows) * var(--vas-row-h));
+    display: block;
+    overflow: hidden;
+}
+
+    .vas-neg-var-modal-body > .vas-neg-var-row {
+        height: var(--vas-row-h);
+        box-sizing: border-box;
+        overflow: hidden;
+    }
+
+.vas-neg-var-filler {
+    pointer-events: none;
+    background: transparent !important;
+    cursor: default;
+}
+
+    .vas-neg-var-filler:hover {
+        background: transparent !important;
+    }

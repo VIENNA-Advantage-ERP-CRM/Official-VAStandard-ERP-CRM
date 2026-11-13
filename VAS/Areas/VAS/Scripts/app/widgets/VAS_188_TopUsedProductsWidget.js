@@ -123,42 +123,20 @@
 // ===== NEW CODE START — currency format (agent A10, 2026-08-19) =====
         var currencyIso = '';
         var currencySymbol = '';
+        var currencyPrecision; // VAS163 2026-11-12: C_Currency.StdPrecision from the server
 
-        function isIndianISO(iso) {
-            if (!iso) { return false; }
-            var indianIsos = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
-            return indianIsos.indexOf(String(iso).toUpperCase()) !== -1;
-        }
-
-        function getDisplaySymbol() {
-            return currencySymbol || currencyIso || '';
-        }
-
+        // VAS163 2026-11-12: server currency (iso + stdPrecision) through VAS.formatAmountByBrowser;
+        // the browser culture places symbol / sign (was "sign + symbol + number", Indian ISO list, fixed 2 dp).
         function formatCurrencyCompact(value) {
             var val = Number(value || 0);
             if (isNaN(val)) { val = 0; }
-            var sym = getDisplaySymbol();
-            var prefix = sym ? (sym + (sym.length > 2 ? ' ' : '')) : '';
-            var sign = val < 0 ? '-' : '';
-            var absVal = Math.abs(val);
-
-            // VAS163 2026-11-10: browser locale (6-Nov retest2).
-            if (absVal >= 1000) {
-                return sign + prefix + VIS.Util.formatCompactAmount(absVal, currencyIso || '');
-            }
-            return sign + prefix + absVal.toLocaleString(window.navigator.language);
+            return VAS.formatAmountByBrowser(val, currencyIso || '', currencyPrecision, { compact: Math.abs(val) >= 1000, symbol: currencySymbol || '' });
         }
 
         function formatCurrencyFull(value) {
             var val = Number(value || 0);
             if (isNaN(val)) { val = 0; }
-            var sym = getDisplaySymbol();
-            var prefix = sym ? (sym + (sym.length > 2 ? ' ' : '')) : '';
-            var sign = val < 0 ? '-' : '';
-            var absVal = Math.abs(val);
-
-            // VAS163 2026-11-10: browser locale (6-Nov retest2).
-            return sign + prefix + absVal.toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            return VAS.formatAmountByBrowser(val, currencyIso || '', currencyPrecision, { symbol: currencySymbol || '' });
         }
 // ===== NEW CODE END — currency format =====
 // ----- OLD CODE (kept for rollback, do not delete) -----
@@ -241,6 +219,7 @@
                     if (data.currency) {
                         currencyIso = data.currency.iso || currencyIso;
                         currencySymbol = data.currency.symbol || currencySymbol;
+                        if (data.currency.stdPrecision != null) { currencyPrecision = data.currency.stdPrecision; } // VAS163 2026-11-12
                     }
                     productsData = data.products || [];
                     pageNo = 1;
@@ -286,7 +265,7 @@
                 var metaStr = (item.attribute ? (item.attribute + ' · ') : '') + (item.categoryName || label("VAS_188_CategoryFallback", "General"));
 
                 rowsHtml +=
-                    '<button type="button" class="vas-tup-row" data-pid="' + item.productId + '" data-pname="' + escapeHtml(item.productName) + '" data-cat="' + escapeHtml(item.categoryName || label("VAS_188_CategoryFallback", "General")) + '" data-uom="' + escapeHtml(item.uomName || label("VAS_188_UomFallback", "Nos")) + '" data-qty="' + item.totalQty + '" data-val="' + item.totalValue + '">' +
+                    '<button type="button" class="vas-tup-row" data-pid="' + item.productId + '" data-pname="' + escapeHtml(item.productName) + '" data-cat="' + escapeHtml(item.categoryName || label("VAS_188_CategoryFallback", "General")) + '" data-uom="' + escapeHtml(item.uomName || label("VAS_188_UomFallback", "Nos")) + '" data-uomid="' + (item.uomId || 0) + '" data-qty="' + item.totalQty + '" data-val="' + item.totalValue + '">' + // VAS163 2026-11-13: row 23 line UOM id
                     getRankBadge(rank) +
                     '<div class="vas-tup-row-left">' +
                     '<div class="vas-tup-p-name" title="' + escapeHtml(item.productName) + '">' + escapeHtml(item.productName) + '</div>' +
@@ -311,7 +290,7 @@
             $body.toggleClass('single-row', (endIndex - startIndex) === 1);
 
             if ($footHelper) {
-                $footHelper.text((startIndex + 1) + '–' + endIndex + ' ' + label("VAS_188_Of", "of") + ' ' + productsData.length);
+                $footHelper.text(formatQty(startIndex + 1) + '–' + formatQty(endIndex) + ' ' + label("VAS_188_Of", "of") + ' ' + formatQty(productsData.length)); // VAS163 2026-11-12: locale counts
             }
             if ($pagerText) {
                 $pagerText.text(pageNo + ' ' + label("VAS_188_Of", "of") + ' ' + totalPages);
@@ -326,7 +305,8 @@
            on a real install); otherwise fall back to VAS.ZoomUtil.zoomToRecord with a window id
            resolved once via VAS_178's existing GetMaterialIssueWindowId endpoint (reused rather
            than re-deriving the same window lookup here). */
-        var INVENTORY_USE_WINDOW_NAME = 'Inventory Use';
+        // VAS163 2026-11-12: real AD_Window name ('Inventory Use' is not a window name).
+        var INVENTORY_USE_WINDOW_NAME = 'VAS_InternalUseInventory';
         var inventoryUseWindowId = 0;
 
         function hostWindowName() {
@@ -353,25 +333,16 @@
                     });
                     return;
                 }
-                if (inventoryUseWindowId > 0) {
-                    if (window.VAS && VAS.ZoomUtil) { VAS.ZoomUtil.zoomToRecord('M_Inventory_ID', Number(inventoryId), inventoryUseWindowId, null, null); }
-                    return;
+                // VAS163 2026-11-12: private GetMaterialIssueWindowId lookup replaced by
+                // VAS.ZoomUtil name resolution (new name first, legacy second); id cached.
+                if (window.VAS && VAS.ZoomUtil) {
+                    VAS.ZoomUtil.zoomToRecord('M_Inventory_ID', Number(inventoryId), inventoryUseWindowId, 'VAS_InternalUseInventory', 'Internal Use Inventory')
+                        .done(function (id) { if (id > 0) { inventoryUseWindowId = id; } });
                 }
-                $.ajax({
-                    url: VIS.Application.contextUrl + 'VAS_178_NewMaterialIssueQuickAction/GetMaterialIssueWindowId',
-                    type: 'GET', dataType: 'json', cache: false,
-                    success: function (res) {
-                        var data = parseResponse(res);
-                        inventoryUseWindowId = Number((data && data.windowId) || 0);
-                        if (inventoryUseWindowId > 0 && window.VAS && VAS.ZoomUtil) {
-                            VAS.ZoomUtil.zoomToRecord('M_Inventory_ID', Number(inventoryId), inventoryUseWindowId, null, null);
-                        }
-                    }
-                });
             } catch (e) { /* best-effort */ }
         }
 
-        function openProductUsageDetailModal(pid, pname, categoryName, uomName, totalQty, totalValue) {
+        function openProductUsageDetailModal(pid, pname, categoryName, uomName, totalQty, totalValue, uomId) {
             $(document).off("keydown.vas-tup-modal"); if ($modal) { $modal.remove(); }
 
             var monthFull = formatMonthYear(selectedMonth, selectedYear);
@@ -541,13 +512,14 @@
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_188_TopUsedProductsWidget/GetProductUsageDetails',
                 type: 'GET',
-                data: { productId: pid, month: selectedMonth, year: selectedYear },
+                data: { productId: pid, month: selectedMonth, year: selectedYear, uomId: uomId || 0 }, // VAS163 2026-11-13: row 23 same product+UOM row
 // ===== NEW CODE START — currency format (agent A10, 2026-08-19) =====
                 success: function (res) {
                     var data = parseResponse(res);
                     if (data.currency) {
                         currencyIso = data.currency.iso || currencyIso;
                         currencySymbol = data.currency.symbol || currencySymbol;
+                        if (data.currency.stdPrecision != null) { currencyPrecision = data.currency.stdPrecision; } // VAS163 2026-11-12
                     }
                     usageLines = data.lines || [];
                     // Consumed Qty (In Base UOM) is re-derived as the sum of the lines actually
@@ -676,7 +648,8 @@
                 var uom = $(this).data('uom');
                 var qty = Number($(this).data('qty') || 0);
                 var val = Number($(this).data('val') || 0);
-                openProductUsageDetailModal(pid, pname, cat, uom, qty, val);
+                var uomId = Number($(this).data('uomid') || 0); // VAS163 2026-11-13: row 23
+                openProductUsageDetailModal(pid, pname, cat, uom, qty, val, uomId);
             });
 
             $root.append($card);
@@ -728,3 +701,78 @@
 
 })(VAS, jQuery);
 
+/* VAS163 2026-11-12: VAS.formatAmountByBrowser(value, isoCode, precision, { compact, symbol })
+   Amount in the BROWSER culture (window.navigator.language) with the currency the SERVER sent
+   (ISO code + precision; the server symbol only as a fallback). Defined in each widget / panel
+   that uses it - guarded, so the first file loaded defines it - so the shared util/CurrencyFormat.js
+   stays as shipped. Compact amounts keep that file's default scale (VIS.Util.formatCompactAmount:
+   L / Cr for Indian-numbering currencies, K / M / B otherwise, digits in the browser culture);
+   separators, decimals and the position of the currency sign come from the browser culture. */
+; (function () {
+    var V = window.VAS = window.VAS || {};
+    if (typeof V.formatAmountByBrowser === 'function') return;
+    function browserLocale() { try { return window.navigator.language || undefined; } catch (e) { return undefined; } }
+    function resolvePrecision(p) {
+        var n = Number(p);
+        if (p === null || p === undefined || p === '' || isNaN(n) || n < 0) {
+            try { n = VIS.Env.getCtx().getStdPrecision(); } catch (e) { n = 2; }
+        }
+        n = Math.round(Number(n));
+        return (isNaN(n) || n < 0) ? 2 : Math.min(n, 10);
+    }
+    function validIso(c) { c = String(c || '').trim().toUpperCase(); return /^[A-Z]{3}$/.test(c) ? c : ''; }
+    function numberFormat(o) {
+        try { return new Intl.NumberFormat(browserLocale(), o); } catch (e) { }
+        if (o.currencyDisplay === 'narrowSymbol') {
+            o.currencyDisplay = 'symbol';
+            try { return new Intl.NumberFormat(browserLocale(), o); } catch (e2) { }
+        }
+        return null;
+    }
+    /* Currency sign and where the browser culture puts it for this ISO code. */
+    var layoutCache = {};
+    function currencyLayout(iso) {
+        var key = browserLocale() + '|' + iso;
+        if (layoutCache[key]) return layoutCache[key];
+        var out = { sign: '', before: true, gap: '' };
+        var f = iso ? numberFormat({ style: 'currency', currency: iso, currencyDisplay: 'narrowSymbol' }) : null;
+        if (f && typeof f.formatToParts === 'function') {
+            try {
+                var parts = f.formatToParts(1234.5), ci = -1, ni = -1;
+                for (var i = 0; i < parts.length; i++) {
+                    if (parts[i].type === 'currency' && ci < 0) ci = i;
+                    if (parts[i].type === 'integer' && ni < 0) ni = i;
+                }
+                if (ci >= 0) {
+                    out.sign = parts[ci].value;
+                    if (ni >= 0) {
+                        out.before = ci < ni;
+                        var near = out.before ? parts[ci + 1] : parts[ci - 1];
+                        out.gap = (near && near.type === 'literal') ? near.value : '';
+                    }
+                }
+            } catch (e) { }
+        }
+        layoutCache[key] = out;
+        return out;
+    }
+    V.formatAmountByBrowser = function (value, isoCode, precision, options) {
+        options = options || {};
+        var num = Number(value) || 0;
+        var p = resolvePrecision(precision);
+        var iso = validIso(isoCode);
+        var body;
+        if (options.compact && window.VIS && VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
+            body = VIS.Util.formatCompactAmount(Math.abs(num), iso, p);
+        } else {
+            var f = numberFormat({ minimumFractionDigits: p, maximumFractionDigits: p });
+            try { body = f ? f.format(Math.abs(num)) : Math.abs(num).toFixed(p); } catch (e) { body = String(Math.abs(num)); }
+        }
+        var minus = (num < 0 && /[1-9]/.test(body)) ? '-' : '';
+        var lay = currencyLayout(iso);
+        var sign = lay.sign || options.symbol || iso;
+        if (!sign) return minus + body;
+        if (!lay.sign) return minus + sign + ' ' + body;
+        return lay.before ? (minus + sign + lay.gap + body) : (minus + body + lay.gap + sign);
+    };
+})();

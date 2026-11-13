@@ -126,10 +126,18 @@
             return Number(value || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 2 });
         }
 
+        // VAS163 2026-11-12: server sends 'yyyy-MM-dd'; new Date('yyyy-MM-dd') is UTC midnight and
+        // shows the previous day west of UTC - parse the parts as a LOCAL date.
+        function parseLocalDate(value) {
+            var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || '').trim());
+            if (m) { return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])); }
+            return new Date(value);
+        }
+
         /* today / yesterday / "DD Mon YYYY". */
         function formatRelDate(value) {
             if (!value) { return ""; }
-            var d = new Date(value);
+            var d = parseLocalDate(value);
             if (isNaN(d.getTime())) { return value; }
             var now = new Date();
             var t = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -142,7 +150,7 @@
 
         function formatFullDate(value) {
             if (!value) { return "—"; }
-            var d = new Date(value);
+            var d = parseLocalDate(value); // VAS163 2026-11-12: local-date parse (no UTC shift)
             if (isNaN(d.getTime())) { return value; }
             return d.toLocaleDateString(window.navigator.language, { day: "2-digit", month: "short", year: "numeric" });
         }
@@ -346,7 +354,8 @@
             for (var i = 0; i < ROWS.length; i++) {
                 var r = ROWS[i];
                 var label = escapeHtml(r.receiptNo) + ' · ' + escapeHtml(r.supplier);
-                var meta = escapeHtml(r.itemCount) + ' ' + escapeHtml(lbl("VAS_081_Items", "items")) + ' · ' + escapeHtml(formatRelDate(r.receivedOn));
+                // VAS163 2026-11-12: item count in browser-locale number format.
+                var meta = escapeHtml(formatQty(r.itemCount)) + ' ' + escapeHtml(lbl("VAS_081_Items", "items")) + ' · ' + escapeHtml(formatRelDate(r.receivedOn));
                 var $row = $(
                     '<button type="button" class="vas-mrr-row" data-receiptid="' + escapeHtml(r.receiptId) + '">' +
                     '<div class="vas-mrr-row-main">' +
@@ -362,14 +371,14 @@
 
         function updatePager() {
             if ($pageText) {
-                $pageText.text(totalPages > 1 ? (pageNo + ' ' + lbl("VAS_081_Of", "of") + ' ' + totalPages) : '');
+                $pageText.text(totalPages > 1 ? (Number(pageNo).toLocaleString(window.navigator.language) + ' ' + lbl("VAS_081_Of", "of") + ' ' + Number(totalPages).toLocaleString(window.navigator.language)) : ''); // VAS163 2026-11-12: locale page numbers
             }
             if ($pageInfo) {
                 if (totalRecords > 0) {
                     // 29-Oct 4.13: count what is actually listed, so "Showing" always matches the rows.
                     var from = (pageNo - 1) * loadedPageSize + 1;
                     var to = Math.min(from + Math.max(ROWS.length, 1) - 1, totalRecords);
-                    $pageInfo.text(lbl("VAS_081_Showing", "Showing") + ' ' + from + '–' + to + ' ' + lbl("VAS_081_Of", "of") + ' ' + totalRecords);
+                    $pageInfo.text(lbl("VAS_081_Showing", "Showing") + ' ' + Number(from).toLocaleString(window.navigator.language) + '–' + Number(to).toLocaleString(window.navigator.language) + ' ' + lbl("VAS_081_Of", "of") + ' ' + Number(totalRecords).toLocaleString(window.navigator.language)); // VAS163 2026-11-12: locale counts
                 } else { $pageInfo.text(''); }
             }
             if ($prevBtn) { $prevBtn.prop('disabled', loading || pageNo <= 1); }
@@ -574,7 +583,7 @@
                 var chevR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
                 pager =
                     '<div class="vas-mrr-lines-foot">' +
-                    '<span>' + escapeHtml(lbl("VAS_081_Showing", "Showing")) + ' ' + (start + 1) + '–' + (start + pageLines.length) + ' ' + escapeHtml(lbl("VAS_081_Of", "of")) + ' ' + detailLines.length + '</span>' +
+                    '<span>' + escapeHtml(lbl("VAS_081_Showing", "Showing")) + ' ' + Number((start + 1)).toLocaleString(window.navigator.language) + '–' + Number((start + pageLines.length)).toLocaleString(window.navigator.language) + ' ' + escapeHtml(lbl("VAS_081_Of", "of")) + ' ' + Number(detailLines.length).toLocaleString(window.navigator.language) + '</span>' +
                     '<span class="vas-mrr-pager">' +
                     '<button type="button" class="vas-mrr-pgbtn vas-mrr-lprev" aria-label="' + escapeHtml(lbl("VAS_081_Previous", "Previous")) + '"' + (detailPage === 1 ? ' disabled' : '') + '>' + chevL + '</button>' +
                     '<span class="vas-mrr-pgtext">' + detailPage + ' ' + escapeHtml(lbl("VAS_081_Of", "of")) + ' ' + detailTotalPages + '</span>' +
