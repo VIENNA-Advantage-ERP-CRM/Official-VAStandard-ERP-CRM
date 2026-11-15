@@ -44,6 +44,49 @@ namespace VAdvantage.Process
 
         private StringBuilder retVal = new StringBuilder();
 
+        // ImportMailbox: context of the user whose mailbox is imported (null when run as a process),
+        // the one mail configuration to import, the date to fetch from and the number of mails stored
+        private Ctx mailboxCtx = null;
+        private int mailConfigFilter = 0;
+        private DateTime? mailboxSince = null;
+        private int importedCount = 0;
+
+        /// <summary>
+        /// Imports the new mails of one mail configuration now, as a run of this process does for every
+        /// configuration (same fetch, linking and notifications). Used by the Workspace Inbox so new mail
+        /// shows without waiting for the scheduled run. A configuration that another run is importing at
+        /// the same moment is skipped.
+        /// </summary>
+        /// <param name="ctx">Context of the mailbox user</param>
+        /// <param name="mailConfigID">AD_UserMailConfigration_ID</param>
+        /// <param name="since">Fetch mails from this date, in UTC (Google, Microsoft; Exchange keeps its own sync state);
+        /// null = the window of the scheduled run</param>
+        /// <returns>Number of mails stored</returns>
+        public int ImportMailbox(Ctx ctx, int mailConfigID, DateTime? since)
+        {
+            if (ctx == null || mailConfigID <= 0)
+            {
+                return 0;
+            }
+            mailboxCtx = ctx;
+            mailConfigFilter = mailConfigID;
+            mailboxSince = since;
+            DoIt();
+            return importedCount;
+        }
+
+        /// <summary>Context of the run: the mailbox user's for ImportMailbox, else the process's</summary>
+        private Ctx MailCtx()
+        {
+            return mailboxCtx ?? GetCtx();
+        }
+
+        /// <summary>Organization of the run: the mailbox user's for ImportMailbox, else the process's</summary>
+        private int MailOrgID()
+        {
+            return mailboxCtx != null ? mailboxCtx.GetAD_Org_ID() : GetAD_Org_ID();
+        }
+
         protected override void Prepare()
         {
             //ProcessInfoParameter[] para = GetParameter();
@@ -102,6 +145,11 @@ namespace VAdvantage.Process
                                 WHERE umail.IsActive ='Y' ";
             }
 
+            if (mailConfigFilter > 0)
+            {
+                sql += " AND umail.AD_UserMailConfigration_ID = " + mailConfigFilter;
+            }
+
             DataSet ds = DB.ExecuteDataset(sql);
             if (ds == null || ds.Tables[0].Rows.Count == 0)
             {
@@ -121,11 +169,16 @@ namespace VAdvantage.Process
                 {
                     lastRun = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["DateLastRun"]);
                 }
+                // ImportMailbox: only the mails since the caller's previous import, not the whole window of the scheduled run
+                if (mailboxSince != null)
+                {
+                    lastRun = mailboxSince;
+                }
 
                 if (isAutoAttach == "N" && Env.IsModuleInstalled("VAI01_") && Convert.ToString(ds.Tables[0].Rows[i]["VAI01_IsCustomizeAttach"]).Trim() == "N")
                 {
                     retVal.Append("Mail Configration EMail Address <=> " + Convert.ToString(ds.Tables[0].Rows[i]["imapusername"]) + Environment.NewLine);
-                    retVal.Append(Utility.Msg.GetMsg(GetCtx(), "IsAutoAttachORCustAttach") + Environment.NewLine);
+                    retVal.Append(Utility.Msg.GetMsg(MailCtx(), "IsAutoAttachORCustAttach") + Environment.NewLine);
                     continue;
                 }
 
@@ -140,7 +193,7 @@ namespace VAdvantage.Process
 
                     if (apiAuthCred_ID == 0)
                     {
-                        log.Log(Level.SEVERE, Msg.GetMsg(GetCtx(), "UserAccountNotFound") + " " + ds.Tables[0].Rows[i]["AD_User_ID"].ToString());
+                        log.Log(Level.SEVERE, Msg.GetMsg(MailCtx(), "UserAccountNotFound") + " " + ds.Tables[0].Rows[i]["AD_User_ID"].ToString());
                         continue;
                     }
 
@@ -149,7 +202,7 @@ namespace VAdvantage.Process
                     // Exchange signs in with the stored user name and password and has no access token
                     if (protocol.Equals("OA") && string.IsNullOrEmpty(accessToken))
                     {
-                        log.Log(Level.SEVERE, Msg.GetMsg(GetCtx(), "TokenNotGenerated") + " " + ds.Tables[0].Rows[i]["AD_User_ID"].ToString());
+                        log.Log(Level.SEVERE, Msg.GetMsg(MailCtx(), "TokenNotGenerated") + " " + ds.Tables[0].Rows[i]["AD_User_ID"].ToString());
                         continue;
                     }
                     excludedEmails = Util.GetValueOfString(ds.Tables[0].Rows[i]["VAS_ExcludedEmailList"]);
@@ -232,41 +285,72 @@ namespace VAdvantage.Process
                     userAccount = Util.GetValueOfString(ds.Tables[0].Rows[i]["EMail"]);
                 }
 
-                if (AD_User_ID > 0)
+                // One import per mail configuration at a time (scheduled run, Workspace Inbox, other web servers):
+                // its row stays locked until the configuration is done; one locked by another run is skipped, so
+                // the same mails are not stored twice and an OAuth token is not refreshed by two runs at once
+                int mailConfigID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_UserMailConfigration_ID"]);
+                int storedBefore = importedCount;
+                Trx lockTrx = Trx.GetTrx("AttachMail_" + mailConfigID + "_" + Guid.NewGuid().ToString("N"));
+                try
                 {
-                    if (isVA101Fetch)
+                    if (Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_UserMailConfigration_ID FROM AD_UserMailConfigration"
+                        + " WHERE AD_UserMailConfigration_ID = " + mailConfigID + " FOR UPDATE SKIP LOCKED", null, lockTrx)) == 0)
                     {
-                        assembly = Assembly.Load("VA101Svc");
-                        // Load type VA101.Common.EmailServices
-                        emailServiceType = assembly.GetType("VA101.Common.EmailServices");
-                        if (emailServiceType == null)
+                        log.Info("Mail configuration " + mailConfigID + " is being imported by another run - skipped");
+                        continue;
+                    }
+
+                    if (AD_User_ID > 0)
+                    {
+                        if (isVA101Fetch)
                         {
-                            return "Type 'VA101.Common.EmailServices' not found.";
+                            assembly = Assembly.Load("VA101Svc");
+                            // Load type VA101.Common.EmailServices
+                            emailServiceType = assembly.GetType("VA101.Common.EmailServices");
+                            if (emailServiceType == null)
+                            {
+                                return "Type 'VA101.Common.EmailServices' not found.";
+                            }
+                            try
+                            {
+                                GetEmails(AD_User_ID, AD_Client_ID, AD_Org_ID);
+                            }
+                            catch (Exception ex)
+                            {
+                                log.Severe(ex.Message);
+                            }
                         }
-                        try
+                        else
                         {
-                            GetEmails(AD_User_ID, AD_Client_ID, AD_Org_ID);
-                        }
-                        catch (Exception ex)
-                        {
-                            log.Severe(ex.Message);
+                            GetMails(user, AD_User_ID, AD_Client_ID, AD_Org_ID);
                         }
                     }
-                    else
+
+                    // The window of the scheduled run; an ImportMailbox leaves it as it is
+                    if (mailboxCtx == null)
                     {
-                        GetMails(user, AD_User_ID, AD_Client_ID, AD_Org_ID);
+                        DB.ExecuteQuery("UPDATE AD_UserMailConfigration SET DateLastRun = " + GlobalVariable.TO_DATE(DateTime.Now.AddDays(-1), true)
+                            + " WHERE AD_UserMailConfigration_ID = " + mailConfigID, null, lockTrx);
                     }
                 }
+                finally
+                {
+                    lockTrx.Commit();
+                    lockTrx.Close();
+                }
 
-                DB.ExecuteQuery("UPDATE AD_UserMailConfigration SET DateLastRun = " + GlobalVariable.TO_DATE(DateTime.Now.AddDays(-1), true)
-                    + " WHERE AD_UserMailConfigration_ID = " + Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_UserMailConfigration_ID"]));
+                // ImportMailbox runs often: the AI mail suggestion only when it stored new mails
+                if (mailboxCtx != null && importedCount == storedBefore)
+                {
+                    continue;
+                }
 
                 if (Env.IsModuleInstalled("VAI01_") && Util.GetValueOfInt(ds.Tables[0].Rows[i]["VAI01_AIOrchestration_ID"]) > 0)
                 {
                     string orchestartionkey = Util.GetValueOfString(DB.ExecuteScalar(@"SELECT Value FROM VAI01_AIOrchestration 
                     WHERE VAI01_AIOrchestration_ID = " + Util.GetValueOfInt(ds.Tables[0].Rows[i]["VAI01_AIOrchestration_ID"])));
 
-                    ExecuteMailSuggestion(AD_Client_ID, orchestartionkey, 1000003, 0, AD_User_ID, GetCtx());
+                    ExecuteMailSuggestion(AD_Client_ID, orchestartionkey, 1000003, 0, AD_User_ID, MailCtx());
                 }
             }
             return retVal.ToString();
@@ -291,7 +375,7 @@ namespace VAdvantage.Process
             // Prepare arguments
             object[] parameters = new object[]
             {
-                 GetCtx(),
+                 MailCtx(),
                  apiAuthCred_ID,
                  lastRun
             };
@@ -355,7 +439,7 @@ namespace VAdvantage.Process
                                 continue;
                             }
 
-                            MMailAttachment1 mAttachment = new MMailAttachment1(GetCtx(), 0, null);
+                            MMailAttachment1 mAttachment = new MMailAttachment1(MailCtx(), 0, null);
 
                             string textmsg = mail.Body;
                             bool isAttachment = false;
@@ -374,7 +458,7 @@ namespace VAdvantage.Process
                             string mailFrom = mail.From;
 
                             mAttachment.SetAD_Client_ID(AD_Client_ID);
-                            mAttachment.SetAD_Org_ID(GetAD_Org_ID());
+                            mAttachment.SetAD_Org_ID(MailOrgID());
                             mAttachment.SetAD_Table_ID(Util.GetValueOfInt(TableID));
                             mAttachment.SetAttachmentType("I");
                             mAttachment.SetDateMailReceived(mail.EmailDate);
@@ -397,7 +481,8 @@ namespace VAdvantage.Process
                             }
                             else
                             {
-                                SendMailOrNotification(dsUser, GetCtx(), Msg.GetMsg(GetCtx(), "Emailrecievedwithsubject") + " = " + mail.Subject + " " + Msg.GetMsg(GetCtx(), "ANDAttachto") + " " + Msg.GetMsg(GetCtx(), "RequestID") + " = " + recordID, Util.GetValueOfInt(TableID), Util.GetValueOfInt(recordID), Convert.ToString(documentNO));
+                                importedCount++;
+                                SendMailOrNotification(dsUser, MailCtx(), Msg.GetMsg(MailCtx(), "Emailrecievedwithsubject") + " = " + mail.Subject + " " + Msg.GetMsg(MailCtx(), "ANDAttachto") + " " + Msg.GetMsg(MailCtx(), "RequestID") + " = " + recordID, Util.GetValueOfInt(TableID), Util.GetValueOfInt(recordID), Convert.ToString(documentNO));
                             }
                             continue;
                         }
@@ -618,7 +703,7 @@ namespace VAdvantage.Process
                 if (dsLead != null && dsLead.Tables.Count > 0 && dsLead.Tables[0].Rows.Count == 1)
                 {
                     DataRow dr = dsLead.Tables[0].Rows[0];
-                    AddTarget(targets, PO.Get_Table_ID("C_Lead"), Util.GetValueOfInt(dr["C_Lead_ID"]), Msg.GetMsg(GetCtx(), "Lead"),
+                    AddTarget(targets, PO.Get_Table_ID("C_Lead"), Util.GetValueOfInt(dr["C_Lead_ID"]), Msg.GetMsg(MailCtx(), "Lead"),
                         Util.GetValueOfString(dr["Name"]), Util.GetValueOfString(dr["DocumentNo"]));
                 }
             }
@@ -643,7 +728,7 @@ namespace VAdvantage.Process
                 {
                     continue;
                 }
-                AddTarget(targets, tableID, Util.GetValueOfInt(dr["C_BPartner_ID"]), Msg.GetMsg(GetCtx(), "BusinessPartner"),
+                AddTarget(targets, tableID, Util.GetValueOfInt(dr["C_BPartner_ID"]), Msg.GetMsg(MailCtx(), "BusinessPartner"),
                     Util.GetValueOfString(dr["Name"]), Util.GetValueOfString(dr["Value"]));
             }
             return true;
@@ -670,6 +755,11 @@ namespace VAdvantage.Process
             int mailID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT MAX(MailAttachment1_ID) FROM MailAttachment1 WHERE MailUID='"
                 + mailUID + "' AND FolderName='" + folderName + "'"));
             bool linked = false;
+            // A mail sent from the application was stored when it was sent: its copy in the Sent folder is that mail
+            if (mailID == 0 && attachType == "M" && folderName == "Sent")
+            {
+                mailID = ClaimSentMail(mail);
+            }
             if (mailID == 0)
             {
                 MailTarget first = targets.FirstOrDefault();
@@ -698,9 +788,9 @@ namespace VAdvantage.Process
                     + " WHERE MailAttachment1_ID=" + mailID + " AND (AD_Table_ID IS NULL OR AD_Table_ID=0)") > 0;
                 if (!saved)
                 {
-                    PO related = MTable.Get(GetCtx(), "MailAttachmentRelatedTo").GetPO(GetCtx(), 0, null);
+                    PO related = MTable.Get(MailCtx(), "MailAttachmentRelatedTo").GetPO(MailCtx(), 0, null);
                     related.SetAD_Client_ID(AD_Client_ID);
-                    related.SetAD_Org_ID(GetAD_Org_ID());
+                    related.SetAD_Org_ID(MailOrgID());
                     related.Set_Value("MailAttachment1_ID", mailID);
                     related.Set_Value("AD_Table_ID", t.TableID);
                     related.Set_Value("Record_ID", t.RecordID);
@@ -712,8 +802,8 @@ namespace VAdvantage.Process
                     continue;
                 }
                 linked = true;
-                SendMailOrNotification(dsUser, GetCtx(), Msg.GetMsg(GetCtx(), "Emailrecievedwithsubject") + " = " + subject
-                    + Msg.GetMsg(GetCtx(), "ANDAttachto") + t.Kind + " = " + t.Name, t.TableID, t.RecordID, t.Value);
+                SendMailOrNotification(dsUser, MailCtx(), Msg.GetMsg(MailCtx(), "Emailrecievedwithsubject") + " = " + subject
+                    + Msg.GetMsg(MailCtx(), "ANDAttachto") + t.Kind + " = " + t.Name, t.TableID, t.RecordID, t.Value);
             }
 
             if (!linked)
@@ -722,10 +812,77 @@ namespace VAdvantage.Process
             }
         }
 
+        /// <summary>
+        /// A mail sent from the application (Email form, Inbox, processes) is stored as it is sent, without the
+        /// mail server's message id and folder. When its copy is fetched from the Sent folder, that row is the
+        /// same mail: it gets the message id, folder and mailbox of the copy instead of a second row being stored,
+        /// so the mail shows once and later runs find it by its message id.
+        /// Matched on sender, subject and recipients (To and Cc), stored within a day of the send time, not
+        /// fetched before (no message id); of several, the one stored closest to the send time.
+        /// </summary>
+        /// <returns>MailAttachment1_ID of the row taken over, 0 when there is none</returns>
+        private int ClaimSentMail(dynamic mail)
+        {
+            string mailUID = Util.GetValueOfString((object)mail.MessageID);
+            string from = GetAddresses(Util.GetValueOfString((object)mail.From)).FirstOrDefault();
+            string subject = Util.GetValueOfString((object)mail.Subject);
+            DateTime? sent = Util.GetValueOfDateTime((object)mail.EmailDate);
+            if (string.IsNullOrEmpty(mailUID) || string.IsNullOrEmpty(from) || string.IsNullOrEmpty(subject) || sent == null)
+            {
+                return 0;
+            }
+            List<string> recipients = GetAddresses(Util.GetValueOfString((object)mail.To) + ";" + Util.GetValueOfString((object)mail.Cc));
+            recipients.Sort();
+
+            // A day each way: the stored time and the mail server's send time may be in different time zones
+            string sql = "SELECT MailAttachment1_ID, MailAddress, MailAddressCc, Created FROM MailAttachment1"
+                + " WHERE AD_Client_ID = " + AD_Client_ID + " AND AttachmentType = 'M' AND MailUID IS NULL"
+                + " AND LOWER(MailAddressFrom) LIKE '%" + from.Replace("'", "''") + "%'"
+                + " AND Title = '" + subject.Replace("'", "''") + "'"
+                + " AND Created BETWEEN " + GlobalVariable.TO_DATE(sent.Value.AddDays(-1), false)
+                + " AND " + GlobalVariable.TO_DATE(sent.Value.AddDays(1), false);
+            DataSet ds = DB.ExecuteDataset(sql);
+            if (ds == null || ds.Tables.Count == 0)
+            {
+                return 0;
+            }
+
+            int mailID = 0;
+            double closest = double.MaxValue;
+            foreach (DataRow row in ds.Tables[0].Rows)
+            {
+                List<string> stored = GetAddresses(Util.GetValueOfString(row["MailAddress"]) + ";" + Util.GetValueOfString(row["MailAddressCc"]));
+                stored.Sort();
+                if (!stored.SequenceEqual(recipients))
+                {
+                    continue;
+                }
+                DateTime? created = Util.GetValueOfDateTime(row["Created"]);
+                double distance = created == null ? double.MaxValue - 1 : Math.Abs((created.Value - sent.Value).TotalSeconds);
+                if (distance < closest)
+                {
+                    closest = distance;
+                    mailID = Util.GetValueOfInt(row["MailAttachment1_ID"]);
+                }
+            }
+            if (mailID == 0)
+            {
+                return 0;
+            }
+
+            // "MailUID IS NULL": another run may have taken the row meanwhile
+            int updated = DB.ExecuteQuery("UPDATE MailAttachment1 SET MailUID = '" + mailUID.Replace("'", "''") + "'"
+                + ", FolderName = '" + folderName + "'"
+                + ", MailAccount = '" + userAccount.Replace("'", "''") + "'"
+                + ", UserAccount_ID = " + AD_User_ID
+                + " WHERE MailAttachment1_ID = " + mailID + " AND MailUID IS NULL");
+            return updated > 0 ? mailID : 0;
+        }
+
         /// <returns>MailAttachment1_ID of the stored mail, 0 when it could not be saved</returns>
         private int AttachMail(dynamic mail, int _tableID, int record_ID, string attachType, string userOrBp, string name, string value)
         {
-            MMailAttachment1 mAttachment = new MMailAttachment1(GetCtx(), 0, null);
+            MMailAttachment1 mAttachment = new MMailAttachment1(MailCtx(), 0, null);
             string textmsg = mail.Body;
             bool isAttachment = false;
             if (mail.Attachments != null && mail.Attachments.Count > 0)
@@ -738,7 +895,7 @@ namespace VAdvantage.Process
             }
 
             mAttachment.SetAD_Client_ID(AD_Client_ID);
-            mAttachment.SetAD_Org_ID(GetAD_Org_ID());
+            mAttachment.SetAD_Org_ID(MailOrgID());
             if (_tableID > 0)
             {
                 mAttachment.SetAD_Table_ID(_tableID);
@@ -767,9 +924,10 @@ namespace VAdvantage.Process
                 retVal.Append("SaveError");
                 return 0;
             }
+            importedCount++;
             if (record_ID > 0)
             {
-                SendMailOrNotification(dsUser, GetCtx(), Msg.GetMsg(GetCtx(), "Emailrecievedwithsubject") + " = " + mail.Subject + Msg.GetMsg(GetCtx(), "ANDAttachto") + userOrBp + " = " + name, _tableID, record_ID, value);
+                SendMailOrNotification(dsUser, MailCtx(), Msg.GetMsg(MailCtx(), "Emailrecievedwithsubject") + " = " + mail.Subject + Msg.GetMsg(MailCtx(), "ANDAttachto") + userOrBp + " = " + name, _tableID, record_ID, value);
             }
             return mAttachment.Get_ID();
         }
@@ -828,7 +986,7 @@ namespace VAdvantage.Process
                                 continue;
                             }
 
-                            MMailAttachment1 mAttachment = new MMailAttachment1(GetCtx(), 0, null);
+                            MMailAttachment1 mAttachment = new MMailAttachment1(MailCtx(), 0, null);
 
                             IMail message;
                             String eml = imapMail.GetMessageByUID(uid);
@@ -871,8 +1029,8 @@ namespace VAdvantage.Process
 
                             }
 
-                            mAttachment.SetAD_Client_ID(GetCtx().GetAD_Client_ID());
-                            mAttachment.SetAD_Org_ID(GetCtx().GetAD_Org_ID());
+                            mAttachment.SetAD_Client_ID(MailCtx().GetAD_Client_ID());
+                            mAttachment.SetAD_Org_ID(MailCtx().GetAD_Org_ID());
                             mAttachment.SetAD_Table_ID(Util.GetValueOfInt(TableID));
                             mAttachment.SetAttachmentType("I");
                             mAttachment.SetDateMailReceived(message.Date);
@@ -905,7 +1063,7 @@ namespace VAdvantage.Process
                             }
                             else
                             {
-                                SendMailOrNotification(dsUser, GetCtx(), Msg.GetMsg(GetCtx(), "Emailrecievedwithsubject") + " = " + message.Subject + " " + Msg.GetMsg(GetCtx(), "ANDAttachto") + " " + Msg.GetMsg(GetCtx(), "RequestID") + " = " + recordID, Util.GetValueOfInt(TableID), Util.GetValueOfInt(recordID), Convert.ToString(documentNO));
+                                SendMailOrNotification(dsUser, MailCtx(), Msg.GetMsg(MailCtx(), "Emailrecievedwithsubject") + " = " + message.Subject + " " + Msg.GetMsg(MailCtx(), "ANDAttachto") + " " + Msg.GetMsg(MailCtx(), "RequestID") + " = " + recordID, Util.GetValueOfInt(TableID), Util.GetValueOfInt(recordID), Convert.ToString(documentNO));
                             }
 
                         }
@@ -926,8 +1084,8 @@ namespace VAdvantage.Process
                             }
 
                             sql += " AND AD_Client_ID=" + AD_Client_ID;
-                            //sql += " AND AD_Client_ID=" + GetCtx().GetAD_Client_ID();
-                            //string finalSql = MRole.GetDefault(GetCtx(), false).AddAccessSQL(sql, tableName.ToString(), MRole.SQL_NOTQUALIFIED, MRole.SQL_RO);
+                            //sql += " AND AD_Client_ID=" + MailCtx().GetAD_Client_ID();
+                            //string finalSql = MRole.GetDefault(MailCtx(), false).AddAccessSQL(sql, tableName.ToString(), MRole.SQL_NOTQUALIFIED, MRole.SQL_RO);
                             IDataReader idr = DB.ExecuteReader(sql);//+ " order by ad_texttemplate_id");                    
                             DataTable dt = new DataTable();
                             dt.Load(idr);
@@ -955,8 +1113,8 @@ namespace VAdvantage.Process
                                     {
                                         string sqlQuery = "SELECT IsEmployee FROM C_BPartner WHERE C_BPartner_ID=" + Util.GetValueOfInt(dt.Rows[j]["C_BPartner_ID"]);
                                         sql += " AND AD_Client_ID=" + AD_Client_ID;
-                                        //sqlQuery += " AND AD_Client_ID=" + GetCtx().GetAD_Client_ID();
-                                        //string finalQuery = MRole.GetDefault(GetCtx(), false).AddAccessSQL(sqlQuery, "C_BPartner", MRole.SQL_NOTQUALIFIED, MRole.SQL_RO);
+                                        //sqlQuery += " AND AD_Client_ID=" + MailCtx().GetAD_Client_ID();
+                                        //string finalQuery = MRole.GetDefault(MailCtx(), false).AddAccessSQL(sqlQuery, "C_BPartner", MRole.SQL_NOTQUALIFIED, MRole.SQL_RO);
                                         DataSet ds = DB.ExecuteDataset(sqlQuery);
 
                                         if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
@@ -971,21 +1129,21 @@ namespace VAdvantage.Process
                                     {
                                         _tableID = PO.Get_Table_ID("AD_User");
                                         existRec = GetAttachedRecord(_tableID, Util.GetValueOfInt(dt.Rows[j]["AD_User_ID"]), Util.GetValueOfInt(uid), folderName);
-                                        userOrBp = Msg.GetMsg(GetCtx(), "User");
+                                        userOrBp = Msg.GetMsg(MailCtx(), "User");
                                     }
                                     //if (sender == "businessPartner")
                                     if (sender == "C_BPartner")
                                     {
                                         _tableID = PO.Get_Table_ID("C_BPartner");
                                         existRec = GetAttachedRecord(_tableID, Util.GetValueOfInt(dt.Rows[j]["C_BPartner_ID"]), Util.GetValueOfInt(uid), folderName);
-                                        userOrBp = Msg.GetMsg(GetCtx(), "BusinessPartner");
+                                        userOrBp = Msg.GetMsg(MailCtx(), "BusinessPartner");
                                     }
                                     //if sender is lead
                                     if (sender == "C_Lead")
                                     {
                                         _tableID = PO.Get_Table_ID("C_Lead");
                                         existRec = GetAttachedRecord(_tableID, Util.GetValueOfInt(dt.Rows[j]["C_Lead_ID"]), Util.GetValueOfInt(uid), folderName);
-                                        userOrBp = Msg.GetMsg(GetCtx(), "Lead");
+                                        userOrBp = Msg.GetMsg(MailCtx(), "Lead");
                                     }
 
                                     if (existRec > 0)// Is mail already attached
@@ -993,7 +1151,7 @@ namespace VAdvantage.Process
                                         retVal.Append("MailAlreadyAttachedWithParticularRecord");
                                         continue;
                                     }
-                                    MMailAttachment1 mAttachment = new MMailAttachment1(GetCtx(), 0, null);
+                                    MMailAttachment1 mAttachment = new MMailAttachment1(MailCtx(), 0, null);
                                     IMail message;
                                     String eml = imapMail.GetMessageByUID(uid);
                                     message = new MailBuilder().CreateFromEml(eml);
@@ -1035,8 +1193,8 @@ namespace VAdvantage.Process
                                     string date = ((DateTime)message.Date).ToShortDateString();
 
 
-                                    mAttachment.SetAD_Client_ID(GetCtx().GetAD_Client_ID());
-                                    mAttachment.SetAD_Org_ID(GetCtx().GetAD_Org_ID());
+                                    mAttachment.SetAD_Client_ID(MailCtx().GetAD_Client_ID());
+                                    mAttachment.SetAD_Org_ID(MailCtx().GetAD_Org_ID());
                                     mAttachment.SetAD_Table_ID(_tableID);
                                     mAttachment.SetAttachmentType("I");
                                     mAttachment.SetDateMailReceived(message.Date);
@@ -1074,7 +1232,7 @@ namespace VAdvantage.Process
                                     }
                                     else
                                     {
-                                        SendMailOrNotification(dsUser, GetCtx(), Msg.GetMsg(GetCtx(), "Emailrecievedwithsubject") + " = " + message.Subject + Msg.GetMsg(GetCtx(), "ANDAttachto") + userOrBp + " = " + Util.GetValueOfString(dt.Rows[j]["Name"]), _tableID, record_ID, Util.GetValueOfString(dt.Rows[j]["Value"]));
+                                        SendMailOrNotification(dsUser, MailCtx(), Msg.GetMsg(MailCtx(), "Emailrecievedwithsubject") + " = " + message.Subject + Msg.GetMsg(MailCtx(), "ANDAttachto") + userOrBp + " = " + Util.GetValueOfString(dt.Rows[j]["Name"]), _tableID, record_ID, Util.GetValueOfString(dt.Rows[j]["Value"]));
                                     }
                                 }
                             }
