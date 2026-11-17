@@ -3876,6 +3876,15 @@ namespace VAdvantage.Model
                             }
                             #endregion
                         }
+
+                        // User Validation After Complete - a quotation / proposal completes here, so fire it here too
+                        String validOffer = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_COMPLETE);
+                        if (validOffer != null)
+                        {
+                            _processMsg = validOffer;
+                            return DocActionVariables.STATUS_INVALID;
+                        }
+
                         SetProcessed(true);
                         SetDocAction(DOCACTION_Close);
                         return DocActionVariables.STATUS_COMPLETED;
