@@ -26,7 +26,7 @@
         listSub: function (d) {
             return U.num(d.count) + ' ' + U.phrase(d.count, 'VAS_307_ListSub', 'requisitions with quantity still to come',
                 function () { return U.lbl('VAS_305_Requisition1', 'requisition') + ' · ' + U.lbl('VAS_305_StillOpen', 'Still to come'); }) +
-                ' · ' + U.money(d.amount, d.currency);
+                ' · ' + U.docMoney(d.amount, d.currency, false); // VAS163 2026-11-17: Sr 33 - full amount, not L / Cr
         }
     });
 })(VAS, jQuery);

@@ -150,6 +150,9 @@
 .vas-rqw-kv b { font-size: 1.75em; font-weight: 600; line-height: 1.05; padding-bottom: 0.06em; }
 .vas-rqw-kv small { font-size: 0.75em; font-weight: 500; color: #5F7283; }
 .vas-rqw-kv .sep { align-self: center; width: 1px; height: 1.3em; background: #C5D2DD; margin: 0 0.35em; flex: none; }
+/* VAS163 2026-11-17: Sr 33 - the full amount is shown; when it does not fit next to the count it wraps (never cut off) */
+.vas-rqw-kpi .vas-rqw-kv { flex-wrap: wrap; white-space: normal; overflow: visible; row-gap: 0.1em; }
+.vas-rqw-kv b.amt { font-size: 1.5em; min-width: 0; overflow-wrap: anywhere; white-space: normal; }
 .vas-rqw-kpi.amb .vas-rqw-kv b { color: #9A6500; }
 .vas-rqw-kpi.red .vas-rqw-kv b { color: #A33F3F; }
 
@@ -172,22 +175,31 @@
     flex-direction: column;
     justify-content: space-between;
     text-align: left;
-    padding: 0.85em;
-    border: 2px dashed #9ED1FF;
+    padding: 0.875em;
+    /* VAS163 2026-11-17: Sr 23 - no dotted border; same white-glass tile as New Sales Order (VAS_269) / New Purchase Order (VAS_204) */
+    border: 2px solid #FFFFFF;
     border-radius: 14px;
-    background: linear-gradient(180deg, #EAF8FF, #FFFFFF);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
     cursor: pointer;
     overflow: hidden;
     color: #102C3F;
-    font-size: inherit;
+    /* VAS163 2026-11-17: Sr 23 - same root size lever as VAS_269 (was inherited 16-20px) */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 32px);
+    -webkit-appearance: none;
+    appearance: none;
+    outline: none;
+    transition: box-shadow 180ms ease;
 }
 
-.vas-rqw-qa:hover { border-color: #1F83FF; }
-.vas-rqw-qa:focus-visible { outline: 2px solid #0083DA; outline-offset: 2px; }
+.vas-rqw-qa:active, .vas-rqw-qa:focus { border-color: #FFFFFF; outline: none; }
+.vas-rqw-qa:hover { box-shadow: 0 14px 30px rgba(15, 61, 97, .13); }
+.vas-rqw-qa:focus-visible { outline: 2px solid #1F83FF; outline-offset: 2px; }
 .vas-rqw-qa .plus { align-self: flex-end; width: 1.75em; height: 1.75em; border-radius: 10px; background: #1F83FF; display: flex; align-items: center; justify-content: center; }
 .vas-rqw-qa .plus svg { width: 1em; height: 1em; color: #FFFFFF; }
-.vas-rqw-qa .qt { display: block; font-size: 0.75em; line-height: 1.2; }
-.vas-rqw-qa .qs { display: -webkit-box; font-size: 0.6875em; color: #5F7283; line-height: 1.3; margin-top: 0.25em; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* VAS163 2026-11-17: Sr 23 - larger text, 'New Requisition' in bold */
+.vas-rqw-qa .qt { display: block; font-size: 0.875em; font-weight: 700; line-height: 1.2; color: #102C3F; }
+.vas-rqw-qa .qs { display: -webkit-box; font-size: 0.6875em; font-weight: 400; color: #5F7283; line-height: 1.3; margin-top: 0.25em; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
 /* ---------- grid data (rows) ---------- */
 .vas-rqw-tb { flex: 1; min-height: 0; overflow: hidden; }
@@ -337,7 +349,13 @@
 .vas-rqw-hero.ok .pl, .vas-rqw-hero.ok .v { color: #0B6B45; }
 .vas-rqw-hero.warn .pl, .vas-rqw-hero.warn .v { color: #9A6500; }
 .vas-rqw-hero.risk .pl, .vas-rqw-hero.risk .v { color: #A33F3F; }
-.vas-rqw-dcard { border-radius: 12px; border: 1px solid #D9E2EB; background: #FFFFFF; padding: 0.875em; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.625em 0.875em; }
+/* VAS163 2026-11-17: Sr 25 - three fields per line (Requested by / Priority / Requisition date, Warehouse / Source warehouse / Date required) */
+.vas-rqw-dcard { border-radius: 12px; border: 1px solid #D9E2EB; background: #FFFFFF; padding: 0.875em; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.625em 0.875em; }
+/* VAS163 2026-11-17: Sr 33 - long amounts wrap instead of being cut off */
+.vas-rqw-gr > span.vas-rqw-wrap { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+/* VAS163 2026-11-17: Sr 29 - pager of the requisition list popup (12 rows per page) */
+.vas-rqw-lpg { display: flex; align-items: center; justify-content: space-between; gap: 0.75em; padding: 0.5em 0.5em 0; border-top: 1px solid #E2EAF1; }
+.vas-rqw-lpg .vas-rqw-hp { font-size: 0.75em; color: #5F7283; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vas-rqw-mc .ml { font-size: 0.6875em; color: #5F7283; }
 .vas-rqw-mc .mv { font-size: 0.8125em; font-weight: 700; margin-top: 0.1em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vas-rqw-mc .mv.risk { color: #A33F3F; }

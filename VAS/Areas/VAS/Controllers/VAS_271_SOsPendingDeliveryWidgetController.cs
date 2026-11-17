@@ -210,9 +210,14 @@ namespace VAS.Controllers
         /// VAS163 2026-11-11: Row 20 'Y' when the order's prices include tax - the order's own
         /// IsTaxIncluded flag or its price list's flag (same expression as VAS_270).
         /// </summary>
+        // VAS163 2026-11-17: Sr 206 the flags are not reliable (SO 50209: order N, price list Y,
+        // yet the tax was ADDED on top - GrandTotal 10,337.30 = TotalLines 9,722 + tax 615.30 - so
+        // the SO value showed 9,106.70 instead of 9,722). Tax-inclusive is now read from the
+        // order's own totals: the tax is inside TotalLines when GrandTotal is not raised by it
+        // (GrandTotal - TotalLines below half the C_OrderTax total).
         private const string TaxIncludedSql =
-            "(CASE WHEN COALESCE(o.IsTaxIncluded, 'N') = 'Y' " +
-            "OR COALESCE((SELECT pl.IsTaxIncluded FROM M_PriceList pl WHERE pl.M_PriceList_ID = o.M_PriceList_ID), 'N') = 'Y' " +
+            "(CASE WHEN 2 * (COALESCE(o.GrandTotal, 0) - COALESCE(o.TotalLines, 0)) < " +
+            "(SELECT COALESCE(SUM(COALESCE(ott.TaxAmt, 0)), 0) FROM C_OrderTax ott WHERE ott.C_Order_ID = o.C_Order_ID AND ott.IsActive = 'Y') " +
             "THEN 'Y' ELSE 'N' END)";
 
         // VAS163 2026-11-11: Row 20 the tax is taken from the order's tax summary (C_OrderTax.TaxAmt)

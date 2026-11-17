@@ -221,6 +221,7 @@
         var lineState = null;      // { order, lines, page, size, tableId }
         var cfgStack = [];
         var currentCfg = null;
+        var zoomWindowId = 0;      // VAS163 2026-11-17: Sr 210 resolved Sales Order window id
 
         var translatedTexts = null;   // message-key -> translated text (see loadMessages)
 
@@ -582,11 +583,32 @@
             $mBody.on('click', function (event) {
                 var pageBtn = event.target.closest ? event.target.closest('[data-dir]') : null;
                 if (pageBtn) { turnPage(pageBtn.getAttribute('data-table'), Number(pageBtn.getAttribute('data-dir'))); return; }
+                // VAS163 2026-11-17: Sr 210 the document number opens the record on the Sales Order
+                // screen (same as VAS_287 openRecordInWindow) instead of the preview pop-up.
                 var soBtn = event.target.closest ? event.target.closest('[data-so]') : null;
-                if (soBtn) { openRecordModal(Number(soBtn.getAttribute('data-so'))); return; }
+                if (soBtn) { openRecordInWindow(Number(soBtn.getAttribute('data-so'))); return; }
                 var linesBtn = event.target.closest ? event.target.closest('[data-lines]') : null;
                 if (linesBtn) { openLinesModal(Number(linesBtn.getAttribute('data-lines'))); return; }
             });
+        }
+
+        /* VAS163 2026-11-17: Sr 210 inside the Sales Order window (windowNo >= 0) the host's
+           value-changed channel re-queries that window; on the Home page the shared zoom helper
+           opens the Sales Order window on the record. */
+        function openRecordInWindow(orderId) {
+            closeModal();
+            if (!orderId) { return; }
+            if ($self.windowNo >= 0) {
+                $self.widgetFirevalueChanged({
+                    "TabWhereClause": "C_Order.C_Order_ID=" + Number(orderId),
+                    "TabLayout": "Y",
+                    "TabIndex": "0"
+                });
+                return;
+            }
+            if (!window.VAS || !VAS.ZoomUtil) { return; }
+            VAS.ZoomUtil.zoomToRecord('C_Order_ID', orderId, zoomWindowId, 'VAS_SalesOrder', 'Sales Order')
+                .done(function (id) { if (id > 0) { zoomWindowId = id; } });
         }
 
         function bindDocumentLevelEvents() {

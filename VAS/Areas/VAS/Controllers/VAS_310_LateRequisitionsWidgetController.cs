@@ -45,7 +45,8 @@ namespace VIS.Controllers
                     lineCount = late.Count,
                     oldestDays = oldest,
                     currency = cur,
-                    records = VAS_ReqWidgetData.RequisitionRows(ctx, late, l => l.Amount(l.OpenQty))
+                    // VAS163 2026-11-17: Sr 27 - rows also carry the value in the requisition's price-list currency
+                    records = VAS_ReqWidgetData.RequisitionRows(ctx, late, l => l.Amount(l.OpenQty), l => l.DocAmount(l.OpenQty))
                 };
                 return Json(JsonConvert.SerializeObject(data), JsonRequestBehavior.AllowGet);
             }

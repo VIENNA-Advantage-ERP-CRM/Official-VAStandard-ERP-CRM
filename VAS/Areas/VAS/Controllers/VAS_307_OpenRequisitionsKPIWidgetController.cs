@@ -1,9 +1,9 @@
 /************************************************************
  * Module Name    : VAS
  * Purpose        : VAS_307 - Open Requisitions KPI (2x1) on the Requisition screen.
- *                  Completed requisitions with quantity still to come (not ordered, or ordered
- *                  on a PO / transfer and not yet received). Count + open amount in the
- *                  accounting-schema currency; the popup list comes from the same call.
+ *                  VAS163 2026-11-17: Sr 26 - completed / closed requisitions with no document created
+ *                  against any line (PO, blanket PO, Material Transfer, Inventory Use, RFQ). Count +
+ *                  amount in the accounting-schema currency; the popup list comes from the same call.
  * Author         : VAS
  * Date           : 05 November 2026
  ***********************************************************/
@@ -34,15 +34,19 @@ namespace VIS.Controllers
             try
             {
                 VAS_ReqCurrency cur = VAS_ReqWidgetData.GetSchemaCurrency(ctx);
-                List<VAS_ReqLine> open = VAS_ReqWidgetData.LoadLines(ctx, cur, "r.DocStatus = 'CO'", null)
-                    .Where(l => l.OpenQty > 0).ToList();
+                // VAS163 2026-11-17: Sr 26 - completed or closed requisitions against which no document has been created
+                // yet (no PO / blanket PO, Material Transfer, Inventory Use or RFQ on any line; drafts count as created,
+                // voided / reversed documents do not). Value = whole requisition amount.
+                List<VAS_ReqLine> open = VAS_ReqWidgetData.LoadLines(ctx, cur,
+                    "r.DocStatus IN ('CO', 'CL') AND " + VAS_ReqWidgetData.NoDocumentSql(), null);
                 var data = new
                 {
                     count = open.Select(l => l.RequisitionId).Distinct().Count(),
-                    amount = open.Sum(l => l.Amount(l.OpenQty)),
+                    amount = open.Sum(l => l.Amount(l.Qty)),
                     lineCount = open.Count,
                     currency = cur,
-                    records = VAS_ReqWidgetData.RequisitionRows(ctx, open, l => l.Amount(l.OpenQty))
+                    // VAS163 2026-11-17: Sr 27 - rows also carry the value in the requisition's price-list currency
+                    records = VAS_ReqWidgetData.RequisitionRows(ctx, open, l => l.Amount(l.Qty), l => l.DocAmount(l.Qty))
                 };
                 return Json(JsonConvert.SerializeObject(data), JsonRequestBehavior.AllowGet);
             }
