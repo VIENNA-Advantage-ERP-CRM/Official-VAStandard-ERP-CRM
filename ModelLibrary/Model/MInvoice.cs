@@ -5805,14 +5805,6 @@ namespace VAdvantage.Model
                 // JID_1290: Set the document number from completed document sequence after completed (if needed)
                 SetCompletedDocumentNo();
 
-                //VIS-383: 25/04/2024 User Validation After Complete
-                string valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_COMPLETE);
-                if (valid != null)
-                {
-                    _processMsg = valid;
-                    return DocActionVariables.STATUS_INVALID;
-                }
-
                 // VIS0060: Update Order Status on Order Header tab based on delivered and Invoiced qty on Order Line.
                 if (GetC_Order_ID() > 0)
                 {
@@ -5828,6 +5820,14 @@ namespace VAdvantage.Model
                             MOrder.UpdateOrderStatus(GetCtx(), Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Order_ID"]), Get_Trx());
                         }
                     }
+                }
+
+                //VIS-383: 25/04/2024 User Validation After Complete - last step, once all completion work is done
+                string valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_COMPLETE);
+                if (valid != null)
+                {
+                    _processMsg = valid;
+                    return DocActionVariables.STATUS_INVALID;
                 }
 
                 timeEstimation += " End at " + DateTime.Now.ToUniversalTime();
