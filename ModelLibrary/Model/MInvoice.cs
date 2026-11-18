@@ -2054,12 +2054,18 @@ namespace VAdvantage.Model
                 }
             }
 
-            // Re-priced lines whose product has no price on the selected price list kept their price.
-            // Reported last, together with a warning raised above (only one warning reaches the client).
-            if (_priceKeptCount > 0)
+            // Re-priced lines whose product has no price on the selected price list: price kept (same currency)
+            // or set to 0 (other currency), with their line numbers. Reported last, together with a warning
+            // raised above (only one warning reaches the client).
+            if (!string.IsNullOrEmpty(_priceKeptLines) || !string.IsNullOrEmpty(_priceZeroLines))
             {
-                string kept = Msg.GetMsg(GetCtx(), "VAS_PriceNotFoundPriceKept") + " " + _priceKeptCount;
-                _priceKeptCount = 0;
+                string kept = (string.IsNullOrEmpty(_priceZeroLines) ? ""
+                        : Msg.GetMsg(GetCtx(), "VAS_PriceNotFoundPriceZero") + " " + _priceZeroLines)
+                    + (!string.IsNullOrEmpty(_priceZeroLines) && !string.IsNullOrEmpty(_priceKeptLines) ? " | " : "")
+                    + (string.IsNullOrEmpty(_priceKeptLines) ? ""
+                        : Msg.GetMsg(GetCtx(), "VAS_PriceNotFoundPriceKept") + " " + _priceKeptLines);
+                _priceKeptLines = "";
+                _priceZeroLines = "";
                 ValueNamePair pending = VLogger.RetrieveWarning();
                 if (pending != null)
                 {
@@ -2157,10 +2163,11 @@ namespace VAdvantage.Model
         }
 
         /// <summary>
-        /// Lines whose product has no price on the newly selected price list (price kept) in this save;
-        /// reported as one warning at the end of AfterSave.
+        /// Lines ("Line (Product)") whose product has no price on the newly selected price list in this save:
+        /// kept their old price (same currency) / price set to 0 (other currency). Reported as one message at
+        /// the end of AfterSave.
         /// </summary>
-        private int _priceKeptCount = 0;
+        private string _priceKeptLines = "", _priceZeroLines = "";
 
         /// <summary>
         /// After lines were saved with IsBulkLineUpdate on: recalculate each invoice tax used by those
@@ -2272,10 +2279,16 @@ namespace VAdvantage.Model
                 && MPriceList.Get(GetCtx(), oldPriceList_ID, Get_TrxName()).IsTaxIncluded()
                     != MPriceList.Get(GetCtx(), GetM_PriceList_ID(), Get_TrxName()).IsTaxIncluded();
 
+            // Same currency on both price lists: a product without a price on the new list keeps its old
+            // price. Different currency: the old price means nothing in the new currency - it becomes 0.
+            bool sameCurrency = oldPriceList_ID > 0
+                && MPriceList.Get(GetCtx(), oldPriceList_ID, Get_TrxName()).GetC_Currency_ID()
+                    == MPriceList.Get(GetCtx(), GetM_PriceList_ID(), Get_TrxName()).GetC_Currency_ID();
+
             Dictionary<int, int> productUOM = new Dictionary<int, int>();
             HashSet<string> priced = GetPricedProductsOnPriceList(productUOM);
 
-            int notFound = 0;
+            List<string> keptLines = new List<string>(), zeroLines = new List<string>();
             List<MInvoiceLine> saved = new List<MInvoiceLine>();
             IsBulkLineUpdate = true;
             try
@@ -2296,7 +2309,17 @@ namespace VAdvantage.Model
                         repriced = onList && line.SetPriceFromPriceList(GetM_PriceList_ID(), GetC_BPartner_ID());
                         if (!repriced)
                         {
-                            notFound++;
+                            string label = line.GetLine() + " (" + MProduct.Get(GetCtx(), line.GetM_Product_ID()).GetName() + ")";
+                            if (sameCurrency)
+                            {
+                                keptLines.Add(label);
+                            }
+                            else
+                            {
+                                line.SetPriceZeroNotOnPriceList();
+                                zeroLines.Add(label);
+                                repriced = true;   // changed - save it
+                            }
                         }
                     }
                     if (!repriced && !taxIncludedChanged)
@@ -2327,7 +2350,8 @@ namespace VAdvantage.Model
             }
 
             // reported at the end of AfterSave (a line save above resets the logger)
-            _priceKeptCount = notFound;
+            _priceKeptLines = string.Join(", ", keptLines);
+            _priceZeroLines = string.Join(", ", zeroLines);
             return true;
         }
 

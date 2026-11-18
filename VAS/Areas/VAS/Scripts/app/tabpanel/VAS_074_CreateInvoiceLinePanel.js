@@ -464,9 +464,16 @@
                     // new invoice so its val rule re-resolves against the new header context
                     // (e.g. a different C_BPartner_ID) instead of serving the prior invoice's list.
                     _mlookupCache = {};
+                    // Same invoice reloaded after its header was saved with another price list (or Tax
+                    // Included setting): the saved lines were re-priced on the server and come back with
+                    // this load; the lines still unsaved in the panel were priced against the old header.
+                    var pricingChanged = !!prevParent && !!parent && +prevParent.C_Invoice_ID === +parent.C_Invoice_ID
+                        && (+prevParent.M_PriceList_ID !== +parent.M_PriceList_ID || !!prevParent.IsTaxIncluded !== !!parent.IsTaxIncluded);
+                    var currencyChanged = pricingChanged && +prevParent.C_Currency_ID !== +parent.C_Currency_ID;
                     var carriedLines = [];
                     if (keepUnsaved && parent && +parent.C_Invoice_ID === +recordID && hasPanelChanges()) {
-                        carriedLines = mergeReloadedLines(parent.Lines || []);
+                        // price list changed -> the price comes from the new list, not from the user's typed price
+                        carriedLines = mergeReloadedLines(parent.Lines || [], pricingChanged);
                     } else {
                         lines = [];
                         if (parent && parent.Lines) for (var j = 0; j < parent.Lines.length; j++) lines.push(fromServerRow(parent.Lines[j]));
@@ -480,14 +487,9 @@
                     render();
                     if ($root && $root[0]) $root.scrollTop(0);
                     refreshSummary();    // then load this invoice's server tax breakdown
-                    // Same invoice reloaded after its header was saved with another price list
-                    // (or Tax Included setting): the saved lines were re-priced on the server and
-                    // come back with this load; the lines still unsaved in the panel were priced
-                    // against the old header, so re-price them against the new one.
-                    var pricingChanged = !!prevParent && !!parent && +prevParent.C_Invoice_ID === +parent.C_Invoice_ID
-                        && (+prevParent.M_PriceList_ID !== +parent.M_PriceList_ID || !!prevParent.IsTaxIncluded !== !!parent.IsTaxIncluded);
+                    // re-price the unsaved panel lines against the new header
                     var finish = function () { if (isPageChange) showBusy(false); flushLoadWaiters(true); };
-                    if (pricingChanged && hasPanelChanges()) repriceUnsavedLines(finish);
+                    if (pricingChanged && hasPanelChanges()) repriceUnsavedLines(currencyChanged, finish);
                     // server copy + the user's edits: recalculate the amounts at the server's price
                     else if (carriedLines.length) recalcLines(carriedLines, finish);
                     else finish();
@@ -523,35 +525,48 @@
         /* Re-price the panel's unsaved lines (new, or edited saved lines) after the header
            price list changed, through the same line callouts the grid uses, so the line
            context is the saved header (parent) again:
-             - product line: the UOM callout re-prices from the new price list; when the product
-               has no price on it, the line keeps its previous price and only the amounts / tax
-               are recalculated;
-             - product line with a manually entered price: price kept, amounts / tax recalculated;
+             - product line: the UOM callout re-prices from the new price list - also when the
+               user had typed a price (the price list wins after a price list change). When the
+               product has no price on the new list:
+                 same currency on both lists -> the line keeps its previous price;
+                 other currency               -> the price stays 0;
+               both reported with the lines concerned;
              - charge line: price kept, amounts / tax recalculated.
            done() runs when every line has settled. */
-        function repriceUnsavedLines(done) {
+        function repriceUnsavedLines(currencyChanged, done) {
             var todo = lines.filter(function (l) {
                 return (l.status === "new" || l.dirty) && (+l.values.M_Product_ID > 0 || +l.values.C_Charge_ID > 0);
             });
-            var kept = 0;
+            var kept = [], zero = [];
+            function lineLabel(l) {
+                var no = +l.values.Line || 0;
+                return (no > 0 ? no + " " : "") + "(" + (l.display.productName || "") + ")";
+            }
             function next(i) {
                 if (i >= todo.length) {
-                    if (kept > 0) showToast(lbl("VAS_074_PriceKeptNotOnList", "Some products have no price on the selected price list - their price was kept"));
+                    if (zero.length) showToast(lbl("VAS_074_PriceZeroNotOnList", "No price on the selected price list (other currency) - price set to 0 for:") + " " + zero.join(", "));
+                    if (kept.length) showToast(lbl("VAS_074_PriceKeptNotOnList", "No price on the selected price list - previous price kept for:") + " " + kept.join(", "));
                     if (done) done();
                     return;
                 }
                 var l = todo[i];
                 if (lines.indexOf(l) < 0) { next(i + 1); return; }   // removed meanwhile
                 if (!(+l.values.M_Product_ID > 0)) { runCallout(l, "C_Tax_ID", function () { next(i + 1); }); return; }
-                if (l._priceOverride) { runCallout(l, "PriceEntered", function () { next(i + 1); }); return; }
+                l._priceOverride = false;   // the new price list decides the price
                 var old = { PriceEntered: l.values.PriceEntered, PriceActual: l.values.PriceActual, PriceList: l.values.PriceList, PriceLimit: l.values.PriceLimit };
                 runCallout(l, "C_UOM_ID", function () {
                     var v = l.values;
                     if (!(+v.PriceList) && !(+v.PriceEntered) && +old.PriceEntered) {
-                        // no price on the new price list - keep the previous price
+                        if (currencyChanged) {
+                            // other currency: the old price means nothing in it - leave 0
+                            zero.push(lineLabel(l));
+                            next(i + 1);
+                            return;
+                        }
+                        // same currency: keep the previous price
                         v.PriceEntered = old.PriceEntered; v.PriceActual = old.PriceActual;
                         v.PriceList = old.PriceList; v.PriceLimit = old.PriceLimit;
-                        kept++;
+                        kept.push(lineLabel(l));
                         runCallout(l, "PriceEntered", function () { next(i + 1); });
                         return;
                     }
@@ -650,16 +665,17 @@
            values the user changed since the line was loaded are carried: the row inputs above
            (the price only when the user typed it - otherwise it follows the server, e.g. a
            re-price after a price list change) and every "..." field the user edited
-           (_dynTouched). Returns the merged line (still unsaved), or null when there was no
-           user edit to carry (the server copy is then used as it is). */
-        function carryUserEdits(mine, fresh) {
+           (_dynTouched). After a price list change (priceFromList) a typed price is NOT carried:
+           the server's price from the new list stays. Returns the merged line (still unsaved), or
+           null when there was no user edit to carry (the server copy is then used as it is). */
+        function carryUserEdits(mine, fresh, priceFromList) {
             var base = (mine._saved && mine._saved.values) || {};
             var cols = USER_INPUT_COLS.slice();
             if (mine._dynTouched) for (var t in mine._dynTouched) if (mine._dynTouched.hasOwnProperty(t) && cols.indexOf(t) < 0) cols.push(t);
             var carried = 0;
             for (var i = 0; i < cols.length; i++) {
                 var c = cols[i];
-                if (c === "PriceEntered" && !mine._priceOverride) continue;
+                if (c === "PriceEntered" && (!mine._priceOverride || priceFromList)) continue;
                 var mv = lineVal(mine, c), bv = (base[c] !== undefined) ? base[c] : base[String(c).toLowerCase()];
                 if (sameVal(mv, bv)) continue;
                 setLineVal(fresh, c, mv);
@@ -670,7 +686,7 @@
             if (!sameVal(mine.values.C_Tax_ID, base.C_Tax_ID)) fresh.display.taxName = mine.display.taxName;
             if (!sameVal(mine.values.M_AttributeSetInstance_ID, base.M_AttributeSetInstance_ID)) fresh.display.attrName = mine.display.attrName;
             if (mine._dynDisp) fresh._dynDisp = $.extend({}, fresh._dynDisp || {}, mine._dynDisp);
-            fresh._priceOverride = mine._priceOverride;
+            fresh._priceOverride = priceFromList ? false : mine._priceOverride;
             fresh._dynTouched = mine._dynTouched;
             fresh._sel = mine._sel;
             fresh.rowId = mine.rowId;   // same row for the editor, selection and a pending save
@@ -685,9 +701,10 @@
                server copy is taken and the user's own edits are put back on top of it
                (carryUserEdits) - the line stays unsaved and its amounts are recalculated;
              - an edited line the server no longer has (deleted elsewhere) is dropped.
-           Clean saved lines are refreshed from the server rows. Returns the merged lines that
-           need their amounts recalculated. */
-        function mergeReloadedLines(serverRows) {
+           Clean saved lines are refreshed from the server rows. priceFromList: the price list
+           changed, so prices come from it (a typed price is not carried). Returns the merged lines
+           that need their amounts recalculated. */
+        function mergeReloadedLines(serverRows, priceFromList) {
             var dirtyById = {}, seen = {}, carriedLines = [], removed = 0;
             lines.forEach(function (l) {
                 var id = +l.values.C_InvoiceLine_ID || 0;
@@ -700,7 +717,7 @@
                 if (!mine) return fresh;
                 seen[r.C_InvoiceLine_ID] = true;
                 if (!serverRowChanged(mine, fresh)) return mine;
-                var both = carryUserEdits(mine, fresh);
+                var both = carryUserEdits(mine, fresh, priceFromList);
                 if (!both) return fresh;
                 carriedLines.push(both);
                 return both;

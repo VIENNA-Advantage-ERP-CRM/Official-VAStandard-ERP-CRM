@@ -658,6 +658,20 @@ namespace VAdvantage.Model
             return true;
         }
 
+        /// <summary>
+        /// The invoice moved to a price list in another currency and the product has no price on it:
+        /// the old price means nothing in the new currency, so all prices become 0. Marked as priced so
+        /// BeforeSave does not look a price up again (SetPrice would fall back to the base price list).
+        /// </summary>
+        internal void SetPriceZeroNotOnPriceList()
+        {
+            SetPriceEntered(Env.ZERO);
+            SetPriceActual(Env.ZERO);
+            SetPriceList(Env.ZERO);
+            SetPriceLimit(Env.ZERO);
+            _priceSet = true;
+        }
+
         /**
          * 	Set Price Entered/Actual.
          * 	Use this Method if the Line UOM is the Product UOM
