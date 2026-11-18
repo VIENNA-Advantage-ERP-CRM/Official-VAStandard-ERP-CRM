@@ -764,6 +764,8 @@
                 RepresentativeName: row.RepresentativeName || '',
                 LineCount: Number(row.LineCount) || 0,
                 OrderQty: Number(row.OrderQty) || 0,
+                OrderUomName: row.OrderUomName || '', // VAS163 2026-11-17: Sr 209 UOM of the line quantities (single-UOM orders)
+                DocStatusCode: row.DocStatusCode || '', // VAS163 2026-11-17: Sr 208 raw DocStatus for the chip colour
                 OrderValue: Number(row.OrderValue) || 0,
                 // VAS163 2026-11-11: row 93 - document (price list) currency of OrderValue.
                 CurrencySymbol: row.CurrencySymbol || '',
@@ -823,10 +825,12 @@
                     cellHtml(row.CustomerName, 'vas277-c-prim'),
                     cellHtml(row.RepresentativeName || '—', 'vas277-c-std'),
                     cellHtml(formatNum(row.LineCount), 'vas277-c-std', 'right'),
-                    cellHtml(formatNum(row.OrderQty), 'vas277-c-std', 'right'),
+                    // VAS163 2026-11-17: Sr 209 quantity in the lines' selected UOM (QtyEntered), with the UOM name.
+                    cellHtml(formatQty(row.OrderQty) + (row.OrderUomName ? ' ' + row.OrderUomName : ''), 'vas277-c-std', 'right'),
                     // VAS163 2026-11-11: row 93 - in the document (price list) currency.
                     cellHtml(formatMoney(row.OrderValue, row.CurrencySymbol, row.CurrencyPrecision, row.CurrencyIso), 'vas277-c-emph', 'right'),
-                    '<span class="vas277-cell" title="' + escapeHtml(row.DocumentStatus) + '"><span class="vas277-chip vas277-chip-ok">' + escapeHtml(row.DocumentStatus) + '</span></span>'
+                    // VAS163 2026-11-17: Sr 208 Drafted / In Progress in orange.
+                    '<span class="vas277-cell" title="' + escapeHtml(row.DocumentStatus) + '"><span class="vas277-chip ' + ((row.DocStatusCode === 'DR' || row.DocStatusCode === 'IP') ? 'vas277-chip-orange' : 'vas277-chip-ok') + '">' + escapeHtml(row.DocumentStatus) + '</span></span>'
                 ];
                 return '<div class="vas277-mrow" style="grid-template-columns:' + tpl + '">' + cells.join('') + '</div>';
             }).join('');

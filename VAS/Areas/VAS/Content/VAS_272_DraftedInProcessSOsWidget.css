@@ -339,6 +339,9 @@
 }
 
 .vas272-mbody-rows { overflow: hidden; flex: 1; min-height: 0; }
+/* VAS163 2026-11-17: Sr 207 lines pop-ups list every line - the rows area scrolls instead of paging. */
+#vas272-linetbl-record .vas272-mbody-rows,
+#vas272-linetbl-lines .vas272-mbody-rows { overflow-y: auto; }
 .vas272-mbody-rows .vas272-mrow {
     font-size: .75em;
     padding: .55em .5em;

@@ -794,7 +794,8 @@
             var secHtml = '<div class="vas272-msec">' + escapeHtml(label('VAS_272_SalesOrderLines', 'Sales order lines')) + '</div>';
             $mBody.html(soHeaderStats(order) + secHtml + '<div class="vas272-mtwrap"><div class="vas272-mtbl" id="vas272-linetbl-record"></div></div>');
 
-            lineState = { order: order, lines: lines, page: 0, size: MAX_ROWS_PER_PAGE, tableId: 'vas272-linetbl-record', showAttribute: lines.some(function (l) { return hasAttributeValue(l.AttributeText); }) };
+            // VAS163 2026-11-17: Sr 207 every line is listed (no fit-to-space paging that showed 3 of 5); the rows scroll.
+            lineState = { order: order, lines: lines, page: 0, size: Math.max(1, lines.length), tableId: 'vas272-linetbl-record', showAttribute: lines.some(function (l) { return hasAttributeValue(l.AttributeText); }) };
             drawLineTable('vas272-linetbl-record');
 
             // VAS163 2026-11-11: Row 24 no separate footer bar (buttons are on the pager row).
@@ -849,7 +850,8 @@
             var secHtml = '<div class="vas272-msec">' + escapeHtml(label('VAS_272_SalesOrderLines', 'Sales order lines')) + '</div>';
             $mBody.html(breadcrumb + stats + secHtml + '<div class="vas272-mtwrap"><div class="vas272-mtbl" id="vas272-linetbl-lines"></div></div>');
 
-            lineState = { order: order, lines: lines, page: 0, size: MAX_ROWS_PER_PAGE, tableId: 'vas272-linetbl-lines', showAttribute: lines.some(function (l) { return hasAttributeValue(l.AttributeText); }) };
+            // VAS163 2026-11-17: Sr 207 every line is listed (no fit-to-space paging); the rows scroll.
+            lineState = { order: order, lines: lines, page: 0, size: Math.max(1, lines.length), tableId: 'vas272-linetbl-lines', showAttribute: lines.some(function (l) { return hasAttributeValue(l.AttributeText); }) };
             drawLineTable('vas272-linetbl-lines');
 
             // VAS163 2026-11-11: Row 24 no separate footer bar (buttons are on the pager row).
@@ -965,12 +967,8 @@
                 var page = Math.min(docsState.page, newPages - 1);
                 fetchOrders(page, n, function (ok) { if (ok) { drawDocumentsTable(); } });
             });
-            if (lineState) {
-                fitTable(lineState.tableId, lineState.size, function (n) {
-                    lineState.size = n;
-                    drawLineTable(lineState.tableId);
-                });
-            }
+            // VAS163 2026-11-17: Sr 207 the lines tables are no longer shrunk to the free space
+            // (that paged a 5-line order as 3 + 2); all lines stay listed and the rows area scrolls.
         }
 
         this.Initalize = function () {

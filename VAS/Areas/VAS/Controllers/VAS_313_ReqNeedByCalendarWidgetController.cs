@@ -79,9 +79,10 @@ namespace VIS.Controllers
                             items = ls.Select(l => new
                             {
                                 product = l.ItemName,
-                                qty = l.Qty,
+                                // VAS163 2026-11-17: Sr 7 - quantities in the line's UOM (shown with it)
+                                qty = l.QtyEntered,
                                 uom = l.UomName,
-                                pendingQty = l.OpenQty,
+                                pendingQty = l.OpenQty * l.UomFactor,
                                 state = l.IsLate(today) ? "late" : l.State()
                             })
                         };

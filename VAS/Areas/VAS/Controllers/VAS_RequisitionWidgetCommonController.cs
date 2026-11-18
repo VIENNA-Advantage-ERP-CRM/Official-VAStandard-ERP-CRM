@@ -97,16 +97,24 @@ namespace VIS.Controllers
                     // VAS163 2026-11-13: row 1122 - 'Raised' shows the creation date (M_Requisition.Created)
                     created = VAS_ReqWidgetData.D(h.Created),
                     dateRequired = VAS_ReqWidgetData.D(h.DateRequired),
-                    earliestNeedBy = VAS_ReqWidgetData.D(lines.Where(l => l.OpenQty > 0 && l.NeedBy.HasValue).Select(l => l.NeedBy).Min()
-                                                   ?? lines.Select(l => l.NeedBy).Min() ?? h.DateRequired),
+                    // VAS163 2026-11-17: Sr 5 - the header field is the requisition's own Date Required (M_Requisition.DateRequired).
+                    // It was the earliest line date (M_RequisitionLine.DTD001_DateRequired), which is not changed when the
+                    // header date is edited, so the popup kept showing the old date (e.g. 900119: header 20-Dec, lines 20-Nov).
+                    // The lines' own dates are still shown per line.
+                    earliestNeedBy = VAS_ReqWidgetData.D(h.DateRequired
+                                                   ?? lines.Where(l => l.OpenQty > 0 && l.NeedBy.HasValue).Select(l => l.NeedBy).Min()
+                                                   ?? lines.Select(l => l.NeedBy).Min()),
                     requester = h.RequesterName,
                     warehouse = h.WarehouseName,
                     sourceWarehouse = h.SourceWarehouseName,
                     priority = VAS_ReqWidgetData.PriorityName(ctx, h.Priority),
                     description = h.Description,
                     isLate = lines.Any(l => l.IsLate(today)),
-                    totalAmount = lines.Sum(l => l.Amount(l.Qty)),
-                    openAmount = lines.Sum(l => l.Amount(l.OpenQty)),
+                    // VAS163 2026-11-17: Sr 14 / Sr 11 - Total = sum of the line amounts (LineNetAmt), Still to come = the
+                    // share of each line amount not yet received (OpenQty / Qty, never above the line amount), both in
+                    // the price-list currency of the requisition.
+                    totalAmount = lines.Sum(l => l.DocAmount(l.Qty)),
+                    openAmount = lines.Sum(l => l.DocAmount(l.OpenQty)),
                     lineCount = lines.Count,
                     receivedLines = lines.Count(l => l.Qty > 0 && l.OpenQty <= 0)
                 };
@@ -120,11 +128,16 @@ namespace VIS.Controllers
                     category = l.CategoryName,
                     attribute = l.AttributeName, // VAS163 2026-11-13: row 1130 - attribute set instance description (blank when none)
                     uom = l.UomName,
-                    qty = l.Qty,
-                    orderedQty = l.OrderedQty,
-                    receivedQty = l.ReceivedQty,
-                    pendingQty = l.OpenQty,
-                    amount = l.Amount(l.Qty),
+                    // VAS163 2026-11-17: Sr 7 - quantities in the line's own UOM (QtyEntered; ordered / received / pending
+                    // are kept in the product UOM and converted with QtyEntered / Qty)
+                    qty = l.QtyEntered,
+                    // VAS163 2026-11-17: Sr 32 - 'Ord.' counts completed / closed POs and transfers only (a drafted PO /
+                    // Material Transfer is not ordered yet), same figure the status uses
+                    orderedQty = l.DoneOrderedQty * l.UomFactor,
+                    receivedQty = l.ReceivedQty * l.UomFactor,
+                    pendingQty = l.OpenQty * l.UomFactor,
+                    // VAS163 2026-11-17: Sr 11 - line amount in the price-list currency
+                    amount = l.DocAmount(l.Qty),
                     needBy = VAS_ReqWidgetData.D(l.NeedBy),
                     vendor = l.VendorName,
                     state = l.State(),
@@ -133,7 +146,12 @@ namespace VIS.Controllers
                     documents = docs.ContainsKey(l.LineId) ? docs[l.LineId] : new List<object>()
                 }).ToList();
 
-                return Json(JsonConvert.SerializeObject(new { header, lines = lineRows, currency = cur }), JsonRequestBehavior.AllowGet);
+                // VAS163 2026-11-17: Sr 11 - the popup shows the requisition in its price-list currency (schema currency
+                // only when the requisition has no price list)
+                VAS_ReqCurrency docCur = h.CurrencyId > 0
+                    ? new VAS_ReqCurrency { Id = h.CurrencyId, Symbol = h.DocCurrencySymbol, Iso = h.DocCurrencyIso, Precision = h.DocCurrencyPrecision }
+                    : cur;
+                return Json(JsonConvert.SerializeObject(new { header, lines = lineRows, currency = docCur }), JsonRequestBehavior.AllowGet);
             }
             catch (Exception ex)
             {
@@ -163,6 +181,19 @@ namespace VIS.Controllers
         public decimal Qty, Price, PoQty, PoRcvQty, TrfQty, TrfOpenQty, DeliveredQty, PoDoneQty;
         /// <summary>Requisition currency to accounting-schema currency factor.</summary>
         public decimal Rate = 1m;
+        /// <summary>
+        /// VAS163 2026-11-17: Sr 7 / Sr 14 - QtyEntered (in the line UOM C_UOM_ID) and LineNetAmt (amount of the line in
+        /// the price-list currency). Qty and all ordered / received figures are in the product UOM, while PriceActual is a
+        /// price per entered UOM, so Qty * PriceActual was wrong for every line entered in another UOM (e.g. 2000 ml at
+        /// 0.33 = 660, but Qty 2 L * 0.33 = 0.66).
+        /// </summary>
+        public decimal QtyEntered, LineNet;
+        /// <summary>VAS163 2026-11-17: Sr 11 - price-list (document) currency of the requisition.</summary>
+        public string DocCurrencyIso, DocCurrencySymbol;
+        public int DocCurrencyPrecision = 2;
+
+        /// <summary>VAS163 2026-11-17: Sr 7 - factor from the product UOM (Qty) to the line UOM (QtyEntered).</summary>
+        public decimal UomFactor { get { return (Qty != 0m && QtyEntered != 0m) ? QtyEntered / Qty : 1m; } }
 
         public DateTime? NeedBy { get { return LineNeedBy ?? DateRequired; } }
         public string ItemName { get { return !string.IsNullOrEmpty(ProductName) ? ProductName : (ChargeName ?? ""); } }
@@ -182,9 +213,30 @@ namespace VIS.Controllers
         /// </summary>
         public decimal StatusNotOrderedQty { get { return Math.Max(0m, Qty - PoDoneQty - Math.Max(TrfQty - TrfOpenQty, DeliveredQty)); } }
 
+        /// <summary>
+        /// VAS163 2026-11-17: Sr 32 - ordered quantity shown on the popup line (product UOM): completed / closed purchase
+        /// orders + completed transfers (or the delivered qty of completed transfers / inventory use, whichever is higher).
+        /// Drafted documents are left out.
+        /// </summary>
+        public decimal DoneOrderedQty { get { return PoDoneQty + Math.Max(TrfQty - TrfOpenQty, DeliveredQty); } }
+
+        /// <summary>Amount of a part of the line (qty in the product UOM), in the accounting-schema currency.</summary>
         public decimal Amount(decimal qty)
         {
-            return Math.Round(qty * Price * Rate, 2);
+            // VAS163 2026-11-17: Sr 14 - share of the line amount (LineNetAmt), not qty * PriceActual (price per entered UOM)
+            return Math.Round(DocAmountRaw(qty) * Rate, 2);
+        }
+
+        /// <summary>VAS163 2026-11-17: Sr 11 / Sr 14 - amount of a part of the line in the price-list currency of the requisition.</summary>
+        public decimal DocAmount(decimal qty)
+        {
+            return Math.Round(DocAmountRaw(qty), Math.Max(0, Math.Min(DocCurrencyPrecision, 10)));
+        }
+
+        private decimal DocAmountRaw(decimal qty)
+        {
+            if (Qty == 0m) { return 0m; }
+            return qty == Qty ? LineNet : LineNet * qty / Qty;
         }
 
         public bool IsLate(DateTime today)
@@ -278,6 +330,53 @@ namespace VIS.Controllers
                 : "(r.CreatedBy = @RQ_User2 OR r.CreatedBy = @RQ_User1)";
         }
 
+        /// <summary>
+        /// VAS163 2026-11-17: Sr 26 - condition (alias r = M_Requisition) "no document has been created against any line of
+        /// the requisition": no purchase order line (incl. blanket PO), Material Transfer line, Inventory Use line or RFQ
+        /// line / RFQ (header link) refers to it. Every document that is not voided / reversed counts, drafts included
+        /// (the document has been created). Links whose column does not exist in this database are skipped.
+        /// </summary>
+        public static string NoDocumentSql()
+        {
+            StringBuilder s = new StringBuilder("1 = 1");
+            if (HasColumn("C_OrderLine", "M_RequisitionLine_ID"))
+            {
+                s.Append(@" AND NOT EXISTS (SELECT 1 FROM M_RequisitionLine xl
+                                INNER JOIN C_OrderLine xol ON xol.M_RequisitionLine_ID = xl.M_RequisitionLine_ID
+                                INNER JOIN C_Order xo ON xo.C_Order_ID = xol.C_Order_ID
+                                WHERE xl.M_Requisition_ID = r.M_Requisition_ID AND xol.IsActive = 'Y' AND xo.DocStatus NOT IN ('VO', 'RE'))");
+            }
+            if (HasColumn("M_MovementLine", "M_RequisitionLine_ID"))
+            {
+                s.Append(@" AND NOT EXISTS (SELECT 1 FROM M_RequisitionLine xl
+                                INNER JOIN M_MovementLine xmv ON xmv.M_RequisitionLine_ID = xl.M_RequisitionLine_ID
+                                INNER JOIN M_Movement xm ON xm.M_Movement_ID = xmv.M_Movement_ID
+                                WHERE xl.M_Requisition_ID = r.M_Requisition_ID AND xmv.IsActive = 'Y' AND xm.DocStatus NOT IN ('VO', 'RE'))");
+            }
+            if (HasColumn("M_InventoryLine", "M_RequisitionLine_ID"))
+            {
+                s.Append(@" AND NOT EXISTS (SELECT 1 FROM M_RequisitionLine xl
+                                INNER JOIN M_InventoryLine xil ON xil.M_RequisitionLine_ID = xl.M_RequisitionLine_ID
+                                INNER JOIN M_Inventory xi ON xi.M_Inventory_ID = xil.M_Inventory_ID
+                                WHERE xl.M_Requisition_ID = r.M_Requisition_ID AND xil.IsActive = 'Y' AND xi.DocStatus NOT IN ('VO', 'RE'))");
+            }
+            bool hasRfqStatus = HasColumn("C_RfQ", "DocStatus");
+            string rfqAlive = hasRfqStatus ? " AND (xf.DocStatus IS NULL OR xf.DocStatus NOT IN ('VO', 'RE'))" : "";
+            if (HasColumn("C_RfQLine", "M_RequisitionLine_ID"))
+            {
+                s.Append(@" AND NOT EXISTS (SELECT 1 FROM M_RequisitionLine xl
+                                INNER JOIN C_RfQLine xq ON xq.M_RequisitionLine_ID = xl.M_RequisitionLine_ID
+                                INNER JOIN C_RfQ xf ON xf.C_RfQ_ID = xq.C_RfQ_ID
+                                WHERE xl.M_Requisition_ID = r.M_Requisition_ID AND xq.IsActive = 'Y' AND xf.IsActive = 'Y'" + rfqAlive + ")");
+            }
+            if (HasColumn("C_RfQ", "M_Requisition_ID"))
+            {
+                s.Append(@" AND NOT EXISTS (SELECT 1 FROM C_RfQ xf
+                                WHERE xf.M_Requisition_ID = r.M_Requisition_ID AND xf.IsActive = 'Y'" + rfqAlive + ")");
+            }
+            return s.ToString();
+        }
+
         /// <summary>Requisitions the current role may read (simple statement MRole can parse).</summary>
         public static string AccessSql(Ctx ctx)
         {
@@ -329,28 +428,39 @@ namespace VIS.Controllers
             bool hasPoLink = HasColumn("C_OrderLine", "M_RequisitionLine_ID");
             bool hasMoveLink = HasColumn("M_MovementLine", "M_RequisitionLine_ID");
             bool hasAsi = HasColumn("M_RequisitionLine", "M_AttributeSetInstance_ID"); // VAS163 2026-11-13: row 1130
+            // VAS163 2026-11-17: Sr 7 / Sr 14 - entered qty (line UOM) and line amount
+            bool hasQtyEntered = HasColumn("M_RequisitionLine", "QtyEntered");
+            bool hasLineNet = HasColumn("M_RequisitionLine", "LineNetAmt");
 
             StringBuilder sql = new StringBuilder();
             sql.Append(@"
                 SELECT r.M_Requisition_ID, r.DocumentNo, r.DocStatus, r.DateDoc, r.DateRequired, r.PriorityRule,
                        r.AD_Org_ID, r.CreatedBy, r.Description, w.Name AS WarehouseName, cu.Name AS CreatedByName,
-                       pl.C_Currency_ID, rl.M_RequisitionLine_ID, rl.Line, rl.M_Product_ID, rl.C_Charge_ID,
+                       pl.C_Currency_ID, dcur.ISO_Code AS DocCurrencyIso, dcur.CurSymbol AS DocCurrencySymbol,
+                       dcur.StdPrecision AS DocCurrencyPrecision,
+                       rl.M_RequisitionLine_ID, rl.Line, rl.M_Product_ID, rl.C_Charge_ID,
                        rl.Qty, rl.PriceActual, p.Name AS ProductName, p.Value AS ProductValue, ch.Name AS ChargeName,
                        uom.Name AS UomName, pc.M_Product_Category_ID, pc.Name AS CategoryName, vnd.VendorName,
                        COALESCE(po.PoQty, 0) AS PoQty, COALESCE(po.PoRcvQty, 0) AS PoRcvQty,
                        COALESCE(mv.TrfQty, 0) AS TrfQty, COALESCE(mv.TrfOpenQty, 0) AS TrfOpenQty,
                        COALESCE(po.PoDoneQty, 0) AS PoDoneQty");
             if (hasAsi) { sql.Append(", asi.Description AS AttributeName"); }
+            sql.Append(hasQtyEntered ? ", COALESCE(rl.QtyEntered, rl.Qty) AS QtyEntered" : ", rl.Qty AS QtyEntered");
+            sql.Append(hasLineNet ? ", COALESCE(rl.LineNetAmt, 0) AS LineNetAmt" : ", 0 AS LineNetAmt");
             sql.Append(hasLineDate ? ", rl.DTD001_DateRequired AS LineNeedBy" : ", r.DateRequired AS LineNeedBy");
             sql.Append(hasDelivered ? ", COALESCE(rl.DTD001_DeliveredQty, 0) AS DeliveredQty" : ", 0 AS DeliveredQty");
             sql.Append(hasUser ? ", r.AD_User_ID, u.Name AS RequesterName" : ", 0 AS AD_User_ID, cu.Name AS RequesterName");
             sql.Append(hasSource ? ", sw.Name AS SourceWarehouseName" : ", w.Name AS SourceWarehouseName");
+            // VAS163 2026-11-17: Sr 24 / Sr 30 - requester (business partner, field 'Requester' of window VAS_Requisition)
+            bool hasRequester = HasRequesterColumn();
+            sql.Append(hasRequester ? ", rbp.Name AS RequesterBpName" : ", NULL AS RequesterBpName");
             sql.Append(@"
                 FROM M_RequisitionLine rl
                 INNER JOIN M_Requisition r ON r.M_Requisition_ID = rl.M_Requisition_ID
                 LEFT JOIN M_Warehouse w ON w.M_Warehouse_ID = r.M_Warehouse_ID
                 LEFT JOIN AD_User cu ON cu.AD_User_ID = r.CreatedBy
                 LEFT JOIN M_PriceList pl ON pl.M_PriceList_ID = r.M_PriceList_ID
+                LEFT JOIN C_Currency dcur ON dcur.C_Currency_ID = pl.C_Currency_ID
                 LEFT JOIN M_Product p ON p.M_Product_ID = rl.M_Product_ID
                 LEFT JOIN M_Product_Category pc ON pc.M_Product_Category_ID = p.M_Product_Category_ID
                 LEFT JOIN C_Charge ch ON ch.C_Charge_ID = rl.C_Charge_ID");
@@ -358,6 +468,7 @@ namespace VIS.Controllers
                 ? " LEFT JOIN C_UOM uom ON uom.C_UOM_ID = COALESCE(rl.C_UOM_ID, p.C_UOM_ID)"
                 : " LEFT JOIN C_UOM uom ON uom.C_UOM_ID = p.C_UOM_ID");
             if (hasUser) { sql.Append(" LEFT JOIN AD_User u ON u.AD_User_ID = r.AD_User_ID"); }
+            if (hasRequester) { sql.Append(" LEFT JOIN C_BPartner rbp ON rbp.C_BPartner_ID = r.C_BPartner_ID"); }
             if (hasSource) { sql.Append(" LEFT JOIN M_Warehouse sw ON sw.M_Warehouse_ID = r.DTD001_MWarehouseSource_ID"); }
             if (hasAsi) { sql.Append(" LEFT JOIN M_AttributeSetInstance asi ON asi.M_AttributeSetInstance_ID = rl.M_AttributeSetInstance_ID AND asi.M_AttributeSetInstance_ID > 0"); }
             sql.Append(@"
@@ -459,12 +570,20 @@ namespace VIS.Controllers
                     TrfOpenQty = Util.GetValueOfDecimal(row["TrfOpenQty"]),
                     DeliveredQty = Util.GetValueOfDecimal(row["DeliveredQty"]),
                     PoDoneQty = Util.GetValueOfDecimal(row["PoDoneQty"]),
-                    AttributeName = hasAsi ? Util.GetValueOfString(row["AttributeName"]) : ""
+                    AttributeName = hasAsi ? Util.GetValueOfString(row["AttributeName"]) : "",
+                    // VAS163 2026-11-17: Sr 7 / Sr 11 / Sr 14
+                    QtyEntered = Util.GetValueOfDecimal(row["QtyEntered"]),
+                    LineNet = Util.GetValueOfDecimal(row["LineNetAmt"]),
+                    DocCurrencyIso = Util.GetValueOfString(row["DocCurrencyIso"]),
+                    DocCurrencySymbol = Util.GetValueOfString(row["DocCurrencySymbol"]),
+                    DocCurrencyPrecision = row["DocCurrencyPrecision"] == DBNull.Value ? 2 : Util.GetValueOfInt(row["DocCurrencyPrecision"])
                 };
-                if (string.IsNullOrEmpty(l.RequesterName))
+                if (!hasLineNet)
                 {
-                    l.RequesterName = Util.GetValueOfString(row["CreatedByName"]);
+                    // no LineNetAmt column: price is per entered UOM
+                    l.LineNet = Math.Round(l.QtyEntered * l.Price, 2);
                 }
+                l.RequesterName = RequesterOf(row);
                 if (string.IsNullOrEmpty(l.CategoryName))
                 {
                     l.CategoryName = l.ChargeId > 0 ? MsgOr(ctx, "VAS_315_Charges", "Charges") : MsgOr(ctx, "VAS_315_Uncategorised", "Uncategorised");
@@ -485,14 +604,23 @@ namespace VIS.Controllers
             bool hasSource = HasColumn("M_Requisition", "DTD001_MWarehouseSource_ID");
             StringBuilder sql = new StringBuilder(@"
                 SELECT r.M_Requisition_ID, r.DocumentNo, r.DocStatus, r.DateDoc, r.DateRequired, r.PriorityRule,
-                       r.AD_Org_ID, r.CreatedBy, r.Created, r.Description, w.Name AS WarehouseName, cu.Name AS CreatedByName");
+                       r.AD_Org_ID, r.CreatedBy, r.Created, r.Description, w.Name AS WarehouseName, cu.Name AS CreatedByName,
+                       pl.C_Currency_ID, dcur.ISO_Code AS DocCurrencyIso, dcur.CurSymbol AS DocCurrencySymbol,
+                       dcur.StdPrecision AS DocCurrencyPrecision");
             sql.Append(hasUser ? ", u.Name AS RequesterName" : ", cu.Name AS RequesterName");
             sql.Append(hasSource ? ", sw.Name AS SourceWarehouseName" : ", w.Name AS SourceWarehouseName");
+            // VAS163 2026-11-17: Sr 24 - requester business partner (field 'Requester' of window VAS_Requisition)
+            bool hasRequester = HasRequesterColumn();
+            sql.Append(hasRequester ? ", rbp.Name AS RequesterBpName" : ", NULL AS RequesterBpName");
+            // VAS163 2026-11-17: Sr 11 - price-list currency of the requisition (popup amounts are shown in it)
             sql.Append(@"
                 FROM M_Requisition r
+                LEFT JOIN M_PriceList pl ON pl.M_PriceList_ID = r.M_PriceList_ID
+                LEFT JOIN C_Currency dcur ON dcur.C_Currency_ID = pl.C_Currency_ID
                 LEFT JOIN M_Warehouse w ON w.M_Warehouse_ID = r.M_Warehouse_ID
                 LEFT JOIN AD_User cu ON cu.AD_User_ID = r.CreatedBy");
             if (hasUser) { sql.Append(" LEFT JOIN AD_User u ON u.AD_User_ID = r.AD_User_ID"); }
+            if (hasRequester) { sql.Append(" LEFT JOIN C_BPartner rbp ON rbp.C_BPartner_ID = r.C_BPartner_ID"); }
             if (hasSource) { sql.Append(" LEFT JOIN M_Warehouse sw ON sw.M_Warehouse_ID = r.DTD001_MWarehouseSource_ID"); }
             sql.Append(@"
                 WHERE r.M_Requisition_ID = @RQ_Req AND r.AD_Client_ID = @RQC_Client AND r.IsActive = 'Y'
@@ -521,13 +649,37 @@ namespace VIS.Controllers
                 Description = Util.GetValueOfString(row["Description"]),
                 WarehouseName = Util.GetValueOfString(row["WarehouseName"]),
                 SourceWarehouseName = Util.GetValueOfString(row["SourceWarehouseName"]),
-                RequesterName = Util.GetValueOfString(row["RequesterName"])
+                RequesterName = Util.GetValueOfString(row["RequesterName"]),
+                // VAS163 2026-11-17: Sr 11
+                CurrencyId = Util.GetValueOfInt(row["C_Currency_ID"]),
+                DocCurrencyIso = Util.GetValueOfString(row["DocCurrencyIso"]),
+                DocCurrencySymbol = Util.GetValueOfString(row["DocCurrencySymbol"]),
+                DocCurrencyPrecision = row["DocCurrencyPrecision"] == DBNull.Value ? 2 : Util.GetValueOfInt(row["DocCurrencyPrecision"])
             };
-            if (string.IsNullOrEmpty(h.RequesterName))
-            {
-                h.RequesterName = Util.GetValueOfString(row["CreatedByName"]);
-            }
+            h.RequesterName = RequesterOf(row);
             return h;
+        }
+
+        /// <summary>
+        /// VAS163 2026-11-17: Sr 24 / Sr 30 - True when M_Requisition has C_BPartner_ID, the 'Requester' field of window
+        /// VAS_Requisition (the AD_User_ID field there is the 'Preparer').
+        /// </summary>
+        public static bool HasRequesterColumn()
+        {
+            return HasColumn("M_Requisition", "C_BPartner_ID");
+        }
+
+        /// <summary>
+        /// VAS163 2026-11-17: Sr 24 / Sr 30 - 'Requested by' = name of the requester business partner (M_Requisition.C_BPartner_ID);
+        /// when no requester is entered, the preparer (AD_User_ID), then the creator, so the column is never blank.
+        /// Expects columns RequesterBpName, RequesterName (preparer) and CreatedByName.
+        /// </summary>
+        public static string RequesterOf(DataRow row)
+        {
+            string name = Util.GetValueOfString(row["RequesterBpName"]);
+            if (string.IsNullOrEmpty(name)) { name = Util.GetValueOfString(row["RequesterName"]); }
+            if (string.IsNullOrEmpty(name)) { name = Util.GetValueOfString(row["CreatedByName"]); }
+            return name;
         }
 
         /// <summary>Factor from the requisition's price-list currency to the accounting-schema currency.</summary>
@@ -577,36 +729,36 @@ namespace VIS.Controllers
             }
             if (del > 0m)
             {
-                return (del == ord || del >= qty) ? "DE" : "PD";
+                // VAS163 2026-11-17: Sr 31 - 'Delivered' only when every line's requested qty is received. 'del == ord'
+                // made a requisition 'Delivered' after a partial Material Transfer / Inventory Use (e.g. 900126: 5 of 8
+                // transferred -> ordered 5 = delivered 5). ReceivedQty is capped at the line Qty (product UOM, same unit
+                // as PO / transfer / internal-use quantities), so the sum reaches qty only when all lines are complete.
+                return del >= qty ? "DE" : "PD";
             }
             if (ord <= 0m) { return "OP"; }
             return ord >= qty ? "OR" : "PO";
         }
 
-        private static int _statusRef = -1;
-
-        /// <summary>Translated name of a VAS_RequisitionStatus value (DR / CL handled by the caller).</summary>
+        /// <summary>
+        /// Display name of a VAS_RequisitionStatus value (DR / CL handled by the caller).
+        /// VAS163 2026-11-17: Sr 21 - the status badge text comes ONLY from these messages (no reference-list
+        /// name, no hard-coded fallback), chosen by the status code:
+        ///   OP -> VAS_305_ReqStatusOpen, PO -> VAS_305_ReqStatusPartiallyOrdered, OR -> VAS_305_ReqStatusOrdered,
+        ///   PD -> VAS_305_ReqStatusPartiallyReceived, DE -> VAS_305_ReqStatusDelivered.
+        /// Msg.GetMsg(ctx, key, true) returns the message text only (the 2-argument form appends the tip).
+        /// </summary>
         public static string StatusName(Ctx ctx, string code)
         {
-            if (_statusRef < 0)
-            {
-                _statusRef = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT c.AD_Reference_Value_ID FROM AD_Column c
-                    INNER JOIN AD_Table t ON t.AD_Table_ID = c.AD_Table_ID
-                    WHERE t.TableName = 'M_Requisition' AND c.ColumnName = 'VAS_RequisitionStatus'", null, null));
-            }
-            string name = _statusRef > 0 ? MRefList.GetListName(ctx, _statusRef, code) : null;
-            if (!string.IsNullOrEmpty(name))
-            {
-                return name;
-            }
+            string key;
             switch (code)
             {
-                case "PO": return "Partially Ordered";
-                case "OR": return "Ordered";
-                case "PD": return "Partially Delivered";
-                case "DE": return "Delivered";
-                default: return "Open";
+                case "PO": key = "VAS_305_ReqStatusPartiallyOrdered"; break;
+                case "OR": key = "VAS_305_ReqStatusOrdered"; break;
+                case "PD": key = "VAS_305_ReqStatusPartiallyReceived"; break;
+                case "DE": key = "VAS_305_ReqStatusDelivered"; break;
+                default: key = "VAS_305_ReqStatusOpen"; break;
             }
+            return Msg.GetMsg(ctx, key, true);
         }
 
         /// <summary>Translated DocStatus name (reference 131).</summary>
@@ -650,7 +802,10 @@ namespace VIS.Controllers
         }
 
         /// <summary>One row per requisition built from its lines (used by the KPI and list popups).</summary>
-        public static List<object> RequisitionRows(Ctx ctx, IEnumerable<VAS_ReqLine> lines, Func<VAS_ReqLine, decimal> amountOf)
+        /// <param name="docAmountOf">VAS163 2026-11-17: Sr 27 - the same amount in the requisition's price-list currency
+        /// (null = whole line amount); sent as docAmount with currencyIso / currencyPrecision / currencySymbol per row.</param>
+        public static List<object> RequisitionRows(Ctx ctx, IEnumerable<VAS_ReqLine> lines, Func<VAS_ReqLine, decimal> amountOf,
+            Func<VAS_ReqLine, decimal> docAmountOf = null)
         {
             DateTime today = DateTime.Now.Date;
             return lines.GroupBy(l => l.RequisitionId).Select(g =>
@@ -667,6 +822,12 @@ namespace VIS.Controllers
                     dateDoc = D(h.DateDoc),
                     needBy = D(need),
                     amount = amountOf == null ? g.Sum(l => l.Amount(l.Qty)) : g.Sum(amountOf),
+                    // VAS163 2026-11-17: Sr 27 - value in the price-list currency of the requisition (all its lines share it;
+                    // no price list -> schema currency, empty ISO: the page then uses the list currency)
+                    docAmount = docAmountOf == null ? g.Sum(l => l.DocAmount(l.Qty)) : g.Sum(docAmountOf),
+                    currencyIso = h.CurrencyId > 0 ? h.DocCurrencyIso : "",
+                    currencySymbol = h.CurrencyId > 0 ? h.DocCurrencySymbol : "",
+                    currencyPrecision = h.CurrencyId > 0 ? h.DocCurrencyPrecision : -1,
                     lines = g.Count(),
                     status = bucket,
                     statusName = BucketName(ctx, bucket),
@@ -674,7 +835,12 @@ namespace VIS.Controllers
                     sortDate = need
                 };
             }).OrderBy(x => x.sortDate ?? DateTime.MaxValue).ThenBy(x => x.documentNo)
-              .Select(x => (object)new { x.requisitionId, x.documentNo, x.requester, x.warehouse, x.dateDoc, x.needBy, x.amount, x.lines, x.status, x.statusName, x.isLate })
+              .Select(x => (object)new
+              {
+                  x.requisitionId, x.documentNo, x.requester, x.warehouse, x.dateDoc, x.needBy, x.amount,
+                  x.docAmount, x.currencyIso, x.currencySymbol, x.currencyPrecision,
+                  x.lines, x.status, x.statusName, x.isLate
+              })
               .ToList();
         }
 

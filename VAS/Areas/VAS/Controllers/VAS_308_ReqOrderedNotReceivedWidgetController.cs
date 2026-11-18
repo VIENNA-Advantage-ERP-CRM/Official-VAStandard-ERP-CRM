@@ -45,7 +45,8 @@ namespace VIS.Controllers
                     onPurchaseOrder = lines.Count(l => l.PoQty > l.PoRcvQty),
                     onTransfer = lines.Count(l => l.TrfOpenQty > 0),
                     currency = cur,
-                    records = VAS_ReqWidgetData.RequisitionRows(ctx, lines, l => l.Amount(l.InProgressQty))
+                    // VAS163 2026-11-17: Sr 27 - rows also carry the value in the requisition's price-list currency
+                    records = VAS_ReqWidgetData.RequisitionRows(ctx, lines, l => l.Amount(l.InProgressQty), l => l.DocAmount(l.InProgressQty))
                 };
                 return Json(JsonConvert.SerializeObject(data), JsonRequestBehavior.AllowGet);
             }

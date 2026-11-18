@@ -614,9 +614,11 @@
                     renderMainDocTable($m, records, sym);
                 }
             });
+            // VAS163 2026-11-17: Sr 195 the PO number opens the record on the Purchase Order window
+            // (was a record pop-up only, so the click never navigated).
             $m.find('.vas-w205-lnk[data-poid]').on('click', function () {
                 var poid = Number($(this).attr('data-poid'));
-                openRecordModal(poid);
+                zoomToPurchaseOrder(poid);
             });
             $m.find('.vas-w205-iconbtn[data-lines]').on('click', function () {
                 var poid = Number($(this).attr('data-lines'));
@@ -839,7 +841,8 @@
                 foot: footHtml,
                 after: function ($m) {
                     $m.find('#vas205-btn-back').on('click', function () { backModal(); });
-                    $m.find('#vas205-lnk-po-rec').on('click', function () { openRecordModal(po.PurchaseOrderId); });
+                    // VAS163 2026-11-17: Sr 195 the PO number opens the Purchase Order window record.
+                    $m.find('#vas205-lnk-po-rec').on('click', function () { zoomToPurchaseOrder(po.PurchaseOrderId); });
                     renderLinesTable($m, lines, curSym, curIso, curPrec);
                 }
             });

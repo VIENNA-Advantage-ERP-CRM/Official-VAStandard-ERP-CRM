@@ -42,7 +42,8 @@ namespace VIS.Controllers
                     amount = lines.Sum(l => l.Amount(l.NotOrderedQty)),
                     requisitions = lines.Select(l => l.RequisitionId).Distinct().Count(),
                     currency = cur,
-                    records = VAS_ReqWidgetData.RequisitionRows(ctx, lines, l => l.Amount(l.NotOrderedQty))
+                    // VAS163 2026-11-17: Sr 27 - rows also carry the value in the requisition's price-list currency
+                    records = VAS_ReqWidgetData.RequisitionRows(ctx, lines, l => l.Amount(l.NotOrderedQty), l => l.DocAmount(l.NotOrderedQty))
                 };
                 return Json(JsonConvert.SerializeObject(data), JsonRequestBehavior.AllowGet);
             }

@@ -245,8 +245,11 @@ namespace VAS.Controllers
         /// IsTaxIncluded flag or its price list's flag) - same expression as VAS_273 / VAS_270.
         /// </summary>
         private const string TaxIncludedSql =
-            "(CASE WHEN COALESCE(o.IsTaxIncluded, 'N') = 'Y' " +
-            "OR COALESCE((SELECT pl.IsTaxIncluded FROM M_PriceList pl WHERE pl.M_PriceList_ID = o.M_PriceList_ID), 'N') = 'Y' " +
+            // VAS163 2026-11-17: tax-inclusive read from the order's own totals (as VAS_271 Sr 206):
+            // the flags are unreliable (SO 50209: order N, price list Y, tax added on top), so an
+            // order is tax-inclusive only when GrandTotal is not raised by its C_OrderTax total.
+            "(CASE WHEN 2 * (COALESCE(o.GrandTotal, 0) - COALESCE(o.TotalLines, 0)) < " +
+            "(SELECT COALESCE(SUM(COALESCE(ott.TaxAmt, 0)), 0) FROM C_OrderTax ott WHERE ott.C_Order_ID = o.C_Order_ID AND ott.IsActive = 'Y') " +
             "THEN 'Y' ELSE 'N' END)";
 
         /// <summary>
@@ -447,7 +450,9 @@ namespace VAS.Controllers
                     SELECT
                         ol.C_Order_ID AS C_Order_ID,
                         COUNT(1) AS Line_Count,
-                        SUM(COALESCE(ol.QtyOrdered, 0)) AS Order_Qty
+                        SUM(COALESCE(ol.QtyEntered, ol.QtyOrdered, 0)) AS Order_Qty,
+                        MIN(ol.C_UOM_ID) AS Min_Uom_Id,
+                        MAX(ol.C_UOM_ID) AS Max_Uom_Id
                       FROM C_OrderLine ol
                      WHERE ol.IsActive = 'Y'
                      GROUP BY ol.C_Order_ID
@@ -460,6 +465,7 @@ namespace VAS.Controllers
                     COALESCE(rep.Name, N'') AS Representative_Name,
                     COALESCE(ls.Line_Count, 0) AS Line_Count,
                     COALESCE(ls.Order_Qty, 0) AS Order_Qty,
+                    uom.Name AS Uom_Name,
                     bo.Order_Value AS Order_Value,
                     cur.CurSymbol AS Currency_Symbol,
                     cur.ISO_Code AS Currency_Code,
@@ -470,9 +476,14 @@ namespace VAS.Controllers
                   INNER JOIN C_BPartner bp ON ( bp.C_BPartner_ID = bo.Bpartner_Id )
                   LEFT OUTER JOIN AD_User rep ON ( rep.AD_User_ID = bo.Sales_Rep_Id )
                   LEFT OUTER JOIN line_stats ls ON ( ls.C_Order_ID = bo.C_Order_ID )
+                  LEFT OUTER JOIN C_UOM uom ON ( uom.C_UOM_ID = ls.Min_Uom_Id AND ls.Min_Uom_Id = ls.Max_Uom_Id )
                   LEFT OUTER JOIN C_Currency cur ON ( cur.C_Currency_ID = bo.Currency_Id )
                  ORDER BY bo.Date_Ordered DESC, bo.Document_No DESC
                  OFFSET @Row_Offset ROWS FETCH NEXT @Page_Size ROWS ONLY";
+            // VAS163 2026-11-17: Sr 209 Qty is the quantity in each line's selected UOM (QtyEntered,
+            // not the base-UOM QtyOrdered); the UOM name is returned when every line uses the same
+            // UOM (mixed UOMs: the sum without a unit). Sr 208: the DocStatus code is returned so
+            // the list can colour Drafted / In Progress orange.
 
             IDataReader dr2 = null;
             try
@@ -505,6 +516,8 @@ namespace VAS.Controllers
                         RepresentativeName = Util.GetValueOfString(dr2["Representative_Name"]),
                         LineCount = dr2["Line_Count"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr2["Line_Count"]),
                         OrderQty = dr2["Order_Qty"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr2["Order_Qty"]),
+                        OrderUomName = dr2["Uom_Name"] == DBNull.Value ? "" : (Util.GetValueOfString(dr2["Uom_Name"]) ?? "").Trim(), // VAS163 2026-11-17: Sr 209
+                        DocStatusCode = (docStatusCode ?? "").Trim(), // VAS163 2026-11-17: Sr 208
                         OrderValue = dr2["Order_Value"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr2["Order_Value"]),
                         CurrencySymbol = (rowCurSymbol ?? "").Trim(),
                         CurrencyIso = (Util.GetValueOfString(dr2["Currency_Code"]) ?? "").Trim(), // VAS163 2026-11-12: document currency ISO for client-side Intl formatting
@@ -1059,6 +1072,10 @@ namespace VAS.Controllers
             public string RepresentativeName { get; set; }
             public int LineCount { get; set; }
             public decimal OrderQty { get; set; }
+            /// <summary>VAS163 2026-11-17: Sr 209 - UOM of OrderQty when all lines share one UOM, else empty.</summary>
+            public string OrderUomName { get; set; }
+            /// <summary>VAS163 2026-11-17: Sr 208 - raw C_Order.DocStatus for the status chip colour.</summary>
+            public string DocStatusCode { get; set; }
             public decimal OrderValue { get; set; }
             /// <summary>VAS163 2026-11-11: row 93 - document (price list) currency of OrderValue.</summary>
             public string CurrencyIso { get; set; } // VAS163 2026-11-12
