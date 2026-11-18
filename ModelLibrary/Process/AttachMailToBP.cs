@@ -746,6 +746,8 @@ namespace VAdvantage.Process
         /// Stores the mail once (MailAttachment1, current folder) and links it to every target: the first on the
         /// mail itself, the others through MailAttachmentRelatedTo. A mail stored before (another run, or the same
         /// mail in another user's mailbox) only gets the links it does not have yet; without targets it stays unlinked.
+        /// A sent mail stored before with a record keeps its links: one sent from the application is linked to the
+        /// record it was sent from, and a link to the recipient's business partner showed it a second time in the Inbox.
         /// </summary>
         private void LinkMail(dynamic mail, List<MailTarget> targets, string attachType)
         {
@@ -756,9 +758,19 @@ namespace VAdvantage.Process
                 + mailUID + "' AND FolderName='" + folderName + "'"));
             bool linked = false;
             // A mail sent from the application was stored when it was sent: its copy in the Sent folder is that mail
-            if (mailID == 0 && attachType == "M" && folderName == "Sent")
+            if (attachType == "M" && folderName == "Sent")
             {
-                mailID = ClaimSentMail(mail);
+                if (mailID == 0)
+                {
+                    mailID = ClaimSentMail(mail);
+                }
+                // Stored already with a record (sent from it, or fetched before): not linked again
+                if (mailID > 0 && Util.GetValueOfInt(DB.ExecuteScalar("SELECT COALESCE(AD_Table_ID, 0) FROM MailAttachment1"
+                    + " WHERE MailAttachment1_ID=" + mailID)) > 0)
+                {
+                    retVal.Append("MailAlreadyAttachedWithParticularRecord");
+                    return;
+                }
             }
             if (mailID == 0)
             {
