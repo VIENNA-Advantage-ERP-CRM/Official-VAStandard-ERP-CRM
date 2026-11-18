@@ -625,9 +625,42 @@ namespace VAdvantage.Model
             }
         }
 
+        /// <summary>
+        /// Re-price the line from the given price list (used when the invoice header's price list
+        /// is changed while lines exist). Prices are looked up in the line's UOM and attribute set
+        /// instance on the invoice date. When the product has no price on that list, the line keeps
+        /// its current prices and nothing is changed.
+        /// </summary>
+        /// <param name="M_PriceList_ID">price list to price from</param>
+        /// <param name="C_BPartner_ID">business partner</param>
+        /// <returns>true when a price was found and set on the line</returns>
+        public bool SetPriceFromPriceList(int M_PriceList_ID, int C_BPartner_ID)
+        {
+            if (GetM_Product_ID() == 0 || IsDescription() || M_PriceList_ID == 0)
+                return false;
+            MProductPricing pp = new MProductPricing(GetAD_Client_ID(), GetAD_Org_ID(),
+                GetM_Product_ID(), C_BPartner_ID, GetQtyInvoiced(), _IsSOTrx);
+            pp.SetM_PriceList_ID(M_PriceList_ID);
+            pp.SetPriceDate(_DateInvoiced);
+            pp.SetM_AttributeSetInstance_ID(GetM_AttributeSetInstance_ID());
+            pp.SetC_UOM_ID(GetC_UOM_ID());
+            if (!pp.CalculatePrice())
+            {
+                log.Fine("No price on M_PriceList_ID=" + M_PriceList_ID + " for M_Product_ID=" + GetM_Product_ID() + " - price kept");
+                return false;
+            }
+            SetPriceActual(pp.GetPriceStd());
+            SetPriceList(pp.GetPriceList());
+            SetPriceLimit(pp.GetPriceLimit());
+            // price is already in the line UOM (see SetPrice)
+            SetPriceEntered(pp.GetPriceStd());
+            _priceSet = true;
+            return true;
+        }
+
         /**
          * 	Set Price Entered/Actual.
-         * 	Use this Method if the Line UOM is the Product UOM 
+         * 	Use this Method if the Line UOM is the Product UOM
          *	@param PriceActual price
          */
         public void SetPrice(Decimal priceActual)
@@ -4509,7 +4542,7 @@ namespace VAdvantage.Model
 
                 // when purchase order having setting as "Hold payment" then need to set "Hold payment" on Invoice header also.
                 // calling - when IsHoldPayment column exist, Purchase side record, not in processing (like prepareit, completeit..) , not a hold payment Invoice
-                if (!((!String.IsNullOrEmpty(inv.GetConditionalFlag()) && inv.GetConditionalFlag().Equals(MInvoice.CONDITIONALFLAG_Reversal))
+                if (!inv.IsBulkLineUpdate && !((!String.IsNullOrEmpty(inv.GetConditionalFlag()) && inv.GetConditionalFlag().Equals(MInvoice.CONDITIONALFLAG_Reversal))
                     || IsReversal()) && inv.Get_ColumnIndex("IsHoldPayment") > 0 && !inv.IsSOTrx() && !inv.IsProcessing() && !inv.IsHoldPayment())
                 {
                     if (!UpdateHoldPayment())
@@ -4533,6 +4566,12 @@ namespace VAdvantage.Model
             catch (Exception ex)
             {
                 // MessageBox.Show("MInvoiceLine--AfterSave");
+            }
+
+            // The header is re-pricing all its lines: it recalculates the invoice tax and totals once at the end
+            if (inv != null && inv.IsBulkLineUpdate)
+            {
+                return true;
             }
 
             if (!(!String.IsNullOrEmpty(inv.GetConditionalFlag()) &&
@@ -4896,7 +4935,7 @@ namespace VAdvantage.Model
          *	Update Tax & Header
          *	@return true if header updated with tax
          */
-        private bool UpdateHeaderTax(MInvoice invoice)
+        internal bool UpdateHeaderTax(MInvoice invoice)
         {
             try
             {
@@ -5031,14 +5070,32 @@ namespace VAdvantage.Model
         /// Update Invoice as Hold Payment or not based on order selected on respective Invoice
         /// </summary>
         /// <returns>True, In case when record updated successfully or when no record found as Hold payment Order</returns>
+        /// <summary>
+        /// Hold payment flag on the invoice header from the order lines of this invoice - run once by
+        /// MInvoice.FinishBulkLineUpdate after a bulk line save (the per-line save skips it then).
+        /// </summary>
+        /// <returns>false when the header could not be updated</returns>
+        internal bool UpdateHoldPaymentForInvoice()
+        {
+            if (!UpdateHoldPayment())
+            {
+                log.SaveWarning("", Msg.GetMsg(GetCtx(), "VIS_HoldPaymentNotUpdated"));
+                return false;
+            }
+            return true;
+        }
+
         private bool UpdateHoldPayment()
         {
             String sql = @"SELECT DISTINCT COALESCE(SUM(
                           CASE WHEN IsHoldPayment!= 'N' THEN 1 ELSE 0 END) , 0) AS IsHoldPayment
                         FROM C_InvoiceLine INNER JOIN C_OrderLine ON C_InvoiceLine.C_OrderLine_ID=C_OrderLine.C_OrderLine_ID
                         INNER JOIN C_Order ON C_OrderLine.C_Order_ID = C_Order.C_Order_ID
-                        WHERE C_InvoiceLine.C_Invoice_ID =  " + GetC_Invoice_ID();
-            int no = DataBase.DB.GetSQLValue(Get_Trx(), sql, null);
+                        WHERE C_InvoiceLine.C_Invoice_ID = @param1";
+            // bind the invoice: passing null here picked the string overload, which sent an untyped null
+            // @param1 - PostgreSQL (Npgsql) rejects that, the query failed and returned -1, so the hold
+            // payment of the order was never copied to the invoice
+            int no = DataBase.DB.GetSQLValue(Get_Trx(), sql, GetC_Invoice_ID());
             if (no > 0)
             {
                 no = DB.ExecuteQuery("UPDATE C_Invoice SET IsHoldPayment = 'Y' WHERE C_Invoice_ID = " + GetC_Invoice_ID(), null, Get_Trx());

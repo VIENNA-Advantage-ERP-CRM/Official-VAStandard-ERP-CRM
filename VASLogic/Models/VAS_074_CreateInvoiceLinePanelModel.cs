@@ -2225,6 +2225,11 @@ namespace VASLogic.Models
             try
             {
                 MInvoice inv = new MInvoice(ctx, C_Invoice_ID, trx);
+                // Bulk mode: each line save skips the invoice tax / header total / withholding / hold
+                // payment update (which, with withholding, also re-saves the whole invoice); it runs
+                // once for the batch below (MInvoice.FinishBulkLineUpdate). Needs inv as every line's parent.
+                List<MInvoiceLine> savedLines = new List<MInvoiceLine>();
+                inv.IsBulkLineUpdate = true;
                 foreach (InvoiceLineInput input in rows)
                 {
                     if (input.M_Product_ID <= 0 && input.C_Charge_ID <= 0)
@@ -2234,8 +2239,8 @@ namespace VASLogic.Models
                         ? new MInvoiceLine(ctx, input.C_InvoiceLine_ID, trx)
                         : new MInvoiceLine(inv);
 
-                    if (input.C_InvoiceLine_ID <= 0)
-                        line.SetInvoice(inv);
+                    // existing lines too, so the line save sees the bulk flag on its parent
+                    line.SetInvoice(inv);
 
                     if (input.M_Product_ID > 0)
                     {
@@ -2343,7 +2348,12 @@ namespace VASLogic.Models
                             Message = err
                         });
                     }
+                    else
+                    {
+                        savedLines.Add(line);
+                    }
                 }
+                inv.IsBulkLineUpdate = false;
 
                 // Any line failed -> roll the whole batch back (all-or-nothing) and return the
                 // per-line errors; the client paints each on its record row.
@@ -2352,6 +2362,16 @@ namespace VASLogic.Models
                     trx.Rollback();
                     res.ErrorKey = "VAS_074_SaveFailed";
                     res.ErrorDetail = res.LineErrors[0].Message;
+                    return res;
+                }
+
+                // Invoice tax per tax rate, header totals, withholding and hold payment - once for the batch
+                if (!inv.FinishBulkLineUpdate(savedLines))
+                {
+                    trx.Rollback();
+                    ValueNamePair fp = VLogger.RetrieveError();
+                    res.ErrorKey = "VAS_074_SaveFailed";
+                    res.ErrorDetail = fp != null ? (string.IsNullOrEmpty(fp.GetName()) ? Msg.GetMsg(ctx, fp.GetValue()) : fp.GetName()) : "";
                     return res;
                 }
 
