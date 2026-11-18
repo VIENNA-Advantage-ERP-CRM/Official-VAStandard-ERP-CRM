@@ -224,8 +224,11 @@ namespace VAS.Controllers
         /// IsTaxIncluded flag or its price list's flag) - same expression as VAS_270 / VAS_273.
         /// </summary>
         private const string TaxIncludedSql =
-            "(CASE WHEN COALESCE(o.IsTaxIncluded, 'N') = 'Y' " +
-            "OR COALESCE((SELECT pl.IsTaxIncluded FROM M_PriceList pl WHERE pl.M_PriceList_ID = o.M_PriceList_ID), 'N') = 'Y' " +
+            // VAS163 2026-11-17: tax-inclusive read from the order's own totals (as VAS_271 Sr 206):
+            // the flags are unreliable (SO 50209: order N, price list Y, tax added on top), so an
+            // order is tax-inclusive only when GrandTotal is not raised by its C_OrderTax total.
+            "(CASE WHEN 2 * (COALESCE(o.GrandTotal, 0) - COALESCE(o.TotalLines, 0)) < " +
+            "(SELECT COALESCE(SUM(COALESCE(ott.TaxAmt, 0)), 0) FROM C_OrderTax ott WHERE ott.C_Order_ID = o.C_Order_ID AND ott.IsActive = 'Y') " +
             "THEN 'Y' ELSE 'N' END)";
 
         /// <summary>
@@ -453,10 +456,24 @@ namespace VAS.Controllers
             // PO dashboard's VAS_215 Avg cycle). Day arithmetic stays in C#.
             int cycleCount;
             double cycleDaysTotal;
-            ComputeCycleDays(ctx, repId, monthStart, monthEnd, out cycleCount, out cycleDaysTotal);
+            // VAS163 2026-11-17: Sr 73 the card still showed "—" for a selected representative whose
+            // orders were shipped but not yet FULLY delivered (e.g. Anu: Nov SO and Aug SO both partly
+            // shipped, no fully delivered order in 12 months). Fallback chain, always for the selected
+            // representative only: fully delivered orders of the month -> orders of the month with at
+            // least one completed shipment (days to the latest shipment so far) -> the same two steps
+            // over the trailing 12 months.
+            ComputeCycleDays(ctx, repId, monthStart, monthEnd, true, out cycleCount, out cycleDaysTotal);
             if (cycleCount == 0)
             {
-                ComputeCycleDays(ctx, repId, monthStart.AddMonths(-12), monthEnd, out cycleCount, out cycleDaysTotal);
+                ComputeCycleDays(ctx, repId, monthStart, monthEnd, false, out cycleCount, out cycleDaysTotal);
+            }
+            if (cycleCount == 0)
+            {
+                ComputeCycleDays(ctx, repId, monthStart.AddMonths(-12), monthEnd, true, out cycleCount, out cycleDaysTotal);
+            }
+            if (cycleCount == 0)
+            {
+                ComputeCycleDays(ctx, repId, monthStart.AddMonths(-12), monthEnd, false, out cycleCount, out cycleDaysTotal);
             }
             result.AvgCycleDays = cycleCount > 0 ? (decimal?)Math.Round(cycleDaysTotal / cycleCount, 1) : null;
 
@@ -468,7 +485,7 @@ namespace VAS.Controllers
         /// delivered booked orders dated in [fromDate, toDate). Orders without a
         /// completed/closed shipment, or whose shipment predates the order, are skipped.
         /// </summary>
-        private void ComputeCycleDays(Ctx ctx, int repId, DateTime fromDate, DateTime toDate, out int cycleCount, out double cycleDaysTotal)
+        private void ComputeCycleDays(Ctx ctx, int repId, DateTime fromDate, DateTime toDate, bool fullyDeliveredOnly, out int cycleCount, out double cycleDaysTotal)
         {
             cycleCount = 0;
             cycleDaysTotal = 0;
@@ -520,8 +537,10 @@ namespace VAS.Controllers
                         )
                     ) AS Completion_Date
                   FROM line_stats ls
-                 WHERE ( ls.Doc_Status_Code = 'CL' AND ls.Qty_Delivered > 0 )
-                    OR ( ls.Qty_Ordered > 0 AND ls.Qty_Delivered >= ls.Qty_Ordered )";
+                 WHERE " + (fullyDeliveredOnly
+                    ? @"( ls.Doc_Status_Code = 'CL' AND ls.Qty_Delivered > 0 )
+                    OR ( ls.Qty_Ordered > 0 AND ls.Qty_Delivered >= ls.Qty_Ordered )"
+                    : "ls.Qty_Delivered > 0"); // VAS163 2026-11-17: Sr 73 partly shipped orders as fallback
 
             IDataReader dr = null;
             try

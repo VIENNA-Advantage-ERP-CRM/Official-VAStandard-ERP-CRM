@@ -803,10 +803,25 @@
 
         // Sr 8.28: a refresh also re-arms the list and re-creates the modal shell if
         // the host removed it, so the widget stays clickable after "refresh all".
+        // VAS163 2026-11-17: Sr 212 after "Refresh" in the widget's '...' (mosaic) menu - the host
+        // calls frame.refreshWidget() -> this.refreshWidget() - the tile stayed empty until the page
+        // was reloaded: the old shell / list nodes could be detached or emptied by the host (and
+        // the root itself taken out of the frame), so the reloaded figures were written into nodes
+        // that were no longer on screen. The refresh now rebuilds the tile shell from scratch
+        // (fresh nodes, handlers and size observer), puts the root back into the frame's content
+        // grid when the host removed it, resets the tile paging, and then reloads the data.
         this.refreshWidget = function () {
             if (!$mask || !$.contains(document.body, $mask[0])) { createModal(); }
-            if ($shell && !$.contains($root[0], $shell[0])) { $root.append($shell); }
-            bindList();
+            if (tileObserver) { tileObserver.disconnect(); tileObserver = null; }
+            if ($shell) { $shell.remove(); }
+            $root.find('.vasso-retry').remove();
+            createWidget();
+            if (!$.contains(document.body, $root[0]) && $self.frame && $self.frame.getContentGrid) {
+                try { $self.frame.getContentGrid().append($root); } catch (e) { /* host grid not available */ }
+            }
+            tileState = { rows: [], page: 0, size: 3 };
+            summaryState = 'loading';
+            summary = null;
             loadSummary();
         };
     };

@@ -761,7 +761,8 @@
                 '  <div><div class="l">' + esc(lbl('VAS_217_AlreadyOrdered', 'Already ordered')) + '</div><div class="v">' + (req.alreadyOrderedQty > 0 ? num(req.alreadyOrderedQty) : '—') + '</div></div>' +
                 '  <div><div class="l">' + esc(lbl('VAS_217_PendingQty', 'Pending qty')) + '</div><div class="v">' + num(req.pendingQty) + '</div></div>' +
                 '  <div><div class="l">' + esc(lbl('VAS_217_NeededBy', 'Needed by')) + '</div><div class="v">' + esc(needDisplay) + '</div></div>' +
-                '  <div><div class="l">' + esc(lbl('VAS_Status', 'Status')) + '</div><div class="v">' + esc(statusLabel(req.status)) + '</div></div>' +
+                // VAS163 2026-11-17: Sr 196 the shared VAS_Status text is "Status:" - drop the trailing colon (as the grid header does).
+                '  <div><div class="l">' + esc(lbl('VAS_Status', 'Status').replace(/\s*[:;]\s*$/, '')) + '</div><div class="v">' + esc(statusLabel(req.status)) + '</div></div>' +
                 '</div>' +
                 '<div class="vas-217-orw-msec">' + esc(lbl('VAS_217_RequisitionLines', 'Requisition lines · select one or many')) + '</div>' +
                 '<div class="vas-217-orw-mtwrap" id="vas_217_lines_wrap"></div>';

@@ -146,8 +146,11 @@ namespace VAS.Controllers
         /// own IsTaxIncluded flag or its price list's flag) - same expression as VAS_270 / VAS_274.
         /// </summary>
         private const string TaxIncludedSql =
-            "(CASE WHEN COALESCE(o.IsTaxIncluded, 'N') = 'Y' " +
-            "OR COALESCE((SELECT pl.IsTaxIncluded FROM M_PriceList pl WHERE pl.M_PriceList_ID = o.M_PriceList_ID), 'N') = 'Y' " +
+            // VAS163 2026-11-17: tax-inclusive read from the order's own totals (as VAS_271 Sr 206):
+            // the flags are unreliable (SO 50209: order N, price list Y, tax added on top), so an
+            // order is tax-inclusive only when GrandTotal is not raised by its C_OrderTax total.
+            "(CASE WHEN 2 * (COALESCE(o.GrandTotal, 0) - COALESCE(o.TotalLines, 0)) < " +
+            "(SELECT COALESCE(SUM(COALESCE(ott.TaxAmt, 0)), 0) FROM C_OrderTax ott WHERE ott.C_Order_ID = o.C_Order_ID AND ott.IsActive = 'Y') " +
             "THEN 'Y' ELSE 'N' END)";
 
         /// <summary>
@@ -169,6 +172,10 @@ namespace VAS.Controllers
                        o.DatePromised AS Date_Promised,
                        " + OrderValueExclTaxSql + @" AS Order_Value,
                        o.C_Currency_ID AS Currency_Id,
+                       COALESCE(o.DateAcct, o.DateOrdered) AS Date_Acct,
+                       o.C_ConversionType_ID AS Conversion_Type_Id,
+                       o.AD_Client_ID AS Client_Id,
+                       o.AD_Org_ID AS Org_Id,
                        o.C_BPartner_ID AS Bpartner_Id
                   FROM C_Order o
                  WHERE o.AD_Client_ID = @AD_Client_ID
@@ -221,6 +228,10 @@ namespace VAS.Controllers
                         bo.Date_Promised AS Date_Promised,
                         bo.Order_Value AS Order_Value,
                         bo.Currency_Id AS Currency_Id,
+                        bo.Date_Acct AS Date_Acct,
+                        bo.Conversion_Type_Id AS Conversion_Type_Id,
+                        bo.Client_Id AS Client_Id,
+                        bo.Org_Id AS Org_Id,
                         bo.Bpartner_Id AS Bpartner_Id
                       FROM base_orders bo
                       INNER JOIN line_pending lp ON ( lp.C_Order_ID = bo.C_Order_ID )
@@ -248,11 +259,21 @@ namespace VAS.Controllers
                 new SqlParameter("@Next7_End", next7EndExclusive)
             };
 
+            // VAS163 2026-11-17: Sr 211 the SO value total (ex-tax Order_Value) is shown in the base
+            // currency, so an order in another currency is converted with the configured rates
+            // (currencyConvert, as VAS_272) before summing - it used to add e.g. USD amounts to INR
+            // ones unconverted. The id is an int read from the DB, inlined like VAS_272.
+            int baseCurrencyId = GetBaseCurrencyId(ctx);
+            string totalValueSql = baseCurrencyId > 0
+                ? "ROUND(COALESCE(SUM(CASE WHEN Currency_Id = " + baseCurrencyId + " THEN COALESCE(Order_Value, 0) " +
+                  "ELSE COALESCE(currencyConvert(COALESCE(Order_Value, 0), Currency_Id, " + baseCurrencyId + ", Date_Acct, Conversion_Type_Id, Client_Id, Org_Id), 0) END), 0), 6)"
+                : "COALESCE(SUM(Order_Value), 0)";
+
             string summarySql = @"
                 WITH " + BuildPendingOrdersCtesSql(ctx) + @"
                 SELECT
                     COUNT(1) AS Due_This_Month_Count,
-                    COALESCE(SUM(Order_Value), 0) AS Due_This_Month_Value,
+                    " + totalValueSql + @" AS Due_This_Month_Value,
                     COALESCE(SUM(
                         CASE WHEN Date_Promised >= @Today AND Date_Promised < @Next7_End
                              THEN 1 ELSE 0
@@ -763,6 +784,29 @@ namespace VAS.Controllers
         /// VAS_205) so the widget labels its amounts with it instead of a hard-coded rupee.
         /// Left empty (client shows no symbol) when it cannot be resolved.
         /// </summary>
+        /// <summary>
+        /// VAS163 2026-11-17: Sr 211 C_Currency_ID of the client's primary accounting schema
+        /// (same lookup as FillBaseCurrency / VAS_272.GetBaseCurrencyId); 0 when unresolved.
+        /// </summary>
+        private static int GetBaseCurrencyId(Ctx ctx)
+        {
+            if (ctx == null) { return 0; }
+            try
+            {
+                return Util.GetValueOfInt(DB.ExecuteScalar(@"
+                    SELECT cs.C_Currency_ID
+                      FROM AD_ClientInfo ci
+                     INNER JOIN C_AcctSchema cs ON ( cs.C_AcctSchema_ID = ci.C_AcctSchema1_ID )
+                     WHERE ci.AD_Client_ID = @AD_Client_ID",
+                    new[] { new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()) }, null));
+            }
+            catch (Exception ex)
+            {
+                Log.Log(Level.WARNING, "GetBaseCurrencyId", ex);
+                return 0;
+            }
+        }
+
         private static void FillBaseCurrency(Ctx ctx, CurrencyPayload target)
         {
             if (ctx == null || target == null) { return; }
