@@ -1783,7 +1783,9 @@ namespace VAdvantage.Model
                 int ImageID = GenerateQRImage();
                 if (ImageID > 0)
                 {
-                    if (DB.ExecuteQuery("UPDATE M_InOut SET AD_Image_ID = " + ImageID + " WHERE M_InOut_ID = " + GetM_InOut_ID()) < 0)
+                    // Run in the document's own transaction: the new shipment is not committed yet, so outside it this
+                    // update found no row (image never linked) and used a second database connection
+                    if (DB.ExecuteQuery("UPDATE M_InOut SET AD_Image_ID = " + ImageID + " WHERE M_InOut_ID = " + GetM_InOut_ID(), null, Get_Trx()) < 0)
                     {
                         log.Info(Msg.GetMsg(GetCtx(), "VAS_QRImageNotUpdated"));
                     }
@@ -1911,6 +1913,51 @@ namespace VAdvantage.Model
 
             retValue = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, Get_Trx()));
             return retValue;
+        }
+
+        /// <summary>
+        /// On-hand quantity (M_Storage) of every Locator / Product / Attribute Set Instance used on the lines of this document,
+        /// read with one query. Used by the negative inventory check on completion for a document dated today or later.
+        /// </summary>
+        /// <returns>key (see GetStorageQtyKey) and on-hand quantity</returns>
+        private Dictionary<string, decimal> GetStorageQtyOfLines()
+        {
+            Dictionary<string, decimal> storageQty = new Dictionary<string, decimal>();
+            string sql = @"SELECT s.M_Locator_ID, s.M_Product_ID, NVL(s.M_AttributeSetInstance_ID, 0) AS M_AttributeSetInstance_ID,
+                    SUM(s.QtyOnHand) AS QtyOnHand
+                    FROM M_Storage s
+                    WHERE s.AD_Client_ID = " + GetAD_Client_ID() + @"
+                    AND s.M_Product_ID IN (SELECT M_Product_ID FROM M_InOutLine WHERE M_InOut_ID = " + GetM_InOut_ID() + @")
+                    AND s.M_Locator_ID IN (SELECT M_Locator_ID FROM M_InOutLine WHERE M_InOut_ID = " + GetM_InOut_ID() + @")
+                    GROUP BY s.M_Locator_ID, s.M_Product_ID, NVL(s.M_AttributeSetInstance_ID, 0)";
+            DataSet ds = DB.ExecuteDataset(sql, null, Get_Trx());
+            if (ds != null && ds.Tables.Count > 0)
+            {
+                foreach (DataRow dr in ds.Tables[0].Rows)
+                {
+                    storageQty[GetStorageQtyKey(Util.GetValueOfInt(dr["M_Locator_ID"]), Util.GetValueOfInt(dr["M_Product_ID"]),
+                        Util.GetValueOfInt(dr["M_AttributeSetInstance_ID"]))] = Util.GetValueOfDecimal(dr["QtyOnHand"]);
+                }
+            }
+            return storageQty;
+        }
+
+        /// <summary>
+        /// On-hand quantity of the line's Locator / Product / Attribute Set Instance from the result of GetStorageQtyOfLines
+        /// </summary>
+        /// <param name="storageQty">result of GetStorageQtyOfLines</param>
+        /// <param name="iol">shipment line</param>
+        /// <returns>on-hand quantity, ZERO when there is no storage record</returns>
+        private decimal GetStorageQty(Dictionary<string, decimal> storageQty, MInOutLine iol)
+        {
+            decimal qty;
+            storageQty.TryGetValue(GetStorageQtyKey(iol.GetM_Locator_ID(), iol.GetM_Product_ID(), iol.GetM_AttributeSetInstance_ID()), out qty);
+            return qty;
+        }
+
+        private static string GetStorageQtyKey(int M_Locator_ID, int M_Product_ID, int M_AttributeSetInstance_ID)
+        {
+            return M_Locator_ID + "_" + M_Product_ID + "_" + M_AttributeSetInstance_ID;
         }
 
         /// <summary>
@@ -2182,6 +2229,18 @@ namespace VAdvantage.Model
                         StringBuilder products = new StringBuilder();   // Added by sukhwinder for storing product aand locators IDs. on 19Dec, 2017
                         StringBuilder locators = new StringBuilder();
                         bool check = false;
+
+                        // Performance: on-hand stock as on today is kept in M_Storage, so for a document dated today (or later) read it
+                        // once for all lines instead of scanning M_Transaction history once per line.
+                        // A back-dated document still reads the quantity as on its movement date from M_Transaction (below).
+                        // Container (pallet) quantities are only in M_Transaction, so that case is unchanged.
+                        Dictionary<string, decimal> storageQty = null;
+                        if (!isContainrApplicable && ioLine.Length > 0 && GetMovementDate() != null
+                            && GetMovementDate().Value.Date >= DateTime.Now.Date)
+                        {
+                            storageQty = GetStorageQtyOfLines();
+                        }
+
                         for (int i = 0; i < ioLine.Length; i++)
                         {
                             MInOutLine iol = new MInOutLine(Env.GetCtx(), ioLine[i], Get_TrxName());
@@ -2210,7 +2269,8 @@ namespace VAdvantage.Model
                                     " AND t.M_Product_ID = " + iol.GetM_Product_ID() + " AND NVL(t.M_AttributeSetInstance_ID,0) = " + iol.GetM_AttributeSetInstance_ID() +
                                     " AND NVL(t.M_ProductContainer_ID, 0) = " + iol.GetM_ProductContainer_ID());
                                 }
-                                decimal qty = Util.GetValueOfDecimal(DB.ExecuteScalar(sql.ToString(), null, Get_TrxName()));
+                                decimal qty = storageQty != null ? GetStorageQty(storageQty, iol)
+                                    : Util.GetValueOfDecimal(DB.ExecuteScalar(sql.ToString(), null, Get_TrxName()));
                                 decimal qtyToMove = iol.GetMovementQty();
                                 if (qty < qtyToMove)
                                 {
@@ -2239,7 +2299,8 @@ namespace VAdvantage.Model
                                         " AND t.M_Product_ID = " + iol.GetM_Product_ID() + " AND NVL(t.M_AttributeSetInstance_ID,0) = " + iol.GetM_AttributeSetInstance_ID() +
                                         " AND NVL(t.M_ProductContainer_ID, 0) = " + iol.GetM_ProductContainer_ID());
                                 }
-                                decimal qty = Util.GetValueOfDecimal(DB.ExecuteScalar(sql.ToString(), null, Get_TrxName()));
+                                decimal qty = storageQty != null ? GetStorageQty(storageQty, iol)
+                                    : Util.GetValueOfDecimal(DB.ExecuteScalar(sql.ToString(), null, Get_TrxName()));
                                 decimal qtyToMove = iol.GetMovementQty();
                                 if (qty < qtyToMove)
                                 {
@@ -4487,7 +4548,18 @@ namespace VAdvantage.Model
                 DB.ExecuteQuery("UPDATE M_InOutLine SET CurrentCostPrice = " + currentCostPrice +
                                                   @" WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
 
-                orderLine = new MOrderLine(GetCtx(), sLine.GetC_OrderLine_ID(), null);
+                // Performance: CompleteIt already loaded this order line for the shipment line (costingCheck.orderline);
+                // reuse it instead of reading it again (outside the transaction) for every costed line.
+                // Only QtyOrdered and the line amounts are used here, and completion does not change them.
+                if (costingCheck.orderline != null && sLine.GetC_OrderLine_ID() > 0
+                    && costingCheck.orderline.GetC_OrderLine_ID() == sLine.GetC_OrderLine_ID())
+                {
+                    orderLine = costingCheck.orderline;
+                }
+                else
+                {
+                    orderLine = new MOrderLine(GetCtx(), sLine.GetC_OrderLine_ID(), null);
+                }
                 if (IsSOTrx() && !IsReturnTrx())  // shipment
                 {
                     #region shipment
