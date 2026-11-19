@@ -2595,6 +2595,10 @@ namespace VASLogic.Models
             {
                 MOrder order = new MOrder(ctx, C_Order_ID, trx);
                 ShiftNewLinesToTop(C_Order_ID, rows, trx);
+                // Bulk mode: each line save skips the order tax / header total update; it runs once
+                // for the batch below (MOrder.FinishBulkLineUpdate). Needs order as every line's parent.
+                List<MOrderLine> savedLines = new List<MOrderLine>();
+                order.IsBulkLineUpdate = true;
                 foreach (OrderLineInput input in rows)
                 {
                     if (input.M_Product_ID <= 0 && input.C_Charge_ID <= 0)
@@ -2606,6 +2610,8 @@ namespace VASLogic.Models
 
                     if (input.C_OrderLine_ID <= 0)
                         line.SetOrder(order);
+                    else
+                        line.SetHeaderInfo(order);  // existing lines too, so the line save sees the bulk flag on its parent
 
                     // A saved line whose product / charge was swapped (a Drafted order keeps
                     // the cell editable): the previous product's attribute instance must not
@@ -2692,13 +2698,28 @@ namespace VASLogic.Models
                             Message = err
                         });
                     }
+                    else
+                    {
+                        savedLines.Add(line);
+                    }
                 }
+                order.IsBulkLineUpdate = false;
 
                 if (res.LineErrors.Count > 0)
                 {
                     trx.Rollback();
                     res.ErrorKey = "VAS_107_SaveFailed";
                     res.ErrorDetail = res.LineErrors[0].Message;
+                    return res;
+                }
+
+                // Order tax per tax rate and header totals - once for the batch
+                if (!order.FinishBulkLineUpdate(savedLines))
+                {
+                    trx.Rollback();
+                    ValueNamePair fp = VLogger.RetrieveError();
+                    res.ErrorKey = "VAS_107_SaveFailed";
+                    res.ErrorDetail = fp != null ? (string.IsNullOrEmpty(fp.GetName()) ? Msg.GetMsg(ctx, fp.GetValue()) : fp.GetName()) : "";
                     return res;
                 }
 

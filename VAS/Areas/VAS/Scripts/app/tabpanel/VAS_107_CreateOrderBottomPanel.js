@@ -297,7 +297,12 @@
                 "VAS_107_Surcharge",
                 "VAS_107_Total",
                 "VAS_107_DocLockedNow",
-                "VAS_107_SaveHeaderFirst",
+                "VAS_107_HeaderNotSaved",
+                "VAS_107_HeaderNotConfirmed",
+                "VAS_107_PriceKeptNotOnList",
+                "VAS_107_PriceZeroNotOnList",
+                "VAS_107_LinesChangedOnServer",
+                "VAS_107_LinesChangedOnServerKept",
                 "VAS_107_SaveRows",
                 "VAS_107_AddDescription",
                 "VAS_107_Saving",
@@ -647,18 +652,32 @@
         }
         function showBusy(show) { if ($busy && $busy[0]) $busy[0].style.visibility = show ? "visible" : "hidden"; }
 
-        this.fetchData = function (recordID, page) {
+        this.fetchData = function (recordID, page, onLoaded) {
             // A parked duplicate (see startPanel) only remembers what it was asked for, so
             // it can pick up where the live panel left off if it ever takes over.
             if ($self._parked) { $self._parkedRecord = recordID; return; }
             // Framework calls fetchData(recordID) on record load -> reset to page 0; the
             // pager calls it with an explicit page. Server returns LinePageSize (20) rows.
             var reqPage = (typeof page === "number" && page >= 0) ? page : 0;
+            // The panel's own reload after it saved the header (onLoaded) stays on the page
+            // the user is on. onLoaded(ok) runs once a load of this order has been painted -
+            // by this request or by a newer one that superseded it (e.g. the framework's own
+            // reload after the same save).
+            if (typeof onLoaded === "function") {
+                loadWaiters.push(onLoaded);
+                if (typeof page !== "number") reqPage = linePage;
+            }
             // Capture a monotonic token before the AJAX call so a stale response arriving
             // after the user navigated to a different record can be silently discarded in
             // the success callback (mySeq !== fetchSeq means a newer load has started).
             var mySeq = ++fetchSeq;
             var isPageChange = (typeof page === "number");
+            // A reload of the SAME order (e.g. after the header was saved) while the panel
+            // still holds unsaved lines: keep that work (merged in the success handler) and
+            // reload the page the user is on, since page navigation is blocked while lines are
+            // unsaved - so all of them are on the current page.
+            var keepUnsaved = !isPageChange && !!parent && +parent.C_Order_ID === +recordID && hasPanelChanges();
+            if (keepUnsaved) reqPage = linePage;
             // Tear down any open dialog FIRST. The framework calls fetchData to (re)load the
             // record - including after a save - and a still-open dialog's position:fixed
             // backdrop would otherwise be left orphaned over the page (morePopoverFor is
@@ -679,9 +698,8 @@
                     // Discard stale responses: a newer fetchData call has already started.
                     if (mySeq !== fetchSeq) { if (isPageChange) showBusy(false); return; }
                     var data = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
-                    // Reload of the SAME order (e.g. after a header save): the unsaved panel
-                    // work must survive it. Capture the previous lines before they are rebuilt.
-                    var prevLines = (!isPageChange && parent && data && +parent.C_Order_ID === +data.C_Order_ID) ? lines : null;
+                    // The header snapshot the unsaved lines were priced against.
+                    var prevParent = parent;
                     parent = data || null;
                     linesTotal = (parent && parent.LinesTotal) || 0;
                     linePage = (parent && +parent.LinePage) || 0;
@@ -716,9 +734,21 @@
                     // new order so its val rule re-resolves against the new header context
                     // (e.g. a different C_BPartner_ID) instead of serving the prior order's list.
                     _mlookupCache = {};
-                    lines = [];
-                    if (parent && parent.Lines) for (var j = 0; j < parent.Lines.length; j++) lines.push(fromServerRow(parent.Lines[j]));
-                    if (prevLines) lines = mergeReloadedLines(prevLines, lines);
+                    // Same order reloaded after its header was saved with another price list (or
+                    // Tax Included setting): the saved lines were re-priced on the server and come
+                    // back with this load; the lines still unsaved in the panel were priced against
+                    // the old header.
+                    var pricingChanged = !!prevParent && !!parent && +prevParent.C_Order_ID === +parent.C_Order_ID
+                        && (+prevParent.M_PriceList_ID !== +parent.M_PriceList_ID || !!prevParent.IsTaxIncluded !== !!parent.IsTaxIncluded);
+                    var currencyChanged = pricingChanged && +prevParent.C_Currency_ID !== +parent.C_Currency_ID;
+                    var carriedLines = [];
+                    if (keepUnsaved && parent && +parent.C_Order_ID === +recordID && hasPanelChanges()) {
+                        // price list changed -> the price comes from the new list, not from the user's typed price
+                        carriedLines = mergeReloadedLines(parent.Lines || [], pricingChanged);
+                    } else {
+                        lines = [];
+                        if (parent && parent.Lines) for (var j = 0; j < parent.Lines.length; j++) lines.push(fromServerRow(parent.Lines[j]));
+                    }
                     editing = null; morePopoverFor = null;
                     render();
                     if ($root && $root[0]) $root.scrollTop(0);
@@ -726,13 +756,97 @@
                     // Loaded while another user's document action holds the order: say why
                     // the lines are read-only (not again on a page change).
                     if (!isPageChange && parent && parent.IsProcessingByOther) showLockedByOtherToast();
+                    // re-price the unsaved panel lines against the new header
+                    var finish = function () { if (isPageChange) showBusy(false); flushLoadWaiters(true); };
+                    if (pricingChanged && hasPanelChanges()) repriceUnsavedLines(currencyChanged, finish);
+                    // server copy + the user's edits: recalculate the amounts at the server's price
+                    else if (carriedLines.length) recalcLines(carriedLines, finish);
+                    else finish();
                 },
                 error: function (err) {
                     console.log(err);
-                    if (isPageChange && mySeq === fetchSeq) showBusy(false);
+                    if (mySeq !== fetchSeq) return;   // a newer load answers the waiters
+                    if (isPageChange) showBusy(false);
+                    flushLoadWaiters(false);
                 }
             });
         };
+
+        /* Callbacks waiting for the next painted load (see fetchData's onLoaded). */
+        var loadWaiters = [];
+        function flushLoadWaiters(ok) {
+            var w = loadWaiters; loadWaiters = [];
+            for (var i = 0; i < w.length; i++) { try { w[i](ok); } catch (e) { if (window.console) console.log(e); } }
+        }
+
+        /* Recalculate amounts / tax of the given lines at their current price (PriceEntered
+           callout keeps the price), one after the other; done() when all have settled. */
+        function recalcLines(list, done) {
+            function next(i) {
+                if (i >= list.length) { if (done) done(); return; }
+                var l = list[i];
+                if (lines.indexOf(l) < 0) { next(i + 1); return; }
+                runCallout(l, +l.values.M_Product_ID > 0 ? "PriceEntered" : "C_Tax_ID", function () { next(i + 1); });
+            }
+            next(0);
+        }
+
+        /* Re-price the panel's unsaved lines (new, or edited saved lines) after the header
+           price list changed, through the same line callouts the grid uses, so the line
+           context is the saved header (parent) again:
+             - product line: the UOM callout re-prices from the new price list - also when the
+               user had typed a price (the price list wins after a price list change). When the
+               product has no price on the new list:
+                 same currency on both lists -> the line keeps its previous price;
+                 other currency               -> the price stays 0;
+               both reported with the lines concerned;
+             - charge line: price kept, amounts / tax recalculated.
+           done() runs when every line has settled. */
+        function repriceUnsavedLines(currencyChanged, done) {
+            var todo = lines.filter(function (l) {
+                return (l.status === "new" || l.dirty) && (+l.values.M_Product_ID > 0 || +l.values.C_Charge_ID > 0);
+            });
+            var kept = [], zero = [];
+            function lineLabel(l) {
+                var no = +l.values.Line || 0;
+                return (no > 0 ? no + " " : "") + "(" + (l.display.productName || "") + ")";
+            }
+            function next(i) {
+                if (i >= todo.length) {
+                    if (zero.length) showToast(lbl("VAS_107_PriceZeroNotOnList", "No price on the selected price list (other currency) - price set to 0 for:") + " " + zero.join(", "));
+                    if (kept.length) showToast(lbl("VAS_107_PriceKeptNotOnList", "No price on the selected price list - previous price kept for:") + " " + kept.join(", "));
+                    if (done) done();
+                    return;
+                }
+                var l = todo[i];
+                if (lines.indexOf(l) < 0) { next(i + 1); return; }   // removed meanwhile
+                if (!(+l.values.M_Product_ID > 0)) { runCallout(l, "C_Tax_ID", function () { next(i + 1); }); return; }
+                // A release-order line takes its price from its blanket order line (the server keeps it too and,
+                // with price control, refuses a price change): recalculate the amounts only
+                if ((+lineVal(l, "C_OrderLine_Blanket_ID") || 0) > 0) { runCallout(l, "PriceEntered", function () { next(i + 1); }); return; }
+                l._priceOverride = false;   // the new price list decides the price
+                var old = { PriceEntered: l.values.PriceEntered, PriceActual: l.values.PriceActual, PriceList: l.values.PriceList, PriceLimit: l.values.PriceLimit };
+                runCallout(l, "C_UOM_ID", function () {
+                    var v = l.values;
+                    if (!(+v.PriceList) && !(+v.PriceEntered) && +old.PriceEntered) {
+                        if (currencyChanged) {
+                            // other currency: the old price means nothing in it - leave 0
+                            zero.push(lineLabel(l));
+                            next(i + 1);
+                            return;
+                        }
+                        // same currency: keep the previous price
+                        v.PriceEntered = old.PriceEntered; v.PriceActual = old.PriceActual;
+                        v.PriceList = old.PriceList; v.PriceLimit = old.PriceLimit;
+                        kept.push(lineLabel(l));
+                        runCallout(l, "PriceEntered", function () { next(i + 1); });
+                        return;
+                    }
+                    next(i + 1);
+                });
+            }
+            next(0);
+        }
 
         this.clear = function (isNewRecord) {
             // Bump fetchSeq so any in-flight GetPanelData response is discarded — the panel
@@ -754,39 +868,113 @@
                 updateDocTypeLabels();
                 render();
             }
+            flushLoadWaiters(false);   // the order they waited for is gone
         };
 
-        /* True when the freshly loaded server copy of a line differs from the snapshot taken
-           when the panel last loaded/saved it, i.e. someone changed the line on the server. */
-        function serverChangedSince(fresh, old) {
-            if (!old || !old._saved) return false;
-            var a = fresh.values, b = old._saved.values;
-            for (var k in a) {
-                if (!a.hasOwnProperty(k)) continue;
-                var x = a[k], y = b[k];
-                if ((x == null || x === "") && (y == null || y === "")) continue;
-                if (String(x) !== String(y)) return true;
+        /* Does the panel hold work not yet saved - a new line or an edited saved line? */
+        function hasPanelChanges() {
+            for (var i = 0; i < lines.length; i++) if (lines[i].status === "new" || lines[i].dirty) return true;
+            return false;
+        }
+
+        /* Same value for change detection on a reload: empty / null alike, numbers compared
+           as numbers (the panel's own sameVal compares strings, for cell commits). */
+        function sameLoadedVal(a, b) {
+            a = (a == null) ? "" : a; b = (b == null) ? "" : b;
+            if (a === b) return true;
+            var sa = String(a), sb = String(b);
+            if (sa !== "" && sb !== "" && !isNaN(sa) && !isNaN(sb)) return +sa === +sb;
+            return sa === sb;
+        }
+
+        /* Was the saved line changed on the server since the panel loaded it? Compares the
+           server's fresh copy with the line's load-time snapshot (_saved). */
+        function serverRowChanged(line, fresh) {
+            var base = line._saved && line._saved.values;
+            if (!base) return true;
+            for (var k in fresh.values) if (fresh.values.hasOwnProperty(k)) {
+                if (!sameLoadedVal(fresh.values[k], base[k])) return true;
             }
             return false;
         }
 
-        /* Merge a server reload of the SAME order with the panel's unsaved work (header-save
-           reload must not lose lines):
-           - brand-new unsaved lines are kept;
-           - a saved line edited in the panel keeps the panel edit when the server copy is
-             unchanged, and takes the server copy when the server changed it. */
-        function mergeReloadedLines(prev, fresh) {
-            var dirtyById = {};
-            prev.forEach(function (l) {
-                var id = l.values.C_OrderLine_ID || 0;
+        /* Columns the user types on the grid row. Amounts (net, tax, totals, list/limit price)
+           are NOT carried - the line callout recalculates them from these. QtyOrdered goes
+           with QtyEntered (the order's base-UOM quantity the qty callout derives). */
+        var USER_INPUT_COLS = ["QtyEntered", "QtyOrdered", "PriceEntered", "C_UOM_ID", "C_Tax_ID", "M_AttributeSetInstance_ID", "Description", "Discount", "Notes"];
+
+        /* Put the user's own edits of a saved line onto the server's newer copy of it. Only the
+           values the user changed since the line was loaded are carried: the row inputs above
+           (the price only when the user typed it - otherwise it follows the server, e.g. a
+           re-price after a price list change) and every "..." field the user edited
+           (_dynTouched). After a price list change (priceFromList) a typed price is NOT carried:
+           the server's price from the new list stays. Returns the merged line (still unsaved), or
+           null when there was no user edit to carry (the server copy is then used as it is). */
+        function carryUserEdits(mine, fresh, priceFromList) {
+            var base = (mine._saved && mine._saved.values) || {};
+            var cols = USER_INPUT_COLS.slice();
+            if (mine._dynTouched) for (var t in mine._dynTouched) if (mine._dynTouched.hasOwnProperty(t) && cols.indexOf(t) < 0) cols.push(t);
+            var carried = 0;
+            for (var i = 0; i < cols.length; i++) {
+                var c = cols[i];
+                if (c === "PriceEntered" && (!mine._priceOverride || priceFromList)) continue;
+                var mv = lineVal(mine, c), bv = (base[c] !== undefined) ? base[c] : base[String(c).toLowerCase()];
+                if (sameLoadedVal(mv, bv)) continue;
+                setLineVal(fresh, c, mv);
+                carried++;
+            }
+            if (!carried) return null;
+            if (!sameLoadedVal(mine.values.C_UOM_ID, base.C_UOM_ID)) fresh.display.uomName = mine.display.uomName;
+            if (!sameLoadedVal(mine.values.C_Tax_ID, base.C_Tax_ID)) fresh.display.taxName = mine.display.taxName;
+            if (!sameLoadedVal(mine.values.M_AttributeSetInstance_ID, base.M_AttributeSetInstance_ID)) fresh.display.attrName = mine.display.attrName;
+            if (mine._dynDisp) fresh._dynDisp = $.extend({}, fresh._dynDisp || {}, mine._dynDisp);
+            fresh._priceOverride = priceFromList ? false : mine._priceOverride;
+            fresh._dynTouched = mine._dynTouched;
+            fresh._sel = mine._sel;
+            fresh.rowId = mine.rowId;   // same row for the editor, selection and a pending save
+            fresh.dirty = true;
+            return fresh;
+        }
+
+        /* Rebuild the lines from a reload of the SAME order without losing panel work:
+             - new (never-saved) lines are kept as they are;
+             - an edited saved line keeps the panel's edit when the server copy is unchanged;
+               when the server changed it (e.g. re-priced it after a price list change), the
+               server copy is taken and the user's own edits are put back on top of it
+               (carryUserEdits) - the line stays unsaved and its amounts are recalculated;
+             - an edited line the server no longer has (deleted elsewhere) is dropped.
+           Clean saved lines are refreshed from the server rows. priceFromList: the price list
+           changed, so prices come from it (a typed price is not carried). Returns the merged lines
+           that need their amounts recalculated. */
+        function mergeReloadedLines(serverRows, priceFromList) {
+            var dirtyById = {}, seen = {}, carriedLines = [], removed = 0;
+            lines.forEach(function (l) {
+                var id = +l.values.C_OrderLine_ID || 0;
                 if (id > 0 && l.dirty) dirtyById[id] = l;
             });
-            var newKeep = prev.filter(function (l) { return (l.values.C_OrderLine_ID || 0) <= 0; });
-            var merged = fresh.map(function (f) {
-                var old = dirtyById[f.values.C_OrderLine_ID];
-                return (old && !serverChangedSince(f, old)) ? old : f;
+            var newKeep = lines.filter(function (l) { return (+l.values.C_OrderLine_ID || 0) <= 0; });
+            var merged = (serverRows || []).map(function (r) {
+                var fresh = fromServerRow(r);
+                var mine = dirtyById[r.C_OrderLine_ID];
+                if (!mine) return fresh;
+                seen[r.C_OrderLine_ID] = true;
+                if (!serverRowChanged(mine, fresh)) return mine;
+                var both = carryUserEdits(mine, fresh, priceFromList);
+                if (!both) return fresh;
+                carriedLines.push(both);
+                return both;
             });
-            return newKeep.concat(merged);
+            for (var id in dirtyById) if (dirtyById.hasOwnProperty(id) && !seen[id]) removed++;
+            lines = newKeep.concat(merged);
+            if (carriedLines.length) {
+                showToast(lbl("VAS_107_LinesChangedOnServerKept",
+                    "Some edited lines were changed on the server - your changes were applied to the server version"));
+            }
+            if (removed) {
+                showToast(lbl("VAS_107_LinesChangedOnServer",
+                    "Some edited lines were changed or removed on the server - the server version is shown for them"));
+            }
+            return carriedLines;
         }
 
         function fromServerRow(r) {
@@ -1000,7 +1188,7 @@
             // mousedown - handle that here so the button stays accessible, without
             // double-firing on a real mouse click (detail >= 1, already handled above).
             $saveBtn.on("click", function (e) { if (e.detail === 0) { flushAndSave(); } });
-            $deleteBtn.on("click", deleteSelected);
+            $deleteBtn.on("click", function () { deleteSelected(); });   // don't pass the click event as headerReady
         }
 
         function buildHeadRow() {
@@ -1349,7 +1537,11 @@
             // edit is not yet the order's price list) and only on a real change, so
             // ordinary field edits do not reload the grid.
             if (priceListChangedOnTab()) {   // every screen since 23-Sep-2026
-                if (!isHeaderDirty()) { $self.fetchData(parent.C_Order_ID, linePage); return; }
+                // Reload as a same-record reload (no page argument; the onLoaded callback keeps
+                // the page on screen), so unsaved panel lines are kept and re-priced against
+                // the new price list (fetchData / repriceUnsavedLines) - a page-change reload
+                // would rebuild the lines and drop them.
+                if (!isHeaderDirty()) { $self.fetchData(parent.C_Order_ID, undefined, function () { }); return; }
             }
             applyLockState();
             checkProcessingLock();
@@ -1434,14 +1626,87 @@
             return (gt.rowChanged >= 0) || (typeof gt.getIsInserting === "function" && !!gt.getIsInserting());
         }
 
-        /* Gate in front of every panel mutation (edit, add, save, delete, attribute, scan).
-           Returns true and shows a toast when the header has unsaved changes — mirrors the
-           VAS_074 / VAS_218 blockedByTabChanges() pattern. */
-        function blockedByDirtyHeader() {
-            if (!isHeaderDirty()) return false;
-            showToast(lbl("VAS_107_SaveHeaderFirst", "Please save the header record before adding lines."));
-            return true;
+        /* True when the hosting tab has an edit the user hasn't saved yet (a header field
+           changed, or a brand-new unsaved record). curTab is the framework GridTab; its
+           needSave(true, false) is the "is ANYTHING pending" form, as opposed to the per-row
+           variants (as VAS_074); the gridTable row check above (isHeaderDirty) backs it up.
+           Guarded - a panel started without a tab has none. */
+        function tabHasUnsavedChanges() {
+            try {
+                if ($self.curTab && typeof $self.curTab.needSave === "function" && $self.curTab.needSave(true, false)) return true;
+            } catch (e) { if (window.console) console.log(e); }
+            return isHeaderDirty();
         }
+
+        /* Lines may be edited while the header (hosting tab) has unsaved changes. The server
+           saves lines against the header as stored and recomputes tax / totals from it, so
+           before lines are saved or deleted the header is saved first - the same way the
+           toolbar Save does it (APanel.cmd_save2): the tab's Commit Warning confirm
+           ("SaveChanges?") only when the tab has one, then GridTab.dataSave(true). The panel
+           shows no confirm of its own. cb(true) when the header is saved (or had nothing to
+           save), cb(false) when the user declined the commit warning or the save failed.
+           Mirrors VAS_074 saveHeaderThen. */
+        function saveHeaderThen(cb) {
+            if (!tabHasUnsavedChanges()) { cb(true); return; }
+            var tab = $self.curTab;
+            function doSave() {
+                // GridTab.dataSave is a SYNCHRONOUS request (and with a price list change the server
+                // re-prices every line inside it), so the page cannot repaint while it runs. Show the
+                // panel's busy overlay first and start the save on a later tick, so the overlay is on
+                // screen for the whole freeze; it stays up until the panel has reloaded.
+                showBusy(true);
+                setTimeout(function () {
+                    var ok = false;
+                    try { ok = !!tab.dataSave(true); } catch (e) { if (window.console) console.log(e); }
+                    if (!ok || tabHasUnsavedChanges()) {
+                        showBusy(false);
+                        // The framework shows the header's own save error on the tab.
+                        showToast(lbl("VAS_107_HeaderNotSaved", "The header could not be saved - the lines were not saved"));
+                        cb(false);
+                        return;
+                    }
+                    // The header is saved: reload the panel's header snapshot (price list, currency,
+                    // tax included, tax list, editable state ...) so the lines are calculated and
+                    // saved against the saved header - and take the lines the server re-priced when
+                    // the price list changed. The unsaved panel lines are kept and re-priced (see
+                    // fetchData / repriceUnsavedLines), then the caller continues.
+                    $self.fetchData(parent ? parent.C_Order_ID : $self.record_ID, undefined, function (loaded) {
+                        showBusy(false);
+                        if (!loaded) { cb(false); return; }
+                        afterCallouts(function () { cb(true); });
+                    });
+                }, 50);
+            }
+            var warning = "";
+            try { warning = (tab && typeof tab.getCommitWarning === "function" && tab.getCommitWarning()) || ""; } catch (e) { }
+            if (warning.length > 0) {
+                VIS.ADialog.confirm("SaveChanges?", true, warning, "Confirm", function (result) {
+                    if (!result) {
+                        // Declined: nothing is saved - say so, the user clicked Save on the lines
+                        showToast(lbl("VAS_107_HeaderNotConfirmed", "The header change was not confirmed - the lines were not saved"));
+                        cb(false);
+                        return;
+                    }
+                    doSave();
+                });
+                return;
+            }
+            doSave();
+        }
+
+        /* A header value for line calculations: the hosting tab's CURRENT value while the
+           header has unsaved changes (so callouts / lookups price against what is on
+           screen), otherwise the snapshot the panel loaded. */
+        function hdr(col) {
+            try {
+                if ($self.curTab && typeof $self.curTab.getValue === "function" && tabHasUnsavedChanges()) {
+                    var v = $self.curTab.getValue(col);
+                    if (v !== undefined && v !== null && v !== "") return v;
+                }
+            } catch (e) { }
+            return parent ? parent[col] : null;
+        }
+        function hdrBool(col) { var v = hdr(col); return v === true || v === "Y" || v === "true"; }
 
         function renderHeaderButtons() {
             var n = unsavedLines().length;
@@ -1945,7 +2210,6 @@
         /* ---------- edit / commit ---------- */
         function startEdit(line, field) {
             if (!panelEditable()) return;             // completed/void/reversed/closed -> read-only
-            if (blockedByDirtyHeader()) return;       // unsaved header edit — save the tab first
             if (line._saving) return;                 // row is being saved - locked until it returns
             if (fieldReadOnly(line, field)) return;   // AD_Column.ReadOnlyLogic / IsReadOnly
             commitMorePopover(); morePopoverFor = null;
@@ -2159,7 +2423,6 @@
         /* ---------- line operations ---------- */
         function addLine() {
             if (!panelEditable()) { showToast(docMsg("VAS_107_OrderNotEditable", "This {0} cannot take new lines")); return; }
-            if (blockedByDirtyHeader()) return;       // unsaved header edit — save the tab first
             var maxLine = 0;
             for (var i = 0; i < lines.length; i++) maxLine = Math.max(maxLine, lines[i].values.Line || 0);
             var line = {
@@ -2691,14 +2954,14 @@
                     case "C_Charge_ID": return line.values.C_Charge_ID || 0;
                     case "C_UOM_ID": return line.values.C_UOM_ID || 0;
                     case "M_AttributeSetInstance_ID": return line.values.M_AttributeSetInstance_ID || 0;
-                    case "M_PriceList_ID": return parent.M_PriceList_ID || 0;
-                    case "C_BPartner_ID": return parent.C_BPartner_ID || 0;
-                    case "C_BPartner_Location_ID": return parent.C_BPartner_Location_ID || 0;
-                    case "AD_Org_ID": return parent.AD_Org_ID || 0;
+                    case "M_PriceList_ID": return hdr("M_PriceList_ID") || 0;
+                    case "C_BPartner_ID": return hdr("C_BPartner_ID") || 0;
+                    case "C_BPartner_Location_ID": return hdr("C_BPartner_Location_ID") || 0;
+                    case "AD_Org_ID": return hdr("AD_Org_ID") || 0;
                     case "AD_Client_ID": return parent.AD_Client_ID || 0;
-                    case "M_Warehouse_ID": return parent.M_Warehouse_ID || 0;
-                    case "DateOrdered": return dateStr(parent.DateOrdered);
-                    case "IsSOTrx": return parent.IsSOTrx ? "Y" : "N";
+                    case "M_Warehouse_ID": return hdr("M_Warehouse_ID") || 0;
+                    case "DateOrdered": return dateStr(hdr("DateOrdered"));
+                    case "IsSOTrx": return hdrBool("IsSOTrx") ? "Y" : "N";
                     case "IsSalesQuotation": return parent.IsSalesQuotation ? "Y" : "N";
                     case "IsBlanketTrx": return parent.IsBlanketTrx ? "Y" : "N";
                     case "IsReturnTrx": return parent.IsReturnTrx ? "Y" : "N";
@@ -2914,17 +3177,17 @@
             if (rv !== undefined && rv !== null && rv !== "") return String(rv);
             switch (key) {
                 case "C_Order_ID": return String((parent && parent.C_Order_ID) || 0);
-                case "M_PriceList_ID": return String((parent && parent.M_PriceList_ID) || 0);
-                case "C_BPartner_ID": return String((parent && parent.C_BPartner_ID) || 0);
-                case "C_BPartner_Location_ID": return String((parent && parent.C_BPartner_Location_ID) || 0);
-                case "C_Currency_ID": return String((parent && parent.C_Currency_ID) || 0);
-                case "AD_Org_ID": return String((parent && parent.AD_Org_ID) || 0);
+                case "M_PriceList_ID": return String(hdr("M_PriceList_ID") || 0);
+                case "C_BPartner_ID": return String(hdr("C_BPartner_ID") || 0);
+                case "C_BPartner_Location_ID": return String(hdr("C_BPartner_Location_ID") || 0);
+                case "C_Currency_ID": return String(hdr("C_Currency_ID") || 0);
+                case "AD_Org_ID": return String(hdr("AD_Org_ID") || 0);
                 case "AD_Client_ID": return String((parent && parent.AD_Client_ID) || 0);
-                case "IsSOTrx": return (parent && parent.IsSOTrx) ? "Y" : "N";
+                case "IsSOTrx": return hdrBool("IsSOTrx") ? "Y" : "N";
                 case "IsSalesQuotation": return (parent && parent.IsSalesQuotation) ? "Y" : "N";
                 case "IsBlanketTrx": return (parent && parent.IsBlanketTrx) ? "Y" : "N";
                 case "IsReturnTrx": return (parent && parent.IsReturnTrx) ? "Y" : "N";
-                case "IsTaxIncluded": return (parent && parent.IsTaxIncluded) ? "Y" : "N";
+                case "IsTaxIncluded": return hdrBool("IsTaxIncluded") ? "Y" : "N";
                 case "Processed": return (parent && parent.Processed) ? "Y" : "N";
                 case "DocStatus": return (parent && parent.DocStatus) || "";
                 default: break;
@@ -3541,19 +3804,19 @@
             }
             if (parent) {
                 stage("C_Order_ID",             parent.C_Order_ID             || 0);
-                stage("C_BPartner_ID",          parent.C_BPartner_ID          || 0);
-                stage("C_BPartner_Location_ID", parent.C_BPartner_Location_ID || 0);
-                stage("M_PriceList_ID",         parent.M_PriceList_ID         || 0);
-                stage("C_Currency_ID",          parent.C_Currency_ID          || 0);
-                stage("AD_Org_ID",              parent.AD_Org_ID              || 0);
+                stage("C_BPartner_ID",          hdr("C_BPartner_ID")          || 0);
+                stage("C_BPartner_Location_ID", hdr("C_BPartner_Location_ID") || 0);
+                stage("M_PriceList_ID",         hdr("M_PriceList_ID")         || 0);
+                stage("C_Currency_ID",          hdr("C_Currency_ID")          || 0);
+                stage("AD_Org_ID",              hdr("AD_Org_ID")              || 0);
                 stage("AD_Client_ID",           parent.AD_Client_ID           || 0);
-                stage("M_Warehouse_ID",         parent.M_Warehouse_ID         || 0);
-                stage("DateOrdered",            parent.DateOrdered);
-                stage("IsSOTrx",                !!parent.IsSOTrx);
+                stage("M_Warehouse_ID",         hdr("M_Warehouse_ID")         || 0);
+                stage("DateOrdered",            hdr("DateOrdered"));
+                stage("IsSOTrx",                hdrBool("IsSOTrx"));
                 stage("IsSalesQuotation",       !!parent.IsSalesQuotation);
                 stage("IsBlanketTrx",           !!parent.IsBlanketTrx);
                 stage("IsReturnTrx",            !!parent.IsReturnTrx);
-                stage("IsTaxIncluded",          !!parent.IsTaxIncluded);
+                stage("IsTaxIncluded",          hdrBool("IsTaxIncluded"));
                 stage("Processed",              !!parent.Processed);
                 stage("DocStatus",              parent.DocStatus              || "");
                 // The header columns the line's DisplayLogic / AD_Val_Rule read by token
@@ -3574,7 +3837,7 @@
                 if (columnNameByLc[klc] || bag[klc]) stage(k, v[k]);
             }
             // Re-assert order org so @AD_Org_ID@ always resolves to the order's org.
-            if (parent && (parent.AD_Org_ID || 0) > 0) stage("AD_Org_ID", parent.AD_Org_ID);
+            if (parent && (hdr("AD_Org_ID") || 0) > 0) stage("AD_Org_ID", hdr("AD_Org_ID"));
             // Write each column exactly once.
             for (var key in bag) {
                 if (!bag.hasOwnProperty(key)) continue;
@@ -4230,7 +4493,6 @@
         // (The control handles the pre-select + unchanged-OK no-op internally.)
         function openAttrDialog(line) {
             if (!line.values.M_Product_ID) return;
-            if (blockedByDirtyHeader()) return;       // unsaved header edit — save the tab first
             // The product must actually carry an attribute set (M_AttributeSet_ID > 0) for
             // the attribute control to be meaningful. A saved line whose product has no
             // attribute set defined must not open the control even if it's clicked - guard
@@ -4752,7 +5014,6 @@
 
         /* ---------- scan dialog ---------- */
         function openScanDialog() {
-            if (blockedByDirtyHeader()) return;       // unsaved header edit — save the tab first
             closeDialogs();
             scanState = { rows: [], input: "", error: "" };
             var backdrop = $('<div class="vas-obl-dialog-backdrop" id="vasOblScan"></div>');
@@ -4931,7 +5192,6 @@
            Commits the focused cell then waits for any in-flight callout to finish before
            posting — so the line saves with the recomputed price / tax / amounts. */
         function flushAndSave() {
-            if (blockedByDirtyHeader()) return;       // unsaved header edit — save the tab first
             flushActiveEdit();
             afterCallouts(function () { saveRows(); });
         }
@@ -4941,11 +5201,11 @@
            is locked from editing until the save returns - so the user can keep working
            (Add line, edit other rows) while the save is in flight.
            restrictIds (optional): map of rowId -> true. When supplied only those rows are
-           saved; used by flushPendingSave to replay a queued partial batch. */
-        function saveRows(done, restrictIds) {
+           saved; used by flushPendingSave to replay a queued partial batch.
+           headerReady: the header was just saved by saveHeaderThen (do not save it again). */
+        function saveRows(done, restrictIds, headerReady) {
             commitMorePopover();
             if (!panelEditable()) { if (done) done(false); return; }   // read-only when doc completed/void/reversed/closed
-            if (isHeaderDirty()) { showToast(lbl("VAS_107_SaveHeaderFirst", "Please save the header record before adding lines.")); if (done) done(false); return; }
             var batch = unsavedLines();
             if (restrictIds) batch = batch.filter(function (l) { return restrictIds[l.rowId]; });
             if (!batch.length && !restrictIds) {   // every screen since 23-Sep-2026
@@ -4959,6 +5219,11 @@
             }
             if (!batch.length || !parent) { if (done) done(false); return; }
             if (!validateUnsaved(batch)) { if (done) done(false); return; }   // AD_Column mandatory validation
+            // Header changed on the tab: save it first (confirm), then these lines.
+            if (!headerReady && tabHasUnsavedChanges()) {
+                saveHeaderThen(function (ok) { if (ok) saveRows(done, restrictIds, true); else if (done) done(false); });
+                return;
+            }
             // Prevent a concurrent POST from racing on the same DB transaction.
             // Queue the row IDs instead; flushPendingSave replays them once this POST returns.
             if (saveInFlight) {
@@ -5080,10 +5345,24 @@
             render();
         }
 
-        function deleteSelected() {
+        function deleteSelected(headerReady) {
             if (!panelEditable()) return;             // read-only when doc completed/void/reversed/closed
-            if (blockedByDirtyHeader()) return;       // unsaved header edit — save the tab first
             var sel = selectedLines(); if (!sel.length) return;
+            // Deleting saved lines refreshes the header row from the server, which would drop
+            // unsaved header changes - so save the header first (confirm). Removing only new,
+            // never-saved lines is client-side and needs no header save.
+            var hasSaved = sel.some(function (l) { return l.values.C_OrderLine_ID > 0; });
+            if (hasSaved && !headerReady && tabHasUnsavedChanges()) {
+                // The header save reloads the lines, so remember the selection and restore it.
+                var selIds = {}, selRows = {};
+                sel.forEach(function (l) { if (l.values.C_OrderLine_ID > 0) selIds[l.values.C_OrderLine_ID] = true; selRows[l.rowId] = true; });
+                saveHeaderThen(function (ok) {
+                    if (!ok) return;
+                    lines.forEach(function (l) { if (selIds[l.values.C_OrderLine_ID] || selRows[l.rowId]) l._sel = true; });
+                    deleteSelected(true);
+                });
+                return;
+            }
             var ids = [], localOnly = [];
             sel.forEach(function (l) { if (l.values.C_OrderLine_ID > 0) ids.push(l.values.C_OrderLine_ID); else localOnly.push(l); });
             localOnly.forEach(function (l) { var i = lines.indexOf(l); if (i >= 0) lines.splice(i, 1); });
@@ -5103,8 +5382,50 @@
         }
 
         /* ---------- misc ---------- */
+        /* Toasts on screen, oldest first - stacked upwards so two at once (e.g. "price kept" +
+           "lines saved") don't cover each other. (Mirrors VAS_074; the shared
+           VAS.PanelUtil.showToast closes every toast after 2.6 s, too short for the
+           line lists of the re-pricing messages.) */
+        var activeToasts = [];
+        function layoutToasts() {
+            var offset = 0;   // px above the CSS bottom
+            for (var i = activeToasts.length - 1; i >= 0; i--) {
+                activeToasts[i][0].style.marginBottom = offset + "px";
+                offset += (activeToasts[i].outerHeight() || 40) + 8;
+            }
+        }
+
+        /* Show a message long enough to read: 5 s, plus 60 ms per character over ~20, at most
+           12 s. The timer pauses while the pointer is on the toast; a click closes it. */
         function showToast(msg) {
-            VAS.PanelUtil.showToast(msg);
+            if (window.VIS && VIS.ADD && typeof VIS.ADD.Notification === "function") { VIS.ADD.Notification(msg); return; }
+            var text = String(msg == null ? "" : msg);
+            var duration = Math.min(12000, Math.max(5000, 3800 + text.length * 60));
+            var $t = $('<div class="vas-obl-toast" role="status" aria-live="polite"></div>').text(text);
+            $t[0].style.cursor = "pointer";
+            $("body").append($t);
+            activeToasts.push($t);
+            layoutToasts();
+            setTimeout(function () { $t.addClass("vas-obl-toast--show"); }, 10);
+
+            var timer = null, left = duration, started = 0, closed = false;
+            function close() {
+                if (closed) return;
+                closed = true;
+                if (timer) clearTimeout(timer);
+                $t.removeClass("vas-obl-toast--show");
+                setTimeout(function () {
+                    $t.remove();
+                    var i = activeToasts.indexOf($t);
+                    if (i >= 0) activeToasts.splice(i, 1);
+                    layoutToasts();
+                }, 300);
+            }
+            function start() { started = Date.now(); timer = setTimeout(close, left); }
+            $t.on("mouseenter", function () { if (timer) { clearTimeout(timer); timer = null; left = Math.max(1500, left - (Date.now() - started)); } });
+            $t.on("mouseleave", function () { if (!closed && !timer) start(); });
+            $t.on("click", close);
+            start();
         }
 
         function closeDialogs() { $("#vasOblAttr, #vasOblScan, #vasOblMore, #vasOblConfirm").remove(); attrState = null; scanState = null; morePopoverFor = null; }
