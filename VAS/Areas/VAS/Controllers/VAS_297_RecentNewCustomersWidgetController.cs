@@ -45,18 +45,15 @@ namespace VAS.Controllers
         private const int NewCustomerWindowDays = 45;
 
         // Profile completion % (0..100). Matches VAS_136.ProfileCompletionExpr
-        // exactly - correlated to the outer C_BPartner alias "bp"; portable
-        // across Oracle and PostgreSQL.
-        private const string ProfileCompletionExpr = @"COALESCE((
-                        SELECT SUM(t.Cnt)
-                        FROM (
-                            SELECT DISTINCT 20 AS Cnt FROM C_BPartner
-                            UNION ALL SELECT DISTINCT 20 AS Cnt FROM C_BPartner_Location bpl WHERE bpl.C_BPartner_ID = bp.C_BPartner_ID
-                            UNION ALL SELECT DISTINCT 20 AS Cnt FROM AD_User bpu WHERE bpu.C_BPartner_ID = bp.C_BPartner_ID
-                            UNION ALL SELECT DISTINCT 20 AS Cnt FROM C_BP_BankAccount bpb WHERE bpb.C_BPartner_ID = bp.C_BPartner_ID
-                            UNION ALL SELECT DISTINCT 20 AS Cnt FROM FRPT_BP_Customer_Acct bpc WHERE bpc.C_BPartner_ID = bp.C_BPartner_ID
-                        ) t
-                    ), 0)";
+        // exactly - correlated to the outer C_BPartner alias "bp".
+        // Oracle: every EXISTS correlates ONE level up to "bp". The earlier form correlated
+        // from inside an inline view (SELECT SUM(t.Cnt) FROM (... WHERE x.C_BPartner_ID =
+        // bp.C_BPartner_ID) t), which Oracle rejects with ORA-00904 (invalid identifier).
+        private const string ProfileCompletionExpr = @"(20
+                    + CASE WHEN EXISTS (SELECT 1 FROM C_BPartner_Location bpl WHERE bpl.C_BPartner_ID = bp.C_BPartner_ID) THEN 20 ELSE 0 END
+                    + CASE WHEN EXISTS (SELECT 1 FROM AD_User bpu WHERE bpu.C_BPartner_ID = bp.C_BPartner_ID) THEN 20 ELSE 0 END
+                    + CASE WHEN EXISTS (SELECT 1 FROM C_BP_BankAccount bpb WHERE bpb.C_BPartner_ID = bp.C_BPartner_ID) THEN 20 ELSE 0 END
+                    + CASE WHEN EXISTS (SELECT 1 FROM FRPT_BP_Customer_Acct bpc WHERE bpc.C_BPartner_ID = bp.C_BPartner_ID) THEN 20 ELSE 0 END)";
 
         /// <summary>
         /// Tenant-local "today" as a DATE, dialect-specific. Matches VAS_138's
@@ -113,13 +110,15 @@ namespace VAS.Controllers
                 // Customers created within the new-customer window. Plain SELECT
                 // (no GROUP BY / ORDER BY) so AddAccessSQL's predicate lands in the
                 // WHERE clause where alias "bp" is in scope.
+                // Plain SELECT for MRole: AddAccessSQL cannot parse a main SELECT with a FROM
+                // inside its select list ("More than one FROM clause"), so the profile score
+                // is computed over this CTE in CustomerScope below.
                 string customerScopeSql = @"
-                    SELECT bp.C_BPartner_ID AS Id,
+                    SELECT bp.C_BPartner_ID AS C_BPartner_ID,
                            bp.Name AS Customer_Name,
                            bp.SalesRep_ID AS SalesRep_ID,
                            bp.Created AS Created_At,
-                           " + TodayDateExpr() + @" AS As_Of_Date,
-                           " + ProfileCompletionExpr + @" AS Onb_Progress
+                           " + TodayDateExpr() + @" AS As_Of_Date
                     FROM C_BPartner bp
                     WHERE bp.IsActive = 'Y'
                       AND bp.IsCustomer = 'Y'
@@ -128,8 +127,17 @@ namespace VAS.Controllers
                 customerScopeSql = MRole.GetDefault(ctx).AddAccessSQL(customerScopeSql, "bp", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
                 string sql = @"
-                    WITH CustomerScope AS (
+                    WITH Scope AS (
                         " + customerScopeSql + @"
+                    ),
+                    CustomerScope AS (
+                        SELECT bp.C_BPartner_ID AS Id,
+                               bp.Customer_Name AS Customer_Name,
+                               bp.SalesRep_ID AS SalesRep_ID,
+                               bp.Created_At AS Created_At,
+                               bp.As_Of_Date AS As_Of_Date,
+                               " + ProfileCompletionExpr + @" AS Onb_Progress
+                        FROM Scope bp
                     )
                     SELECT cs.Id,
                            cs.Customer_Name,
@@ -139,7 +147,7 @@ namespace VAS.Controllers
                            cs.As_Of_Date,
                            COUNT(1) OVER () AS Total_Rows
                     FROM CustomerScope cs
-                    LEFT OUTER JOIN AD_User rep ON (rep.AD_User_ID=cs.SalesRep_ID AND rep.AD_Client_ID = @Client_ID AND rep.IsActive = 'Y')
+                    LEFT OUTER JOIN AD_User rep ON (rep.AD_User_ID=cs.SalesRep_ID AND rep.IsActive = 'Y')
                     ORDER BY cs.Created_At DESC,
                              cs.Customer_Name ASC,
                              cs.Id ASC

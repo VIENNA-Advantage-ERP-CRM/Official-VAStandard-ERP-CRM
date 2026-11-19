@@ -220,7 +220,7 @@
             var sign = n < 0 ? '-' : '';
             var iso = (cur && cur.iso) || '';
             var symbol = (cur && (cur.symbol || cur.iso)) || '';
-            var compact = VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
+            var compact = VIS.Util.BrowserCultureFormatter.formatCompactAmount(n, iso, precisionOf(cur));
             // Currency symbol placed per the browser locale (before / after the number).
             if (iso) {
                 try {
@@ -240,6 +240,17 @@
                 } catch (e) { /* fall back to the server symbol in front */ }
             }
             return sign + symbol + compact;
+        }
+        // 2026-11-18: hover tooltip - the FULL amount (browser culture, currency precision)
+        // behind a compact amount. fullTitleAttr() gives a ' title="..."' fragment (or '').
+        function fullTitleAttr(value, cur) {
+            if (!(window.VIS && VIS.Util && VIS.Util.BrowserCultureFormatter && typeof VIS.Util.BrowserCultureFormatter.formatFullAmount === 'function')) { return ''; }
+            var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
+            var full = VIS.Util.BrowserCultureFormatter.formatFullAmount(n, (cur && cur.iso) || '', precisionOf(cur));
+            return full ? ' title="' + escapeHtml(full) + '"' : '';
+        }
+        function moneyHtml(value, cur) {
+            return '<span' + fullTitleAttr(value, cur) + '>' + escapeHtml(formatMoney(value, cur)) + '</span>';
         }
 
         var AVATAR_COLORS = ['#1F83FF', '#5F4AA6', '#0B6B45', '#D78B10', '#0083DA', '#A33F3F'];
@@ -319,7 +330,7 @@
                 '<span class="vas302-avatar" style="background:' + avatarColor(name) + '">' + escapeHtml(initials(name)) + '</span>' +
                 '<span class="vas302-row-main">' +
                     '<span class="vas302-row-title" title="' + escapeHtml(name) + '">' + escapeHtml(name) + '</span>' +
-                    '<span class="vas302-row-meta">' + tierTagHtml(item.tier) + '<span>' + escapeHtml(formatMoney(item.arr, { precision: 0 })) + ' ' + escapeHtml(label('VAS_302_ARR', 'ARR')) + ' · ' + escapeHtml(owner) + '</span></span>' +
+                    '<span class="vas302-row-meta">' + tierTagHtml(item.tier) + '<span>' + moneyHtml(item.arr, { precision: 0 }) + ' ' + escapeHtml(label('VAS_302_ARR', 'ARR')) + ' · ' + escapeHtml(owner) + '</span></span>' +
                 '</span>' +
                 '<button type="button" class="vas302-segbtn" data-segid="' + Number(item.customerId) + '" data-segname="' + escapeHtml(name) + '">' + icon('target') + escapeHtml(label('VAS_302_Segment', 'Segment')) + '</button>' +
             '</div>';
@@ -410,14 +421,14 @@
                 fact(label('VAS_302_Tier', 'Tier'), tierLabel ? escapeHtml(tierLabel) : dash) +
                 fact(label('VAS_302_SegmentFact', 'Segment'), escapeHtml(data.segment || dash)) +
                 fact(label('VAS_302_Owner', 'Owner'), escapeHtml(data.rep || dash)) +
-                fact(label('VAS_302_ARR', 'ARR'), escapeHtml(formatMoney(data.value, detailCurrency))) +
+                fact(label('VAS_302_ARR', 'ARR'), moneyHtml(data.value, detailCurrency)) +
                 fact(label('VAS_302_OpenTicketsFact', 'Open tickets'), escapeHtml(formatCount(data.openTickets || 0))) +
             '</div>';
 
             var signals = '';
             var overdue = Number(data.overdueAmount || 0);
             if (overdue > 0) {
-                signals += signalRow('cash', '#ED1C24', escapeHtml(formatMoney(overdue, detailCurrency)), '');
+                signals += signalRow('cash', '#ED1C24', moneyHtml(overdue, detailCurrency), '');
             }
             var openT = Number(data.openTickets || 0);
             if (openT > 0) {
@@ -572,7 +583,7 @@
             return '<label class="vas302-chk"><input type="checkbox" checked value="' + Number(c.customerId) + '"/>' +
                 '<span class="vas302-avatar" style="width:28px;height:28px;background:' + avatarColor(name) + '">' + escapeHtml(initials(name)) + '</span>' +
                 '<span class="vas302-row-main"><span class="vas302-row-title" style="font-size:.85em">' + escapeHtml(name) + '</span>' +
-                    '<span class="vas302-row-meta"><span>' + escapeHtml(formatMoney(c.customerValue, { precision: 0 })) + '</span></span></span></label>';
+                    '<span class="vas302-row-meta"><span>' + moneyHtml(c.customerValue, { precision: 0 }) + '</span></span></span></label>';
         }
         function renderBulk(data) {
             var customers = data.customers || [];

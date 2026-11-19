@@ -250,7 +250,7 @@
             var sign = n < 0 ? '-' : '';
             var iso = (cur && cur.iso) || '';
             var symbol = (cur && (cur.symbol || cur.iso)) || '';
-            var compact = VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
+            var compact = VIS.Util.BrowserCultureFormatter.formatCompactAmount(n, iso, precisionOf(cur));
             // Currency symbol placed per the browser locale (before / after the number).
             if (iso) {
                 try {
@@ -270,6 +270,20 @@
                 } catch (e) { /* fall back to the server symbol in front */ }
             }
             return sign + symbol + compact;
+        }
+        // 2026-11-18: hover tooltip - the FULL amount (browser culture, currency precision)
+        // behind a compact amount. fullTitleAttr() gives a ' title="..."' fragment (or '').
+        function fullMoney(value, cur) {
+            if (!(window.VIS && VIS.Util && VIS.Util.BrowserCultureFormatter && typeof VIS.Util.BrowserCultureFormatter.formatFullAmount === 'function')) { return ''; }
+            var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
+            return VIS.Util.BrowserCultureFormatter.formatFullAmount(n, (cur && cur.iso) || '', precisionOf(cur));
+        }
+        function fullTitleAttr(value, cur) {
+            var full = fullMoney(value, cur);
+            return full ? ' title="' + escapeHtml(full) + '"' : '';
+        }
+        function moneyHtml(value, cur) {
+            return '<span' + fullTitleAttr(value, cur) + '>' + escapeHtml(formatMoney(value, cur)) + '</span>';
         }
         function projectText(name, count, dash) {
             if (!name) { return dash; }
@@ -341,7 +355,9 @@
         // "expiring" always uses its own fixed suffix; the others pluralise
         // clients/client by count.
         function setTile(flag, value, count, pluralKey, singularKey, kind) {
-            $grid.find('[data-val="' + flag + '"]').text(formatMoney(value, widgetCurrency));
+            var $val = $grid.find('[data-val="' + flag + '"]').text(formatMoney(value, widgetCurrency));
+            var fullTitle = fullMoney(value, widgetCurrency);
+            if (fullTitle) { $val.attr('title', fullTitle); } else { $val.removeAttr('title'); }
             var n = Number(count || 0);
             var sub = kind === 'expiring'
                 ? formatCount(n) + ' ' + label('VAS_299_Expiring', 'expiring')
@@ -424,7 +440,7 @@
                         '<span class="vas299-row-title" title="' + escapeHtml(item.customerName) + '">' + escapeHtml(item.customerName) + '</span>' +
                         '<span class="vas299-row-meta" title="' + escapeHtml(meta) + '">' + escapeHtml(meta) + '</span>' +
                     '</span>' +
-                    '<span class="vas299-row-val">' + escapeHtml(formatMoney(item.amount, listCurrency)) + '</span>' +
+                    '<span class="vas299-row-val"' + fullTitleAttr(item.amount, listCurrency) + '>' + escapeHtml(formatMoney(item.amount, listCurrency)) + '</span>' +
                 '</button>';
             }).join('');
 
@@ -525,10 +541,10 @@
                 fact(label('VAS_299_Tier', 'Tier'), tierLabel ? escapeHtml(tierLabel) : dash) +
                 fact(label('VAS_299_Segment', 'Segment'), escapeHtml(data.segment || dash)) +
                 fact(label('VAS_299_Owner', 'Owner'), escapeHtml(data.rep || dash)) +
-                fact(label('VAS_299_ARR', 'ARR'), escapeHtml(formatMoney(data.value, detailCurrency))) +
+                fact(label('VAS_299_ARR', 'ARR'), moneyHtml(data.value, detailCurrency)) +
                 fact(label('VAS_299_OpenTicketsFact', 'Open tickets'), escapeHtml(formatCount(data.openTickets || 0))) +
                 fact(label('VAS_299_Projects', 'Projects'), projectText(data.projectName, projects, dash)) +
-                fact(label('VAS_299_Pipeline', 'Pipeline'), pipeline > 0 ? escapeHtml(formatMoney(pipeline, detailCurrency)) : dash) +
+                fact(label('VAS_299_Pipeline', 'Pipeline'), pipeline > 0 ? moneyHtml(pipeline, detailCurrency) : dash) +
                 fact(label('VAS_299_Onboarding', 'Onboarding'), data.onboardingPercent == null ? dash : escapeHtml(formatPercent(Math.round(Number(data.onboardingPercent) || 0), 0))) +
             '</div>';
 
@@ -536,7 +552,7 @@
             var overdue = Number(data.overdueAmount || 0);
             if (overdue > 0) {
                 var invPart = data.overdueInvoice ? ' · ' + data.overdueInvoice : '';
-                signals += signalRow('cash', '#ED1C24', escapeHtml(formatMoney(overdue, detailCurrency) + ' ' + label('VAS_299_Overdue', 'overdue') + invPart),
+                signals += signalRow('cash', '#ED1C24', moneyHtml(overdue, detailCurrency) + escapeHtml(' ' + label('VAS_299_Overdue', 'overdue') + invPart),
                     formatCount(data.overdueDays || 0) + ' ' + label('VAS_299_DaysPastDue', 'days past due'));
             }
             var openT = Number(data.openTickets || 0);

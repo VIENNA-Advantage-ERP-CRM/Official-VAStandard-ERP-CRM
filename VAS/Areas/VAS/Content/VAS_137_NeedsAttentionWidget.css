@@ -13,7 +13,8 @@
     min-height: 0;
     color: #102C3F;
     font-family: Roboto, sans-serif;
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 20px);
+    container-type: inline-size;
+    font-size: clamp(16px, 1.2cqi, 20px);
 }
 
     .vas137-root,
@@ -78,7 +79,7 @@
 }
 
 .vas137-sub {
-    font-size: 0.7em;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
     color: #717182;
     margin-top: 1px;                            /* px */
     white-space: nowrap;
@@ -146,7 +147,7 @@
 .vas137-tile-num {
     grid-column: 2;
     grid-row: 1;
-    font-size: 1.5em;
+    font-size: 1.25em;
     font-weight: 700;
     color: #102C3F;
     line-height: 1;
@@ -159,7 +160,7 @@
 .vas137-tile-lab {
     grid-column: 1 / span 2;
     grid-row: 2;
-    font-size: 0.78em;
+    font-size: 0.75em;
     color: #5F7283;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -172,7 +173,7 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;                                   /* px */
-    font-size: 0.72em;
+    font-size: 0.6875em;
     font-weight: 600;
     color: #1F83FF;
 }
@@ -191,7 +192,7 @@
 .vas137-state {
     grid-column: 1 / span 2;
     padding: 0.9em 0.25em;
-    font-size: 0.82em;
+    font-size: 0.8125em;
     color: #748494;
     text-align: center;
 }
@@ -203,7 +204,7 @@
     color: #0083DA;
     border-radius: 999px;
     font-family: inherit;
-    font-size: 0.9em;
+    font-size: 0.8125em;
     padding: 2px 10px;                          /* px */
     cursor: pointer;
 }

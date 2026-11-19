@@ -154,7 +154,7 @@
         }
 
         // Compact currency amount (e.g. ₹3.42Cr / €1.25M). The magnitude comes from
-        // VIS.Util.formatCompactAmount, which scales against the base
+        // VIS.Util.BrowserCultureFormatter.formatCompactAmount, which scales against the base
         // (accounting-schema) currency's numbering system and renders at the
         // system-configured standard precision; the sign sits BEFORE the symbol.
         function formatCompactAmount(value, symbol, isoCode, precision) {
@@ -162,7 +162,7 @@
             if (!isFinite(number)) { number = 0; }
             var sign = number < 0 ? '-' : '';
             var affix = currencyAffixes(symbol, isoCode);
-            return sign + affix.before + VIS.Util.formatCompactAmount(Math.abs(number), isoCode, getPrecision(precision)) + affix.after;
+            return sign + affix.before + VIS.Util.BrowserCultureFormatter.formatCompactAmount(Math.abs(number), isoCode, getPrecision(precision)) + affix.after;
         }
 
         // Full, precise currency amount for the value tooltip.
@@ -353,7 +353,8 @@
                         navKind: isLead ? 'LEAD' : 'BP',
                         title: item.customerName,
                         meta: meta,
-                        valueText: h.formatMoney(item.pipeline, cur)
+                        valueText: h.formatMoney(item.pipeline, cur),
+                        valueTitle: h.fullMoney(item.pipeline, cur)
                     };
                 },
                 navigate: openDrillRow

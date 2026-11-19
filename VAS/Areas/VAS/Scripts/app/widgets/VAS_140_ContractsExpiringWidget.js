@@ -202,15 +202,26 @@
             return !isNaN(p) && p >= 0 ? p : 0;
         }
         // Compact money against the base (accounting-schema) currency the endpoint
-        // reported. VIS.Util.formatCompactAmount supplies the scaled magnitude at the
+        // reported. VIS.Util.BrowserCultureFormatter.formatCompactAmount supplies the scaled magnitude at the
         // system-configured precision; the sign is composed before the symbol here.
         function formatMoney(value, cur) {
             var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
             var sign = n < 0 ? '-' : '';
             var iso = (cur && cur.iso) || '';
             var aff = currencyAffix(iso, cur && cur.symbol);
-            var compact = VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
+            var compact = VIS.Util.BrowserCultureFormatter.formatCompactAmount(n, iso, precisionOf(cur));
             return sign + (aff.before ? aff.symbol + aff.space + compact : compact + aff.space + aff.symbol);
+        }
+        // 2026-11-18: hover tooltip - the FULL amount (browser culture, currency precision)
+        // behind a compact amount (title text / ' title="..."' fragment, '' when unavailable).
+        function fullMoney(value, cur) {
+            if (!(window.VIS && VIS.Util && VIS.Util.BrowserCultureFormatter && typeof VIS.Util.BrowserCultureFormatter.formatFullAmount === 'function')) { return ''; }
+            var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
+            return VIS.Util.BrowserCultureFormatter.formatFullAmount(n, (cur && cur.iso) || '', precisionOf(cur));
+        }
+        function fullTitleAttr(value, cur) {
+            var full = fullMoney(value, cur);
+            return full ? ' title="' + escapeHtml(full) + '"' : '';
         }
         function renewalLabel(code) {
             // VAS Contract Master uses ATC/MNL; core C_Contract used A/M.
@@ -280,15 +291,18 @@
             var value = Number((bucket && bucket.valueAtStake) || 0);
             var hv = Number((bucket && bucket.highValueCount) || 0);
             var winLabel = label(win.labelKey, win.labelText);
-            var valLine = formatMoney(value, widgetCurrency) + ' ' + label('VAS_140_Value', 'value') +
+            var valTail = ' ' + label('VAS_140_Value', 'value') +
                 (hv > 0 ? ' · ' + formatCount(hv) + ' ' + label('VAS_140_HighValue', 'high-value') : '');
+            var valLine = formatMoney(value, widgetCurrency) + valTail;
+            // Tooltip = the same line with the amount shown in full (2026-11-18).
+            var valTitle = (fullMoney(value, widgetCurrency) || formatMoney(value, widgetCurrency)) + valTail;
             return '<button type="button" class="vas140-col" data-bucket="' + win.key + '" data-label="' + escapeHtml(winLabel) + '" ' +
                 'style="background:' + win.color + '0d;border-color:' + win.color + '33">' +
                 '<div class="vas140-col-top">' +
                     '<div class="vas140-col-win">' + escapeHtml(label('VAS_140_Expiring', 'Expiring')) + ' ' + escapeHtml(winLabel) + '</div>' +
                     '<div class="vas140-col-n" style="color:' + win.color + '">' + formatCount(count) + '</div>' +
                 '</div>' +
-                '<div class="vas140-col-val" title="' + escapeHtml(valLine) + '">' + escapeHtml(valLine) + '</div>' +
+                '<div class="vas140-col-val" title="' + escapeHtml(valTitle) + '">' + escapeHtml(valLine) + '</div>' +
             '</button>';
         }
 
@@ -353,7 +367,7 @@
                     '<span class="vas140-row-meta" title="' + escapeHtml(meta) + '">' + escapeHtml(meta) + '</span>' +
                 '</span>' +
                 '<span class="vas140-row-right">' +
-                    '<span class="vas140-row-val">' + escapeHtml(formatMoney(item.contractValue, listCurrency)) + '</span>' +
+                    '<span class="vas140-row-val"' + fullTitleAttr(item.contractValue, listCurrency) + '>' + escapeHtml(formatMoney(item.contractValue, listCurrency)) + '</span>' +
                     '<span class="vas140-row-days" style="color:' + color + ';background:' + color + '14">' + formatCount(days) + escapeHtml(label('VAS_140_Days', 'd')) + '</span>' +
                 '</span>' +
             '</div>';

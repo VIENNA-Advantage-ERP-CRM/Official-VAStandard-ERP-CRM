@@ -11,6 +11,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Text.RegularExpressions;
 using System.Web.Mvc;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
@@ -164,6 +165,74 @@ namespace VAS.Controllers
         }
 
         /// <summary>
+        /// Flat list of C_BPartner_IDs that have at least one open ticket - the same
+        /// customers the triage list shows. Used by "Open in browser" to filter the
+        /// host Customers grid with a flat IN (...) list (a nested subquery in the tab
+        /// where clause breaks the host window's grid SQL handling).
+        /// </summary>
+        /// <returns>JSON { ids:[...] } or { error }.</returns>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetOpenTicketCustomerIds()
+        {
+            if (Session["ctx"] == null)
+            {
+                return Json(new
+                {
+                    error = Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired"
+                }, JsonRequestBehavior.AllowGet);
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+
+            try
+            {
+                string sql = @"
+                    SELECT DISTINCT r.C_BPartner_ID AS C_BPartner_ID
+                    FROM R_Request r
+                    INNER JOIN R_Status s ON (s.R_Status_ID=r.R_Status_ID AND s.AD_Client_ID=r.AD_Client_ID AND s.IsActive = 'Y')
+                    INNER JOIN C_BPartner bp ON (bp.C_BPartner_ID=r.C_BPartner_ID AND bp.AD_Client_ID=r.AD_Client_ID AND bp.IsActive = 'Y' AND bp.IsCustomer = 'Y')
+                    WHERE r.IsActive = 'Y'
+                      AND r.AD_Client_ID = @Client_ID
+                      AND s.IsOpen = 'Y'
+                      AND COALESCE(s.IsClosed, 'N') = 'N'";
+
+                sql = MRole.GetDefault(ctx).AddAccessSQL(
+                    sql,
+                    "r",
+                    MRole.SQL_FULLYQUALIFIED,
+                    MRole.SQL_RO
+                );
+
+                List<int> ids = new List<int>();
+                IDataReader dr = null;
+                try
+                {
+                    dr = DB.ExecuteReader(
+                        sql,
+                        new SqlParameter[] { new SqlParameter("@Client_ID", ctx.GetAD_Client_ID()) }
+                    );
+                    while (dr != null && dr.Read())
+                    {
+                        int id = Util.GetValueOfInt(dr["C_BPartner_ID"]);
+                        if (id > 0) { ids.Add(id); }
+                    }
+                }
+                finally
+                {
+                    CloseReader(dr);
+                }
+
+                return Json(JsonConvert.SerializeObject(new { ids = ids }), JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                Log.Log(Level.SEVERE, "VAS_126_OpenTicketsWidget.GetOpenTicketCustomerIds", ex);
+                return Json(new { error = ex.Message }, JsonRequestBehavior.AllowGet);
+            }
+        }
+
+        /// <summary>
         /// Paged triage list: one row per customer with open tickets, key clients
         /// first then by open-ticket count (deterministic tie-breakers).
         /// </summary>
@@ -208,7 +277,8 @@ namespace VAS.Controllers
                 // Distinct customers that have at least one open ticket. Ticket source
                 // - MRole applied to the main physical table alias "r".
                 string openTicketCustomersSql = @"
-                    SELECT DISTINCT r.C_BPartner_ID AS C_BPartner_ID
+                    SELECT r.C_BPartner_ID AS C_BPartner_ID,
+                           r.R_Request_ID AS R_Request_ID
                     FROM R_Request r
                     INNER JOIN R_Status s ON (s.R_Status_ID=r.R_Status_ID AND s.AD_Client_ID=r.AD_Client_ID AND s.IsActive = 'Y')
                     WHERE r.IsActive = 'Y'
@@ -236,9 +306,10 @@ namespace VAS.Controllers
                            COALESCE(owner.Name, N'') AS Rep,
                            bp.Rating AS Tier_Code,
                            COALESCE(RatingTrl.Name, RatingList.Name, N'') AS Tier_Name,
-                           COALESCE(bp.ActualLifeTimeValue, 0) AS Cust_Value
+                           COALESCE(bp.ActualLifeTimeValue, 0) AS Cust_Value,
+                           otc.Open_Tickets AS Open_Tickets
                     FROM C_BPartner bp
-                    INNER JOIN OpenTicketCustomers otc ON (otc.C_BPartner_ID=bp.C_BPartner_ID)
+                    INNER JOIN OpenTicketCounts otc ON (otc.C_BPartner_ID=bp.C_BPartner_ID)
                     LEFT OUTER JOIN RankedContacts c ON (c.C_BPartner_ID=bp.C_BPartner_ID AND c.RN=1)
                     LEFT OUTER JOIN CustomerSegment seg ON (seg.C_BPartner_ID=bp.C_BPartner_ID)
                     LEFT OUTER JOIN AD_User owner ON (owner.AD_User_ID=bp.SalesRep_ID AND owner.AD_Client_ID=bp.AD_Client_ID AND owner.IsActive = 'Y')" + RatingLabelJoins + @"
@@ -262,6 +333,11 @@ namespace VAS.Controllers
                     OpenTicketCustomers AS (
                         " + openTicketCustomersSql + @"
                     ),
+                    OpenTicketCounts AS (
+                        SELECT C_BPartner_ID, COUNT(1) AS Open_Tickets
+                        FROM OpenTicketCustomers
+                        GROUP BY C_BPartner_ID
+                    ),
                     CustomerSegment AS (
                         " + CustomerSegmentCte + @"
                     ),
@@ -277,6 +353,7 @@ namespace VAS.Controllers
                            cr.Tier_Code,
                            cr.Tier_Name,
                            cr.Cust_Value,
+                           cr.Open_Tickets,
                            COUNT(1) OVER () AS Total_Customers
                     FROM CustomerRows cr
                     ORDER BY cr.Cust_Value DESC,
@@ -289,14 +366,13 @@ namespace VAS.Controllers
                 IDataReader dr = null;
                 try
                 {
-                    dr = DB.ExecuteReader(
-                        sql,
-                        new SqlParameter[]
-                        {
-                            new SqlParameter("@Client_ID", ctx.GetAD_Client_ID()),
-                            new SqlParameter("@AD_Language", SqlDbType.NVarChar) { Value = GetLanguage(ctx) }
-                        }
-                    );
+                    // @Client_ID appears in several CTEs: one bind per occurrence, in SQL order.
+                    SqlParameter[] listParams = BindInOrder(ref sql, new Dictionary<string, object>
+                    {
+                        { "Client_ID", ctx.GetAD_Client_ID() },
+                        { "AD_Language", GetLanguage(ctx) }
+                    });
+                    dr = DB.ExecuteReader(sql, listParams);
 
                     while (dr != null && dr.Read())
                     {
@@ -313,7 +389,8 @@ namespace VAS.Controllers
                             rep = Util.GetValueOfString(dr["Rep"]),
                             tierCode = tierCode,
                             tier = MapTier(tierCode, tierName),
-                            value = Util.GetValueOfDecimal(dr["Cust_Value"])
+                            value = Util.GetValueOfDecimal(dr["Cust_Value"]),
+                            openTickets = Util.GetValueOfInt(dr["Open_Tickets"])
                         });
                     }
                 }
@@ -377,15 +454,6 @@ namespace VAS.Controllers
                 int clientId = ctx.GetAD_Client_ID();
                 SchemaCurrency currency = GetSchemaCurrency(ctx);
 
-                // Order follows first textual appearance in profileSql (Oracle binds
-                // positionally): @Client_ID and @BP_ID inside the RankedContacts CTE,
-                // then @AD_Language in the rating-label joins of the profile body.
-                SqlParameter[] keyParams = new SqlParameter[]
-                {
-                    new SqlParameter("@Client_ID", clientId),
-                    new SqlParameter("@BP_ID", C_BPartner_ID),
-                    new SqlParameter("@AD_Language", SqlDbType.NVarChar) { Value = GetLanguage(ctx) }
-                };
 
                 // 1. Profile (contact/title/email, segment, owner, tier, value, group).
                 string rankedContactsSql = @"
@@ -412,7 +480,7 @@ namespace VAS.Controllers
                            COALESCE(RatingTrl.Name, RatingList.Name, N'') AS Tier_Name,
                            COALESCE(bp.ActualLifeTimeValue, 0) AS Cust_Value,
                            COALESCE(bp.C_BP_Group_ID, 0) AS Group_Id,
-                           " + ProfileCompletionExpr + @" AS Onb_Progress
+                           bp.C_BPartner_ID AS C_BPartner_ID
                     FROM C_BPartner bp
                     LEFT OUTER JOIN RankedContacts c ON (c.RN=1)
                     LEFT OUTER JOIN CustomerSegment seg ON (seg.C_BPartner_ID=bp.C_BPartner_ID)
@@ -421,7 +489,22 @@ namespace VAS.Controllers
                       AND bp.IsActive = 'Y'
                       AND bp.AD_Client_ID = @Client_ID";
                 profileBodySql = MRole.GetDefault(ctx).AddAccessSQL(profileBodySql, "bp", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-                string profileSql = "WITH RankedContacts AS (" + rankedContactsSql + "), CustomerSegment AS (" + CustomerSegmentCte + ") " + profileBodySql;
+                // MRole.AddAccessSQL cannot parse a main SELECT that has a FROM inside its select
+                // list ("More than one FROM clause"), so the profile score is computed OUTSIDE the
+                // MRole-wrapped body, over the Profile CTE (aliased "bp" for ProfileCompletionExpr).
+                string profileSql = "WITH RankedContacts AS (" + rankedContactsSql + "), CustomerSegment AS (" + CustomerSegmentCte + "), Profile AS (" + profileBodySql + @")
+                    SELECT bp.Customer_Name AS Customer_Name,
+                           bp.Contact_Name AS Contact_Name,
+                           bp.Contact_Email AS Contact_Email,
+                           bp.Segment AS Segment,
+                           bp.Segment_Count AS Segment_Count,
+                           bp.Rep AS Rep,
+                           bp.Tier_Code AS Tier_Code,
+                           bp.Tier_Name AS Tier_Name,
+                           bp.Cust_Value AS Cust_Value,
+                           bp.Group_Id AS Group_Id,
+                           " + ProfileCompletionExpr + @" AS Onb_Progress
+                    FROM Profile bp";
 
                 string customerName = null;
                 string contactName = "", contactTitle = "", contactEmail = "", segment = "", rep = "", tierCode = "", tierName = "";
@@ -431,6 +514,14 @@ namespace VAS.Controllers
                 IDataReader dr = null;
                 try
                 {
+                    // Oracle binds positionally: @Client_ID / @BP_ID occur in the RankedContacts
+                    // CTE, the CustomerSegment CTE and the profile body - one bind per occurrence.
+                    SqlParameter[] keyParams = BindInOrder(ref profileSql, new Dictionary<string, object>
+                    {
+                        { "Client_ID", clientId },
+                        { "BP_ID", C_BPartner_ID },
+                        { "AD_Language", GetLanguage(ctx) }
+                    });
                     dr = DB.ExecuteReader(profileSql, keyParams);
                     if (dr != null && dr.Read())
                     {
@@ -748,13 +839,15 @@ namespace VAS.Controllers
             IDataReader dr = null;
             try
             {
-                dr = DB.ExecuteReader(sql, new SqlParameter[]
+                // @Ccy_ID occurs twice and comes first in the SQL: bind per occurrence, in SQL order.
+                SqlParameter[] pipeParams = BindInOrder(ref sql, new Dictionary<string, object>
                 {
-                    new SqlParameter("@Client_ID", ctx.GetAD_Client_ID()),
-                    new SqlParameter("@BP_ID", bpId),
-                    new SqlParameter("@Ccy_ID", currencyId),
-                    new SqlParameter("@ConvType_ID", conversionTypeId)
+                    { "Client_ID", ctx.GetAD_Client_ID() },
+                    { "BP_ID", bpId },
+                    { "Ccy_ID", currencyId },
+                    { "ConvType_ID", conversionTypeId }
                 });
+                dr = DB.ExecuteReader(sql, pipeParams);
                 if (dr != null && dr.Read())
                 {
                     value = Util.GetValueOfDecimal(dr["Val"]);
@@ -781,11 +874,11 @@ namespace VAS.Controllers
                 ? " AND CAST(ips.DueDate AS DATE) < CAST(CURRENT_DATE AS DATE)"
                 : " AND TRUNC(ips.DueDate) < TRUNC(SYSDATE)";
 
-            SqlParameter[] pars = new SqlParameter[]
+            Dictionary<string, object> bindValues = new Dictionary<string, object>
             {
-                new SqlParameter("@Client_ID", ctx.GetAD_Client_ID()),
-                new SqlParameter("@BP_ID", bpId),
-                new SqlParameter("@Ccy_ID", currencyId)
+                { "Client_ID", ctx.GetAD_Client_ID() },
+                { "BP_ID", bpId },
+                { "Ccy_ID", currencyId }
             };
 
             // Aggregate amount + count + oldest due date.
@@ -810,6 +903,8 @@ namespace VAS.Controllers
             IDataReader dr = null;
             try
             {
+                // @Ccy_ID occurs twice: one bind per occurrence, in SQL order.
+                SqlParameter[] pars = BindInOrder(ref aggSql, bindValues);
                 dr = DB.ExecuteReader(aggSql, pars);
                 if (dr != null && dr.Read())
                 {
@@ -853,12 +948,9 @@ namespace VAS.Controllers
             IDataReader topReader = null;
             try
             {
-                topReader = DB.ExecuteReader(topSql, new SqlParameter[]
-                {
-                    new SqlParameter("@Client_ID", ctx.GetAD_Client_ID()),
-                    new SqlParameter("@BP_ID", bpId),
-                    new SqlParameter("@Ccy_ID", currencyId)
-                });
+                // Only @BP_ID then @Client_ID are in this SQL (no @Ccy_ID): bind exactly those, in order.
+                SqlParameter[] topParams = BindInOrder(ref topSql, bindValues);
+                topReader = DB.ExecuteReader(topSql, topParams);
                 if (topReader != null && topReader.Read())
                 {
                     invoiceNo = Util.GetValueOfString(topReader["DocNo"]);
@@ -997,22 +1089,51 @@ namespace VAS.Controllers
         /// C_BPartner alias "bp". Scored 20 points per profile section that holds data
         /// - the customer itself, a location (C_BPartner_Location), a contact
         /// (AD_User), a bank account (C_BP_BankAccount) and a customer accounting
-        /// record (FRPT_BP_Customer_Acct). Each DISTINCT 20 line contributes its 20
-        /// only when that section exists, so the sum is a multiple of 20 up to 100.
+        /// record (FRPT_BP_Customer_Acct). The customer itself is 20, then 20 for each
+        /// section that has a row, so the sum is a multiple of 20 up to 100.
         /// There is no VAS_ProfileCompletion column. Identical rule to VAS_136 and
         /// VAS_137, so the same customer reads the same percentage everywhere.
-        /// Portable across Oracle and PostgreSQL.
+        /// Oracle: every EXISTS correlates ONE level up to "bp". The earlier form correlated
+        /// from inside an inline view (SELECT SUM(t.Cnt) FROM (... WHERE x.C_BPartner_ID =
+        /// bp.C_BPartner_ID) t), which Oracle rejects with ORA-00904 (invalid identifier).
         /// </summary>
-        private const string ProfileCompletionExpr = @"COALESCE((
-                        SELECT SUM(t.Cnt)
-                        FROM (
-                            SELECT DISTINCT 20 AS Cnt FROM C_BPartner
-                            UNION ALL SELECT DISTINCT 20 AS Cnt FROM C_BPartner_Location bpl WHERE bpl.C_BPartner_ID = bp.C_BPartner_ID
-                            UNION ALL SELECT DISTINCT 20 AS Cnt FROM AD_User bpu WHERE bpu.C_BPartner_ID = bp.C_BPartner_ID
-                            UNION ALL SELECT DISTINCT 20 AS Cnt FROM C_BP_BankAccount bpb WHERE bpb.C_BPartner_ID = bp.C_BPartner_ID
-                            UNION ALL SELECT DISTINCT 20 AS Cnt FROM FRPT_BP_Customer_Acct bpc WHERE bpc.C_BPartner_ID = bp.C_BPartner_ID
-                        ) t
-                    ), 0)";
+        private const string ProfileCompletionExpr = @"(20
+                    + CASE WHEN EXISTS (SELECT 1 FROM C_BPartner_Location bpl WHERE bpl.C_BPartner_ID = bp.C_BPartner_ID) THEN 20 ELSE 0 END
+                    + CASE WHEN EXISTS (SELECT 1 FROM AD_User bpu WHERE bpu.C_BPartner_ID = bp.C_BPartner_ID) THEN 20 ELSE 0 END
+                    + CASE WHEN EXISTS (SELECT 1 FROM C_BP_BankAccount bpb WHERE bpb.C_BPartner_ID = bp.C_BPartner_ID) THEN 20 ELSE 0 END
+                    + CASE WHEN EXISTS (SELECT 1 FROM FRPT_BP_Customer_Acct bpc WHERE bpc.C_BPartner_ID = bp.C_BPartner_ID) THEN 20 ELSE 0 END)";
+
+        /// <summary>
+        /// Oracle binds positionally: every placeholder occurrence in the SQL text needs its own
+        /// bind, in order of appearance. A named placeholder used more than once (or parameters
+        /// listed in a different order than they appear) raises ORA-01008 "not all variables
+        /// bound". This numbers each occurrence of a known placeholder (@Client_ID ->
+        /// @Client_ID_1, @Client_ID_2 ...) and returns one parameter per occurrence, in SQL order.
+        /// Call it AFTER MRole.AddAccessSQL / any SQL concatenation. Placeholders not in
+        /// <paramref name="values"/> are left untouched.
+        /// </summary>
+        private static SqlParameter[] BindInOrder(ref string sql, Dictionary<string, object> values)
+        {
+            Dictionary<string, object> lookup = new Dictionary<string, object>(values, StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, int> seen = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            List<SqlParameter> list = new List<SqlParameter>();
+
+            sql = Regex.Replace(sql, @"@([A-Za-z_][A-Za-z0-9_]*)", delegate (Match m)
+            {
+                string name = m.Groups[1].Value;
+                object value;
+                if (!lookup.TryGetValue(name, out value)) { return m.Value; }
+                int n;
+                seen.TryGetValue(name, out n);
+                n++;
+                seen[name] = n;
+                string unique = "@" + name + "_" + n;
+                list.Add(new SqlParameter(unique, value));
+                return unique;
+            });
+
+            return list.ToArray();
+        }
 
         /// <summary>Session language for the AD_Ref_List_Trl join, falling back to en_US.</summary>
         private string GetLanguage(Ctx ctx)

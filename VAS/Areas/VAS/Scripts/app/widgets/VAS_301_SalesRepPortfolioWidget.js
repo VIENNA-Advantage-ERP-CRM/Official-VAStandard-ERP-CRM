@@ -168,7 +168,7 @@
             var sign = n < 0 ? '-' : '';
             var iso = (cur && cur.iso) || '';
             var symbol = (cur && (cur.symbol || cur.iso)) || '';
-            var compact = VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
+            var compact = VIS.Util.BrowserCultureFormatter.formatCompactAmount(n, iso, precisionOf(cur));
             // Currency symbol placed per the browser locale (before / after the number).
             if (iso) {
                 try {
@@ -188,6 +188,17 @@
                 } catch (e) { /* fall back to the server symbol in front */ }
             }
             return sign + symbol + compact;
+        }
+        // 2026-11-18: hover tooltip - the FULL amount (browser culture, currency precision)
+        // behind a compact amount. fullTitleAttr() gives a ' title="..."' fragment (or '').
+        function fullTitleAttr(value, cur) {
+            if (!(window.VIS && VIS.Util && VIS.Util.BrowserCultureFormatter && typeof VIS.Util.BrowserCultureFormatter.formatFullAmount === 'function')) { return ''; }
+            var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
+            var full = VIS.Util.BrowserCultureFormatter.formatFullAmount(n, (cur && cur.iso) || '', precisionOf(cur));
+            return full ? ' title="' + escapeHtml(full) + '"' : '';
+        }
+        function moneyHtml(value, cur) {
+            return '<span' + fullTitleAttr(value, cur) + '>' + escapeHtml(formatMoney(value, cur)) + '</span>';
         }
         var AVATAR_COLORS = ['#1F83FF', '#5F4AA6', '#0B6B45', '#D78B10', '#0083DA', '#A33F3F'];
         function avatarColor(text) {
@@ -231,7 +242,7 @@
                     listTotal = Number(data.total || 0);
                     widgetCurrency = { symbol: data.currency_symbol || widgetCurrency.symbol, iso: data.currency_iso || widgetCurrency.iso, precision: data.std_precision };
                     var repWord = listTotal === 1 ? label('VAS_301_Rep', 'rep') : label('VAS_301_Reps', 'reps');
-                    $sub.text(formatCount(listTotal) + ' ' + repWord + ' · ' + formatMoney(data.totalArr, widgetCurrency) + ' ' + label('VAS_301_OwnedARR', 'owned ARR'));
+                    $sub.html(escapeHtml(formatCount(listTotal) + ' ' + repWord + ' · ') + moneyHtml(data.totalArr, widgetCurrency) + escapeHtml(' ' + label('VAS_301_OwnedARR', 'owned ARR')));
                     renderRows(data.items || []);
                 },
                 error: function () { if (seq === rowsSeq) { renderErrorState(); } }
@@ -258,7 +269,7 @@
                     '<span class="vas301-bar"><div style="width:' + bar + '%"></div></span>' +
                 '</span>' +
                 '<span class="vas301-row-amt">' +
-                    '<span class="vas301-amt-val">' + escapeHtml(formatMoney(item.arr, cur)) + '</span>' +
+                    '<span class="vas301-amt-val"' + fullTitleAttr(item.arr, cur) + '>' + escapeHtml(formatMoney(item.arr, cur)) + '</span>' +
                     '<span class="vas301-amt-lab">' + meta + '</span>' +
                 '</span>' +
                 riskTag +
@@ -345,7 +356,7 @@
                 '<span class="vas301-row-main">' +
                     '<span class="vas301-row-title" title="' + escapeHtml(name) + '">' + escapeHtml(name) + '</span>' +
                 '</span>' +
-                '<span class="vas301-row-val">' + escapeHtml(formatMoney(item.arr, listCurrency)) + '</span>' +
+                '<span class="vas301-row-val"' + fullTitleAttr(item.arr, listCurrency) + '>' + escapeHtml(formatMoney(item.arr, listCurrency)) + '</span>' +
             '</button>';
         }
         function renderListRows(items) {

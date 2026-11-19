@@ -48,19 +48,17 @@ namespace VAS.Controllers
         // completion is scored 20 points per profile section that has data - the
         // customer itself, a location (C_BPartner_Location), a contact (AD_User), a
         // bank account (C_BP_BankAccount) and a customer accounting record
-        // (FRPT_BP_Customer_Acct). Each DISTINCT 20 line yields one 20 only when the
-        // section exists, so the sum is a multiple of 20 up to 100. Correlated to the
-        // outer C_BPartner alias "bp"; portable across Oracle and PostgreSQL.
-        private const string ProfileCompletionExpr = @"COALESCE((
-                        SELECT SUM(t.Cnt)
-                        FROM (
-                            SELECT DISTINCT 20 AS Cnt FROM C_BPartner
-                            UNION ALL SELECT DISTINCT 20 AS Cnt FROM C_BPartner_Location bpl WHERE bpl.C_BPartner_ID = bp.C_BPartner_ID
-                            UNION ALL SELECT DISTINCT 20 AS Cnt FROM AD_User bpu WHERE bpu.C_BPartner_ID = bp.C_BPartner_ID
-                            UNION ALL SELECT DISTINCT 20 AS Cnt FROM C_BP_BankAccount bpb WHERE bpb.C_BPartner_ID = bp.C_BPartner_ID
-                            UNION ALL SELECT DISTINCT 20 AS Cnt FROM FRPT_BP_Customer_Acct bpc WHERE bpc.C_BPartner_ID = bp.C_BPartner_ID
-                        ) t
-                    ), 0)";
+        // (FRPT_BP_Customer_Acct). The customer itself is 20, then 20 for each section
+        // that has a row, so the sum is a multiple of 20 up to 100. Correlated to the
+        // outer C_BPartner alias "bp".
+        // Oracle: every EXISTS correlates ONE level up to "bp". The earlier form correlated
+        // from inside an inline view (SELECT SUM(t.Cnt) FROM (... WHERE x.C_BPartner_ID =
+        // bp.C_BPartner_ID) t), which Oracle rejects with ORA-00904 (invalid identifier).
+        private const string ProfileCompletionExpr = @"(20
+                    + CASE WHEN EXISTS (SELECT 1 FROM C_BPartner_Location bpl WHERE bpl.C_BPartner_ID = bp.C_BPartner_ID) THEN 20 ELSE 0 END
+                    + CASE WHEN EXISTS (SELECT 1 FROM AD_User bpu WHERE bpu.C_BPartner_ID = bp.C_BPartner_ID) THEN 20 ELSE 0 END
+                    + CASE WHEN EXISTS (SELECT 1 FROM C_BP_BankAccount bpb WHERE bpb.C_BPartner_ID = bp.C_BPartner_ID) THEN 20 ELSE 0 END
+                    + CASE WHEN EXISTS (SELECT 1 FROM FRPT_BP_Customer_Acct bpc WHERE bpc.C_BPartner_ID = bp.C_BPartner_ID) THEN 20 ELSE 0 END)";
 
         /// <summary>
         /// Donut aggregate: total active customers and the onboarded / in-progress
@@ -80,18 +78,25 @@ namespace VAS.Controllers
 
             try
             {
-                string customerScopeSql = @"
-                    SELECT bp.C_BPartner_ID AS C_BPartner_ID,
-                           " + ProfileCompletionExpr + @" AS Onb_Progress
+                // MRole.AddAccessSQL cannot parse a main SELECT that has a FROM inside its
+                // select list ("More than one FROM clause"), so Scope is a plain SELECT and
+                // the profile score is computed over it (alias "bp" for ProfileCompletionExpr).
+                string scopeSql = @"
+                    SELECT bp.C_BPartner_ID AS C_BPartner_ID
                     FROM C_BPartner bp
                     WHERE bp.IsActive = 'Y'
                       AND bp.IsCustomer = 'Y'
                       AND bp.AD_Client_ID = @Client_ID";
-                customerScopeSql = MRole.GetDefault(ctx).AddAccessSQL(customerScopeSql, "bp", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                scopeSql = MRole.GetDefault(ctx).AddAccessSQL(scopeSql, "bp", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
                 string sql = @"
-                    WITH CustomerScope AS (
-                        " + customerScopeSql + @"
+                    WITH Scope AS (
+                        " + scopeSql + @"
+                    ),
+                    CustomerScope AS (
+                        SELECT bp.C_BPartner_ID AS C_BPartner_ID,
+                               " + ProfileCompletionExpr + @" AS Onb_Progress
+                        FROM Scope bp
                     )
                     SELECT COUNT(1) AS Total_Customers,
                            SUM(CASE WHEN cs.Onb_Progress >= 100 THEN 1 ELSE 0 END) AS Onboarded_Count,
@@ -191,15 +196,16 @@ namespace VAS.Controllers
                            ) AS RN
                     FROM AD_User Contact
                     WHERE Contact.IsActive = 'Y'
-                      AND Contact.AD_Client_ID = @Client_ID";
+                      AND Contact.AD_Client_ID = @Contact_Client_ID";
 
+                // Plain SELECT for MRole (no FROM in the select list - see GetSummary); the
+                // profile score is added in CustomerScope below.
                 string customerScopeSql = @"
-                    SELECT bp.C_BPartner_ID AS Id,
+                    SELECT bp.C_BPartner_ID AS C_BPartner_ID,
                            bp.Value AS Customer_Code,
                            bp.Name AS Customer_Name,
                            bp.SalesRep_ID AS SalesRep_ID,
-                           bp.Updated AS Updated_At,
-                           " + ProfileCompletionExpr + @" AS Onb_Progress
+                           bp.Updated AS Updated_At
                     FROM C_BPartner bp
                     WHERE bp.IsActive = 'Y'
                       AND bp.IsCustomer = 'Y'
@@ -209,12 +215,27 @@ namespace VAS.Controllers
                 // Order: in-progress lists least-onboarded first (progress ASC); the
                 // done list ties on progress and falls through to name. CASE avoids
                 // dialect-specific NULLS FIRST/LAST.
+                // The status is allow-listed above, so the filter / order are composed here
+                // rather than bound: Oracle binds positionally and a repeated @Status would
+                // leave its later slots unbound (ORA-01008).
+                string statusFilter = state == "done" ? "cs.Onb_Progress >= 100" : "cs.Onb_Progress < 100";
+                string statusOrder = state == "incomplete" ? "cs.Onb_Progress ASC," : "";
+
                 string sql = @"
                     WITH RankedContacts AS (
                         " + rankedContactsSql + @"
                     ),
-                    CustomerScope AS (
+                    Scope AS (
                         " + customerScopeSql + @"
+                    ),
+                    CustomerScope AS (
+                        SELECT bp.C_BPartner_ID AS Id,
+                               bp.Customer_Code AS Customer_Code,
+                               bp.Customer_Name AS Customer_Name,
+                               bp.SalesRep_ID AS SalesRep_ID,
+                               bp.Updated_At AS Updated_At,
+                               " + ProfileCompletionExpr + @" AS Onb_Progress
+                        FROM Scope bp
                     )
                     SELECT cs.Id,
                            cs.Customer_Code,
@@ -226,10 +247,9 @@ namespace VAS.Controllers
                            COUNT(1) OVER () AS Total_Rows
                     FROM CustomerScope cs
                     LEFT OUTER JOIN RankedContacts c ON (c.C_BPartner_ID=cs.Id AND c.RN=1)
-                    LEFT OUTER JOIN AD_User rep ON (rep.AD_User_ID=cs.SalesRep_ID AND rep.AD_Client_ID = @Client_ID AND rep.IsActive = 'Y')
-                    WHERE (@Status = 'done' AND cs.Onb_Progress >= 100)
-                       OR (@Status = 'incomplete' AND cs.Onb_Progress < 100)
-                    ORDER BY CASE WHEN @Status = 'incomplete' THEN cs.Onb_Progress ELSE 0 END ASC,
+                    LEFT OUTER JOIN AD_User rep ON (rep.AD_User_ID=cs.SalesRep_ID AND rep.IsActive = 'Y')
+                    WHERE " + statusFilter + @"
+                    ORDER BY " + statusOrder + @"
                              cs.Customer_Name ASC,
                              cs.Id ASC
                     OFFSET " + offset + @" ROWS FETCH NEXT " + limit + @" ROWS ONLY";
@@ -240,10 +260,12 @@ namespace VAS.Controllers
                 IDataReader dr = null;
                 try
                 {
+                    // Positional binding: listed in the order the placeholders appear in the SQL
+                    // (@Contact_Client_ID in RankedContacts, then @Client_ID in CustomerScope).
                     dr = DB.ExecuteReader(sql, new SqlParameter[]
                     {
-                        new SqlParameter("@Client_ID", ctx.GetAD_Client_ID()),
-                        new SqlParameter("@Status", SqlDbType.VarChar) { Value = state }
+                        new SqlParameter("@Contact_Client_ID", ctx.GetAD_Client_ID()),
+                        new SqlParameter("@Client_ID", ctx.GetAD_Client_ID())
                     });
                     while (dr != null && dr.Read())
                     {

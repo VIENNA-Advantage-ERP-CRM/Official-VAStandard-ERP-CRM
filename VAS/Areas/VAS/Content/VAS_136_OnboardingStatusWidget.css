@@ -14,7 +14,8 @@
     min-height: 0;
     color: #102C3F;
     font-family: Roboto, sans-serif;
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 20px);
+    container-type: inline-size;
+    font-size: clamp(16px, 1.2cqi, 20px);
 }
 
     .vas136-root,
@@ -79,7 +80,7 @@
 }
 
 .vas136-sub {
-    font-size: 0.7em;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
     color: #717182;
     margin-top: 1px;                            /* px */
     white-space: nowrap;
@@ -196,7 +197,7 @@
 .vas136-leg-lab {
     flex: 1;
     min-width: 0;
-    font-size: 0.72em;
+    font-size: 0.6875em;
     color: #102C3F;
     white-space: nowrap;
     overflow: hidden;
@@ -204,7 +205,7 @@
 }
 
 .vas136-leg-num {
-    font-size: 0.78em;
+    font-size: 0.75em;
     font-weight: 700;
     color: #102C3F;
     flex-shrink: 0;
@@ -226,7 +227,7 @@
 
 .vas136-state {
     padding: 0.9em 0.25em;
-    font-size: 0.82em;
+    font-size: 0.8125em;
     color: #748494;
     text-align: center;
 }
@@ -238,7 +239,7 @@
     color: #0083DA;
     border-radius: 999px;
     font-family: inherit;
-    font-size: 0.9em;
+    font-size: 0.8125em;
     padding: 2px 10px;                          /* px */
     cursor: pointer;
 }

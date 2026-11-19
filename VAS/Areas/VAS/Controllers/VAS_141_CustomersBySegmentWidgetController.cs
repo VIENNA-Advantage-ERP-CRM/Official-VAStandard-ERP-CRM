@@ -11,6 +11,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Text.RegularExpressions;
 using System.Web.Mvc;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
@@ -37,6 +38,8 @@ namespace VAS.Controllers
     ///               applied to the main physical table of each query/CTE.
     /// Chronological development:
     ///   VAI052      2026-07-23 Created
+    ///   VAI052      2026-11-18 Oracle fixes: totals query has a FROM (ORA-00923); every placeholder
+    ///                          occurrence is bound in SQL order (ORA-01008)
     /// </summary>
     public class VAS_141_CustomersBySegmentWidgetController : Controller
     {
@@ -128,14 +131,21 @@ namespace VAS.Controllers
                     memb AS (
                         " + membSql + @"
                     )
-                    SELECT (SELECT COUNT(*) FROM eligible) AS Total_Customers,
-                           (SELECT COUNT(DISTINCT m.C_BPartner_ID) FROM memb m) AS Segmented_Customers";
+                    SELECT t.Total_Customers AS Total_Customers,
+                           s.Segmented_Customers AS Segmented_Customers
+                    FROM (SELECT COUNT(*) AS Total_Customers FROM eligible) t
+                    CROSS JOIN (SELECT COUNT(DISTINCT m.C_BPartner_ID) AS Segmented_Customers FROM memb m) s";
+                // Two separate aggregates joined together: Oracle rejects a scalar sub-select
+                // next to COUNT(*) in one aggregate query (ORA-00937), and a SELECT with no FROM
+                // (ORA-00923).
 
                 int total = 0, segmented = 0;
                 IDataReader tdr = null;
                 try
                 {
-                    tdr = DB.ExecuteReader(totalsSql, new SqlParameter[] { new SqlParameter("@Client_ID", ctx.GetAD_Client_ID()) });
+                    // @Client_ID occurs in both CTEs: one bind per occurrence, in SQL order.
+                    SqlParameter[] totalsParams = BindInOrder(ref totalsSql, new Dictionary<string, object> { { "Client_ID", ctx.GetAD_Client_ID() } });
+                    tdr = DB.ExecuteReader(totalsSql, totalsParams);
                     if (tdr != null && tdr.Read())
                     {
                         total = Util.GetValueOfInt(tdr["Total_Customers"]);
@@ -170,7 +180,9 @@ namespace VAS.Controllers
                 IDataReader dr = null;
                 try
                 {
-                    dr = DB.ExecuteReader(distSql, new SqlParameter[] { new SqlParameter("@Client_ID", ctx.GetAD_Client_ID()) });
+                    // @Client_ID occurs in the eligible, memb and mtl blocks: one bind per occurrence.
+                    SqlParameter[] distParams = BindInOrder(ref distSql, new Dictionary<string, object> { { "Client_ID", ctx.GetAD_Client_ID() } });
+                    dr = DB.ExecuteReader(distSql, distParams);
                     while (dr != null && dr.Read())
                     {
                         int count = Util.GetValueOfInt(dr["Customer_Count"]);
@@ -282,11 +294,13 @@ namespace VAS.Controllers
                 IDataReader dr = null;
                 try
                 {
-                    dr = DB.ExecuteReader(sql, new SqlParameter[]
+                    // @Client_ID occurs twice (main query + EXISTS), then @Seg_ID: bind per occurrence.
+                    SqlParameter[] segParams = BindInOrder(ref sql, new Dictionary<string, object>
                     {
-                        new SqlParameter("@Client_ID", ctx.GetAD_Client_ID()),
-                        new SqlParameter("@Seg_ID", C_MasterTargetList_ID)
+                        { "Client_ID", ctx.GetAD_Client_ID() },
+                        { "Seg_ID", C_MasterTargetList_ID }
                     });
+                    dr = DB.ExecuteReader(sql, segParams);
                     while (dr != null && dr.Read())
                     {
                         total = Util.GetValueOfInt(dr["Total_Rows"]);
@@ -390,7 +404,9 @@ namespace VAS.Controllers
                 IDataReader dr = null;
                 try
                 {
-                    dr = DB.ExecuteReader(sql, new SqlParameter[] { new SqlParameter("@Client_ID", ctx.GetAD_Client_ID()) });
+                    // @Client_ID occurs twice (main query + NOT EXISTS): one bind per occurrence.
+                    SqlParameter[] unsegParams = BindInOrder(ref sql, new Dictionary<string, object> { { "Client_ID", ctx.GetAD_Client_ID() } });
+                    dr = DB.ExecuteReader(sql, unsegParams);
                     while (dr != null && dr.Read())
                     {
                         total = Util.GetValueOfInt(dr["Total_Rows"]);
@@ -543,11 +559,13 @@ namespace VAS.Controllers
                 IDataReader dr = null;
                 try
                 {
-                    dr = DB.ExecuteReader(eligibleSql, new SqlParameter[]
+                    // SQL order is @Client_ID, @Seg_ID, @Client_ID: one bind per occurrence, in order.
+                    SqlParameter[] eligibleParams = BindInOrder(ref eligibleSql, new Dictionary<string, object>
                     {
-                        new SqlParameter("@Client_ID", ctx.GetAD_Client_ID()),
-                        new SqlParameter("@Seg_ID", C_MasterTargetList_ID)
+                        { "Client_ID", ctx.GetAD_Client_ID() },
+                        { "Seg_ID", C_MasterTargetList_ID }
                     });
+                    dr = DB.ExecuteReader(eligibleSql, eligibleParams);
                     while (dr != null && dr.Read())
                     {
                         toInsert.Add(new int[] { Util.GetValueOfInt(dr["C_BPartner_ID"]), Util.GetValueOfInt(dr["AD_Org_ID"]) });
@@ -582,6 +600,36 @@ namespace VAS.Controllers
                 Log.Log(Level.SEVERE, "VAS_141_CustomersBySegmentWidget.AssignSegment", ex);
                 return Json(new { error = ex.Message }, JsonRequestBehavior.AllowGet);
             }
+        }
+
+        /// <summary>
+        /// Oracle binds positionally: every placeholder occurrence in the SQL text needs its own
+        /// bind, in order of appearance (a repeated named placeholder, or parameters listed in a
+        /// different order, raises ORA-01008 "not all variables bound"). Numbers each occurrence
+        /// of a known placeholder (@Client_ID -> @Client_ID_1, @Client_ID_2 ...) and returns one
+        /// parameter per occurrence, in SQL order. Call AFTER MRole.AddAccessSQL / concatenation.
+        /// </summary>
+        private static SqlParameter[] BindInOrder(ref string sql, Dictionary<string, object> values)
+        {
+            Dictionary<string, object> lookup = new Dictionary<string, object>(values, StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, int> seen = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            List<SqlParameter> list = new List<SqlParameter>();
+
+            sql = Regex.Replace(sql, @"@([A-Za-z_][A-Za-z0-9_]*)", delegate (Match m)
+            {
+                string name = m.Groups[1].Value;
+                object value;
+                if (!lookup.TryGetValue(name, out value)) { return m.Value; }
+                int n;
+                seen.TryGetValue(name, out n);
+                n++;
+                seen[name] = n;
+                string unique = "@" + name + "_" + n;
+                list.Add(new SqlParameter(unique, value));
+                return unique;
+            });
+
+            return list.ToArray();
         }
 
         private void CloseReader(IDataReader reader)

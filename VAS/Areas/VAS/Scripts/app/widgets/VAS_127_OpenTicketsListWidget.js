@@ -480,7 +480,13 @@
             var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
             var sign = n < 0 ? '-' : '';
             var affix = currencyAffixes(searchCurrency.symbol, searchCurrency.iso);
-            return sign + affix.before + VIS.Util.formatCompactAmount(Math.abs(n), searchCurrency.iso, currencyPrecision()) + affix.after;
+            return sign + affix.before + VIS.Util.BrowserCultureFormatter.formatCompactAmount(Math.abs(n), searchCurrency.iso, currencyPrecision()) + affix.after;
+        }
+        // 2026-11-18: compact amount with the full amount (browser culture) as its hover tooltip.
+        function amountHtml(value) {
+            var full = (window.VIS && VIS.Util && VIS.Util.BrowserCultureFormatter && typeof VIS.Util.BrowserCultureFormatter.formatFullAmount === 'function')
+                ? VIS.Util.BrowserCultureFormatter.formatFullAmount(Number(value) || 0, searchCurrency.iso, currencyPrecision()) : '';
+            return '<span' + (full ? ' title="' + escapeHtml(full) + '"' : '') + '>' + escapeHtml(formatArr(value)) + '</span>';
         }
 
         function openCustomer(bpId) {
@@ -529,10 +535,10 @@
                 fact(label('VAS_127_Tier', 'Tier'), tierLabel ? escapeHtml(tierLabel) : dash) +
                 fact(label('VAS_127_Segment', 'Segment'), escapeHtml(data.segment || dash)) +
                 fact(label('VAS_127_Owner', 'Owner'), escapeHtml(data.rep || dash)) +
-                fact(label('VAS_127_ARR', 'ARR'), escapeHtml(formatArr(data.value))) +
+                fact(label('VAS_127_ARR', 'ARR'), amountHtml(data.value)) +
                 fact(label('VAS_127_OpenTicketsFact', 'Open tickets'), escapeHtml(formatCount(data.openTickets || 0))) +
                 fact(label('VAS_127_Projects', 'Projects'), projectText(data.projectName, projects, dash)) +
-                fact(label('VAS_127_Pipeline', 'Pipeline'), pipeline > 0 ? escapeHtml(formatArr(pipeline)) : dash) +
+                fact(label('VAS_127_Pipeline', 'Pipeline'), pipeline > 0 ? amountHtml(pipeline) : dash) +
                 fact(label('VAS_127_Onboarding', 'Onboarding'), data.onboardingPercent == null ? dash : escapeHtml(formatCount(data.onboardingPercent) + '%')) +
             '</div>';
 
@@ -545,7 +551,7 @@
             var overdue = Number(data.overdueAmount || 0);
             if (overdue > 0) {
                 var invPart = data.overdueInvoice ? ' · ' + data.overdueInvoice : '';
-                signals += signalRow('cash', '#ED1C24', escapeHtml(formatArr(overdue) + ' ' + label('VAS_127_Overdue', 'overdue') + invPart),
+                signals += signalRow('cash', '#ED1C24', amountHtml(overdue) + escapeHtml(' ' + label('VAS_127_Overdue', 'overdue') + invPart),
                     formatCount(data.overdueDays || 0) + ' ' + label('VAS_127_DaysPastDue', 'days past due'));
             }
             var signalsBlock = signals ? '<div class="vas127-signals"><div class="vas127-sig-title">' + escapeHtml(label('VAS_127_Signals', 'Signals')) + '</div>' + signals + '</div>' : '';

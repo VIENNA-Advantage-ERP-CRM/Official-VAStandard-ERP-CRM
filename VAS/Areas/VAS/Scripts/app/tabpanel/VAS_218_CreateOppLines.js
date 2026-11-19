@@ -15,6 +15,7 @@
 //        04-Nov-2026  Save is ignored while a save is in flight (repeated clicks inserted duplicate lines)
 //        04-Nov-2026  Delete refreshes the header record (was save only); own refresh echo no longer reloads the grid
 //        10-Nov-2026  Texts via VIS.Msg.translate (loadMessages); amounts, quantities and counts formatted in the browser culture
+//        19-Nov-2026  Qty / Planned Price inputs: shown, typed and parsed with the browser culture's decimal mark (parseInputNum)
 
 ;VAS = window.VAS || {};
 (function (VAS, $) {
@@ -286,6 +287,44 @@
             return isNaN(n) ? 0 : n;
         }
 
+        // 2026-11-19: decimal / thousands marks of the BROWSER culture (QueryRules "Date, Time and
+        // Amount Format - Browser Culture"). Used only for what the user types into Qty / Price.
+        var numberMarks = (function () {
+            var marks = { dec: ".", grp: "," };
+            try {
+                var parts = new Intl.NumberFormat(lang).formatToParts(11111.1);
+                for (var i = 0; i < parts.length; i++) {
+                    if (parts[i].type === "decimal") marks.dec = parts[i].value;
+                    else if (parts[i].type === "group") marks.grp = parts[i].value;
+                }
+            } catch (e) { /* keep "." / "," */ }
+            return marks;
+        })();
+
+        /**
+         * Reads a number the user TYPED in the browser culture ("1.234,50" in de-DE, "1,234.50" in
+         * en-US) into a plain JS number. Server / callout values keep using parseNum.
+         * @param {*} v
+         * @returns {number}
+         */
+        function parseInputNum(v) {
+            if (typeof v === "number") return isFinite(v) ? v : 0;
+            var s = String(v == null ? "" : v).split(numberMarks.grp).join("").replace(/[\s  ]/g, "");
+            if (numberMarks.dec !== ".") s = s.split(numberMarks.dec).join(".");
+            var n = parseFloat(s.replace(/[^0-9.\-]/g, ""));
+            return isNaN(n) ? 0 : n;
+        }
+
+        // Number text for an editable input: browser decimal mark, no thousands mark.
+        function fmtEditNumber(v, minFrac, maxFrac) {
+            try {
+                return v.toLocaleString(lang, { minimumFractionDigits: minFrac, maximumFractionDigits: maxFrac, useGrouping: false });
+            } catch (e) {
+                var s = v.toFixed(maxFrac);
+                return numberMarks.dec !== "." ? s.replace(".", numberMarks.dec) : s;
+            }
+        }
+
         /**
          * Prevents non-numeric key presses on Qty and Price inputs.
          * Allows digits, decimal point, navigation keys, and Ctrl/Meta shortcuts.
@@ -302,8 +341,8 @@
                 k === 'ArrowLeft' || k === 'ArrowRight' ||
                 k === 'ArrowUp' || k === 'ArrowDown' ||
                 k === 'Home' || k === 'End') return;
-            // Allow digits and decimal point
-            if (/^[0-9.]$/.test(k)) return;
+            // Allow digits and the browser culture's decimal mark (2026-11-19)
+            if (/^[0-9]$/.test(k) || k === numberMarks.dec) return;
             // Block all other characters (letters, symbols, etc.)
             e.preventDefault();
         }
@@ -325,11 +364,16 @@
             $inp.attr("maxlength", maxLen);
             $inp.on("input", function () {
                 var s = this.value;
-                var t = s.replace(/[^0-9.,]/g, "");
-                var dot = t.indexOf(".");
-                if (dot >= 0) t = t.slice(0, dot + 1) + t.slice(dot + 1).replace(/\./g, "");
+                // Digits, one browser-culture decimal mark (and its thousands mark when pasted).
+                var t = "";
+                for (var ci = 0; ci < s.length; ci++) {
+                    var c = s.charAt(ci);
+                    if (c >= "0" && c <= "9") t += c;
+                    else if (c === numberMarks.dec) { if (t.indexOf(numberMarks.dec) < 0) t += c; }
+                    else if (c === numberMarks.grp) t += c;
+                }
                 if (t.length > maxLen) t = t.slice(0, maxLen);
-                if (parseNum(t) > AMOUNT_MAX_VALUE) t = String(AMOUNT_MAX_VALUE);
+                if (parseInputNum(t) > AMOUNT_MAX_VALUE) t = fmtEditNumber(AMOUNT_MAX_VALUE, 0, 0);
                 if (t !== s) this.value = t;
             });
         }
@@ -352,15 +396,16 @@
         }
 
         /**
-         * Plain "1234.50" text for the editable Price input (decimal point, no grouping).
-         * The input only accepts digits and "." and is read back with parseNum.
+         * Plain "1234.50" / "1234,50" text for the editable Price input (browser decimal mark,
+         * no grouping). The input only accepts digits and that decimal mark and is read back with
+         * parseInputNum.
          * @param {number} n
          * @returns {string}
          */
         function fmtMoneyEdit(n) {
             var v = (n == null || isNaN(n)) ? 0 : parseFloat(n);
             if (Math.abs(v) > AMOUNT_MAX_VALUE) v = AMOUNT_MAX_VALUE;
-            return v.toFixed(2);
+            return fmtEditNumber(v, 2, 2);
         }
 
         /**
@@ -404,19 +449,15 @@
         }
 
         /**
-         * Plain "8.50" text for the editable Qty input (decimal point, no grouping): at least
-         * 2 decimal places (up to 6), trailing zeros beyond the 2nd place stripped.
+         * Plain "8.50" / "8,50" text for the editable Qty input (browser decimal mark, no
+         * grouping): at least 2 decimal places (up to 6), trailing zeros beyond the 2nd place stripped.
          * @param {number} n
          * @returns {string}
          */
         function fmtQtyEdit(n) {
-            if (n == null || isNaN(n)) return "0.00";
-            var v = parseFloat(n);
+            var v = (n == null || isNaN(n)) ? 0 : parseFloat(n);
             if (Math.abs(v) > AMOUNT_MAX_VALUE) v = AMOUNT_MAX_VALUE;
-            var s = v.toFixed(6);
-            // Strip trailing zeros but always keep at least 2 decimal places
-            s = s.replace(/(\.\d{2})(\d*?)0+$/, "$1$2").replace(/(\.\d{2,}?)0+$/, "$1");
-            return s;
+            return fmtEditNumber(v, 2, 6);
         }
 
         /**
@@ -2010,7 +2051,7 @@
                 $q.val(v.PlannedQty ? fmtQtyEdit(v.PlannedQty) : "").css("text-align", "right");
                 limitNumericInput($q, "PlannedQty");
                 $q.on("blur", function () {
-                    var n = parseNum($q.val());
+                    var n = parseInputNum($q.val());
                     fieldSet(line, "PlannedQty", n);
                     // Recalculate amount
                     fieldSet(line, "PlannedAmt", parseFloat((n * parseNum(line.values.PlannedPrice)).toFixed(10)));
@@ -2026,7 +2067,7 @@
                     if (e.key === "Enter") { $q.trigger("blur"); }
                     if (e.key === "Tab") {
                         e.preventDefault();
-                        var n = parseNum($q.val());
+                        var n = parseInputNum($q.val());
                         fieldSet(line, "PlannedQty", n);
                         fieldSet(line, "PlannedAmt", parseFloat((n * parseNum(line.values.PlannedPrice)).toFixed(10)));
                         moveFocus(line, "quantity", e.shiftKey);
@@ -2112,7 +2153,7 @@
                 $inp.val(fmtMoneyEdit(line.values.PlannedPrice || 0)).css("text-align", "right");
                 limitNumericInput($inp, "PlannedPrice");
                 $inp.on("blur", function () {
-                    var n = parseNum($inp.val());
+                    var n = parseInputNum($inp.val());
                     // Mark price as manually set so server callouts don't overwrite it.
                     line._priceOverride = true;
                     fieldSet(line, "PlannedPrice", n);
@@ -2129,7 +2170,7 @@
                     if (e.key === "Enter") { $inp.trigger("blur"); }
                     if (e.key === "Tab") {
                         e.preventDefault();
-                        var n = parseNum($inp.val());
+                        var n = parseInputNum($inp.val());
                         fieldSet(line, "PlannedPrice", n);
                         fieldSet(line, "PlannedAmt", parseFloat((parseNum(line.values.PlannedQty) * n).toFixed(10)));
                         moveFocus(line, "price", e.shiftKey);

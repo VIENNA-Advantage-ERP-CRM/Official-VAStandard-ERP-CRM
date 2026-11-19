@@ -135,7 +135,7 @@
         }
 
         // Compact currency amount (e.g. ₹3.42Cr / $34.2M / -$5.3T). The magnitude comes
-        // from VIS.Util.formatCompactAmount, which scales against the base
+        // from VIS.Util.BrowserCultureFormatter.formatCompactAmount, which scales against the base
         // (accounting-schema) currency's numbering system and renders at the
         // system-configured standard precision; the sign sits BEFORE the symbol.
         function formatCompactAmount(value, symbol, isoCode, precision) {
@@ -143,7 +143,7 @@
             if (!isFinite(number)) { number = 0; }
             var sign = number < 0 ? '-' : '';
             var affix = currencyAffixes(symbol, isoCode);
-            return sign + affix.before + VIS.Util.formatCompactAmount(Math.abs(number), isoCode, getPrecision(precision)) + affix.after;
+            return sign + affix.before + VIS.Util.BrowserCultureFormatter.formatCompactAmount(Math.abs(number), isoCode, getPrecision(precision)) + affix.after;
         }
 
         // Full, precise currency amount for the value tooltip.
@@ -281,7 +281,7 @@
                         invoices > 0 ? h.formatCount(invoices) + ' ' + invoiceWord : '',
                         label('VAS_124_DaysOverdue', '{0}d overdue').replace('{0}', h.formatCount(days))
                     ].filter(function (p) { return p; }).join(' · ');
-                    return { bpId: item.customerId, title: item.customerName, meta: meta, valueText: h.formatMoney(item.overdueAmt, cur), valueTone: 'danger' };
+                    return { bpId: item.customerId, title: item.customerName, meta: meta, valueText: h.formatMoney(item.overdueAmt, cur), valueTitle: h.fullMoney(item.overdueAmt, cur), valueTone: 'danger' };
                 },
                 navigate: zoomToCustomer
             });

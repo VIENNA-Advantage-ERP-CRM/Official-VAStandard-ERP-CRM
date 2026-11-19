@@ -14,7 +14,8 @@
  *               extraParams: {},                 // optional static query params
  *               pageSize: 7,                     // default 7
  *               mapData: function (data) { return { items, total, currency }; },
- *               mapRow: function (item, cur, h) { return { bpId, title, meta, valueText, valueTone }; },
+ *               mapRow: function (item, cur, h) { return { bpId, title, meta, valueText, valueTitle, valueTone }; },
+ *                                                // valueTitle = h.fullMoney(...) -> full amount on hover (2026-11-18)
  *               navigate: function (recordId, kind) { ... }
  *           });
  *           drill.open(); drill.close(); drill.dispose();
@@ -69,14 +70,21 @@
         return !isNaN(p) && p >= 0 ? p : 0;
     }
     // Compact money against the base (accounting-schema) currency the endpoint
-    // reported. VIS.Util.formatCompactAmount supplies the scaled magnitude at the
+    // reported. VIS.Util.BrowserCultureFormatter.formatCompactAmount supplies the scaled magnitude at the
     // system-configured precision; the sign is composed before the symbol here.
     function formatMoney(value, cur) {
         var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
         var sign = n < 0 ? '-' : '';
         var iso = (cur && cur.iso) || '';
         var symbol = (cur && (cur.symbol || cur.iso)) || '';
-        return sign + symbol + VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
+        return sign + symbol + VIS.Util.BrowserCultureFormatter.formatCompactAmount(n, iso, precisionOf(cur));
+    }
+    // 2026-11-18 - hover tooltip: the FULL amount (browser culture, currency precision) behind
+    // the compact formatMoney text. mapRow hands it back as valueTitle.
+    function fullMoney(value, cur) {
+        if (!(window.VIS && VIS.Util && VIS.Util.BrowserCultureFormatter && typeof VIS.Util.BrowserCultureFormatter.formatFullAmount === 'function')) { return ''; }
+        var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
+        return VIS.Util.BrowserCultureFormatter.formatFullAmount(n, (cur && cur.iso) || '', precisionOf(cur));
     }
     function avatarColor(text) {
         var hash = 0, value = String(text || '');
@@ -93,7 +101,7 @@
         return '';
     }
 
-    var HELPERS = { formatMoney: formatMoney, formatCount: formatCount, escapeHtml: escapeHtml };
+    var HELPERS = { formatMoney: formatMoney, fullMoney: fullMoney, formatCount: formatCount, escapeHtml: escapeHtml };
 
     VAS.KpiDrill = function (opts) {
         opts = opts || {};
@@ -185,7 +193,7 @@
                         '<span class="MPC-kpidrill-rtitle" title="' + escapeHtml(name) + '">' + escapeHtml(name) + '</span>' +
                         (r.meta ? '<span class="MPC-kpidrill-rmeta" title="' + escapeHtml(r.meta) + '">' + escapeHtml(r.meta) + '</span>' : '') +
                     '</span>' +
-                    (r.valueText ? '<span class="MPC-kpidrill-rval' + toneCls + '">' + escapeHtml(r.valueText) + '</span>' : '') +
+                    (r.valueText ? '<span class="MPC-kpidrill-rval' + toneCls + '"' + (r.valueTitle ? ' title="' + escapeHtml(r.valueTitle) + '"' : '') + '>' + escapeHtml(r.valueText) + '</span>' : '') +
                 '</' + tag + '>';
             }).join('');
             $body.html('<div class="MPC-kpidrill-list">' + rows + '</div>');

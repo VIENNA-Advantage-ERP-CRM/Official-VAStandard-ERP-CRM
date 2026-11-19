@@ -14,7 +14,8 @@
     min-height: 0;
     color: #102C3F;
     font-family: Roboto, sans-serif;
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 20px);
+    container-type: inline-size;
+    font-size: clamp(16px, 1.2cqi, 20px);
 }
 
     .vas135-root,
@@ -86,7 +87,7 @@
 }
 
 .vas135-sub {
-    font-size: 0.7em;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
     color: #717182;
     margin-top: 1px;                            /* px */
     white-space: nowrap;
@@ -103,7 +104,7 @@
     color: #0083DA;
     font-family: inherit;
     font-weight: 500;
-    font-size: 0.78em;
+    font-size: 0.75em;
     cursor: pointer;
     flex-shrink: 0;
 }
@@ -188,7 +189,7 @@
 
 .vas135-row-title {
     max-width: 12em;                            /* ~240px at the 20px root max, per DevTools measurement */
-    font-size: 0.85em;
+    font-size: 0.75em;
     font-weight: 700;
     color: #102C3F;
     white-space: nowrap;
@@ -197,7 +198,7 @@
 }
 
 .vas135-row-meta {
-    font-size: 0.72em;
+    font-size: 0.6875em;
     color: #5F7283;
     white-space: nowrap;
     overflow: hidden;
@@ -209,7 +210,7 @@
     border-radius: 999px;
     font-family: inherit;
     font-weight: 600;
-    font-size: 0.72em;
+    font-size: 0.75em;
     padding: 0.28em 0.7em;
     background: #FFFFFF;
     border: 1px solid #BFE4FF;                  /* px */
@@ -291,7 +292,7 @@
 .vas135-pgtext {
     min-width: 3em;
     text-align: center;
-    font-size: 0.8125em;
+    font-size: 0.75em;
     font-weight: 500;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
@@ -330,7 +331,7 @@
 
 .vas135-state {
     padding: 0.9em 0.25em;
-    font-size: 0.82em;
+    font-size: 0.8125em;
     color: #748494;
     text-align: center;
 }
