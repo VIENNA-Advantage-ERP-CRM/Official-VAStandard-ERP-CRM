@@ -227,12 +227,19 @@
             }
         }
 
-        // Compact amount (K/M/B or L/Cr per currency) via the shared locale-aware helper.
+        // Compact amount in the BROWSER culture (2026-11-19): the unit as well as the digits come from
+        // Intl compact notation - de-DE "2,60 Mio. $", en-US "$2.60M", en-IN "₹2.60Cr" - through
+        // VIS.Util.BrowserCultureFormatter. CurrencyFormat.js (fixed K / M / B units) is only the
+        // fallback when that formatter is not loaded.
         function fmtM(v, sym, prec, iso) {
             var s = (sym != null ? sym : getSym());
             var p = (prec != null ? Math.max(0, parseInt(prec, 10) || 0) : getPrec());
             var code = (iso != null ? iso : getIso());
             try {
+                if (VIS.Util && VIS.Util.BrowserCultureFormatter && typeof VIS.Util.BrowserCultureFormatter.formatCompactAmount === 'function') {
+                    var cnum = VIS.Util.BrowserCultureFormatter.formatCompactAmount(Math.abs(toNum(v)), code, p);
+                    return (toNum(v) < 0 ? '-' : '') + withCurrency(s, code, cnum);
+                }
                 if (VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
                     var num = VIS.Util.formatCompactAmount(Math.abs(toNum(v)), code, p);
                     return (toNum(v) < 0 ? '-' : '') + withCurrency(s, code, num);

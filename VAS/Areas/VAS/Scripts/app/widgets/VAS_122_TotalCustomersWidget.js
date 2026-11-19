@@ -147,7 +147,7 @@
         }
 
         // Compact currency amount for the sub-line (e.g. ₹3.42Cr / $34.2M / -$5.3T).
-        // The magnitude comes from VIS.Util.formatCompactAmount, which scales against
+        // The magnitude comes from VIS.Util.BrowserCultureFormatter.formatCompactAmount, which scales against
         // the base (accounting-schema) currency's numbering system and renders at the
         // system-configured standard precision. Composition stays local: the sign sits
         // BEFORE the currency symbol ("-$5.3T", not "$-5.3T").
@@ -156,7 +156,7 @@
             if (!isFinite(number)) { number = 0; }
             var sign = number < 0 ? '-' : '';
             var affix = currencyAffixes(symbol, isoCode);
-            return sign + affix.before + VIS.Util.formatCompactAmount(Math.abs(number), isoCode, getPrecision(precision)) + affix.after;
+            return sign + affix.before + VIS.Util.BrowserCultureFormatter.formatCompactAmount(Math.abs(number), isoCode, getPrecision(precision)) + affix.after;
         }
 
         // Full, precise currency amount for the sub-line tooltip. The sign sits
@@ -305,7 +305,7 @@
                     };
                 },
                 mapRow: function (item, cur, h) {
-                    return { bpId: item.customerId, title: item.customerName, meta: contactMeta(item), valueText: h.formatMoney(item.customerValue, cur) };
+                    return { bpId: item.customerId, title: item.customerName, meta: contactMeta(item), valueText: h.formatMoney(item.customerValue, cur), valueTitle: h.fullMoney(item.customerValue, cur) };
                 },
                 navigate: zoomToCustomer
             });

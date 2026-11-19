@@ -4,6 +4,7 @@
  *               Part 1: Identity, Key Facts, Next Meeting, Document Status
  * Employee Code: VAI154
  * Date        : 20-Jul-2026
+ * 2026-11-19  : WhatsApp chat date shown through fmtDateTime (browser culture).
  ********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -2751,7 +2752,7 @@
                     '  <div>',
                     '    <div class="vas_123_qrp-wachat-contact-name">', esc(topic.contactName || ''), '</div>',
                     '    <div class="vas_123_qrp-wachat-contact-meta">', esc(msg('VAS_123_WhatsApp')),
-                             topic.chatDate ? ' &middot; ' + esc(topic.chatDate) : '',
+                             topic.chatDate ? ' &middot; ' + esc(fmtDateTime(topic.chatDate)) : '',   // 2026-11-19: browser culture, not the raw server text
                     '    </div>',
                     '  </div>',
                     '</div>'

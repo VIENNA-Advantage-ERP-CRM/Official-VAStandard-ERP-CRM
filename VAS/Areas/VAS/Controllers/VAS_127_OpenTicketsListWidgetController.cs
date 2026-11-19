@@ -11,6 +11,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Text.RegularExpressions;
 using System.Web.Mvc;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
@@ -260,12 +261,16 @@ namespace VAS.Controllers
                            t.Open_Ticket_Count AS Open_Ticket_Count,
                            t.Highest_Priority AS Highest_Priority,
                            COALESCE(owner.Name, N'') AS Owner_Name
-                    FROM TicketByCustomer t
-                    INNER JOIN C_BPartner bp ON (bp.C_BPartner_ID=t.C_BPartner_ID AND bp.AD_Client_ID = @Client_ID)
+                    FROM C_BPartner bp
+                    INNER JOIN TicketByCustomer t ON (t.C_BPartner_ID=bp.C_BPartner_ID)
                     LEFT OUTER JOIN C_BP_Group grp ON (grp.C_BP_Group_ID=bp.C_BP_Group_ID AND grp.AD_Client_ID=bp.AD_Client_ID AND grp.IsActive = 'Y')
                     LEFT OUTER JOIN AD_User owner ON (owner.AD_User_ID=bp.SalesRep_ID AND owner.AD_Client_ID=bp.AD_Client_ID AND owner.IsActive = 'Y')
                     WHERE bp.IsActive = 'Y'
-                      AND bp.IsCustomer = 'Y'";
+                      AND bp.IsCustomer = 'Y'
+                      AND bp.AD_Client_ID = @Client_ID";
+                // The physical C_BPartner is the FROM table (the TicketByCustomer CTE is joined to
+                // it): MRole.AddAccessSQL could not parse "FROM <CTE> t INNER JOIN C_BPartner bp"
+                // ("TableName not correctly parsed - TableNameIn=bp").
                 if (hasSearch)
                 {
                     rankedCustomerSql += @"
@@ -303,11 +308,14 @@ namespace VAS.Controllers
                              rc.Customer_Id ASC
                     OFFSET " + offset + @" ROWS FETCH NEXT " + limit + @" ROWS ONLY";
 
-                List<SqlParameter> parameters = new List<SqlParameter> { new SqlParameter("@Client_ID", ctx.GetAD_Client_ID()) };
+                // Oracle binds positionally: @Client_ID occurs in both CTEs and @Search four times,
+                // so every occurrence gets its own bind, in SQL order.
+                Dictionary<string, object> bindValues = new Dictionary<string, object> { { "Client_ID", ctx.GetAD_Client_ID() } };
                 if (hasSearch)
                 {
-                    parameters.Add(new SqlParameter("@Search", SqlDbType.NVarChar) { Value = likeValue });
+                    bindValues["Search"] = likeValue;
                 }
+                SqlParameter[] parameters = BindInOrder(ref sql, bindValues);
 
                 List<object> items = new List<object>();
                 int total = 0;
@@ -315,7 +323,7 @@ namespace VAS.Controllers
                 IDataReader dr = null;
                 try
                 {
-                    dr = DB.ExecuteReader(sql, parameters.ToArray());
+                    dr = DB.ExecuteReader(sql, parameters);
                     while (dr != null && dr.Read())
                     {
                         total = Util.GetValueOfInt(dr["Total_Customers"]);
@@ -367,6 +375,35 @@ namespace VAS.Controllers
                 case "9": return "Minor";
                 default: return "";
             }
+        }
+
+        /// <summary>
+        /// Oracle binds positionally: every placeholder occurrence in the SQL text needs its own
+        /// bind, in order of appearance (a repeated named placeholder raises ORA-01008). Numbers
+        /// each occurrence of a known placeholder (@Client_ID -> @Client_ID_1, @Client_ID_2 ...)
+        /// and returns one parameter per occurrence, in SQL order. Call AFTER AddAccessSQL.
+        /// </summary>
+        private static SqlParameter[] BindInOrder(ref string sql, Dictionary<string, object> values)
+        {
+            Dictionary<string, object> lookup = new Dictionary<string, object>(values, StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, int> seen = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            List<SqlParameter> list = new List<SqlParameter>();
+
+            sql = Regex.Replace(sql, @"@([A-Za-z_][A-Za-z0-9_]*)", delegate (Match m)
+            {
+                string name = m.Groups[1].Value;
+                object value;
+                if (!lookup.TryGetValue(name, out value)) { return m.Value; }
+                int n;
+                seen.TryGetValue(name, out n);
+                n++;
+                seen[name] = n;
+                string unique = "@" + name + "_" + n;
+                list.Add(new SqlParameter(unique, value));
+                return unique;
+            });
+
+            return list.ToArray();
         }
 
         private void CloseReader(IDataReader reader)

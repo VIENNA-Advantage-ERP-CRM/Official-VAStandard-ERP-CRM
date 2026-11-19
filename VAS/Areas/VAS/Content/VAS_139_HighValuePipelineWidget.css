@@ -21,7 +21,8 @@
     min-height: 0;
     color: #102C3F;
     font-family: Roboto, sans-serif;
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 20px);
+    container-type: inline-size;
+    font-size: clamp(16px, 1.2cqi, 20px);
 }
 
     .vas139-root,
@@ -94,7 +95,7 @@
 }
 
 .vas139-sub {
-    font-size: 0.7em;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
     color: #717182;
     margin-top: 1px;                            /* px */
     white-space: nowrap;
@@ -167,7 +168,7 @@
 }
 
 .vas139-row-title {
-    font-size: 0.85em;
+    font-size: 0.75em;
     font-weight: 700;
     color: #102C3F;
     white-space: nowrap;
@@ -199,14 +200,14 @@
 }
 
 .vas139-amt-val {
-    font-size: 0.82em;
+    font-size: 0.75em;
     font-weight: 700;
     color: #102C3F;
     white-space: nowrap;
 }
 
 .vas139-amt-lab {
-    font-size: 0.72em;
+    font-size: 0.6875em;
     color: #748494;
     white-space: nowrap;
 }
@@ -264,7 +265,7 @@
 .vas139-pgtext {
     min-width: 3em;
     text-align: center;
-    font-size: 0.8125em;
+    font-size: 0.75em;
     font-weight: 500;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
@@ -303,7 +304,7 @@
 
 .vas139-state {
     padding: 0.9em 0.25em;
-    font-size: 0.82em;
+    font-size: 0.8125em;
     color: #748494;
 }
 
@@ -314,7 +315,7 @@
     color: #0083DA;
     border-radius: 999px;
     font-family: inherit;
-    font-size: 0.9em;
+    font-size: 0.8125em;
     padding: 2px 10px;                          /* px */
     cursor: pointer;
 }

@@ -19,7 +19,8 @@
     font-family: Roboto, sans-serif;
     /* Single grid-row (3x1) cell, so the whole card (header + 3 rows + pager)
        must fit ~1 block - matches VAS_294's compact ceiling. */
-    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .0095), 15px);
+    container-type: inline-size;
+    font-size: clamp(16px, 1.2cqi, 20px);
 }
 
     .vas295-root,
@@ -81,7 +82,7 @@
 }
 
 .vas295-title {
-    font-size: 1.05em;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
     font-weight: 500;
     color: #000000;
     line-height: 1.15;
@@ -91,7 +92,7 @@
 }
 
 .vas295-sub {
-    font-size: 0.68em;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
     color: #717182;
     margin-top: 1px;                            /* px */
     white-space: nowrap;
@@ -197,7 +198,7 @@
 }
 
 .vas295-row-title {
-    font-size: 0.82em;
+    font-size: 0.75em;
     font-weight: 700;
     color: #102C3F;
     white-space: nowrap;
@@ -206,7 +207,7 @@
 }
 
 .vas295-row-meta {
-    font-size: 0.7em;
+    font-size: 0.6875em;
     color: #5F7283;
     white-space: nowrap;
     overflow: hidden;
@@ -218,7 +219,7 @@
     border-radius: 999px;
     font-family: inherit;
     font-weight: 600;
-    font-size: 0.7em;
+    font-size: 0.75em;
     padding: 0.24em 0.6em;
     background: #FFFFFF;
     border: 1px solid #BFE4FF;                  /* px */
@@ -234,7 +235,7 @@
 .vas295-tag {
     display: inline-flex;
     align-items: center;
-    font-size: 0.66em;
+    font-size: 0.6875em;
     font-weight: 600;
     padding: 0.1875em 0.5em;
     border-radius: 6px;                         /* px */
@@ -269,7 +270,7 @@
 .vas295-pglabel {
     flex: 1 1 auto;
     min-width: 0;
-    font-size: 0.7em;
+    font-size: 0.75em;
     color: #5F7283;
     white-space: nowrap;
     overflow: hidden;
@@ -286,7 +287,7 @@
 .vas295-pgtext {
     min-width: 2.8em;
     text-align: center;
-    font-size: 0.78em;
+    font-size: 0.75em;
     font-weight: 500;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
@@ -325,7 +326,7 @@
 
 .vas295-state {
     padding: 0.7em 0.2em;
-    font-size: 0.8em;
+    font-size: 0.8125em;
     color: #748494;
     text-align: center;
 }

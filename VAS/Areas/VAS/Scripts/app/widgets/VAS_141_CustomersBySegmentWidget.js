@@ -202,15 +202,26 @@
             return !isNaN(p) && p >= 0 ? p : 0;
         }
         // Compact money against the base (accounting-schema) currency the endpoint
-        // reported. VIS.Util.formatCompactAmount supplies the scaled magnitude at the
+        // reported. VIS.Util.BrowserCultureFormatter.formatCompactAmount supplies the scaled magnitude at the
         // system-configured precision; the sign is composed before the symbol here.
         function formatMoney(value, cur) {
             var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
             var sign = n < 0 ? '-' : '';
             var iso = (cur && cur.iso) || '';
             var aff = currencyAffix(iso, cur && cur.symbol);
-            var compact = VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
+            var compact = VIS.Util.BrowserCultureFormatter.formatCompactAmount(n, iso, precisionOf(cur));
             return sign + (aff.before ? aff.symbol + aff.space + compact : compact + aff.space + aff.symbol);
+        }
+        // 2026-11-18: hover tooltip - the FULL amount (browser culture, currency precision)
+        // behind a compact amount (title text / ' title="..."' fragment, '' when unavailable).
+        function fullMoney(value, cur) {
+            if (!(window.VIS && VIS.Util && VIS.Util.BrowserCultureFormatter && typeof VIS.Util.BrowserCultureFormatter.formatFullAmount === 'function')) { return ''; }
+            var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
+            return VIS.Util.BrowserCultureFormatter.formatFullAmount(n, (cur && cur.iso) || '', precisionOf(cur));
+        }
+        function fullTitleAttr(value, cur) {
+            var full = fullMoney(value, cur);
+            return full ? ' title="' + escapeHtml(full) + '"' : '';
         }
         var AVATAR_COLORS = ['#1F83FF', '#5F4AA6', '#0B6B45', '#D78B10', '#0083DA', '#A33F3F'];
         function avatarColor(text) {
@@ -381,7 +392,7 @@
                     '<span class="vas141-row-title" title="' + escapeHtml(name) + '">' + escapeHtml(name) + '</span>' +
                     '<span class="vas141-row-meta" title="' + escapeHtml(meta) + '">' + escapeHtml(meta) + '</span>' +
                 '</span>' +
-                '<span class="vas141-row-val">' + escapeHtml(formatMoney(item.customerValue, listCurrency)) + '</span>' +
+                '<span class="vas141-row-val"' + fullTitleAttr(item.customerValue, listCurrency) + '>' + escapeHtml(formatMoney(item.customerValue, listCurrency)) + '</span>' +
             '</button>';
         }
         function renderListRows(items) {
@@ -498,11 +509,13 @@
             var rows = customers.map(function (c) {
                 var name = c.customerName || '';
                 var meta = [c.ownerName, formatMoney(c.customerValue, bulkCurrency)].filter(function (p) { return p; }).join(' · ');
+                // Tooltip = the same line with the amount shown in full (2026-11-18).
+                var metaTitle = [c.ownerName, fullMoney(c.customerValue, bulkCurrency) || formatMoney(c.customerValue, bulkCurrency)].filter(function (p) { return p; }).join(' · ');
                 return '<label class="vas141-chk">' +
                     '<input type="checkbox" class="vas141-cbx" value="' + Number(c.customerId) + '" checked>' +
                     '<span class="vas141-avatar" style="background:' + avatarColor(name) + '">' + escapeHtml(initials(name)) + '</span>' +
                     '<span class="vas141-chk-main"><span class="vas141-row-title" title="' + escapeHtml(name) + '">' + escapeHtml(name) + '</span>' +
-                        '<span class="vas141-row-meta" title="' + escapeHtml(meta) + '">' + escapeHtml(meta) + '</span></span>' +
+                        '<span class="vas141-row-meta" title="' + escapeHtml(metaTitle) + '">' + escapeHtml(meta) + '</span></span>' +
                 '</label>';
             }).join('');
             $bulkBody.html('<div class="vas141-sectitle">' + escapeHtml(label('VAS_141_TopUnsegmented', 'Top unsegmented by value')) + '</div>' + rows);

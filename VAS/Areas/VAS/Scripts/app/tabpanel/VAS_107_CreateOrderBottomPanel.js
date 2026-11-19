@@ -78,6 +78,9 @@
  *                        (loadMessages / lbl); sentences with dynamic parts use {0} tokens;
  *                        amounts, quantities, counts and dates follow the browser culture
  *                        (Intl; currency symbol placed per locale from the order's ISO code).
+ *            2026-11-19  Amount inputs: decimal / thousands marks come from the browser
+ *                        culture (Intl), not the ERP number-format setting, so typed, shown
+ *                        and parsed values agree (QueryRules, Browser Culture).
  ************************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -170,23 +173,47 @@
         var SEARCH_DEBOUNCE = 260;
         var TAB_ORDER = ["primary", "description", "quantity", "uom", "price", "tax", "more"];
 
-        /* ---------- locale-aware amount helpers (per ERP number format) ---------- */
-        var dotDecimal = (VIS.Env && typeof VIS.Env.isDecimalPoint === "function") ? VIS.Env.isDecimalPoint() : true;
-        var decSep = dotDecimal ? "." : ",";
-        var grpSep = dotDecimal ? "," : ".";
+        /* ---------- amount input helpers (BROWSER culture, QueryRules "Date, Time and Amount Format") ----------
+           2026-11-19: the decimal / thousands marks come from the browser culture
+           (navigator.language) through Intl - no longer from the ERP number-format setting
+           (VIS.Env.isDecimalPoint) - so what the user types, sees and what is parsed on save agree
+           with every other amount on the screen. Values sent to the server stay culture-neutral
+           (plain "." decimal, no grouping). */
+        var numberMarks = (function () {
+            var marks = { dec: ".", grp: "," };
+            try {
+                var parts = new Intl.NumberFormat(window.navigator.language).formatToParts(11111.1);
+                for (var i = 0; i < parts.length; i++) {
+                    if (parts[i].type === "decimal") marks.dec = parts[i].value;
+                    else if (parts[i].type === "group") marks.grp = parts[i].value;
+                }
+            } catch (e) { /* keep "." / "," */ }
+            return marks;
+        })();
+        var decSep = numberMarks.dec;
+        var grpSep = numberMarks.grp;
 
         function parseNum(s) {
-            s = String(s == null ? "" : s).split(grpSep).join("");
+            // A real number is already culture-neutral (callouts / server values) - never re-read it
+            // through the browser's separators ("12.5" would become 125 where "." is the thousands mark).
+            if (typeof s === "number") return isFinite(s) ? s : 0;
+            s = String(s == null ? "" : s).split(grpSep).join("").replace(/[\s  ]/g, "");
             if (decSep !== ".") s = s.split(decSep).join(".");
             var n = parseFloat(s.replace(/[^0-9.\-]/g, ""));
             return isNaN(n) ? 0 : n;
         }
 
+        /* Editable amount text: browser decimal mark, fixed decimals, no thousands mark. */
         function fmtAmtInput(v, prec) {
             var p = prec >= 0 ? prec : 0;
-            var f = Math.pow(10, p);
-            var s = (Math.round((+v || 0) * f) / f).toFixed(p);
-            return (decSep !== ".") ? s.replace(".", decSep) : s;
+            var n = +v || 0;
+            try {
+                return n.toLocaleString(window.navigator.language, { minimumFractionDigits: p, maximumFractionDigits: p, useGrouping: false });
+            } catch (e) {
+                var f = Math.pow(10, p);
+                var s = (Math.round(n * f) / f).toFixed(p);
+                return (decSep !== ".") ? s.replace(".", decSep) : s;
+            }
         }
 
         /* Maximum numeric magnitude accepted for any amount field — Int32.MaxValue.

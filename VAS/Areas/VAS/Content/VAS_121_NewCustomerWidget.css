@@ -31,7 +31,7 @@
 .vas121-card {
     font-family: Roboto, Arial, sans-serif;
     /* Widget root anchor — one lever; internal em values scale from this. */
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 32px);
+    font-size: clamp(16px, 1.2cqi, 20px);       /* same anchor as the Lead window widgets (VA061 New Lead) */
     width: 100%;
     height: 100%;
     display: flex;
@@ -85,7 +85,7 @@
 
 .vas121-title {
     display: block;
-    font-size: 0.9em;
+    font-size: 0.85em;                          /* Lead New Lead title size */
     font-weight: 700;
     color: #102C3F;
     line-height: 1.1;

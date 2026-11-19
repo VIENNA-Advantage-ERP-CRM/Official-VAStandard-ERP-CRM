@@ -8,8 +8,10 @@
 
 using Newtonsoft.Json;
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Text.RegularExpressions;
 using System.Web.Mvc;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
@@ -73,6 +75,37 @@ namespace VAS.Controllers
         /// it is a fallback rather than the primary link.
         /// </summary>
         private const string CustomerIdExpr = "COALESCE(o.Ref_BPartner_ID, o.C_BPartner_ID)";
+
+        /// <summary>
+        /// Oracle binds positionally: every placeholder occurrence in the SQL text needs its own
+        /// bind, in order of appearance. A repeated named placeholder, or parameters listed in a
+        /// different order than they appear, raises ORA-01008 or silently binds the wrong value
+        /// (e.g. a language string into AD_Client_ID -> ORA-01722). Numbers each occurrence of a
+        /// known placeholder (@Client_ID -> @Client_ID_1, @Client_ID_2 ...) and returns one
+        /// parameter per occurrence, in SQL order. Call AFTER MRole.AddAccessSQL / concatenation.
+        /// </summary>
+        private static SqlParameter[] BindInOrder(ref string sql, Dictionary<string, object> values)
+        {
+            Dictionary<string, object> lookup = new Dictionary<string, object>(values, StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, int> seen = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            List<SqlParameter> list = new List<SqlParameter>();
+
+            sql = Regex.Replace(sql, @"@([A-Za-z_][A-Za-z0-9_]*)", delegate (Match m)
+            {
+                string name = m.Groups[1].Value;
+                object value;
+                if (!lookup.TryGetValue(name, out value)) { return m.Value; }
+                int n;
+                seen.TryGetValue(name, out n);
+                n++;
+                seen[name] = n;
+                string unique = "@" + name + "_" + n;
+                list.Add(new SqlParameter(unique, value));
+                return unique;
+            });
+
+            return list.ToArray();
+        }
 
         /// <summary>
         /// KPI tile data: base-currency open-pipeline total, distinct customer and
@@ -202,14 +235,14 @@ namespace VAS.Controllers
                 IDataReader dr = null;
                 try
                 {
-                    dr = DB.ExecuteReader(
-                        sql,
-                        new SqlParameter[]
-                        {
-                            new SqlParameter("@Client_ID", ctx.GetAD_Client_ID()),
-                            new SqlParameter("@ConversionType_ID", conversionTypeId)
-                        }
-                    );
+                    // @ConversionType_ID occurs twice and comes BEFORE @Client_ID in the SQL; Oracle
+                    // binds positionally, so one bind per occurrence, in SQL order.
+                    SqlParameter[] pipeParams = BindInOrder(ref sql, new Dictionary<string, object>
+                    {
+                        { "Client_ID", ctx.GetAD_Client_ID() },
+                        { "ConversionType_ID", conversionTypeId }
+                    });
+                    dr = DB.ExecuteReader(sql, pipeParams);
 
                     if (dr != null && dr.Read())
                     {
