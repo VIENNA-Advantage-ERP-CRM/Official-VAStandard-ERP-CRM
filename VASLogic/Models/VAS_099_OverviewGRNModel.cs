@@ -434,6 +434,11 @@ namespace VASLogic.Models
                               CASE WHEN ord.IsSOTrx  = 'N' THEN ord.DocumentNo
                                    WHEN refo.IsSOTrx = 'N' THEN refo.DocumentNo
                               END                                 AS PO_DocumentNo,
+                              /* VAS163 2026-11-12: the purchase-side order's return flag,
+                                 so the panel zooms a Vendor RMA to its own window. */
+                              CASE WHEN ord.IsSOTrx  = 'N' THEN ord.IsReturnTrx
+                                   WHEN refo.IsSOTrx = 'N' THEN refo.IsReturnTrx
+                              END                                 AS PO_IsReturnTrx,
                               CASE WHEN ord.IsSOTrx  = 'N' THEN ord.DateOrdered
                                    WHEN refo.IsSOTrx = 'N' THEN refo.DateOrdered
                               END                                 AS PODate,
@@ -579,6 +584,8 @@ namespace VASLogic.Models
             result.C_Invoice_ID     = Util.GetValueOfInt(r["C_Invoice_ID"]);
             result.PurchaseOrderId  = Util.GetValueOfInt(r["PO_Order_ID"]);
             result.PONo             = Util.GetValueOfString(r["PO_DocumentNo"]);
+            // VAS163 2026-11-12: Vendor RMA vs Purchase Order, for the zoom window.
+            result.POIsReturnTrx    = Util.GetValueOfString(r["PO_IsReturnTrx"]) == "Y";
             result.PODate           = Stamp(r["PODate"]);
             result.ExpectedDate     = Stamp(r["ExpectedDate"]);
             result.POReference      = Util.GetValueOfString(r["PO_Reference"]);
@@ -3370,6 +3377,7 @@ namespace VASLogic.Models
             public int       C_Invoice_ID     { get; set; }   // AP invoice the receipt was raised against
             public int       PurchaseOrderId  { get; set; }   // the order that is actually the PO
             public string    PONo             { get; set; }
+            public bool      POIsReturnTrx    { get; set; }   // VAS163 2026-11-12: PO is a Vendor RMA
             public DateTime? PODate           { get; set; }
             public DateTime? ExpectedDate     { get; set; }
             public string    POReference      { get; set; }   // C_Order.POReference (vendor's ref)

@@ -1320,15 +1320,16 @@
             // Fulfilment.
             var f = fulfilment();
             $snap.append(metricCard("fulfil", "box", getMsg("VAS_106_Fulfilment", "Fulfilment"),
-                f.pct + "%",
-                f.full + " " + getMsg("VAS_106_Of", "of") + " " + f.total + " " + getMsg("VAS_106_StockLines", "stock lines delivered"),
+                // VAS163 2026-11-12: counts / percent in the browser locale.
+                formatNumber(f.pct, 0) + "%",
+                formatNumber(f.full, 0) + " " + getMsg("VAS_106_Of", "of") + " " + formatNumber(f.total, 0) + " " + getMsg("VAS_106_StockLines", "stock lines delivered"),
                 f.pct));
 
             // Invoiced. The payment state is appended only when there IS one — an
             // order with no invoice yet has no paid/unpaid position, and the
             // separator alone would trail the caption.
             var iv = invoiced();
-            var ivSub = iv.pct + "% " + getMsg("VAS_106_Billed", "billed");
+            var ivSub = formatNumber(iv.pct, 0) + "% " + getMsg("VAS_106_Billed", "billed"); // VAS163 2026-11-12: locale number
             if (iv.state) ivSub += " · " + iv.state;
             $snap.append(metricCard("invoiced", "fileText", getMsg("VAS_106_Invoiced", "Invoiced"),
                 formatAmount(iv.amount, data.CurSymbol, data.ISO_Code, data.StdPrecision),
@@ -1337,8 +1338,9 @@
             // Delivery Readiness.
             var rd = readiness();
             $snap.append(metricCard("readiness", "cube", getMsg("VAS_106_DeliveryReadiness", "Delivery Readiness"),
-                rd.pct + "%",
-                rd.available + " " + getMsg("VAS_106_Of", "of") + " " + rd.pending + " " + getMsg("VAS_106_PendingUnits", "pending units in stock"),
+                // VAS163 2026-11-12: quantities can be fractional - locale qty (up to 4 dp), not raw floats.
+                formatNumber(rd.pct, 0) + "%",
+                formatQtyLocale(rd.available) + " " + getMsg("VAS_106_Of", "of") + " " + formatQtyLocale(rd.pending) + " " + getMsg("VAS_106_PendingUnits", "pending units in stock"),
                 rd.pct));
 
             $body.append($snap);
@@ -2188,8 +2190,8 @@
             // counted in.
             $tr.append($('<span class="vas_106-rdUom"></span>').text(ruom).attr("title", ruom));
             $tr.append($('<span></span>').text(rd.WarehouseName || ""));
-            $tr.append($('<span class="vas_106-ta-c"></span>').text(formatNumber(+rd.PendingQty || 0, 0)));
-            $tr.append($('<span class="vas_106-ta-c"></span>').text(formatNumber(+rd.QtyOnHand || 0, 0)));
+            $tr.append($('<span class="vas_106-ta-c"></span>').text(formatQtyLocale(+rd.PendingQty || 0))); // VAS163 2026-11-12: fractional qty kept (was rounded to 0 dp)
+            $tr.append($('<span class="vas_106-ta-c"></span>').text(formatQtyLocale(+rd.QtyOnHand || 0))); // VAS163 2026-11-12: fractional qty kept
 
             // Every state is named, which is what a column headed Readiness is for.
             //
@@ -2221,13 +2223,13 @@
                 var lost = +rd.QtyLostSales || 0;
                 tone  = "vas_106-closed";
                 label = getMsg("VAS_106_Closed", "Closed") + " · " +
-                    formatNumber(lost, 0) + (ruom ? " " + ruom : "") + " " +
+                    formatQtyLocale(lost) + (ruom ? " " + ruom : "") + " " +
                     getMsg("VAS_106_NotDelivered", "not delivered");
             } else if (state === "short") {
                 var shortBy = (+rd.PendingQty || 0) - (+rd.QtyOnHand || 0);
                 tone  = "vas_106-short";
                 label = getMsg("VAS_106_ShortBy", "Short by") + " " +
-                    formatNumber(shortBy > 0 ? shortBy : (+rd.PendingQty || 0), 0) +
+                    formatQtyLocale(shortBy > 0 ? shortBy : (+rd.PendingQty || 0)) + // VAS163 2026-11-12: fractional qty kept
                     (ruom ? " " + ruom : "");
             } else if (state === "partial") {
                 tone  = "vas_106-partial";
@@ -2823,40 +2825,18 @@
             "C_Project":  "VAS_Project"
         };
 
-        // Window name -> AD_Window_ID, resolved once per name and remembered for
-        // the life of the panel. A name the dictionary does not know is cached as
-        // -1 so a failed lookup is not repeated on every click.
-        var windowIdByName = {};
+        // VAS163 2026-11-12: the panel's private name -> id lookup (GetWindow_ID) is
+        // replaced by VAS.ZoomUtil, which resolves new name -> old name -> zoom config.
+        // Old (pre-VAS) window names passed as the util's fallback.
+        var OLD_WINDOW_NAME = {
+            "VAS_SalesOrder":     "Sales Order",
+            "VAS_SalesQuotation": "Sales Quotation",
+            "VAS_DeliveryOrder":  "Shipment (Customer)"
+        };
 
-        // Resolves a window id from its name through the panel's own endpoint.
-        // Returns 0 when it cannot be resolved, which leaves openRecord() to fall
-        // back to the table's zoom target.
-        function resolveWindowIdByName(windowName) {
-            if (!windowName) return 0;
-            if (windowIdByName.hasOwnProperty(windowName)) {
-                return windowIdByName[windowName] > 0 ? windowIdByName[windowName] : 0;
-            }
-            try {
-                if (!(window.VIS && VIS.dataContext &&
-                      typeof VIS.dataContext.getJSONRecord === "function")) {
-                    return 0;
-                }
-                var id = VIS.dataContext.getJSONRecord(
-                    "VAS_106_OverviewSalesOrder/GetWindow_ID", windowName);
-                id = parseInt(id, 10);
-                if (isNaN(id) || id <= 0) {
-                    windowIdByName[windowName] = -1;
-                    console.log("resolveWindowIdByName: no window named " + windowName);
-                    return 0;
-                }
-                windowIdByName[windowName] = id;
-                return id;
-            } catch (e) {
-                windowIdByName[windowName] = -1;
-                console.log(e);
-                return 0;
-            }
-        }
+        // "TableName|WindowName" -> AD_Window_ID the util resolved, reused on the
+        // next click so the lookup is not repeated.
+        var zoomWindowIds = {};
 
         // Tables that serve BOTH sides of the trade, where the zoom target has to
         // be told which side to resolve. Everything else — a project, a contract —
@@ -2913,34 +2893,37 @@
         // The caller's name wins because a table does not always settle the screen:
         // a quotation, a blanket and an order are all C_Order records living on
         // three different windows.
+        //
+        // VAS163 2026-11-12: every open goes through VAS.ZoomUtil.zoomToRecord (no
+        // more VIS.ZoomTarget / direct startWindow). A table with a named VAS window
+        // (quotation / blanket / order / AR invoice / AR receipt / delivery order)
+        // opens only on that window - never a by-table fallback, which could land on
+        // the purchase-side screen. A table without a named window (contract,
+        // opportunity, project when its name is unknown) uses the server's by-table
+        // id (GetWindowIdByTable), passed to the util as AD_Window_ID. An id that
+        // resolves to 0 simply does not navigate (no error toast).
         function openRecord(tableName, recordId, windowName) {
-            if (!tableName || !recordId || +recordId <= 0 || !window.VIS) return;
-            try {
-                var windowId = resolveWindowIdByName(windowName || WINDOW_NAME_BY_TABLE[tableName]);
-                // A named window the dictionary does not know falls back to the
-                // table's own mapping before the zoom target gets its turn.
-                if (windowId <= 0 && windowName) {
-                    windowId = resolveWindowIdByName(WINDOW_NAME_BY_TABLE[tableName]);
-                }
+            if (!tableName || !recordId || +recordId <= 0) return;
+            if (!window.VAS || !VAS.ZoomUtil) return;
+            var newName = windowName || WINDOW_NAME_BY_TABLE[tableName] || "";
+            var key = tableName + "|" + newName;
+            var knownId = zoomWindowIds[key] || 0;
+            if (!knownId && !newName) knownId = resolveWindowIdByTable(tableName);
+            if (!knownId && !newName) return;
 
-                if (windowId <= 0 &&
-                    VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === "function") {
-                    // 4th arg is IsSOTrx. It is only meaningful for a table that
-                    // serves both sides — every one of those this panel opens is on
-                    // the SALES side. Asking it of a single-screen table like
-                    // C_Contract could resolve the wrong window, or none.
-                    var isSOTrx = !!DUAL_PURPOSE_TABLES[tableName];
-                    windowId = VIS.ZoomTarget.getZoomAD_Window_ID(tableName, 0, null, isSOTrx) || 0;
-                }
-                if (windowId <= 0) windowId = resolveWindowIdByTable(tableName);
-
-                if (windowId > 0 && VIS.viewManager && typeof VIS.viewManager.startWindow === "function") {
-                    var zoomQuery = VIS.Query.prototype.getEqualQuery(tableName + "_ID", +recordId);
-                    VIS.viewManager.startWindow(windowId, zoomQuery);
-                    return;
-                }
-            } catch (e) { console.log(e); }
-            toast(getMsg("VAS_106_OpenRecord", "Open") + " " + tableName + " #" + recordId, false);
+            VAS.ZoomUtil.zoomToRecord(tableName + "_ID", +recordId, knownId, newName, OLD_WINDOW_NAME[newName] || newName)
+                .done(function (id) {
+                    if (id > 0) { zoomWindowIds[key] = id; return; }
+                    // A named window the dictionary does not know (e.g. VAS_Project on a
+                    // tenant without it): single-screen tables may still open by table.
+                    if (newName && !DUAL_PURPOSE_TABLES[tableName]) {
+                        var tableId = resolveWindowIdByTable(tableName);
+                        if (tableId > 0) {
+                            VAS.ZoomUtil.zoomToRecord(tableName + "_ID", +recordId, tableId, newName, null)
+                                .done(function (id2) { if (id2 > 0) { zoomWindowIds[key] = id2; } });
+                        }
+                    }
+                });
         }
 
         // Lightweight self-contained toast (no dependency on a host toast API).
@@ -3001,15 +2984,16 @@
             });
         }
 
+        // VAS163 2026-11-12: quantity in the browser locale, up to 4 decimals, no padding.
+        function formatQtyLocale(value) {
+            return (+value || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 4 });
+        }
+
+        // VAS163 2026-11-12: delegates to VAS.formatAmountByBrowser - the order's ISO code + precision from
+        // the server, symbol position / separators / sign from the browser culture (no "symbol + ' ' + number").
         function formatAmount(value, symbol, iso, precision) {
-            var sign = value < 0 ? "-" : "";
-            var abs = Math.abs(+value || 0);
-            var cur = symbol || iso || "";
-            var p = (precision >= 0) ? precision : 2;
-            var formatted = abs.toLocaleString(window.navigator.language, {
-                minimumFractionDigits: p, maximumFractionDigits: p
-            });
-            return sign + (cur ? cur + " " : "") + formatted;
+            var p = (typeof precision === "number" && precision >= 0) ? precision : null;
+            return VAS.formatAmountByBrowser(+value || 0, iso || "", p, { symbol: symbol || "" });
         }
 
         // Parses a .NET/Newtonsoft DB value into a Date.
@@ -3031,6 +3015,13 @@
             if (!value) return null;
             if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
             var s = String(value);
+            // VAS163 2026-11-12: a bare "yyyy-MM-dd" is read by parts as a LOCAL date
+            // (new Date("yyyy-MM-dd") is UTC midnight and rolls back a day west of UTC).
+            var dOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+            if (dOnly) {
+                var ld = new Date(+dOnly[1], +dOnly[2] - 1, +dOnly[3]);
+                return isNaN(ld.getTime()) ? null : ld;
+            }
             var hasTz = /(z|[+-]\d{2}:?\d{2})$/i.test(s);
             var isDateTime = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(s);
             if (asUtc && isDateTime && !hasTz) {
@@ -3054,10 +3045,10 @@
         function formatDateTime(value) {
             var d = parseDbDate(value, true);
             if (!d) return "";
+            // VAS163 2026-11-12: one Intl pattern so the locale decides order and separators
+            // (was date + ", " + time glued by hand).
             try {
-                var dp = d.toLocaleDateString(window.navigator.language, { month: "short", day: "2-digit" });
-                var tp = d.toLocaleTimeString(window.navigator.language, { hour: "2-digit", minute: "2-digit" });
-                return dp + ", " + tp;
+                return new Intl.DateTimeFormat(window.navigator.language, { month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(d);
             } catch (e) { return d.toString(); }
         }
 
@@ -3126,3 +3117,78 @@
     };
 
 })(VAS, jQuery);
+/* VAS163 2026-11-12: VAS.formatAmountByBrowser(value, isoCode, precision, { compact, symbol })
+   Amount in the BROWSER culture (window.navigator.language) with the currency the SERVER sent
+   (ISO code + precision; the server symbol only as a fallback). Defined in each widget / panel
+   that uses it - guarded, so the first file loaded defines it - so the shared util/CurrencyFormat.js
+   stays as shipped. Compact amounts keep that file's default scale (VIS.Util.formatCompactAmount:
+   L / Cr for Indian-numbering currencies, K / M / B otherwise, digits in the browser culture);
+   separators, decimals and the position of the currency sign come from the browser culture. */
+; (function () {
+    var V = window.VAS = window.VAS || {};
+    if (typeof V.formatAmountByBrowser === 'function') return;
+    function browserLocale() { try { return window.navigator.language || undefined; } catch (e) { return undefined; } }
+    function resolvePrecision(p) {
+        var n = Number(p);
+        if (p === null || p === undefined || p === '' || isNaN(n) || n < 0) {
+            try { n = VIS.Env.getCtx().getStdPrecision(); } catch (e) { n = 2; }
+        }
+        n = Math.round(Number(n));
+        return (isNaN(n) || n < 0) ? 2 : Math.min(n, 10);
+    }
+    function validIso(c) { c = String(c || '').trim().toUpperCase(); return /^[A-Z]{3}$/.test(c) ? c : ''; }
+    function numberFormat(o) {
+        try { return new Intl.NumberFormat(browserLocale(), o); } catch (e) { }
+        if (o.currencyDisplay === 'narrowSymbol') {
+            o.currencyDisplay = 'symbol';
+            try { return new Intl.NumberFormat(browserLocale(), o); } catch (e2) { }
+        }
+        return null;
+    }
+    /* Currency sign and where the browser culture puts it for this ISO code. */
+    var layoutCache = {};
+    function currencyLayout(iso) {
+        var key = browserLocale() + '|' + iso;
+        if (layoutCache[key]) return layoutCache[key];
+        var out = { sign: '', before: true, gap: '' };
+        var f = iso ? numberFormat({ style: 'currency', currency: iso, currencyDisplay: 'narrowSymbol' }) : null;
+        if (f && typeof f.formatToParts === 'function') {
+            try {
+                var parts = f.formatToParts(1234.5), ci = -1, ni = -1;
+                for (var i = 0; i < parts.length; i++) {
+                    if (parts[i].type === 'currency' && ci < 0) ci = i;
+                    if (parts[i].type === 'integer' && ni < 0) ni = i;
+                }
+                if (ci >= 0) {
+                    out.sign = parts[ci].value;
+                    if (ni >= 0) {
+                        out.before = ci < ni;
+                        var near = out.before ? parts[ci + 1] : parts[ci - 1];
+                        out.gap = (near && near.type === 'literal') ? near.value : '';
+                    }
+                }
+            } catch (e) { }
+        }
+        layoutCache[key] = out;
+        return out;
+    }
+    V.formatAmountByBrowser = function (value, isoCode, precision, options) {
+        options = options || {};
+        var num = Number(value) || 0;
+        var p = resolvePrecision(precision);
+        var iso = validIso(isoCode);
+        var body;
+        if (options.compact && window.VIS && VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
+            body = VIS.Util.formatCompactAmount(Math.abs(num), iso, p);
+        } else {
+            var f = numberFormat({ minimumFractionDigits: p, maximumFractionDigits: p });
+            try { body = f ? f.format(Math.abs(num)) : Math.abs(num).toFixed(p); } catch (e) { body = String(Math.abs(num)); }
+        }
+        var minus = (num < 0 && /[1-9]/.test(body)) ? '-' : '';
+        var lay = currencyLayout(iso);
+        var sign = lay.sign || options.symbol || iso;
+        if (!sign) return minus + body;
+        if (!lay.sign) return minus + sign + ' ' + body;
+        return lay.before ? (minus + sign + lay.gap + body) : (minus + body + lay.gap + sign);
+    };
+})();

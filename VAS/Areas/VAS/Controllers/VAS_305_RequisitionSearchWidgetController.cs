@@ -60,11 +60,16 @@ namespace VIS.Controllers
                     SELECT r.M_Requisition_ID, r.DocumentNo, r.DocStatus, r.DateDoc, r.DateRequired, r.TotalLines,
                            w.Name AS WarehouseName, cu.Name AS CreatedByName");
                 sql.Append(hasUser ? ", u.Name AS RequesterName" : ", cu.Name AS RequesterName");
+                // VAS163 2026-11-17: Sr 24 - 'Requested by' is the requester business partner (M_Requisition.C_BPartner_ID,
+                // field 'Requester' of window VAS_Requisition; AD_User_ID is the 'Preparer'), preparer / creator when none
+                bool hasRequester = VAS_ReqWidgetData.HasRequesterColumn();
+                sql.Append(hasRequester ? ", rbp.Name AS RequesterBpName" : ", NULL AS RequesterBpName");
                 sql.Append(@"
                     FROM M_Requisition r
                     LEFT JOIN M_Warehouse w ON w.M_Warehouse_ID = r.M_Warehouse_ID
                     LEFT JOIN AD_User cu ON cu.AD_User_ID = r.CreatedBy");
                 if (hasUser) { sql.Append(" LEFT JOIN AD_User u ON u.AD_User_ID = r.AD_User_ID"); }
+                if (hasRequester) { sql.Append(" LEFT JOIN C_BPartner rbp ON rbp.C_BPartner_ID = r.C_BPartner_ID"); }
                 sql.Append(@"
                     WHERE r.AD_Client_ID = @RQ_Client AND r.IsActive = 'Y'
                       AND r.M_Requisition_ID IN (" + VAS_ReqWidgetData.AccessSql(ctx) + @")
@@ -74,6 +79,8 @@ namespace VIS.Controllers
                 // requester; the creator counts only when no requester is set (same rule as My Requisitions)
                 if (hasUser) { sql.Append(" OR LOWER(u.Name) LIKE @RQ_S5 OR (r.AD_User_ID IS NULL AND LOWER(cu.Name) LIKE @RQ_S3)"); }
                 else { sql.Append(" OR LOWER(cu.Name) LIKE @RQ_S3"); }
+                // VAS163 2026-11-17: Sr 24 - the requester name shown in the result is searchable too
+                if (hasRequester) { sql.Append(" OR LOWER(rbp.Name) LIKE @RQ_S10"); }
                 sql.Append(@"
                            OR EXISTS (SELECT 1 FROM M_RequisitionLine sl
                                       LEFT JOIN M_Product sp ON sp.M_Product_ID = sl.M_Product_ID
@@ -91,6 +98,7 @@ namespace VIS.Controllers
                     if (i == 5 && !hasUser) { continue; }
                     p.Add(new SqlParameter("@RQ_S" + i, like));
                 }
+                if (hasRequester) { p.Add(new SqlParameter("@RQ_S10", like)); } // VAS163 2026-11-17: Sr 24
 
                 DataSet ds = DB.ExecuteDataset(sql.ToString(), p.ToArray(), null);
                 List<DataRow> all = (ds != null && ds.Tables.Count > 0) ? ds.Tables[0].Rows.Cast<DataRow>().Take(MaxMatches).ToList() : new List<DataRow>();
@@ -135,8 +143,7 @@ namespace VIS.Controllers
                 var items = page.Select(r =>
                 {
                     int rid = Util.GetValueOfInt(r["M_Requisition_ID"]);
-                    string requester = Util.GetValueOfString(r["RequesterName"]);
-                    if (string.IsNullOrEmpty(requester)) { requester = Util.GetValueOfString(r["CreatedByName"]); }
+                    string requester = VAS_ReqWidgetData.RequesterOf(r); // VAS163 2026-11-17: Sr 24
                     string docStatus = Util.GetValueOfString(r["DocStatus"]);
                     return new
                     {

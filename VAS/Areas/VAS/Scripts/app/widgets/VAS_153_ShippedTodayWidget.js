@@ -65,7 +65,8 @@
         }
 
         function metaText(partial) {
-            return String(partial) + ' ' + lbl('VAS_153_SHT_MetaPartial', 'partial');
+            // VAS163 2026-11-12: counts in the browser culture.
+            return (Number(partial) || 0).toLocaleString(window.navigator.language) + ' ' + lbl('VAS_153_SHT_MetaPartial', 'partial');
         }
 
         /* ---- Build the static DOM once ---- */
@@ -125,7 +126,7 @@
             var shipped = data.shippedTodayCount || 0;
             var partial = data.partialLineCount || 0;
             els.value.classList.remove('MPC-sht-neutral');
-            els.value.textContent = String(shipped);
+            els.value.textContent = (Number(shipped) || 0).toLocaleString(window.navigator.language); // VAS163 2026-11-12: locale count
             els.meta.textContent = metaText(partial);
             els.card.setAttribute('aria-label',
                 shipped + ' ' + lbl('VAS_153_SHT_AriaOrders', 'delivery orders shipped today') + ', ' +

@@ -110,9 +110,13 @@ namespace VIS.Controllers
                 // The value expression must match the one selected below, or ordering by value would
                 // rank on numbers the widget never displays. See LineUnitCostSql
                 // for why the NULLIF guards are required.
+                // VAS163 2026-11-13: rows 23/45/46/52/53/76 one Inventory Use rule - quantity is the
+                // line's selected-UOM QtyEntered (QtyInternalUse is already base UOM, so multiplying it
+                // by the UOM factor doubled 1 UNITS = 2 Each into 4 Each), one row per product + line UOM
+                // (same as VAS_184), value = QtyInternalUse x M_InventoryLine.CurrentCostPrice.
                 string orderBy = (measure == "val")
-                    ? "SUM(line.QtyInternalUse * " + LineUnitCostSql + ") DESC"
-                    : "SUM(line.QtyInternalUse * " + UomToProductFactorSql + ") DESC";
+                    ? "SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, 0)) DESC"
+                    : "SUM(line.QtyEntered) DESC";
 
                 // Role access is applied to the inner header SELECT; applying it to this wrapped
                 // aggregate would append the predicate outside the subquery (ORA-00907).
@@ -128,19 +132,19 @@ namespace VIS.Controllers
                         p.Name AS ProductName,
                         asi.Description AS Attribute,
                         pcat.Name AS CategoryName,
-                        puom.Name AS UomName,
-                        SUM(line.QtyInternalUse * " + UomToProductFactorSql + @") AS TotalQty,
-                        SUM(line.QtyInternalUse * " + LineUnitCostSql + @") AS TotalValue
+                        COALESCE(line.C_UOM_ID, 0) AS UomId,
+                        luom.Name AS UomName,
+                        SUM(line.QtyEntered) AS TotalQty,
+                        SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, 0)) AS TotalValue
                       FROM M_InventoryLine line
                       INNER JOIN (" + invAccessSql + @") ai ON ai.M_Inventory_ID = line.M_Inventory_ID
                       INNER JOIN M_Product p ON p.M_Product_ID = line.M_Product_ID
                       LEFT JOIN M_Product_Category pcat ON pcat.M_Product_Category_ID = p.M_Product_Category_ID
-                      LEFT JOIN C_UOM puom ON puom.C_UOM_ID = p.C_UOM_ID
+                      LEFT JOIN C_UOM luom ON luom.C_UOM_ID = line.C_UOM_ID
                       LEFT JOIN M_AttributeSetInstance asi ON asi.M_AttributeSetInstance_ID = line.M_AttributeSetInstance_ID
-                      LEFT JOIN (" + ProductCurrentCostSql + @") pc ON pc.M_Product_ID = line.M_Product_ID
                       WHERE line.IsActive = 'Y'
                         AND COALESCE(line.QtyInternalUse, 0) > 0
-                      GROUP BY p.M_Product_ID, p.Name, asi.Description, pcat.Name, puom.Name
+                      GROUP BY p.M_Product_ID, p.Name, asi.Description, pcat.Name, COALESCE(line.C_UOM_ID, 0), luom.Name
                       ORDER BY " + orderBy + @"
                     ) WHERE ROWNUM <= 10";
 
@@ -154,6 +158,7 @@ namespace VIS.Controllers
                             productName = Util.GetValueOfString(dr["ProductName"]),
                             attribute = NormalizeAttributes(Util.GetValueOfString(dr["Attribute"])),
                             categoryName = Util.GetValueOfString(dr["CategoryName"]),
+                            uomId = Util.GetValueOfInt(dr["UomId"]), // VAS163 2026-11-13: row 23 line UOM of this row
                             uomName = Util.GetValueOfString(dr["UomName"]),
                             totalQty = Util.GetValueOfDecimal(dr["TotalQty"]),
                             totalValue = Util.GetValueOfDecimal(dr["TotalValue"])
@@ -178,7 +183,7 @@ namespace VIS.Controllers
         /// <summary>Endpoint B: Individual issue lines for a specific product in selected period for modal.</summary>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetProductUsageDetails(int productId, int month, int year)
+        public JsonResult GetProductUsageDetails(int productId, int month, int year, int uomId = 0)
         {
             Ctx ctx = Session["ctx"] as Ctx;
             if (ctx == null) { return Json("", JsonRequestBehavior.AllowGet); }
@@ -213,7 +218,7 @@ namespace VIS.Controllers
                       uom.Name AS UomName,
                       line.QtyInternalUse AS QtyBaseUOM,
                       baseUom.Name AS BaseUomName,
-                      (line.QtyInternalUse * " + LineUnitCostSql + @") AS LineValue
+                      (line.QtyInternalUse * COALESCE(line.CurrentCostPrice, 0)) AS LineValue
                     FROM M_InventoryLine line
                     INNER JOIN (" + invAccessSql + @") ai ON ai.M_Inventory_ID = line.M_Inventory_ID
                     INNER JOIN M_Product prod ON prod.M_Product_ID = line.M_Product_ID
@@ -221,11 +226,13 @@ namespace VIS.Controllers
                     LEFT JOIN M_Warehouse wh ON wh.M_Warehouse_ID = loc.M_Warehouse_ID
                     LEFT JOIN C_UOM uom ON uom.C_UOM_ID = line.C_UOM_ID
                     LEFT JOIN C_UOM baseUom ON baseUom.C_UOM_ID = prod.C_UOM_ID
-                    LEFT JOIN (" + ProductCurrentCostSql + @") pc ON pc.M_Product_ID = line.M_Product_ID
                     WHERE line.IsActive = 'Y'
                       AND COALESCE(line.QtyInternalUse, 0) > 0
                       AND line.M_Product_ID = " + productId + @"
+                      " + (uomId > 0 ? "AND line.C_UOM_ID = " + uomId : "") + @"
                     ORDER BY ai.MovementDate DESC, ai.DocumentNo DESC";
+                // VAS163 2026-11-13: row 23 - value = QtyInternalUse x M_InventoryLine.CurrentCostPrice (same
+                // as the tile); uomId limits the lines to the product+UOM row the modal was opened from.
 
                 string baseUomName = "";
 
@@ -380,6 +387,7 @@ namespace VIS.Controllers
         {
             string iso = "";
             string symbol = "";
+            int stdPrecision = 2; // VAS163 2026-11-12: currency precision sent to the UI (C_Currency.StdPrecision)
             int currencyId = ctx.GetContextAsInt("$C_Currency_ID");
             if (currencyId > 0)
             {
@@ -387,12 +395,13 @@ namespace VIS.Controllers
                 try
                 {
                     cdr = DB.ExecuteReader(
-                        "SELECT ISO_Code, CurSymbol FROM C_Currency WHERE C_Currency_ID = @Cur",
+                        "SELECT ISO_Code, CurSymbol, StdPrecision FROM C_Currency WHERE C_Currency_ID = @Cur",
                         new SqlParameter[] { new SqlParameter("@Cur", currencyId) });
                     if (cdr != null && cdr.Read())
                     {
                         iso = Util.GetValueOfString(cdr["ISO_Code"]);
                         symbol = Util.GetValueOfString(cdr["CurSymbol"]);
+                        stdPrecision = Util.GetValueOfInt(cdr["StdPrecision"]);
                     }
                 }
                 finally { if (cdr != null) { cdr.Close(); cdr.Dispose(); } }
@@ -405,7 +414,7 @@ namespace VIS.Controllers
                 try
                 {
                     string sql = @"
-                        SELECT c.ISO_Code, c.CurSymbol
+                        SELECT c.ISO_Code, c.CurSymbol, c.StdPrecision
                         FROM AD_ClientInfo ci
                         INNER JOIN C_AcctSchema a ON (a.C_AcctSchema_ID = ci.C_AcctSchema1_ID AND a.IsActive = 'Y')
                         INNER JOIN C_Currency c ON (c.C_Currency_ID = a.C_Currency_ID AND c.IsActive = 'Y')
@@ -415,12 +424,13 @@ namespace VIS.Controllers
                     {
                         iso = Util.GetValueOfString(cdr["ISO_Code"]);
                         symbol = Util.GetValueOfString(cdr["CurSymbol"]);
+                        stdPrecision = Util.GetValueOfInt(cdr["StdPrecision"]);
                     }
                 }
                 finally { if (cdr != null) { cdr.Close(); cdr.Dispose(); } }
             }
 
-            return new { iso = iso, symbol = symbol };
+            return new { iso = iso, symbol = symbol, stdPrecision = stdPrecision };
         }
 // ===== NEW CODE END — currency format =====
     }

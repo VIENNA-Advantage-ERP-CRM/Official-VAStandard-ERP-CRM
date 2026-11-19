@@ -1358,8 +1358,9 @@
             // Denominator is the deliverable (stockable) line count, not the raw
             // line count — charge / service lines are never received, so counting
             // them would keep a fully received order below 100%.
-            var recvSub = pct + "% · " + (data.FullyReceivedLineCount || 0) + " " +
-                getMsg("VAS_092_Of") + " " + (data.DeliverableLineCount || 0) + " " +
+            // VAS163 2026-11-12: percent and counts as browser-locale numbers.
+            var recvSub = formatNumber(pct, 0) + "% · " + formatNumber(data.FullyReceivedLineCount || 0, 0) + " " +
+                getMsg("VAS_092_Of") + " " + formatNumber(data.DeliverableLineCount || 0, 0) + " " +
                 getMsg("VAS_092_Lines");
             $snap.append(metricCard("received", "inbox", getMsg("VAS_092_Received"),
                 formatQty(delivered) + " / " + qtyWithUnit(ordered), recvSub, pct));
@@ -2897,15 +2898,19 @@
         // purchase order, so all three can be named outright.
         // C_Order appears here on its PURCHASE side only, which in this panel is
         // the Blanket Order chip — the sales side is named separately below.
+        // VAS163 2026-11-12: [new VAS window name, old window name] per table, opened
+        // through the shared VAS.ZoomUtil (was: private GetWindow_ID lookup + table
+        // ZoomTarget fallback + direct viewManager.startWindow).
         var WINDOW_NAME_BY_TABLE = {
-            "C_RfQ":              "VAS_RFQ",
-            "C_Project":          "VAS_Project",
-            "M_Requisition":      "VAS_Requisition",
-            "M_InOut":            "VAS_MaterialReceipt",
-            "C_Invoice":          "VAS_APInvoice",
-            "C_Payment":          "VAS_APPayment",
-            "VAS_ContractMaster": "VAS_ContractMaster",
-            "C_Order":            "VAS_BlanketPurchaseOrder"
+            "C_RfQ":              ["VAS_RFQ", "RfQ"],
+            "C_Project":          ["VAS_Project", "Project"],
+            "M_Requisition":      ["VAS_Requisition", "Requisition"],
+            "M_InOut":            ["VAS_MaterialReceipt", "Material Receipt"],
+            "C_Invoice":          ["VAS_APInvoice", "Invoice (Vendor)"],
+            "C_Payment":          ["VAS_APPayment", "Payment"],
+            "VAS_ContractMaster": ["VAS_ContractMaster", ""],
+            "VAMRP_PlanRun":      ["VAMRP_Plan", ""],
+            "C_Order":            ["VAS_BlanketPurchaseOrder", "Blanket Purchase Order"]
         };
 
         // The same map for records opened as a SALES transaction. C_Order serves
@@ -2913,73 +2918,26 @@
         // Blanket Order chip without — so each side names its own window and this
         // one wins when the flag is set.
         var WINDOW_NAME_BY_TABLE_SOTRX = {
-            "C_Order": "VAS_SalesOrder"
+            "C_Order": ["VAS_SalesOrder", "Sales Order"]
         };
 
-        // Window name -> AD_Window_ID, resolved once per name and remembered for
-        // the life of the panel. A name the dictionary does not know is cached as
-        // -1 so a failed lookup is not repeated on every click.
-        var windowIdByName = {};
+        // "NewName|OldName" -> AD_Window_ID returned by VAS.ZoomUtil, kept for the
+        // life of the panel so repeat clicks skip the lookup.
+        var zoomWindowIdByName = {};
 
-        // Resolves a window id from its name through the panel's own endpoint.
-        // Returns 0 when it cannot be resolved, which leaves openRecord() to fall
-        // back to the table's zoom target.
-        function resolveWindowIdByName(windowName) {
-            if (!windowName) return 0;
-            if (windowIdByName.hasOwnProperty(windowName)) {
-                return windowIdByName[windowName] > 0 ? windowIdByName[windowName] : 0;
-            }
-            try {
-                if (!(window.VIS && VIS.dataContext &&
-                      typeof VIS.dataContext.getJSONRecord === "function")) {
-                    return 0;
-                }
-                var id = VIS.dataContext.getJSONRecord(
-                    "VAS_092_OverviewPurchaseOrder/GetWindow_ID", windowName);
-                id = parseInt(id, 10);
-                if (isNaN(id) || id <= 0) {
-                    windowIdByName[windowName] = -1;
-                    console.log("resolveWindowIdByName: no window named " + windowName);
-                    return 0;
-                }
-                windowIdByName[windowName] = id;
-                return id;
-            } catch (e) {
-                windowIdByName[windowName] = -1;
-                console.log(e);
-                return 0;
-            }
-        }
-
-        // Open the record's window filtered to that row: the window named for this
-        // table when it has one, else the table's default zoom target (the
-        // VAS_105_AccountRightPanel pattern). Either way the window is started
-        // with an equal-query on the table's key column (TableName_ID). Degrades
-        // to a toast so a click never throws.
+        // Open the record's window filtered to that row. A record whose window
+        // cannot be resolved simply does not navigate (no error).
         function openRecord(tableName, recordId, isSOTrx) {
-            if (!tableName || !recordId || +recordId <= 0 || !window.VIS) return;
-            try {
-                // A sales-transaction record takes its own name where the table
-                // has one; everything else takes the plain mapping.
-                var windowName = (isSOTrx && WINDOW_NAME_BY_TABLE_SOTRX[tableName])
-                    ? WINDOW_NAME_BY_TABLE_SOTRX[tableName]
-                    : WINDOW_NAME_BY_TABLE[tableName];
-                var windowId = resolveWindowIdByName(windowName);
-
-                if (windowId <= 0 &&
-                    VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === "function") {
-                    // The 4th arg (IsSOTrx) picks the sales vs purchase window for
-                    // dual-purpose tables like C_Order — true opens the Sales Order
-                    // window, false the Purchase Order window.
-                    windowId = VIS.ZoomTarget.getZoomAD_Window_ID(tableName, 0, null, !!isSOTrx) || 0;
-                }
-                if (windowId > 0 && VIS.viewManager && typeof VIS.viewManager.startWindow === "function") {
-                    var zoomQuery = VIS.Query.prototype.getEqualQuery(tableName + "_ID", +recordId);
-                    VIS.viewManager.startWindow(windowId, zoomQuery);
-                    return;
-                }
-            } catch (e) { console.log(e); }
-            toast(getMsg("VAS_092_OpenRecord") + " " + tableName + " #" + recordId, false);
+            if (!tableName || !recordId || +recordId <= 0 || !window.VAS || !VAS.ZoomUtil) return;
+            var names = (isSOTrx && WINDOW_NAME_BY_TABLE_SOTRX[tableName])
+                ? WINDOW_NAME_BY_TABLE_SOTRX[tableName]
+                : WINDOW_NAME_BY_TABLE[tableName];
+            if (!names) return;
+            var key = names[0] + "|" + names[1];
+            VAS.ZoomUtil.zoomToRecord(tableName + "_ID", +recordId, zoomWindowIdByName[key] || 0, names[0], names[1])
+                .done(function (id) {
+                    if (id > 0) { zoomWindowIdByName[key] = id; }
+                });
         }
 
         function toast(message, isError) {
@@ -3054,16 +3012,12 @@
                 ((data && data.QtyUOMSymbol) ? data.QtyUOMSymbol : getMsg("VAS_092_Units"));
         }
 
+        // VAS163 2026-11-12: the document currency's server ISO + precision through VAS.formatAmountByBrowser;
+        // the browser culture places the symbol and sign (was sign + symbol + " " + number, fixed 2-decimal fallback).
         function formatAmount(value, symbol, iso, precision) {
-            var sign = value < 0 ? "-" : "";
-            var abs = Math.abs(value);
-            var cur = symbol || iso || "";
-            var p = (precision >= 0) ? precision : 2;
-            var formatted = abs.toLocaleString(window.navigator.language, {
-                minimumFractionDigits: p,
-                maximumFractionDigits: p
-            });
-            return sign + (cur ? cur + " " : "") + formatted;
+            var p = (typeof precision === "number" && precision >= 0) ? precision
+                : ((precision !== null && precision !== undefined && precision !== "" && +precision >= 0) ? +precision : undefined);
+            return VAS.formatAmountByBrowser(+value || 0, iso || "", p, { symbol: symbol || "" });
         }
 
         // Parses a .NET/Newtonsoft DB value into a Date.
@@ -3082,6 +3036,10 @@
             if (!value) return null;
             if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
             var s = String(value);
+            // VAS163 2026-11-12: a bare 'yyyy-MM-dd' is parsed by parts as a LOCAL date
+            // (new Date('yyyy-MM-dd') reads it as UTC and can roll the day back).
+            var dOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+            if (dOnly) return new Date(+dOnly[1], +dOnly[2] - 1, +dOnly[3]);
             var hasTz = /(z|[+-]\d{2}:?\d{2})$/i.test(s);
             var isDateTime = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(s);
             if (asUtc && isDateTime && !hasTz) {
@@ -3207,3 +3165,78 @@
     };
 
 })(VAS, jQuery);
+/* VAS163 2026-11-12: VAS.formatAmountByBrowser(value, isoCode, precision, { compact, symbol })
+   Amount in the BROWSER culture (window.navigator.language) with the currency the SERVER sent
+   (ISO code + precision; the server symbol only as a fallback). Defined in each widget / panel
+   that uses it - guarded, so the first file loaded defines it - so the shared util/CurrencyFormat.js
+   stays as shipped. Compact amounts keep that file's default scale (VIS.Util.formatCompactAmount:
+   L / Cr for Indian-numbering currencies, K / M / B otherwise, digits in the browser culture);
+   separators, decimals and the position of the currency sign come from the browser culture. */
+; (function () {
+    var V = window.VAS = window.VAS || {};
+    if (typeof V.formatAmountByBrowser === 'function') return;
+    function browserLocale() { try { return window.navigator.language || undefined; } catch (e) { return undefined; } }
+    function resolvePrecision(p) {
+        var n = Number(p);
+        if (p === null || p === undefined || p === '' || isNaN(n) || n < 0) {
+            try { n = VIS.Env.getCtx().getStdPrecision(); } catch (e) { n = 2; }
+        }
+        n = Math.round(Number(n));
+        return (isNaN(n) || n < 0) ? 2 : Math.min(n, 10);
+    }
+    function validIso(c) { c = String(c || '').trim().toUpperCase(); return /^[A-Z]{3}$/.test(c) ? c : ''; }
+    function numberFormat(o) {
+        try { return new Intl.NumberFormat(browserLocale(), o); } catch (e) { }
+        if (o.currencyDisplay === 'narrowSymbol') {
+            o.currencyDisplay = 'symbol';
+            try { return new Intl.NumberFormat(browserLocale(), o); } catch (e2) { }
+        }
+        return null;
+    }
+    /* Currency sign and where the browser culture puts it for this ISO code. */
+    var layoutCache = {};
+    function currencyLayout(iso) {
+        var key = browserLocale() + '|' + iso;
+        if (layoutCache[key]) return layoutCache[key];
+        var out = { sign: '', before: true, gap: '' };
+        var f = iso ? numberFormat({ style: 'currency', currency: iso, currencyDisplay: 'narrowSymbol' }) : null;
+        if (f && typeof f.formatToParts === 'function') {
+            try {
+                var parts = f.formatToParts(1234.5), ci = -1, ni = -1;
+                for (var i = 0; i < parts.length; i++) {
+                    if (parts[i].type === 'currency' && ci < 0) ci = i;
+                    if (parts[i].type === 'integer' && ni < 0) ni = i;
+                }
+                if (ci >= 0) {
+                    out.sign = parts[ci].value;
+                    if (ni >= 0) {
+                        out.before = ci < ni;
+                        var near = out.before ? parts[ci + 1] : parts[ci - 1];
+                        out.gap = (near && near.type === 'literal') ? near.value : '';
+                    }
+                }
+            } catch (e) { }
+        }
+        layoutCache[key] = out;
+        return out;
+    }
+    V.formatAmountByBrowser = function (value, isoCode, precision, options) {
+        options = options || {};
+        var num = Number(value) || 0;
+        var p = resolvePrecision(precision);
+        var iso = validIso(isoCode);
+        var body;
+        if (options.compact && window.VIS && VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
+            body = VIS.Util.formatCompactAmount(Math.abs(num), iso, p);
+        } else {
+            var f = numberFormat({ minimumFractionDigits: p, maximumFractionDigits: p });
+            try { body = f ? f.format(Math.abs(num)) : Math.abs(num).toFixed(p); } catch (e) { body = String(Math.abs(num)); }
+        }
+        var minus = (num < 0 && /[1-9]/.test(body)) ? '-' : '';
+        var lay = currencyLayout(iso);
+        var sign = lay.sign || options.symbol || iso;
+        if (!sign) return minus + body;
+        if (!lay.sign) return minus + sign + ' ' + body;
+        return lay.before ? (minus + sign + lay.gap + body) : (minus + body + lay.gap + sign);
+    };
+})();

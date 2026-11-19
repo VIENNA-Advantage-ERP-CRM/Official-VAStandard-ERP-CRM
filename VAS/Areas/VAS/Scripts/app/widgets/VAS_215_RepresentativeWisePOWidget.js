@@ -106,11 +106,7 @@
         var $monthSelect, $yearSelect, $busy;
         var widgetObserver = null;
 
-        var MONTH_NAMES = [
-            "January", "February", "March", "April", "May", "June",
-            "July", "August", "September", "October", "November", "December"
-        ];
-        var MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        // VAS163 2026-11-12: English month-name arrays removed (month labels go through Intl).
         var BAR_COLORS = ['#A9D2FF', '#A3E0D4', '#FFDCA1', '#CFC9F5', '#FFC7C7'];
 
         var now = new Date();
@@ -124,7 +120,7 @@
         var totalMonthPOs = 0;
         var curSymbol = ""; // VAS163 2026-11-10: browser locale (6-Nov retest2).
         var curIso = "";
-        var stdPrecision = 2;
+        var stdPrecision = null; // VAS163 2026-11-12: from the server, no fixed default
 
         var currentPage = 0; // 0-indexed
         // Rows per page in the modal table. The stylesheet sizes the table body to
@@ -165,12 +161,13 @@
 
         function formatCycleText(avgCycleDays, serverText) {
             if (avgCycleDays != null && avgCycleDays >= 0) {
-                return avgCycleDays === 1 ? ('1 ' + lbl('VAS_215_Day', 'day')) : (avgCycleDays + ' ' + lbl('VAS_215_Days', 'days'));
+                // VAS163 2026-11-12: day count as a locale number.
+                return avgCycleDays === 1 ? ('1 ' + lbl('VAS_215_Day', 'day')) : (Number(avgCycleDays).toLocaleString(window.navigator.language, { maximumFractionDigits: 1 }) + ' ' + lbl('VAS_215_Days', 'days'));
             }
             if (serverText && serverText.indexOf('day') !== -1) {
                 var numVal = parseInt(serverText, 10);
                 if (!isNaN(numVal)) {
-                    return numVal === 1 ? ('1 ' + lbl('VAS_215_Day', 'day')) : (numVal + ' ' + lbl('VAS_215_Days', 'days'));
+                    return numVal === 1 ? ('1 ' + lbl('VAS_215_Day', 'day')) : (numVal.toLocaleString(window.navigator.language) + ' ' + lbl('VAS_215_Days', 'days')); // VAS163 2026-11-12: locale number
                 }
             }
             return serverText || '—';
@@ -186,20 +183,26 @@
         }
 
         // VAS163 2026-11-10: browser locale (6-Nov retest2).
-        function fmtMoney(v) {
+        // VAS163 2026-11-12: VAS.formatAmountByBrowser with the server ISO + precision; the browser culture
+        // places the symbol and picks the compact form (was symbol + ' ' + number and INR-specific compact tiers).
+        // cur = { iso, symbol, precision } of a PO's own currency (lines popup); omitted -> functional currency.
+        function fmtMoney(v, cur) {
             var val = Number(v || 0);
-            var sym = curSymbol || curIso || '';
-            var indian = VIS.Util.usesIndianNumbering(curIso);
-            if (Math.abs(val) >= (indian ? 1e5 : 1e3)) {
-                return sym + ' ' + (val < 0 ? '-' : '') + VIS.Util.formatCompactAmount(Math.abs(val), curIso || '', stdPrecision);
-            }
-            return sym + ' ' + Math.round(val).toLocaleString(window.navigator.language);
+            var c = cur || { iso: curIso, symbol: curSymbol, precision: stdPrecision };
+            var p = (typeof c.precision === 'number' && c.precision >= 0) ? c.precision : undefined;
+            return VAS.formatAmountByBrowser(val, c.iso || '', p, { compact: Math.abs(val) >= 1e5, symbol: c.symbol || '' });
         }
 
         // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        // VAS163 2026-11-12: no rounding - also used for (fractional) quantities.
         function num(v) {
             var val = Number(v || 0);
-            return Math.round(val).toLocaleString(window.navigator.language);
+            return val.toLocaleString(window.navigator.language, { maximumFractionDigits: 2 });
+        }
+
+        // VAS163 2026-11-12: percentages as browser-locale numbers (were toFixed).
+        function pct1(v) {
+            return Number(v || 0).toLocaleString(window.navigator.language, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
         }
 
         // VAS163 2026-11-10: browser locale (6-Nov retest2).
@@ -248,7 +251,7 @@
             $yearSelect = $('<select class="vas-rwpo-sel vas-rwpo-sel-year" aria-label="' + esc(lbl('VAS_Year', 'Year')) + '"></select>');
 
             for (var m = 1; m <= 12; m++) {
-                var mName = MONTH_NAMES[m - 1];
+                var mName = String(m); // VAS163 2026-11-12: no English month-name fallback
                 try {
                     // VAS163 2026-11-10: browser locale (6-Nov retest2).
                     mName = new Date(2026, m - 1, 1).toLocaleDateString(window.navigator.language, { month: 'long' });
@@ -354,7 +357,7 @@
                     if (data && data.success) {
                         curSymbol = data.curSymbol || data.curIso || ""; // VAS163 2026-11-10: browser locale (6-Nov retest2).
                         curIso = data.curIso || "";
-                        stdPrecision = data.stdPrecision || 2;
+                        stdPrecision = (typeof data.stdPrecision === 'number') ? data.stdPrecision : null; // VAS163 2026-11-12: keep 0-decimal currencies, no fixed 2
                         totalMonthValue = data.totalMonthValue || 0;
                 totalMonthCompletedValue = data.totalMonthCompletedValue || 0;
                         totalMonthPOs = data.totalMonthPOs || 0;
@@ -574,10 +577,8 @@
             } else if (cfg.foot) {
                 $mFoot.html(cfg.foot);
             } else {
-                var $defFoot = $('<span class="vas-rwpo-foot-note"></span>' +
-                    '<button type="button" class="vas-rwpo-btn vas-rwpo-btn-close">' + esc(lbl('VAS_Close', 'Close')) + '</button>');
-                $defFoot.filter('.vas-rwpo-btn-close').on('click', closeModal);
-                $mFoot.append($defFoot);
+                // VAS163 2026-11-13: Row 444 - default footer without a second Close button (header X only).
+                $mFoot.append($('<span class="vas-rwpo-foot-note"></span>'));
             }
 
             $host.addClass('vas-rwpo-open');
@@ -620,7 +621,7 @@
             var rSpend = rObj ? rObj.value : 0;
             var rPOs = rObj ? rObj.pos : 0;
             // Share of month counts completed POs only (Widget_Bug_Fix Sr 145).
-            var rShare = rObj ? ((rObj.completedShare || 0) * 100).toFixed(1) + '%' : '0.0%';
+            var rShare = pct1(rObj ? (rObj.completedShare || 0) * 100 : 0); // VAS163 2026-11-12: locale percent
             var rAvgCycle = rObj ? formatCycleText(rObj.avgCycle, rObj.avgCycleText) : '—';
 
             var statStripHtml = '<div class="vas-rwpo-mstats">' +
@@ -638,9 +639,8 @@
                 subtitle: subtitle,
                 body: statStripHtml,
                 foot: function ($foot) {
-                    $foot.html('<span class="vas-rwpo-foot-note">' + esc(lbl('VAS_SelectPOToOpen', 'select a PO number to open the record')) + '</span>' +
-                        '<button type="button" class="vas-rwpo-btn vas-rwpo-close-btn">' + esc(lbl('VAS_Close', 'Close')) + '</button>');
-                    $foot.find('.vas-rwpo-close-btn').on('click', closeModal);
+                    // VAS163 2026-11-13: Row 444 - bottom Close removed; the header X is the only close control.
+                    $foot.html('<span class="vas-rwpo-foot-note">' + esc(lbl('VAS_SelectPOToOpen', 'select a PO number to open the record')) + '</span>');
                 },
                 afterRender: function ($host) {
                     loadRepresentativePurchaseOrders(repId, title, $host);
@@ -671,7 +671,7 @@
                     }
                     if (data.repCompletedValue != null) {
                         // Completed POs only, over the month's completed POs.
-                        var sharePct = totalMonthCompletedValue > 0 ? ((data.repCompletedValue / totalMonthCompletedValue) * 100).toFixed(1) + '%' : '0.0%';
+                        var sharePct = pct1(totalMonthCompletedValue > 0 ? (data.repCompletedValue / totalMonthCompletedValue) * 100 : 0); // VAS163 2026-11-12: locale percent
                         $host.find('#vas_rwpo_stat_share').text(sharePct);
                     }
                     if (data.avgCycleText != null) {
@@ -872,13 +872,8 @@
                             body: '<div class="vas-rwpo-empty-box"><p class="vas-rwpo-empty-msg">' +
                                 esc(data.message || data.error) + '</p></div>',
                             foot: function ($foot) {
-                                $foot.html('<span class="vas-rwpo-foot-note"></span>' +
-                                    '<span>' +
-                                    '<button type="button" class="vas-rwpo-btn vas-rwpo-back-btn">' + esc(lbl('VAS_Back', 'Back')) + '</button> ' +
-                                    '<button type="button" class="vas-rwpo-btn vas-rwpo-close-btn">' + esc(lbl('VAS_Close', 'Close')) + '</button>' +
-                                    '</span>');
-                                $foot.find('.vas-rwpo-back-btn').on('click', popModal);
-                                $foot.find('.vas-rwpo-close-btn').on('click', closeModal);
+                                // VAS163 2026-11-13: Row 444 - header back arrow and X only.
+                                $foot.html('<span class="vas-rwpo-foot-note"></span>');
                             }
                         });
                         return;
@@ -886,6 +881,10 @@
 
                     var header = data.header || {};
                     var lines = data.lines || [];
+                    // VAS163 2026-11-12: line rate / amount in the order's own currency (server), else functional.
+                    var lineCur = data.docCurIso
+                        ? { iso: data.docCurIso, symbol: data.docCurSymbol || '', precision: data.docCurPrecision }
+                        : null;
 
                     var poNo = header.po || (lbl('VAS_PONo', 'PO No') + ' #' + orderId);
                     var poVendor = header.vendor || '—';
@@ -911,7 +910,7 @@
                         '</div>' +
                         '<div class="vas-rwpo-mstats">' +
                         '  <div class="vas-rwpo-mstat"><div class="l">' + esc(lbl('VAS_Lines', 'Lines')) + '</div><div class="v">' + lines.length + '</div></div>' +
-                        '  <div class="vas-rwpo-mstat"><div class="l">' + esc(lbl('VAS_POValue', 'PO value')) + '</div><div class="v" title="' + esc(fmtMoney(totalLinesAmt)) + '">' + esc(fmtMoney(totalLinesAmt)) + '</div></div>' +
+                        '  <div class="vas-rwpo-mstat"><div class="l">' + esc(lbl('VAS_POValue', 'PO value')) + '</div><div class="v" title="' + esc(fmtMoney(totalLinesAmt, lineCur)) + '">' + esc(fmtMoney(totalLinesAmt, lineCur)) + '</div></div>' +
                         '  <div class="vas-rwpo-mstat"><div class="l">' + esc(lbl('VAS_QtyOrdered', 'Qty ordered')) + '</div><div class="v">' + num(totalOrdered) + '</div></div>' +
                         '  <div class="vas-rwpo-mstat"><div class="l">' + esc(lbl('VAS_QtyPending', 'Qty pending')) + '</div><div class="v">' + num(totalPending) + '</div></div>' +
                         '</div>' +
@@ -925,19 +924,14 @@
                         subtitle: poVendor + ' · ' + poDate,
                         body: linesBodyHtml,
                         foot: function ($foot) {
-                            $foot.html('<span class="vas-rwpo-foot-note">' + esc(poNo) + ' · ' + esc(poVendor) + '</span>' +
-                                '<span>' +
-                                '<button type="button" class="vas-rwpo-btn vas-rwpo-back-btn">' + esc(lbl('VAS_Back', 'Back')) + '</button> ' +
-                                '<button type="button" class="vas-rwpo-btn vas-rwpo-close-btn">' + esc(lbl('VAS_Close', 'Close')) + '</button>' +
-                                '</span>');
-                            $foot.find('.vas-rwpo-back-btn').on('click', popModal);
-                            $foot.find('.vas-rwpo-close-btn').on('click', closeModal);
+                            // VAS163 2026-11-13: Row 444 - bottom Back / Close removed; the header back arrow and X are the only controls.
+                            $foot.html('<span class="vas-rwpo-foot-note">' + esc(poNo) + ' · ' + esc(poVendor) + '</span>');
                         },
                         afterRender: function ($host) {
                             $host.find('.vas-rwpo-po-direct-lnk').on('click', function () {
                                 openPurchaseOrderRecord(orderId);
                             });
-                            renderPagedLinesTable($host.find('#vas_rwpo_lines_table_wrap'), lines, poNo);
+                            renderPagedLinesTable($host.find('#vas_rwpo_lines_table_wrap'), lines, poNo, lineCur);
                         }
                     });
                 },
@@ -951,16 +945,15 @@
                         body: '<div class="vas-rwpo-empty-box"><p class="vas-rwpo-empty-msg">' +
                             esc(lbl('VAS_215_FailedToLoadRepresentativeData', 'Failed to load representative data')) + '</p></div>',
                         foot: function ($foot) {
-                            $foot.html('<span class="vas-rwpo-foot-note"></span>' +
-                                '<button type="button" class="vas-rwpo-btn vas-rwpo-close-btn">' + esc(lbl('VAS_Close', 'Close')) + '</button>');
-                            $foot.find('.vas-rwpo-close-btn').on('click', closeModal);
+                            // VAS163 2026-11-13: Row 444 - header X only.
+                            $foot.html('<span class="vas-rwpo-foot-note"></span>');
                         }
                     });
                 }
             });
         }
 
-        function renderPagedLinesTable($container, lines, poNo) {
+        function renderPagedLinesTable($container, lines, poNo, lineCur) { // VAS163 2026-11-12: lineCur = the PO's own currency
             $container.empty();
             var lPage = 0;
             var lPageSize = 6;
@@ -1005,8 +998,8 @@
 
                 for (var i = 0; i < slice.length; i++) {
                     var l = slice[i];
-                    var rateFormatted = fmtMoney(l.rate);
-                    var amtFormatted = fmtMoney(l.amount);
+                    var rateFormatted = fmtMoney(l.rate, lineCur);
+                    var amtFormatted = fmtMoney(l.amount, lineCur);
                     var lineStatusLabel = nsDash(l, getStatusLabel(l.statusText));
 
                     var $row = $('<div class="vas-rwpo-mrow" style="grid-template-columns: minmax(0, 0.4fr) minmax(0, 1.6fr) minmax(0, 1.2fr) minmax(0, 0.6fr) minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1.1fr);">' +
@@ -1087,7 +1080,7 @@
                 };
                 $self.widgetFirevalueChanged(windowParam);
             } else {
-                VAS.ZoomUtil.zoomToRecord("C_Order_ID", orderId, poZoomWindowId, "VAS_PurchaseOrder", "")
+                VAS.ZoomUtil.zoomToRecord("C_Order_ID", orderId, poZoomWindowId, "VAS_PurchaseOrder", "Purchase Order") /* VAS163 2026-11-12: old window name passed so the util can fall back */
                     .done(function (id) {
                         if (id > 0) { poZoomWindowId = id; }
                     });
@@ -1162,3 +1155,78 @@
     }
 
 })(VAS, jQuery);
+/* VAS163 2026-11-12: VAS.formatAmountByBrowser(value, isoCode, precision, { compact, symbol })
+   Amount in the BROWSER culture (window.navigator.language) with the currency the SERVER sent
+   (ISO code + precision; the server symbol only as a fallback). Defined in each widget / panel
+   that uses it - guarded, so the first file loaded defines it - so the shared util/CurrencyFormat.js
+   stays as shipped. Compact amounts keep that file's default scale (VIS.Util.formatCompactAmount:
+   L / Cr for Indian-numbering currencies, K / M / B otherwise, digits in the browser culture);
+   separators, decimals and the position of the currency sign come from the browser culture. */
+; (function () {
+    var V = window.VAS = window.VAS || {};
+    if (typeof V.formatAmountByBrowser === 'function') return;
+    function browserLocale() { try { return window.navigator.language || undefined; } catch (e) { return undefined; } }
+    function resolvePrecision(p) {
+        var n = Number(p);
+        if (p === null || p === undefined || p === '' || isNaN(n) || n < 0) {
+            try { n = VIS.Env.getCtx().getStdPrecision(); } catch (e) { n = 2; }
+        }
+        n = Math.round(Number(n));
+        return (isNaN(n) || n < 0) ? 2 : Math.min(n, 10);
+    }
+    function validIso(c) { c = String(c || '').trim().toUpperCase(); return /^[A-Z]{3}$/.test(c) ? c : ''; }
+    function numberFormat(o) {
+        try { return new Intl.NumberFormat(browserLocale(), o); } catch (e) { }
+        if (o.currencyDisplay === 'narrowSymbol') {
+            o.currencyDisplay = 'symbol';
+            try { return new Intl.NumberFormat(browserLocale(), o); } catch (e2) { }
+        }
+        return null;
+    }
+    /* Currency sign and where the browser culture puts it for this ISO code. */
+    var layoutCache = {};
+    function currencyLayout(iso) {
+        var key = browserLocale() + '|' + iso;
+        if (layoutCache[key]) return layoutCache[key];
+        var out = { sign: '', before: true, gap: '' };
+        var f = iso ? numberFormat({ style: 'currency', currency: iso, currencyDisplay: 'narrowSymbol' }) : null;
+        if (f && typeof f.formatToParts === 'function') {
+            try {
+                var parts = f.formatToParts(1234.5), ci = -1, ni = -1;
+                for (var i = 0; i < parts.length; i++) {
+                    if (parts[i].type === 'currency' && ci < 0) ci = i;
+                    if (parts[i].type === 'integer' && ni < 0) ni = i;
+                }
+                if (ci >= 0) {
+                    out.sign = parts[ci].value;
+                    if (ni >= 0) {
+                        out.before = ci < ni;
+                        var near = out.before ? parts[ci + 1] : parts[ci - 1];
+                        out.gap = (near && near.type === 'literal') ? near.value : '';
+                    }
+                }
+            } catch (e) { }
+        }
+        layoutCache[key] = out;
+        return out;
+    }
+    V.formatAmountByBrowser = function (value, isoCode, precision, options) {
+        options = options || {};
+        var num = Number(value) || 0;
+        var p = resolvePrecision(precision);
+        var iso = validIso(isoCode);
+        var body;
+        if (options.compact && window.VIS && VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
+            body = VIS.Util.formatCompactAmount(Math.abs(num), iso, p);
+        } else {
+            var f = numberFormat({ minimumFractionDigits: p, maximumFractionDigits: p });
+            try { body = f ? f.format(Math.abs(num)) : Math.abs(num).toFixed(p); } catch (e) { body = String(Math.abs(num)); }
+        }
+        var minus = (num < 0 && /[1-9]/.test(body)) ? '-' : '';
+        var lay = currencyLayout(iso);
+        var sign = lay.sign || options.symbol || iso;
+        if (!sign) return minus + body;
+        if (!lay.sign) return minus + sign + ' ' + body;
+        return lay.before ? (minus + sign + lay.gap + body) : (minus + body + lay.gap + sign);
+    };
+})();

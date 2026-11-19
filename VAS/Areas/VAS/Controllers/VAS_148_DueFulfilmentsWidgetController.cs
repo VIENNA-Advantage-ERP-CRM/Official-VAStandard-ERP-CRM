@@ -76,13 +76,15 @@ namespace VAS.Controllers
                        wh.Name AS Warehouse_Name,
                        MIN(COALESCE(ol.DatePromised, o.DatePromised)) AS Promised_Date,
                        COUNT(ol.C_OrderLine_ID) AS Line_Count,
-                       SUM(COALESCE(ol.LineNetAmt, 0)) AS Fulfilment_Value
+                       SUM(COALESCE(ol.LineNetAmt, 0)) AS Fulfilment_Value,
+                       cur.ISO_Code AS Cur_Iso, cur.CurSymbol AS Cur_Symbol, cur.StdPrecision AS Cur_Precision
                 FROM C_Order o
                 JOIN C_OrderLine ol ON ol.C_Order_ID = o.C_Order_ID
                 JOIN C_BPartner bp ON bp.C_BPartner_ID = o.C_BPartner_ID
                 LEFT JOIN C_BPartner_Location bpl ON bpl.C_BPartner_Location_ID = o.C_BPartner_Location_ID
                 LEFT JOIN C_Location loc ON loc.C_Location_ID = bpl.C_Location_ID
                 LEFT JOIN M_Warehouse wh ON wh.M_Warehouse_ID = o.M_Warehouse_ID
+                LEFT JOIN C_Currency cur ON cur.C_Currency_ID = o.C_Currency_ID
                 WHERE o.IsSOTrx = 'Y'
                   AND o.DocStatus = 'CO'
                   AND o.IsActive = 'Y'
@@ -98,12 +100,13 @@ namespace VAS.Controllers
             rawSql = MRole.GetDefault(ctx).AddAccessSQL(rawSql, "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             rawSql += @"
                 GROUP BY o.C_Order_ID, o.DocumentNo, bp.Name, loc.Address1, loc.Address2, loc.City,
-                         o.M_Warehouse_ID, wh.Name";
+                         o.M_Warehouse_ID, wh.Name, cur.ISO_Code, cur.CurSymbol, cur.StdPrecision";
 
             string sql = @"
                 SELECT Page.Fulfilment_ID, Page.Fulfilment_No, Page.Customer_Name,
                        Page.Addr1, Page.Addr2, Page.City, Page.Warehouse_ID, Page.Warehouse_Name,
                        Page.Promised_Date, Page.Line_Count, Page.Fulfilment_Value,
+                       Page.Cur_Iso, Page.Cur_Symbol, Page.Cur_Precision,
                        COUNT(1) OVER () AS TotalRecords
                 FROM ( " + rawSql + @" ) Page
                 ORDER BY Page.Promised_Date ASC, Page.Fulfilment_No ASC
@@ -131,7 +134,12 @@ namespace VAS.Controllers
                         warehouseId = Util.GetValueOfInt(dr["Warehouse_ID"]),
                         warehouseName = Util.GetValueOfString(dr["Warehouse_Name"]),
                         lineCount = Util.GetValueOfInt(dr["Line_Count"]),
-                        fulfilmentValue = Util.GetValueOfDecimal(dr["Fulfilment_Value"])
+                        fulfilmentValue = Util.GetValueOfDecimal(dr["Fulfilment_Value"]),
+                        // VAS163 2026-11-12: the order's own currency for the value (was formatted
+                        // with the session currency and 0 decimals).
+                        currencyIso = Util.GetValueOfString(dr["Cur_Iso"]),
+                        currencySymbol = Util.GetValueOfString(dr["Cur_Symbol"]),
+                        currencyPrecision = Util.GetValueOfInt(dr["Cur_Precision"])
                     });
                 }
             }
@@ -444,6 +452,7 @@ namespace VAS.Controllers
         {
             string iso = "";
             string symbol = "";
+            int precision = 2; // VAS163 2026-11-12: StdPrecision sent too
             int currencyId = ctx.GetContextAsInt("$C_Currency_ID");
             if (currencyId > 0)
             {
@@ -451,17 +460,18 @@ namespace VAS.Controllers
                 try
                 {
                     cdr = DB.ExecuteReader(
-                        "SELECT ISO_Code, CurSymbol FROM C_Currency WHERE C_Currency_ID = @Cur",
+                        "SELECT ISO_Code, CurSymbol, StdPrecision FROM C_Currency WHERE C_Currency_ID = @Cur",
                         new SqlParameter[] { new SqlParameter("@Cur", currencyId) });
                     if (cdr != null && cdr.Read())
                     {
                         iso = Util.GetValueOfString(cdr["ISO_Code"]);
                         symbol = Util.GetValueOfString(cdr["CurSymbol"]);
+                        precision = Util.GetValueOfInt(cdr["StdPrecision"]);
                     }
                 }
                 finally { if (cdr != null) { cdr.Close(); cdr.Dispose(); } }
             }
-            return new { iso = iso, symbol = symbol };
+            return new { iso = iso, symbol = symbol, precision = precision };
         }
 
         private HeaderInfo GetHeader(Ctx ctx, int orderId)

@@ -537,11 +537,15 @@ namespace VIS.Controllers
                         bp.Name AS VendorName,
                         wh.Name AS WarehouseName,
                         usr.Name AS CreatedByName,
-                        o.Created AS CreatedOn
+                        o.Created AS CreatedOn,
+                        dcur.ISO_Code AS DocCurIso,
+                        dcur.CurSymbol AS DocCurSymbol,
+                        dcur.StdPrecision AS DocCurPrecision
                     FROM C_Order o
                     INNER JOIN C_BPartner bp ON bp.C_BPartner_ID = o.C_BPartner_ID
                     LEFT JOIN M_Warehouse wh ON wh.M_Warehouse_ID = o.M_Warehouse_ID
                     LEFT JOIN AD_User usr ON usr.AD_User_ID = o.CreatedBy
+                    LEFT JOIN C_Currency dcur ON dcur.C_Currency_ID = o.C_Currency_ID
                     WHERE o.C_Order_ID = @OrderID
                       AND o.AD_Client_ID = @ClientID";
 
@@ -553,12 +557,20 @@ namespace VIS.Controllers
 
                 object orderHeader = null;
                 string parentDocStatus = "DR";
+                // VAS163 2026-11-12: line rate / amount are in the order's own currency - sent so the client
+                // formats them with that currency (they were shown with the functional currency).
+                string docCurIso = "";
+                string docCurSymbol = "";
+                int docCurPrecision = curInfo.StdPrecision;
 
                 using (IDataReader dr = DB.ExecuteReader(orderSql, orderParams, null))
                 {
                     if (dr != null && dr.Read())
                     {
                         parentDocStatus = Util.GetValueOfString(dr["DocStatus"]);
+                        docCurIso = Util.GetValueOfString(dr["DocCurIso"]);
+                        docCurSymbol = Util.GetValueOfString(dr["DocCurSymbol"]);
+                        if (dr["DocCurPrecision"] != DBNull.Value) { docCurPrecision = Util.GetValueOfInt(dr["DocCurPrecision"]); }
                         DateTime? dtOrd = Util.GetValueOfDateTime(dr["DateOrdered"]);
                         DateTime? dtProm = Util.GetValueOfDateTime(dr["DatePromised"]);
                         DateTime? dtCreated = Util.GetValueOfDateTime(dr["CreatedOn"]);
@@ -710,7 +722,10 @@ namespace VIS.Controllers
                     lines = linesList,
                     curSymbol = curInfo.CurSymbol,
                     curIso = curInfo.CurIso,
-                    stdPrecision = curInfo.StdPrecision
+                    stdPrecision = curInfo.StdPrecision,
+                    docCurIso = docCurIso,             // VAS163 2026-11-12
+                    docCurSymbol = docCurSymbol,
+                    docCurPrecision = docCurPrecision
                 }), JsonRequestBehavior.AllowGet);
             }
             catch (Exception ex)
@@ -765,9 +780,11 @@ namespace VIS.Controllers
         {
             CurrencyInfo info = new CurrencyInfo
             {
+                // VAS163 2026-11-12: no hard-coded INR/₹ fallback - without an accounting schema currency the
+                // client shows plain locale numbers instead of guessing a currency.
                 CurrencyId = 0,
-                CurSymbol = "₹",
-                CurIso = "INR",
+                CurSymbol = "",
+                CurIso = "",
                 StdPrecision = 2
             };
 

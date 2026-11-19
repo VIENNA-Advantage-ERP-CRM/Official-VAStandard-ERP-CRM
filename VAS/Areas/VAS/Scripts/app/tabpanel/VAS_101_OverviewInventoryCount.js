@@ -309,107 +309,23 @@
             });
         }
 
-        // Tables whose record does NOT open in the table's default zoom window,
-        // mapped to the name of the window it does open. Any further screen that
-        // needs naming belongs here; nothing else has to change.
-        var WINDOW_NAME_BY_TABLE = {
-            "C_Project": "VAS_Project"
+        // VAS163 2026-11-12: record navigation goes through VAS.ZoomUtil. The panel's own
+        // window-name / AD_Table lookups and VIS.ZoomTarget fallback were replaced: every
+        // source document opens the VAS window for its TYPE (new name first, legacy name
+        // second), and the resolved id is cached per table for the next click.
+        var ZOOM_WINDOW_BY_TABLE = {
+            "M_Requisition":     ["VAS_Requisition", "Requisition"],
+            "VAMFG_M_WorkOrder": ["VAMFG_ProductionOrder", "VAMFG_WorkOrder"],
+            "VA075_WorkOrder":   ["VA075_MaintenanceWorkOrder", "VA075_WorkOrder"],
+            "C_Project":         ["VAS_Project", "Project"]
         };
+        var zoomWindowIdByTable = {};
 
-        // Window name -> AD_Window_ID, resolved once per name and remembered for
-        // the life of the panel. A name the dictionary does not know is cached as
-        // -1 so a failed lookup is not repeated on every click.
-        var windowIdByName = {};
-
-        function resolveWindowIdByName(windowName) {
-            if (!windowName) return 0;
-            if (windowIdByName.hasOwnProperty(windowName)) {
-                return windowIdByName[windowName] > 0 ? windowIdByName[windowName] : 0;
-            }
-            try {
-                if (!(window.VIS && VIS.dataContext &&
-                      typeof VIS.dataContext.getJSONRecord === "function")) {
-                    return 0;
-                }
-                var id = VIS.dataContext.getJSONRecord(
-                    "VAS_101_OverviewInventoryCount/GetWindow_ID", windowName);
-                id = parseInt(id, 10);
-                if (isNaN(id) || id <= 0) {
-                    windowIdByName[windowName] = -1;
-                    console.log("resolveWindowIdByName: no window named " + windowName);
-                    return 0;
-                }
-                windowIdByName[windowName] = id;
-                return id;
-            } catch (e) {
-                windowIdByName[windowName] = -1;
-                console.log(e);
-                return 0;
-            }
-        }
-
-        // Table -> AD_Window_ID, for the last-resort lookup below. Same caching
-        // rule as windowIdByName: a table the dictionary cannot place is cached as
-        // -1 so the miss is not repeated on every click.
-        var windowIdByTable = {};
-
-        // Asks the SERVER which window a table's records open in
-        // (GetWindowIdByTable -> AD_Table.AD_Window_ID, else the first window with
-        // a tab on the table).
-        //
-        // The work order needs this. VA075 ships its own window and is not part of
-        // this solution, so its screen cannot be named in the map above, and the
-        // browser-side zoom lookup only knows tables the client has already
-        // cached — so every click on the row would end at the "Cannot open" toast.
-        // The dictionary knows it either way. Ported from VAS_102.
-        function resolveWindowIdByTable(tableName) {
-            if (!tableName) return 0;
-            if (windowIdByTable.hasOwnProperty(tableName)) {
-                return windowIdByTable[tableName] > 0 ? windowIdByTable[tableName] : 0;
-            }
-            try {
-                if (!(window.VIS && VIS.dataContext &&
-                      typeof VIS.dataContext.getJSONRecord === "function")) {
-                    return 0;
-                }
-                var id = VIS.dataContext.getJSONRecord(
-                    "VAS_101_OverviewInventoryCount/GetWindowIdByTable", tableName);
-                id = parseInt(id, 10);
-                if (isNaN(id) || id <= 0) {
-                    windowIdByTable[tableName] = -1;
-                    console.log("resolveWindowIdByTable: no window for table " + tableName);
-                    return 0;
-                }
-                windowIdByTable[tableName] = id;
-                return id;
-            } catch (e) {
-                windowIdByTable[tableName] = -1;
-                console.log(e);
-                return 0;
-            }
-        }
-
-        // Opens the record's window filtered to that row, in three steps: the
-        // window named for this table when it has one, else the table's default
-        // zoom target, else the dictionary's window for the table. Then started
-        // with an equal-query on the table's key column. Degrades to a toast so a
-        // click never throws.
         function openRecord(tableName, recordId) {
-            if (!tableName || !recordId || +recordId <= 0 || !window.VIS) return;
-            try {
-                var windowId = resolveWindowIdByName(WINDOW_NAME_BY_TABLE[tableName]);
-                if (windowId <= 0 &&
-                    VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === "function") {
-                    windowId = VIS.ZoomTarget.getZoomAD_Window_ID(tableName, 0, null, false) || 0;
-                }
-                if (windowId <= 0) windowId = resolveWindowIdByTable(tableName);
-                if (windowId > 0 && VIS.viewManager && typeof VIS.viewManager.startWindow === "function") {
-                    var zoomQuery = VIS.Query.prototype.getEqualQuery(tableName + "_ID", +recordId);
-                    VIS.viewManager.startWindow(windowId, zoomQuery);
-                    return;
-                }
-            } catch (e) { console.log(e); }
-            toast(msg("VAS_101_OpenRecord", "Open") + " " + tableName + " #" + recordId, false);
+            if (!tableName || !recordId || +recordId <= 0 || !window.VAS || !VAS.ZoomUtil) return;
+            var names = ZOOM_WINDOW_BY_TABLE[tableName] || ["", ""];
+            VAS.ZoomUtil.zoomToRecord(tableName + "_ID", +recordId, zoomWindowIdByTable[tableName] || 0, names[0], names[1])
+                .done(function (id) { if (id > 0) { zoomWindowIdByTable[tableName] = id; } });
         }
 
         // Lightweight self-contained toast.
@@ -679,7 +595,7 @@
             $right.append(headerField(VIS.Msg.getMsg("VAS_101_Posted"),
                 data.Posted ? VIS.Msg.getMsg("VAS_101_Posted")
                             : VIS.Msg.getMsg("VAS_101_NotPosted"), false));
-            $right.append(headerField(VIS.Msg.getMsg("VAS_101_Lines"), (data.LineCount || 0) + "", false));
+            $right.append(headerField(VIS.Msg.getMsg("VAS_101_Lines"), formatNumber(data.LineCount || 0, 0), false)); // VAS163 2026-11-12: locale count
             $card.append($right);
 
             $body.append($card);
@@ -727,14 +643,14 @@
             $snap.append(metricCard(netTone, "delta", VIS.Msg.getMsg("VAS_101_NetVariance"),
                 signedNumber(net, 0), VIS.Msg.getMsg("VAS_101_NetQtyDifference")));
 
-            // Variance lines.
+            // Variance lines. VAS163 2026-11-12: counts in the browser locale (were raw numbers).
             $snap.append(metricCard("variance", "alert", VIS.Msg.getMsg("VAS_101_VarianceLines"),
-                (data.VarianceLineCount || 0) + "",
-                VIS.Msg.getMsg("VAS_101_Of") + " " + (data.LineCount || 0) + " " + VIS.Msg.getMsg("VAS_101_LinesWord")));
+                formatNumber(data.VarianceLineCount || 0, 0),
+                VIS.Msg.getMsg("VAS_101_Of") + " " + formatNumber(data.LineCount || 0, 0) + " " + VIS.Msg.getMsg("VAS_101_LinesWord")));
 
             // Total lines.
             $snap.append(metricCard("lines", "box", VIS.Msg.getMsg("VAS_101_TotalLines"),
-                (data.LineCount || 0) + "", ""));
+                formatNumber(data.LineCount || 0, 0), ""));
 
             $body.append($snap);
         }
@@ -756,9 +672,10 @@
 
         function renderStatusCards() {
             var $row = $('<section class="vas_101-status"></section>');
-            $row.append(statusCard(VIS.Msg.getMsg("VAS_101_Matched"), data.MatchedCount || 0, "match"));
-            $row.append(statusCard(VIS.Msg.getMsg("VAS_101_Short"),   data.ShortCount || 0,   "short"));
-            $row.append(statusCard(VIS.Msg.getMsg("VAS_101_Excess"),  data.ExcessCount || 0,  "excess"));
+            // VAS163 2026-11-12: counts in the browser locale (were raw numbers).
+            $row.append(statusCard(VIS.Msg.getMsg("VAS_101_Matched"), formatNumber(data.MatchedCount || 0, 0), "match"));
+            $row.append(statusCard(VIS.Msg.getMsg("VAS_101_Short"),   formatNumber(data.ShortCount || 0, 0),   "short"));
+            $row.append(statusCard(VIS.Msg.getMsg("VAS_101_Excess"),  formatNumber(data.ExcessCount || 0, 0),  "excess"));
 
             // What the variance is WORTH, beside the three cards that count it.
             // The rate is chosen per line by the DIRECTION it varies in (model
@@ -792,7 +709,7 @@
             return $c;
         }
 
-        // Signed money: "+₹ N" for a gain, "−₹ N" for a loss, plain for zero.
+        // Signed money: "+" for a gain, "−" for a loss, plain for zero (currency placed by the culture).
         function signedAmount(value, cur, precision) {
             var v = +value || 0;
             if (v === 0) return formatAmount(0, cur, precision);
@@ -884,7 +801,7 @@
             $seg.append($btnAll).append($btnVar);
 
             var $sec = section(VIS.Msg.getMsg("VAS_101_CountLines"), {
-                summary: (data.LineCount || 0) + " " + VIS.Msg.getMsg("VAS_101_Items"),
+                summary: formatNumber(data.LineCount || 0, 0) + " " + VIS.Msg.getMsg("VAS_101_Items"), // VAS163 2026-11-12: locale count
                 $right: $seg
             });
 
@@ -1055,7 +972,7 @@
             // section: a count raised against a work order is the work order's
             // count first and the project's second. Clicking opens the work order
             // screen — VA075 is not part of this solution, so the window is
-            // resolved from the dictionary (see resolveWindowIdByTable).
+            // resolved by name via VAS.ZoomUtil (VAS163 2026-11-12, see openRecord).
             if (data.VA075_WorkOrder_ID > 0) {
                 // No "#id" fallback: an internal key is not a document number. A
                 // work order whose identifier could not be read draws its chip
@@ -1571,15 +1488,13 @@
             return sign + formatNumber(Math.abs(v), precision);
         }
 
+        // VAS163 2026-11-12: server base currency (data.ISO_Code + StdPrecision) through
+        // VAS.formatAmountByBrowser; the browser culture places symbol and sign
+        // (was "sign + symbol + ' ' + number"). `cur` is the server symbol, used only when
+        // the browser cannot render the ISO code.
         function formatAmount(value, cur, precision) {
-            var sign = value < 0 ? "-" : "";
-            var abs = Math.abs(value);
-            var p = (precision >= 0) ? precision : 2;
-            var formatted = abs.toLocaleString(window.navigator.language, {
-                minimumFractionDigits: p,
-                maximumFractionDigits: p
-            });
-            return sign + (cur ? cur + " " : "") + formatted;
+            var iso = (data && data.ISO_Code) || "";
+            return VAS.formatAmountByBrowser(+value || 0, iso, (precision >= 0) ? precision : undefined, { symbol: cur || "" });
         }
 
         // Parses a .NET/Newtonsoft DB value into a Date.
@@ -1596,6 +1511,9 @@
             if (!value) return null;
             if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
             var s = String(value);
+            // VAS163 2026-11-12: a bare 'yyyy-MM-dd' is built as a LOCAL date (new Date() reads it as UTC).
+            var dOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+            if (dOnly) return new Date(+dOnly[1], +dOnly[2] - 1, +dOnly[3]);
             var hasTz = /(z|[+-]\d{2}:?\d{2})$/i.test(s);
             var isDateTime = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(s);
             if (asUtc && isDateTime && !hasTz) {
@@ -1693,3 +1611,78 @@
     };
 
 })(VAS, jQuery);
+/* VAS163 2026-11-12: VAS.formatAmountByBrowser(value, isoCode, precision, { compact, symbol })
+   Amount in the BROWSER culture (window.navigator.language) with the currency the SERVER sent
+   (ISO code + precision; the server symbol only as a fallback). Defined in each widget / panel
+   that uses it - guarded, so the first file loaded defines it - so the shared util/CurrencyFormat.js
+   stays as shipped. Compact amounts keep that file's default scale (VIS.Util.formatCompactAmount:
+   L / Cr for Indian-numbering currencies, K / M / B otherwise, digits in the browser culture);
+   separators, decimals and the position of the currency sign come from the browser culture. */
+; (function () {
+    var V = window.VAS = window.VAS || {};
+    if (typeof V.formatAmountByBrowser === 'function') return;
+    function browserLocale() { try { return window.navigator.language || undefined; } catch (e) { return undefined; } }
+    function resolvePrecision(p) {
+        var n = Number(p);
+        if (p === null || p === undefined || p === '' || isNaN(n) || n < 0) {
+            try { n = VIS.Env.getCtx().getStdPrecision(); } catch (e) { n = 2; }
+        }
+        n = Math.round(Number(n));
+        return (isNaN(n) || n < 0) ? 2 : Math.min(n, 10);
+    }
+    function validIso(c) { c = String(c || '').trim().toUpperCase(); return /^[A-Z]{3}$/.test(c) ? c : ''; }
+    function numberFormat(o) {
+        try { return new Intl.NumberFormat(browserLocale(), o); } catch (e) { }
+        if (o.currencyDisplay === 'narrowSymbol') {
+            o.currencyDisplay = 'symbol';
+            try { return new Intl.NumberFormat(browserLocale(), o); } catch (e2) { }
+        }
+        return null;
+    }
+    /* Currency sign and where the browser culture puts it for this ISO code. */
+    var layoutCache = {};
+    function currencyLayout(iso) {
+        var key = browserLocale() + '|' + iso;
+        if (layoutCache[key]) return layoutCache[key];
+        var out = { sign: '', before: true, gap: '' };
+        var f = iso ? numberFormat({ style: 'currency', currency: iso, currencyDisplay: 'narrowSymbol' }) : null;
+        if (f && typeof f.formatToParts === 'function') {
+            try {
+                var parts = f.formatToParts(1234.5), ci = -1, ni = -1;
+                for (var i = 0; i < parts.length; i++) {
+                    if (parts[i].type === 'currency' && ci < 0) ci = i;
+                    if (parts[i].type === 'integer' && ni < 0) ni = i;
+                }
+                if (ci >= 0) {
+                    out.sign = parts[ci].value;
+                    if (ni >= 0) {
+                        out.before = ci < ni;
+                        var near = out.before ? parts[ci + 1] : parts[ci - 1];
+                        out.gap = (near && near.type === 'literal') ? near.value : '';
+                    }
+                }
+            } catch (e) { }
+        }
+        layoutCache[key] = out;
+        return out;
+    }
+    V.formatAmountByBrowser = function (value, isoCode, precision, options) {
+        options = options || {};
+        var num = Number(value) || 0;
+        var p = resolvePrecision(precision);
+        var iso = validIso(isoCode);
+        var body;
+        if (options.compact && window.VIS && VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
+            body = VIS.Util.formatCompactAmount(Math.abs(num), iso, p);
+        } else {
+            var f = numberFormat({ minimumFractionDigits: p, maximumFractionDigits: p });
+            try { body = f ? f.format(Math.abs(num)) : Math.abs(num).toFixed(p); } catch (e) { body = String(Math.abs(num)); }
+        }
+        var minus = (num < 0 && /[1-9]/.test(body)) ? '-' : '';
+        var lay = currencyLayout(iso);
+        var sign = lay.sign || options.symbol || iso;
+        if (!sign) return minus + body;
+        if (!lay.sign) return minus + sign + ' ' + body;
+        return lay.before ? (minus + sign + lay.gap + body) : (minus + body + lay.gap + sign);
+    };
+})();

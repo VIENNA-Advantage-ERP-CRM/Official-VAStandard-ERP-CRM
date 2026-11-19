@@ -22,7 +22,7 @@
         listTitle: function () { return U.lbl('VAS_309_NotYetOrdered', 'Not Yet Ordered'); },
         listSub: function (d) {
             return U.num(d.count) + ' ' + U.unit(d.count, 'VAS_309_Lines', 'lines') + ' · ' +
-                U.num(d.requisitions) + ' ' + U.unit(d.requisitions, 'VAS_309_OnReqs', 'requisitions') + ' · ' + U.money(d.amount, d.currency);
+                U.num(d.requisitions) + ' ' + U.unit(d.requisitions, 'VAS_309_OnReqs', 'requisitions') + ' · ' + U.docMoney(d.amount, d.currency, false); // VAS163 2026-11-17: Sr 33 - full amount, not L / Cr
         }
     });
 })(VAS, jQuery);

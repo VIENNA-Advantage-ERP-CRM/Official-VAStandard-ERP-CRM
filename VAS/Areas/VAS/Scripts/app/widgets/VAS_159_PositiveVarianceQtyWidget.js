@@ -391,7 +391,8 @@
                     '  <span class="vas-pos-var-cell vas-pos-var-attr" title="' + escapeHtml(attributeDisplay) + '">' + escapeHtml(attributeDisplay) + '</span>' +
                     '  <span class="vas-pos-var-cell" title="' + escapeHtml(item.warehouse) + '">' + escapeHtml(item.warehouse) + '</span>' +
                     '  <span class="vas-pos-var-cell" title="' + escapeHtml(locatorDisplay) + '">' + escapeHtml(locatorDisplay) + '</span>' +
-                    '  <span class="vas-pos-var-cell vas-pos-var-tr" title="' + item.qtyCount + '">' + Number(item.qtyCount).toLocaleString() + '</span>' +
+                    // VAS163 2026-11-12: explicit browser locale (was toLocaleString() with no locale); tooltip too (was raw value).
+                    '  <span class="vas-pos-var-cell vas-pos-var-tr" title="' + Number(item.qtyCount).toLocaleString(window.navigator.language, { maximumFractionDigits: 10 }) + '">' + Number(item.qtyCount).toLocaleString(window.navigator.language, { maximumFractionDigits: 4 }) + '</span>' +
                     '  <span class="vas-pos-var-cell-diff vas-pos-var-tr" title="' + formatQty(item.differenceQty) + '">' + escapeHtml(formatQty(item.differenceQty)) + '</span>' +
                     '</div>'
                 );

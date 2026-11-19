@@ -132,6 +132,8 @@ namespace VIS.Controllers
 
                 // Ranking measure is M_InventoryLine.CurrentCostPrice directly - no NULLIF/fallback
                 // chain and no product-cost (M_Cost) lookup, per explicit instruction.
+                // VAS163 2026-11-13: rows 52/53 - the row now shows (and ranks by) the issued value
+                // QtyInternalUse x CurrentCostPrice, the one Inventory Use value rule; cost price breaks ties.
                 string sql = @"
                     SELECT * FROM (
                       SELECT
@@ -152,8 +154,8 @@ namespace VIS.Controllers
                         AND COALESCE(line.QtyInternalUse, 0) > 0
                       GROUP BY p.M_Product_ID, p.Name, asi.Description, uom.C_UOM_ID, uom.Name
                       HAVING SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, 0)) > 0
-                      ORDER BY MAX(COALESCE(line.CurrentCostPrice, 0)) DESC,
-                               SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, 0)) DESC
+                      ORDER BY SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, 0)) DESC,
+                               MAX(COALESCE(line.CurrentCostPrice, 0)) DESC
                     ) WHERE ROWNUM <= 10";
 
                 using (IDataReader dr = DB.ExecuteReader(sql, null, null))

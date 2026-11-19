@@ -50,7 +50,9 @@ namespace VAS.Controllers
     ///       per-row percentage (converted qty / quoted qty) carries that nuance.
     ///     - Value quoted = C_Order.TotalLines (pre-tax) on the quotation header;
     ///       value converted = SUM(LineNetAmt) from the qualifying linked actual
-    ///       order lines.
+    ///       order lines. (VAS163 2026-11-17: Sr 149/150 - both ex-tax and in the base
+    ///       currency; value converted is now the quotation lines' ex-tax value of the
+    ///       converted qty, capped at the quoted qty - see ConvertedQuoteValueBaseSql.)
     ///     - Avg days to convert = mean of (first linked order DateOrdered - quotation
     ///       DateOrdered), converted quotations only, via the codebase's confirmed
     ///       portable DAYSBETWEEN(a, b) = a - b function.
@@ -170,35 +172,49 @@ namespace VAS.Controllers
         /// (accounting-schema) currency with the configured rates (CurrencyConvert argument
         /// order copied from VAS_273). Binds @Base_Currency_ID.
         /// </summary>
+        // VAS163 2026-11-17: Sr 150 - tax-inclusive is read from the quotation's own totals (the
+        // tax is inside TotalLines when GrandTotal is not raised by it), not from the order /
+        // price-list flags, which disagree with the stored amounts on several documents (e.g.
+        // SO 50209: order N, price list Y, tax added on top). Same rule as VAS_270/271/273/274.
+        private const string QuoteTaxIncludedSql =
+            "(CASE WHEN 2 * (COALESCE(q.GrandTotal, 0) - COALESCE(q.TotalLines, 0)) < " +
+            "(SELECT COALESCE(SUM(COALESCE(ott.TaxAmt, 0)), 0) FROM C_OrderTax ott WHERE ott.C_Order_ID = q.C_Order_ID AND ott.IsActive = 'Y') " +
+            "THEN 'Y' ELSE 'N' END)";
+
         private const string QuotedValueBaseSql =
             "COALESCE(CurrencyConvert(" +
-            "CASE WHEN (CASE WHEN COALESCE(q.IsTaxIncluded, 'N') = 'Y' " +
-            "OR COALESCE((SELECT pl.IsTaxIncluded FROM M_PriceList pl WHERE pl.M_PriceList_ID = q.M_PriceList_ID), 'N') = 'Y' " +
-            "THEN 'Y' ELSE 'N' END) = 'Y' " +
+            "CASE WHEN " + QuoteTaxIncludedSql + " = 'Y' " +
             "THEN COALESCE(q.TotalLines, 0) - (SELECT COALESCE(SUM(COALESCE(ot.TaxAmt, 0)), 0) FROM C_OrderTax ot WHERE ot.C_Order_ID = q.C_Order_ID AND ot.IsActive = 'Y') " +
             "ELSE COALESCE(q.TotalLines, 0) END" +
             ", q.C_Currency_ID, @Base_Currency_ID, COALESCE(q.DateAcct, q.DateOrdered), q.C_ConversionType_ID, q.AD_Client_ID, q.AD_Org_ID), 0)";
 
         /// <summary>
-        /// VAS163 2026-11-11: rows 78/79 - one linked Sales Order line's value WITHOUT taxes
-        /// (on a tax-inclusive order LineNetAmt is gross; the line's share of its tax's
-        /// C_OrderTax.TaxAmt - by gross proportion, same approach as VAS_268's
-        /// GetOrderTaxNetRatios - is taken off), converted to the base currency.
-        /// Binds @Base_Currency_ID.
+        /// VAS163 2026-11-17: Sr 149/150 - Value converted = the QUOTED value, without taxes, of
+        /// the quantity that was ordered (per quotation line: ex-tax quotation line amount x
+        /// converted qty / quoted qty, converted qty capped at the quoted qty), converted to the
+        /// base currency with the quotation's own currency, date and conversion type. Previously
+        /// the linked Sales Order lines' LineNetAmt was summed, so a mispriced order inflated the
+        /// card (SO 50226 / 50227: LineNetAmt 400,000 / 2,000,000 for quotation lines quoted at
+        /// 2,000 - QtyEntered in a 1000x UOM times the base-UOM price) and the converted value
+        /// could exceed the value quoted. Alias "ql" = quotation line, "bq1" = base_quotations.
+        /// On a tax-inclusive quotation the line's share of its tax's C_OrderTax.TaxAmt (by gross
+        /// proportion) is taken off. Binds @Base_Currency_ID.
         /// </summary>
-        private const string ConvertedLineValueBaseSql =
+        private const string ConvertedQuoteValueBaseSql =
             "COALESCE(CurrencyConvert(" +
-            "CASE WHEN (CASE WHEN COALESCE(so.IsTaxIncluded, 'N') = 'Y' " +
-            "OR COALESCE((SELECT pl.IsTaxIncluded FROM M_PriceList pl WHERE pl.M_PriceList_ID = so.M_PriceList_ID), 'N') = 'Y' " +
-            "THEN 'Y' ELSE 'N' END) = 'Y' " +
-            "THEN COALESCE(sol.LineNetAmt, 0) - COALESCE(ROUND(COALESCE(sol.LineNetAmt, 0) * " +
-            "(SELECT SUM(COALESCE(ot.TaxAmt, 0)) FROM C_OrderTax ot WHERE ot.C_Order_ID = sol.C_Order_ID AND ot.C_Tax_ID = sol.C_Tax_ID AND ot.IsActive = 'Y') / " +
-            "NULLIF((SELECT SUM(COALESCE(ol2.LineNetAmt, 0)) FROM C_OrderLine ol2 WHERE ol2.C_Order_ID = sol.C_Order_ID AND ol2.C_Tax_ID = sol.C_Tax_ID AND ol2.IsActive = 'Y'), 0), 6), 0) " +
-            "ELSE COALESCE(sol.LineNetAmt, 0) END" +
-            ", so.C_Currency_ID, @Base_Currency_ID, COALESCE(so.DateAcct, so.DateOrdered), so.C_ConversionType_ID, so.AD_Client_ID, so.AD_Org_ID), 0)";
+            "ROUND(CASE WHEN COALESCE(ql.QtyEntered, 0) <> 0 THEN (CASE WHEN bq1.Tax_Included = 'Y' " +
+            "THEN COALESCE(ql.LineNetAmt, 0) - COALESCE(ROUND(COALESCE(ql.LineNetAmt, 0) * " +
+            "(SELECT SUM(COALESCE(ot.TaxAmt, 0)) FROM C_OrderTax ot WHERE ot.C_Order_ID = ql.C_Order_ID AND ot.C_Tax_ID = ql.C_Tax_ID AND ot.IsActive = 'Y') / " +
+            "NULLIF((SELECT SUM(COALESCE(ol2.LineNetAmt, 0)) FROM C_OrderLine ol2 WHERE ol2.C_Order_ID = ql.C_Order_ID AND ol2.C_Tax_ID = ql.C_Tax_ID AND ol2.IsActive = 'Y'), 0), 6), 0) " +
+            "ELSE COALESCE(ql.LineNetAmt, 0) END) " +
+            "* (CASE WHEN COALESCE(cl.Converted_Qty, 0) > COALESCE(ql.QtyEntered, 0) THEN COALESCE(ql.QtyEntered, 0) ELSE COALESCE(cl.Converted_Qty, 0) END) " +
+            "/ ql.QtyEntered ELSE 0 END, 6)" +
+            ", bq1.Currency_Id, @Base_Currency_ID, bq1.Date_Acct, bq1.Conversion_Type_Id, bq1.Client_Id, bq1.Org_Id), 0)";
 
         // VAS163 2026-11-11: rows 78/79 Quoted_Value is now ex-tax and in the base currency;
         // @Base_Currency_ID occurs BEFORE @AD_Client_ID (positional binding).
+        // VAS163 2026-11-17: Sr 149/150 tax flag, currency, date, conversion type, client and org
+        // carried for the converted value (ConvertedQuoteValueBaseSql).
         private static string BuildBaseQuotationsSql()
         {
             return @"
@@ -207,6 +223,12 @@ namespace VAS.Controllers
                        q.DateOrdered AS Date_Ordered,
                        q.ValidTillDate AS Valid_Till,
                        " + QuotedValueBaseSql + @" AS Quoted_Value,
+                       " + QuoteTaxIncludedSql + @" AS Tax_Included,
+                       q.C_Currency_ID AS Currency_Id,
+                       COALESCE(q.DateAcct, q.DateOrdered) AS Date_Acct,
+                       q.C_ConversionType_ID AS Conversion_Type_Id,
+                       q.AD_Client_ID AS Client_Id,
+                       q.AD_Org_ID AS Org_Id,
                        COALESCE(bp.Name, N'') AS Customer_Name,
                        COALESCE(bpg.Name, N'') AS Segment_Name
                   FROM C_Order q
@@ -239,7 +261,9 @@ namespace VAS.Controllers
         //    converted" only when it is 0) and Capped_Converted_Qty (converted capped at
         //    quoted per line) feeds the quantity-based conversion rate.
         //  - Rows 78/79: Converted_Value ex-tax and in the base currency.
-        //  Binds @Base_Currency_ID once (conv_src).
+        //  VAS163 2026-11-17: Sr 149/150 Converted_Value is the quotation's ex-tax value of the
+        //  converted qty (quote_line_value, ConvertedQuoteValueBaseSql), summed in quote_lines.
+        //  Binds @Base_Currency_ID once (quote_line_value).
         private static string BuildConversionCtesSql()
         {
             return @"
@@ -252,7 +276,6 @@ namespace VAS.Controllers
                             THEN ROUND(COALESCE(sol.QtyOrdered, 0) * COALESCE(ql.QtyEntered, 0) / ql.QtyOrdered, 6)
                             ELSE COALESCE(sol.QtyEntered, 0)
                         END AS Converted_Qty,
-                        " + ConvertedLineValueBaseSql + @" AS Converted_Value,
                         so.DateOrdered AS Order_Date
                       FROM C_OrderLine ql
                       INNER JOIN C_OrderLine sol ON ( sol.C_Quotation_Line_ID = ql.C_OrderLine_ID AND sol.IsActive = 'Y' )
@@ -270,10 +293,18 @@ namespace VAS.Controllers
                         cs.Quotation_Id AS Quotation_Id,
                         cs.Quotation_Line_Id AS Quotation_Line_Id,
                         SUM(cs.Converted_Qty) AS Converted_Qty,
-                        SUM(cs.Converted_Value) AS Converted_Value,
                         MIN(cs.Order_Date) AS First_Order_Date
                       FROM conv_src cs
                      GROUP BY cs.Quotation_Id, cs.Quotation_Line_Id
+                ),
+                quote_line_value AS (
+                    SELECT
+                        ql.C_OrderLine_ID AS Quotation_Line_Id,
+                        " + ConvertedQuoteValueBaseSql + @" AS Converted_Value
+                      FROM C_OrderLine ql
+                      INNER JOIN base_quotations bq1 ON ( bq1.C_Order_ID = ql.C_Order_ID )
+                      INNER JOIN conv_line cl ON ( cl.Quotation_Line_Id = ql.C_OrderLine_ID )
+                     WHERE ql.IsActive = 'Y'
                 ),
                 quote_lines AS (
                     SELECT
@@ -286,18 +317,19 @@ namespace VAS.Controllers
                                 ELSE COALESCE(cl.Converted_Qty, 0)
                             END
                         ) AS Capped_Converted_Qty,
-                        SUM(CASE WHEN COALESCE(cl.Converted_Qty, 0) < COALESCE(ql.QtyEntered, 0) THEN 1 ELSE 0 END) AS Open_Line_Count
+                        SUM(CASE WHEN COALESCE(cl.Converted_Qty, 0) < COALESCE(ql.QtyEntered, 0) THEN 1 ELSE 0 END) AS Open_Line_Count,
+                        SUM(COALESCE(qlv.Converted_Value, 0)) AS Converted_Value
                       FROM C_OrderLine ql
                       LEFT OUTER JOIN conv_line cl ON ( cl.Quotation_Line_Id = ql.C_OrderLine_ID )
+                      LEFT OUTER JOIN quote_line_value qlv ON ( qlv.Quotation_Line_Id = ql.C_OrderLine_ID )
                      WHERE ql.IsActive = 'Y'
-                       AND ql.C_Order_ID IN (SELECT bq1.C_Order_ID FROM base_quotations bq1)
+                       AND ql.C_Order_ID IN (SELECT bq2.C_Order_ID FROM base_quotations bq2)
                      GROUP BY ql.C_Order_ID
                 ),
                 conversion AS (
                     SELECT
                         cl2.Quotation_Id AS Quotation_Id,
                         SUM(cl2.Converted_Qty) AS Converted_Qty,
-                        SUM(cl2.Converted_Value) AS Converted_Value,
                         MIN(cl2.First_Order_Date) AS First_Order_Date
                       FROM conv_line cl2
                      GROUP BY cl2.Quotation_Id
@@ -349,7 +381,7 @@ namespace VAS.Controllers
                         COALESCE(qls.Capped_Converted_Qty, 0) AS Capped_Converted_Qty,
                         COALESCE(qls.Open_Line_Count, 0) AS Open_Line_Count,
                         COALESCE(c.Converted_Qty, 0) AS Converted_Qty,
-                        COALESCE(c.Converted_Value, 0) AS Converted_Value,
+                        COALESCE(qls.Converted_Value, 0) AS Converted_Value,
                         c.First_Order_Date AS First_Order_Date
                       FROM base_quotations bq
                       LEFT OUTER JOIN quote_lines qls ON ( qls.Quotation_Id = bq.C_Order_ID )

@@ -789,3 +789,54 @@
     display: block;
     flex: none;
 }
+
+/* VAS163 2026-11-13 / 2026-11-17: Sr 197 - Month / Year filters on the SAME line as the widget name, to its
+   right (the 13-Nov version of this block put them on their own line under the title). ONE fixed size for
+   every PO widget: 30px high, 13px / 500, left-aligned text; fixed px (not em) so the size does not follow
+   each widget's container width. The title takes the remaining width and truncates with an ellipsis when
+   space is short; the filters never wrap below it. */
+.vas-211-head {
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.vas-211-head-txt {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.vas-211-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-211-mfilter {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    margin: 0;
+}
+
+.vas-211-msel {
+    font-size: 13px !important;
+    font-weight: 500;
+    height: 30px;
+    line-height: 28px;
+    padding: 0 10px;
+    max-width: none;
+    text-align: left;
+    text-align-last: left;
+    box-sizing: border-box;
+}
+
+.vas-211-msel.vas-211-month {
+    min-width: 120px;
+}
+.vas-211-msel.vas-211-year {
+    min-width: 80px;
+}

@@ -118,7 +118,7 @@
         function showSummary(data) {
             var count = data.backorderLineCount || 0;
             els.value.classList.remove('MPC-bko-neutral');
-            els.value.textContent = String(count);
+            els.value.textContent = (Number(count) || 0).toLocaleString(window.navigator.language); // VAS163 2026-11-12: locale count
             els.meta.textContent = lbl('VAS_142_BKO_Meta', 'Stock shortfall');
             els.card.setAttribute('aria-label', count + ' ' + lbl('VAS_142_BKO_AriaSuffix', 'sales order lines have a stock shortfall'));
         }

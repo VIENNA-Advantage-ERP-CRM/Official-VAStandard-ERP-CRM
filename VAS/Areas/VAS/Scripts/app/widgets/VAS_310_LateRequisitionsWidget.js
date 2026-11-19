@@ -26,7 +26,7 @@
         listTitle: function () { return U.lbl('VAS_310_LateRequisitions', 'Late Requisitions'); },
         listSub: function (d) {
             return U.num(d.count) + ' ' + U.unit(d.count, 'VAS_314_Requisitions', 'requisitions') + ' · ' +
-                U.num(d.lineCount) + ' ' + U.unit(d.lineCount, 'VAS_309_Lines', 'lines') + ' · ' + U.money(d.amount, d.currency);
+                U.num(d.lineCount) + ' ' + U.unit(d.lineCount, 'VAS_309_Lines', 'lines') + ' · ' + U.docMoney(d.amount, d.currency, false); // VAS163 2026-11-17: Sr 33 - full amount, not L / Cr
         }
     });
 })(VAS, jQuery);

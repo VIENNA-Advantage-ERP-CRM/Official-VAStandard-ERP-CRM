@@ -201,6 +201,8 @@ namespace VAS.Controllers
 
             List<object> rows = new List<object>();
             decimal totalAmount = 0;
+            // VAS163 2026-11-12: each DO amount carries its order's currency (ISO / symbol / precision).
+            Dictionary<int, object[]> curCache = new Dictionary<int, object[]>();
             IDataReader dr = null;
             try
             {
@@ -215,6 +217,9 @@ namespace VAS.Controllers
                     decimal amount = Util.GetValueOfDecimal(dr["Do_Amount"]);
                     totalAmount += amount;
                     DateTime? d = Util.GetValueOfDateTime(dr["Do_Date"]);
+                    int curId = Util.GetValueOfInt(dr["Currency_Id"]);
+                    if (!curCache.ContainsKey(curId)) { curCache[curId] = LookupCurrency(curId); }
+                    object[] cur = curCache[curId];
                     rows.Add(new
                     {
                         doId = Util.GetValueOfInt(dr["Do_Id"]),
@@ -223,7 +228,10 @@ namespace VAS.Controllers
                         soNumber = Util.GetValueOfString(dr["So_Number"]),
                         customerName = Util.GetValueOfString(dr["Customer_Name"]),
                         doDate = d.HasValue ? d.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
-                        doAmount = amount
+                        doAmount = amount,
+                        currencyIso = (string)cur[0],
+                        currencySymbol = (string)cur[1],
+                        currencyPrecision = (int)cur[2]
                     });
                 }
             }
@@ -247,26 +255,35 @@ namespace VAS.Controllers
         /// </summary>
         private object GetCurrencyInfo(Ctx ctx)
         {
+            // VAS163 2026-11-12: StdPrecision sent too (the widget showed 0 decimals).
+            object[] cur = LookupCurrency(ctx.GetContextAsInt("$C_Currency_ID"));
+            return new { iso = (string)cur[0], symbol = (string)cur[1], precision = (int)cur[2] };
+        }
+
+        /// <summary>VAS163 2026-11-12: { ISO_Code, CurSymbol, StdPrecision } of a currency; empties / 2 if unavailable.</summary>
+        private object[] LookupCurrency(int currencyId)
+        {
             string iso = "";
             string symbol = "";
-            int currencyId = ctx.GetContextAsInt("$C_Currency_ID");
+            int precision = 2;
             if (currencyId > 0)
             {
                 IDataReader cdr = null;
                 try
                 {
                     cdr = DB.ExecuteReader(
-                        "SELECT ISO_Code, CurSymbol FROM C_Currency WHERE C_Currency_ID = @Cur",
+                        "SELECT ISO_Code, CurSymbol, StdPrecision FROM C_Currency WHERE C_Currency_ID = @Cur",
                         new SqlParameter[] { new SqlParameter("@Cur", currencyId) });
                     if (cdr != null && cdr.Read())
                     {
                         iso = Util.GetValueOfString(cdr["ISO_Code"]);
                         symbol = Util.GetValueOfString(cdr["CurSymbol"]);
+                        precision = Util.GetValueOfInt(cdr["StdPrecision"]);
                     }
                 }
                 finally { if (cdr != null) { cdr.Close(); cdr.Dispose(); } }
             }
-            return new { iso = iso, symbol = symbol };
+            return new object[] { iso, symbol, precision };
         }
 
         private List<int> GetYears(Ctx ctx, int currentYear)

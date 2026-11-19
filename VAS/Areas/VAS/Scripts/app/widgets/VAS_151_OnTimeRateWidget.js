@@ -68,9 +68,9 @@
            the rate - the backend already produced the percentage. */
         function formatRate(raw) {
             var n = Number(raw);
-            if (!isFinite(n)) { return '0'; }
-            n = Math.round(n * 100) / 100;
-            return String(n);
+            if (!isFinite(n)) { n = 0; }
+            // VAS163 2026-11-12: browser-culture decimal separator (String(n) always printed '.').
+            return n.toLocaleString(window.navigator.language, { maximumFractionDigits: 2 });
         }
 
         /* ---- Build the static DOM once ---- */

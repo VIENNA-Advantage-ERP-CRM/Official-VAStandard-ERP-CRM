@@ -52,7 +52,7 @@ namespace VIS.Controllers
                             requisitionId = l.RequisitionId,
                             documentNo = l.DocumentNo,
                             product = l.ItemName,
-                            qty = l.Qty,
+                            qty = l.QtyEntered, // VAS163 2026-11-17: Sr 7 - qty in the line's UOM (shown with it)
                             uom = l.UomName,
                             needBy = VAS_ReqWidgetData.D(l.NeedBy),
                             amount = l.Amount(l.Qty),

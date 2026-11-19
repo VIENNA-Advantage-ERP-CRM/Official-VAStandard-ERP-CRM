@@ -213,8 +213,11 @@ namespace VAS.Controllers
         /// IsTaxIncluded flag or its price list's flag) - same expression as VAS_273 / VAS_270.
         /// </summary>
         private const string TaxIncludedSql =
-            "(CASE WHEN COALESCE(o.IsTaxIncluded, 'N') = 'Y' " +
-            "OR COALESCE((SELECT pl.IsTaxIncluded FROM M_PriceList pl WHERE pl.M_PriceList_ID = o.M_PriceList_ID), 'N') = 'Y' " +
+            // VAS163 2026-11-17: tax-inclusive read from the order's own totals (as VAS_271 Sr 206):
+            // the flags are unreliable (SO 50209: order N, price list Y, tax added on top), so an
+            // order is tax-inclusive only when GrandTotal is not raised by its C_OrderTax total.
+            "(CASE WHEN 2 * (COALESCE(o.GrandTotal, 0) - COALESCE(o.TotalLines, 0)) < " +
+            "(SELECT COALESCE(SUM(COALESCE(ott.TaxAmt, 0)), 0) FROM C_OrderTax ott WHERE ott.C_Order_ID = o.C_Order_ID AND ott.IsActive = 'Y') " +
             "THEN 'Y' ELSE 'N' END)";
 
         /// <summary>
@@ -411,16 +414,38 @@ namespace VAS.Controllers
                        its.Date_Promised AS Date_Promised,
                        its.Item_Lines AS Item_Lines,
                        its.Short_Lines AS Short_Lines,
-                       (
-                           SELECT MAX(io.MovementDate)
-                             FROM M_InOut io
-                            WHERE io.C_Order_ID = its.C_Order_ID
-                              AND io.IsActive = 'Y'
-                              AND io.IsSOTrx = 'Y'
-                              AND COALESCE(io.IsReturnTrx, 'N') = 'N'
-                              AND io.DocStatus IN ('CO', 'CL')
-                       ) AS Last_Movement_Date
+                       COALESCE(
+                           (
+                               SELECT MIN(io.MovementDate)
+                                 FROM M_InOut io
+                                 INNER JOIN M_InOutLine iol ON ( iol.M_InOut_ID = io.M_InOut_ID )
+                                 INNER JOIN C_OrderLine sol ON ( sol.C_OrderLine_ID = iol.C_OrderLine_ID )
+                                WHERE sol.C_Order_ID = its.C_Order_ID
+                                  AND io.IsActive = 'Y'
+                                  AND io.IsSOTrx = 'Y'
+                                  AND COALESCE(io.IsReturnTrx, 'N') = 'N'
+                                  AND io.DocStatus IN ('CO', 'CL')
+                           ),
+                           (
+                               SELECT MIN(io2.MovementDate)
+                                 FROM M_InOut io2
+                                WHERE io2.C_Order_ID = its.C_Order_ID
+                                  AND io2.IsActive = 'Y'
+                                  AND io2.IsSOTrx = 'Y'
+                                  AND COALESCE(io2.IsReturnTrx, 'N') = 'N'
+                                  AND io2.DocStatus IN ('CO', 'CL')
+                           )
+                       ) AS First_Movement_Date
                   FROM item_stats its";
+            // VAS163 2026-11-17: Sr 173 On-time % per the 17-Nov rule: every booked SO of the
+            // customer created in the selected month (default current month) is compared with its
+            // DatePromised. On time = a delivery order (completed / closed customer shipment, matched
+            // through its lines, header C_Order_ID as fallback) exists with MovementDate on or
+            // before DatePromised. Delayed = no delivery order by DatePromised (first shipment after
+            // the promised date, or none at all and the promised date has passed). An order whose
+            // promised date is still ahead and has no shipment yet cannot be judged and is not
+            // counted. Full delivery is no longer required (it used to need every Item line fully
+            // shipped and only matched shipments through M_InOut.C_Order_ID).
 
             DateTime today = DateTime.Today;
             int onTimeCount = 0, delayedCount = 0;
@@ -435,21 +460,20 @@ namespace VAS.Controllers
                     if (itemLines <= 0 || dr2["Date_Promised"] == DBNull.Value) { continue; }
 
                     DateTime promised = Util.GetValueOfDateTime(dr2["Date_Promised"]).Value.Date;
-                    int shortLines = dr2["Short_Lines"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr2["Short_Lines"]);
-                    DateTime? lastMovement = dr2["Last_Movement_Date"] == DBNull.Value
+                    // VAS163 2026-11-17: Sr 173 judged on the first delivery order's MovementDate.
+                    DateTime? firstMovement = dr2["First_Movement_Date"] == DBNull.Value
                         ? (DateTime?)null
-                        : Util.GetValueOfDateTime(dr2["Last_Movement_Date"]).Value.Date;
+                        : Util.GetValueOfDateTime(dr2["First_Movement_Date"]).Value.Date;
 
-                    bool fullyDelivered = shortLines == 0 && lastMovement.HasValue;
-                    if (fullyDelivered)
+                    if (firstMovement.HasValue && firstMovement.Value <= promised)
                     {
-                        if (lastMovement.Value <= promised) { onTimeCount++; } else { delayedCount++; }
+                        onTimeCount++;
                     }
-                    else if (promised < today)
+                    else if (firstMovement.HasValue || promised < today)
                     {
                         delayedCount++;
                     }
-                    // else: promised date not yet passed and not fully delivered - not judged yet.
+                    // else: no delivery order yet and the promised date is still ahead - not judged yet.
                 }
             }
             finally
@@ -554,6 +578,7 @@ namespace VAS.Controllers
                         RepresentativeName = Util.GetValueOfString(dr["Representative_Name"]),
                         OrderValue = dr["Order_Value"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Order_Value"]),
                         CurrencySymbol = (rowCurSymbol ?? "").Trim(),
+                        CurrencyIso = (Util.GetValueOfString(dr["Currency_Code"]) ?? "").Trim(), // VAS163 2026-11-12: document currency ISO for client-side Intl formatting
                         CurrencyPrecision = dr["Currency_Precision"] == DBNull.Value ? 2 : Util.GetValueOfInt(dr["Currency_Precision"]),
                         DocumentStatus = DecodeLabel(docStatusMap, docStatusCode),
                         DeliveryStatus = Msg.GetMsg(ctx, deliveryCode) ?? deliveryFallback,
@@ -639,6 +664,7 @@ namespace VAS.Controllers
                     DocumentStatus = DecodeLabel(docStatusMap, docStatusCode),
                     OrderValue = dr["Order_Value"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Order_Value"]),
                     CurrencySymbol = (currencySymbol ?? "").Trim(),
+                    CurrencyIso = (Util.GetValueOfString(dr["Currency_Code"]) ?? "").Trim(), // VAS163 2026-11-12: document currency ISO for client-side Intl formatting
                     CurrencyPrecision = stdPrecision,
                     WarehouseName = Util.GetValueOfString(dr["Warehouse_Name"]),
                     DeliveryMode = DecodeLabel(GetDecodeMap("C_Order", "DeliveryViaRule", language), Util.GetValueOfString(dr["Delivery_Via_Rule"]))
@@ -827,9 +853,10 @@ namespace VAS.Controllers
         {
             if (productId <= 0 || warehouseId <= 0) { return 0m; }
 
+            // VAS163 2026-11-13: rows 1029/1064 one In-stock definition in every SO lines pop-up (same as VAS_270/271/272):
+            // on-hand of the order's warehouse in the base UOM (the reservation already holds this order), clamped at 0 by the caller.
             string sql = @"
-                SELECT COALESCE(SUM(COALESCE(s.QtyOnHand, 0) - COALESCE(s.QtyReserved, 0)
-                              - COALESCE(s.QtyDedicated, 0) - COALESCE(s.QtyAllocated, 0)), 0) AS Free_Stock
+                SELECT COALESCE(SUM(COALESCE(s.QtyOnHand, 0)), 0) AS Free_Stock
                   FROM M_Storage s
                   INNER JOIN M_Locator loc ON ( loc.M_Locator_ID = s.M_Locator_ID )
                  WHERE s.M_Product_ID = @M_Product_ID
@@ -1077,6 +1104,7 @@ namespace VAS.Controllers
             public string RepresentativeName { get; set; }
             public decimal OrderValue { get; set; }
             /// <summary>VAS163 2026-11-11: row 93 - document (price list) currency of OrderValue.</summary>
+            public string CurrencyIso { get; set; } // VAS163 2026-11-12
             public string CurrencySymbol { get; set; }
             public int CurrencyPrecision { get; set; }
             public string DocumentStatus { get; set; }
@@ -1100,6 +1128,7 @@ namespace VAS.Controllers
             public string DocumentStatus { get; set; }
             public decimal OrderValue { get; set; }
             /// <summary>VAS163 2026-11-11: row 98 - document currency of the SO value / line amounts.</summary>
+            public string CurrencyIso { get; set; } // VAS163 2026-11-12
             public string CurrencySymbol { get; set; }
             public int CurrencyPrecision { get; set; }
             public string WarehouseName { get; set; }

@@ -210,9 +210,14 @@ namespace VAS.Controllers
         /// 'Y' when the order's prices include tax - the order's own IsTaxIncluded flag
         /// (5-Nov Row 45: "SO has IsTaxIncluded = Y") or its price list's flag.
         /// </summary>
+        // VAS163 2026-11-17: Sr 93 the flags are not reliable (SO 50209: order N, price list Y,
+        // yet the tax was ADDED on top - GrandTotal 10,337.30 = TotalLines 9,722 + tax 615.30 - so
+        // the Value column showed 9,106.70 instead of 9,722). Tax-inclusive is now read from the
+        // order's own totals: the tax is inside TotalLines when GrandTotal is not raised by it
+        // (GrandTotal - TotalLines below half the C_OrderTax total).
         private const string TaxIncludedSql =
-            "(CASE WHEN COALESCE(o.IsTaxIncluded, 'N') = 'Y' " +
-            "OR COALESCE((SELECT pl.IsTaxIncluded FROM M_PriceList pl WHERE pl.M_PriceList_ID = o.M_PriceList_ID), 'N') = 'Y' " +
+            "(CASE WHEN 2 * (COALESCE(o.GrandTotal, 0) - COALESCE(o.TotalLines, 0)) < " +
+            "(SELECT COALESCE(SUM(COALESCE(ott.TaxAmt, 0)), 0) FROM C_OrderTax ott WHERE ott.C_Order_ID = o.C_Order_ID AND ott.IsActive = 'Y') " +
             "THEN 'Y' ELSE 'N' END)";
 
         /// <summary>
@@ -272,7 +277,8 @@ namespace VAS.Controllers
                         ol.C_Order_ID AS C_Order_ID,
                         SUM(COALESCE(ol.QtyOrdered, 0)) AS Ordered_Qty,
                         SUM(COALESCE(ol.QtyDelivered, 0)) AS Delivered_Qty,
-                        SUM(" + DeliveredValueSql + @") AS Delivered_Value
+                        SUM(" + DeliveredValueSql + @") AS Delivered_Value,
+                        SUM(CASE WHEN COALESCE(ol.QtyDelivered, 0) < COALESCE(ol.QtyOrdered, 0) THEN 1 ELSE 0 END) AS Pending_Lines
                       FROM base_orders bo
                      INNER JOIN C_OrderLine ol ON ( ol.C_Order_ID = bo.C_Order_ID AND ol.IsActive = 'Y' )
                      INNER JOIN M_Product p ON ( p.M_Product_ID = ol.M_Product_ID AND p.ProductType = 'I' )
@@ -297,6 +303,7 @@ namespace VAS.Controllers
                     COALESCE(ld.Ordered_Qty, 0) AS Ordered_Qty,
                     COALESCE(ld.Delivered_Qty, 0) AS Delivered_Qty,
                     COALESCE(ld.Delivered_Value, 0) AS Delivered_Value,
+                    COALESCE(ld.Pending_Lines, 0) AS Pending_Lines,
                     ls.Last_Shipment_Date AS Last_Shipment_Date
                   FROM base_orders o
                   LEFT OUTER JOIN line_delivery ld ON ( ld.C_Order_ID = o.C_Order_ID )
@@ -330,7 +337,13 @@ namespace VAS.Controllers
                     // the Item lines of every cohort order - fully AND partially delivered
                     // orders contribute their delivered portion; the undelivered rest never
                     // counts. (Supersedes the earlier "fully delivered orders only" rule.)
-                    deliveredValue += dr["Delivered_Value"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Delivered_Value"]);
+                    // VAS163 2026-11-13: row 885 Delivered value sums ONLY fully delivered SOs
+                    // (every Item line delivered); pending and partly delivered SOs are excluded.
+                    decimal pendingLines = dr["Pending_Lines"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Pending_Lines"]);
+                    if (orderedQty > 0m && pendingLines <= 0m)
+                    {
+                        deliveredValue += dr["Delivered_Value"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Delivered_Value"]);
+                    }
 
                     // 5-Nov Row 44: on-time shipment over every SO of this month's cohort.
                     //  - Fully delivered: on time when the last completed DO's movement date
@@ -554,6 +567,7 @@ namespace VAS.Controllers
                     DocumentStatusCode = docStatusCode,
                     OrderValue = dr["Order_Value"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Order_Value"]),
                     CurrencySymbol = (currencySymbol ?? "").Trim(),
+                    CurrencyIso = (Util.GetValueOfString(dr["Currency_Code"]) ?? "").Trim(), // VAS163 2026-11-12: document currency ISO for client-side Intl formatting
                     CurrencyPrecision = stdPrecision,
                     WarehouseName = Util.GetValueOfString(dr["Warehouse_Name"]),
                     DeliveryMode = DecodeLabel(GetDecodeMap("C_Order", "DeliveryViaRule", language), Util.GetValueOfString(dr["Delivery_Via_Rule"]))
@@ -1032,6 +1046,7 @@ namespace VAS.Controllers
             public string DocumentStatus { get; set; }
             public string DocumentStatusCode { get; set; }
             public decimal OrderValue { get; set; }
+            public string CurrencyIso { get; set; } // VAS163 2026-11-12
             public string CurrencySymbol { get; set; }
             public int CurrencyPrecision { get; set; }
             public string WarehouseName { get; set; }

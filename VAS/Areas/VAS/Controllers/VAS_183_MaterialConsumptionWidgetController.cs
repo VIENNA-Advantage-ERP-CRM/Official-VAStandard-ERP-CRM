@@ -98,14 +98,12 @@ namespace VIS.Controllers
                       loc.M_Locator_ID,
                       loc.Value AS LocatorCode,
                       CASE WHEN loc.LocatorCombination IS NULL OR TRIM(loc.LocatorCombination) = '' THEN loc.Value ELSE loc.LocatorCombination END AS LocatorName,
-                      SUM(ABS(mt.MovementQty)) AS TotalQty,
-                      SUM(ABS(mt.MovementQty) * COALESCE(il.CurrentCostPrice, il.PriceCost, il.VA024_CostPrice, cc.CurrentCostPrice, 0)) AS TotalValue
+                      -- VAS163 2026-11-13: rows 23/45/46/52/53/76 one Inventory Use rule - qty in the line's
+                      -- selected UOM (QtyEntered), value = QtyInternalUse (base) x M_InventoryLine.CurrentCostPrice.
+                      SUM(mt.QtyEntered) AS TotalQty,
+                      SUM(ABS(mt.MovementQty) * COALESCE(mt.CurrentCostPrice, 0)) AS TotalValue
                     FROM (" + trxAccessSql + @") mt
-                    INNER JOIN M_Locator loc ON loc.M_Locator_ID = mt.M_Locator_ID AND loc.IsActive = 'Y'
-                    LEFT JOIN M_InventoryLine il ON il.M_InventoryLine_ID = mt.M_InventoryLine_ID AND il.IsActive = 'Y'
-                    LEFT JOIN (SELECT M_Product_ID, MAX(CurrentCostPrice) AS CurrentCostPrice
-                               FROM M_Cost WHERE IsActive = 'Y' AND CurrentCostPrice IS NOT NULL
-                               GROUP BY M_Product_ID) cc ON cc.M_Product_ID = mt.M_Product_ID";
+                    INNER JOIN M_Locator loc ON loc.M_Locator_ID = mt.M_Locator_ID AND loc.IsActive = 'Y'";
 
                 if (warehouseId > 0)
                 {
@@ -115,7 +113,7 @@ namespace VIS.Controllers
                 sql += @"
                     GROUP BY loc.M_Locator_ID, loc.Value,
                       CASE WHEN loc.LocatorCombination IS NULL OR TRIM(loc.LocatorCombination) = '' THEN loc.Value ELSE loc.LocatorCombination END
-                    ORDER BY SUM(ABS(mt.MovementQty)) DESC";
+                    ORDER BY SUM(mt.QtyEntered) DESC";
 
                 using (IDataReader dr = DB.ExecuteReader(sql, null, null))
                 {
@@ -174,19 +172,18 @@ namespace VIS.Controllers
                       p.Name AS ProductName,
                       uom.Name AS UomName,
                       asi.Description AS Attributes,
-                      SUM(ABS(mt.MovementQty)) AS ConsumedQty,
-                      SUM(ABS(mt.MovementQty) * COALESCE(il.CurrentCostPrice, il.PriceCost, il.VA024_CostPrice, cc.CurrentCostPrice, 0)) AS LineValue
+                      -- VAS163 2026-11-13: rows 23/45/46/52/53/76 qty in the line's selected UOM (grouped by
+                      -- line UOM), value = QtyInternalUse x M_InventoryLine.CurrentCostPrice (same as the header).
+                      SUM(mt.QtyEntered) AS ConsumedQty,
+                      SUM(ABS(mt.MovementQty)) AS ConsumedQtyBase,
+                      SUM(ABS(mt.MovementQty) * COALESCE(mt.CurrentCostPrice, 0)) AS LineValue
                     FROM (" + trxAccessSql + @") mt
                     INNER JOIN M_Product p ON p.M_Product_ID = mt.M_Product_ID
-                    LEFT JOIN C_UOM uom ON uom.C_UOM_ID = p.C_UOM_ID
+                    LEFT JOIN C_UOM uom ON uom.C_UOM_ID = mt.C_UOM_ID
                     LEFT JOIN M_AttributeSetInstance asi ON asi.M_AttributeSetInstance_ID = mt.M_AttributeSetInstance_ID
-                    LEFT JOIN M_InventoryLine il ON il.M_InventoryLine_ID = mt.M_InventoryLine_ID AND il.IsActive = 'Y'
-                    LEFT JOIN (SELECT M_Product_ID, MAX(CurrentCostPrice) AS CurrentCostPrice
-                               FROM M_Cost WHERE IsActive = 'Y' AND CurrentCostPrice IS NOT NULL
-                               GROUP BY M_Product_ID) cc ON cc.M_Product_ID = mt.M_Product_ID
                     WHERE mt.M_Locator_ID = " + locatorId + @"
                     GROUP BY p.M_Product_ID, p.Name, uom.Name, asi.Description
-                    ORDER BY SUM(ABS(mt.MovementQty)) DESC";
+                    ORDER BY SUM(ABS(mt.MovementQty) * COALESCE(mt.CurrentCostPrice, 0)) DESC";
 
                 using (IDataReader dr = DB.ExecuteReader(sql, null, null))
                 {
@@ -195,6 +192,7 @@ namespace VIS.Controllers
                         int pId = Util.GetValueOfInt(dr["M_Product_ID"]);
                         decimal qty = Util.GetValueOfDecimal(dr["ConsumedQty"]);
                         decimal val = Util.GetValueOfDecimal(dr["LineValue"]);
+                        decimal qtyBase = Util.GetValueOfDecimal(dr["ConsumedQtyBase"]); // VAS163 2026-11-13: row 76 unit cost per base unit
 
                         distinctItems.Add(pId);
                         totalQty += qty;
@@ -208,9 +206,10 @@ namespace VIS.Controllers
                             attributes = NormalizeAttributes(Util.GetValueOfString(dr["Attributes"])),
                             consumedQty = qty,
                             lineValue = val,
-                            // Unit cost shown in the modal's Value column: the line CurrentCostPrice
-                            // (weighted by quantity when one row groups lines with different costs).
-                            costPrice = qty != 0 ? val / qty : 0m
+                            // VAS163 2026-11-13: row 76 - the modal's Value column now shows lineValue
+                            // (qty x cost, adds up to the header); costPrice stays as the per-base-unit
+                            // CurrentCostPrice (weighted when one row groups lines with different costs).
+                            costPrice = qtyBase != 0 ? val / qtyBase : 0m
                         });
                     }
                 }
@@ -264,10 +263,11 @@ namespace VIS.Controllers
             // VAS163 2026-11-10: browser locale (6-Nov retest2) - no hard-coded INR/₹ default.
             string iso = "";
             string symbol = "";
+            int stdPrecision = 2; // VAS163 2026-11-12: currency precision sent to the UI (C_Currency.StdPrecision)
 
             if (ctx == null)
             {
-                return new { iso = iso, symbol = symbol };
+                return new { iso = iso, symbol = symbol, stdPrecision = stdPrecision };
             }
 
             int currencyId = ctx.GetContextAsInt("$C_Currency_ID");
@@ -281,18 +281,19 @@ namespace VIS.Controllers
             {
                 if (currencyId > 0)
                 {
-                    string sql = "SELECT ISO_Code, CurSymbol FROM C_Currency WHERE C_Currency_ID = " + currencyId + " AND IsActive = 'Y'";
+                    string sql = "SELECT ISO_Code, CurSymbol, StdPrecision FROM C_Currency WHERE C_Currency_ID = " + currencyId + " AND IsActive = 'Y'";
                     dr = DB.ExecuteReader(sql, null, null);
                     if (dr != null && dr.Read())
                     {
                         iso = Util.GetValueOfString(dr["ISO_Code"]);
                         symbol = Util.GetValueOfString(dr["CurSymbol"]);
+                        stdPrecision = Util.GetValueOfInt(dr["StdPrecision"]);
                     }
                 }
                 else
                 {
                     string sql = @"
-                        SELECT c.ISO_Code, c.CurSymbol
+                        SELECT c.ISO_Code, c.CurSymbol, c.StdPrecision
                         FROM AD_ClientInfo ci
                         INNER JOIN C_AcctSchema a ON (a.C_AcctSchema_ID = ci.C_AcctSchema1_ID AND a.IsActive = 'Y')
                         INNER JOIN C_Currency c ON (c.C_Currency_ID = a.C_Currency_ID AND c.IsActive = 'Y')
@@ -302,6 +303,7 @@ namespace VIS.Controllers
                     {
                         iso = Util.GetValueOfString(dr["ISO_Code"]);
                         symbol = Util.GetValueOfString(dr["CurSymbol"]);
+                        stdPrecision = Util.GetValueOfInt(dr["StdPrecision"]);
                     }
                 }
             }
@@ -323,7 +325,7 @@ namespace VIS.Controllers
                 symbol = iso;
             }
 
-            return new { iso = iso, symbol = symbol };
+            return new { iso = iso, symbol = symbol, stdPrecision = stdPrecision };
         }
         // ===== NEW CODE END — currency format =====
 
@@ -343,7 +345,8 @@ namespace VIS.Controllers
             // The column aliases match what the callers read (mt.M_Product_ID, mt.MovementQty ...).
             string sql = @"
                     SELECT line.M_InventoryLine_ID, line.M_Product_ID, line.M_Locator_ID,
-                           line.M_AttributeSetInstance_ID, line.QtyInternalUse AS MovementQty
+                           line.M_AttributeSetInstance_ID, line.QtyInternalUse AS MovementQty,
+                           line.QtyEntered, line.C_UOM_ID, line.CurrentCostPrice
                     FROM M_InventoryLine line
                     INNER JOIN M_Inventory inv ON inv.M_Inventory_ID = line.M_Inventory_ID
                     WHERE line.IsActive = 'Y'

@@ -34,7 +34,8 @@
             .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
     }
 
-    var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    // VAS163 2026-11-12: month names from the browser culture, not a fixed English list.
+    var MONTHS = (function () { var a = []; for (var i = 0; i < 12; i++) { a.push(new Date(2000, i, 1).toLocaleDateString(window.navigator.language, { month: 'short' })); } return a; })();
 
     /* Dates arrive as "YYYY-MM-DDT00:00:00" without a time zone: read the calendar date as written
        (UTC getters would show the previous day in time zones ahead of UTC). */
@@ -50,6 +51,9 @@
         var p = ymd(iso);
         return p ? new Date(p.y, p.m - 1, p.d).toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
     }
+
+    // VAS163 2026-11-12: counts in browser-locale grouping.
+    function fmtInt(n) { return (Number(n) || 0).toLocaleString(window.navigator.language); }
 
     function formatQty(v) {
         var n = Number(v || 0);
@@ -90,7 +94,7 @@
                 { t: r.DocumentNo || '—', primary: true, link: r.MovementID },
                 { t: formatDate(r.MovementDate) },
                 { t: route },
-                { t: formatQty(r.TotalQty), title: formatQty(r.TotalQty) + ' (' + (r.LineCount || 0) + ' ' + lbl('VAS_176_Lines', 'lines') + ')' }
+                { t: formatQty(r.TotalQty), title: formatQty(r.TotalQty) + ' (' + fmtInt(r.LineCount) + ' ' + lbl('VAS_176_Lines', 'lines') + ')' }
             ];
         }
 
@@ -170,6 +174,10 @@
         /* Opens the transfer. Hosted on the Material Transfer window (windowNo >= 0) the window's own
            grid is navigated to the record (same pattern as InvoicesWidget / VAS_227); on a home
            dashboard the Material Transfer window is opened on it. */
+        // VAS163 2026-11-12: M_Movement window is VAS_InventoryMove (old 'Inventory Move'); the former
+        // 'VAS_MaterialTransfer' / 'Material Transfer' names do not exist. Resolved id is cached here.
+        var transferWindowId = 0;
+
         function openTransfer(id) {
             id = Number(id);
             if (!id) { return; }
@@ -181,7 +189,8 @@
                         "TabIndex": "0"
                     });
                 } else {
-                    VAS.ZoomUtil.zoomToRecord('M_Movement_ID', id, 0, 'VAS_MaterialTransfer', 'Material Transfer');
+                    VAS.ZoomUtil.zoomToRecord('M_Movement_ID', id, transferWindowId, 'VAS_InventoryMove', 'Inventory Move')
+                        .then(function (wid) { if (wid > 0) { transferWindowId = wid; } });
                 }
             } catch (e) { }
         }
@@ -303,7 +312,7 @@
 
             if (filtered.length > rowsPerPage) {
                 $footer.html(
-                    '<span class="vas-176-footer-helper">' + escapeHtml(lbl('VAS_176_Showing', 'Showing') + ' ' + (start + 1) + '–' + end + ' ' + lbl('VAS_176_Of', 'of') + ' ' + filtered.length) + '</span>' +
+                    '<span class="vas-176-footer-helper">' + escapeHtml(lbl('VAS_176_Showing', 'Showing') + ' ' + fmtInt(start + 1) + '–' + fmtInt(end) + ' ' + lbl('VAS_176_Of', 'of') + ' ' + fmtInt(filtered.length)) /* VAS163 2026-11-12: locale counts */ + '</span>' +
                     '<span class="vas-176-pager">' +
                         '<button type="button" class="vas-176-pager-btn" data-dir="-1"' + (page <= 1 ? ' disabled' : '') + '><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg></button>' +
                         '<span class="vas-176-pager-label">' + page + ' ' + escapeHtml(lbl('VAS_176_Of', 'of')) + ' ' + total + '</span>' +

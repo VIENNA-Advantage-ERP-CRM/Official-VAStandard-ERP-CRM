@@ -27,7 +27,7 @@
             var reqs = (d.records || []).length;
             return U.num(d.count) + ' ' + U.phrase(d.count, 'VAS_308_ListSub', 'lines on PO / transfer not received',
                 function () { return U.lbl('VAS_305_Line1', 'line') + ' · ' + U.lbl('VAS_308_OnPOOrTransfer', 'On PO or transfer'); }) +
-                ' · ' + U.num(reqs) + ' ' + U.unit(reqs, 'VAS_314_Requisitions', 'requisitions') + ' · ' + U.money(d.amount, d.currency);
+                ' · ' + U.num(reqs) + ' ' + U.unit(reqs, 'VAS_314_Requisitions', 'requisitions') + ' · ' + U.docMoney(d.amount, d.currency, false); // VAS163 2026-11-17: Sr 33 - full amount, not L / Cr
         }
     });
 })(VAS, jQuery);

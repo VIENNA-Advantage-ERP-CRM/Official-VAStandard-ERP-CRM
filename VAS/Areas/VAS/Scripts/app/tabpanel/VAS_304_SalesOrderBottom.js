@@ -788,11 +788,24 @@
             return sa === sb;
         }
 
-        /* Was the saved line changed on the server since the panel loaded it? Compares the
-           server's fresh copy with the line's load-time snapshot (_saved). */
+        /* Case-insensitive read of a server column bag (PostgreSQL lowercases keys). */
+        function bagVal(bag, col) {
+            if (!bag) return undefined;
+            if (bag.hasOwnProperty(col)) return bag[col];
+            var lc = col.toLowerCase();
+            for (var k in bag) if (bag.hasOwnProperty(k) && k.toLowerCase() === lc) return bag[k];
+            return undefined;
+        }
+
+        /* Was the saved line changed on the server since the panel loaded it? The row's Updated
+           stamp decides when both copies carry it; otherwise every column of the server's fresh
+           copy is compared with the line's load-time snapshot (_saved). (Updated stamp as in
+           VAS163, 12-Nov-2026.) */
         function serverRowChanged(line, fresh) {
             var base = line._saved && line._saved.values;
             if (!base) return true;
+            var ua = bagVal(base, "Updated"), ub = bagVal(fresh.values, "Updated");
+            if (ua != null && ub != null) return !sameServerVal(ua, ub);
             for (var k in fresh.values) if (fresh.values.hasOwnProperty(k)) {
                 if (!sameServerVal(fresh.values[k], base[k])) return true;
             }
@@ -851,7 +864,7 @@
             var dirtyById = {}, seen = {}, carriedLines = [], removed = 0;
             lines.forEach(function (l) {
                 var id = +l.values.C_OrderLine_ID || 0;
-                if (id > 0 && l.dirty) dirtyById[id] = l;
+                if (id > 0 && (l.dirty || l._saving)) dirtyById[id] = l;
             });
             var newKeep = lines.filter(function (l) { return (+l.values.C_OrderLine_ID || 0) <= 0; });
             var merged = (serverRows || []).map(function (r) {
@@ -859,14 +872,21 @@
                 var mine = dirtyById[r.C_OrderLine_ID];
                 if (!mine) return fresh;
                 seen[r.C_OrderLine_ID] = true;
-                if (!serverRowChanged(mine, fresh)) return mine;
+                // a line whose own save is in flight stays as it is - its save answer refreshes it
+                if (mine._saving || !serverRowChanged(mine, fresh)) return mine;
                 var both = carryUserEdits(mine, fresh, priceFromList);
                 if (!both) return fresh;
                 carriedLines.push(both);
                 return both;
             });
-            for (var id in dirtyById) if (dirtyById.hasOwnProperty(id) && !seen[id]) removed++;
-            lines = newKeep.concat(merged);
+            // An edited line missing from the reloaded rows: on a document that fits one page it was
+            // deleted on the server (dropped); off a multi-page document it cannot be told from
+            // "moved to another page", so it is kept (as VAS163, 12-Nov-2026).
+            var onePage = linePage === 0 && (linesTotal || 0) <= (linePageSize || 0), strays = [];
+            for (var id in dirtyById) if (dirtyById.hasOwnProperty(id) && !seen[id]) {
+                if (onePage) removed++; else strays.push(dirtyById[id]);
+            }
+            lines = newKeep.concat(merged, strays);
             if (carriedLines.length) {
                 showToast(lbl("VAS_304_LinesChangedOnServerKept",
                     "Some edited lines were changed on the server - your changes were applied to the server version"));
@@ -1193,8 +1213,10 @@
                     // TaxAmt from C_OrderTax is the base tax only (surcharge is separate).
                     $totalsRow.append(totalsRow(esc(taxSummary[i].TaxName) + ":", fmtP(taxSummary[i].TaxAmt), false));
                 }
-                // Surcharge stored on index-0 (total across all lines; separate from base tax).
-                if (+h.TotalSurcharge) $totalsRow.append(totalsRow(lbl("VAS_107_Surcharge", "Surcharge") + ":", fmtP(h.TotalSurcharge), false));
+                // VAS163 2026-11-12: no separate "Surcharge" row. A surcharge tax (C_Tax.Surcharge_Tax_ID)
+                // already has its own C_OrderTax row listed above under its tax name (e.g. "Tax 2%"), so
+                // h.TotalSurcharge (the same money summed off C_OrderLine.SurchargeAmt) showed it twice.
+                // if (+h.TotalSurcharge) $totalsRow.append(totalsRow(lbl("VAS_107_Surcharge", "Surcharge") + ":", fmtP(h.TotalSurcharge), false));
                 if (+h.TCSAmount) $totalsRow.append(totalsRow(lbl("VA106_TaxCollectedAtSource", "TCS") + ":", fmtP(h.TCSAmount), false));
                 // Grand Total = the rows above it, NOT C_Order.GrandTotal (18-Sep-2026).
                 // The framework's two halves read two different Prices-Include-Tax
