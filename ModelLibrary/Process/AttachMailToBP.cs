@@ -748,6 +748,8 @@ namespace VAdvantage.Process
         /// mail in another user's mailbox) only gets the links it does not have yet; without targets it stays unlinked.
         /// A sent mail stored before with a record keeps its links: one sent from the application is linked to the
         /// record it was sent from, and a link to the recipient's business partner showed it a second time in the Inbox.
+        /// A sent mail is one mail in every folder: with the mailbox itself in To or Cc it is also in the Inbox,
+        /// and that copy was stored as a second sent mail.
         /// </summary>
         private void LinkMail(dynamic mail, List<MailTarget> targets, string attachType)
         {
@@ -755,10 +757,11 @@ namespace VAdvantage.Process
             mailUID = mailUID.Replace("'", "''");
             string subject = Util.GetValueOfString((object)mail.Subject);
             int mailID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT MAX(MailAttachment1_ID) FROM MailAttachment1 WHERE MailUID='"
-                + mailUID + "' AND FolderName='" + folderName + "'"));
+                + mailUID + "'" + (attachType == "M" ? " AND AttachmentType='M'" : " AND FolderName='" + folderName + "'")));
             bool linked = false;
-            // A mail sent from the application was stored when it was sent: its copy in the Sent folder is that mail
-            if (attachType == "M" && folderName == "Sent")
+            // A mail sent from the application was stored when it was sent: its copy in the Sent folder, or in the
+            // Inbox when the mailbox is a recipient, is that mail
+            if (attachType == "M")
             {
                 if (mailID == 0)
                 {
@@ -826,7 +829,8 @@ namespace VAdvantage.Process
 
         /// <summary>
         /// A mail sent from the application (Email form, Inbox, processes) is stored as it is sent, without the
-        /// mail server's message id and folder. When its copy is fetched from the Sent folder, that row is the
+        /// mail server's message id and folder. When its copy is fetched (from the Sent folder, or from the Inbox
+        /// when the mailbox is one of the recipients), that row is the
         /// same mail: it gets the message id, folder and mailbox of the copy instead of a second row being stored,
         /// so the mail shows once and later runs find it by its message id.
         /// Matched on sender, subject and recipients (To and Cc), stored within a day of the send time, not
