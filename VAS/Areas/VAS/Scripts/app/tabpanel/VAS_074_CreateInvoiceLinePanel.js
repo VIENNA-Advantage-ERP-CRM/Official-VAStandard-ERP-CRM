@@ -321,13 +321,23 @@
         /* Exposed so the prototype's sizeChanged (a framework callback) can re-fit too. */
         this.fitHostWidth = function () { fitHostWidth(); };
 
+        /* Full-page busy overlay, as VAS_218 (20-Nov-2026). The old one was a vis-apanel-busy div
+           appended at the END of $root with position:absolute but no top/left - it sat below the
+           panel content (often out of view) instead of over it, so it was never seen. This one is
+           mounted on <body> with position:fixed (CSS .vas-cil-busy-overlay), so it covers the page
+           wherever the panel is scrolled and is not clipped by the tab's overflow. */
         function createBusyIndicator() {
-            $busy = $('<div class="vis-apanel-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
-            $busy.css({ position: "absolute", width: "100%", height: "100%", "text-align": "center", "z-index": "999" });
-            $busy[0].style.visibility = "hidden";
-            $root.append($busy);
+            $busy = $('<div class="vas-cil-busy-overlay" role="progressbar" aria-busy="true"></div>');
         }
-        function showBusy(show) { if ($busy && $busy[0]) $busy[0].style.visibility = show ? "visible" : "hidden"; }
+        function showBusy(show) {
+            if (!$busy) return;
+            if (show) {
+                if (!$busy.parent().length) $("body").append($busy);
+                $busy.addClass("vas-cil-busy-overlay--show");
+            } else {
+                $busy.removeClass("vas-cil-busy-overlay--show");
+            }
+        }
 
         /* Hide/show the WHOLE tab (framework "Invoice Lines" title bar + our root) when no
            invoice is selected. The live framework build appends
@@ -1171,9 +1181,10 @@
                     // the price list changed. The unsaved panel lines are kept and re-priced (see
                     // fetchData / repriceUnsavedLines), then the caller continues.
                     $self.fetchData(parent ? parent.C_Invoice_ID : $self.record_ID, undefined, function (loaded) {
-                        showBusy(false);
-                        if (!loaded) { cb(false); return; }
-                        afterCallouts(function () { cb(true); });
+                        if (!loaded) { showBusy(false); cb(false); return; }
+                        // keep the overlay on until the reload's callouts settled, then hide it before the line save:
+                        // the line save is not blocked (rows show their own spinner, the user can keep adding lines)
+                        afterCallouts(function () { showBusy(false); cb(true); });
                     });
                 }, 50);
             }
@@ -1310,7 +1321,8 @@
             // VIS.Msg.getMsg can return a blank string once the message cache loads).
             var saveLbl = lbl("VAS_074_SaveRow", "Save row");
             if (!saveLbl || !saveLbl.trim()) saveLbl = "Save row";
-            if (n > 1) saveLbl += lbl("VAS_074_PluralS", "s");
+            // No plural suffix (20-Nov-2026): the count in brackets says how many rows are saved, and
+            // VAS_074_PluralS showed as a raw "[VAS_074_PluralS]" key on the button.
             if (n > 0) saveLbl += " (" + n + ")";
             $saveBtn.find(".vas-cil-save-lbl").text(saveLbl);
             var sc = selectedCount();
@@ -4848,7 +4860,9 @@
         $(document).off("mousedown.vascil").off("keydown.vascil");
         $(window).off("resize.vascil074");
         if (this._shortcutFn) { document.removeEventListener("keydown", this._shortcutFn, true); this._shortcutFn = null; }
-        $("#vasCilAttr, #vasCilScan, .vas-cil-toast").remove();
+        // the busy overlay is body-mounted (showBusy) - remove it with the panel; another open
+        // panel instance re-attaches its own on its next showBusy(true)
+        $("#vasCilAttr, #vasCilScan, .vas-cil-toast, .vas-cil-busy-overlay").remove();
         // Release the tab watcher before curTab is dropped, or the GridTab keeps a reference
         // to this disposed panel and goes on calling into it.
         if (this.curTab && typeof this.curTab.removeDataStatusListener === "function") {

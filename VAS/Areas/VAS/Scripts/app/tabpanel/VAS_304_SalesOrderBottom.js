@@ -1607,9 +1607,10 @@
                     // the price list changed. The unsaved panel lines are kept and re-priced (see
                     // fetchData / repriceUnsavedLines), then the caller continues.
                     $self.fetchData(parent ? parent.C_Order_ID : $self.record_ID, undefined, function (loaded) {
-                        showBusy(false);
-                        if (!loaded) { cb(false); return; }
-                        afterCallouts(function () { cb(true); });
+                        if (!loaded) { showBusy(false); cb(false); return; }
+                        // keep the overlay on until the reload's callouts settled, then hide it before the line save:
+                        // the line save is not blocked (rows show their own spinner, the user can keep adding lines)
+                        afterCallouts(function () { showBusy(false); cb(true); });
                     });
                 }, 50);
             }

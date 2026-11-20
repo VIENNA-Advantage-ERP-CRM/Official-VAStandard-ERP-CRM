@@ -154,8 +154,24 @@ namespace VAdvantage.Model
             if (!success)
                 return success;
 
+            // Bulk line save (price list version re-pricing, the line panel): the opportunity updates its
+            // PlannedAmt once for all lines (MVASOpportunity.FinishBulkLineUpdate) instead of being
+            // re-saved after every line
+            if (_parent != null && _parent.IsBulkLineUpdate)
+                return success;
+
             UpdateHeader();
             return success;
+        }
+
+        /// <summary>
+        /// Set the parent opportunity object, so the line sees its bulk-save flag
+        /// (MVASOpportunity.IsBulkLineUpdate).
+        /// </summary>
+        /// <param name="opportunity">parent</param>
+        public void SetParent(MVASOpportunity opportunity)
+        {
+            _parent = opportunity;
         }
         protected override bool AfterDelete(bool success)
         {
