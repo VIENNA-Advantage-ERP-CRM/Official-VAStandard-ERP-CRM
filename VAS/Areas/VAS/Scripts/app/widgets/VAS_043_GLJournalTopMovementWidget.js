@@ -68,6 +68,14 @@
         });
     }
 
+    // Currency amount in the browser culture via the shared formatter; fallback: symbol + fmtAmt.
+    function fmtMoney(amount, precision, iso, rawSym, sym) {
+        if (iso && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+            try { return VAS.formatAmountByBrowser(amount, iso, precision, { symbol: rawSym }); } catch (e) { if (window.console) { console.log(e); } }
+        }
+        return sym + fmtAmt(amount, precision);
+    }
+
     function resolveTotalCount(totalCount, visibleCount, pageSize, totalPages) {
         var total = Number(totalCount || 0);
 
@@ -290,6 +298,8 @@
             var id       = $self.AD_UserHomeWidgetID;
             var accounts = data.Accounts || [];
             var sym      = esc(data.currencySymbol || data.CurSymbol || data.currencyISO || data.ISOCode || '');
+            var rawSym   = data.currencySymbol || data.CurSymbol || '';
+            var iso      = data.currencyISO || data.ISOCode || '';
             var prec     = data.stdPrecision || data.StdPrecision;
             var $body    = $root.find('#VAS-gljtm-body-' + id);
 
@@ -324,11 +334,11 @@
             for (var i = 0; i < pageAccounts.length; i++) {
                 var a       = pageAccounts[i];
                 var fillCls = 'VAS-gljtm-fill' + (a.IsCredit ? ' VAS-gljtm-fill-cr' : '');
-                var valStr  = sym + fmtAmt(a.NetMovement, prec);
+                var valStr  = fmtMoney(a.NetMovement, prec, iso, rawSym, sym);
                 var rowInfo = esc((a.AccountCode || '') + ' ' + (a.AccountName || '')
                     + ' - ' + lbl('VAS_043_NetMovement', 'Net Movement') + ': ' + valStr
-                    + ', ' + lbl('VAS_043_Debit', 'Debit') + ': ' + sym + fmtAmt(a.TotalDebit, prec)
-                    + ', ' + lbl('VAS_043_Credit', 'Credit') + ': ' + sym + fmtAmt(a.TotalCredit, prec));
+                    + ', ' + lbl('VAS_043_Debit', 'Debit') + ': ' + fmtMoney(a.TotalDebit, prec, iso, rawSym, sym)
+                    + ', ' + lbl('VAS_043_Credit', 'Credit') + ': ' + fmtMoney(a.TotalCredit, prec, iso, rawSym, sym));
 
                 html += '<div class="VAS-gljtm-row" title="' + rowInfo + '">'
                     +     '<div class="VAS-gljtm-row-head">'

@@ -240,12 +240,17 @@
 
         /* Card money: the shared compact formatter, so a seven-figure exception does
            not overrun the row and the numbering system follows the currency (lakh /
-           crore vs K / M). The symbol is composed here, never hard-coded. */
+           crore vs K / M). VAS.formatAmountByBrowser composes sign + symbol + digits
+           in the browser culture; the server symbol is never hard-coded. */
         function formatCompact(value, symbol, iso, precision) {
             var n = Number(value || 0);
             if (!isFinite(n)) { n = 0; }
             var p = Number(precision);
             if (!isFinite(p) || p < 0) { p = 2; }
+
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                return VAS.formatAmountByBrowser(n, iso, p, { compact: true, symbol: symbol || '' });
+            }
 
             var sign = n < 0 ? '-' : '';
             var magnitude = (VIS.Util && VIS.Util.formatCompactAmount)
@@ -259,11 +264,16 @@
 
         /* Modal money: exact, at the given precision - a record list is not a KPI, so
            nothing is compacted. */
-        function formatAmount(value, symbol, precision) {
+        function formatAmount(value, symbol, precision, iso) {
             var n = Number(value || 0);
             if (!isFinite(n)) { n = 0; }
             var p = Number(precision);
             if (!isFinite(p) || p < 0) { p = 2; }
+
+            /* Browser culture places sign, separators and currency sign (shared formatter). */
+            if (iso && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try { return VAS.formatAmountByBrowser(n, iso, p, { symbol: symbol || '' }); } catch (e) { if (window.console) { console.log(e); } }
+            }
 
             var sign = n < 0 ? '-' : '';
             var text = Math.abs(n).toLocaleString(window.navigator.language, {
@@ -283,9 +293,16 @@
            them than the currency's standard precision, and rounding it to two would
            hide the very difference the row exists to show - with the document currency
            in front of it. */
-        function formatPrice(value, symbol) {
+        function formatPrice(value, symbol, iso) {
             var n = Number(value || 0);
             if (!isFinite(n)) { n = 0; }
+            /* Shared formatter, with the same 0-4 decimals formatQty would print. */
+            if (iso && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    var dec = (String(Number(Math.abs(n).toFixed(4))).split('.')[1] || '').length;
+                    return VAS.formatAmountByBrowser(n, iso, dec, { symbol: symbol || '' });
+                } catch (e) { if (window.console) { console.log(e); } }
+            }
             return (n < 0 ? '-' : '') + (symbol ? symbol : '') + formatQty(Math.abs(n));
         }
 
@@ -970,7 +987,7 @@
         }
 
         function buildDetailRow(row, data, numeric) {
-            var baseValue = formatAmount(row.BaseValue, data.BaseCurrencySymbol, data.BaseCurrencyPrecision);
+            var baseValue = formatAmount(row.BaseValue, data.BaseCurrencySymbol, data.BaseCurrencyPrecision, data.BaseCurrencyIso);
             var html = '<div class="vas-201-drow">';
 
             if (_category === 'GRNNOTINV') {
@@ -984,7 +1001,7 @@
                     cell(formatDate(row.DateOther)) +
                     cell(row.BusinessPartnerName || '') +
                     cell(row.CurrencyIso || '') +
-                    cell(formatAmount(row.DocumentValue, row.CurrencySymbol, row.CurrencyPrecision), 'vas-201-dcell-num') +
+                    cell(formatAmount(row.DocumentValue, row.CurrencySymbol, row.CurrencyPrecision, row.CurrencyIso), 'vas-201-dcell-num') +
                     cell(baseValue, 'vas-201-dcell-num');
             } else {
                 /* Both sides of the match are links, and each variance keeps its two
@@ -1019,10 +1036,10 @@
                     pairCell(formatQty(row.GrnQty), label('VAS_201_GrnQty', 'GRN Qty'),
                              formatQty(row.InvoiceQty), label('VAS_201_InvoiceQty', 'Invoice Qty'),
                              qtyClass) +
-                    pairCell(formatPrice(row.OrderPrice, sym), label('VAS_201_OrderPrice', 'Order Price'),
-                             formatPrice(row.InvoicePrice, sym), label('VAS_201_InvoicePrice', 'Invoice Price'),
+                    pairCell(formatPrice(row.OrderPrice, sym, row.CurrencyIso), label('VAS_201_OrderPrice', 'Order Price'),
+                             formatPrice(row.InvoicePrice, sym, row.CurrencyIso), label('VAS_201_InvoicePrice', 'Invoice Price'),
                              priceClass) +
-                    cell(formatAmount(row.DocumentValue, sym, row.CurrencyPrecision), 'vas-201-dcell-num');
+                    cell(formatAmount(row.DocumentValue, sym, row.CurrencyPrecision, row.CurrencyIso), 'vas-201-dcell-num');
             }
 
             return html + '</div>';

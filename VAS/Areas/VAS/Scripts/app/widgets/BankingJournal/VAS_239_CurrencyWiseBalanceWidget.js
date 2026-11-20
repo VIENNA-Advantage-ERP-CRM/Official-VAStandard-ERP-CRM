@@ -436,7 +436,7 @@
             var symbol = item.Symbol || code;
 
             var native = amountText(item.NativeBalance, symbol, precisionOf(item.Precision), code);
-            var nativeFull = fullAmountText(item.NativeBalance, symbol, precisionOf(item.Precision));
+            var nativeFull = fullAmountText(item.NativeBalance, symbol, precisionOf(item.Precision), code);
 
             /* A currency whose accounts did not all convert shows a dash rather than a
                partial sum, and says why on hover. */
@@ -445,7 +445,7 @@
                 ? amountText(item.BaseBalance, baseSymbol(), basePrecision(), baseCode())
                 : NIL;
             var baseFull = available
-                ? fullAmountText(item.BaseBalance, baseSymbol(), basePrecision())
+                ? fullAmountText(item.BaseBalance, baseSymbol(), basePrecision(), baseCode())
                 : label('VAS_239_RateUnavailable', 'Rate unavailable');
 
             var baseCls = available ? amountClass(item.BaseBalance) : ' vas-239-nil';
@@ -474,11 +474,11 @@
                 label('VAS_239_Accounts', 'accounts'));
 
             lines.push(label('VAS_239_Native', 'Native') + ': ' +
-                fullAmountText(item.NativeBalance, symbol, precisionOf(item.Precision)));
+                fullAmountText(item.NativeBalance, symbol, precisionOf(item.Precision), code));
 
             if (item.BaseAvailable === true) {
                 lines.push(label('VAS_239_In', 'In') + ' ' + baseCode() + ': ' +
-                    fullAmountText(item.BaseBalance, baseSymbol(), basePrecision()));
+                    fullAmountText(item.BaseBalance, baseSymbol(), basePrecision(), baseCode()));
             }
             else {
                 lines.push(label('VAS_239_RateUnavailable', 'Rate unavailable'));
@@ -508,7 +508,7 @@
                 ? amountText(_totalBase, baseSymbol(), basePrecision(), baseCode())
                 : NIL;
             var full = _totalAvailable
-                ? fullAmountText(_totalBase, baseSymbol(), basePrecision())
+                ? fullAmountText(_totalBase, baseSymbol(), basePrecision(), baseCode())
                 : label('VAS_239_TotalUnavailable',
                     'Total unavailable - some exchange rates are missing');
 
@@ -645,10 +645,21 @@
            no tenant currency is assumed anywhere.
 
            There is no explicit "+": these are balances, not movements, so a positive one
-           needs no sign to be read correctly. */
+           needs no sign to be read correctly.
+
+           Composed by the shared browser-culture formatter with the given ISO code and
+           symbol; the hand composition below is the fallback when it is not loaded. */
         function amountText(value, symbol, precision, isoCode) {
             var v = Number(value) || 0;
             var magnitude;
+
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(v, isoCode || '', precision,
+                        { compact: true, symbol: symbol || '', minusSign: '−' });
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
 
             try {
                 if (VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
@@ -664,9 +675,17 @@
 
         /* Full, non-compact amount for the tooltip: the exact figure behind the compact
            cell. Grouping and the decimal separator come from the browser locale, the
-           decimals from the COLUMN currency's precision. */
-        function fullAmountText(value, symbol, precision) {
+           decimals from the COLUMN currency's precision. The shared formatter places the
+           minus and the currency sign the way the browser culture does, like the cell. */
+        function fullAmountText(value, symbol, precision, isoCode) {
             var v = Number(value) || 0;
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(v, isoCode || '', precision,
+                        { symbol: symbol || '', minusSign: '−' });
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
             var text = Math.abs(v).toLocaleString(window.navigator.language,
                 { minimumFractionDigits: precision, maximumFractionDigits: precision });
 

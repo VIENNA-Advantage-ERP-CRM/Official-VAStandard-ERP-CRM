@@ -53,24 +53,65 @@
             return isVendorReturn() ? lbl(returnKey, returnText) : lbl(receiptKey, receiptText);
         }
 
+        /* ---------- amounts in the browser culture ----------
+           VAS.formatAmountByBrowser places separators, the minus and the currency sign the way
+           the browser culture does ("-$1,234.50" en-US, "-1.234,50 €" de-DE). It needs the ISO
+           code; callers mostly pass only a symbol, so symbol -> ISO pairs are remembered from
+           every response that carries both (invoice, accounting, payment, allocation).
+           A symbol seen with two different ISO codes is not resolved and keeps the old format. */
+        var symIso = {};
+        function rememberCur(sym, iso) {
+            if (!sym || !iso || !/^[A-Za-z]{3}$/.test(iso)) return;
+            iso = iso.toUpperCase();
+            if (symIso.hasOwnProperty(sym) && symIso[sym] !== iso) { symIso[sym] = ""; return; }
+            symIso[sym] = iso;
+        }
+        function isoFor(cur, iso) {
+            if (iso && /^[A-Za-z]{3}$/.test(iso)) return iso.toUpperCase();
+            if (cur && /^[A-Z]{3}$/.test(cur)) return cur;
+            return (cur && symIso[cur]) || "";
+        }
+        /* Signed amount with currency sign; null when the shared formatter can't be used. */
+        function cultureAmount(v, cur, p, iso) {
+            var code = isoFor(cur, iso);
+            if (!code || !(window.VAS && typeof VAS.formatAmountByBrowser === "function")) return null;
+            try { return VAS.formatAmountByBrowser(v, code, p, { symbol: cur || "" }); }
+            catch (e) { if (window.console) { console.log(e); } return null; }
+        }
+
+        /* Signed invoice-currency amount; browser culture through cultureAmount, old format as fallback. */
         function fmtAmount(value, precision) {
             var v = +value || 0;
             var sign = v < 0 ? "-" : "";
             var abs = Math.abs(v);
             var cur = (data && (data.CurSymbol || data.CurISO)) || "";
             var p = (precision >= 0) ? precision : ((data && data.StdPrecision >= 0) ? data.StdPrecision : 2);
+            var shown = cultureAmount(v, cur, p, data && data.CurISO);
+            if (shown !== null) return shown;
             var formatted = abs.toLocaleString(window.navigator.language, {
                 minimumFractionDigits: p, maximumFractionDigits: p
             });
             return sign + (cur ? cur : "") + formatted;
         }
 
-        function fmtAmountCur(value, cur, precision) {
+        /* Magnitude (no sign) with currency sign - existing contract of this helper; browser culture via cultureAmount. */
+        function fmtAmountCur(value, cur, precision, iso) {
             var v = +value || 0;
             var p = (precision >= 0) ? precision : 2;
+            var shown = cultureAmount(Math.abs(v), cur, p, iso);
+            if (shown !== null) return shown;
             return (cur ? cur : "") + Math.abs(v).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: p, maximumFractionDigits: p
             });
+        }
+
+        /* Signed amount with currency sign (minus placed by the culture). */
+        function fmtSignedCur(value, cur, precision, iso) {
+            var v = +value || 0;
+            var p = (precision >= 0) ? precision : 2;
+            var shown = cultureAmount(v, cur, p, iso);
+            if (shown !== null) return shown;
+            return (v < 0 ? "-" : "") + fmtAmountCur(v, cur, p);
         }
 
         function fmtNumber(value, precision) {
@@ -180,6 +221,7 @@
                 data: { C_Invoice_ID: recordID },
                 success: function (raw) {
                     data = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
+                    if (data) { rememberCur(data.CurSymbol, data.CurISO); }
                     linePage = 0;
                     render();
                     // New record -> always start at the top (the scroll position must not
@@ -1090,6 +1132,8 @@
             // so show that currency's symbol — not the invoice transaction currency.
             var acctCur = pj.CurSymbol || "";
             var acctPrec = (pj.StdPrecision >= 0) ? pj.StdPrecision : 2;
+            // pj currency = primary acct schema currency = data.AcctCurISO (same join on the server)
+            rememberCur(acctCur, data.AcctCurISO);
 
             // Columns in the requested order. Account/Debit/Credit always show;
             // each dimension column is dropped when NO row carries a value for it.
@@ -1222,7 +1266,7 @@
             var v = +value || 0;
             var $d = $('<div class="num ' + cls + '"></div>');
             if (v === 0) { $d.addClass("zero").text("—"); }
-            else { $d.text((v < 0 ? "-" : "") + fmtAmountCur(v, cur, prec)); }
+            else { $d.text(fmtSignedCur(v, cur, prec, data && data.AcctCurISO)); }
             return $d.attr("title", $d.text());
         }
 
@@ -1289,8 +1333,9 @@
             var isCN = meta.RecordMode === "AP_CREDIT_NOTE_ALLOCATION";
             var p = meta.StdPrecision >= 0 ? meta.StdPrecision : 2;
             var cur = meta.CurSymbol || meta.ISO_Code || "";
+            rememberCur(meta.CurSymbol, meta.ISO_Code);
 
-            $scrim = $('<div class="vas-apinv-scrim ' + (isCN ? "cn-mode" : "invoice-mode") +
+            $scrim =$('<div class="vas-apinv-scrim ' + (isCN ? "cn-mode" : "invoice-mode") +
                 '" role="dialog" aria-modal="true"></div>');
             var $modal = $('<div class="vas-apinv-modal"></div>');
             $scrim.append($modal);
@@ -1431,9 +1476,11 @@
                         // (current date, AvailableAmountInv = 0 when no rate).
                         var rSym = r.CurSymbol || cur;
                         var rPrec = (r.StdPrecision >= 0) ? r.StdPrecision : p;
-                        var $amt = $('<div class="col-d amt"></div>').text(fmtAmountCur(r.AvailableAmount, rSym, rPrec));
+                        var rIso = r.ISO_Code || r.CurrencyISO ||
+                            ((!r.C_Currency_ID || r.C_Currency_ID === meta.C_Currency_ID) ? meta.ISO_Code : "");
+                        var $amt = $('<div class="col-d amt"></div>').text(fmtAmountCur(r.AvailableAmount, rSym, rPrec, rIso));
                         if (r.C_Currency_ID && r.C_Currency_ID !== meta.C_Currency_ID) {
-                            $amt.append($('<span class="conv"></span>').text(fmtAmountCur(r.AvailableAmountInv, cur, p)));
+                            $amt.append($('<span class="conv"></span>').text(fmtAmountCur(r.AvailableAmountInv, cur, p, meta.ISO_Code)));
                         }
                         $row.append($amt);
                         $row.on("click", function () {
@@ -1788,6 +1835,7 @@
                         if (resp && resp.Success) {
                             payCtx.curId = resp.C_Currency_ID;
                             payCtx.sym = resp.CurSymbol || (opt && opt.CurSymbol) || cur;
+                            rememberCur(payCtx.sym, resp.ISO_Code || (opt && opt.ISO_Code));
                             payCtx.prec = (resp.StdPrecision >= 0) ? resp.StdPrecision : p;
                             payCtx.rate = (resp.Rate > 0) ? resp.Rate : 1;
                             payCtx.noRate = false;
@@ -1798,6 +1846,7 @@
                             // to ZERO (cannot record without a rate).
                             payCtx.curId = (resp && resp.C_Currency_ID) ? resp.C_Currency_ID : curId;
                             payCtx.sym = (resp && resp.CurSymbol) || (opt && opt.CurSymbol) || cur;
+                            rememberCur(payCtx.sym, (resp && resp.ISO_Code) || (opt && opt.ISO_Code));
                             payCtx.prec = (resp && resp.StdPrecision >= 0) ? resp.StdPrecision : (opt && opt.StdPrecision >= 0 ? opt.StdPrecision : p);
                             payCtx.rate = 0;
                             payCtx.noRate = true;

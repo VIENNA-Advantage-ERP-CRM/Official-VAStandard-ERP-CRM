@@ -225,12 +225,17 @@
 
         /* Card money: the shared compact formatter, so a seven-figure queue does not
            overrun the row and the numbering system follows the currency (lakh /
-           crore vs K / M). The symbol is composed here, never hard-coded. */
+           crore vs K / M). VAS.formatAmountByBrowser composes sign + symbol + digits
+           in the browser culture; the server symbol is never hard-coded. */
         function formatCompact(value, symbol, iso, precision) {
             var n = Number(value || 0);
             if (!isFinite(n)) { n = 0; }
             var p = Number(precision);
             if (!isFinite(p) || p < 0) { p = 2; }
+
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                return VAS.formatAmountByBrowser(n, iso, p, { compact: true, symbol: symbol || '' });
+            }
 
             var sign = n < 0 ? '-' : '';
             var magnitude = (VIS.Util && VIS.Util.formatCompactAmount)
@@ -244,11 +249,16 @@
 
         /* Modal money: exact, at the given precision - a record list is not a KPI, so
            nothing is compacted. */
-        function formatAmount(value, symbol, precision) {
+        function formatAmount(value, symbol, precision, iso) {
             var n = Number(value || 0);
             if (!isFinite(n)) { n = 0; }
             var p = Number(precision);
             if (!isFinite(p) || p < 0) { p = 2; }
+
+            /* Browser culture places sign, separators and currency sign (shared formatter). */
+            if (iso && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try { return VAS.formatAmountByBrowser(n, iso, p, { symbol: symbol || '' }); } catch (e) { if (window.console) { console.log(e); } }
+            }
 
             var sign = n < 0 ? '-' : '';
             var text = Math.abs(n).toLocaleString(window.navigator.language, {
@@ -1075,9 +1085,10 @@
                 ? (row.CurrencySymbol || row.CurrencyIso || '')
                 : data.BaseCurrencySymbol;
             var precision = data.HasCurrency ? row.CurrencyPrecision : data.BaseCurrencyPrecision;
+            var iso = data.HasCurrency ? row.CurrencyIso : data.BaseCurrencyIso;
 
             var documentAmount = data.HasValue
-                ? formatAmount(row.DocumentValue, symbol, precision)
+                ? formatAmount(row.DocumentValue, symbol, precision, iso)
                 : '—';
 
             /* Cells are emitted in exactly the order columnsFor() names them, and each

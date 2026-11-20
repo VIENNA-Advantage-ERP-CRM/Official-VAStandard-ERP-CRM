@@ -74,6 +74,8 @@ namespace VIS.Controllers
                        a.DocStatus AS DocStatusA,
                        b.DocStatus AS DocStatusB,
                        CASE WHEN dc.CurSymbol IS NOT NULL THEN dc.CurSymbol ELSE dc.ISO_Code END AS Dup_Cur_Symbol,
+                       dc.ISO_Code AS Dup_Currency_ISO,
+                       dc.StdPrecision AS Dup_Std_Precision,
                        " + dayGap + @" AS DaysApart
                 FROM C_Invoice a
                 INNER JOIN C_Invoice b ON (a.C_BPartner_ID=b.C_BPartner_ID
@@ -154,6 +156,8 @@ namespace VIS.Controllers
                        di.DocStatusB,
                        di.DaysApart,
                        di.Dup_Cur_Symbol,
+                       di.Dup_Currency_ISO,
+                       di.Dup_Std_Precision,
                        sc.Cur_Symbol
                 FROM DuplicateInvoices di
                 CROSS JOIN Schema_Currency sc
@@ -190,6 +194,9 @@ namespace VIS.Controllers
                         /* Symbol of the invoice's own currency (the set shares one currency); the
                            Review dialog shows set amounts in this currency, not the base currency. */
                         curSymbol = Util.GetValueOfString(dr["Dup_Cur_Symbol"]),
+                        /* ISO code + precision of that currency for the browser-culture amount format. */
+                        currencyIso = Util.GetValueOfString(dr["Dup_Currency_ISO"]),
+                        stdPrecision = Util.GetValueOfInt(dr["Dup_Std_Precision"]),
                         orgName = Util.GetValueOfString(dr["OrgName"]),
                         dateA = dr["DateA"] != DBNull.Value ? Convert.ToDateTime(dr["DateA"]).ToString("MMM dd, yyyy") : "",
                         dateB = dr["DateB"] != DBNull.Value ? Convert.ToDateTime(dr["DateB"]).ToString("MMM dd, yyyy") : "",

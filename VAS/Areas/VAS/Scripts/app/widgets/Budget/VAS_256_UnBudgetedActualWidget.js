@@ -1284,10 +1284,20 @@
            the currency has no symbol configured (which is what the server's own
            COALESCE(CurSymbol, ISO_Code) already resolved). A true minus sign, not a
            hyphen. The ISO code drives the scale, so no lakh/crore or million step is ever
-           assumed. */
+           assumed. Composed by the shared browser-culture formatter (it places the minus
+           and the symbol); the hand composition below is the fallback when it is not
+           loaded. */
         function compactAmount(value) {
             var v = Number(value) || 0;
             var magnitude;
+
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(v, isoCode(), precision(),
+                        { compact: true, symbol: symbol(), minusSign: '−' });
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
 
             try {
                 if (VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {

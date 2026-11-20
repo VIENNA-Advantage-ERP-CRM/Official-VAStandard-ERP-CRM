@@ -90,6 +90,7 @@
         var totalAmount = 0;
         var dialogPrecision = 2;
         var dialogCurrencyLabel = '';
+        var dialogCurrencyISO = '';
         var eventNamespace = '';
 
         /* Adaptive paging: page size is derived from the visible dialog body
@@ -160,24 +161,34 @@
             return iso.toUpperCase() === 'IQD' ? 'ID' : iso;
         }
 
-        function formatAmountWithCurrency(value, precision, currencyLabel) {
+        /* Full amount (dialog rows + their hover): browser culture places sign and currency via VAS.formatAmountByBrowser. */
+        function formatAmountWithCurrency(value, precision, currencyLabel, currencyISO) {
+            if (currencyISO && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(Number(value) || 0, currencyISO, getPrecision(precision), { symbol: currencyLabel });
+                } catch (e) { if (window.console) { console.log(e); } }
+            }
+
             var amount = formatAmount(value, precision);
             return currencyLabel ? currencyLabel + amount : amount;
         }
 
         /*
-         * KPI hero value — compact, locale-aware magnitude via
-         * VIS.Util.formatCompactAmount (K/L/Cr or M/B tiers by base currency).
-         * The formatter returns a non-negative magnitude, so we compose the
-         * final string ourselves: sign, then currency, then magnitude — a
-         * negative renders as e.g. -$200.56 (leading minus, before the symbol).
+         * KPI hero value — compact amount (K/L/Cr or M/B tiers by base currency)
+         * composed by VAS.formatAmountByBrowser: the browser culture places the
+         * minus and the currency sign; falls back to sign + currency + magnitude.
          */
         function renderCurrencyAmount($target, value, currencySymbol, currencyISO, precision) {
             var numericValue = Number(value) || 0;
-            var sign = numericValue < 0 ? '-' : '';
             var currency = getCurrencyLabel(currencySymbol, currencyISO);
-            var magnitude = VIS.Util.formatCompactAmount(numericValue, currencyISO, getPrecision(precision));
 
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                $target.text(VAS.formatAmountByBrowser(numericValue, currencyISO, getPrecision(precision), { compact: true, symbol: currency }));
+                return;
+            }
+
+            var sign = numericValue < 0 ? '-' : '';
+            var magnitude = VIS.Util.formatCompactAmount(numericValue, currencyISO, getPrecision(precision));
             $target.text(sign + currency + magnitude);
         }
 
@@ -247,7 +258,8 @@
                 var amountWithCurrency = formatAmountWithCurrency(
                     row.amount,
                     row.stdPrecision,
-                    dialogCurrencyLabel
+                    dialogCurrencyLabel,
+                    dialogCurrencyISO
                 );
 
                 $dialogTbody.append(
@@ -664,6 +676,7 @@
             var deltaRaw = Number(data.deltaPercent || 0);
             var receiptCount = data.receiptCount || data.recordCount || 0;
             dialogCurrencyLabel = getCurrencyLabel(data.currencySymbol, data.currencyISO);
+            dialogCurrencyISO = data.currencyISO || '';
 
             if (!data.deltaPercent && avgDailyAmount > 0) {
                 deltaRaw = Math.round(((mainMetric - avgDailyAmount) / avgDailyAmount) * 100);

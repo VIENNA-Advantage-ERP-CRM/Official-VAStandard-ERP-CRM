@@ -81,6 +81,7 @@
         var totalAmount = 0;
         var dialogPrecision = 2;
         var dialogCurrencyLabel = '';
+        var dialogCurrencyISO = '';
         var rowsLoading = false;
         var eventNamespace = '';
 
@@ -114,18 +115,21 @@
         }
 
         /*
-         * KPI hero value — compact, locale-aware magnitude via
-         * VIS.Util.formatCompactAmount (K/L/Cr or M/B tiers by base currency).
-         * The formatter returns a non-negative magnitude, so we compose the
-         * final string ourselves: sign, then currency, then magnitude — a
-         * negative renders as e.g. -$200.56 (leading minus, before the symbol).
+         * KPI hero value — compact amount (K/L/Cr or M/B tiers by base currency)
+         * composed by VAS.formatAmountByBrowser: the browser culture places the
+         * minus and the currency sign; falls back to sign + currency + magnitude.
          */
         function renderCurrencyAmount($target, value, currencySymbol, currencyISO, precision) {
             var numericValue = Number(value) || 0;
-            var sign = numericValue < 0 ? '-' : '';
             var currency = getCurrencyLabel(currencySymbol, currencyISO);
-            var magnitude = VIS.Util.formatCompactAmount(numericValue, currencyISO, getPrecision(precision));
 
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                $target.text(VAS.formatAmountByBrowser(numericValue, currencyISO, getPrecision(precision), { compact: true, symbol: currency }));
+                return;
+            }
+
+            var sign = numericValue < 0 ? '-' : '';
+            var magnitude = VIS.Util.formatCompactAmount(numericValue, currencyISO, getPrecision(precision));
             $target.text(sign + currency + magnitude);
         }
 
@@ -164,7 +168,14 @@
             });
         }
 
-        function formatDialogAmountWithCurrency(value, precision, currencyLabel) {
+        /* Full amount (dialog rows + their hover): browser culture places sign and currency via VAS.formatAmountByBrowser. */
+        function formatDialogAmountWithCurrency(value, precision, currencyLabel, currencyISO) {
+            if (currencyISO && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(safeNumber(value), currencyISO, getPrecision(precision), { symbol: currencyLabel });
+                } catch (e) { if (window.console) { console.log(e); } }
+            }
+
             var amount = formatDialogAmount(value, precision);
             return currencyLabel ? currencyLabel + amount : amount;
         }
@@ -216,7 +227,7 @@
                 var charge = row.chargeName || '-';
                 var cashBook = row.cashBookName || '-';
                 var description = row.description || '-';
-                var amountWithCurrency = formatDialogAmountWithCurrency(row.amount, row.stdPrecision, dialogCurrencyLabel);
+                var amountWithCurrency = formatDialogAmountWithCurrency(row.amount, row.stdPrecision, dialogCurrencyLabel, dialogCurrencyISO);
 
                 $dialogTbody.append(
                     '<tr>' +
@@ -581,6 +592,7 @@
             var deltaPercent = safeNumber(data.deltaPercent);
             var disbursementCount = safeNumber(data.disbursementCount);
             dialogCurrencyLabel = getCurrencyLabel(data.currencySymbol, data.currencyISO);
+            dialogCurrencyISO = data.currencyISO || '';
             var footerText = lbl('VAS_048_VsSevenDayAvg', 'vs 7-day avg') + ' · ' + disbursementCount.toLocaleString(window.navigator.language) + ' ' + lbl('VAS_048_Disbursements', 'disbursements');
 
             $root.find('#VAS_048_today-cash-out-state-' + widgetId).removeClass('is-visible').text('');

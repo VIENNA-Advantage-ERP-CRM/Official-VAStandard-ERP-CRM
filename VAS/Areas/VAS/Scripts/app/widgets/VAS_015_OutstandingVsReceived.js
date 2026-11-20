@@ -147,7 +147,22 @@
 
         /* Currency amount with explicit leading sign (before the symbol):
            "+$63K" / "-$13K".  value < 0 → "-"; value >= 0 → "+". */
+        /* Shared browser-culture formatter: the scale follows the currency (lakh / crore
+           only for Indian-numbering currencies, K / M / B otherwise) and the browser culture
+           places the minus and the currency sign. The local helpers are the fallback. */
+        function sharedAmount(value, compact) {
+            if (!(window.VAS && typeof VAS.formatAmountByBrowser === 'function')) { return null; }
+            try {
+                return VAS.formatAmountByBrowser(Number(value || 0), (series && series.CurrencyIso) || '',
+                    series ? Number(series.StdPrecision) : getStdPrecision(),
+                    { compact: compact, symbol: (series && series.CurrencySymbol) || '' });
+            }
+            catch (e) { if (window.console) { console.log(e); } return null; }
+        }
+
         function formatAmount(value) {
+            var shared = sharedAmount(value, true);
+            if (shared !== null) { return shared; }
             var sym = (series && series.CurrencySymbol) || "";
             var prec = series ? Number(series.StdPrecision) : getStdPrecision();
             var sign = Number(value || 0) < 0 ? "-" : "";
@@ -157,6 +172,8 @@
         /* Exact currency amount with explicit leading sign (before the symbol):
            "+$63,000.00" / "-$13,000.00".  value < 0 → "-"; value >= 0 → "+". */
         function formatExactAmount(value) {
+            var shared = sharedAmount(value, false);
+            if (shared !== null) { return shared; }
             var sym = (series && series.CurrencySymbol) || "";
             var prec = series ? Number(series.StdPrecision) : getStdPrecision();
             var v = Number(value || 0);

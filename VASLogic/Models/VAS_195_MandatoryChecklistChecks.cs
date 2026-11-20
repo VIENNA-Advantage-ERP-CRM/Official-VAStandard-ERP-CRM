@@ -1159,6 +1159,8 @@ namespace VASLogic.Models
                   taking a column of its own. Symbol first, code as the fallback for a
                   currency that defines none. */
                .Append(",").Append(d.HasCurrency ? "COALESCE(cur.CurSymbol," + CodeAsText("cur.ISO_Code") + ",N'')" : "N''").Append(" AS Currency_Symbol")
+               /* The ISO code as well - the client formats the amount in the browser culture with it. */
+               .Append(",").Append(d.HasCurrency ? "COALESCE(" + CodeAsText("cur.ISO_Code") + ",N'')" : "N''").Append(" AS Currency_Iso")
                .Append(",").Append(d.HasAmount ? "COALESCE(" + a + "." + d.AmountColumn + ",0)" : "0").Append(" AS Doc_Amount")
                .Append(" FROM ").Append(d.TableName).Append(" ").Append(a)
                .Append(" LEFT OUTER JOIN AD_Org org ON (org.AD_Org_ID=").Append(a).Append(".AD_Org_ID)");
@@ -1260,6 +1262,7 @@ namespace VASLogic.Models
             {
                 ColumnDef amount = Col("Doc_Amount", "VAS_195_Amount", "Amount", COLTYPE_DOCAMOUNT, 1.1m);
                 amount.SymbolKey = "Currency_Symbol";
+                amount.IsoKey = "Currency_Iso";
                 columns.Add(amount);
             }
 

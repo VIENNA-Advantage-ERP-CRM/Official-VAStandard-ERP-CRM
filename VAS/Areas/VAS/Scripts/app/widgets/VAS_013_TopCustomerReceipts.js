@@ -121,18 +121,16 @@
             });
         }
 
-        /* Symbol *before* the amount, explicit sign before the symbol (none for
-           zero/positive, '-' for negative). The compact magnitude comes from the
-           shared VIS.Util.formatCompactAmount (Indian vs international numbering
-           chosen by the base-currency ISO, kept to the currency precision) — the
-           same sign + symbol + magnitude composition as OverdueWidget. The symbol
-           is never gated on the value, so it renders even when the amount is 0. */
+        /* Compact amount with the currency sign in a styled span, same as
+           OverdueWidget; the browser culture places the sign and the minus
+           (VAS.formatAmountByBrowser, 20-Nov-2026). */
         function formatAmount(value, symbol, isoCode, precision) {
             value = Number(value || 0);
-            var sign = value < 0 ? '-' : '';
-            var compact = VIS.Util.formatCompactAmount(value, isoCode, precision);
-            var sym = symbol ? '<span class="vas-tcr-cur">' + escapeHtml(symbol) + '</span>' : '';
-            return sign + sym + compact;
+            return VAS.formatAmountByBrowser(value, isoCode, precision, {
+                compact: true,
+                symbol: symbol,
+                symbolWrap: function (s) { return '<span class="vas-tcr-cur">' + escapeHtml(s) + '</span>'; }
+            });
         }
 
         function renderList(data, rows) {
@@ -180,6 +178,11 @@
                 var amtHtml = formatAmount(amount, symbol, isoCode, stdPrecision);
                 var exactSign = amount < 0 ? '-' : '';
                 var exactTitle = exactSign + (symbol ? symbol + ' ' : '') + formatExactAmount(Math.abs(amount), stdPrecision);
+                /* Full value in the browser culture (VAS.formatAmountByBrowser). */
+                if (isoCode && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                    try { exactTitle = VAS.formatAmountByBrowser(amount, isoCode, stdPrecision, { symbol: symbol }); }
+                    catch (e) { if (window.console) { console.log(e); } }
+                }
 
                 /* Proportion of the top customer; keep a small floor so tiny
                    non-zero values still render a visible sliver. */

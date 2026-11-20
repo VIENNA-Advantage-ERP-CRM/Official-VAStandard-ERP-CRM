@@ -254,17 +254,16 @@
             });
         }
 
-        /* Place the currency symbol *before* the amount, sign before symbol
-           (e.g. ₹1.2M or -₹1.2M). Negatives show '-'; positives and zero show no sign.
-           The compact magnitude (Indian vs international numbering by base currency,
-           kept to the currency precision) is delegated to VIS.Util.formatCompactAmount
-           (always non-negative). The symbol is shown even at zero. Matches OverdueWidget. */
+        /* Compact amount with the currency sign in a styled span; the browser
+           culture places the sign and the minus (VAS.formatAmountByBrowser,
+           20-Nov-2026). Matches OverdueWidget. */
         function formatMetric(value, symbol, isoCode, precision) {
             value = Number(value || 0);
-            var sign = value < 0 ? '-' : '';
-            var compact = VIS.Util.formatCompactAmount(value, isoCode, precision);
-            var sym = symbol ? '<span class="vas-tarm-cur">' + escapeHtml(symbol) + '</span>' : '';
-            return sign + sym + compact;
+            return VAS.formatAmountByBrowser(value, isoCode, precision, {
+                compact: true,
+                symbol: symbol,
+                symbolWrap: function (s) { return '<span class="vas-tarm-cur">' + escapeHtml(s) + '</span>'; }
+            });
         }
 
         function renderMetric(data) {
@@ -276,7 +275,7 @@
             lastTotal = Number(total);
             lastSymbol = sym;
             /* isoCode drives Indian vs international compact numbering; precision falls
-               back to the ctx std precision inside VIS.Util.formatCompactAmount when
+               back to the ctx std precision inside VAS.formatAmountByBrowser when
                the backend omits it. */
             lastIsoCode = (data && data.isoCode) || "";
             lastPrecision = (data && typeof data.stdPrecision !== "undefined" && data.stdPrecision !== null)

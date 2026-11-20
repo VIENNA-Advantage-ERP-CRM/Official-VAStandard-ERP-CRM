@@ -393,12 +393,13 @@
 
             var negative = _balance < 0;
 
-            /* The minus leads the symbol and both sit at stat size with the digits. The red
+            /* The minus and symbol sit at stat size with the digits; the browser culture
+               places them (compactMoney). The red
                of .vas-230-neg says the same thing a second time, so the reading never rests
                on the sign alone or on colour alone. */
             $value.attr('class', 'vas-230-value' + (negative ? ' vas-230-neg' : ''))
                 .attr('title', valueTooltip())
-                .text((negative ? '−' : '') + _currencySymbol + compactAmount(_balance));
+                .text(compactMoney(_balance));
         }
 
         /* The exact figure behind the compact one, plus which account it belongs to and
@@ -576,8 +577,8 @@
             return (isNaN(p) || p < 0 || p > 6) ? 2 : p;
         }
 
-        /* Compact magnitude only - the sign and symbol are composed on separately so each
-           can carry its own type treatment. The ACCOUNT's ISO code drives the scale, which
+        /* Compact magnitude only - used by compactMoney's fallback when the shared formatter
+           is missing. The ACCOUNT's ISO code drives the scale, which
            is what decides whether it steps in lakh/crore or million/billion, so no compact
            unit is written into this file. */
         function compactAmount(value) {
@@ -595,11 +596,34 @@
             return magnitude;
         }
 
+        /* Signed compact amount with the account's currency sign, composed by the shared
+           browser-culture formatter (sign position and separators from the browser);
+           falls back to minus + symbol + compactAmount when it is not loaded. */
+        function compactMoney(value) {
+            var v = Number(value) || 0;
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(v, _currencyCode, _precision,
+                        { compact: true, symbol: _currencySymbol, minusSign: '−' });
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
+            return (v < 0 ? '−' : '') + _currencySymbol + compactAmount(v);
+        }
+
         /* Full, non-compact amount for the tooltip: the exact figure behind the compact
            value. Grouping and the decimal separator come from the browser locale, the
            decimals from the account currency's precision. */
         function fullAmount(value) {
             var v = Number(value) || 0;
+            /* Browser-culture formatter places minus, separators and currency sign; hand-composed fallback below. */
+            if (_currencyCode && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(v, _currencyCode, _precision,
+                        { symbol: _currencySymbol, minusSign: '−' });
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
             var text = Math.abs(v).toLocaleString(window.navigator.language,
                 { minimumFractionDigits: _precision, maximumFractionDigits: _precision });
 

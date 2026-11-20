@@ -187,15 +187,13 @@
             $container.append(html);
         }
 
-        /* Compose the KPI metric via the shared CurrencyFormat util
-           (VIS.Util.formatCompactAmount): sign, then the currency symbol, then the
-           compact magnitude (Indian vs international per the base-currency ISO).
+        /* Compose the KPI metric: compact amount (Indian vs international per the
+           base-currency ISO) with the currency symbol; the browser culture places the
+           sign and the minus (VAS.formatAmountByBrowser, 20-Nov-2026).
            Mirrors VAS_018_OverduePayablesWidget.formatMetric. */
         function formatMetric(value, symbol, isoCode, precision) {
             value = Number(value || 0);
-            var sign = value < 0 ? '-' : '';
-            var absStr = VIS.Util.formatCompactAmount(value, isoCode, precision);
-            return sign + (symbol || '') + absStr;
+            return VAS.formatAmountByBrowser(value, isoCode, precision, { compact: true, symbol: symbol });
         }
 
         function openCategoryDialog() {
@@ -314,17 +312,17 @@
                 + formatQty(catCount) + ' ' + msg('VAS_025_CategoriesLower', 'categories') + '.';
             if (topName) {
                 summaryText += ' ' + msg('VAS_025_TopSpenderIs', 'The top spender is') + ' ' + topName
-                    + ' ' + msg('VAS_025_AtLower', 'at') + ' ' + sym + VIS.Util.formatCompactAmount(topAmount, iso, precision) + '.';
+                    + ' ' + msg('VAS_025_AtLower', 'at') + ' ' + VAS.formatAmountByBrowser(topAmount, iso, precision, { compact: true, symbol: sym }) + '.';
             }
 
             var pageNo = data.PageNo || drillPage || 1;
             var pageCount = data.TotalPages || 1;
 
-            var totalTip = sym + ' ' + formatFull(total, precision);
+            var totalTip = formatFullMoney(total, sym, iso, precision);
             var html = '<div class="vas-tpwidg-drill">'
                 + '<div class="vas-tpwidg-drill-card">'
                 +   '<span class="vas-tpwidg-drill-card-label">' + tpEsc(msg('VAS_025_TotalPurchasesMTD', 'Total Purchases')) + '</span>'
-                +   '<strong class="vas-tpwidg-drill-card-value" title="' + tpEsc(totalTip) + '">' + tpEsc(sym + VIS.Util.formatCompactAmount(total, iso, precision)) + '</strong>'
+                +   '<strong class="vas-tpwidg-drill-card-value" title="' + tpEsc(totalTip) + '">' + tpEsc(VAS.formatAmountByBrowser(total, iso, precision, { compact: true, symbol: sym })) + '</strong>'
                 +   '<em class="vas-tpwidg-drill-card-trend">' + tpEsc(subtitle) + '</em>'
                 + '</div>'
                 + '<div class="vas-tpwidg-drill-copy">'
@@ -337,12 +335,12 @@
                 var width = maxAmount > 0 ? (amount / maxAmount) * 100 : 0;
                 width = Math.max(0, Math.min(100, width));
                 var barWidth = width > 0 ? Math.max(2, width) : 0;
-                var rowTip = sym + ' ' + formatFull(amount, precision);
+                var rowTip = formatFullMoney(amount, sym, iso, precision);
 
                 html += '<div class="vas-tpwidg-drill-row">'
                     + '<div class="vas-tpwidg-drill-row-head">'
                     +   '<span class="vas-tpwidg-drill-row-name">' + tpEsc(category.IsOther ? msg('VAS_025_OtherChargesTax', 'Other (charges & tax)') : (category.Name || '-')) + '</span>'
-                    +   '<span class="vas-tpwidg-drill-row-val" title="' + tpEsc(rowTip) + '">' + tpEsc(sym + VIS.Util.formatCompactAmount(amount, iso, precision)) + '</span>'
+                    +   '<span class="vas-tpwidg-drill-row-val" title="' + tpEsc(rowTip) + '">' + tpEsc(VAS.formatAmountByBrowser(amount, iso, precision, { compact: true, symbol: sym })) + '</span>'
                     + '</div>'
                     + '<div class="vas-tpwidg-drill-track">'
                     +   '<div class="vas-tpwidg-drill-fill" style="width:' + barWidth.toFixed(1) + '%"></div>'
@@ -414,6 +412,15 @@
                 minimumFractionDigits: prec,
                 maximumFractionDigits: prec
             });
+        }
+
+        /* Full amount with the currency sign for tooltips; the browser culture places the sign
+           and the minus (VAS.formatAmountByBrowser), old "symbol + space + number" as fallback. */
+        function formatFullMoney(value, sym, isoCode, precision) {
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try { return VAS.formatAmountByBrowser(value, isoCode, precision, { symbol: sym }); } catch (e) { if (window.console) { console.log(e); } }
+            }
+            return sym + ' ' + formatFull(value, precision);
         }
 
         function formatQty(value) {

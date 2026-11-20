@@ -151,9 +151,18 @@
         }
 
         /* Amount markup: invoice-currency symbol before the locale-formatted number. */
-        function formatAmount(value, symbol) {
+        function formatAmount(value, symbol, isoCode) {
             var p = VIS.Env.getCtx().getStdPrecision();
             var v = Number(value) || 0;
+            /* Browser culture places sign, minus and the styled symbol span (VAS.formatAmountByBrowser). */
+            if (isoCode && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(v, isoCode, p, {
+                        symbol: symbol,
+                        symbolWrap: function (s) { return '<span class="vas-sics-cur">' + escapeHtml(s) + '</span>'; }
+                    });
+                } catch (e) { if (window.console) { console.log(e); } }
+            }
             var sign = v < 0 ? '-' : '';
             var num = Math.abs(v).toLocaleString(window.navigator.language, { minimumFractionDigits: p, maximumFractionDigits: p });
             var sym = symbol ? '<span class="vas-sics-cur">' + escapeHtml(symbol) + '</span>' : '';
@@ -757,7 +766,7 @@
                     ' · ' + escapeHtml(statusLabel(r.docStatus));
                 /* Right column: amount over invoice date, right-aligned — the money is what the eye
                    scans down, so it gets its own edge instead of trailing the meta line. */
-                var side = '<div class="vas-sics-amt">' + formatAmount(r.grandTotal, r.curSymbol) + '</div>' +
+                var side = '<div class="vas-sics-amt">' + formatAmount(r.grandTotal, r.curSymbol, r.currencyIso) + '</div>' +
                     (r.dateInvoiced ? '<div class="vas-sics-date">' + escapeHtml(r.dateInvoiced) + '</div>' : '');
                 html += '<div class="vas-sics-line" data-index="' + i + '" role="option">' +
                     '<div class="vas-sics-avatar" style="background:' + color + ';">' + escapeHtml(initials(r.customerName)) + '</div>' +

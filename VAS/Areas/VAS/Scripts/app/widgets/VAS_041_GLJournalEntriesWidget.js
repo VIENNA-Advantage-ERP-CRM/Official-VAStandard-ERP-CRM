@@ -236,11 +236,18 @@
        "$-220.00": the symbol belongs to the number, the minus to the value. The
        amount is formatted from its absolute value so toLocaleString can't
        reintroduce its own minus after the symbol. */
-    function formatMoney(symbol, amount, precision) {
+    function formatMoney(symbol, amount, precision, isoCode) {
         var numericAmount = Number(amount || 0);
 
         if (isNaN(numericAmount)) {
             numericAmount = 0;
+        }
+
+        /* With the row's ISO code the browser culture places sign, minus and separators. */
+        if (isoCode && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+            try {
+                return VAS.formatAmountByBrowser(numericAmount, isoCode, precision, { symbol: symbol });
+            } catch (e) { if (window.console) { console.log(e); } }
         }
 
         return (
@@ -1817,18 +1824,25 @@
                             ? Number(row.StdPrecision)
                             : precision;
 
+                    var rowIso =
+                        row.ISOCode ||
+                        data.ISOCode ||
+                        "";
+
                     var debit =
                         formatMoney(
                             rowSymbol,
                             row.TotalDebit,
-                            rowPrecision
+                            rowPrecision,
+                            rowIso
                         );
 
                     var credit =
                         formatMoney(
                             rowSymbol,
                             row.TotalCredit,
-                            rowPrecision
+                            rowPrecision,
+                            rowIso
                         );
 
                     html +=
@@ -2115,6 +2129,11 @@
                             ? Number(row.StdPrecision)
                             : fallbackPrecision;
 
+                    var rowIso =
+                        row.ISOCode ||
+                        data.ISOCode ||
+                        "";
+
                     table +=
                         "<tr>" +
                         "<td>" + esc(row.DocumentNo) + "</td>" +
@@ -2122,8 +2141,8 @@
                         "<td>" + esc(row.DateAcct) + "</td>" +
                         "<td>" + esc(row.Description) + "</td>" +
                         "<td>" + esc(row.StatusName || row.DocStatus) + "</td>" +
-                        "<td>" + esc(formatMoney(rowSymbol, row.TotalDebit, rowPrecision)) + "</td>" +
-                        "<td>" + esc(formatMoney(rowSymbol, row.TotalCredit, rowPrecision)) + "</td>" +
+                        "<td>" + esc(formatMoney(rowSymbol, row.TotalDebit, rowPrecision, rowIso)) + "</td>" +
+                        "<td>" + esc(formatMoney(rowSymbol, row.TotalCredit, rowPrecision, rowIso)) + "</td>" +
                         "</tr>";
                 }
 

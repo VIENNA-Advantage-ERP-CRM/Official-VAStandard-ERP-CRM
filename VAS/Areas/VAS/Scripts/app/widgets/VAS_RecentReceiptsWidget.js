@@ -306,9 +306,23 @@
               negative (refund / void)   → "-<sym><abs>"  red
            Sign is ASCII '+' or '-', driven from the raw signed value.
            The CSS class is returned alongside so the caller can apply it. */
-        function signedAmountHtml(value, stdPrecision, sym) {
+        function signedAmountHtml(value, stdPrecision, sym, isoCode) {
             var num = Number(value || 0);
             var isNeg = num < 0;
+            /* With an ISO code the browser culture places sign, minus and the styled symbol span (VAS.formatAmountByBrowser). */
+            if (isoCode && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return {
+                        html: VAS.formatAmountByBrowser(num, isoCode, stdPrecision, {
+                            symbol: sym,
+                            minusSign: '<span class="vas-rr-amt-sign">-</span>',
+                            symbolWrap: function (s) { return '<span class="vas-rr-cur-inline">' + escapeHtml(s) + '</span>'; }
+                        }),
+                        cls: isNeg ? 'vas-rr-td-amount-neg' : 'vas-rr-td-amount-pos',
+                        title: VAS.formatAmountByBrowser(num, isoCode, stdPrecision, { symbol: sym })
+                    };
+                } catch (e) { if (window.console) { console.log(e); } }
+            }
             var absText = formatExactAmount(Math.abs(num), stdPrecision);
             var symHtml = sym ? '<span class="vas-rr-cur-inline">' + escapeHtml(sym) + '</span>' : '';
             var sign = isNeg ? '-' : '';
@@ -418,7 +432,7 @@
                 var stdPrecision = Number(pick(row, "StdPrecision", "stdPrecision") || 2);
                 var amount = Number(pick(row, "PayAmount", "payAmount") || 0);
                 var sym = pick(row, "CurSymbol", "curSymbol") || pick(row, "CurrencyIso", "currencyIso") || "";
-                var amt = signedAmountHtml(amount, stdPrecision, sym);
+                var amt = signedAmountHtml(amount, stdPrecision, sym, pick(row, "CurrencyIso", "currencyIso") || "");
 
                 var $tr = $(
                     '<tr class="vas-rr-tr" data-payment-id="' + paymentId + '" tabindex="0">' +
@@ -676,6 +690,19 @@
             var amountHtml = '<span class="' + amountValueClass + '">' +
                 '<span class="vas-rr-amt-sign">' + payAmountSign + '</span>' +
                 symHtml + escapeHtml(payAmountText) + '</span>';
+            /* Receipt amount in the browser culture (VAS.formatAmountByBrowser); same markup classes. */
+            var payAmountFormatted = null;
+            if (iso && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    amountHtml = '<span class="' + amountValueClass + '">' +
+                        VAS.formatAmountByBrowser(payAmountNum, iso, stdPrecision, {
+                            symbol: sym,
+                            minusSign: '<span class="vas-rr-amt-sign">-</span>',
+                            symbolWrap: function (s) { return '<span class="vas-rr-cur-inline">' + escapeHtml(s) + '</span>'; }
+                        }) + '</span>';
+                    payAmountFormatted = VAS.formatAmountByBrowser(payAmountNum, iso, stdPrecision, { symbol: sym });
+                } catch (e) { payAmountFormatted = null; if (window.console) { console.log(e); } }
+            }
 
             var gridHtml =
                 fieldHtml(lbl("VAS_ReceiptDate", "Receipt date"), escapeHtml(dateText)) +
@@ -802,7 +829,7 @@
                     '</tr>';
             }
 
-            var totalText = payAmountSign + (sym ? sym : '') + payAmountText;
+            var totalText = payAmountFormatted || (payAmountSign + (sym ? sym : '') + payAmountText);
             var invCountLabel = lines.length === 1
                 ? lbl("VAS_Invoice", "allocation")
                 : lbl("VAS_Invoices", "allocations");

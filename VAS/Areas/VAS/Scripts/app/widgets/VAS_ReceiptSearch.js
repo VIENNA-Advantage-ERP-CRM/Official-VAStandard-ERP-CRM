@@ -150,7 +150,7 @@
         }
 
         /* Amount markup: payment-currency symbol before the locale-formatted number. */
-        function formatAmount(value, symbol) {
+        function formatAmount(value, symbol, isoCode) {
             var p = 2;
             try {
                 if (VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
@@ -158,6 +158,15 @@
                 }
             } catch (e) { p = 2; }
             var v = Number(value) || 0;
+            /* Browser culture places sign, minus and the styled symbol span (VAS.formatAmountByBrowser). */
+            if (isoCode && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(v, isoCode, p, {
+                        symbol: symbol,
+                        symbolWrap: function (s) { return '<span class="vas-rsw-cur">' + escapeHtml(s) + '</span>'; }
+                    });
+                } catch (e2) { if (window.console) { console.log(e2); } }
+            }
             var sign = v < 0 ? '-' : '';
             var num = Math.abs(v).toLocaleString(window.navigator.language, { minimumFractionDigits: p, maximumFractionDigits: p });
             var sym = symbol ? '<span class="vas-rsw-cur">' + escapeHtml(symbol) + '</span>' : '';
@@ -794,7 +803,7 @@
                     '<div class="vas-rsw-rowmeta">' + meta + '</div>' +
                     '</div>' +
                     '<div class="vas-rsw-metacol">' +
-                    '<div class="vas-rsw-amount">' + formatAmount(r.payAmount, r.curSymbol) + '</div>' +
+                    '<div class="vas-rsw-amount">' + formatAmount(r.payAmount, r.curSymbol, r.currencyIso) + '</div>' +
                     '<div class="vas-rsw-date">' + escapeHtml(r.dateAcct || '') + '</div>' +
                     '</div>' +
                     '</div>';

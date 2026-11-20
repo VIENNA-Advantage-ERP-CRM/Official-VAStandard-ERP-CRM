@@ -98,6 +98,21 @@
             });
         }
 
+        /* KPI amount in the browser culture: signed value, currency ISO + precision from the response; the sign keeps the VAS-gljtc-prefix span. Null -> old composition. */
+        function formatAmountHtmlByBrowser(value, data) {
+            var iso = data.currencyISO || data.ISOCode;
+            var precision = (data.stdPrecision !== undefined && data.stdPrecision !== null) ? data.stdPrecision : data.StdPrecision;
+            if (iso && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(Number(value || 0), iso, precision, {
+                        symbol: getCurrencyText(data),
+                        symbolWrap: function (sign) { return '<span class="VAS-gljtc-prefix">' + esc(sign) + '</span>'; }
+                    });
+                } catch (e) { if (window.console) { console.log(e); } }
+            }
+            return null;
+        }
+
         function getCurrencyText(data) {
             return data.currencySymbol ||
                 data.CurSymbol ||
@@ -214,18 +229,24 @@
 
             var currencyText = getCurrencyText(data);
 
-            $kpiValue.html(
-                (
-                    currencyText
-                        ? '<span class="VAS-gljtc-prefix">' +
-                        esc(currencyText) +
-                        '</span>'
-                        : ''
-                ) +
-                '<span>' +
-                esc(amountText) +
-                '</span>'
-            );
+            var browserHtml = formatAmountHtmlByBrowser(amountValue, data);
+
+            if (browserHtml !== null) {
+                $kpiValue.html(browserHtml);
+            } else {
+                $kpiValue.html(
+                    (
+                        currencyText
+                            ? '<span class="VAS-gljtc-prefix">' +
+                            esc(currencyText) +
+                            '</span>'
+                            : ''
+                    ) +
+                    '<span>' +
+                    esc(amountText) +
+                    '</span>'
+                );
+            }
 
             $whyText.text(
                 lbl('VAS_038_SumCreditLines', 'Sum of credit lines across') +

@@ -83,18 +83,20 @@
         }
 
         /*
-         * Compact, locale-aware magnitude via VIS.Util.formatCompactAmount
-         * (K/L/Cr or M/B tiers by base currency). The formatter returns a
-         * non-negative magnitude, so we compose the final string ourselves:
-         * sign, then currency, then magnitude — a negative renders as e.g.
-         * -$200.56 (leading minus, before the symbol).
+         * Compact amount (K/L/Cr or M/B tiers by base currency) composed by
+         * VAS.formatAmountByBrowser: the browser culture places the minus and
+         * the currency sign; falls back to sign + currency + magnitude.
          */
         function formatCurrencyAmount(value, currencySymbol, currencyISO, precision) {
             var numericValue = safeNumber(value);
-            var sign = numericValue < 0 ? '-' : '';
             var currency = getCurrencyLabel(currencySymbol, currencyISO);
-            var magnitude = VIS.Util.formatCompactAmount(numericValue, currencyISO, getPrecision(precision));
 
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                return VAS.formatAmountByBrowser(numericValue, currencyISO, getPrecision(precision), { compact: true, symbol: currency });
+            }
+
+            var sign = numericValue < 0 ? '-' : '';
+            var magnitude = VIS.Util.formatCompactAmount(numericValue, currencyISO, getPrecision(precision));
             return sign + currency + magnitude;
         }
 

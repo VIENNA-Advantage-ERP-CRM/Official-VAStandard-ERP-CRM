@@ -103,15 +103,16 @@
             });
         }
 
-        /* Build amount markup with the base-currency symbol placed *before* the amount;
-           the minus sign (if any) precedes the symbol (e.g. -$1.2M). The compact
-           magnitude (Indian vs international numbering by base currency, kept to the
-           currency precision) comes from VIS.Util.formatCompactAmount. */
+        /* Build compact amount markup with the currency sign in a styled span; the
+           browser culture places the sign and the minus (VAS.formatAmountByBrowser,
+           20-Nov-2026), e.g. en-US -$1.2M, de-DE -1,2M $. */
         function formatMetric(value, symbol) {
             value = Number(value || 0);
-            var sign = value < 0 ? '-' : '';
-            var symHtml = symbol ? '<span class="vas-td-cur">' + escapeHtml(symbol) + '</span>' : '';
-            return sign + symHtml + VIS.Util.formatCompactAmount(value, currencyIso, currencyPrecision);
+            return VAS.formatAmountByBrowser(value, currencyIso, currencyPrecision, {
+                compact: true,
+                symbol: symbol,
+                symbolWrap: function (s) { return '<span class="vas-td-cur">' + escapeHtml(s) + '</span>'; }
+            });
         }
 
         /* ── Avatar initials ── */

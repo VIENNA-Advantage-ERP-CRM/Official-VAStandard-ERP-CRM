@@ -287,7 +287,7 @@
                             callbacks: {
                                 label: function (ctx) {
                                     if (ctx.raw === null) { return null; }
-                                    return ' ' + ctx.dataset.label + ': ' + sym + fmtShort(ctx.raw, data.StdPrecision);
+                                    return ' ' + ctx.dataset.label + ': ' + fmtMoney(ctx.raw, sym, data.StdPrecision);
                                 }
                             }
                         }
@@ -307,7 +307,7 @@
                                 font: { family: 'Roboto, sans-serif', size: 10 },
                                 color: '#5F7283',
                                 maxTicksLimit: 6,
-                                callback: function (v) { return sym + fmtShort(v, data.StdPrecision); }
+                                callback: function (v) { return fmtMoney(v, sym, data.StdPrecision); }
                             },
                             border: { display: false }
                         }
@@ -317,12 +317,12 @@
         }
 
         /* ---- Compact amount formatter ----
-             Delegates the compact scaling (Indian vs international, per base-currency ISO) to
-             the shared CurrencyFormat util VIS.Util.formatCompactAmount, exactly like
-             VAS_019/VAS_023. Returns the unsigned magnitude; callers prepend the symbol. */
-        function fmtShort(val, stdPrecision) {
+             Compact scaling (Indian vs international, per base-currency ISO) with the
+             currency sign; the browser culture places the sign and the minus
+             (VAS.formatAmountByBrowser, 20-Nov-2026). Returns plain text. */
+        function fmtMoney(val, sym, stdPrecision) {
             var d = $self._kpiData || {};
-            return VIS.Util.formatCompactAmount(val, d.CurIso || '', (d.StdPrecision != null ? d.StdPrecision : stdPrecision));
+            return VAS.formatAmountByBrowser(val, d.CurIso || '', (d.StdPrecision != null ? d.StdPrecision : stdPrecision), { compact: true, symbol: sym });
         }
 
         /* ---- Busy indicator ---- */

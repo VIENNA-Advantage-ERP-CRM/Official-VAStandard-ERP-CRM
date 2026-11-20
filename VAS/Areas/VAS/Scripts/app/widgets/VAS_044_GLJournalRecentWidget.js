@@ -175,12 +175,23 @@
     /* Money label with the sign OUTSIDE the currency symbol — "-$220.00", not
        "$-220.00": the symbol belongs to the number, the minus to the value. The
        amount is formatted from its absolute value so toLocaleString can't
-       reintroduce its own minus after the symbol. */
-    function formatMoney(symbol, amount, precision) {
+       reintroduce its own minus after the symbol. With the shared formatter the
+       browser culture places the minus and the currency sign ("-$220.00" en-US,
+       "-220,00 $" de-DE); the hand composition below is the fallback. */
+    function formatMoney(symbol, amount, precision, isoCode) {
         var numericAmount = Number(amount || 0);
 
         if (isNaN(numericAmount)) {
             numericAmount = 0;
+        }
+
+        // Shared formatter only with an ISO code; without one keep the symbol + number fallback.
+        if (isoCode && window.VAS && typeof VAS.formatAmountByBrowser === "function") {
+            try {
+                return VAS.formatAmountByBrowser(numericAmount, isoCode || "", precision,
+                    { symbol: symbol || "" });
+            }
+            catch (e) { if (window.console) { console.log(e); } }
         }
 
         return (
@@ -1006,6 +1017,10 @@
                     data.ISOCode ||
                     "";
 
+                var isoCode =
+                    data.ISOCode ||
+                    "";
+
                 var precision =
                     Number(
                         data.StdPrecision
@@ -1143,6 +1158,10 @@
                         entry.ISOCode ||
                         symbol;
 
+                    var rowIso =
+                        entry.ISOCode ||
+                        isoCode;
+
                     var rowPrecision =
                         (
                             entry.StdPrecision !== undefined &&
@@ -1159,7 +1178,8 @@
                             ? formatMoney(
                                 rowSymbol,
                                 entry.TotalDebit,
-                                rowPrecision
+                                rowPrecision,
+                                rowIso
                             )
                             : "—";
 
@@ -1170,7 +1190,8 @@
                             ? formatMoney(
                                 rowSymbol,
                                 entry.TotalCredit,
-                                rowPrecision
+                                rowPrecision,
+                                rowIso
                             )
                             : "—";
 

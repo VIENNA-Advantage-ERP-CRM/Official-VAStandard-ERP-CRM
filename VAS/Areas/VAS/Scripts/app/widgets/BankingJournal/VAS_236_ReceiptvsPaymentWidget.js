@@ -43,7 +43,7 @@
  *
  *                  Amounts arrive already converted into the tenant's base
  *                  (accounting-schema) currency and are formatted through the shared
- *                  VIS.Util.formatCompactAmount helper
+ *                  VAS.formatAmountByBrowser (compact) helper
  *                  (Scripts/app/util/CurrencyFormat.js).
  *
  *                  THE FIGURES ARE NOT ABSOLUTES. The helper returns a magnitude by
@@ -808,16 +808,29 @@
            opposite figure would print. Only negatives are marked; a gross running its own
            way is the ordinary case and needs no plus. */
         function money(value) {
-            var v = Number(value) || 0;
-            return (v < 0 ? '−' : '') + symbol() + compact(v);
+            return compactMoney(value, '');
         }
 
         function signedMoney(value) {
-            var v = Number(value) || 0;
             /* An explicit sign on the net - the sign IS the reading, never left to colour
-               alone. A true minus sign, not a hyphen. Composed from the magnitude rather
-               than from money(), which would print the minus twice. */
-            return (v < 0 ? '−' : '+') + symbol() + compact(v);
+               alone. A true minus sign, not a hyphen. */
+            return compactMoney(value, '+');
+        }
+
+        /* Signed compact amount with the currency sign, composed by the shared
+           browser-culture formatter (sign position and separators from the browser);
+           positiveSign marks amounts above zero. Falls back to sign + symbol + compact()
+           when the shared formatter is not loaded. */
+        function compactMoney(value, positiveSign) {
+            var v = Number(value) || 0;
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(v, iso(), precision(),
+                        { compact: true, symbol: symbol(), minusSign: '−', positiveSign: positiveSign });
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
+            return (v < 0 ? '−' : (positiveSign || '')) + symbol() + compact(v);
         }
 
         function compact(value) {
@@ -843,13 +856,26 @@
         /* Full, non-compact amount for the tooltips. The tooltip is where the exact figure
            lives, so it must not be the one place a minus goes missing. */
         function amountText(value) {
-            var v = Number(value) || 0;
-            return (v < 0 ? '−' : '') + amountMagnitude(v);
+            return fullMoney(value, '');
         }
 
         function signedAmountText(value) {
+            return fullMoney(value, '+');
+        }
+
+        /* Exact signed amount through the shared browser-culture formatter, so the minus
+           and the currency sign sit where the culture puts them - as on the compact
+           headline ("−$900.00" en-US, "−900,00 $" de-DE). Falls back to sign + magnitude. */
+        function fullMoney(value, positiveSign) {
             var v = Number(value) || 0;
-            return (v < 0 ? '−' : '+') + amountMagnitude(v);
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(v, iso(), precision(),
+                        { symbol: symbol(), minusSign: '−', positiveSign: positiveSign });
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
+            return (v < 0 ? '−' : (positiveSign || '')) + amountMagnitude(v);
         }
 
         function countSuffix(count) {

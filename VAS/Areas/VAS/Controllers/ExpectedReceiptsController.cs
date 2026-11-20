@@ -60,7 +60,9 @@ namespace VIS.Controllers
             string schemaCurrencySql = @"
                 SELECT ClientInfo.AD_Client_ID,
                        AcctSchema.C_Currency_ID AS C_Currency_ID,
-                       Currency.StdPrecision
+                       Currency.StdPrecision,
+                       Currency.ISO_Code AS Iso_Code,
+                       CASE WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol ELSE Currency.ISO_Code END AS Cur_Symbol
                 FROM AD_ClientInfo ClientInfo
                 INNER JOIN C_AcctSchema AcctSchema
                     ON ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID
@@ -74,6 +76,8 @@ namespace VIS.Controllers
                        InvoicePaySchedule.DueDate,
                        SchemaCurrency.C_Currency_ID,
                        SchemaCurrency.StdPrecision,
+                       SchemaCurrency.Iso_Code,
+                       SchemaCurrency.Cur_Symbol,
 
                        Invoice.PaymentRule,
                        PaymentRuleList.Name AS PaymentRuleName,
@@ -158,6 +162,8 @@ namespace VIS.Controllers
                        ExpectedReceiptData.DueDate,
                        ExpectedReceiptData.C_Currency_ID,
                        ExpectedReceiptData.StdPrecision,
+                       ExpectedReceiptData.Iso_Code,
+                       ExpectedReceiptData.Cur_Symbol,
                        ROUND(
                            COALESCE(ExpectedReceiptData.ExpectedAmount, 0),
                            ExpectedReceiptData.StdPrecision
@@ -212,6 +218,9 @@ namespace VIS.Controllers
                         dueDate = dueDate == DateTime.MinValue ? "" : dueDate.ToString("yyyy-MM-dd"),
                         cCurrencyId = Util.GetValueOfInt(dr["C_Currency_ID"]),
                         stdPrecision = Util.GetValueOfInt(dr["StdPrecision"]),
+                        // base currency ISO code + symbol for the client's browser-culture amount format
+                        isoCode = Util.GetValueOfString(dr["Iso_Code"]),
+                        curSymbol = Util.GetValueOfString(dr["Cur_Symbol"]),
                         expectedAmount = Util.GetValueOfDecimal(dr["ExpectedAmount"]),
                         paymentRule = paymentRule,
                         paymentMethodName = paymentMethodName

@@ -329,9 +329,19 @@
         /* Amounts carry their currency symbol and the currency's own precision -
            the allocation currency can differ from the payment currency, so the
            caller always passes both rather than assuming the payment's. */
-        function fmtMoney(value, symbol, precision) {
+        function fmtMoney(value, symbol, precision, isoCode) {
             var v = (+value) || 0;
             var p = (precision >= 0 && precision <= 10) ? precision : 2;
+            /* Browser culture places separators, the minus and the currency sign
+               ("-$100.000" en-US, "-100,000 $" de-DE). It needs the ISO code; a symbol
+               that is itself a 3-letter code (server fallback) is used as one. */
+            var iso = (isoCode && /^[A-Za-z]{3}$/.test(isoCode)) ? isoCode.toUpperCase()
+                : ((symbol && /^[A-Z]{3}$/.test(symbol)) ? symbol : "");
+            if (iso && window.VAS && typeof VAS.formatAmountByBrowser === "function") {
+                try {
+                    return VAS.formatAmountByBrowser(v, iso, p, { symbol: symbol || "" });
+                } catch (e) { if (window.console) { console.log(e); } }
+            }
             var sign = v < 0 ? "-" : "";
             var text;
             try {
@@ -349,7 +359,7 @@
            allocation history. */
         function money(value) {
             if (!data) return "";
-            return fmtMoney(value, data.CurSymbol || data.CurISO, data.StdPrecision);
+            return fmtMoney(value, data.CurSymbol || data.CurISO, data.StdPrecision, data.CurISO);
         }
 
         /* Server dates arrive as ISO yyyy-MM-dd, so they are parsed as a plain
@@ -1731,6 +1741,7 @@
                money totals on the right. The totals are magnitudes, so the band
                reads the same whether the document paid out or took money in. */
             var curSymbol = rows[0].CurrencySymbol || rows[0].CurrencyIso;
+            var curIso = rows[0].CurrencyIso;
             var curPrec = rows[0].Precision;
             var $foot = $('<div class="' + CLS + 'block-foot"></div>');
             $foot.append($('<span></span>').text(isReceiptDoc()
@@ -1738,9 +1749,9 @@
                 : msg("VAS_191_PaymentAllocation", "Payment Allocation")));
             $foot.append($('<span></span>').text(
                 msg("VAS_191_AllocationFooter", "Allocated {0} - Discount {1} - Write-off {2}")
-                    .replace("{0}", fmtMoney(data.AllocationAmount, curSymbol, curPrec))
-                    .replace("{1}", fmtMoney(data.AllocationDiscount, curSymbol, curPrec))
-                    .replace("{2}", fmtMoney(data.AllocationWriteOff, curSymbol, curPrec))));
+                    .replace("{0}", fmtMoney(data.AllocationAmount, curSymbol, curPrec, curIso))
+                    .replace("{1}", fmtMoney(data.AllocationDiscount, curSymbol, curPrec, curIso))
+                    .replace("{2}", fmtMoney(data.AllocationWriteOff, curSymbol, curPrec, curIso))));
 
             paginate($sec, "detail", rows, DETAIL_PER_PAGE, buildDetailRow, $foot);
         }
@@ -1801,7 +1812,7 @@
                not be the payment's, so each row names its own. The magnitude is
                shown: the direction is already given by the section it sits in. */
             var amount = fmtMoney(Math.abs(+row.Amount || 0),
-                row.CurrencySymbol || row.CurrencyIso, row.Precision);
+                row.CurrencySymbol || row.CurrencyIso, row.Precision, row.CurrencyIso);
             $r.append($('<div class="col-d amt"></div>').text(amount).attr("title", amount));
             return $r;
         }
@@ -1900,6 +1911,7 @@
             /* Posted amounts are ACCOUNTED amounts, so the accounting schema's
                currency applies here - not the payment's. */
             var acctCur = pj.CurSymbol || "";
+            var acctIso = pj.CurISO || "";
             var acctPrec = (pj.StdPrecision >= 0) ? pj.StdPrecision : 2;
 
             var cols = [
@@ -1965,7 +1977,7 @@
                     var $r = $('<div class="' + CLS + 'je-row"></div>').css("grid-template-columns", tmpl);
                     cols.forEach(function (c) {
                         if (c.num) {
-                            $r.append(jeAmount(c.get(jr), acctCur, acctPrec));
+                            $r.append(jeAmount(c.get(jr), acctCur, acctPrec, acctIso));
                         } else if (c.key === "Account") {
                             /* Account on top, what the fact line is for underneath -
                                the reference's two-line account cell. */
@@ -2024,9 +2036,9 @@
                first column carries the label, everything else stays empty. */
             cols.forEach(function (c, idx) {
                 if (c.key === "Dr") {
-                    $total.append($('<div class="num"></div>').text(fmtMoney(pj.TotalDr, acctCur, acctPrec)));
+                    $total.append($('<div class="num"></div>').text(fmtMoney(pj.TotalDr, acctCur, acctPrec, acctIso)));
                 } else if (c.key === "Cr") {
-                    $total.append($('<div class="num"></div>').text(fmtMoney(pj.TotalCr, acctCur, acctPrec)));
+                    $total.append($('<div class="num"></div>').text(fmtMoney(pj.TotalCr, acctCur, acctPrec, acctIso)));
                 } else if (idx === 0) {
                     $total.append($('<div class="tlab"></div>').text(msg("VAS_191_Total", "Total")));
                 } else {
@@ -2050,13 +2062,13 @@
 
         /* A posted amount cell. A zero leg reads as an em dash rather than as
            "0.00", so the eye lands on the side that actually moved. */
-        function jeAmount(value, cur, prec) {
+        function jeAmount(value, cur, prec, iso) {
             var v = +value || 0;
             var $d = $('<div class="num"></div>');
             if (v === 0) {
                 $d.addClass("zero").text("—");
             } else {
-                $d.text(fmtMoney(v, cur, prec));
+                $d.text(fmtMoney(v, cur, prec, iso));
             }
             return $d.attr("title", $d.text());
         }

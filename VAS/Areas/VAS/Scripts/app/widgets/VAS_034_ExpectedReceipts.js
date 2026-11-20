@@ -420,6 +420,14 @@
             var absVal = Math.abs(rawVal);
             var precision = Number(row && row.stdPrecision || 0);
 
+            /* Browser culture places sign, minus and the currency sign (VAS.formatAmountByBrowser). */
+            var iso = row && row.ISO_Code ? row.ISO_Code.toString() : "";
+            if (iso && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(rawVal, iso, precision, { symbol: row.Symbol ? row.Symbol.toString() : "" });
+                } catch (e) { if (window.console) { console.log(e); } }
+            }
+
             var text = absVal.toLocaleString(window.navigator.language, {
                 minimumFractionDigits: precision,
                 maximumFractionDigits: precision
