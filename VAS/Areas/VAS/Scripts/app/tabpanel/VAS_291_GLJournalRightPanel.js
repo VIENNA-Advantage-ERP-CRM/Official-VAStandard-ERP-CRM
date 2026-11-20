@@ -258,8 +258,12 @@
             return sign + (symbol || "") + text;
         }
 
+        // With the journal's ISO code the shared formatter places minus and currency sign in the browser culture.
         function money(value) {
             if (!data) return "";
+            if (data.CurISO && window.VAS && typeof VAS.formatAmountByBrowser === "function") {
+                try { return VAS.formatAmountByBrowser(value, data.CurISO, (data.StdPrecision >= 0 && data.StdPrecision <= 10) ? data.StdPrecision : 2, { symbol: data.CurSymbol || "" }); } catch (e) { if (window.console) { console.log(e); } }
+            }
             return fmtMoney(value, data.CurSymbol || data.CurISO, data.StdPrecision);
         }
 

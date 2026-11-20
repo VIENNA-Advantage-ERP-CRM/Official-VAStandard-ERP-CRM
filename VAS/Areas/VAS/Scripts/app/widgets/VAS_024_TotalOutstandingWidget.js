@@ -285,11 +285,11 @@
             var start = drillPage * DRILL_PAGE_SIZE;
             var end = Math.min(start + DRILL_PAGE_SIZE, vendors.length);
 
-            var totalTip = sym + ' ' + formatFull(total, precision);
+            var totalTip = formatFullMoney(total, sym, data.CurIso, precision);
             var html = '<div class="vas-towdg-drill">'
                 + '<div class="vas-towdg-drill-card">'
                 +   '<span class="vas-towdg-drill-card-label">' + toEsc(msg('VAS_024_TotalOutstanding', 'Total Outstanding')) + '</span>'
-                +   '<strong class="vas-towdg-drill-card-value" title="' + toEsc(totalTip) + '">' + toEsc(sym + VIS.Util.formatCompactAmount(total, data.CurIso, precision)) + '</strong>'
+                +   '<strong class="vas-towdg-drill-card-value" title="' + toEsc(totalTip) + '">' + toEsc(VAS.formatAmountByBrowser(total, data.CurIso, precision, { compact: true, symbol: sym })) + '</strong>'
                 + '</div>'
                 + '<div class="vas-towdg-drill-copy">'
                 +   '<p class="vas-towdg-drill-desc">' + toEsc(summaryText) + '</p>'
@@ -301,12 +301,12 @@
                 var width = maxAmount > 0 ? (amount / maxAmount) * 100 : 0;
                 width = Math.max(0, Math.min(100, width));
                 var barWidth = width > 0 ? Math.max(2, width) : 0;
-                var rowTip = sym + ' ' + formatFull(amount, precision);
+                var rowTip = formatFullMoney(amount, sym, data.CurIso, precision);
 
                 html += '<div class="vas-towdg-drill-row">'
                     + '<div class="vas-towdg-drill-row-head">'
                     +   '<span class="vas-towdg-drill-row-name">' + toEsc(vendor.VendorName || '-') + '</span>'
-                    +   '<span class="vas-towdg-drill-row-val" title="' + toEsc(rowTip) + '">' + toEsc((amount < 0 ? '-' : '') + sym + VIS.Util.formatCompactAmount(amount, data.CurIso, precision)) + '</span>'
+                    +   '<span class="vas-towdg-drill-row-val" title="' + toEsc(rowTip) + '">' + toEsc(VAS.formatAmountByBrowser(amount, data.CurIso, precision, { compact: true, symbol: sym })) + '</span>'
                     + '</div>'
                     + '<div class="vas-towdg-drill-track">'
                     +   '<div class="vas-towdg-drill-fill" style="width:' + barWidth.toFixed(1) + '%"></div>'
@@ -381,6 +381,15 @@
             });
         }
 
+        /* Full amount with the currency sign for tooltips; the browser culture places the sign
+           and the minus (VAS.formatAmountByBrowser), old "symbol + space + number" as fallback. */
+        function formatFullMoney(value, sym, isoCode, precision) {
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try { return VAS.formatAmountByBrowser(value, isoCode, precision, { symbol: sym }); } catch (e) { if (window.console) { console.log(e); } }
+            }
+            return sym + ' ' + formatFull(value, precision);
+        }
+
         function formatQty(value) {
             return Number(value || 0).toLocaleString(window.navigator.language, {
                 maximumFractionDigits: 2
@@ -415,16 +424,16 @@
             }
         };
 
-        /* Compose the KPI metric via the shared CurrencyFormat util
-           (VIS.Util.formatCompactAmount): sign, then the currency-symbol span, then
-           the compact magnitude (Indian vs international per the base-currency ISO).
-           Mirrors VIS.OutstandingSalesOrderWidget.formatMetric. */
+        /* Compose the KPI metric: compact amount with the currency-symbol span; the
+           browser culture places the sign and the minus (VAS.formatAmountByBrowser,
+           20-Nov-2026). Mirrors VIS.OutstandingSalesOrderWidget.formatMetric. */
         function formatMetric(value, symbol, isoCode, precision) {
             value = Number(value || 0);
-            var sign = value < 0 ? '-' : '';
-            var absStr = VIS.Util.formatCompactAmount(value, isoCode, precision);
-            var symHtml = symbol ? '<span class="vas-towdg-cur">' + toEsc(symbol) + '</span>' : '';
-            return sign + symHtml + absStr;
+            return VAS.formatAmountByBrowser(value, isoCode, precision, {
+                compact: true,
+                symbol: symbol,
+                symbolWrap: function (s) { return '<span class="vas-towdg-cur">' + toEsc(s) + '</span>'; }
+            });
         }
 
         /* ---- Busy indicator ---- */

@@ -89,19 +89,22 @@
         }
 
         /*
-         * KPI hero value — compact, locale-aware magnitude via
-         * VIS.Util.formatCompactAmount (K/L/Cr or M/B tiers by base currency).
-         * The formatter returns a non-negative magnitude, so we compose the
-         * final string ourselves: sign, then currency, then magnitude. The net
-         * value is signed, so getSignPrefix carries the meaningful +/− marker —
-         * a negative net renders as e.g. -$200.56 (sign before the currency).
+         * KPI hero value — compact amount (K/L/Cr or M/B tiers by base currency)
+         * composed by VAS.formatAmountByBrowser with the +/− markers of
+         * getSignPrefix; the browser culture places the sign and the currency.
+         * Falls back to sign + currency + magnitude.
          */
         function formatSignedAmount(value, currencySymbol, currencyISO, precision) {
             var numericValue = safeNumber(value);
-            var sign = getSignPrefix(numericValue);
             var currency = getCurrencyLabel(currencySymbol, currencyISO);
-            var magnitude = VIS.Util.formatCompactAmount(numericValue, currencyISO, getPrecision(precision));
 
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                return VAS.formatAmountByBrowser(numericValue, currencyISO, getPrecision(precision),
+                    { compact: true, symbol: currency, minusSign: '−', positiveSign: '+' });
+            }
+
+            var sign = getSignPrefix(numericValue);
+            var magnitude = VIS.Util.formatCompactAmount(numericValue, currencyISO, getPrecision(precision));
             return sign + currency + magnitude;
         }
 

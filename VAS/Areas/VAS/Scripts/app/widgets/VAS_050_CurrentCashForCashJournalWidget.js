@@ -107,16 +107,27 @@
             return isNaN(stdPrecision) || stdPrecision < 0 ? 2 : stdPrecision;
         }
 
-        function formatCurrencyAmount(value, currencySymbol, currencyISO, precision) {
+        /* Exact amount; the shared browser-culture formatter places the sign and the
+           currency sign like the compact KPI value. positiveSign ("+") marks amounts
+           above zero. Falls back to sign + currency + number. */
+        function formatCurrencyAmount(value, currencySymbol, currencyISO, precision, positiveSign) {
             var numericValue = Number(value || 0);
             var stdPrecision = getPrecision(precision);
             var currencyLabel = getCurrencyLabel(currencySymbol, currencyISO);
+
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(numericValue, currencyISO, stdPrecision,
+                        { symbol: currencyLabel, positiveSign: positiveSign || '' });
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
 
             var amount = Math.abs(numericValue).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: stdPrecision,
                 maximumFractionDigits: stdPrecision
             });
-            var sign = numericValue < 0 ? '-' : '';
+            var sign = numericValue < 0 ? '-' : (numericValue > 0 && positiveSign ? positiveSign : '');
 
             return currencyLabel ? sign + currencyLabel + amount : sign + amount;
         }
@@ -143,41 +154,31 @@
             return isNaN(numberValue) ? 0 : numberValue;
         }
 
-        function formatAmount(value, precision) {
-            return safeNumber(value).toLocaleString(window.navigator.language, {
-                minimumFractionDigits: getPrecision(precision),
-                maximumFractionDigits: getPrecision(precision)
-            });
-        }
-
         function formatSignedAmount(value, currencySymbol, currencyISO, precision, showPositiveSign) {
-            var numberValue = safeNumber(value);
-            var sign = '';
-
-            if (numberValue < 0) {
-                sign = '-';
-            } else if (numberValue > 0 && showPositiveSign === true) {
-                sign = '+';
-            }
-
-            return sign + formatCurrencyAmount(Math.abs(numberValue), currencySymbol, currencyISO, precision);
+            return formatCurrencyAmount(safeNumber(value), currencySymbol, currencyISO, precision,
+                showPositiveSign === true ? '+' : '');
         }
 
         /*
-         * KPI hero value — compact, locale-aware magnitude via
-         * VIS.Util.formatCompactAmount (K/L/Cr or M/B tiers by base currency).
-         * The formatter returns a non-negative magnitude, so we compose the
-         * final string ourselves: sign, then currency, then magnitude — a
-         * negative renders as e.g. -$200.56 (leading minus, before the symbol).
+         * KPI hero value — compact amount (K/L/Cr or M/B tiers by base currency)
+         * composed by VAS.formatAmountByBrowser ("+" for positives when
+         * showPositiveSign); the browser culture places the sign and the currency.
+         * Falls back to sign + currency + magnitude.
          */
         function renderSignedAmount($target, value, currencySymbol, currencyISO, precision, showPositiveSign) {
             var numericValue = safeNumber(value);
+            var currency = getCurrencyLabel(currencySymbol, currencyISO);
+
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                $target.text(VAS.formatAmountByBrowser(numericValue, currencyISO, getPrecision(precision),
+                    { compact: true, symbol: currency, positiveSign: showPositiveSign === true ? '+' : '' }));
+                return;
+            }
+
             var sign = numericValue < 0
                 ? '-'
                 : (numericValue > 0 && showPositiveSign === true ? '+' : '');
-            var currency = getCurrencyLabel(currencySymbol, currencyISO);
             var magnitude = VIS.Util.formatCompactAmount(numericValue, currencyISO, getPrecision(precision));
-
             $target.text(sign + currency + magnitude);
         }
 
@@ -256,11 +257,8 @@
                 var cashDate = row.statementDate || '-';
                 var cashType = row.cashTypeName || row.cashTypeValue || '-';
                 var charge = row.chargeName || '-';
-                var numericAmount = safeNumber(row.amount);
-                var amountSign = numericAmount < 0 ? '-' : '';
-                var currencyLabel = getCurrencyLabel(row.currencySymbol, row.currencyISO);
-                var amountText = formatAmount(Math.abs(numericAmount), row.stdPrecision);
-                var amountWithCurrency = amountSign + currencyLabel + amountText;
+                var amountWithCurrency = formatCurrencyAmount(safeNumber(row.amount),
+                    row.currencySymbol, row.currencyISO, row.stdPrecision);
                 var status = row.docStatusName || row.docStatusValue || '-';
                 var description = row.description || '-';
 

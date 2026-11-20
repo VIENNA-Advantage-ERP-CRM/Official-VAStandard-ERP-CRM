@@ -421,6 +421,11 @@
                 precision = 2;
             }
 
+            // browser culture places sign, symbol and separators
+            if (currencyISO && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try { return VAS.formatAmountByBrowser(numericValue, currencyISO, precision, { symbol: currencySymbol }); } catch (e) { if (window.console) { console.log(e); } }
+            }
+
             var sign = numericValue < 0 ? '-' : '';
 
             amountText = Math.abs(
@@ -459,6 +464,13 @@
                 precision < 0
             ) {
                 precision = 2;
+            }
+
+            /* Compact amount; the browser culture places the currency sign and the minus
+               (VAS.formatAmountByBrowser, 20-Nov-2026). The hand-composed form below is the
+               fallback when the shared formatter is not loaded. */
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                return VAS.formatAmountByBrowser(numericValue, currencyISO, precision, { compact: true, symbol: currencySymbol });
             }
 
             amountText =

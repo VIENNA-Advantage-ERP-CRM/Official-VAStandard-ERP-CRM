@@ -99,7 +99,13 @@
             return (number < 0 ? '-' : '') + VIS.Util.formatCompactAmount(Math.abs(number), currencyIso || '', stdPrecision);
         }
 
+        // Compact amount composed by VAS.formatAmountByBrowser (browser culture places the minus and the
+        // currency sign); falls back to symbol + signed compact number.
         function formatCompactAmount(value) {
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                return VAS.formatAmountByBrowser(Number(value || 0), currencyIso || '', stdPrecision,
+                    { compact: true, symbol: currencySymbol || currencyIso || '' });
+            }
             return (currencySymbol || currencyIso || '') + formatCompactNumber(value);
         }
 

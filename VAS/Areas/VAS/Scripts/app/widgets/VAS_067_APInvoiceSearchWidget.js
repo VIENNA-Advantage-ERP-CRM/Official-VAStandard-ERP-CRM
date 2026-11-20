@@ -723,6 +723,10 @@
             if (isNaN(n)) { return ''; }
             var prec = (item && typeof item.StdPrecision === 'number' && item.StdPrecision >= 0) ? item.StdPrecision : 2;
             var symbol = (item && (item.CurSymbol || item.IsoCode)) || '';
+            // Browser culture places the invoice currency's sign and the minus (VAS.formatAmountByBrowser).
+            if (item && item.IsoCode && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try { return VAS.formatAmountByBrowser(n, item.IsoCode, prec, { symbol: symbol }); } catch (e) { if (window.console) { console.log(e); } }
+            }
             // Sign BEFORE the currency symbol, and NO space between symbol and amount
             // (e.g. -$28,000.000, not $ -28,000.000).
             var sign = n < 0 ? '-' : '';

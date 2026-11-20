@@ -109,16 +109,25 @@
             });
         }
 
-        /* Build amount markup with the base-currency symbol placed *before* the amount;
-           the minus sign (if any) precedes the symbol (e.g. -$1.2M). The compact
-           magnitude (Indian vs international numbering by base currency, kept to the
-           currency precision) comes from VIS.Util.formatCompactAmount. */
+        /* Build compact amount markup with the currency sign in a styled span; the
+           browser culture places the sign and the minus (VAS.formatAmountByBrowser,
+           20-Nov-2026), e.g. en-US -$1.2M, de-DE -1,2M $. */
         function formatMetric(value, symbol) {
             value = Number(value || 0);
-            var sign = value < 0 ? '-' : '';
-            var absStr = VIS.Util.formatCompactAmount(value, currencyIso, currencyPrecision);
-            var symHtml = symbol ? '<span class="vas-ar-cur">' + symbol + '</span>' : '';
-            return sign + symHtml + absStr;
+            /* Guarded call; the sign is HTML-escaped; fallback: minus + symbol span + compact digits. */
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(value, currencyIso, currencyPrecision, {
+                        compact: true,
+                        symbol: symbol,
+                        symbolWrap: function (s) { return '<span class="vas-ar-cur">' + $('<div>').text(s).html() + '</span>'; }
+                    });
+                } catch (e) { if (window.console) { console.log(e); } }
+            }
+            var digits = (VIS.Util && typeof VIS.Util.formatCompactAmount === 'function')
+                ? VIS.Util.formatCompactAmount(value, currencyIso, currencyPrecision)
+                : Math.abs(value).toLocaleString(window.navigator.language);
+            return (value < 0 ? '-' : '') + '<span class="vas-ar-cur">' + $('<div>').text(symbol || '').html() + '</span>' + digits;
         }
 
         /* ── One bucket row: label, amount, and a proportional track bar ── */

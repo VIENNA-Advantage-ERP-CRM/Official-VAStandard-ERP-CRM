@@ -193,9 +193,9 @@
 
                 /* ---- Legend ---- */
                 + '<div class="vas-pawdg-legend">'
-                +   buildLegendRow('vas-pawdg-dot--ok',   msg('VAS_019_PaidOnTime', 'Paid on time'),   sym + formatAmount(data.PaidAmount,    data.StdPrecision) + ' · ' + paidPct    + '%', 'vas-pawdg-lv-ok')
-                +   buildLegendRow('vas-pawdg-dot--info', msg('VAS_019_Pending', 'Pending'),       sym + formatAmount(data.PendingAmount, data.StdPrecision) + ' · ' + pendingPct + '%', 'vas-pawdg-lv-info')
-                +   buildLegendRow('vas-pawdg-dot--err',  msg('VAS_019_OverdueLabel', 'Overdue'),  sym + formatAmount(data.OverdueAmount, data.StdPrecision) + ' · ' + overduePct + '%', 'vas-pawdg-lv-err')
+                +   buildLegendRow('vas-pawdg-dot--ok',   msg('VAS_019_PaidOnTime', 'Paid on time'),   formatAmount(data.PaidAmount,    sym, data.StdPrecision) + ' · ' + paidPct    + '%', 'vas-pawdg-lv-ok')
+                +   buildLegendRow('vas-pawdg-dot--info', msg('VAS_019_Pending', 'Pending'),       formatAmount(data.PendingAmount, sym, data.StdPrecision) + ' · ' + pendingPct + '%', 'vas-pawdg-lv-info')
+                +   buildLegendRow('vas-pawdg-dot--err',  msg('VAS_019_OverdueLabel', 'Overdue'),  formatAmount(data.OverdueAmount, sym, data.StdPrecision) + ' · ' + overduePct + '%', 'vas-pawdg-lv-err')
                 + '</div>';
 
             $container.html(html);
@@ -277,7 +277,7 @@
                             callbacks: {
                                 label: function (ctx) {
                                     var p = Math.round((ctx.raw / totalAll) * 100);
-                                    return ' ' + ctx.label + ': ' + sym + formatAmount(ctx.raw, data.StdPrecision) + '  (' + p + '%)';
+                                    return ' ' + ctx.label + ': ' + formatAmount(ctx.raw, sym, data.StdPrecision) + '  (' + p + '%)';
                                 }
                             }
                         }
@@ -290,7 +290,7 @@
         /* ---- Build one aging row (label | bar | amount | count) ---- */
         function buildAgingRow(msgKey, defaultLabel, amount, count, totalOpen, sym, stdPrecision, colorClass) {
             var pct    = totalOpen > 0 ? Math.round((amount / totalOpen) * 100) : 0;
-            var amtFmt = sym + formatAmount(amount, stdPrecision);
+            var amtFmt = formatAmount(amount, sym, stdPrecision);
             var cntFmt = count + ' ' + msg('VAS_019_InvSuffix', 'inv.');
             return '<div class="vas-pawdg-aging-row">'
                 + '<div class="vas-pawdg-ag-lbl">' + msg(msgKey, defaultLabel) + '</div>'
@@ -313,17 +313,14 @@
                 + '</div>';
         }
 
-        /* ---- Number formatter ----
-             Delegates the compact scaling (Indian vs international, chosen from the
-             base-currency ISO) to the shared CurrencyFormat util
-             VIS.Util.formatCompactAmount, exactly like VAS_024. That util returns the
-             unsigned magnitude; the sign is composed here and callers prepend the
-             currency symbol. */
-        function formatAmount(number, stdPrecision) {
+        /* ---- Amount formatter ----
+             Compact scaling (Indian vs international, chosen from the base-currency
+             ISO) with the currency symbol; the browser culture places the sign and the
+             minus (VAS.formatAmountByBrowser, 20-Nov-2026). Returns plain text. */
+        function formatAmount(number, sym, stdPrecision) {
             number = Number(number || 0);
-            var sign = number < 0 ? '-' : '';
             var iso  = ($self._kpiData && $self._kpiData.CurIso) || '';
-            return sign + VIS.Util.formatCompactAmount(number, iso, stdPrecision);
+            return VAS.formatAmountByBrowser(number, iso, stdPrecision, { compact: true, symbol: sym });
         }
 
         /* ---- Busy indicator ---- */

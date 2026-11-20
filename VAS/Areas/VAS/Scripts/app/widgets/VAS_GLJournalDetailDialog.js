@@ -148,11 +148,19 @@
        "$-220.00": the symbol belongs to the number, the minus to the value. The
        amount is formatted from its absolute value so toLocaleString can't
        reintroduce its own minus after the symbol. */
-    function formatMoney(symbol, amount, precision) {
+    // With an ISO code the shared formatter places minus and currency sign in the browser culture.
+    function formatMoney(symbol, amount, precision, isoCode) {
         var numericAmount = Number(amount || 0);
 
         if (isNaN(numericAmount)) {
             numericAmount = 0;
+        }
+
+        if (isoCode && window.VAS && typeof VAS.formatAmountByBrowser === "function") {
+            try {
+                return VAS.formatAmountByBrowser(numericAmount, isoCode, precision, { symbol: symbol || "" });
+            }
+            catch (e) { if (window.console) { console.log(e); } }
         }
 
         return (
@@ -764,8 +772,8 @@
             statusText + " · " + (journal.DateAcct || "")
         );
 
-        var totalDebit = formatMoney(symbol, journal.TotalDebit, precision);
-        var totalCredit = formatMoney(symbol, journal.TotalCredit, precision);
+        var totalDebit = formatMoney(symbol, journal.TotalDebit, precision, data.ISOCode);
+        var totalCredit = formatMoney(symbol, journal.TotalCredit, precision, data.ISOCode);
 
         var accountingBook =
             journal.AccountingBook || lbl("VAS_041_Primary", "Primary");

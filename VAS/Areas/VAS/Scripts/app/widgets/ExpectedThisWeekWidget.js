@@ -240,20 +240,52 @@
             return 2;
         }
 
-        /* Currency symbol leads the amount (sign before symbol; nothing for zero
-           and positive, - for negative). Compact magnitude comes from the shared
-           VIS.Util.formatCompactAmount (Indian vs international numbering by
-           isoCode, kept to the base-currency precision). */
+        /* Compact amount with the currency sign in a styled span; the browser
+           culture places the sign and the minus (VAS.formatAmountByBrowser,
+           20-Nov-2026). Indian vs international numbering by isoCode, kept to the
+           base-currency precision. */
         function formatMetric(value, symbol, isoCode, precision) {
             value = Number(value || 0);
-            var sign = value < 0 ? '-' : '';
-            var compact = VIS.Util.formatCompactAmount(
-                value,
-                isoCode,
-                (precision == null ? safeStdPrecision() : precision)
-            );
-            var sym = symbol ? '<span class="vas-etw-cur">' + escapeHtml(symbol) + '</span>' : '';
-            return sign + sym + compact;
+            var p = (precision == null ? safeStdPrecision() : precision);
+            /* Guarded call; fallback: minus + symbol span + compact digits. */
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(
+                        value,
+                        isoCode,
+                        p,
+                        {
+                            compact: true,
+                            symbol: symbol,
+                            symbolWrap: function (s) { return '<span class="vas-etw-cur">' + escapeHtml(s) + '</span>'; }
+                        }
+                    );
+                } catch (e) { if (window.console) { console.log(e); } }
+            }
+            var digits = (VIS.Util && typeof VIS.Util.formatCompactAmount === 'function')
+                ? VIS.Util.formatCompactAmount(value, isoCode, p)
+                : Math.abs(value).toLocaleString(window.navigator.language, { minimumFractionDigits: p, maximumFractionDigits: p });
+            return (value < 0 ? '-' : '') + (symbol ? '<span class="vas-etw-cur">' + escapeHtml(symbol) + '</span>' : '') + escapeHtml(digits);
+        }
+
+        /* Exact invoice-currency row amount in the browser culture (VAS.formatAmountByBrowser, 20-Nov-2026); asHtml puts the sign in the inline span. Fallback: sign + symbol + number. */
+        function formatRowAmount(value, iso, sym, asHtml) {
+            var num = Number(value || 0);
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    var opts = { symbol: sym };
+                    if (asHtml) {
+                        opts.symbolWrap = function (s) { return '<span class="vas-etw-cur-inline">' + escapeHtml(s) + '</span>'; };
+                    }
+                    return VAS.formatAmountByBrowser(num, iso, safeStdPrecision(), opts);
+                } catch (e) { if (window.console) { console.log(e); } }
+            }
+            var amountSign = num < 0 ? '-' : '';
+            var amountText = Math.abs(num).toLocaleString(window.navigator.language, { minimumFractionDigits: safeStdPrecision(), maximumFractionDigits: safeStdPrecision() });
+            if (asHtml) {
+                return escapeHtml(amountSign) + (sym ? '<span class="vas-etw-cur-inline">' + escapeHtml(sym) + '</span>' : '') + escapeHtml(amountText);
+            }
+            return amountSign + (sym ? sym : '') + amountText;
         }
 
         function renderMetric(data) {
@@ -343,15 +375,12 @@
                 var dueDateText = formatDate(row.dueDate);
                 var invoiceCurrency = row.invoiceCurrency || "";
                 var sym = row.invoiceCurrencySymbol || invoiceCurrency || "";
-                var rawAmount = Number(row.amount || 0);
-                var amountSign = rawAmount < 0 ? '-' : '';
                 /* Modal shows the full, exact per-row amount (no compact
-                   magnitude): locale-formatted number at the row's precision. */
-                var amountText = Math.abs(rawAmount).toLocaleString(window.navigator.language, { minimumFractionDigits: safeStdPrecision(), maximumFractionDigits: safeStdPrecision() });
-                /* Amount keeps its invoice-currency symbol inline — no
-                   conversion to base currency, per spec.  Sign leads the
-                   symbol: e.g. "$1,000.00" (positive) or "-$1,000.00" (negative). */
-                var amountHtml = escapeHtml(amountSign) + (sym ? '<span class="vas-etw-cur-inline">' + escapeHtml(sym) + '</span>' : '') + escapeHtml(amountText);
+                   magnitude). Amount keeps its invoice-currency symbol inline —
+                   no conversion to base currency, per spec; the browser culture
+                   places the sign and the minus (formatRowAmount). */
+                var amountHtml = formatRowAmount(row.amount, invoiceCurrency, sym, true);
+                var amountTitle = formatRowAmount(row.amount, invoiceCurrency, sym, false);
 
                 var dueDays = getDaysUntilDue(row.dueDate);
                 var dueInText = formatDueIn(dueDays);
@@ -380,7 +409,7 @@
                     '</td>' +
                     '<td class="vas-etw-td-duedate" title="' + escapeHtml(dueDateText) + '">' + escapeHtml(dueDateText) + '</td>' +
                     '<td class="vas-etw-td-currency" title="' + escapeHtml(invoiceCurrency) + '">' + escapeHtml(invoiceCurrency) + '</td>' +
-                    '<td class="vas-etw-td-amount" title="' + escapeHtml(amountSign + (sym ? sym : '') + amountText) + '">' + amountHtml + '</td>' +
+                    '<td class="vas-etw-td-amount" title="' + escapeHtml(amountTitle) + '">' + amountHtml + '</td>' +
                     '<td class="vas-etw-td-duein" title="' + escapeHtml(dueInText) + '">' +
                     (dueInText ? '<span class="' + dueInClass + '">' + escapeHtml(dueInText) + '</span>' : '') +
                     '</td>' +

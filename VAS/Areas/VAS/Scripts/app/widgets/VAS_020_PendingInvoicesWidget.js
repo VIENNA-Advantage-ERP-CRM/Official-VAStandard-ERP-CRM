@@ -576,6 +576,10 @@
             var n = (typeof amount === 'number') ? amount : parseFloat(amount);
             if (isNaN(n)) { n = 0; }
             var prec = _curPrec || 2;
+            // Browser culture places the currency sign and minus; curCode is the row's ISO (server falls back to the symbol).
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try { return VAS.formatAmountByBrowser(n, curCode, prec, { symbol: curCode }); } catch (e) { if (window.console) { console.log(e); } }
+            }
             var formatted = n.toLocaleString(window.navigator.language, { minimumFractionDigits: prec, maximumFractionDigits: prec });
             return (curCode ? curCode + ' ' : '') + formatted;
         }
@@ -612,13 +616,12 @@
                 .replace(/"/g, '&quot;');
         }
 
-        /* Compact base-currency amount via the shared CurrencyFormat util
-           (Indian vs international scale per the base-currency ISO). Sign, then
-           symbol, then the compact magnitude. */
+        /* Compact base-currency amount (Indian vs international scale per the
+           base-currency ISO); the browser culture places the symbol and the minus
+           (VAS.formatAmountByBrowser, 20-Nov-2026). */
         function piMetric(amount) {
             var v = Number(amount || 0);
-            var sign = v < 0 ? '-' : '';
-            return sign + _curSym + VIS.Util.formatCompactAmount(v, _curIso, _curPrec);
+            return VAS.formatAmountByBrowser(v, _curIso, _curPrec, { compact: true, symbol: _curSym });
         }
 
         /* ---- Busy indicator ---- */

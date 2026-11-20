@@ -170,6 +170,14 @@
                 return '-';
             }
 
+            /* Full amount (cell hover): browser culture places sign and currency via VAS.formatAmountByBrowser. */
+            var iso = data && (data.currencyISO || data.currencyISOCode);
+            if (iso && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(numericValue, iso, precision, { symbol: getCurrencyLabel(data) });
+                } catch (e) { if (window.console) { console.log(e); } }
+            }
+
             /* Line-item amounts keep full precision (never compacted). */
             var amount =
                 Math.abs(numericValue)
@@ -252,6 +260,37 @@
                 );
 
             $target.attr('title', formatCurrencyAmount(numericValue, data));
+
+            /* Cell amount: browser culture places minus and currency (VAS.formatAmountByBrowser); the text
+               before / after the number keeps the prefix style, the number keeps its main + decimal spans. */
+            var iso = data && (data.currencyISO || data.currencyISOCode);
+            if (iso && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    var fullText = VAS.formatAmountByBrowser(numericValue, iso, precision, { symbol: getCurrencyLabel(data) });
+                    var numberAt = fullText.indexOf(amount);
+                    if (numberAt >= 0) {
+                        var beforeText = fullText.substring(0, numberAt);
+                        var afterText = fullText.substring(numberAt + amount.length);
+                        $target.empty();
+                        if (beforeText) {
+                            $target.append($('<span>', { 'class': 'VAS-cash-amount-prefix', 'text': beforeText }));
+                        }
+                        $target
+                            .append($('<span>', {
+                                'class': 'VAS-cash-amount-main',
+                                'text': decimalMatch ? amount.substring(0, amount.length - decimalMatch[1].length) : amount
+                            }))
+                            .append($('<span>', {
+                                'class': 'VAS-cash-amount-decimal',
+                                'text': decimalMatch ? decimalMatch[1] : ''
+                            }));
+                        if (afterText) {
+                            $target.append($('<span>', { 'class': 'VAS-cash-amount-prefix', 'text': afterText }));
+                        }
+                        return;
+                    }
+                } catch (e) { if (window.console) { console.log(e); } }
+            }
 
             $target
                 .empty()

@@ -26,7 +26,7 @@
  *
  *                  Amounts arrive already converted into the tenant's base
  *                  (accounting-schema) currency and are formatted through the
- *                  shared VIS.Util.formatCompactAmount helper
+ *                  shared VAS.formatAmountByBrowser (compact) helper
  *                  (Scripts/app/util/CurrencyFormat.js), so the compact scale
  *                  follows the base currency - K/L/Cr for Indian-numbering
  *                  currencies, K/M/B otherwise - and the decimals follow its
@@ -356,11 +356,10 @@
                way the sibling amount cards print theirs, rather than the sign and symbol
                in their own smaller span. A card whose headline is one number should read
                as one number; two type tiers inside it read as two marks. */
-            var sign = negative ? '-' : '+';
             $value
                 .toggleClass('vas-231-value--neg', negative)
-                .attr('title', label('VAS_231_NetMovement', 'Net Movement') + ': ' + sign + amountText(net))
-                .text(sign + symbol() + compact(net));
+                .attr('title', label('VAS_231_NetMovement', 'Net Movement') + ': ' + amountText(net, '+'))
+                .text(compactMoney(net, '+'));
 
             var inLabel = label('VAS_231_In', 'in');
             var outLabel = label('VAS_231_Out', 'out');
@@ -420,23 +419,46 @@
            THE MAGNITUDE IS NOT AN ABSOLUTE. compact() returns a magnitude, so a negative
            gross printed as though it were positive: the same "$900" a receipt of +900
            prints, in a line whose whole job is to say what went in and what went out.
-           The headline composes its own sign from the net, which is why it cannot use
-           this helper and this line cannot use the headline's. Only negatives are marked
-           - a gross that ran its own way is the ordinary case and needs no plus. */
+           The headline also marks a positive net with "+"; this line marks only
+           negatives - a gross that ran its own way is the ordinary case and needs no plus. */
         function grossText(value) {
+            return compactMoney(value);
+        }
+
+        /* Signed compact amount with the currency sign, composed by the shared
+           browser-culture formatter (sign position and separators from the browser);
+           positiveSign ("+") marks amounts above zero. Falls back to sign + symbol +
+           compact() when the shared formatter is not loaded. */
+        function compactMoney(value, positiveSign) {
             var v = Number(value) || 0;
-            return (v < 0 ? '-' : '') + symbol() + compact(v);
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(v, iso(), precision(),
+                        { compact: true, symbol: symbol(), minusSign: '-', positiveSign: positiveSign });
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
+            return (v < 0 ? '-' : (positiveSign || '')) + symbol() + compact(v);
         }
 
         /* Full, non-compact amount for the tooltips: the exact figure behind the
            rounded headline. Grouping and the decimal separator come from the browser
-           locale, the decimals from the base currency's precision. */
-        function amountText(value) {
+           locale, the decimals from the base currency's precision. The shared formatter
+           places the minus / positiveSign and the currency sign the way the browser
+           culture does ("-$900.00" en-US, "-900,00 $" de-DE), like the headline. */
+        function amountText(value, positiveSign) {
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(Number(value) || 0, iso(), precision(),
+                        { symbol: symbol(), minusSign: '-', positiveSign: positiveSign });
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
             var abs = Math.abs(Number(value) || 0);
             var p = precision();
             var text = abs.toLocaleString(window.navigator.language,
                 { minimumFractionDigits: p, maximumFractionDigits: p });
-            return (Number(value) < 0 ? '-' : '') + symbol() + text;
+            return (Number(value) < 0 ? '-' : (Number(value) > 0 && positiveSign ? positiveSign : '')) + symbol() + text;
         }
 
         function countSuffix(count) {

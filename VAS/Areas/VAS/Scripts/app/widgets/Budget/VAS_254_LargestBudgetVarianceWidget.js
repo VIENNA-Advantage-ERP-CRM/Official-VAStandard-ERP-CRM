@@ -781,10 +781,21 @@
            "$1.9M", "₹74K" - never "USD 1.9M", and only falling back to the ISO code when
            the currency has no symbol configured (which is what the server's own
            COALESCE(CurSymbol, ISO_Code) already resolved). The ISO code drives the scale,
-           so no lakh/crore or million step is ever assumed here. */
-        function compactAmount(value) {
+           so no lakh/crore or million step is ever assumed here. Composed by the shared
+           browser-culture formatter (it places the sign and the symbol; positiveSign marks
+           amounts above zero); the hand composition below is the fallback when it is not
+           loaded. */
+        function compactAmount(value, positiveSign) {
             var v = Number(value) || 0;
             var magnitude;
+
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(v, isoCode(), precision(),
+                        { compact: true, symbol: symbol(), minusSign: '−', positiveSign: positiveSign });
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
 
             try {
                 if (VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
@@ -795,36 +806,34 @@
 
             if (magnitude === undefined) { magnitude = String(Math.abs(v)); }
 
-            return (v < 0 ? '−' : '') + symbol() + magnitude;
+            return (v < 0 ? '−' : (positiveSign || '')) + symbol() + magnitude;
         }
 
         /* The variance, with its sign ALWAYS printed - a plus on a favourable gap as much
            as a minus on an unfavourable one. The sign is what carries the direction when
            the colour cannot: in print, for a colour-blind reader, or anywhere the tone is
-           lost. A true minus sign, not a hyphen. */
+           lost. A true minus sign, not a hyphen. Composed by compactAmount with "+". */
         function signedCompactAmount(value) {
-            var v = Number(value) || 0;
-            var magnitude;
-
-            try {
-                if (VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
-                    magnitude = VIS.Util.formatCompactAmount(v, isoCode(), precision());
-                }
-            }
-            catch (e) { if (window.console) { console.log(e); } }
-
-            if (magnitude === undefined) { magnitude = String(Math.abs(v)); }
-
-            return (v < 0 ? '−' : '+') + symbol() + magnitude;
+            return compactAmount(Number(value) || 0, '+');
         }
 
         /* Full, non-compact amount for the tooltips: the exact figure behind the compact
            cell. Grouping and the decimal separator come from the browser locale, the
-           decimals from the schema currency's precision. */
-        function fullAmount(value) {
+           decimals from the schema currency's precision. The shared formatter places the
+           sign and the currency sign the way the browser culture does, like the cell;
+           positiveSign ("+") marks amounts above zero. */
+        function fullAmount(value, positiveSign) {
             var v = Number(value) || 0;
             var p = precision();
             var text;
+
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(v, isoCode(), p,
+                        { symbol: symbol(), minusSign: '−', positiveSign: positiveSign });
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
 
             try {
                 text = Math.abs(v).toLocaleString(window.navigator.language,
@@ -832,13 +841,11 @@
             }
             catch (e) { text = String(Math.abs(v)); }
 
-            return (v < 0 ? '−' : '') + symbol() + text;
+            return (v < 0 ? '−' : (positiveSign || '')) + symbol() + text;
         }
 
         function signedFullAmount(value) {
-            var v = Number(value) || 0;
-            var text = fullAmount(v);
-            return v < 0 ? text : '+' + text;
+            return fullAmount(Number(value) || 0, '+');
         }
 
         /* ------------------------------------------------------------ */

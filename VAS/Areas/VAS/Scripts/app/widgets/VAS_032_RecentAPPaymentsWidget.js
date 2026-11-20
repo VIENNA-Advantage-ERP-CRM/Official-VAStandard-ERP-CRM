@@ -956,6 +956,10 @@
                 firstLine.currencyISO ||
                 payment.currencySymbol ||
                 '';
+            var allocCurrencyISO =
+                firstLine.currencyISO ||
+                payment.currencyISO ||
+                '';
             var stdPrecision =
                 Number(firstLine.stdPrecision) ||
                 Number(payment.stdPrecision) ||
@@ -991,19 +995,19 @@
                     '<tr>' +
                     '<td>' + escapeHtml(line.invoiceDocumentNo || '—') + '</td>' +
                     '<td>' + escapeHtml(formatDate(line.invoiceDate) || '—') + '</td>' +
-                    '<td class="vas-recent-ap-payments-alloc-num">' + formatAllocAmount(allocated, currencySymbol, stdPrecision) + '</td>' +
+                    '<td class="vas-recent-ap-payments-alloc-num">' + formatAllocAmount(allocated, currencySymbol, stdPrecision, allocCurrencyISO) + '</td>' +
                     '<td class="vas-recent-ap-payments-alloc-num">' +
                     (discount !== 0
-                        ? formatAllocAmount(discount, currencySymbol, stdPrecision)
+                        ? formatAllocAmount(discount, currencySymbol, stdPrecision, allocCurrencyISO)
                         : '<span class="vas-recent-ap-payments-alloc-dash">—</span>') +
                     '</td>' +
                     '<td class="vas-recent-ap-payments-alloc-num">' +
                     (writeOff !== 0
-                        ? formatAllocAmount(writeOff, currencySymbol, stdPrecision)
+                        ? formatAllocAmount(writeOff, currencySymbol, stdPrecision, allocCurrencyISO)
                         : '<span class="vas-recent-ap-payments-alloc-dash">—</span>') +
                     '</td>' +
                     '<td class="vas-recent-ap-payments-alloc-num vas-recent-ap-payments-alloc-total-cell">' +
-                    formatAllocAmount(lineTotal, currencySymbol, stdPrecision) +
+                    formatAllocAmount(lineTotal, currencySymbol, stdPrecision, allocCurrencyISO) +
                     '</td>' +
                     '</tr>';
             }
@@ -1014,19 +1018,19 @@
                 '</tbody>' +
                 '<tfoot><tr class="vas-recent-ap-payments-alloc-foot">' +
                 '<td colspan="2"><strong>' + escapeHtml(lbl('VAS_032_Total', 'Total')) + '</strong></td>' +
-                '<td class="vas-recent-ap-payments-alloc-num"><strong>' + formatAllocAmount(totalAllocated, currencySymbol, stdPrecision) + '</strong></td>' +
+                '<td class="vas-recent-ap-payments-alloc-num"><strong>' + formatAllocAmount(totalAllocated, currencySymbol, stdPrecision, allocCurrencyISO) + '</strong></td>' +
                 '<td class="vas-recent-ap-payments-alloc-num"><strong>' +
                 (totalDiscount !== 0
-                    ? formatAllocAmount(totalDiscount, currencySymbol, stdPrecision)
+                    ? formatAllocAmount(totalDiscount, currencySymbol, stdPrecision, allocCurrencyISO)
                     : '<span class="vas-recent-ap-payments-alloc-dash">—</span>') +
                 '</strong></td>' +
                 '<td class="vas-recent-ap-payments-alloc-num"><strong>' +
                 (totalWriteOff !== 0
-                    ? formatAllocAmount(totalWriteOff, currencySymbol, stdPrecision)
+                    ? formatAllocAmount(totalWriteOff, currencySymbol, stdPrecision, allocCurrencyISO)
                     : '<span class="vas-recent-ap-payments-alloc-dash">—</span>') +
                 '</strong></td>' +
                 '<td class="vas-recent-ap-payments-alloc-num vas-recent-ap-payments-alloc-total-cell"><strong>' +
-                formatAllocAmount(grandTotal, currencySymbol, stdPrecision) +
+                formatAllocAmount(grandTotal, currencySymbol, stdPrecision, allocCurrencyISO) +
                 '</strong></td>' +
                 '</tr></tfoot>' +
                 '</table>';
@@ -1034,8 +1038,14 @@
             $dialogAllocWrap.html(html);
         }
 
-        function formatAllocAmount(value, currencySymbol, stdPrecision) {
+        function formatAllocAmount(value, currencySymbol, stdPrecision, currencyISO) {
             var numericValue = Number(value || 0);
+
+            // browser culture places sign, symbol and separators (result stays HTML-escaped)
+            if (currencyISO && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try { return escapeHtml(VAS.formatAmountByBrowser(numericValue, currencyISO, stdPrecision, { symbol: currencySymbol })); } catch (e) { if (window.console) { console.log(e); } }
+            }
+
             var sign = numericValue < 0 ? '-' : '';
 
             var amount = Math.abs(numericValue).toLocaleString(
@@ -1175,6 +1185,11 @@
                 precision = 2;
             }
 
+            // browser culture places sign, symbol and separators
+            if (currencyISO && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try { return VAS.formatAmountByBrowser(numericValue, currencyISO, precision, { symbol: currencySymbol }); } catch (e) { if (window.console) { console.log(e); } }
+            }
+
             var sign = numericValue < 0 ? '-' : '';
 
             var amount = Math.abs(numericValue).toLocaleString(window.navigator.language, {
@@ -1191,10 +1206,10 @@
 
         function formatWidgetCurrencyAmount(value, currencySymbol, currencyISO, stdPrecision) {
             var numericValue = Number(value || 0);
-            var sign = numericValue < 0 ? '-' : '';
 
-            return sign + formatCurrencyAmount(
-                Math.abs(numericValue),
+            // signed value in, so the browser culture places the minus (same text as before in the fallback)
+            return formatCurrencyAmount(
+                numericValue,
                 currencySymbol,
                 currencyISO,
                 stdPrecision

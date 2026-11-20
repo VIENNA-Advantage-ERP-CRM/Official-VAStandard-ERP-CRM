@@ -224,18 +224,16 @@
             });
         }
 
-        /* Currency symbol *before* the amount, sign before symbol only for
-           negatives ('-' for value < 0; no sign for value >= 0; e.g. ₹1.2M, -₹0.5K).
-           The compact magnitude (Indian vs international numbering by base currency,
-           kept to precision) comes from the shared VIS.Util.formatCompactAmount, which
-           always returns a non-negative string. The symbol is shown whenever present
-           — including at zero (e.g. ₹0.00) — never gated behind a non-zero amount. */
+        /* Compact amount with the currency sign in a styled span; the browser
+           culture places the sign and the minus (VAS.formatAmountByBrowser,
+           20-Nov-2026). */
         function formatMetric(value, symbol, isoCode, precision) {
             value = Number(value || 0);
-            var sign = value < 0 ? '-' : '';
-            var compact = VIS.Util.formatCompactAmount(value, isoCode, precision);
-            var sym = symbol ? '<span class="vas-tdr-cur">' + escapeHtml(symbol) + '</span>' : '';
-            return sign + sym + compact;
+            return VAS.formatAmountByBrowser(value, isoCode, precision, {
+                compact: true,
+                symbol: symbol,
+                symbolWrap: function (s) { return '<span class="vas-tdr-cur">' + escapeHtml(s) + '</span>'; }
+            });
         }
 
         /* Detail line: "<N> receipts · across <M> customers", pluralised. */
@@ -271,7 +269,13 @@
                 /* Full (non-compact) value on hover so the abbreviation never
                    hides the exact figure. */
                 var _metricSign = lastAmount < 0 ? '-' : '';
-                $metricEl.attr('title', _metricSign + (lastSymbol ? lastSymbol + ' ' : '') + formatExactAmount(Math.abs(lastAmount), lastPrecision));
+                var _metricTitle = _metricSign + (lastSymbol ? lastSymbol + ' ' : '') + formatExactAmount(Math.abs(lastAmount), lastPrecision);
+                /* Full value in the browser culture (VAS.formatAmountByBrowser). */
+                if (lastIso && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                    try { _metricTitle = VAS.formatAmountByBrowser(lastAmount, lastIso, lastPrecision, { symbol: lastSymbol }); }
+                    catch (e) { if (window.console) { console.log(e); } }
+                }
+                $metricEl.attr('title', _metricTitle);
             }
 
             renderDetail();
@@ -327,6 +331,17 @@
                 var iso = row.currencyIso || "";
                 var sym = row.curSymbol || iso || "";
                 var amtHtml = escapeHtml(amtSign) + (sym ? '<span class="vas-tdr-cur-inline">' + escapeHtml(sym) + '</span>' : '') + escapeHtml(amtText);
+                var amtTitle = amtSign + (sym ? sym + ' ' : '') + amtText;
+                /* Browser culture places sign, minus and the styled symbol span (VAS.formatAmountByBrowser). */
+                if (iso && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                    try {
+                        amtHtml = VAS.formatAmountByBrowser(rawAmt, iso, stdPrecision, {
+                            symbol: row.curSymbol || "",
+                            symbolWrap: function (s) { return '<span class="vas-tdr-cur-inline">' + escapeHtml(s) + '</span>'; }
+                        });
+                        amtTitle = VAS.formatAmountByBrowser(rawAmt, iso, stdPrecision, { symbol: row.curSymbol || "" });
+                    } catch (e) { if (window.console) { console.log(e); } }
+                }
 
                 var $tr = $(
                     '<tr>' +
@@ -341,7 +356,7 @@
                     '<span class="vas-tdr-truncate">' + escapeHtml(bankText) + '</span>' +
                     '</td>' +
                     '<td class="vas-tdr-td-currency" title="' + escapeHtml(iso) + '">' + escapeHtml(iso) + '</td>' +
-                    '<td class="vas-tdr-td-amount" title="' + escapeHtml(amtSign + (sym ? sym + ' ' : '') + amtText) + '">' + amtHtml + '</td>' +
+                    '<td class="vas-tdr-td-amount" title="' + escapeHtml(amtTitle) + '">' + amtHtml + '</td>' +
                     '</tr>'
                 );
 

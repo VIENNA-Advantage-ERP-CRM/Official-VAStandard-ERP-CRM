@@ -139,17 +139,21 @@
         }
 
         /*
-         * Per-row Volume — aggregate cash volume, so a compact, locale-aware
-         * magnitude via VIS.Util.formatCompactAmount (K/L/Cr or M/B tiers by
-         * base currency) is appropriate. The formatter returns a non-negative
-         * magnitude, so we compose the final string ourselves: sign, then
-         * currency, then magnitude — a negative renders as e.g. -$200.56
-         * (leading minus, before the symbol).
+         * Per-row Volume — aggregate cash volume, so a compact amount (K/L/Cr or
+         * M/B tiers by base currency) composed by VAS.formatAmountByBrowser: the
+         * browser culture places the minus and the currency sign; falls back to
+         * sign + currency + magnitude.
          */
         function formatVolume(item) {
             var numericValue = safeNumber(item && item.displayAmount);
-            var sign = numericValue < 0 ? '-' : '';
             var currency = getCurrencyLabel(item && item.currencySymbol, item && item.currencyISO);
+
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                return VAS.formatAmountByBrowser(numericValue, item && item.currencyISO,
+                    getPrecision(item && item.stdPrecision), { compact: true, symbol: currency });
+            }
+
+            var sign = numericValue < 0 ? '-' : '';
             var magnitude = VIS.Util.formatCompactAmount(
                 numericValue,
                 item && item.currencyISO,

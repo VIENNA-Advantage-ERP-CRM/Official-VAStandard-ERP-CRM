@@ -933,6 +933,7 @@ namespace VASLogic.Models
                                   orgtrx.Name AS OrgTrxName,
                                   per.Name AS PeriodName,
                                   cur.CurSymbol AS AcctCurSymbol,
+                                  cur.ISO_Code AS AcctCurISO,
                                   cur.StdPrecision AS AcctStdPrecision
                              FROM Fact_Acct fa
                              INNER JOIN C_ElementValue ev ON (ev.C_ElementValue_ID=fa.Account_ID)
@@ -987,6 +988,7 @@ namespace VASLogic.Models
                         if (string.IsNullOrEmpty(pj.CurSymbol))
                         {
                             pj.CurSymbol = Util.GetValueOfString(r["AcctCurSymbol"]);
+                            pj.CurISO = Util.GetValueOfString(r["AcctCurISO"]);
                             pj.StdPrecision = Util.GetValueOfInt(r["AcctStdPrecision"]);
                         }
                     }
@@ -1483,6 +1485,8 @@ namespace VASLogic.Models
             /// <summary>Accounting-schema currency — posted amounts are ACCOUNTED
             /// amounts, so the payment's own currency does not apply here.</summary>
             public string CurSymbol { get; set; }
+            /// <summary>ISO code of that currency, for the browser-culture amount format.</summary>
+            public string CurISO { get; set; }
             public int StdPrecision { get; set; }
         }
 

@@ -265,16 +265,15 @@
             bodyObserver.observe($list[0]);
         }
 
-        /* Compact currency string for an alert amount using the shared CurrencyFormat
-           util (Indian vs international scale per the base-currency ISO). Sign is
-           prepended by the caller convention; symbol precedes the magnitude. */
+        /* Compact currency string for an alert amount (Indian vs international scale
+           per the base-currency ISO); the browser culture places the symbol and the
+           minus (VAS.formatAmountByBrowser, 20-Nov-2026). */
         function rtaFormatAmount(alert, data) {
             var sym = (data && data.CurSymbol) || '';
             var iso = (data && data.CurIso) || '';
             var precision = (data && data.StdPrecision != null) ? data.StdPrecision : 2;
             var value = Number(alert.Amount || 0);
-            var sign = value < 0 ? '-' : '';
-            return sign + sym + VIS.Util.formatCompactAmount(value, iso, precision);
+            return VAS.formatAmountByBrowser(value, iso, precision, { compact: true, symbol: sym });
         }
 
         function rtaBuildRow(alert, idx, data) {

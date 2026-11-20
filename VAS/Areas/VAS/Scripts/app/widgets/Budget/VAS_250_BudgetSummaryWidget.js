@@ -1436,10 +1436,20 @@
 
            The helper returns a magnitude by contract, so the sign is restored here - a balance
            that has gone negative means the budget is overspent, and a card that printed
-           "−$117K" as "$117K" would state the opposite of the figure behind it. */
+           "−$117K" as "$117K" would state the opposite of the figure behind it.
+           Composed by the shared browser-culture formatter (it places the minus and the
+           symbol); the hand composition below is the fallback when it is not loaded. */
         function compactAmount(value) {
             var v = Number(value) || 0;
             var magnitude;
+
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(v, isoCode(), precision(),
+                        { compact: true, symbol: symbol(), minusSign: '−' });
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
 
             try {
                 if (VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
@@ -1455,11 +1465,19 @@
 
         /* Full, non-compact amount for the tooltips: the exact figure behind the compact cell.
            Grouping and the decimal separator come from the browser locale, the decimals from the
-           schema currency's precision. */
+           schema currency's precision. The shared formatter places the minus and the
+           currency sign the way the browser culture does, like the compact cell. */
         function fullAmount(value) {
             var v = Number(value) || 0;
             var p = precision();
             var text;
+
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(v, isoCode(), p, { symbol: symbol(), minusSign: '−' });
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
 
             try {
                 text = Math.abs(v).toLocaleString(window.navigator.language,

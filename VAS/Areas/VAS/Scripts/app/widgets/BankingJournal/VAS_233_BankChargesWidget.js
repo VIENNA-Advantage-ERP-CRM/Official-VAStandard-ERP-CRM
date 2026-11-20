@@ -22,7 +22,7 @@
  *
  *                  Amounts arrive already converted into the tenant's base
  *                  (accounting-schema) currency and are formatted through the
- *                  shared VIS.Util.formatCompactAmount helper
+ *                  shared VAS.formatAmountByBrowser (compact) helper
  *                  (Scripts/app/util/CurrencyFormat.js), so the compact scale
  *                  follows the base currency - K/L/Cr for Indian-numbering
  *                  currencies, K/M/B otherwise - and the decimals follow its
@@ -363,11 +363,11 @@
                type tiers inside it read as two marks. */
             /* THE SIGN IS PART OF THE FIGURE. compact() returns a MAGNITUDE by contract, so
                a period whose charges net negative - a reversed or refunded fee - would
-               otherwise print as though the bank had taken that money. The minus goes
-               before the symbol, where a reader expects it. */
+               otherwise print as though the bank had taken that money. compactMoney passes
+               the signed value, and the browser culture places the minus and the symbol. */
             $value
                 .attr('title', valueTooltip(amount))
-                .text((amount < 0 ? '-' : '') + symbol() + compact(amount));
+                .text(compactMoney(amount));
 
             $foot.html(deltaHtml() + countHtml(count));
         }
@@ -446,10 +446,34 @@
             return String(Math.abs(Number(value) || 0));
         }
 
+        /* Signed compact amount with the currency sign, composed by the shared
+           browser-culture formatter (sign position and separators from the browser);
+           falls back to minus + symbol + compact() when it is not loaded. */
+        function compactMoney(value) {
+            var v = Number(value) || 0;
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(v, iso(), precision(),
+                        { compact: true, symbol: symbol(), minusSign: '-' });
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
+            return (v < 0 ? '-' : '') + symbol() + compact(v);
+        }
+
         /* Full, non-compact amount for the tooltips: the exact figure behind the
            rounded headline. Grouping and the decimal separator come from the browser
-           locale, the decimals from the base currency's precision. */
+           locale, the decimals from the base currency's precision. The shared formatter
+           places the minus and the currency sign the way the browser culture does,
+           like the headline ("-$900.00" en-US, "-900,00 $" de-DE). */
         function amountText(value) {
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(Number(value) || 0, iso(), precision(),
+                        { symbol: symbol(), minusSign: '-' });
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
             var abs = Math.abs(Number(value) || 0);
             var p = precision();
             var text = abs.toLocaleString(window.navigator.language,

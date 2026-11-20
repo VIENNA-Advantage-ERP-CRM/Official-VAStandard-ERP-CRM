@@ -166,7 +166,7 @@
             var customerName = row.customerName || "";
             var dueDateText = formatDueDate(row.dueDate);
             var methodName = normalizeMethodName(row.paymentMethodName);
-            var amount = formatAmount(row.expectedAmount);
+            var amount = formatAmount(row.expectedAmount, row);
             var barClass = getBarClass(methodName, index);
 
             return $(
@@ -247,7 +247,16 @@
             });
         }
 
-        function formatAmount(value) {
+        function formatAmount(value, row) {
+            // Browser-culture amount with the base currency's sign and precision once the row carries isoCode.
+            if (row && row.isoCode && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(Number(value || 0), row.isoCode, row.stdPrecision,
+                        { symbol: row.curSymbol || '' });
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
+
             var absVal = Number(value || 0);
             var stdPrecision = 0;
 

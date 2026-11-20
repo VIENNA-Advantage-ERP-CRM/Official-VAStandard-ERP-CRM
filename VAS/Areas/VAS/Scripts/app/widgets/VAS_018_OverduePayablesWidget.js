@@ -267,11 +267,11 @@
             var start = drillPage * DRILL_PAGE_SIZE;
             var end = Math.min(start + DRILL_PAGE_SIZE, vendors.length);
 
-            var totalTip = sym + ' ' + formatFull(total, precision);
+            var totalTip = formatFullMoney(total, sym, data.CurIso, precision);
             var html = '<div class="vas-opwdg-drill">'
                 + '<div class="vas-opwdg-drill-card">'
                 +   '<span class="vas-opwdg-drill-card-label">' + opEsc(msg('VAS_018_OverdueAmount', 'Overdue Amount')) + '</span>'
-                +   '<strong class="vas-opwdg-drill-card-value" title="' + opEsc(totalTip) + '">' + opEsc((total < 0 ? '-' : '') + sym + VIS.Util.formatCompactAmount(total, data.CurIso, precision)) + '</strong>'
+                +   '<strong class="vas-opwdg-drill-card-value" title="' + opEsc(totalTip) + '">' + opEsc(VAS.formatAmountByBrowser(total, data.CurIso, precision, { compact: true, symbol: sym })) + '</strong>'
                 + '</div>'
                 + '<div class="vas-opwdg-drill-copy">'
                 +   '<p class="vas-opwdg-drill-desc">' + opEsc(summaryText) + '</p>'
@@ -284,8 +284,8 @@
                 var width = maxAmount > 0 ? (amount / maxAmount) * 100 : 0;
                 width = Math.max(0, Math.min(100, width));
                 var barWidth = width > 0 ? Math.max(2, width) : 0;
-                var rowValue = (amount < 0 ? '-' : '') + sym + VIS.Util.formatCompactAmount(amount, data.CurIso, precision) + ' — ' + formatQty(dpd) + msg('VAS_018_DaySuffix', 'd');
-                var rowTip = sym + ' ' + formatFull(amount, precision) + ' — ' + formatQty(dpd) + msg('VAS_018_DaySuffix', 'd');
+                var rowValue = VAS.formatAmountByBrowser(amount, data.CurIso, precision, { compact: true, symbol: sym }) + ' — ' + formatQty(dpd) + msg('VAS_018_DaySuffix', 'd');
+                var rowTip = formatFullMoney(amount, sym, data.CurIso, precision) + ' — ' + formatQty(dpd) + msg('VAS_018_DaySuffix', 'd');
 
                 html += '<div class="vas-opwdg-drill-row">'
                     + '<div class="vas-opwdg-drill-row-head">'
@@ -365,6 +365,15 @@
             });
         }
 
+        /* Full amount with the currency sign for tooltips; the browser culture places the sign
+           and the minus (VAS.formatAmountByBrowser), old "symbol + space + number" as fallback. */
+        function formatFullMoney(value, sym, isoCode, precision) {
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try { return VAS.formatAmountByBrowser(value, isoCode, precision, { symbol: sym }); } catch (e) { if (window.console) { console.log(e); } }
+            }
+            return sym + ' ' + formatFull(value, precision);
+        }
+
         function formatQty(value) {
             return Number(value || 0).toLocaleString(window.navigator.language, {
                 maximumFractionDigits: 2
@@ -399,16 +408,16 @@
             }
         };
 
-        /* Compose the KPI metric via the shared CurrencyFormat util
-           (VIS.Util.formatCompactAmount): sign, then the currency-symbol span, then
-           the compact magnitude (Indian vs international per the base-currency ISO).
-           Mirrors VIS.OverdueWidget.formatMetric. */
+        /* Compose the KPI metric: compact amount with the currency-symbol span; the
+           browser culture places the sign and the minus (VAS.formatAmountByBrowser,
+           20-Nov-2026). Mirrors VIS.OverdueWidget.formatMetric. */
         function formatMetric(value, symbol, isoCode, precision) {
             value = Number(value || 0);
-            var sign = value < 0 ? '-' : '';
-            var absStr = VIS.Util.formatCompactAmount(value, isoCode, precision);
-            var symHtml = symbol ? '<span class="vas-opwdg-cur">' + opEsc(symbol) + '</span>' : '';
-            return sign + symHtml + absStr;
+            return VAS.formatAmountByBrowser(value, isoCode, precision, {
+                compact: true,
+                symbol: symbol,
+                symbolWrap: function (s) { return '<span class="vas-opwdg-cur">' + opEsc(s) + '</span>'; }
+            });
         }
 
         /* ---- Busy indicator ---- */

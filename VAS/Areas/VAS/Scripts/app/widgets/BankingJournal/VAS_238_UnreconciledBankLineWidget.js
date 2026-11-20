@@ -809,10 +809,21 @@
         /* Compact magnitude with the sign and symbol composed on. The ROW's own currency
            drives the scale - the ISO code decides whether it steps in lakh/crore or
            million/billion - so no tenant currency is assumed anywhere. A true minus sign,
-           not a hyphen, and an explicit plus so the direction is never inferred. */
+           not a hyphen, and an explicit plus so the direction is never inferred. Composed
+           by the shared browser-culture formatter with the ROW's ISO code and symbol;
+           the hand composition below is the fallback when it is not loaded. */
         function signedAmount(item, value) {
             var v = Number(value) || 0;
             var magnitude;
+
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(v,
+                        (item && item.CurrencyCode) ? item.CurrencyCode : '', precisionOf(item),
+                        { compact: true, symbol: symbolOf(item), minusSign: '−', positiveSign: '+' });
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
 
             try {
                 if (VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
@@ -833,6 +844,15 @@
         function signedAmountText(item, value) {
             var v = Number(value) || 0;
             var p = precisionOf(item);
+            var iso = (item && item.CurrencyCode) ? item.CurrencyCode : '';
+            /* Browser-culture formatter places sign, separators and currency sign; hand-composed fallback below. */
+            if (iso && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(v, iso, p,
+                        { symbol: symbolOf(item), minusSign: '−', positiveSign: '+' });
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
             var text = Math.abs(v).toLocaleString(window.navigator.language,
                 { minimumFractionDigits: p, maximumFractionDigits: p });
 

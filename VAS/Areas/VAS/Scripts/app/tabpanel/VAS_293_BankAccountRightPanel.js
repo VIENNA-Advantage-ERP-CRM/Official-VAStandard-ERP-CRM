@@ -392,8 +392,12 @@
 
         /* Amounts carry the ACCOUNT currency's symbol and precision - never a
            hard-coded symbol; the user's locale decides grouping and separators. */
+        // With the account's ISO code the shared formatter places minus and currency sign in the browser culture.
         function money(value) {
             if (!data) return "";
+            if (data.CurISO && window.VAS && typeof VAS.formatAmountByBrowser === "function") {
+                try { return ltrToken(VAS.formatAmountByBrowser(value, data.CurISO, (data.StdPrecision >= 0 && data.StdPrecision <= 10) ? data.StdPrecision : 2, { symbol: data.CurSymbol || "" })); } catch (e) { if (window.console) { console.log(e); } }
+            }
             return ltrToken(rawMoney(value, data.CurSymbol || data.CurISO, data.StdPrecision));
         }
 

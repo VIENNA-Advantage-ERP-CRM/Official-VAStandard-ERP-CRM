@@ -539,6 +539,17 @@
                 var amountText = formatAmount(Math.abs(Number(row.amount || 0)), precision);
                 var sign = Number(row.amount || 0) < 0 ? '-' : '';
                 var amountHtml = sign + (sym ? '<span class="vas-scheduled-ap-payment-cur-inline">' + escapeHtml(sym) + '</span>' : '') + escapeHtml(amountText);
+                var amountTitle = sign + (sym ? sym : '') + amountText;
+                // browser culture places sign, styled symbol and separators
+                if (invoiceCurrency && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                    try {
+                        amountTitle = VAS.formatAmountByBrowser(Number(row.amount || 0) || 0, invoiceCurrency, precision, { symbol: row.invoiceCurrencySymbol });
+                        amountHtml = VAS.formatAmountByBrowser(Number(row.amount || 0) || 0, invoiceCurrency, precision, {
+                            symbol: row.invoiceCurrencySymbol,
+                            symbolWrap: function (s) { return '<span class="vas-scheduled-ap-payment-cur-inline">' + escapeHtml(s) + '</span>'; }
+                        });
+                    } catch (e) { if (window.console) { console.log(e); } }
+                }
                 var paymentMethodName = row.paymentMethodName || lbl('VAS_029_MessageNotSpecified', 'Not Specified');
 
                 $dialogTbody.append(
@@ -555,7 +566,7 @@
                     '<td class="vas-scheduled-ap-payment-td-method" title="' + escapeHtml(paymentMethodName) + '">' +
                     '<span class="vas-scheduled-ap-payment-truncate">' + escapeHtml(paymentMethodName) + '</span>' +
                     '</td>' +
-                    '<td class="vas-scheduled-ap-payment-td-amount" title="' + escapeHtml(sign + (sym ? sym : '') + amountText) + '">' + amountHtml + '</td>' +
+                    '<td class="vas-scheduled-ap-payment-td-amount" title="' + escapeHtml(amountTitle) + '">' + amountHtml + '</td>' +
                     '</tr>'
                 );
             }
@@ -780,6 +791,11 @@
          * for example ID12,000. Table cells keep the exact amount.
          */
         function formatHeaderAmount(value, currencySymbol, currencyISO) {
+            // browser culture places sign, symbol and separators (whole numbers kept)
+            if (currencyISO && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try { return VAS.formatAmountByBrowser(Number(value || 0) || 0, currencyISO, 0, { symbol: currencySymbol }); } catch (e) { if (window.console) { console.log(e); } }
+            }
+
             var numericValue = Number(value || 0);
 
             if (isNaN(numericValue)) {
@@ -799,6 +815,12 @@
 
         function formatCurrencyAmount(value, currencySymbol, currencyISO, precision) {
             var numericValue = Number(value || 0);
+
+            // browser culture places sign, symbol and separators
+            if (currencyISO && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try { return VAS.formatAmountByBrowser(numericValue, currencyISO, normalizePrecision(precision), { symbol: currencySymbol }); } catch (e) { if (window.console) { console.log(e); } }
+            }
+
             var sign = numericValue < 0 ? '-' : '';
             var absValue = Math.abs(numericValue);
             var amount = formatAmount(absValue, normalizePrecision(precision));
@@ -810,10 +832,16 @@
             return currencyISO ? sign + amount + ' ' + currencyISO : sign + amount;
         }
 
+        /* Compact amount; the browser culture places the currency sign and the minus
+           (VAS.formatAmountByBrowser, 20-Nov-2026). The hand-composed form below is the
+           fallback when the shared formatter is not loaded. */
         function formatWidgetCompactAmount(value, currencySymbol, currencyISO, precision) {
             var numericValue = Number(value || 0);
             var sign = numericValue < 0 ? '-' : '';
             var stdPrecision = normalizePrecision(precision);
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                return VAS.formatAmountByBrowser(numericValue, currencyISO, stdPrecision, { compact: true, symbol: currencySymbol });
+            }
             var amount =
                 VIS &&
                     VIS.Util &&

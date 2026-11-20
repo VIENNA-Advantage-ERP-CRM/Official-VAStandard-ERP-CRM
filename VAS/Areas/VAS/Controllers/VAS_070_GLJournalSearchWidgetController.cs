@@ -162,7 +162,7 @@ namespace VAS.Areas.VAS.Controllers
 
             string core = @"SELECT b.GL_Journal_ID AS RecordId, b.DocumentNo AS DocumentNo, b.Description AS Title,
                        b.TotalDr AS Amount, b.DateDoc AS DocDate, b.DocStatus AS DocStatus, b.Posted AS Posted,
-                       cur.CurSymbol AS CurSymbol, cur.StdPrecision AS StdPrecision,
+                       cur.CurSymbol AS CurSymbol, cur.ISO_Code AS ISOCode, cur.StdPrecision AS StdPrecision,
                        acs.Name AS AcctSchema, rl.Name AS PostingTypeName,
                        CASE WHEN LOWER(b.DocumentNo) = LOWER(@QExact) THEN 4
                             WHEN LOWER(b.DocumentNo) LIKE LOWER(@QStart) THEN 3
@@ -225,6 +225,7 @@ namespace VAS.Areas.VAS.Controllers
                         Title        = title,
                         Amount       = Util.GetValueOfDecimal(row["Amount"]),
                         CurSymbol    = Util.GetValueOfString(row["CurSymbol"]),
+                        ISOCode      = Util.GetValueOfString(row["ISOCode"]),
                         StdPrecision = Util.GetValueOfInt(row["StdPrecision"]),
                         DocDate      = d.HasValue ? d.Value.ToString("yyyy-MM-dd") : "",
                         DocStatus    = Util.GetValueOfString(row["DocStatus"]),
@@ -319,6 +320,7 @@ namespace VAS.Areas.VAS.Controllers
             public string  Title        { get; set; }
             public decimal Amount       { get; set; }   // TotalDr in the journal's document currency
             public string  CurSymbol    { get; set; }   // document currency symbol (per row)
+            public string  ISOCode      { get; set; }   // document currency ISO code (per row)
             public int     StdPrecision { get; set; }   // document currency precision (per row)
             public string  DocDate      { get; set; }
             public string  DocStatus    { get; set; }

@@ -56,6 +56,7 @@ namespace VAS.Controllers
                 "SELECT ClientInfo.AD_Client_ID," +
                 "       AcctSchema.C_Currency_ID AS C_Currency_ID," +
                 "       Currency.StdPrecision," +
+                "       Currency.ISO_Code AS Iso_Code," +
                 "       CASE WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol ELSE Currency.ISO_Code END AS Cur_Symbol" +
                 " FROM AD_ClientInfo ClientInfo" +
                 " INNER JOIN C_AcctSchema AcctSchema ON (ClientInfo.C_AcctSchema1_ID=AcctSchema.C_AcctSchema_ID)" +
@@ -77,6 +78,7 @@ namespace VAS.Controllers
                 "), 0) AS TodayAmount," +
                 "       COUNT(1) AS TodayCount," +
                 "       MIN(Sch.Cur_Symbol) AS Cur_Symbol," +
+                "       MIN(Sch.Iso_Code) AS Iso_Code," +
                 "       MIN(Sch.StdPrecision) AS StdPrecision" +
                 " FROM C_CashLine CashLine" +
                 " INNER JOIN C_Cash Cash ON (Cash.C_Cash_ID=CashLine.C_Cash_ID)" +
@@ -133,6 +135,7 @@ namespace VAS.Controllers
                 "        TodayData.TodayCount," +
                 "        (SELECT AVG(D.DailyAmount) FROM DailyTotals D) AS AvgDailyAmount," +
                 "        TodayData.Cur_Symbol," +
+                "        TodayData.Iso_Code," +
                 "        TodayData.StdPrecision" +
                 " FROM TodayData";
 
@@ -140,6 +143,7 @@ namespace VAS.Controllers
             int     todayCount     = 0;
             decimal avgDailyAmount = 0;
             string  curSymbol      = "";
+            string  isoCode        = "";
             // StdPrecision is read from C_Currency.StdPrecision via SchemaCurrency — never hardcoded.
             int     stdPrecision   = 0;
 
@@ -153,6 +157,7 @@ namespace VAS.Controllers
                     todayCount     = Util.GetValueOfInt(dr["TodayCount"]);
                     avgDailyAmount = Util.GetValueOfDecimal(dr["AvgDailyAmount"]);
                     curSymbol      = Util.GetValueOfString(dr["Cur_Symbol"]);
+                    isoCode        = Util.GetValueOfString(dr["Iso_Code"]);
                     stdPrecision   = Util.GetValueOfInt(dr["StdPrecision"]);
                 }
             }
@@ -171,6 +176,8 @@ namespace VAS.Controllers
                 todayCount     = todayCount,
                 avgDailyAmount = Math.Round(avgDailyAmount, stdPrecision),
                 symbol         = curSymbol,
+                // ISO code drives the client's browser-culture amount format
+                isoCode        = isoCode,
                 precision      = stdPrecision
             };
 

@@ -300,7 +300,7 @@
                         (sub ? '<div class="vas-dssrch-subline">' + sub + '</div>' : '') +
                     '</div>' +
                     '<div class="vas-dssrch-meta">' +
-                        '<div class="vas-dssrch-amount">' + formatAmount(item.Amount, item.CurSymbol, item.StdPrecision) + '</div>' +
+                        '<div class="vas-dssrch-amount">' + formatAmount(item.Amount, item.CurSymbol, item.StdPrecision, item.ISOCode) + '</div>' +
                         '<div class="vas-dssrch-date">' + dsEsc(formatDate(item.DocDate)) + '</div>' +
                     '</div>' +
                 '</div>'
@@ -383,10 +383,14 @@
         // Amount is shown in the journal's OWN document currency (symbol + precision come
         // per row from the server - no conversion). Sign goes BEFORE the currency symbol and
         // there is NO space between symbol and amount (e.g. -$134.99, not $ -134.99).
-        function formatAmount(number, symbol, precision) {
+        // With the row's ISO code the shared formatter places sign and symbol in the browser culture.
+        function formatAmount(number, symbol, precision, iso) {
             var n = (typeof number === 'number') ? number : parseFloat(number);
             if (isNaN(n)) { return ''; }
             var prec = (typeof precision === 'number' && precision >= 0) ? precision : 2;
+            if (iso && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try { return dsEsc(VAS.formatAmountByBrowser(n, iso, prec, { symbol: symbol || '' })); } catch (e) { if (window.console) { console.log(e); } }
+            }
             var sign = n < 0 ? '-' : '';
             var formatted = Math.abs(n).toLocaleString(window.navigator.language, { minimumFractionDigits: prec, maximumFractionDigits: prec });
             return sign + (symbol || '') + formatted;

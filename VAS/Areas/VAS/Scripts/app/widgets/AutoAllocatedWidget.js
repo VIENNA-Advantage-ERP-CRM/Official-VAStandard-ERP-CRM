@@ -275,6 +275,26 @@
             return { sign: sign, magnitude: magnitude };
         }
 
+        /* Payment-currency amount in the browser culture (VAS.formatAmountByBrowser, 20-Nov-2026); asHtml puts the sign in the inline currency span. Fallback: sign + symbol + number. */
+        function formatRowAmount(value, iso, sym, asHtml) {
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    var opts = { symbol: sym };
+                    if (asHtml) {
+                        opts.symbolWrap = function (s) { return '<span class="vas-aa-cur-inline">' + escapeHtml(s) + '</span>'; };
+                    }
+                    return VAS.formatAmountByBrowser(Number(value || 0), iso, null, opts);
+                } catch (e) { if (window.console) { console.log(e); } }
+            }
+            var parts = formatExactAmount(value);
+            if (asHtml) {
+                return escapeHtml(parts.sign) +
+                    (sym ? '<span class="vas-aa-cur-inline">' + escapeHtml(sym) + '</span>' : '') +
+                    escapeHtml(parts.magnitude);
+            }
+            return parts.sign + (sym ? sym : '') + parts.magnitude;
+        }
+
         function renderMetric(data) {
             var percent = (data && data.autoAllocatedPercent) || 0;
             lastPeriod = (data && data.period) || "";
@@ -388,24 +408,17 @@
                 var bankText = formatBankAccount(row);
                 var currencyCode = row.paymentCurrency || "";
                 var sym = row.paymentCurrencySymbol || currencyCode || "";
-                var amountParts = formatExactAmount(row.amount);
-                var amountSign = amountParts.sign;
-                var amountMagnitude = amountParts.magnitude;
                 /* Amount keeps its payment-currency symbol inline — no
-                   conversion to base currency, per spec. Sign precedes the
-                   symbol: "+$1,000.00" / "-$1,000.00". */
-                var amountHtml = escapeHtml(amountSign) +
-                    (sym ? '<span class="vas-aa-cur-inline">' + escapeHtml(sym) + '</span>' : '') +
-                    escapeHtml(amountMagnitude);
+                   conversion to base currency, per spec. The browser culture
+                   places the sign and the minus (formatRowAmount). */
+                var amountHtml = formatRowAmount(row.amount, currencyCode, sym, true);
+                var amountTitle = formatRowAmount(row.amount, currencyCode, sym, false);
 
                 /* Unallocated amount (payment-currency, same formatting as Amount).
                    The cell is always rendered; CSS shows it only on the Unallocated
                    tab (table carries .vas-aa-show-unalloc). */
-                var unallocParts = formatExactAmount(row.unallocatedAmount);
-                var unallocHtml = escapeHtml(unallocParts.sign) +
-                    (sym ? '<span class="vas-aa-cur-inline">' + escapeHtml(sym) + '</span>' : '') +
-                    escapeHtml(unallocParts.magnitude);
-                var unallocTitle = unallocParts.sign + (sym ? sym : '') + unallocParts.magnitude;
+                var unallocHtml = formatRowAmount(row.unallocatedAmount, currencyCode, sym, true);
+                var unallocTitle = formatRowAmount(row.unallocatedAmount, currencyCode, sym, false);
 
                 /* The Matched column was dropped — the active tab itself
                    indicates the allocated/unallocated state. */
@@ -422,7 +435,7 @@
                     '<span class="vas-aa-truncate">' + escapeHtml(bankText) + '</span>' +
                     '</td>' +
                     '<td class="vas-aa-td-currency" title="' + escapeHtml(currencyCode) + '">' + escapeHtml(currencyCode) + '</td>' +
-                    '<td class="vas-aa-td-amount" title="' + escapeHtml(amountSign + (sym ? sym : '') + amountMagnitude) + '">' + amountHtml + '</td>' +
+                    '<td class="vas-aa-td-amount" title="' + escapeHtml(amountTitle) + '">' + amountHtml + '</td>' +
                     '<td class="vas-aa-td-unallocated" title="' + escapeHtml(unallocTitle) + '">' + unallocHtml + '</td>' +
                     '</tr>'
                 );
