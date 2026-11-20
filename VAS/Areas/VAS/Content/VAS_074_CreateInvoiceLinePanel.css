@@ -2129,6 +2129,41 @@
     color: var(--cil-danger);
 }
 
+/* ---------- busy overlay (as VAS_218 .vas-ol-busy-overlay) ----------
+   Body-mounted, position:fixed over the whole page, so it is visible wherever the panel is
+   scrolled and is not clipped by the tab's overflow. Shown during the header save, the
+   re-pricing reload and the line save. Below the toasts (z-index 10002). */
+.vas-cil-busy-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.55);
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.vas-cil-busy-overlay--show {
+    display: flex;
+}
+
+.vas-cil-busy-overlay::after {
+    content: '';
+    width: 36px;
+    height: 36px;
+    border: 4px solid #d0dce8;
+    border-top-color: var(--cil-action-blue, #0083da);
+    border-radius: 50%;
+    animation: vas-cil-spin 0.7s linear infinite;
+}
+
+@keyframes vas-cil-spin {
+    to { transform: rotate(360deg); }
+}
+
 /* ---------- toast ---------- */
 .vas-cil-toast {
     position: fixed;
