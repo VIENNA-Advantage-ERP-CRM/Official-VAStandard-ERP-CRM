@@ -70,6 +70,29 @@ namespace VIS.Models
 
         }
         /// <summary>
+        /// Get the description of a product from M_Product.
+        /// Used by the VAS_GetProductDescription callout to fill the Description of VAS_OppLines.
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="fields">M_Product_ID</param>
+        /// <returns>Product description, empty string if the product has none or is not accessible</returns>
+        public string GetProductDescription(Ctx ctx, string fields)
+        {
+            int M_Product_ID = Util.GetValueOfInt(fields);
+            if (M_Product_ID <= 0)
+            {
+                return "";
+            }
+
+            SqlParameter[] param = new SqlParameter[1];
+            param[0] = new SqlParameter("@productId", M_Product_ID);
+
+            string sql = "SELECT p.Description FROM M_Product p WHERE p.IsActive = 'Y' AND p.M_Product_ID = @productId";
+            // Row-level security on the main table
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            return Util.GetValueOfString(DB.ExecuteScalar(sql, param, null));
+        }
+        /// <summary>
         /// Get UPM Precision
         /// </summary>
         /// <param name="ctx"></param>

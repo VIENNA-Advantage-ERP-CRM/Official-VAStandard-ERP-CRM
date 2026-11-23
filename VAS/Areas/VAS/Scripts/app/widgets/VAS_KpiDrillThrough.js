@@ -20,6 +20,8 @@
  *           });
  *           drill.open(); drill.close(); drill.dispose();
  *
+ * 2026-11-20 - formatMoney now places the currency symbol by browser culture (after the number
+ *           in de-DE), matching the KPI tile instead of always prefixing it.
  * 2026-08-17 - a row used to be clickable whenever mapRow ran, even when it resolved to
  *           no record: VAS_125's pipeline list includes lead-backed accounts, which carry
  *           bpId 0 because there is no C_BPartner to open, so the row rendered as a
@@ -72,12 +74,29 @@
     // Compact money against the base (accounting-schema) currency the endpoint
     // reported. VIS.Util.BrowserCultureFormatter.formatCompactAmount supplies the scaled magnitude at the
     // system-configured precision; the sign is composed before the symbol here.
+    // 2026-11-20 - the currency symbol is placed by browser culture (before / after the number),
+    // exactly like the KPI tiles ("15,00 Mio. $" in de-DE), so tile and popup always agree.
+    function currencyAffixes(symbol, isoCode) {
+        var fallback = { before: symbol || isoCode || '', after: '' };
+        if (!isoCode) { return fallback; }
+        try {
+            var parts = new Intl.NumberFormat(window.navigator.language, { style: 'currency', currency: isoCode }).formatToParts(1);
+            var before = '', after = '', seenInteger = false;
+            for (var i = 0; i < parts.length; i++) {
+                if (parts[i].type === 'integer') { seenInteger = true; continue; }
+                if (parts[i].type === 'decimal' || parts[i].type === 'fraction') { continue; }
+                if (seenInteger) { after += parts[i].value; } else { before += parts[i].value; }
+            }
+            return { before: before, after: after };
+        } catch (e) { return fallback; }
+    }
     function formatMoney(value, cur) {
         var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
         var sign = n < 0 ? '-' : '';
         var iso = (cur && cur.iso) || '';
         var symbol = (cur && (cur.symbol || cur.iso)) || '';
-        return sign + symbol + VIS.Util.BrowserCultureFormatter.formatCompactAmount(n, iso, precisionOf(cur));
+        var affix = currencyAffixes(symbol, iso);
+        return sign + affix.before + VIS.Util.BrowserCultureFormatter.formatCompactAmount(Math.abs(n), iso, precisionOf(cur)) + affix.after;
     }
     // 2026-11-18 - hover tooltip: the FULL amount (browser culture, currency precision) behind
     // the compact formatMoney text. mapRow hands it back as valueTitle.

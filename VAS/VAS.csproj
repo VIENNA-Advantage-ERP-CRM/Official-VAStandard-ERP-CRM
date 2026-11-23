@@ -876,6 +876,7 @@
     <Content Include="Areas\VAS\Scripts\app\util\AttributeControl.js" />
     <Content Include="Areas\VAS\Scripts\app\util\VAS_PanelUtil.js" />
     <Content Include="Areas\VAS\Scripts\app\util\VAS_ZoomUtil.js" />
+    <Content Include="Areas\VAS\Scripts\app\util\VAS_TabNavUtil.js" />
     <Content Include="Areas\VAS\Scripts\app\util\VAS_OverlayWatch.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\AgingReceivablesWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\AvgDaysToPayWidget.js" />
@@ -1091,6 +1092,7 @@
     <Content Include="Areas\VAS\Scripts\model\callouttimeexpense.js" />
     <Content Include="Areas\VAS\Scripts\model\VAS_CalloutContract.js" />
     <Content Include="Areas\VAS\Scripts\model\VAS_CalloutOpportunity.js" />
+    <Content Include="Areas\VAS\Scripts\model\VAS_GetProductDescription.js" />
     <Content Include="Areas\VAS\Scripts\react\index.jsx" />
     <Content Include="Areas\VAS\Scripts\src\reactjs.js" />
     <Content Include="Areas\VAS\Scripts\src\VASjs.js" />

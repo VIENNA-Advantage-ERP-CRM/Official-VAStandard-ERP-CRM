@@ -495,7 +495,7 @@ namespace VAS.Controllers
                         // Whole calendar days to expiry, computed in C# (no SQL date math).
                         int daysToExpiry = 0;
                         if (endDate.HasValue)
-                        {
+                        {   
                             daysToExpiry = (int)(endDate.Value.Date - today.Date).TotalDays;
                             if (daysToExpiry < 0) { daysToExpiry = 0; }
                         }
