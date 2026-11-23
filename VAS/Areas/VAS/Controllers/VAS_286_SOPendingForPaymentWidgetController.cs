@@ -73,6 +73,9 @@ namespace VAS.Controllers
     ///   Read-only here; no writes.
     /// Chronological development:
     ///   VAI052      2026-09-15 Created
+    ///   VAS163      2026-11-20 Sr 234/243 Amount without tax in the order currency (invoice /
+    ///                          receipt currencies converted), total-due chip in the base currency;
+    ///                          Sr 237-242 SO lines: charge name, item-only qty/status, line UOM.
     /// </summary>
     [System.Web.Mvc.SessionState(System.Web.SessionState.SessionStateBehavior.ReadOnly)]
     public class VAS_286_SOPendingForPaymentWidgetController : Controller
@@ -144,6 +147,30 @@ namespace VAS.Controllers
             }
         }
 
+        // VAS163 2026-11-20: Sr 243 / 254 tax-inclusive is read from the order's own totals (same rule
+        // as VAS_271/273/274: the flags are not reliable) - the tax is inside TotalLines when GrandTotal
+        // is not raised by it (GrandTotal - TotalLines below half the C_OrderTax total).
+        private const string TaxIncludedSql =
+            "(CASE WHEN 2 * (COALESCE(o.GrandTotal, 0) - COALESCE(o.TotalLines, 0)) < " +
+            "(SELECT COALESCE(SUM(COALESCE(ott.TaxAmt, 0)), 0) FROM C_OrderTax ott WHERE ott.C_Order_ID = o.C_Order_ID AND ott.IsActive = 'Y') " +
+            "THEN 'Y' ELSE 'N' END)";
+
+        // VAS163 2026-11-20: Sr 243 order value without tax (TotalLines, less the C_OrderTax total on a
+        // tax-inclusive order) - as VAS_271 / VAS_287.
+        private const string OrderValueExclTaxSql =
+            "CASE WHEN " + TaxIncludedSql + " = 'Y' " +
+            "THEN COALESCE(o.TotalLines, 0) - (SELECT COALESCE(SUM(COALESCE(ot.TaxAmt, 0)), 0) FROM C_OrderTax ot WHERE ot.C_Order_ID = o.C_Order_ID AND ot.IsActive = 'Y') " +
+            "ELSE COALESCE(o.TotalLines, 0) END";
+
+        // VAS163 2026-11-20: Sr 243 share of an invoice's grand total that is not tax (alias "i" =
+        // C_Invoice), same totals-based tax-inclusive rule on C_InvoiceTax; 1 when GrandTotal is 0.
+        private const string InvoiceExTaxRatioSql =
+            "(CASE WHEN COALESCE(i.GrandTotal, 0) = 0 THEN 1 ELSE " +
+            "(CASE WHEN 2 * (COALESCE(i.GrandTotal, 0) - COALESCE(i.TotalLines, 0)) < " +
+            "(SELECT COALESCE(SUM(COALESCE(itt.TaxAmt, 0)), 0) FROM C_InvoiceTax itt WHERE itt.C_Invoice_ID = i.C_Invoice_ID AND itt.IsActive = 'Y') " +
+            "THEN COALESCE(i.TotalLines, 0) - (SELECT COALESCE(SUM(COALESCE(it.TaxAmt, 0)), 0) FROM C_InvoiceTax it WHERE it.C_Invoice_ID = i.C_Invoice_ID AND it.IsActive = 'Y') " +
+            "ELSE COALESCE(i.TotalLines, 0) END) / i.GrandTotal END)";
+
         /// <summary>
         /// The single physical-table fragment - one "FROM C_Order o", WHERE-only, no
         /// GROUP BY (Prompt_Instructions.txt "Case 1"). The ONLY thing AddAccessSQL is
@@ -160,7 +187,12 @@ namespace VAS.Controllers
                        o.C_PaymentTerm_ID AS Payment_Term_Id,
                        o.GrandTotal AS Grand_Total,
                        o.C_Currency_ID AS Currency_Id,
-                       o.DocStatus AS Doc_Status_Code
+                       o.DocStatus AS Doc_Status_Code,
+                       " + OrderValueExclTaxSql + @" AS Order_Ex_Tax,
+                       COALESCE(o.DateAcct, o.DateOrdered) AS Date_Acct,
+                       o.C_ConversionType_ID AS Conversion_Type_Id,
+                       o.AD_Client_ID AS Client_Id,
+                       o.AD_Org_ID AS Org_Id
                   FROM C_Order o
                  WHERE o.AD_Client_ID = @AD_Client_ID
                    AND o.IsActive = 'Y'
@@ -191,13 +223,33 @@ namespace VAS.Controllers
                 orderBy = dueExpr + " " + dir + ", c.Document_No " + dir;
             }
 
+            // VAS163 2026-11-20: Sr 234 / 243 the Amount column is the outstanding amount WITHOUT tax in
+            // the order's (price list) currency: an invoice's open amount is scaled by that invoice's
+            // ex-tax share and converted from the invoice currency into the order currency; customer
+            // receipts are converted from the payment currency; the advance outstanding is scaled by the
+            // order's ex-tax share. The header chip (Total_Due) sums each row converted to the base
+            // (accounting-schema) currency - it used to add up amounts of different currencies.
+            // Currency ids are ints read from the DB, inlined like VAS_271.
+            int baseCurrencyId = GetBaseCurrencyId(ctx);
+            string invoiceOpenExTaxSql = "ROUND(COALESCE(i.VA009_OpenAmount, 0) * " + InvoiceExTaxRatioSql + ", 6)";
+            string invoiceOpenDocSql = "CASE WHEN i.C_Currency_ID = bo.Currency_Id THEN " + invoiceOpenExTaxSql +
+                " ELSE COALESCE(currencyConvert(" + invoiceOpenExTaxSql + ", i.C_Currency_ID, bo.Currency_Id, COALESCE(i.DateAcct, i.DateInvoiced), i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) END";
+            string receivedDocSql = "CASE WHEN p.C_Currency_ID = bo.Currency_Id THEN COALESCE(p.PayAmt, 0)" +
+                " ELSE COALESCE(currencyConvert(COALESCE(p.PayAmt, 0), p.C_Currency_ID, bo.Currency_Id, COALESCE(p.DateAcct, p.DateTrx), p.C_ConversionType_ID, p.AD_Client_ID, p.AD_Org_ID), 0) END";
+            string totalDueSql = baseCurrencyId > 0
+                ? "SUM(CASE WHEN c.Currency_Id = " + baseCurrencyId + " THEN c.Amount " +
+                  "ELSE COALESCE(currencyConvert(c.Amount, c.Currency_Id, " + baseCurrencyId + ", c.Date_Acct, c.Conversion_Type_Id, c.Client_Id, c.Org_Id), 0) END) OVER ()"
+                : "SUM(c.Amount) OVER ()";
+
             string sql = @"
                 WITH base_orders AS (" + baseOrdersSql + @"),
-                invoice_due AS (
+                invoice_open AS (
+                    -- VAS163 2026-11-20: Sr 234 / 243 per open invoice (scalar sub-selects kept out of the aggregate).
                     SELECT
                         i.C_Order_ID AS C_Order_ID,
-                        MIN(COALESCE(i.DueDate, i.DateInvoiced)) AS Payment_Due_Date,
-                        SUM(COALESCE(i.VA009_OpenAmount, 0)) AS Open_Amount
+                        COALESCE(i.DueDate, i.DateInvoiced) AS Due_Date,
+                        COALESCE(i.VA009_OpenAmount, 0) AS Open_Amount,
+                        " + invoiceOpenDocSql + @" AS Open_Amount_Doc
                       FROM C_Invoice i
                       INNER JOIN base_orders bo ON ( bo.C_Order_ID = i.C_Order_ID )
                      WHERE i.IsActive = 'Y'
@@ -205,7 +257,15 @@ namespace VAS.Controllers
                        AND COALESCE(i.IsReturnTrx, 'N') = 'N'
                        AND i.DocStatus IN ('CO', 'CL')
                        AND COALESCE(i.VA009_OpenAmount, 0) > 0
-                     GROUP BY i.C_Order_ID
+                ),
+                invoice_due AS (
+                    SELECT
+                        io.C_Order_ID AS C_Order_ID,
+                        MIN(io.Due_Date) AS Payment_Due_Date,
+                        SUM(io.Open_Amount) AS Open_Amount,
+                        ROUND(SUM(io.Open_Amount_Doc), 6) AS Open_Amount_Doc
+                      FROM invoice_open io
+                     GROUP BY io.C_Order_ID
                 ),
                 schedule_due AS (
                     SELECT
@@ -224,7 +284,7 @@ namespace VAS.Controllers
                 received AS (
                     SELECT
                         p.C_Order_ID AS C_Order_ID,
-                        SUM(COALESCE(p.PayAmt, 0)) AS Received_Amount
+                        ROUND(SUM(" + receivedDocSql + @"), 6) AS Received_Amount
                       FROM C_Payment p
                       INNER JOIN base_orders bo ON ( bo.C_Order_ID = p.C_Order_ID )
                      WHERE p.IsActive = 'Y'
@@ -243,6 +303,12 @@ namespace VAS.Controllers
                         bo.Grand_Total AS Grand_Total,
                         bo.Currency_Id AS Currency_Id,
                         bo.Doc_Status_Code AS Doc_Status_Code,
+                        bo.Order_Ex_Tax AS Order_Ex_Tax,
+                        bo.Date_Acct AS Date_Acct,
+                        bo.Conversion_Type_Id AS Conversion_Type_Id,
+                        bo.Client_Id AS Client_Id,
+                        bo.Org_Id AS Org_Id,
+                        inv.Open_Amount_Doc AS Invoice_Open_Amount_Doc,
                         -- 5-Nov row 31: advance term = VA009_Advance on the payment term
                         -- itself OR on any of its active payment schedule rows.
                         CASE WHEN COALESCE(pt.VA009_Advance, 'N') = 'Y'
@@ -269,6 +335,36 @@ namespace VAS.Controllers
                       LEFT OUTER JOIN invoice_due inv ON ( inv.C_Order_ID = bo.C_Order_ID )
                       LEFT OUTER JOIN schedule_due sd ON ( sd.C_Order_ID = bo.C_Order_ID )
                       LEFT OUTER JOIN received r ON ( r.C_Order_ID = bo.C_Order_ID )
+                ),
+                due_rows AS (
+                    -- VAS163 2026-11-20: Sr 234 / 243 qualification unchanged (gross amounts); Amount is the
+                    -- outstanding WITHOUT tax in the order currency (advance: the order's ex-tax share).
+                    SELECT
+                        cd.C_Order_ID AS C_Order_ID,
+                        cd.Document_No AS Document_No,
+                        cd.Date_Ordered AS Date_Ordered,
+                        cd.BPartner_Id AS BPartner_Id,
+                        cd.Warehouse_Id AS Warehouse_Id,
+                        cd.Currency_Id AS Currency_Id,
+                        cd.Date_Acct AS Date_Acct,
+                        cd.Conversion_Type_Id AS Conversion_Type_Id,
+                        cd.Client_Id AS Client_Id,
+                        cd.Org_Id AS Org_Id,
+                        cd.Invoice_Order_Id AS Invoice_Order_Id,
+                        cd.Invoice_Due_Date AS Invoice_Due_Date,
+                        CASE WHEN cd.Invoice_Order_Id IS NOT NULL THEN COALESCE(cd.Invoice_Open_Amount_Doc, 0)
+                             WHEN COALESCE(cd.Grand_Total, 0) = 0 THEN (cd.Grand_Total - cd.Received_Amount)
+                             ELSE ROUND((cd.Grand_Total - cd.Received_Amount) * cd.Order_Ex_Tax / cd.Grand_Total, 6)
+                        END AS Amount
+                      FROM candidate cd
+                     WHERE cd.Invoice_Open_Amount > 0
+                        OR (
+                            cd.Invoice_Order_Id IS NULL
+                            AND cd.Advance_Flag = 'Y'
+                            AND cd.Doc_Status_Code IN ('CO', 'CL')
+                            AND cd.Has_Invoice = 'N'
+                            AND (cd.Grand_Total - cd.Received_Amount) > 0
+                        )
                 )
                 SELECT
                     c.C_Order_ID AS Order_Id,
@@ -278,30 +374,16 @@ namespace VAS.Controllers
                     COALESCE(w.Name, N'') AS Warehouse_Name,
                     CASE WHEN c.Invoice_Order_Id IS NOT NULL THEN 'Invoice' ELSE 'Advance' END AS Payment_Type,
                     CASE WHEN c.Invoice_Order_Id IS NOT NULL THEN c.Invoice_Due_Date ELSE c.Date_Ordered END AS Payment_Due_Date,
-                    CASE WHEN c.Invoice_Order_Id IS NOT NULL THEN c.Invoice_Open_Amount
-                         ELSE (c.Grand_Total - c.Received_Amount)
-                    END AS Amount,
+                    c.Amount AS Amount,
                     cur.CurSymbol AS Currency_Symbol,
                     cur.ISO_Code AS Currency_Code,
                     cur.StdPrecision AS Currency_Precision,
                     COUNT(1) OVER () AS Total_Rows,
-                    SUM(
-                        CASE WHEN c.Invoice_Order_Id IS NOT NULL THEN c.Invoice_Open_Amount
-                             ELSE (c.Grand_Total - c.Received_Amount)
-                        END
-                    ) OVER () AS Total_Due
-                  FROM candidate c
+                    ROUND(" + totalDueSql + @", 6) AS Total_Due
+                  FROM due_rows c
                   INNER JOIN C_BPartner bp ON ( bp.C_BPartner_ID = c.BPartner_Id )
                   LEFT OUTER JOIN M_Warehouse w ON ( w.M_Warehouse_ID = c.Warehouse_Id )
                   LEFT OUTER JOIN C_Currency cur ON ( cur.C_Currency_ID = c.Currency_Id )
-                 WHERE c.Invoice_Open_Amount > 0
-                    OR (
-                        c.Invoice_Order_Id IS NULL
-                        AND c.Advance_Flag = 'Y'
-                        AND c.Doc_Status_Code IN ('CO', 'CL')
-                        AND c.Has_Invoice = 'N'
-                        AND (c.Grand_Total - c.Received_Amount) > 0
-                    )
                  ORDER BY " + orderBy + @"
                  OFFSET @Row_Offset ROWS FETCH NEXT @Page_Size ROWS ONLY";
 
@@ -376,7 +458,8 @@ namespace VAS.Controllers
                        o.DateOrdered AS Date_Ordered,
                        o.DatePromised AS Date_Promised,
                        o.DocStatus AS Doc_Status_Code,
-                       o.TotalLines AS Order_Value,
+                       " + OrderValueExclTaxSql + @" AS Order_Value,
+                       " + TaxIncludedSql + @" AS Tax_Included,
                        o.DeliveryViaRule AS Delivery_Via_Rule,
                        o.M_Warehouse_ID AS Warehouse_Id,
                        COALESCE(bp.Name, N'') AS Customer_Name,
@@ -394,6 +477,7 @@ namespace VAS.Controllers
             headerSql = MRole.GetDefault(ctx).AddAccessSQL(headerSql, "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
             int warehouseId = 0;
+            bool taxIncluded = false; // VAS163 2026-11-20: Sr 243 line amounts restated without tax
 
             IDataReader dr = null;
             try
@@ -408,6 +492,7 @@ namespace VAS.Controllers
 
                 string docStatusCode = Util.GetValueOfString(dr["Doc_Status_Code"]);
                 warehouseId = dr["Warehouse_Id"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr["Warehouse_Id"]);
+                taxIncluded = string.Equals((Util.GetValueOfString(dr["Tax_Included"]) ?? "").Trim(), "Y", StringComparison.OrdinalIgnoreCase);
                 DateTime? dateOrdered = dr["Date_Ordered"] == DBNull.Value ? (DateTime?)null : Util.GetValueOfDateTime(dr["Date_Ordered"]);
                 DateTime? datePromised = dr["Date_Promised"] == DBNull.Value ? (DateTime?)null : Util.GetValueOfDateTime(dr["Date_Promised"]);
 
@@ -435,12 +520,16 @@ namespace VAS.Controllers
 
             if (result.Order == null) { return result; }
 
-            LoadOrderLines(ctx, result, orderId, warehouseId);
+            LoadOrderLines(ctx, result, orderId, warehouseId, taxIncluded, result.Order.CurrencyPrecision);
 
+            // VAS163 2026-11-20: Sr 242 the Delivery status card counts Item-type product lines only
+            // (charges and other product types never make an order (un)delivered).
             bool anyDelivered = false, allDelivered = true;
-            bool hasLines = result.Lines.Count > 0;
+            bool hasLines = false;
             foreach (OrderLineRow line in result.Lines)
             {
+                if (!line.IsItem) { continue; }
+                hasLines = true;
                 if (line.QtyDelivered > 0) { anyDelivered = true; }
                 if (line.QtyDelivered < line.QtyOrdered) { allDelivered = false; }
             }
@@ -455,30 +544,54 @@ namespace VAS.Controllers
         }
 
         /// <summary>Every active line of the order, each carrying its own free-stock figure.</summary>
-        private void LoadOrderLines(Ctx ctx, OrderDetailResult result, int orderId, int headerWarehouseId)
+        /// <param name="ctx">Login context.</param>
+        /// <param name="result">Detail payload the lines are added to.</param>
+        /// <param name="orderId">C_Order_ID.</param>
+        /// <param name="headerWarehouseId">Order warehouse (fallback for the line warehouse).</param>
+        /// <param name="taxIncluded">VAS163 2026-11-20: Sr 243 order prices include tax - amounts restated without tax.</param>
+        /// <param name="stdPrecision">Order currency precision.</param>
+        private void LoadOrderLines(Ctx ctx, OrderDetailResult result, int orderId, int headerWarehouseId, bool taxIncluded, int stdPrecision)
         {
+            // VAS163 2026-11-20: Sr 237-241 (as VAS_271): charge name for charge lines, product type,
+            // QtyEntered (selected UOM), base UOM name, tax data. ProductType (CHAR) and the names are
+            // read raw and resolved in C# (no COALESCE against a literal).
             string sql = @"
                 SELECT ol.C_OrderLine_ID AS Line_Id,
                        ol.Line AS Line_No,
                        ol.M_Product_ID AS Product_Id,
+                       ol.C_Charge_ID AS Charge_Id,
+                       ol.Description AS Description,
                        ol.QtyOrdered AS Qty_Ordered,
+                       ol.QtyEntered AS Qty_Entered,
                        ol.QtyDelivered AS Qty_Delivered,
                        ol.PriceActual AS Price_Actual,
+                       ol.PriceEntered AS Price_Entered,
                        ol.LineNetAmt AS Line_Net_Amt,
+                       ol.TaxAmt AS Line_Tax_Amt,
+                       ol.C_Tax_ID AS Line_Tax_Id,
+                       tx.Rate AS Tax_Rate,
                        ol.M_AttributeSetInstance_ID AS Asi_Id,
                        ol.C_UOM_ID AS Uom_Id,
                        ol.M_Warehouse_ID AS Line_Warehouse_Id,
                        COALESCE(p.Name, p.Value) AS Product_Name,
+                       p.ProductType AS Product_Type,
+                       ch.Name AS Charge_Name,
                        COALESCE(asi.Description, N'') AS Attribute_Text,
-                       COALESCE(u.Name, N'') AS Uom_Name
+                       COALESCE(u.Name, N'') AS Uom_Name,
+                       COALESCE(bu.Name, N'') AS Base_Uom_Name
                   FROM C_OrderLine ol
                   LEFT OUTER JOIN M_Product p ON ( p.M_Product_ID = ol.M_Product_ID )
+                  LEFT OUTER JOIN C_Charge ch ON ( ch.C_Charge_ID = ol.C_Charge_ID )
+                  LEFT OUTER JOIN C_Tax tx ON ( tx.C_Tax_ID = ol.C_Tax_ID )
                   LEFT OUTER JOIN M_AttributeSetInstance asi ON ( asi.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID )
                   LEFT OUTER JOIN C_UOM u ON ( u.C_UOM_ID = ol.C_UOM_ID )
+                  LEFT OUTER JOIN C_UOM bu ON ( bu.C_UOM_ID = p.C_UOM_ID )
                  WHERE ol.C_Order_ID = @Order_Id
                    AND ol.IsActive = 'Y'
                  ORDER BY ol.Line ASC
                  OFFSET 0 ROWS FETCH NEXT @Max_Line_Rows ROWS ONLY";
+
+            Dictionary<int, decimal> netRatioByTax = taxIncluded ? GetOrderTaxNetRatios(orderId) : new Dictionary<int, decimal>();
 
             IDataReader dr = null;
             try
@@ -491,25 +604,79 @@ namespace VAS.Controllers
 
                 while (dr != null && dr.Read())
                 {
-                    decimal qtyOrdered = dr["Qty_Ordered"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Qty_Ordered"]);
-                    decimal qtyDelivered = dr["Qty_Delivered"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Qty_Delivered"]);
+                    decimal qtyOrderedBase = dr["Qty_Ordered"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Qty_Ordered"]);
+                    decimal qtyEntered = dr["Qty_Entered"] == DBNull.Value ? qtyOrderedBase : Util.GetValueOfDecimal(dr["Qty_Entered"]);
+                    decimal qtyDeliveredBase = dr["Qty_Delivered"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Qty_Delivered"]);
                     int productId = dr["Product_Id"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr["Product_Id"]);
                     int lineWarehouseId = dr["Line_Warehouse_Id"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr["Line_Warehouse_Id"]);
                     int warehouseId = lineWarehouseId > 0 ? lineWarehouseId : headerWarehouseId;
 
+                    // VAS163 2026-11-20: Sr 240 Ordered / Delivered / Pending in the line's selected UOM
+                    // (QtyEntered; base quantities scaled by QtyEntered / QtyOrdered).
+                    decimal uomRatio = qtyOrderedBase != 0m ? (qtyEntered / qtyOrderedBase) : 1m;
+                    decimal qtyOrdered = qtyEntered;
+                    decimal qtyDelivered = Math.Round(qtyDeliveredBase * uomRatio, 6, MidpointRounding.AwayFromZero);
+
+                    // VAS163 2026-11-20: Sr 238 delivered / pending / stock / line status only for Item-type products.
+                    bool isItem = productId > 0
+                        && string.Equals((Util.GetValueOfString(dr["Product_Type"]) ?? "").Trim(), "I", StringComparison.OrdinalIgnoreCase);
+
+                    // VAS163 2026-11-20: Sr 237 a charge line shows the charge's name.
+                    string productName = Util.GetValueOfString(dr["Product_Name"]);
+                    if (string.IsNullOrEmpty(productName)) { productName = Util.GetValueOfString(dr["Charge_Name"]); }
+                    if (string.IsNullOrEmpty(productName)) { productName = Util.GetValueOfString(dr["Description"]); }
+
+                    // VAS163 2026-11-20: Sr 243 line amount without tax (as VAS_271): on a tax-inclusive order
+                    // LineNetAmt is scaled by its tax's net ratio from C_OrderTax, else line TaxAmt / rate is taken off.
+                    decimal lineGross = dr["Line_Net_Amt"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Line_Net_Amt"]);
+                    decimal lineAmt = lineGross;
+                    int lineTaxId = dr["Line_Tax_Id"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr["Line_Tax_Id"]);
+                    if (taxIncluded && netRatioByTax.ContainsKey(lineTaxId))
+                    {
+                        lineAmt = Math.Round(lineGross * netRatioByTax[lineTaxId], stdPrecision, MidpointRounding.AwayFromZero);
+                    }
+                    else if (taxIncluded)
+                    {
+                        decimal lineTax = dr["Line_Tax_Amt"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Line_Tax_Amt"]);
+                        decimal taxRate = dr["Tax_Rate"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Tax_Rate"]);
+                        if (lineTax == 0m && taxRate > 0m)
+                        {
+                            lineTax = Math.Round(lineGross * taxRate / (100m + taxRate), stdPrecision, MidpointRounding.AwayFromZero);
+                        }
+                        lineAmt = lineGross - lineTax;
+                    }
+
+                    // Rate per selected UOM (PriceEntered, fallback PriceActual), restated without tax with the same proportion.
+                    decimal rate = dr["Price_Entered"] == DBNull.Value
+                        ? (dr["Price_Actual"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Price_Actual"]))
+                        : Util.GetValueOfDecimal(dr["Price_Entered"]);
+                    if (taxIncluded && lineGross != 0m)
+                    {
+                        rate = Math.Round(rate * lineAmt / lineGross, 6, MidpointRounding.AwayFromZero);
+                    }
+
+                    // VAS163 2026-11-20: Sr 241 In stock stays in the product's base UOM (name sent with it);
+                    // the shortage is judged in the line's UOM. Stock is only looked up for item lines.
+                    decimal onHandBase = isItem ? Math.Max(0m, ResolveFreeStock(ctx, productId, warehouseId)) : 0m;
+                    decimal qtyPending = isItem ? Math.Max(0m, qtyOrdered - qtyDelivered) : 0m;
+
                     result.Lines.Add(new OrderLineRow
                     {
                         LineNo = Util.GetValueOfInt(dr["Line_No"]),
-                        ProductName = Util.GetValueOfString(dr["Product_Name"]),
+                        ProductName = productName,
                         AttributeText = Util.GetValueOfString(dr["Attribute_Text"]),
                         UomName = Util.GetValueOfString(dr["Uom_Name"]),
+                        BaseUomName = Util.GetValueOfString(dr["Base_Uom_Name"]),
+                        IsItem = isItem,
+                        HasAttribute = dr["Asi_Id"] != DBNull.Value && Util.GetValueOfInt(dr["Asi_Id"]) > 0,
                         QtyOrdered = qtyOrdered,
-                        QtyDelivered = qtyDelivered,
-                        QtyPending = qtyOrdered - qtyDelivered,
+                        QtyDelivered = isItem ? qtyDelivered : 0m,
+                        QtyPending = qtyPending,
                         // VAS163 2026-11-11: row 58 In stock never negative - show 0.
-                        FreeStock = Math.Max(0m, ResolveFreeStock(ctx, productId, warehouseId)),
-                        Rate = dr["Price_Actual"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Price_Actual"]),
-                        Amount = dr["Line_Net_Amt"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Line_Net_Amt"])
+                        FreeStock = onHandBase,
+                        QtyShort = isItem ? Math.Max(0m, qtyPending - onHandBase * uomRatio) : 0m,
+                        Rate = rate,
+                        Amount = lineAmt
                     });
                 }
             }
@@ -674,6 +841,87 @@ namespace VAS.Controllers
             }
         }
 
+        /// <summary>
+        /// VAS163 2026-11-20: Sr 234 C_Currency_ID of the login client's primary accounting schema
+        /// (same lookup as FillBaseCurrency / VAS_271); 0 when it cannot be resolved (the chip then
+        /// sums unconverted).
+        /// </summary>
+        /// <param name="ctx">Login context.</param>
+        /// <returns>Base currency id or 0.</returns>
+        private static int GetBaseCurrencyId(Ctx ctx)
+        {
+            if (ctx == null) { return 0; }
+            try
+            {
+                return Util.GetValueOfInt(DB.ExecuteScalar(@"
+                    SELECT cs.C_Currency_ID
+                      FROM AD_ClientInfo ci
+                     INNER JOIN C_AcctSchema cs ON ( cs.C_AcctSchema_ID = ci.C_AcctSchema1_ID )
+                     WHERE ci.AD_Client_ID = @AD_Client_ID",
+                    new[] { new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()) }, null));
+            }
+            catch (Exception ex)
+            {
+                Log.Log(Level.WARNING, "VAS_286_SOPendingForPaymentWidget.GetBaseCurrencyId", ex);
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// VAS163 2026-11-20: Sr 243 (copied from VAS_271). Tax-inclusive order only: per C_Tax_ID,
+        /// the share of the lines' gross (SUM(LineNetAmt)) that is NOT tax, from the order's own tax
+        /// summary (C_OrderTax.TaxAmt). A tax without a plausible summary row is left out and the
+        /// caller falls back to the line's own TaxAmt / rate.
+        /// </summary>
+        /// <param name="orderId">C_Order_ID.</param>
+        /// <returns>C_Tax_ID -> net ratio.</returns>
+        private static Dictionary<int, decimal> GetOrderTaxNetRatios(int orderId)
+        {
+            Dictionary<int, decimal> ratios = new Dictionary<int, decimal>();
+            try
+            {
+                Dictionary<int, decimal> grossByTax = new Dictionary<int, decimal>();
+                DataSet grossDs = DB.ExecuteDataset(@"
+                    SELECT ol.C_Tax_ID AS Tax_Id, COALESCE(SUM(ol.LineNetAmt), 0) AS Gross
+                      FROM C_OrderLine ol
+                     WHERE ol.C_Order_ID = @Order_Id
+                       AND ol.IsActive = 'Y'
+                     GROUP BY ol.C_Tax_ID", new[] { new SqlParameter("@Order_Id", orderId) }, null);
+                if (grossDs != null && grossDs.Tables.Count > 0)
+                {
+                    foreach (DataRow row in grossDs.Tables[0].Rows)
+                    {
+                        grossByTax[Util.GetValueOfInt(row["Tax_Id"])] = Util.GetValueOfDecimal(row["Gross"]);
+                    }
+                }
+
+                DataSet taxDs = DB.ExecuteDataset(@"
+                    SELECT ot.C_Tax_ID AS Tax_Id, COALESCE(SUM(ot.TaxAmt), 0) AS Tax_Amt
+                      FROM C_OrderTax ot
+                     WHERE ot.C_Order_ID = @Order_Id
+                       AND ot.IsActive = 'Y'
+                     GROUP BY ot.C_Tax_ID", new[] { new SqlParameter("@Order_Id", orderId) }, null);
+                if (taxDs != null && taxDs.Tables.Count > 0)
+                {
+                    foreach (DataRow row in taxDs.Tables[0].Rows)
+                    {
+                        int taxId = Util.GetValueOfInt(row["Tax_Id"]);
+                        decimal taxAmt = Util.GetValueOfDecimal(row["Tax_Amt"]);
+                        decimal gross;
+                        if (grossByTax.TryGetValue(taxId, out gross) && gross > 0m && taxAmt >= 0m && taxAmt < gross)
+                        {
+                            ratios[taxId] = (gross - taxAmt) / gross;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Log(Level.SEVERE, "VAS_286_SOPendingForPaymentWidget.GetOrderTaxNetRatios", ex);
+            }
+            return ratios;
+        }
+
         /// <summary>VAS163 2026-11-10: base (accounting-schema) currency carried by the widget's first payload.</summary>
         private class CurrencyPayload
         {
@@ -744,6 +992,11 @@ namespace VAS.Controllers
             public string ProductName { get; set; }
             public string AttributeText { get; set; }
             public string UomName { get; set; }
+            /// <summary>VAS163 2026-11-20: Sr 238-241 product base UOM, Item-type flag, ASI present, shortage in line UOM.</summary>
+            public string BaseUomName { get; set; }
+            public bool IsItem { get; set; }
+            public bool HasAttribute { get; set; }
+            public decimal QtyShort { get; set; }
             public decimal QtyOrdered { get; set; }
             public decimal QtyDelivered { get; set; }
             public decimal QtyPending { get; set; }

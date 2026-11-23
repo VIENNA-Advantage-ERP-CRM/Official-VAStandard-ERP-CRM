@@ -23,7 +23,8 @@ namespace VIS.Controllers
 {
     public class VAS_314_RequisitionStatusWidgetController : Controller
     {
-        private static readonly string[] SliceOrder = { "OP", "PO", "OR", "PD", "DE", VAS_ReqWidgetData.StatusDraft, VAS_ReqWidgetData.StatusClosed };
+        // VAS163 2026-11-20: Sr 57 - Closed and Voided are separate slices
+        private static readonly string[] SliceOrder = { "OP", "PO", "OR", "PD", "DE", VAS_ReqWidgetData.StatusDraft, VAS_ReqWidgetData.StatusClosed, VAS_ReqWidgetData.StatusVoided };
 
         /// <summary>Slices of the status donut.</summary>
         [AjaxAuthorizeAttribute]
@@ -41,6 +42,10 @@ namespace VIS.Controllers
                 VAS_ReqCurrency cur = VAS_ReqWidgetData.GetSchemaCurrency(ctx);
                 List<SqlParameter> p = new List<SqlParameter> { new SqlParameter("@RQ_From", today.AddMonths(-12)) };
                 List<VAS_ReqLine> lines = VAS_ReqWidgetData.LoadLines(ctx, cur, "r.DateDoc >= @RQ_From", p);
+                // VAS163 2026-11-20: Sr 61 - requisitions without lines (e.g. a draft, or voided 900092) are counted and
+                // listed too, as one header-only entry (amount 0); own parameter instance for the second statement
+                lines.AddRange(VAS_ReqWidgetData.LoadHeadersWithoutLines(ctx, "r.DateDoc >= @RQ_From",
+                    new List<SqlParameter> { new SqlParameter("@RQ_From", today.AddMonths(-12)) }));
 
                 Dictionary<string, List<VAS_ReqLine>> bySlice = new Dictionary<string, List<VAS_ReqLine>>();
                 foreach (IGrouping<int, VAS_ReqLine> g in lines.GroupBy(l => l.RequisitionId))

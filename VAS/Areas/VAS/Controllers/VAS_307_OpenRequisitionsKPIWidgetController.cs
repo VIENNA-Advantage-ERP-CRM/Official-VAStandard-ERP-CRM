@@ -37,8 +37,9 @@ namespace VIS.Controllers
                 // VAS163 2026-11-17: Sr 26 - completed or closed requisitions against which no document has been created
                 // yet (no PO / blanket PO, Material Transfer, Inventory Use or RFQ on any line; drafts count as created,
                 // voided / reversed documents do not). Value = whole requisition amount.
+                // VAS163 2026-11-20: Sr 76 - closed requisitions (DocStatus CL) are no longer counted: completed only
                 List<VAS_ReqLine> open = VAS_ReqWidgetData.LoadLines(ctx, cur,
-                    "r.DocStatus IN ('CO', 'CL') AND " + VAS_ReqWidgetData.NoDocumentSql(), null);
+                    "r.DocStatus = 'CO' AND " + VAS_ReqWidgetData.NoDocumentSql(), null);
                 var data = new
                 {
                     count = open.Select(l => l.RequisitionId).Distinct().Count(),

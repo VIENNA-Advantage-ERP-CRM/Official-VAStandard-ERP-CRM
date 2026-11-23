@@ -230,6 +230,16 @@
 /* bar inside a grid cell */
 .vas-rqw-bar { display: block; height: 0.75em; border-radius: 999px; background: #EDF2F7; overflow: hidden; }
 .vas-rqw-bar i { display: block; height: 100%; border-radius: 999px; background: #0083DA; }
+/* VAS163 2026-11-20: Sr 74 - share bar with its percentage next to it (Category wise Requisition) */
+.vas-rqw-gr > span.vas-rqw-shr { display: flex; align-items: center; gap: 0.4em; }
+.vas-rqw-shr .vas-rqw-bar { flex: 1; min-width: 1.5em; }
+.vas-rqw-shr em { flex: none; font-style: normal; font-variant-numeric: tabular-nums; color: #41576A; min-width: 2.6em; text-align: right; }
+
+/* VAS163 2026-11-20: Sr 45 - Month / Year filter in the title row (My Requisitions), same look as VAS_278 */
+.vas-rqw-mf { display: flex; align-items: center; gap: 4px; margin-left: auto; flex: none; }
+.vas-rqw-msel { appearance: none; -webkit-appearance: none; font-family: inherit; font-size: 0.6875em; font-weight: 500; color: #41576A; background-color: #FFFFFF; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2341576A' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>"); background-repeat: no-repeat; background-position: right 0.45em center; border: 1px solid #D9E2EB; border-radius: 8px; padding: 0.3em 1.6em 0.3em 0.6em; height: auto; line-height: 1.3; cursor: pointer; flex-shrink: 0; min-width: 4.6em; }
+[dir="rtl"] .vas-rqw-msel, .vis-rtl .vas-rqw-msel { background-position: left 0.45em center; padding: 0.3em 0.6em 0.3em 1.6em; }
+.vas-rqw-msel:hover { background-color: #F7FBFF; border-color: #BFE4FF; }
 
 /* ---------- footer: helper + pager / switcher ---------- */
 .vas-rqw-ft { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 0.625em; padding-top: 0.5em; border-top: 1px solid #D9E2EB; flex: none; min-height: calc(24px + 0.5em); }
@@ -280,7 +290,8 @@
 .vas-rqw-cal .wd { font-size: 0.6875em; font-weight: 500; color: #41576A; padding: 0.45em 0.55em; border-bottom: 1px solid #C5D2DD; }
 .vas-rqw-cal .cd { border-right: 1px solid #E2EAF1; border-bottom: 1px solid #E2EAF1; padding: 0.25em 0.3em; display: flex; flex-direction: column; gap: 0.2em; min-height: 0; min-width: 0; overflow: hidden; }
 .vas-rqw-cal > :nth-child(7n) { border-right: 0; }
-.vas-rqw-cal .cd.we { background: rgba(241, 244, 248, 0.55); }
+/* VAS163 2026-11-20: Sr 48 - Saturday / Sunday have the same (white) background as the other days */
+.vas-rqw-cal .cd.we { background: transparent; }
 .vas-rqw-cal .cd.td { background: #EAF8FF; }
 .vas-rqw-cal .dn { font-size: 0.6875em; font-weight: 500; color: #41576A; align-self: flex-start; min-width: 1.9em; height: 1.9em; padding: 0 0.3em; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; flex: none; }
 .vas-rqw-cal .td .dn { background: #0083DA; color: #FFFFFF; font-weight: 700; }

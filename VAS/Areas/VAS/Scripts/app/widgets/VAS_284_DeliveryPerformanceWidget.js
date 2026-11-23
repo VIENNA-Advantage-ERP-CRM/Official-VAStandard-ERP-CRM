@@ -329,7 +329,31 @@
         // VAS163 2026-11-10: browser locale (6-Nov retest2).
         // VAS163 2026-11-12: delegates to VAS.formatAmountByBrowser (browser culture; server ISO + precision).
         function formatINR(value) {
-            return VAS.formatAmountByBrowser(Number(value || 0), currency.iso, currency.precision, { compact: true, symbol: currency.symbol });
+            // VAS163 2026-11-23: compact amount through the common VIS.Util.BrowserCultureFormatter, as the Sales Quotation /
+            // Customer Master / Service Contract widgets do: the unit (K / M / Mio. / L / Cr / 万 ...), digits and the currency
+            // symbol position come from the browser culture; ISO code, symbol and precision from the server.
+            var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
+            var sign = n < 0 ? '-' : '';
+            var isoCode = String(currency.iso || '').trim();
+            var compact = VIS.Util.BrowserCultureFormatter.formatCompactAmount(n, isoCode, currency.precision);
+            if (isoCode) {
+                try {
+                    var parts = new Intl.NumberFormat(window.navigator.language, { style: 'currency', currency: isoCode }).formatToParts(1);
+                    var ci = -1, ni = -1;
+                    parts.forEach(function (p, idx) {
+                        if (p.type === 'currency' && ci < 0) { ci = idx; }
+                        if (p.type === 'integer' && ni < 0) { ni = idx; }
+                    });
+                    if (ci >= 0 && ni >= 0) {
+                        var sym = parts[ci].value;
+                        if (ci < ni) {
+                            return sign + sym + (parts[ci + 1] && parts[ci + 1].type === 'literal' ? parts[ci + 1].value : '') + compact;
+                        }
+                        return sign + compact + (parts[ci - 1] && parts[ci - 1].type === 'literal' ? parts[ci - 1].value : '') + sym;
+                    }
+                } catch (e) { /* fall back to the server symbol in front */ }
+            }
+            return sign + (String(currency.symbol || '').trim() || isoCode) + compact;
         }
 
         // VAS163 2026-11-11: Row 93 compact amount in a document's own currency (falls back to base) - as VAS_270.
@@ -342,7 +366,8 @@
         // VAS163 2026-11-12: formatAmount was called but never defined (ReferenceError) - compact base-currency amount.
         // VAS163 2026-11-12: delegates to VAS.formatAmountByBrowser (browser culture; server ISO + precision).
         function formatAmount(value) {
-            return VAS.formatAmountByBrowser(Number(value || 0), currency.iso, currency.precision, { compact: true, symbol: currency.symbol });
+            // VAS163 2026-11-23: same base-currency compact amount as formatINR() (browser culture).
+            return formatINR(value);
         }
 
         // VAS163 2026-11-10: browser locale (6-Nov retest2).

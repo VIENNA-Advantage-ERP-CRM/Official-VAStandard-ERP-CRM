@@ -52,10 +52,17 @@ namespace VIS.Controllers
                             requisitionId = l.RequisitionId,
                             documentNo = l.DocumentNo,
                             product = l.ItemName,
+                            // VAS163 2026-11-20: Sr 73 - attribute set instance description (blank when none)
+                            attribute = l.AttributeName,
                             qty = l.QtyEntered, // VAS163 2026-11-17: Sr 7 - qty in the line's UOM (shown with it)
                             uom = l.UomName,
                             needBy = VAS_ReqWidgetData.D(l.NeedBy),
                             amount = l.Amount(l.Qty),
+                            // VAS163 2026-11-20: Sr 68 - line amount in the requisition's price-list currency with its sign
+                            docAmount = l.DocAmount(l.Qty),
+                            currencyIso = l.CurrencyId > 0 ? l.DocCurrencyIso : "",
+                            currencySymbol = l.CurrencyId > 0 ? l.DocCurrencySymbol : "",
+                            currencyPrecision = l.CurrencyId > 0 ? l.DocCurrencyPrecision : -1,
                             state = l.IsLate(today) ? "late" : l.State()
                         })
                     })

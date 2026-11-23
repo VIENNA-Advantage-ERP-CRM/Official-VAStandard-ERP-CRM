@@ -275,7 +275,31 @@
         // Compact amount in the base currency (shared helper picks Cr/L/K or K/M/B by ISO).
         // VAS163 2026-11-12: delegates to VAS.formatAmountByBrowser (browser culture; server ISO + precision).
         function formatINR(value) {
-            return VAS.formatAmountByBrowser(Number(value || 0), currency.iso, currency.precision, { compact: true, symbol: currency.symbol });
+            // VAS163 2026-11-23: compact amount through the common VIS.Util.BrowserCultureFormatter, as the Sales Quotation /
+            // Customer Master / Service Contract widgets do: the unit (K / M / Mio. / L / Cr / 万 ...), digits and the currency
+            // symbol position come from the browser culture; ISO code, symbol and precision from the server.
+            var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
+            var sign = n < 0 ? '-' : '';
+            var isoCode = String(currency.iso || '').trim();
+            var compact = VIS.Util.BrowserCultureFormatter.formatCompactAmount(n, isoCode, currency.precision);
+            if (isoCode) {
+                try {
+                    var parts = new Intl.NumberFormat(window.navigator.language, { style: 'currency', currency: isoCode }).formatToParts(1);
+                    var ci = -1, ni = -1;
+                    parts.forEach(function (p, idx) {
+                        if (p.type === 'currency' && ci < 0) { ci = idx; }
+                        if (p.type === 'integer' && ni < 0) { ni = idx; }
+                    });
+                    if (ci >= 0 && ni >= 0) {
+                        var sym = parts[ci].value;
+                        if (ci < ni) {
+                            return sign + sym + (parts[ci + 1] && parts[ci + 1].type === 'literal' ? parts[ci + 1].value : '') + compact;
+                        }
+                        return sign + compact + (parts[ci - 1] && parts[ci - 1].type === 'literal' ? parts[ci - 1].value : '') + sym;
+                    }
+                } catch (e) { /* fall back to the server symbol in front */ }
+            }
+            return sign + (String(currency.symbol || '').trim() || isoCode) + compact;
         }
 
         // VAS163 2026-11-10: browser locale (6-Nov retest2).
@@ -295,7 +319,31 @@
         // VAS163 2026-11-12: Intl compact currency (browser culture) with the order's ISO + precision from the server.
         function formatDocCompact(value, symbol, iso, precision) {
             var prec = (typeof precision === 'number') ? precision : null;
-            return VAS.formatAmountByBrowser(Number(value || 0), iso || '', prec, { compact: true, symbol: symbol || '' });
+            // VAS163 2026-11-23: compact amount through the common VIS.Util.BrowserCultureFormatter, as the Sales Quotation /
+            // Customer Master / Service Contract widgets do: the unit (K / M / Mio. / L / Cr / 万 ...), digits and the currency
+            // symbol position come from the browser culture; ISO code, symbol and precision from the server.
+            var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
+            var sign = n < 0 ? '-' : '';
+            var isoCode = String(iso || '').trim();
+            var compact = VIS.Util.BrowserCultureFormatter.formatCompactAmount(n, isoCode, prec);
+            if (isoCode) {
+                try {
+                    var parts = new Intl.NumberFormat(window.navigator.language, { style: 'currency', currency: isoCode }).formatToParts(1);
+                    var ci = -1, ni = -1;
+                    parts.forEach(function (p, idx) {
+                        if (p.type === 'currency' && ci < 0) { ci = idx; }
+                        if (p.type === 'integer' && ni < 0) { ni = idx; }
+                    });
+                    if (ci >= 0 && ni >= 0) {
+                        var sym = parts[ci].value;
+                        if (ci < ni) {
+                            return sign + sym + (parts[ci + 1] && parts[ci + 1].type === 'literal' ? parts[ci + 1].value : '') + compact;
+                        }
+                        return sign + compact + (parts[ci - 1] && parts[ci - 1].type === 'literal' ? parts[ci - 1].value : '') + sym;
+                    }
+                } catch (e) { /* fall back to the server symbol in front */ }
+            }
+            return sign + (String(symbol || '').trim() || isoCode) + compact;
         }
 
         // VAS163 2026-11-11: Row 105 - quantities in the line's UOM can be fractional (e.g. ml).
@@ -322,7 +370,7 @@
         function formatDateShort(iso) {
             var d = parseIso(iso);
             if (!d) { return ''; }
-            return d.toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short' });
+            return d.toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' }); // VAS163 2026-11-20: Sr 244 dates show the year
         }
 
         // VAS163 2026-11-10: browser locale (6-Nov retest2).

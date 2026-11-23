@@ -1,8 +1,9 @@
 /**
  * VAS_311_ReqLinesToOrderWidget - 6x2 grid on the Requisition screen (and its Home copy).
  * Completed-requisition lines with quantity on no PO and no Material Transfer, earliest need-by
- * first: requisition, product, qty to order, amount, need-by, suggested vendor (current vendor of
- * the product) and a due chip. Rows that do not fit are paged; a row opens the requisition popup.
+ * first: requisition, product, qty to order, amount (price-list currency), need-by and a due chip
+ * (VAS163 2026-11-20: Sr 37 - suggested vendor column removed). Rows that do not fit are paged;
+ * a row opens the requisition popup.
  * Backend: VAS_311_ReqLinesToOrderWidget/GetLines
  *
  * Labels / Message Keys
@@ -35,7 +36,8 @@
             $card = $('<div class="vas-rqw-card">' +
                 U.header(U.icon.cart, U.lbl('VAS_311_LinesToOrder', 'Lines to Order'),
                     U.lbl('VAS_311_Subtitle', 'Open lines with no PO or transfer · earliest need-by first'), 'amt') +
-                '<div class="vas-rqw-tb" style="--vas-rqw-cols:minmax(0,1fr) minmax(0,2fr) minmax(5.6em,1fr) 5.6em 4.4em minmax(0,1.4fr) 5.8em"></div>' +
+                // VAS163 2026-11-20: Sr 37 - vendor column removed; wider amount (currency sign) and date (year) columns
+                '<div class="vas-rqw-tb" style="--vas-rqw-cols:minmax(0,1fr) minmax(0,2fr) minmax(5.6em,1fr) minmax(7em,1.2fr) 6.6em 8.2em"></div>' +
                 '<div class="vas-rqw-ft"><span class="vas-rqw-hp"></span><span class="vas-rqw-pg"></span></div>' +
                 '<span class="vas-rqw-busy"><i></i></span></div>');
             $root.empty().append($card);
@@ -62,21 +64,25 @@
         this.relayout = function () {
             if (!data || !$tb) { return; }
             var cur = data.currency;
+            // VAS163 2026-11-20: Sr 37 - 'Suggested vendor' column removed; Sr 40 - the Amount heading carries no currency
+            // sign (each row shows its own); Sr 41 - row amount in the requisition's price-list currency with its sign;
+            // Sr 36 - date with the year; every cell has a hover title.
             U.renderRows({
                 $tb: $tb, $help: $help, $pager: $pager, state: state, rows: data.rows,
                 emptyText: U.lbl('VAS_311_Empty', 'Every completed requisition line is on a PO or transfer.'),
                 head: U.gridHead([U.lbl('VAS_311_Requisition', 'Requisition'), U.lbl('VAS_311_Product', 'Product'), U.lbl('VAS_311_Qty', 'Qty'),
-                    U.lbl('VAS_311_Amount', 'Amount') + (cur && cur.Symbol ? ' ' + cur.Symbol : ''), U.lbl('VAS_311_NeedBy', 'Need by'),
-                    U.lbl('VAS_311_Vendor', 'Suggested vendor'), U.lbl('VAS_311_Status', 'Status')], [2, 3, 4]),
+                    U.lbl('VAS_311_Amount', 'Amount'), U.lbl('VAS_311_NeedBy', 'Need by'), U.lbl('VAS_311_Status', 'Status')], [2, 3, 4]),
                 cell: function (r) {
-                    return '<span class="b">' + U.esc(r.documentNo) + '</span>' +
+                    var qty = U.num(r.qty) + ' ' + (r.uom || '');
+                    var amt = U.rowMoney(r, cur);
+                    var need = U.date(r.needBy);
+                    var chip = U.needChip(r.needBy);
+                    return '<span class="b" title="' + U.esc(r.documentNo) + '">' + U.esc(r.documentNo) + '</span>' +
                         '<span title="' + U.esc(r.product + (r.productCode ? ' (' + r.productCode + ')' : '')) + '">' + U.esc(r.product) + '</span>' +
-                        '<span class="vas-rqw-r" title="' + U.esc(U.num(r.qty) + ' ' + (r.uom || '')) + '">' + U.num(r.qty) + ' ' + U.esc(r.uom || '') + '</span>' +
-                        '<span class="vas-rqw-r">' + U.amount(r.amount, cur) + '</span>' +
-                        '<span class="vas-rqw-r">' + U.date(r.needBy) + '</span>' +
-                        (r.vendor ? '<span class="m" title="' + U.esc(r.vendor) + '">' + U.esc(r.vendor) + '</span>'
-                            : '<span>' + U.chip('n', U.lbl('VAS_311_NoVendor', 'No vendor')) + '</span>') +
-                        '<span>' + U.needChip(r.needBy) + '</span>';
+                        '<span class="vas-rqw-r" title="' + U.esc(qty) + '">' + U.esc(qty) + '</span>' +
+                        '<span class="vas-rqw-r" title="' + U.esc(amt) + '">' + U.esc(amt) + '</span>' +
+                        '<span class="vas-rqw-r" title="' + U.esc(need) + '">' + U.esc(need) + '</span>' +
+                        '<span title="' + U.esc($('<div>').html(chip).text()) + '">' + chip + '</span>';
                 },
                 helpText: function (a, b, n) {
                     return U.lbl('VAS_305_Showing', 'Showing') + ' ' + a + '–' + b + ' ' + U.lbl('VAS_305_Of', 'of') + ' ' + n + ' ' + U.unit(n, 'VAS_311_Lines', 'lines');

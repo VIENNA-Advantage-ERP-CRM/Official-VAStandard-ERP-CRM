@@ -22,6 +22,7 @@
  * VAS_305_Showing, VAS_305_Of, VAS_305_Requester, VAS_305_Value, VAS_305_PrevPage, VAS_305_NextPage,
  * VAS163 2026-11-13: VAS_305_Days, VAS_305_Attribute, VAS_305_UOM, VAS_305_NoLines, VAS_305_DocPO, VAS_305_DocBPO,
  * VAS_305_DocMT, VAS_305_DocIU, VAS_305_DocRFQ
+ * VAS163 2026-11-20: VAS_305_OnTime no longer used (every future date shows 'Due in N days', Sr 38)
  */
 ; VAS = window.VAS || {};
 
@@ -55,8 +56,8 @@
 
     function locale() { return window.navigator.language || 'en-US'; }
 
-    /** Same compact money style as the other VAS widgets (L / Cr). */
-    U.money = function (value, cur) {
+    /** Fallback only (VAS.formatAmountByBrowser missing): compact money style (L / Cr). */
+    function moneyFallback(value, cur) {
         var v = Number(value || 0);
         var sym = (cur && cur.Symbol) ? cur.Symbol : '';
         var pre = sym ? sym + ' ' : '';
@@ -64,6 +65,17 @@
         if (a >= 10000000) { return pre + (v / 10000000).toFixed(2) + ' Cr'; }
         if (a >= 100000) { return pre + (v / 100000).toFixed(2) + ' L'; }
         return pre + Math.round(v).toLocaleString(locale());
+    }
+
+    /**
+     * Compact money for card / pill / legend totals.
+     * VAS163 2026-11-20: Sr 244 / Sr 77 - browser culture through VAS.formatAmountByBrowser with the compact option
+     * (VIS.Util.formatCompactAmount: L / Cr for Indian-numbering currencies, digits grouped by the browser culture,
+     * e.g. en-IN 24,40,500); amounts below 1,00,000 are shown in full.
+     */
+    U.money = function (value, cur) {
+        if (typeof VAS.formatAmountByBrowser === 'function') { return U.docMoney(value, cur, true); }
+        return moneyFallback(value, cur);
     };
 
     /** Full amount with grouping (popup tables). */
@@ -82,7 +94,25 @@
         if (typeof VAS.formatAmountByBrowser === 'function') {
             return VAS.formatAmountByBrowser(v, cur ? cur.Iso : '', p, { compact: !!compact && Math.abs(v) >= 1e5, symbol: cur ? cur.Symbol : '' });
         }
-        return compact ? U.money(v, cur) : ((cur && cur.Symbol ? cur.Symbol + ' ' : '') + U.amount(v, cur));
+        return compact ? moneyFallback(v, cur) : ((cur && cur.Symbol ? cur.Symbol + ' ' : '') + U.amount(v, cur));
+    };
+
+    /**
+     * VAS163 2026-11-17: Sr 27 - currency of one row (price-list currency of the requisition, sent by the server as
+     * currencyIso / currencySymbol / currencyPrecision), else the given list currency.
+     * VAS163 2026-11-20: Sr 41 / Sr 47 / Sr 68 - shared, also used by Lines to Order, Need-by Calendar, Category wise.
+     */
+    U.rowCurrency = function (r, cur) {
+        if (r && r.currencyIso) {
+            return { Iso: r.currencyIso, Symbol: r.currencySymbol || '', Precision: r.currencyPrecision != null && r.currencyPrecision >= 0 ? r.currencyPrecision : 2 };
+        }
+        return cur || null;
+    };
+
+    /** VAS163 2026-11-20: Sr 41 / Sr 47 / Sr 68 - full amount of a row in its own (price-list) currency with the currency sign. */
+    U.rowMoney = function (r, cur) {
+        var hasDoc = r && r.docAmount != null && !!r.currencyIso;
+        return U.docMoney(hasDoc ? r.docAmount : (r ? r.amount : 0), hasDoc ? U.rowCurrency(r, cur) : cur, false);
     };
 
     U.num = function (value) {
@@ -97,9 +127,10 @@
     }
     U.toDate = toDate;
 
+    /** VAS163 2026-11-20: Sr 36 / Sr 43 / Sr 66 - dates are shown with the year (browser culture), same as dateLong. */
     U.date = function (iso) {
         var d = toDate(iso);
-        return d ? d.toLocaleDateString(locale(), { day: '2-digit', month: 'short' }) : '—';
+        return d ? d.toLocaleDateString(locale(), { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
     };
 
     U.dateLong = function (iso) {
@@ -133,8 +164,9 @@
         // VAS163 2026-11-13: row 1127 - full day text ('Late 63 days', 'Due in 1 day') instead of '63d'
         if (d < 0) { return U.chip('r', U.lbl('VAS_305_Late', 'Late') + ' ' + (-d) + ' ' + U.unit(-d, 'VAS_305_Days', 'days')); }
         if (d === 0) { return U.chip('a', U.lbl('VAS_305_DueToday', 'Due today')); }
-        if (d <= 2) { return U.chip('a', U.lbl('VAS_305_DueIn', 'Due in') + ' ' + d + ' ' + U.unit(d, 'VAS_305_Days', 'days')); }
-        return U.chip('b', U.lbl('VAS_305_OnTime', 'On time'));
+        // VAS163 2026-11-20: Sr 38 - every future date shows 'Due in N days' (was 'On time' beyond 2 days); amber
+        // up to 2 days, blue after that
+        return U.chip(d <= 2 ? 'a' : 'b', U.lbl('VAS_305_DueIn', 'Due in') + ' ' + d + ' ' + U.unit(d, 'VAS_305_Days', 'days'));
     };
 
     /** Line state chip (received / notordered / partordered / ordered / late). */
@@ -182,9 +214,10 @@
         }
     };
 
-    /** Requisition status chip from the bucket code (OP/PO/OR/PD/DE/DR/CL). */
+    /** Requisition status chip from the bucket code (OP/PO/OR/PD/DE/DR/CL/VO). */
     U.statusChip = function (code, name) {
-        var cls = { OP: 'b', PO: 'a', OR: 'a', PD: 'a', DE: 'g', DR: 'p', CL: 'n' }[code] || 'n';
+        // VAS163 2026-11-20: Sr 44 / Sr 57 - VO (voided / reversed) is its own bucket, red-toned
+        var cls = { OP: 'b', PO: 'a', OR: 'a', PD: 'a', DE: 'g', DR: 'p', CL: 'n', VO: 'r' }[code] || 'n';
         return U.chip(cls, name || code);
     };
 
@@ -251,7 +284,8 @@
     /** Grid header row; right = array of column indexes aligned right. */
     U.gridHead = function (heads, right) {
         return '<div class="vas-rqw-gh">' + heads.map(function (h, i) {
-            return '<span class="' + (right && right.indexOf(i) >= 0 ? 'vas-rqw-r' : '') + '">' + U.esc(h) + '</span>';
+            // VAS163 2026-11-20: Sr 34 - hover title on the headings too (they can be cut on narrow widgets)
+            return '<span class="' + (right && right.indexOf(i) >= 0 ? 'vas-rqw-r' : '') + '" title="' + U.esc(h) + '">' + U.esc(h) + '</span>';
         }).join('') + '</div>';
     };
 
@@ -315,6 +349,48 @@
 
     /* ---------- open the requisition window ---------- */
 
+    /**
+     * VAS163 2026-11-20: Sr 15 - after 'Open requisition' the bottom tab panel and the right (Overview) panel stayed
+     * hidden until the user switched to grid and back to form. The framework applies TabLayout 'Y' (switchRow ->
+     * GridController.switchSingleRow -> APanel.showTabPanel) BEFORE the record is queried, and switchSingleRow does
+     * nothing when the grid controller is already in single-record mode, so the panels are not attached / filled for
+     * the opened record. Once the record is loaded, this runs the same grid -> form switch the user's toggle runs
+     * (APanel.switchRow 'N' then 'Y'), which attaches the tab panels and refreshes them for the current record.
+     * ap = the window's APanel (landing-page listener .apanel on the window, AWindow.cPanel from startWindow on Home).
+     */
+    function showPanelsWhenLoaded(ap, requisitionId) {
+        if (!ap) { return; }
+        var tries = 0, seen = 0;
+        var t = window.setInterval(function () {
+            tries++;
+            var ok = false;
+            try {
+                // VAS163 2026-11-23: Sr 15 wait for the record only - from Home the window opens in its default (card)
+                // layout, so single-row mode cannot be part of the condition.
+                ok = !!(ap.curTab && typeof ap.curTab.getRecord_ID === 'function' && Number(ap.curTab.getRecord_ID()) === Number(requisitionId) &&
+                    ap.curGC);
+            } catch (e) { ok = false; }
+            // the record must be current on two ticks in a row, so the framework's own row-change handling has finished
+            seen = ok ? seen + 1 : 0;
+            if (seen >= 2) {
+                window.clearInterval(t);
+                try {
+                    if (typeof ap.switchRow === 'function') {
+                        // already single-record: leave and re-enter it so the panels attach; card/grid: switch to it
+                        if (typeof ap.curGC.getIsSingleRow === 'function' && ap.curGC.getIsSingleRow()) {
+                            ap.switchRow(ap.curGC, 'N', false);
+                        }
+                        ap.switchRow(ap.curGC, 'Y', true);
+                    } else if (typeof ap.showTabPanel === 'function') {
+                        ap.showTabPanel(true);
+                    }
+                } catch (e2) { /* panels are an extra; the record is open either way */ }
+                return;
+            }
+            if (tries >= 240) { window.clearInterval(t); } // ~60 s - VAS163 2026-11-23: a first (cold) window load can take ~25 s
+        }, 250);
+    }
+
     U.openRequisition = function (widget, requisitionId) {
         if (!requisitionId) { return; }
         U.closeModal();
@@ -324,6 +400,7 @@
                 "TabLayout": "Y",
                 "TabIndex": "0"
             });
+            showPanelsWhenLoaded(widget.listener.apanel, requisitionId); // VAS163 2026-11-20: Sr 15
             return;
         }
         // VAS163 2026-11-17: Sr 15 - VAS.ZoomUtil.zoomToRecord opens the window with a plain zoom query and no action
@@ -345,7 +422,16 @@
         var start = function (windowId) {
             if (!(windowId > 0) || !window.VIS || !VIS.viewManager || typeof VIS.viewManager.startWindow !== 'function') { zoom(); return; }
             U._reqWindowId = windowId;
-            try { VIS.viewManager.startWindow(windowId, null, params); } catch (e) { zoom(); }
+            try {
+                // VAS163 2026-11-23: Sr 15 startWindow with action params (TabWhereClause/TabLayout) never finishes
+                // loading when called from Home; open it with a zoom query (as VAS.ZoomUtil does) and switch the
+                // loaded record to the single-record view, which attaches the bottom and right tab panels.
+                var zoomQuery = new VIS.Query();
+                zoomQuery.addRestriction("M_Requisition_ID", VIS.Query.prototype.EQUAL, Number(requisitionId));
+                zoomQuery.setRecordCount(1);
+                var w = VIS.viewManager.startWindow(windowId, zoomQuery);
+                showPanelsWhenLoaded(w && w.cPanel, requisitionId); // VAS163 2026-11-20: Sr 15
+            } catch (e) { zoom(); }
         };
         if (U._reqWindowId > 0) { start(U._reqWindowId); return; }
         if (VAS.ZoomUtil && typeof VAS.ZoomUtil.getWindowId === 'function') {
@@ -416,37 +502,42 @@
     /** VAS163 2026-11-17: Sr 29 - rows per page of the requisition list popup. */
     var LIST_PAGE = 12;
 
-    /** VAS163 2026-11-17: Sr 27 - currency of one list row (price-list currency of the requisition), else the list currency. */
-    function rowCurrency(r, cur) {
-        if (r && r.currencyIso) {
-            return { Iso: r.currencyIso, Symbol: r.currencySymbol || '', Precision: r.currencyPrecision != null && r.currencyPrecision >= 0 ? r.currencyPrecision : 2 };
-        }
-        return cur || null;
-    }
-
-    /** Popup list of requisitions (KPI, donut slice, ...); a row opens the requisition. */
-    U.showList = function (widget, title, subtitle, records, cur) {
+    /**
+     * Popup list of requisitions (KPI, donut slice, ...); a row opens the requisition.
+     * opts (VAS163 2026-11-20): { docStatusLabel } - when set, a 'Requisition status' column (document status of the
+     * requisition, server docStatusName) is shown before the Status column (Sr 60, Requisitions by Status).
+     */
+    U.showList = function (widget, title, subtitle, records, cur, opts) {
         records = records || [];
+        opts = opts || {};
         var page = 0;
         var pages = Math.max(1, Math.ceil(records.length / LIST_PAGE));
         // VAS163 2026-11-17: Sr 27 / Sr 33 / Sr 34 - value in the requisition's price-list currency (full amount, wrapped
         // when long, VAS.formatAmountByBrowser), Need by with the year (browser culture), Requested by = requester name.
+        // VAS163 2026-11-20: Sr 34 / Sr 54 - hover title with the full text on every cell
         var rowHtml = function (r) {
-            var hasDoc = r.docAmount != null && !!r.currencyIso;
-            var val = U.docMoney(hasDoc ? r.docAmount : r.amount, hasDoc ? rowCurrency(r, cur) : cur, false);
-            return '<div class="vas-rqw-gr" data-r="' + r.requisitionId + '"><span class="b">' + U.esc(r.documentNo) + '</span>' +
+            var val = U.rowMoney(r, cur);
+            var need = U.dateLong(r.needBy);
+            var chip = r.isLate ? U.needChip(r.needBy) : U.statusChip(r.status, r.statusName);
+            var chipText = $('<div>').html(chip).text();
+            return '<div class="vas-rqw-gr" data-r="' + r.requisitionId + '"><span class="b" title="' + U.esc(r.documentNo) + '">' + U.esc(r.documentNo) + '</span>' +
                 '<span title="' + U.esc(r.requester || '') + '">' + U.esc(r.requester || '') + '</span><span class="m" title="' + U.esc(r.warehouse || '') + '">' + U.esc(r.warehouse || '') + '</span>' +
-                '<span class="vas-rqw-r">' + U.esc(U.dateLong(r.needBy)) + '</span><span class="vas-rqw-r vas-rqw-wrap" title="' + U.esc(val) + '">' + U.esc(val) + '</span>' +
-                '<span>' + (r.isLate ? U.needChip(r.needBy) : U.statusChip(r.status, r.statusName)) + '</span></div>';
+                '<span class="vas-rqw-r" title="' + U.esc(need) + '">' + U.esc(need) + '</span><span class="vas-rqw-r vas-rqw-wrap" title="' + U.esc(val) + '">' + U.esc(val) + '</span>' +
+                (opts.docStatusLabel ? '<span title="' + U.esc(r.docStatusName || '') + '">' + U.esc(r.docStatusName || '') + '</span>' : '') +
+                '<span title="' + U.esc(chipText) + '">' + chip + '</span></div>';
         };
         var listHtml = function () {
             if (!records.length) { return '<div class="vas-rqw-msg">' + U.esc(U.lbl('VAS_305_NothingHere', 'Nothing here')) + '</div>'; }
             var start = page * LIST_PAGE;
             var slice = records.slice(start, start + LIST_PAGE);
             // the Value heading carries no currency sign: each row shows its own currency (Sr 27)
-            var html = table('minmax(0,1fr) minmax(0,1.3fr) minmax(0,1.3fr) 6.6em minmax(7.5em,1.1fr) 8em', [3, 4],
-                [U.lbl('VAS_305_Requisition', 'Requisition'), U.lbl('VAS_305_Requester', 'Requested by'), U.lbl('VAS_305_Warehouse', 'Warehouse'),
-                U.lbl('VAS_305_NeedBy', 'Need by'), U.lbl('VAS_305_Value', 'Value'), U.lbl('VAS_305_Status', 'Status')], slice.map(rowHtml));
+            var heads = [U.lbl('VAS_305_Requisition', 'Requisition'), U.lbl('VAS_305_Requester', 'Requested by'), U.lbl('VAS_305_Warehouse', 'Warehouse'),
+                U.lbl('VAS_305_NeedBy', 'Need by'), U.lbl('VAS_305_Value', 'Value')];
+            var cols = 'minmax(0,1fr) minmax(0,1.3fr) minmax(0,1.3fr) 6.6em minmax(7.5em,1.1fr)';
+            if (opts.docStatusLabel) { heads.push(opts.docStatusLabel); cols += ' minmax(5.5em,0.9fr)'; }
+            heads.push(U.lbl('VAS_305_Status', 'Status'));
+            cols += ' 8em';
+            var html = table(cols, [3, 4], heads, slice.map(rowHtml));
             if (pages > 1) {
                 // VAS163 2026-11-17: Sr 29 - 12 rows per page, pager under the table
                 html += '<div class="vas-rqw-lpg"><span class="vas-rqw-hp">' + U.esc(U.lbl('VAS_305_Showing', 'Showing') + ' ' + (start + 1) + '–' + (start + slice.length) + ' ' +
@@ -541,7 +632,8 @@
             // VAS163 2026-11-17: Sr 7 - qty and Ord. / Rcvd. come from the server in the line's UOM (QtyEntered)
             { w: '4.4em', right: true, head: U.lbl('VAS_305_Qty', 'Qty'), cell: function (l) { return cell('vas-rqw-r', U.esc(U.num(l.qty))); } },
             { w: 'minmax(3.5em,0.6fr)', head: U.lbl('VAS_305_UOM', 'UOM'), cell: function (l) { return cell('m', U.esc(l.uom || ''), l.uom || ''); } },
-            { w: '4.6em', right: true, head: U.lbl('VAS_305_NeedBy', 'Need by'), cell: function (l) { return cell('vas-rqw-r', U.esc(U.date(l.needBy)), U.dateLong(l.needBy)); } },
+            // VAS163 2026-11-20: Need by column wider, the date carries the year
+            { w: '6.6em', right: true, head: U.lbl('VAS_305_NeedBy', 'Need by'), cell: function (l) { return cell('vas-rqw-r', U.esc(U.date(l.needBy)), U.dateLong(l.needBy)); } },
             // VAS163 2026-11-17: Sr 11 - line amount in the price-list currency of the requisition (server ISO + precision)
             { w: '7.2em', right: true, head: U.lbl('VAS_305_Amount', 'Amount'), cell: function (l) { return cell('vas-rqw-r', U.esc(U.docMoney(l.amount, cur))); } }
         ];
@@ -638,11 +730,14 @@
                 $card.find('.vas-rqw-busy').addClass('on');
                 U.get(cfg.url).done(function (d) {
                     data = d;
-                    // VAS163 2026-11-17: Sr 33 - full amount (no L / Cr compact form) in the browser culture; it wraps
-                    // onto the next line when it does not fit (.vas-rqw-kv b.amt) instead of being cut off
-                    var amt = U.docMoney(d.amount, d.currency, false);
+                    // VAS163 2026-11-17: Sr 33 - amount in the browser culture; it wraps onto the next line when it
+                    // does not fit (.vas-rqw-kv b.amt) instead of being cut off.
+                    // VAS163 2026-11-20: Sr 77 - card total compact (L / Cr from 1,00,000 for INR, browser-culture digit
+                    // grouping); the list popup rows keep the full amount. The full amount is the hover title.
+                    var amt = U.docMoney(d.amount, d.currency, true);
+                    var amtFull = U.docMoney(d.amount, d.currency, false);
                     $card.find('.vas-rqw-kv').html('<b>' + U.esc(U.num(d.count)) + '</b><small>' + U.esc(cfg.unit(d)) + '</small>' +
-                        '<span class="sep"></span><b class="amt" title="' + U.esc(amt) + '">' + U.esc(amt) + '</b>');
+                        '<span class="sep"></span><b class="amt" title="' + U.esc(amtFull) + '">' + U.esc(amt) + '</b>');
                     var meta = cfg.meta(d);
                     $card.find('.vas-rqw-km').text(meta).attr('title', meta);
                     $card.attr('aria-label', T(cfg.title) + ': ' + d.count + ' ' + cfg.unit(d) + ', ' + amt);

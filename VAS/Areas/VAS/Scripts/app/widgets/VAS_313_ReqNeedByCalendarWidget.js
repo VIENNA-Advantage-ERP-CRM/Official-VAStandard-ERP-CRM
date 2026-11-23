@@ -80,6 +80,7 @@
             U.get('VAS_313_ReqNeedByCalendarWidget/GetMonth', { year: y, month: m }).done(function (d) {
                 if (mine !== req) { return; }
                 data = d;
+                // VAS163 2026-11-20: Sr 50 - the server counts the late requisitions of the shown month only
                 var $p = $card.find('[data-pill="late"]');
                 $p.text(U.num(d.lateCount) + ' ' + U.lbl('VAS_313_Late', 'late')).toggleClass('d', d.lateCount > 0).toggleClass('s', !d.lateCount);
                 self.relayout();
@@ -107,7 +108,8 @@
                 html += '<div class="cd' + (out ? ' out' : '') + (k === todayIso ? ' td' : '') + (d.getDay() % 6 === 0 ? ' we' : '') + '" data-d="' + k + '">' +
                     '<span class="dn">' + d.getDate() + '</span><div class="evs">' +
                     evs.map(function (e) {
-                        var tip = e.documentNo + ' · ' + (e.items || []).map(function (x) { return x.product; }).join(', ') + ' · ' + U.money(e.amount, data.currency);
+                        // VAS163 2026-11-20: Sr 47 - amount in the requisition's price-list currency with its sign
+                        var tip = e.documentNo + ' · ' + (e.items || []).map(function (x) { return x.product; }).join(', ') + ' · ' + U.rowMoney(e, data.currency);
                         return '<button type="button" class="ev s-' + e.state + '" data-r="' + e.requisitionId + '" title="' + U.esc(tip) + '"><b>' + U.esc(e.documentNo) + '</b>' +
                             U.esc(e.firstItem) + (e.lineCount > 1 ? ' +' + (e.lineCount - 1) : '') + '</button>';
                     }).join('') + '</div></div>';
@@ -132,16 +134,19 @@
             var evs = (data.entries || []).filter(function (e) { return e.date === dayIso; });
             var cur = data.currency;
             var rows = evs.map(function (e) {
-                return '<div class="vas-rqw-gr" data-r="' + e.requisitionId + '"><span class="b">' + U.esc(e.documentNo) + '</span>' +
-                    '<span title="' + U.esc(e.firstItem) + '">' + U.esc(e.firstItem) + (e.lineCount > 1 ? ' +' + (e.lineCount - 1) : '') + '</span>' +
-                    '<span class="m">' + U.esc(e.requester || '') + '</span><span class="vas-rqw-r">' + U.amount(e.amount, cur) + '</span>' +
-                    '<span>' + U.stateChip(e.state === 'notordered' ? 'notordered' : e.state, e.date) + '</span></div>';
+                // VAS163 2026-11-20: Sr 47 - amount in the requisition's price-list currency with its sign; hover titles
+                var amt = U.rowMoney(e, cur);
+                var chip = U.stateChip(e.state === 'notordered' ? 'notordered' : e.state, e.date);
+                return '<div class="vas-rqw-gr" data-r="' + e.requisitionId + '"><span class="b" title="' + U.esc(e.documentNo) + '">' + U.esc(e.documentNo) + '</span>' +
+                    '<span title="' + U.esc((e.items || []).map(function (x) { return x.product; }).join(', ') || e.firstItem) + '">' + U.esc(e.firstItem) + (e.lineCount > 1 ? ' +' + (e.lineCount - 1) : '') + '</span>' +
+                    '<span class="m" title="' + U.esc(e.requester || '') + '">' + U.esc(e.requester || '') + '</span><span class="vas-rqw-r vas-rqw-wrap" title="' + U.esc(amt) + '">' + U.esc(amt) + '</span>' +
+                    '<span title="' + U.esc($('<div>').html(chip).text()) + '">' + chip + '</span></div>';
             });
             var title = U.lbl('VAS_313_DueOn', 'Due on') + ' ' + U.dateLong(dayIso);
             U.openModal({
                 title: title,
                 body: '<div class="vas-rqw-sh"><b>' + U.esc(title) + '</b><span>' + evs.length + ' ' + U.esc(U.unit(evs.length, 'VAS_313_Requisitions', 'requisitions')) + '</span></div>' +
-                    U.table('minmax(0,1fr) minmax(0,1.8fr) minmax(0,1.2fr) 6em 7em', [3],
+                    U.table('minmax(0,1fr) minmax(0,1.8fr) minmax(0,1.2fr) minmax(7.5em,1.1fr) 8.2em', [3],
                         [U.lbl('VAS_305_Requisition', 'Requisition'), U.lbl('VAS_305_Product', 'Product'), U.lbl('VAS_305_Requester', 'Requested by'),
                         U.lbl('VAS_305_Value', 'Value'), U.lbl('VAS_305_Status', 'Status')], rows),
                 after: function ($m) {

@@ -265,6 +265,8 @@ namespace VIS.Controllers
 
         public const string StatusDraft = "DR";
         public const string StatusClosed = "CL";
+        /// <summary>VAS163 2026-11-20: Sr 44 / Sr 57 - voided / reversed requisitions get their own bucket (no longer with Closed).</summary>
+        public const string StatusVoided = "VO";
 
         /// <summary>yyyy-MM-dd or empty.</summary>
         public static string D(DateTime? d)
@@ -600,6 +602,61 @@ namespace VIS.Controllers
         /// </summary>
         public static VAS_ReqLine LoadHeader(Ctx ctx, int requisitionId)
         {
+            StringBuilder sql = HeaderSelectSql();
+            sql.Append(@"
+                WHERE r.M_Requisition_ID = @RQ_Req AND r.AD_Client_ID = @RQC_Client AND r.IsActive = 'Y'
+                  AND r.M_Requisition_ID IN (" + AccessSql(ctx) + ")");
+            DataSet ds = DB.ExecuteDataset(sql.ToString(), new SqlParameter[]
+            {
+                new SqlParameter("@RQ_Req", requisitionId),
+                new SqlParameter("@RQC_Client", ctx.GetAD_Client_ID())
+            }, null);
+            if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+            {
+                return null;
+            }
+            return ReadHeader(ds.Tables[0].Rows[0]);
+        }
+
+        /// <summary>
+        /// VAS163 2026-11-20: Sr 61 / Sr 46 - requisitions (the role may read) that have no active line yet, as one
+        /// header-only entry each (LineId 0, Qty 0, amount 0), so drafts without lines still appear on the widgets
+        /// that list requisitions of every status (Requisitions by Status, My Requisitions). LoadLines needs a line.
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="where">Extra condition on alias r (M_Requisition), or null</param>
+        /// <param name="whereParams">Parameters used in <paramref name="where"/> (names must start with @RQ_; new instances,
+        /// a parameter cannot be shared with another statement)</param>
+        /// <returns>Header-only entries</returns>
+        public static List<VAS_ReqLine> LoadHeadersWithoutLines(Ctx ctx, string where, List<SqlParameter> whereParams)
+        {
+            StringBuilder sql = HeaderSelectSql();
+            sql.Append(@"
+                WHERE r.AD_Client_ID = @RQC_Client AND r.IsActive = 'Y'
+                  AND r.M_Requisition_ID IN (" + AccessSql(ctx) + @")
+                  AND NOT EXISTS (SELECT 1 FROM M_RequisitionLine xrl WHERE xrl.M_Requisition_ID = r.M_Requisition_ID AND xrl.IsActive = 'Y')");
+            if (!string.IsNullOrEmpty(where))
+            {
+                sql.Append(" AND (" + where + ")");
+            }
+            List<SqlParameter> prm = new List<SqlParameter> { new SqlParameter("@RQC_Client", ctx.GetAD_Client_ID()) };
+            if (whereParams != null) { prm.AddRange(whereParams); }
+            List<VAS_ReqLine> list = new List<VAS_ReqLine>();
+            DataSet ds = DB.ExecuteDataset(sql.ToString(), prm.ToArray(), null);
+            if (ds == null || ds.Tables.Count == 0)
+            {
+                return list;
+            }
+            foreach (DataRow row in ds.Tables[0].Rows)
+            {
+                list.Add(ReadHeader(row));
+            }
+            return list;
+        }
+
+        /// <summary>VAS163 2026-11-20: Sr 61 - SELECT ... FROM of the requisition header (alias r), shared by LoadHeader / LoadHeadersWithoutLines.</summary>
+        private static StringBuilder HeaderSelectSql()
+        {
             bool hasUser = HasColumn("M_Requisition", "AD_User_ID");
             bool hasSource = HasColumn("M_Requisition", "DTD001_MWarehouseSource_ID");
             StringBuilder sql = new StringBuilder(@"
@@ -622,19 +679,12 @@ namespace VIS.Controllers
             if (hasUser) { sql.Append(" LEFT JOIN AD_User u ON u.AD_User_ID = r.AD_User_ID"); }
             if (hasRequester) { sql.Append(" LEFT JOIN C_BPartner rbp ON rbp.C_BPartner_ID = r.C_BPartner_ID"); }
             if (hasSource) { sql.Append(" LEFT JOIN M_Warehouse sw ON sw.M_Warehouse_ID = r.DTD001_MWarehouseSource_ID"); }
-            sql.Append(@"
-                WHERE r.M_Requisition_ID = @RQ_Req AND r.AD_Client_ID = @RQC_Client AND r.IsActive = 'Y'
-                  AND r.M_Requisition_ID IN (" + AccessSql(ctx) + ")");
-            DataSet ds = DB.ExecuteDataset(sql.ToString(), new SqlParameter[]
-            {
-                new SqlParameter("@RQ_Req", requisitionId),
-                new SqlParameter("@RQC_Client", ctx.GetAD_Client_ID())
-            }, null);
-            if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
-            {
-                return null;
-            }
-            DataRow row = ds.Tables[0].Rows[0];
+            return sql;
+        }
+
+        /// <summary>VAS163 2026-11-20: Sr 61 - header entry (no line figures) from a row of HeaderSelectSql.</summary>
+        private static VAS_ReqLine ReadHeader(DataRow row)
+        {
             VAS_ReqLine h = new VAS_ReqLine
             {
                 RequisitionId = Util.GetValueOfInt(row["M_Requisition_ID"]),
@@ -777,7 +827,7 @@ namespace VIS.Controllers
         }
 
         /// <summary>
-        /// Bucket of a requisition on the status donut / chips: DR draft, CL closed or voided,
+        /// Bucket of a requisition on the status donut / chips: DR draft, CL closed, VO voided / reversed,
         /// otherwise the live system status (OP / PO / OR / PD / DE).
         /// </summary>
         public static string StatusBucket(string docStatus, IEnumerable<VAS_ReqLine> reqLines)
@@ -786,7 +836,12 @@ namespace VIS.Controllers
             {
                 return StatusDraft;
             }
-            if (docStatus == "VO" || docStatus == "RE" || docStatus == "CL")
+            // VAS163 2026-11-20: Sr 44 / Sr 57 - Closed and Voided are separate buckets (were one 'Closed / Voided')
+            if (docStatus == "VO" || docStatus == "RE")
+            {
+                return StatusVoided;
+            }
+            if (docStatus == "CL")
             {
                 return StatusClosed;
             }
@@ -797,7 +852,9 @@ namespace VIS.Controllers
         public static string BucketName(Ctx ctx, string bucket)
         {
             if (bucket == StatusDraft) { return MsgOr(ctx, "VAS_314_Draft", "Draft"); }
-            if (bucket == StatusClosed) { return MsgOr(ctx, "VAS_314_ClosedVoided", "Closed / Voided"); }
+            // VAS163 2026-11-20: Sr 44 / Sr 57 - new message keys VAS_314_Closed / VAS_314_Voided
+            if (bucket == StatusClosed) { return MsgOr(ctx, "VAS_314_Closed", "Closed"); }
+            if (bucket == StatusVoided) { return MsgOr(ctx, "VAS_314_Voided", "Voided"); }
             return StatusName(ctx, bucket);
         }
 
@@ -828,7 +885,11 @@ namespace VIS.Controllers
                     currencyIso = h.CurrencyId > 0 ? h.DocCurrencyIso : "",
                     currencySymbol = h.CurrencyId > 0 ? h.DocCurrencySymbol : "",
                     currencyPrecision = h.CurrencyId > 0 ? h.DocCurrencyPrecision : -1,
-                    lines = g.Count(),
+                    // VAS163 2026-11-20: Sr 61 - a requisition without lines comes as one header-only entry (LineId 0)
+                    lines = g.Count(l => l.LineId > 0),
+                    // VAS163 2026-11-20: Sr 60 - document status of the requisition (column 'Requisition status')
+                    docStatus = h.DocStatus,
+                    docStatusName = DocStatusName(ctx, h.DocStatus),
                     status = bucket,
                     statusName = BucketName(ctx, bucket),
                     isLate = g.Any(l => l.IsLate(today)),
@@ -839,7 +900,7 @@ namespace VIS.Controllers
               {
                   x.requisitionId, x.documentNo, x.requester, x.warehouse, x.dateDoc, x.needBy, x.amount,
                   x.docAmount, x.currencyIso, x.currencySymbol, x.currencyPrecision,
-                  x.lines, x.status, x.statusName, x.isLate
+                  x.lines, x.docStatus, x.docStatusName, x.status, x.statusName, x.isLate
               })
               .ToList();
         }

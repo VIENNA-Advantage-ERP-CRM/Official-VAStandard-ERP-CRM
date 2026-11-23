@@ -45,17 +45,18 @@ namespace VIS.Controllers
                 DateTime to = from.AddMonths(1);
                 string needBy = VAS_ReqWidgetData.NeedBySql();
                 VAS_ReqCurrency cur = VAS_ReqWidgetData.GetSchemaCurrency(ctx);
-                // the month itself plus everything already due (for the "late" count in the header)
+                // VAS163 2026-11-20: Sr 50 - only the selected month: the "late" count in the header is the late
+                // requisitions whose need-by date falls in this month (it was every late requisition up to today)
                 List<SqlParameter> p = new List<SqlParameter>
                 {
                     new SqlParameter("@RQ_From", from),
-                    new SqlParameter("@RQ_To", to),
-                    new SqlParameter("@RQ_Today", today)
+                    new SqlParameter("@RQ_To", to)
                 };
                 List<VAS_ReqLine> lines = VAS_ReqWidgetData.LoadLines(ctx, cur,
-                    "r.DocStatus = 'CO' AND ((" + needBy + " >= @RQ_From AND " + needBy + " < @RQ_To) OR " + needBy + " < @RQ_Today)", p);
+                    "r.DocStatus = 'CO' AND " + needBy + " >= @RQ_From AND " + needBy + " < @RQ_To", p);
 
-                int lateCount = lines.Where(l => l.IsLate(today)).Select(l => l.RequisitionId).Distinct().Count();
+                int lateCount = lines.Where(l => l.IsLate(today) && l.NeedBy.HasValue && l.NeedBy.Value >= from && l.NeedBy.Value < to)
+                    .Select(l => l.RequisitionId).Distinct().Count();
 
                 var entries = lines.Where(l => l.NeedBy.HasValue && l.NeedBy.Value >= from && l.NeedBy.Value < to)
                     .GroupBy(l => new { Day = l.NeedBy.Value.Date, l.RequisitionId })
@@ -74,6 +75,11 @@ namespace VIS.Controllers
                             firstItem = ls[0].ItemName,
                             lineCount = ls.Count,
                             amount = ls.Sum(l => l.Amount(l.Qty)),
+                            // VAS163 2026-11-20: Sr 47 - amount in the requisition's price-list currency with its sign
+                            docAmount = ls.Sum(l => l.DocAmount(l.Qty)),
+                            currencyIso = ls[0].CurrencyId > 0 ? ls[0].DocCurrencyIso : "",
+                            currencySymbol = ls[0].CurrencyId > 0 ? ls[0].DocCurrencySymbol : "",
+                            currencyPrecision = ls[0].CurrencyId > 0 ? ls[0].DocCurrencyPrecision : -1,
                             state,
                             rank = state == "late" ? 0 : state == "notordered" ? 1 : state == "ordered" ? 2 : 3,
                             items = ls.Select(l => new

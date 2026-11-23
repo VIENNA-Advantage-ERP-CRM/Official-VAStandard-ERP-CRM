@@ -48,6 +48,12 @@ namespace VIS.Controllers
                     qty = l.NotOrderedQty * l.UomFactor, // VAS163 2026-11-17: Sr 7 - qty in the line's UOM (shown with it)
                     uom = l.UomName,
                     amount = l.Amount(l.NotOrderedQty),
+                    // VAS163 2026-11-20: Sr 41 - the same amount in the requisition's price-list currency (shown per row
+                    // with its own currency sign; no price list -> empty ISO, the page then uses the base currency)
+                    docAmount = l.DocAmount(l.NotOrderedQty),
+                    currencyIso = l.CurrencyId > 0 ? l.DocCurrencyIso : "",
+                    currencySymbol = l.CurrencyId > 0 ? l.DocCurrencySymbol : "",
+                    currencyPrecision = l.CurrencyId > 0 ? l.DocCurrencyPrecision : -1,
                     needBy = VAS_ReqWidgetData.D(l.NeedBy),
                     daysToNeed = l.NeedBy.HasValue ? (int)(l.NeedBy.Value.Date - today).TotalDays : 9999,
                     vendor = l.VendorName,

@@ -321,7 +321,8 @@
     font-size: .8125em; font-weight: 500; color: #41576A; text-transform: capitalize;
     margin: .2em 0 .1em; padding-bottom: .15em; border-bottom: 1px solid #E2EAF1; flex: none;
 }
-.vas289-form-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: .3em .6em; flex: none; }
+/* VAS163 2026-11-20: Sr 217 five fields per row on the order-details step (was six). */
+.vas289-form-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .3em .6em; flex: none; }
 @container (max-width: 760px) {
     .vas289-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
