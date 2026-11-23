@@ -119,6 +119,10 @@
 
         // Lookup caches
         var uomCache        = {};   // C_UOM_ID → name
+        // VAI154: Standard Precision of the units (C_UOM.StdPrecision) - the general list of the panel data, and the
+        // precision of the units seen on the loaded lines / callout results (id -> precision)
+        var uomList         = [];
+        var uomPrecCache    = {};
 
         // Edit state
         var activeCell      = null; // { lineIdx, role }
@@ -319,8 +323,9 @@
          *    equals what the grid displays.
          * @param {jQuery} $inp
          * @param {string} col - ColumnName used to look up the field length.
+         * @param {number} [maxDec] - VAI154: most decimals the box accepts (0 = whole numbers only); omitted = no limit.
          */
-        function limitNumericInput($inp, col) {
+        function limitNumericInput($inp, col, maxDec) {
             var maxLen = colFieldLength(col) || 16;
             $inp.attr("maxlength", maxLen);
             $inp.on("input", function () {
@@ -328,6 +333,11 @@
                 var t = s.replace(/[^0-9.,]/g, "");
                 var dot = t.indexOf(".");
                 if (dot >= 0) t = t.slice(0, dot + 1) + t.slice(dot + 1).replace(/\./g, "");
+                // VAI154: a quantity takes at most the decimals of its unit (0 = integer only)
+                if (maxDec != null && !isNaN(maxDec)) {
+                    dot = t.indexOf(".");
+                    if (dot >= 0) t = (maxDec > 0) ? t.slice(0, dot + 1 + maxDec) : t.slice(0, dot);
+                }
                 if (t.length > maxLen) t = t.slice(0, maxLen);
                 if (parseNum(t) > AMOUNT_MAX_VALUE) t = String(AMOUNT_MAX_VALUE);
                 if (t !== s) this.value = t;
@@ -387,29 +397,40 @@
         }
 
         /**
-         * Formats a quantity value showing at least 2 decimal places (up to 6), in the
-         * browser culture. Display only - the editable Qty input uses fmtQtyEdit.
-         * Examples (en): 8 → "8.00", 8.5 → "8.50", 8.1234 → "8.1234"
+         * Formats a quantity value in the browser culture. VAI154: it shows exactly the Standard Precision
+         * of its unit of measure (0 = no decimals, 3 = three); when the precision is not known the number
+         * keeps its own digits (up to 6). Display only - the editable Qty input uses fmtQtyEdit.
          * @param {number} n
+         * @param {number} [prec] - StdPrecision of the unit (undefined / null = not known)
          * @returns {string}
          */
-        function fmtQty(n) {
+        function fmtQty(n, prec) {
             var v = (n == null || isNaN(n)) ? 0 : parseFloat(n);
             if (Math.abs(v) > AMOUNT_MAX_VALUE) v = AMOUNT_MAX_VALUE;
+            var known = (prec != null && prec !== "" && !isNaN(prec) && +prec >= 0);
+            var p = known ? Math.min(+prec, 20) : 0;
             try {
-                return v.toLocaleString(lang, { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+                return v.toLocaleString(lang, { minimumFractionDigits: p, maximumFractionDigits: known ? p : 6 });
             } catch (e) {
-                return v.toFixed(2);
+                return known ? v.toFixed(p) : String(v);
             }
         }
 
         /**
-         * Plain "8.50" text for the editable Qty input (decimal point, no grouping): at least
-         * 2 decimal places (up to 6), trailing zeros beyond the 2nd place stripped.
+         * Plain "8.50" text for the editable Qty input (decimal point, no grouping). VAI154: with a known
+         * unit precision the box holds exactly that many decimals; otherwise at least 2 decimal places
+         * (up to 6), trailing zeros beyond the 2nd place stripped.
          * @param {number} n
+         * @param {number} [prec] - StdPrecision of the unit (undefined / null = not known)
          * @returns {string}
          */
-        function fmtQtyEdit(n) {
+        function fmtQtyEdit(n, prec) {
+            var known = (prec != null && prec !== "" && !isNaN(prec) && +prec >= 0);
+            if (known) {
+                var kv = (n == null || isNaN(n)) ? 0 : parseFloat(n);
+                if (Math.abs(kv) > AMOUNT_MAX_VALUE) kv = AMOUNT_MAX_VALUE;
+                return kv.toFixed(Math.min(+prec, 20));
+            }
             if (n == null || isNaN(n)) return "0.00";
             var v = parseFloat(n);
             if (Math.abs(v) > AMOUNT_MAX_VALUE) v = AMOUNT_MAX_VALUE;
@@ -455,6 +476,29 @@
          */
         function lineAmount(line) {
             return +lineVal(line, "PlannedAmt") || 0;
+        }
+
+        /**
+         * VAI154: Standard Precision (C_UOM.StdPrecision) of the unit of a line, used for its quantity. The unit is looked
+         * up by the line's C_UOM_ID in the unit list of the row first, then in the general list of the panel, then in the
+         * precisions seen on the loaded lines / callout results. Returns null when the unit or its precision is not known.
+         * @param {object} line
+         * @returns {number|null}
+         */
+        function qtyPrec(line) {
+            var id = (line && line.values) ? (parseInt(line.values.C_UOM_ID, 10) || 0) : 0;
+            if (!id) return null;
+            var lists = [(line._lk && line._lk.uom) || [], uomList || []];
+            for (var k = 0; k < lists.length; k++) {
+                for (var i = 0; i < lists[k].length; i++) {
+                    if ((parseInt(lists[k][i].C_UOM_ID, 10) || 0) === id) {
+                        var sp = lists[k][i].StdPrecision;
+                        if (sp != null && sp !== "" && !isNaN(sp)) return Math.max(0, parseInt(sp, 10));
+                    }
+                }
+            }
+            var cp = uomPrecCache[id];
+            return (cp != null && !isNaN(cp)) ? Math.max(0, cp) : null;
         }
 
         // ── Column metadata helpers ──────────────────────────────────────────
@@ -769,6 +813,9 @@
             }
             var disp = patch.Display || {};
             if (!line.display) line.display = {};
+            // VAI154: the callout may choose a new unit - keep its Standard Precision for the quantity
+            if (disp.uomPrecision != null && disp.uomPrecision !== "" && !isNaN(disp.uomPrecision) && parseInt(vals.C_UOM_ID, 10) > 0)
+                uomPrecCache[parseInt(vals.C_UOM_ID, 10)] = parseInt(disp.uomPrecision, 10);
             for (var dk in disp) {
                 if (disp.hasOwnProperty(dk)) {
                     line.display[dk] = disp[dk];
@@ -833,6 +880,7 @@
                         columnMeta     = [];
                         for (var c = 0; c < cols.length; c++) columnMeta.push(cols[c]);
                         indexColumnMeta();
+                        uomList        = (parent && parent.UomList) || [];   // VAI154: general unit list (with StdPrecision)
                         totalLineCount = (parent && parent.LinesTotal) || 0;
                         linePage       = parent ? (+parent.LinePage + 1) : 1;
                         otherAmt       = (parent && +parent.OtherPagesPlannedAmt) || 0;
@@ -947,6 +995,9 @@
 
             // Seed UOM cache
             if (vals.C_UOM_ID && disp.uomName) uomCache[vals.C_UOM_ID] = disp.uomName;
+            // VAI154: Standard Precision of the unit of the line (null when the unit is not known)
+            var rowPrec = pick("UOMPrecision");
+            if (vals.C_UOM_ID && rowPrec != null && rowPrec !== "" && !isNaN(rowPrec)) uomPrecCache[vals.C_UOM_ID] = parseInt(rowPrec, 10);
 
             var line = {
                 rowId:       "r" + (vals.VAS_OppLines_ID || Math.random()),
@@ -1037,6 +1088,31 @@
          * Columns: #, Product/Charge, Description, Planned Qty, UOM, Planned Price, Planned Amt, (actions)
          * @returns {string} HTML string.
          */
+        /* VAI154: name of a field as the window shows it: AD_Field.Name in the language of the user (the server resolves
+           AD_Field_Trl). The AD_Message text is the fallback while the dictionary metadata is not loaded. */
+        function fieldName(col, key, fallback) {
+            var m = colMeta(col);
+            return (m && m.Name) ? m.Name : lbl(key, fallback);
+        }
+
+        /* Text of a grid column head: a single field uses its field name; a head that shows two fields joins their names. */
+        function headerText(id) {
+            var both = function (a, b, key, fb) {
+                var ma = colMeta(a), mb = colMeta(b);
+                return (ma && ma.Name && mb && mb.Name) ? ma.Name + " / " + mb.Name : lbl(key, fb);
+            };
+            switch (id) {
+                // VAI154: Line No head = field name of VAS_LineNo (language of the user) from the column metadata; no text of our own
+                case "lineno":        return (colMeta("VAS_LineNo") && colMeta("VAS_LineNo").Name) ? colMeta("VAS_LineNo").Name : "";
+                case "productcharge": return both("M_Product_ID", "C_Charge_ID", "VAS_218_Product", "Product / Charge");
+                case "description":   return fieldName("Description", "VAS_218_Desc", "Description");
+                case "qtyuom":        return both("PlannedQty", "C_UOM_ID", "VAS_218_PlannedQtyUOM", "Qty / UOM");
+                case "price":         return fieldName("PlannedPrice", "VAS_218_PlannedPrice", "Planned Price");
+                case "amt":           return fieldName("PlannedAmt", "VAS_218_PlannedAmt", "Planned Amt");
+            }
+            return "";
+        }
+
         function buildHeadRow() {
             var $row = $('<div class="vas-ol-row vas-ol-row--head" role="row"></div>');
             $selectAll = $('<input type="checkbox" aria-label="' + esc(lbl("VAS_218_SelectAll", "Select all")) + '">');
@@ -1049,11 +1125,13 @@
                 }
                 updateToolbarState();
             });
-            $row.append('<div class="vas-ol-cell" role="columnheader">' + esc(lbl("VAS_218_Product", "Product / Charge")) + '</div>');
-            $row.append('<div class="vas-ol-cell" role="columnheader">' + esc(lbl("VAS_218_Desc", "Description")) + '</div>');
-            $row.append('<div class="vas-ol-cell vas-ol-cell--right" role="columnheader">' + esc(lbl("VAS_218_PlannedQtyUOM", "Qty / UOM")) + '</div>');
-            $row.append('<div class="vas-ol-cell vas-ol-cell--right" role="columnheader">' + esc(lbl("VAS_218_PlannedPrice", "Planned Price")) + '</div>');
-            $row.append('<div class="vas-ol-cell vas-ol-cell--right" role="columnheader">' + esc(lbl("VAS_218_PlannedAmt", "Planned Amt")) + '</div>');
+            // VAI154: Line No column head, right after the selection check box
+            $row.append('<div class="vas-ol-cell vas-ol-cell--right" role="columnheader">' + esc(headerText("lineno")) + '</div>');
+            $row.append('<div class="vas-ol-cell" role="columnheader">' + esc(headerText("productcharge")) + '</div>');
+            $row.append('<div class="vas-ol-cell" role="columnheader">' + esc(headerText("description")) + '</div>');
+            $row.append('<div class="vas-ol-cell vas-ol-cell--right" role="columnheader">' + esc(headerText("qtyuom")) + '</div>');
+            $row.append('<div class="vas-ol-cell vas-ol-cell--right" role="columnheader">' + esc(headerText("price")) + '</div>');
+            $row.append('<div class="vas-ol-cell vas-ol-cell--right" role="columnheader">' + esc(headerText("amt")) + '</div>');
             // Last (blank) header cell: the row Undo icon has its own grid column, as in the
             // Create Order panel. Opportunity lines have no Additional Info modal, so no "..." here.
             $row.append('<div class="vas-ol-cell vas-ol-cell--more" role="columnheader"></div>');
@@ -1944,6 +2022,56 @@
         }
 
         /**
+         * VAI154: Line No cell, as the window has it. A new line is numbered by the panel (highest number + 10) and
+         * only shown; the number of a saved line (VAS_OppLines_ID > 0) can be changed by clicking the cell (integer,
+         * digits only; empty or 0 keeps the old number). The change marks the line dirty (fieldSet).
+         * @param {object} line
+         * @param {number} idx
+         * @returns {jQuery}
+         */
+        function renderLineNoCell(line, idx) {
+            var v = line.values;
+            var cell = $('<div class="vas-ol-cell vas-ol-cell--right" role="cell"></div>');
+            if (!((parseInt(v.VAS_OppLines_ID, 10) || 0) > 0)) {
+                cell.append('<span class="vas-ol-lineno">' + esc(v.Line || "") + '</span>');
+                return cell;
+            }
+            var isEditingThis = editing && editing.rowId === line.rowId && editing.field === "lineno";
+            var wrap = $('<div class="vas-ol-cell-edit"></div>');
+            if (isEditingThis) wrap.addClass("is-editing");
+            cell.append(wrap);
+            if (isEditingThis) {
+                var $inp = $('<input type="text" class="vas-ol-cell-edit__input" inputmode="numeric" maxlength="9" />')
+                    .val(v.Line || "").css("text-align", "right");
+                var commitNo = function () {
+                    var ln = parseInt(String($inp.val()).replace(/[^0-9]/g, ""), 10);
+                    if (!isNaN(ln) && ln > 0) fieldSet(line, "Line", ln);   // empty or 0 keeps the old number
+                };
+                $inp.on("input", function () {
+                    var t = this.value.replace(/[^0-9]/g, "");
+                    if (t !== this.value) this.value = t;
+                });
+                $inp.on("blur", function () {
+                    commitNo();
+                    // Guard: editing may already point at another cell
+                    if (!editing || editing.rowId !== line.rowId || editing.field !== "lineno") return;
+                    editing = null;
+                    renderRow(idx);
+                });
+                $inp.on("keydown", function (e) {
+                    e.stopPropagation();
+                    if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); $inp.trigger("blur"); }
+                    if (e.key === "Escape") { editing = null; renderRow(idx); }
+                });
+                wrap.append($inp);
+                setTimeout(function () { $inp.focus(); $inp.select(); }, 0);
+            } else {
+                wrap.append(dispInput(line, "lineno", v.Line ? String(v.Line) : "", { align: "right", cls: "vas-ol-linenoval" }));
+            }
+            return cell;
+        }
+
+        /**
          * Builds the Description cell.
          * @param {object} line
          * @param {number} idx
@@ -2007,8 +2135,10 @@
             // ── Quantity ──
             if (isEditQty) {
                 var $q = $('<input type="text" class="vas-ol-cell-edit__input vas-ol-qtyval" inputmode="decimal" />');
-                $q.val(v.PlannedQty ? fmtQtyEdit(v.PlannedQty) : "").css("text-align", "right");
-                limitNumericInput($q, "PlannedQty");
+                // VAI154: the box holds, and accepts, the decimals of the unit (0 = integer only)
+                var qPrec = qtyPrec(line);
+                $q.val(v.PlannedQty ? fmtQtyEdit(v.PlannedQty, qPrec) : "").css("text-align", "right");
+                limitNumericInput($q, "PlannedQty", qPrec);
                 $q.on("blur", function () {
                     var n = parseNum($q.val());
                     fieldSet(line, "PlannedQty", n);
@@ -2040,7 +2170,7 @@
             } else {
                 var hasQ = v.PlannedQty !== undefined && +v.PlannedQty !== 0;
                 wrap.append(dispInput(line, "quantity",
-                    hasQ ? fmtQty(v.PlannedQty) : "",
+                    hasQ ? fmtQty(v.PlannedQty, qtyPrec(line)) : "",   // VAI154: shown with the precision of the unit
                     { align: "right", placeholder: lbl("VAS_218_Qty", "Qty"), cls: "vas-ol-qtyval" }));
             }
 
@@ -2197,6 +2327,9 @@
                 }
                 updateToolbarState();
             });
+
+            // VAI154: Line No cell, right after the selection check box
+            $row.append(renderLineNoCell(line, idx));
 
             // Col 2 – Product / Charge
             $row.append(renderPrimaryCell(line, idx));
@@ -2470,10 +2603,10 @@
                     productName: d.productName || "",
                     // Opportunities are always sales-side -> show the existing instance
                     // list first so the picker can select from stock, with the
-                    // "Show All (include zero and (-ve) qty)" box unticked.
+                    // "Show All (include zero and (-ve) qty)" box ticked (VAI154).
                     IsSOTrx: true,
                     newAttribute: false,
-                    showAll: false,
+                    showAll: true,   // VAI154: "Show All (include zero and (-ve) qty)" is ticked by default
                     // "Code" column: Lot No for a lot-controlled set, Serial No for a
                     // serial-controlled one, else the instance id - and translated captions.
                     codeByControl: true,
@@ -3654,6 +3787,8 @@
                 columnMeta     = null;
                 colMetaByName  = {};
                 uomCache       = {};
+                uomPrecCache   = {};   // VAI154
+                uomList        = [];   // VAI154
 
                 // Clear DOM references
                 if ($self) { $self.empty(); $self = null; }
