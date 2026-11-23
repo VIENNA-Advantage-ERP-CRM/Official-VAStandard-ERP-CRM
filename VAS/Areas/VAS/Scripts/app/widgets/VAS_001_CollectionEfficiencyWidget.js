@@ -156,8 +156,14 @@
            widget — 6.20L, 1.20Cr, 25.5K. Falls back to the locale's full
            number for amounts < 1000. Negative values get a leading '-';
            positive/zero values show no sign. */
-        function formatCompactAmount(value, sym, stdPrecision) {
+        function formatCompactAmount(value, sym, stdPrecision, isoCode) {
             var num = Number(value || 0);
+            /* With an ISO code: browser culture + K/M/B (K/L/Cr only for Indian-numbering currencies). */
+            if (isoCode && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(num, isoCode, stdPrecision, { compact: true, symbol: sym });
+                } catch (e) { if (window.console) { console.log(e); } }
+            }
             var absVal = Math.abs(num);
             var sign = num < 0 ? '-' : '';
             var s = sym || '';
@@ -259,6 +265,13 @@
             var status = pick(data, "CollectionStatus", "collectionStatus") || statusFromPercent(percent);
             /* Base (accounting-schema) currency symbol returned by the server. */
             var curSymbol = pick(data, "CurSymbol", "curSymbol") || "";
+            /* ISO code and precision of the base currency (isoCode / stdPrecision in the KPI response).
+               Older servers send neither: then a 3-letter upper-case symbol (the server's ISO_Code
+               fallback) is used as the ISO code, else the old lakh/crore format stays. */
+            var curIso = pick(data, "IsoCode", "isoCode") || pick(data, "CurrencyIso", "currencyIso") ||
+                (/^[A-Z]{3}$/.test(curSymbol) ? curSymbol : "");
+            var curPrec = Number(pick(data, "StdPrecision", "stdPrecision"));
+            if (isNaN(curPrec) || curPrec < 0) { curPrec = 2; }
 
             updateDonut(percent, status);
 
@@ -283,7 +296,7 @@
                     ? lbl("VAS_001_Invoice", "invoice")
                     : lbl("VAS_001_Invoices", "invoices");
                 $overdueText.text(
-                    formatCompactAmount(overdueAmount, curSymbol, 2) + ' ' +
+                    formatCompactAmount(overdueAmount, curSymbol, curPrec, curIso) + ' ' +
                     lbl("VAS_001_OverdueDot", "overdue ·") + ' ' +
                     overdueInvoiceCount + ' ' + invLabel
                 );
@@ -429,6 +442,16 @@
                 }
                 /* Title mirrors the full signed display string. */
                 var amtTitle = isIso ? (amtSign + amtMag + ' ' + sym) : (sym ? (amtSign + sym + amtMag) : (amtSign + amtMag));
+                /* Browser culture places sign, minus and the styled symbol span (VAS.formatAmountByBrowser). */
+                if (iso && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                    try {
+                        amtHtml = VAS.formatAmountByBrowser(rawAmt, iso, stdPrecision, {
+                            symbol: pick(row, "CurSymbol", "curSymbol") || "",
+                            symbolWrap: function (s) { return '<span class="vas-ce-cur-inline">' + escapeHtml(s) + '</span>'; }
+                        });
+                        amtTitle = VAS.formatAmountByBrowser(rawAmt, iso, stdPrecision, { symbol: pick(row, "CurSymbol", "curSymbol") || "" });
+                    } catch (e) { if (window.console) { console.log(e); } }
+                }
 
                 var chipCls = ageChipClass(ageDays);
                 var ageText = ageDays + ' ' + lbl("VAS_001_Days", "days");

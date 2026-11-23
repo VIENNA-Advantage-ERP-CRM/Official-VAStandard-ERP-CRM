@@ -110,6 +110,9 @@
         var ROW_H_FALLBACK = 44; // px, used only before a real row is measured
         /* Base-currency symbol from the backend; rendered before every amount. */
         var currencySymbol = '';
+        /* Base-currency ISO code and precision from GetAttentionInvoices (for VAS.formatAmountByBrowser). */
+        var currencyIso = '';
+        var currencyPrecision = null;
         /* Duplicate sets (grouped by customer) and the open review-dialog overlay. */
         var reviewSets = [];
         var $review = null;
@@ -149,6 +152,15 @@
            (sign, if any, precedes the symbol). */
         function formatAmount(value) {
             var v = Number(value) || 0;
+            /* Browser culture places the sign and the minus (VAS.formatAmountByBrowser, 20-Nov-2026); old composition is the fallback. */
+            if (currencyIso && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(v, currencyIso, currencyPrecision, {
+                        symbol: currencySymbol,
+                        symbolWrap: function (s) { return '<span class="vas-inv-cur">' + escapeHtml(s) + '</span>'; }
+                    });
+                } catch (e) { if (window.console) { console.log(e); } }
+            }
             var sign = v < 0 ? '-' : '';
             var stdPrecision = VIS.Env.getCtx().getStdPrecision();
             var num = Math.abs(v).toLocaleString(window.navigator.language, { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision });
@@ -229,6 +241,8 @@
                     }
                     /* Symbol from whichever endpoint answers first; both report the same base currency. */
                     currencySymbol = data.symbol || currencySymbol || '';
+                    currencyIso = data.iso || currencyIso || '';
+                    if (data.stdPrecision != null && (data.rows || []).length > 0) { currencyPrecision = Number(data.stdPrecision); }
                     pageNo = Number(data.pageNo || pageNo);
                     totalPages = Number(data.totalPages || 0);
                     totalRecords = Number(data.totalRecords || 0);
@@ -699,6 +713,8 @@
                         /* Invoice-currency symbol for this set (the set shares one currency); used for
                            the legend-context amount instead of the base-currency symbol. */
                         curSymbol: p.curSymbol || '',
+                        currencyIso: p.currencyIso || '',
+                        stdPrecision: p.stdPrecision,
                         idMap: {}, invoices: [], invoiceIds: [],
                         detail: null, loaded: false
                     };
@@ -773,7 +789,15 @@
 
         /* Plain-text amount with a currency symbol before the number. Pass the set's invoice-currency
            symbol for duplicate amounts; falls back to the base symbol when none is given. */
-        function money(value, symbol) {
+        function money(value, symbol, isoCode, precision) {
+            // Browser-culture amount (sign + currency placed by the culture) when the ISO code is known; returns escaped HTML.
+            if (isoCode && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return escapeHtml(VAS.formatAmountByBrowser(Number(value) || 0, isoCode, precision,
+                        { symbol: (symbol != null && symbol !== '') ? symbol : currencySymbol }));
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
             var stdPrecision = VIS.Env.getCtx().getStdPrecision();
             var num = (Number(value) || 0).toLocaleString(window.navigator.language, { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision });
             var sym = (symbol != null && symbol !== '') ? symbol : currencySymbol;
@@ -803,6 +827,10 @@
            card grand total; line-item amounts are shown as plain numbers (no currency). */
         function moneyIso(value, iso) {
             var stdPrecision = VIS.Env.getCtx().getStdPrecision();
+            /* Browser culture places the currency sign and the minus (VAS.formatAmountByBrowser, 20-Nov-2026); "number ISO" is the fallback. */
+            if (iso && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try { return escapeHtml(VAS.formatAmountByBrowser(Number(value) || 0, iso, stdPrecision)); } catch (e) { if (window.console) { console.log(e); } }
+            }
             var num = (Number(value) || 0).toLocaleString(window.navigator.language, { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision });
             return escapeHtml(num) + (iso ? ' ' + escapeHtml(iso) : '');
         }
@@ -999,7 +1027,7 @@
             function applyMeta(i) {
                 var s = sets[i];
                 if (!s) return;
-                $ctx.html(escapeHtml(s.customer || '') + ' · <b>' + lbl("VAS_062_PotentialDup", 'potential') + ' ' + billWord(s.invoices.length) + ' ' + money(s.amount, s.curSymbol) + '</b>');
+                $ctx.html(escapeHtml(s.customer || '') + ' · <b>' + lbl("VAS_062_PotentialDup", 'potential') + ' ' + billWord(s.invoices.length) + ' ' + money(s.amount, s.curSymbol, s.currencyIso, s.stdPrecision) + '</b>');
                 $note.text(lbl("VAS_062_DupFooterNote", 'Header amounts match — review the invoices before deciding.'));
             }
 

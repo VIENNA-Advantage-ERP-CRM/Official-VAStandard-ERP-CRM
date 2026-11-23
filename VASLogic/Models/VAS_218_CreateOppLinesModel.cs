@@ -1874,6 +1874,12 @@ namespace VASLogic.Models
             Trx trx = Trx.GetTrx(Trx.CreateTrxName("VAS218Save_" + VAS_Opportunity_ID));
             try
             {
+                // Bulk mode: each line save skips re-saving the opportunity (PlannedAmt + campaign costs);
+                // that runs once for the batch below (MVASOpportunity.FinishBulkLineUpdate). Every line
+                // gets this object as parent so it sees the flag.
+                MVASOpportunity opp = new MVASOpportunity(ctx, VAS_Opportunity_ID, trx);
+                opp.IsBulkLineUpdate = true;
+                int savedCount = 0;
                 foreach (OppLineInput input in rows)
                 {
                     if (input.M_Product_ID <= 0 && input.C_Charge_ID <= 0)
@@ -1887,6 +1893,7 @@ namespace VASLogic.Models
                     // ordinary C# virtual dispatch, so this can't happen again regardless of
                     // whatever AD_Table.ClassName / naming-convention state GetPO relies on.
                     MVASOppLines line = new MVASOppLines(ctx, input.VAS_OppLines_ID, trx);
+                    line.SetParent(opp);
 
                     if (input.VAS_OppLines_ID <= 0)
                     {
@@ -1962,13 +1969,28 @@ namespace VASLogic.Models
                             Message = err
                         });
                     }
+                    else
+                    {
+                        savedCount++;
+                    }
                 }
+                opp.IsBulkLineUpdate = false;
 
                 if (res.LineErrors.Count > 0)
                 {
                     trx.Rollback();
                     res.ErrorKey = "VAS_218_SaveFailed";
                     res.ErrorDetail = res.LineErrors[0].Message;
+                    return res;
+                }
+
+                // Opportunity PlannedAmt and campaign costs - once for the batch
+                if (savedCount > 0 && !opp.FinishBulkLineUpdate(true))
+                {
+                    trx.Rollback();
+                    ValueNamePair fp = VLogger.RetrieveError();
+                    res.ErrorKey = "VAS_218_SaveFailed";
+                    res.ErrorDetail = fp != null ? (string.IsNullOrEmpty(fp.GetName()) ? Msg.GetMsg(ctx, fp.GetValue()) : fp.GetName()) : "";
                     return res;
                 }
 

@@ -91,53 +91,23 @@
         }
 
 // ===== NEW CODE START — currency format (agent A07, 2026-08-19) =====
-        var INDIAN_ISOS = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
+        // VAS163 2026-11-12: every amount goes through VAS.formatAmountByBrowser with the
+        // server's currency (iso + stdPrecision); the browser culture decides symbol position,
+        // separators and compact suffix (was "sign + symbol + number", Indian ISO list, fixed 2 dp).
+        var currencyPrecision;
 
-        function isIndianIso(iso) {
-            var code = String(iso || '').toUpperCase();
-            return INDIAN_ISOS.indexOf(code) >= 0;
+        function money(value, opts) {
+            opts = opts || {};
+            opts.symbol = currencySymbol || '';
+            return VAS.formatAmountByBrowser(Number(value || 0), currencyIso || '', opts.precision != null ? opts.precision : currencyPrecision, opts);
         }
 
         function formatCompactValue(value) {
-            var val = Number(value || 0);
-            var absVal = Math.abs(val);
-            var sign = val < 0 ? '-' : '';
-            var sym = currencySymbol || '';
-
-            if (typeof VIS !== 'undefined' && VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
-                var compactStr = VIS.Util.formatCompactAmount(val, currencyIso, 1);
-                return sign + sym + compactStr;
-            }
-
-            if (isIndianIso(currencyIso)) {
-                if (absVal >= 10000000) {
-                    return sign + sym + (absVal / 10000000).toFixed(1) + 'Cr';
-                } else if (absVal >= 100000) {
-                    return sign + sym + (absVal / 100000).toFixed(1) + 'L';
-                } else if (absVal >= 1000) {
-                    return sign + sym + (absVal / 1000).toFixed(1) + 'k';
-                }
-            } else {
-                if (absVal >= 1000000000) {
-                    return sign + sym + (absVal / 1000000000).toFixed(1) + 'B';
-                } else if (absVal >= 1000000) {
-                    return sign + sym + (absVal / 1000000).toFixed(1) + 'M';
-                } else if (absVal >= 1000) {
-                    return sign + sym + (absVal / 1000).toFixed(1) + 'k';
-                }
-            }
-            return sign + sym + absVal.toLocaleString(window.navigator.language);
+            return money(value, { compact: true });
         }
 
         function formatFullValue(value) {
-            var val = Number(value || 0);
-            var sign = val < 0 ? '-' : '';
-            var absVal = Math.abs(val);
-            var sym = currencySymbol || '';
-            return sign + sym + absVal.toLocaleString(window.navigator.language, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            });
+            return money(value);
         }
 
         // NOTE (2026-09-17): formatINR is called below (SVG tooltip text) but was never defined
@@ -152,30 +122,32 @@
         // formatCompactValue's k/L/Cr abbreviation (kept for hover tooltips) and from
         // formatFullValue's 2-decimal popover figure.
         function formatFullCurrency(value) {
-            var v = Math.round(Number(value || 0));
-            var sign = v < 0 ? '-' : '';
-            var sym = currencySymbol || '';
-            return sign + sym + Math.abs(v).toLocaleString(window.navigator.language);
+            return money(Math.round(Number(value || 0)), { precision: 0 });
         }
 
-        // Compact, whole-number axis tick label (e.g. "₹10K", never "₹10.0k") - the
-        // right (Value) axis's own formatter, separate from the data-label/tooltip ones.
+        // Compact, whole-number axis tick label - the right (Value) axis's own formatter,
+        // separate from the data-label/tooltip ones.
         function formatAxisValue(value) {
-            var v = Math.round(Number(value || 0));
-            var sym = currencySymbol || '';
-            if (v === 0) { return sym + '0'; }
-            var sign = v < 0 ? '-' : '';
-            var absV = Math.abs(v);
-            if (isIndianIso(currencyIso)) {
-                if (absV >= 10000000) { return sign + sym + Math.round(absV / 10000000) + 'Cr'; }
-                if (absV >= 100000) { return sign + sym + Math.round(absV / 100000) + 'L'; }
-                if (absV >= 1000) { return sign + sym + Math.round(absV / 1000) + 'K'; }
-            } else {
-                if (absV >= 1000000000) { return sign + sym + Math.round(absV / 1000000000) + 'B'; }
-                if (absV >= 1000000) { return sign + sym + Math.round(absV / 1000000) + 'M'; }
-                if (absV >= 1000) { return sign + sym + Math.round(absV / 1000) + 'K'; }
+            return money(Math.round(Number(value || 0)), { compact: true, precision: 0 });
+        }
+
+        // VAS163 2026-11-10: browser locale (6-Nov retest2). The server sends year/month numbers
+        // (and key "yyyy-MM"); x-axis label and tooltip/popover fullMonth are built here.
+        function applyLocaleMonthLabels(series) {
+            var lang = window.navigator.language;
+            var withYear = series.length === 12;
+            for (var i = 0; i < series.length; i++) {
+                var it = series[i];
+                var y = Number(it.year), m = Number(it.month);
+                if (!y || !m) {
+                    var p = /^(\d{4})-(\d{2})/.exec(String(it.key || ''));
+                    if (!p) { continue; }
+                    y = Number(p[1]); m = Number(p[2]);
+                }
+                var d = new Date(y, m - 1, 1);
+                it.label = d.toLocaleDateString(lang, withYear ? { month: 'short', year: '2-digit' } : { month: 'short' });
+                it.fullMonth = d.toLocaleDateString(lang, { month: 'short', year: 'numeric' });
             }
-            return sign + sym + absV.toLocaleString(window.navigator.language);
         }
 
         // Left (Quantity) axis tick label - whole number, thousands separator.
@@ -275,9 +247,11 @@
 // ===== NEW CODE START — currency format (agent A07, 2026-08-19) =====
                     var data = parseResponse(res);
                     seriesData = data.series || [];
+                    applyLocaleMonthLabels(seriesData);
                     if (data.currency) {
                         currencyIso = data.currency.iso || '';
                         currencySymbol = data.currency.symbol || '';
+                        currencyPrecision = data.currency.stdPrecision; // VAS163 2026-11-12: server precision
                     }
                     renderChart();
 // ===== NEW CODE END — currency format =====
@@ -630,6 +604,14 @@
                 showPopover(idx, this.getBoundingClientRect());
             });
             $svg.on('mouseout', 'rect, circle', function () { closePopover(); });
+            // VAS163 2026-11-13: row 45 - a click (or tap) on a month bar/point also opens its details;
+            // stopPropagation keeps the document click handler below from closing it at once.
+            $svg.on('click', 'rect, circle', function (e) {
+                e.stopPropagation();
+                var idx = Number($(this).attr('data-idx'));
+                if (isNaN(idx)) { return; }
+                showPopover(idx, this.getBoundingClientRect());
+            });
 
             $(document).on('click.vas-iut', function () { closePopover(); });
             // The popover is fixed-positioned against the viewport, so it must follow scroll/resize.
@@ -686,3 +668,78 @@
     };
 
 })(VAS, jQuery);
+/* VAS163 2026-11-12: VAS.formatAmountByBrowser(value, isoCode, precision, { compact, symbol })
+   Amount in the BROWSER culture (window.navigator.language) with the currency the SERVER sent
+   (ISO code + precision; the server symbol only as a fallback). Defined in each widget / panel
+   that uses it - guarded, so the first file loaded defines it - so the shared util/CurrencyFormat.js
+   stays as shipped. Compact amounts keep that file's default scale (VIS.Util.formatCompactAmount:
+   L / Cr for Indian-numbering currencies, K / M / B otherwise, digits in the browser culture);
+   separators, decimals and the position of the currency sign come from the browser culture. */
+; (function () {
+    var V = window.VAS = window.VAS || {};
+    if (typeof V.formatAmountByBrowser === 'function') return;
+    function browserLocale() { try { return window.navigator.language || undefined; } catch (e) { return undefined; } }
+    function resolvePrecision(p) {
+        var n = Number(p);
+        if (p === null || p === undefined || p === '' || isNaN(n) || n < 0) {
+            try { n = VIS.Env.getCtx().getStdPrecision(); } catch (e) { n = 2; }
+        }
+        n = Math.round(Number(n));
+        return (isNaN(n) || n < 0) ? 2 : Math.min(n, 10);
+    }
+    function validIso(c) { c = String(c || '').trim().toUpperCase(); return /^[A-Z]{3}$/.test(c) ? c : ''; }
+    function numberFormat(o) {
+        try { return new Intl.NumberFormat(browserLocale(), o); } catch (e) { }
+        if (o.currencyDisplay === 'narrowSymbol') {
+            o.currencyDisplay = 'symbol';
+            try { return new Intl.NumberFormat(browserLocale(), o); } catch (e2) { }
+        }
+        return null;
+    }
+    /* Currency sign and where the browser culture puts it for this ISO code. */
+    var layoutCache = {};
+    function currencyLayout(iso) {
+        var key = browserLocale() + '|' + iso;
+        if (layoutCache[key]) return layoutCache[key];
+        var out = { sign: '', before: true, gap: '' };
+        var f = iso ? numberFormat({ style: 'currency', currency: iso, currencyDisplay: 'narrowSymbol' }) : null;
+        if (f && typeof f.formatToParts === 'function') {
+            try {
+                var parts = f.formatToParts(1234.5), ci = -1, ni = -1;
+                for (var i = 0; i < parts.length; i++) {
+                    if (parts[i].type === 'currency' && ci < 0) ci = i;
+                    if (parts[i].type === 'integer' && ni < 0) ni = i;
+                }
+                if (ci >= 0) {
+                    out.sign = parts[ci].value;
+                    if (ni >= 0) {
+                        out.before = ci < ni;
+                        var near = out.before ? parts[ci + 1] : parts[ci - 1];
+                        out.gap = (near && near.type === 'literal') ? near.value : '';
+                    }
+                }
+            } catch (e) { }
+        }
+        layoutCache[key] = out;
+        return out;
+    }
+    V.formatAmountByBrowser = function (value, isoCode, precision, options) {
+        options = options || {};
+        var num = Number(value) || 0;
+        var p = resolvePrecision(precision);
+        var iso = validIso(isoCode);
+        var body;
+        if (options.compact && window.VIS && VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
+            body = VIS.Util.formatCompactAmount(Math.abs(num), iso, p);
+        } else {
+            var f = numberFormat({ minimumFractionDigits: p, maximumFractionDigits: p });
+            try { body = f ? f.format(Math.abs(num)) : Math.abs(num).toFixed(p); } catch (e) { body = String(Math.abs(num)); }
+        }
+        var minus = (num < 0 && /[1-9]/.test(body)) ? '-' : '';
+        var lay = currencyLayout(iso);
+        var sign = lay.sign || options.symbol || iso;
+        if (!sign) return minus + body;
+        if (!lay.sign) return minus + sign + ' ' + body;
+        return lay.before ? (minus + sign + lay.gap + body) : (minus + body + lay.gap + sign);
+    };
+})();

@@ -229,15 +229,26 @@
             return !isNaN(p) && p >= 0 ? p : 0;
         }
         // Compact money against a base (accounting-schema) currency descriptor.
-        // VIS.Util.formatCompactAmount supplies the scaled magnitude at the
+        // VIS.Util.BrowserCultureFormatter.formatCompactAmount supplies the scaled magnitude at the
         // system-configured precision; the sign is composed before the symbol here.
         function formatMoney(value, cur) {
             var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
             var sign = n < 0 ? '-' : '';
             var iso = (cur && cur.iso) || '';
             var aff = currencyAffix(iso, cur && cur.symbol);
-            var compact = VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
+            var compact = VIS.Util.BrowserCultureFormatter.formatCompactAmount(n, iso, precisionOf(cur));
             return sign + (aff.before ? aff.symbol + aff.space + compact : compact + aff.space + aff.symbol);
+        }
+        // 2026-11-18: hover tooltip - the FULL amount (browser culture, currency precision)
+        // behind a compact amount. fullTitleAttr() gives a ' title="..."' fragment (or '').
+        function fullTitleAttr(value, cur) {
+            if (!(window.VIS && VIS.Util && VIS.Util.BrowserCultureFormatter && typeof VIS.Util.BrowserCultureFormatter.formatFullAmount === 'function')) { return ''; }
+            var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
+            var full = VIS.Util.BrowserCultureFormatter.formatFullAmount(n, (cur && cur.iso) || '', precisionOf(cur));
+            return full ? ' title="' + escapeHtml(full) + '"' : '';
+        }
+        function moneyHtml(value, cur) {
+            return '<span' + fullTitleAttr(value, cur) + '>' + escapeHtml(formatMoney(value, cur)) + '</span>';
         }
         function formatAmount(value) {
             return formatMoney(value, listCurrency);
@@ -346,7 +357,7 @@
             return (item.onbStep || '');
         }
         function rowValue(item) {
-            if (listFlag === 'overdue') { return '<span class="vas137-row-val vas137-danger">' + escapeHtml(formatAmount(item.amount)) + '</span>'; }
+            if (listFlag === 'overdue') { return '<span class="vas137-row-val vas137-danger"' + fullTitleAttr(item.amount, listCurrency) + '>' + escapeHtml(formatAmount(item.amount)) + '</span>'; }
             if (listFlag === 'onbIncomplete') { return '<span class="vas137-row-val">' + formatPercent(item.progress, 2) + '</span>'; }
             return '';
         }
@@ -493,10 +504,10 @@
                 fact(label('VAS_137_Tier', 'Tier'), tierLabel ? escapeHtml(tierLabel) : dash) +
                 fact(label('VAS_137_Segment', 'Segment'), escapeHtml(data.segment || dash)) +
                 fact(label('VAS_137_Owner', 'Owner'), escapeHtml(data.rep || dash)) +
-                fact(label('VAS_137_ARR', 'ARR'), escapeHtml(formatDetailAmount(data.value))) +
+                fact(label('VAS_137_ARR', 'ARR'), moneyHtml(data.value, detailCurrency)) +
                 fact(label('VAS_137_OpenTicketsFact', 'Open tickets'), escapeHtml(formatCount(data.openTickets || 0))) +
                 fact(label('VAS_137_Projects', 'Projects'), projectText(data.projectName, projects, dash)) +
-                fact(label('VAS_137_Pipeline', 'Pipeline'), pipeline > 0 ? escapeHtml(formatDetailAmount(pipeline)) : dash) +
+                fact(label('VAS_137_Pipeline', 'Pipeline'), pipeline > 0 ? moneyHtml(pipeline, detailCurrency) : dash) +
                 fact(label('VAS_137_Onboarding', 'Onboarding'), data.onboardingPercent == null ? dash : escapeHtml(formatPercent(data.onboardingPercent, 2))) +
             '</div>';
 
@@ -509,7 +520,7 @@
             var overdue = Number(data.overdueAmount || 0);
             if (overdue > 0) {
                 var invPart = data.overdueInvoice ? ' · ' + data.overdueInvoice : '';
-                signals += signalRow('cash', '#ED1C24', escapeHtml(formatDetailAmount(overdue) + ' ' + label('VAS_137_Overdue', 'overdue') + invPart),
+                signals += signalRow('cash', '#ED1C24', moneyHtml(overdue, detailCurrency) + escapeHtml(' ' + label('VAS_137_Overdue', 'overdue') + invPart),
                     formatCount(data.overdueDays || 0) + ' ' + label('VAS_137_DaysPastDue', 'days past due'));
             }
             var signalsBlock = signals ? '<div class="vas137-signals"><div class="vas137-sig-title">' + escapeHtml(label('VAS_137_Signals', 'Signals')) + '</div>' + signals + '</div>' : '';

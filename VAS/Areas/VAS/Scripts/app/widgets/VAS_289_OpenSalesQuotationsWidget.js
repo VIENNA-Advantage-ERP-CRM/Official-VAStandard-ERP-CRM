@@ -374,7 +374,8 @@
 
         function formatQty(value, precision) {
             var p = Math.max(0, Math.min(10, Number(precision) || 0));
-            return fmtNumber(roundTo(value, p), 0, p);
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            return roundTo(value, p).toLocaleString(window.navigator.language, { minimumFractionDigits: 0, maximumFractionDigits: p });
         }
 
         /* QA 8.75: rate with exactly two decimals. This is the machine-format value of the native
@@ -416,84 +417,61 @@
             return '';
         }
 
-        /* Currency of the order being converted: the quotation's currency, replaced by the
-           selected price list's currency on the Details step. Resolved to the ISO code through
-           the currency list the server sends with the order-form options ('' until loaded). */
-        function activeCurrency() {
-            if (!wizard) { return null; }
-            var id = (wizard.header && wizard.header.currencyId) ||
-                (wizard.formDefaults && wizard.formDefaults.CurrencyId) ||
-                (wizard.quotation && wizard.quotation.CurrencyId) || 0;
-            var list = (wizard.formOptions && wizard.formOptions.Currencies) || [];
-            return list.filter(function (c) { return c.Id === id; })[0] || null;
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        // The SO-to-be's currency (header, else the form defaults = quotation price list's
+        // currency) from GetOrderFormDefaults' Currencies list; {} when not known yet.
+        function wizardCurrency() {
+            if (!wizard) { return {}; }
+            var id = (wizard.header && wizard.header.currencyId) || (wizard.formDefaults && wizard.formDefaults.CurrencyId);
+            return ((wizard.formOptions && wizard.formOptions.Currencies) || []).filter(function (x) { return x.Id === id; })[0] || {};
         }
 
-        /* Puts the currency symbol on the side (and with the spacing) the browser culture uses for
-           that currency. Without an ISO code the symbol the server supplied goes in front; without
-           either, the plain number is returned. */
-        function withCurrencySymbol(text, cur) {
-            var iso = cur ? cur.Code : '';
-            var symbol = cur ? (cur.Symbol || '') : '';
-            var before = true, gap = '';
-            if (iso) {
-                try {
-                    var parts = new Intl.NumberFormat(window.navigator.language, { style: 'currency', currency: iso }).formatToParts(1);
-                    var ci = -1, ii = -1;
-                    parts.forEach(function (p, i) {
-                        if (p.type === 'currency' && ci < 0) { ci = i; }
-                        if (p.type === 'integer' && ii < 0) { ii = i; }
-                    });
-                    if (ci >= 0) {
-                        symbol = parts[ci].value;
-                        before = ii < 0 || ci < ii;
-                        var next = before ? parts[ci + 1] : parts[ci - 1];
-                        gap = (next && next.type === 'literal') ? next.value : '';
-                    }
-                } catch (e) { /* keep the server-supplied symbol */ }
-            }
-            if (!symbol) { return text; }
-            return before ? symbol + gap + text : text + gap + symbol;
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        // VAS163 2026-11-12: compact amount via VAS.formatAmountByBrowser - wizard currency ISO + precision
+        // from the server (CurrencyOption.Code / Precision), symbol position / separators from the browser culture.
+        function formatINR(value) {
+            var cur = wizardCurrency();
+            var prec = (typeof cur.Precision === 'number') ? cur.Precision : null;
+            return VAS.formatAmountByBrowser(Number(value || 0), String(cur.Code || '').trim(), prec, { compact: true, symbol: String(cur.Symbol || '').trim() });
         }
 
+        // VAS163 2026-11-12: formatMoneyCompact was called (step 2 footer, step 3 "Order value")
+        // but never defined - a ReferenceError broke those screens. Compact wizard-currency amount.
         function formatMoneyCompact(value) {
-            var num = Number(value || 0);
-            var cur = activeCurrency();
-            var text;
-            try {
-                var iso = cur ? cur.Code : '';
-                var compactFrom = VIS.Util.usesIndianNumbering(iso) ? 1e5 : 1e6;
-                text = Math.abs(num) >= compactFrom
-                    ? (num < 0 ? '-' : '') + VIS.Util.formatCompactAmount(Math.abs(num), iso, 2)
-                    : fmtNumber(Math.round(num), 0, 0);
-            } catch (e) { text = fmtNumber(Math.round(num), 0, 0); }
-            return withCurrencySymbol(text, cur);
+            return formatINR(value);
         }
 
         function formatNum(value) {
             return Math.round(Number(value || 0) * 100) / 100;
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatNumDisplay(value) {
             var n = Number(value || 0);
-            return fmtNumber(Math.round(n * 100) / 100, 0, 2);
+            return (Math.round(n * 100) / 100).toLocaleString(window.navigator.language);
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        // yyyy-MM-dd parsed by parts (local date, no UTC shift).
         function parseIso(iso) {
-            if (!iso) { return null; }
-            var d = new Date(iso + 'T00:00:00');
+            var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+            if (!m) { return null; }
+            var d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
             return isNaN(d.getTime()) ? null : d;
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatDateShort(iso) {
             var d = parseIso(iso);
             if (!d) { return '—'; }
-            return fmtDate(d, { day: '2-digit', month: 'short' }) || '—';
+            return d.toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short' });
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatDateFull(iso) {
             var d = parseIso(iso);
             if (!d) { return '—'; }
-            return fmtDate(d, { day: '2-digit', month: 'short', year: 'numeric' }) || '—';
+            return d.toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' });
         }
 
         function parseResponse(res) {
@@ -678,7 +656,7 @@
            existing Sales Quotation record window instead (same helper VAS_276 uses). */
         function openQuotationRecord(quotationId) {
             if (!window.VAS || !VAS.ZoomUtil) { return; }
-            VAS.ZoomUtil.zoomToRecord('C_Order_ID', quotationId, zoomWindowId, ZOOM_WINDOW_NAME, ZOOM_WINDOW_NAME)
+            VAS.ZoomUtil.zoomToRecord('C_Order_ID', quotationId, zoomWindowId, ZOOM_WINDOW_NAME, 'Sales Quotation') // VAS163 2026-11-12: legacy window name as fallback
                 .done(function (id) { if (id > 0) { zoomWindowId = id; } });
         }
 
@@ -1695,15 +1673,12 @@
                 '<span>' + escapeHtml(label('VAS_289_TotalsOrderTotal', 'Order total')) + '</span><b>' + escapeHtml(formatAmount(subtotal + tax)) + '</b>';
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2).
+        // VAS163 2026-11-12: full amount via VAS.formatAmountByBrowser (wizard currency ISO + precision from the server).
         function formatAmount(value) {
-            var code = currencyCode(wizard.header.currencyId);
-            var n = Number(value) || 0;
-            if (code) {
-                try {
-                    return new Intl.NumberFormat(window.navigator.language, { style: 'currency', currency: code, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
-                } catch (e) { /* unknown ISO code - plain number below */ }
-            }
-            return fmtNumber(n, 2, 2);
+            var cur = wizardCurrency();
+            var prec = (typeof cur.Precision === 'number' && cur.Precision >= 0) ? cur.Precision : null;
+            return VAS.formatAmountByBrowser(Number(value) || 0, String(cur.Code || '').trim(), prec, { symbol: String(cur.Symbol || '').trim() });
         }
 
         /* 5-Nov rows 25/40: the Document Status (Drafted / Completed) of the SO to create is
@@ -1863,3 +1838,78 @@
     };
 
 })(VAS, jQuery);
+/* VAS163 2026-11-12: VAS.formatAmountByBrowser(value, isoCode, precision, { compact, symbol })
+   Amount in the BROWSER culture (window.navigator.language) with the currency the SERVER sent
+   (ISO code + precision; the server symbol only as a fallback). Defined in each widget / panel
+   that uses it - guarded, so the first file loaded defines it - so the shared util/CurrencyFormat.js
+   stays as shipped. Compact amounts keep that file's default scale (VIS.Util.formatCompactAmount:
+   L / Cr for Indian-numbering currencies, K / M / B otherwise, digits in the browser culture);
+   separators, decimals and the position of the currency sign come from the browser culture. */
+; (function () {
+    var V = window.VAS = window.VAS || {};
+    if (typeof V.formatAmountByBrowser === 'function') return;
+    function browserLocale() { try { return window.navigator.language || undefined; } catch (e) { return undefined; } }
+    function resolvePrecision(p) {
+        var n = Number(p);
+        if (p === null || p === undefined || p === '' || isNaN(n) || n < 0) {
+            try { n = VIS.Env.getCtx().getStdPrecision(); } catch (e) { n = 2; }
+        }
+        n = Math.round(Number(n));
+        return (isNaN(n) || n < 0) ? 2 : Math.min(n, 10);
+    }
+    function validIso(c) { c = String(c || '').trim().toUpperCase(); return /^[A-Z]{3}$/.test(c) ? c : ''; }
+    function numberFormat(o) {
+        try { return new Intl.NumberFormat(browserLocale(), o); } catch (e) { }
+        if (o.currencyDisplay === 'narrowSymbol') {
+            o.currencyDisplay = 'symbol';
+            try { return new Intl.NumberFormat(browserLocale(), o); } catch (e2) { }
+        }
+        return null;
+    }
+    /* Currency sign and where the browser culture puts it for this ISO code. */
+    var layoutCache = {};
+    function currencyLayout(iso) {
+        var key = browserLocale() + '|' + iso;
+        if (layoutCache[key]) return layoutCache[key];
+        var out = { sign: '', before: true, gap: '' };
+        var f = iso ? numberFormat({ style: 'currency', currency: iso, currencyDisplay: 'narrowSymbol' }) : null;
+        if (f && typeof f.formatToParts === 'function') {
+            try {
+                var parts = f.formatToParts(1234.5), ci = -1, ni = -1;
+                for (var i = 0; i < parts.length; i++) {
+                    if (parts[i].type === 'currency' && ci < 0) ci = i;
+                    if (parts[i].type === 'integer' && ni < 0) ni = i;
+                }
+                if (ci >= 0) {
+                    out.sign = parts[ci].value;
+                    if (ni >= 0) {
+                        out.before = ci < ni;
+                        var near = out.before ? parts[ci + 1] : parts[ci - 1];
+                        out.gap = (near && near.type === 'literal') ? near.value : '';
+                    }
+                }
+            } catch (e) { }
+        }
+        layoutCache[key] = out;
+        return out;
+    }
+    V.formatAmountByBrowser = function (value, isoCode, precision, options) {
+        options = options || {};
+        var num = Number(value) || 0;
+        var p = resolvePrecision(precision);
+        var iso = validIso(isoCode);
+        var body;
+        if (options.compact && window.VIS && VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
+            body = VIS.Util.formatCompactAmount(Math.abs(num), iso, p);
+        } else {
+            var f = numberFormat({ minimumFractionDigits: p, maximumFractionDigits: p });
+            try { body = f ? f.format(Math.abs(num)) : Math.abs(num).toFixed(p); } catch (e) { body = String(Math.abs(num)); }
+        }
+        var minus = (num < 0 && /[1-9]/.test(body)) ? '-' : '';
+        var lay = currencyLayout(iso);
+        var sign = lay.sign || options.symbol || iso;
+        if (!sign) return minus + body;
+        if (!lay.sign) return minus + sign + ' ' + body;
+        return lay.before ? (minus + sign + lay.gap + body) : (minus + body + lay.gap + sign);
+    };
+})();

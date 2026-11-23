@@ -337,9 +337,14 @@
          * The sign is carried outside the symbol so a refund cycle reads
          * "-$120.00" rather than "$-120.00".
          */
-        function formatAmount(value, symbol, precision) {
+        function formatAmount(value, symbol, precision, isoCode) {
             var numericValue =
                 toNumber(value, 0);
+
+            // browser culture places sign, symbol and separators
+            if (isoCode && window.VAS && typeof VAS.formatAmountByBrowser === "function") {
+                try { return VAS.formatAmountByBrowser(numericValue, isoCode, normalizePrecision(precision), { symbol: symbol }); } catch (e) { if (window.console) { console.log(e); } }
+            }
 
             var sign =
                 numericValue < 0
@@ -435,7 +440,8 @@
                 value,
                 row.PaymentCurrencySymbol ||
                 row.PaymentCurrency,
-                row.PaymentPrecision
+                row.PaymentPrecision,
+                row.PaymentCurrency
             );
         }
 
@@ -1241,7 +1247,8 @@
                 value,
                 detail.PaymentCurrencySymbol ||
                 detail.PaymentCurrency,
-                detail.PaymentPrecision
+                detail.PaymentPrecision,
+                detail.PaymentCurrency
             );
         }
 
@@ -1250,7 +1257,8 @@
                 value,
                 detail.InvoiceCurrencySymbol ||
                 detail.InvoiceCurrency,
-                detail.InvoicePrecision
+                detail.InvoicePrecision,
+                detail.InvoiceCurrency
             );
         }
 

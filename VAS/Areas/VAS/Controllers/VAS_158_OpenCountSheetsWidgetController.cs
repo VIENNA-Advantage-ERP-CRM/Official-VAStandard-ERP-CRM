@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Globalization;
 using System.Web.Mvc;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
@@ -124,6 +125,8 @@ namespace VAS.Controllers
                         // now shows the count document's own M_Inventory.MovementDate, in the
                         // "dd MMM yyyy" format used across these controllers.
                         MovementDate = (movementDate.HasValue && movementDate.Value != DateTime.MinValue) ? movementDate.Value.ToString("dd MMM yyyy") : "",
+                        // VAS163 2026-11-10: browser locale (6-Nov retest2) - client formats this ISO date.
+                        MovementDateIso = (movementDate.HasValue && movementDate.Value != DateTime.MinValue) ? movementDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                         // Was the hardcoded literal "Draft" for every row - wrong now that three
                         // statuses are returned, and a static literal besides.
                         DocStatus = docStatus,

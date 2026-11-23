@@ -51,7 +51,7 @@
  *                  currency. The modal shows each payment in its OWN currency with
  *                  that currency's precision, because its job is to show the original
  *                  transaction. Both go through the shared
- *                  VIS.Util.formatCompactAmount helper
+ *                  VAS.formatAmountByBrowser (compact) helper
  *                  (Scripts/app/util/CurrencyFormat.js) or a locale-aware exact
  *                  format, never a hand-rolled one.
  *
@@ -1222,9 +1222,18 @@
            A NEGATIVE TOTAL KEEPS ITS SIGN. The compact helper returns a magnitude, so a
            bucket that summed to −40,900 printed "$40.900K" - the same text a bucket of
            +40,900 prints, stating the opposite of the figure behind it. Only negatives are
-           marked; a positive exposure is the ordinary case and needs no plus. */
+           marked; a positive exposure is the ordinary case and needs no plus. Composed by
+           the shared browser-culture formatter (sign position and separators from the
+           browser); falls back to minus + symbol + compact() when it is not loaded. */
         function money(value) {
             var v = Number(value) || 0;
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(v, iso(), precision(),
+                        { compact: true, symbol: symbol(), minusSign: '−' });
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
             return (v < 0 ? '−' : '') + symbol() + compact(v);
         }
 
@@ -1243,6 +1252,13 @@
            the one place a minus goes missing. */
         function amountText(value) {
             var v = Number(value) || 0;
+            // Shared formatter: minus and currency sign placed by the browser culture, like money().
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(v, iso(), precision(), { symbol: symbol(), minusSign: '−' });
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
             var abs = Math.abs(v);
             var p = precision();
             return (v < 0 ? '−' : '') + symbol() + abs.toLocaleString(window.navigator.language,
@@ -1257,6 +1273,14 @@
             if (isNaN(p) || p < 0 || p > 6) { p = 2; }
 
             var sym = item.CurrencySymbol ? item.CurrencySymbol : (item.CurrencyCode || '');
+            // Shared formatter: sign and currency sign placed by the browser culture.
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(Number(value) || 0, item.CurrencyCode || '', p,
+                        { symbol: item.CurrencySymbol || '', minusSign: '−', positiveSign: '+' });
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
             var abs = Math.abs(Number(value) || 0);
             var text = abs.toLocaleString(window.navigator.language,
                 { minimumFractionDigits: p, maximumFractionDigits: p });

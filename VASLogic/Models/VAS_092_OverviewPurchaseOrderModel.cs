@@ -734,7 +734,8 @@ namespace VASLogic.Models
             result.Emails = LoadEmails(C_Order_ID);
 
             // ----- Recent activity (CM_ChatEntry + document milestones) -----
-            result.Activity = LoadActivity(C_Order_ID, result.Emails);
+            // VAS163 2026-11-10: Activity section commented out (6-Nov retest2, All Right Panels).
+            // result.Activity = LoadActivity(C_Order_ID, result.Emails);
 
             // ----- Documents raised from this PO (openable GRNs / invoices) -----
             result.Documents = LoadDocuments(C_Order_ID);

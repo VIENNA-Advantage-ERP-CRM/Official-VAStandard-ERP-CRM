@@ -11,6 +11,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Text.RegularExpressions;
 using System.Web.Mvc;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
@@ -132,12 +133,12 @@ namespace VAS.Controllers
                     SELECT cb.C_BPartner_ID AS Customer_Id,
                            cb.Customer_Name AS Customer_Name,
                            COALESCE(owner.Name, N'') AS Owner_Name,
-                           COALESCE(rm.Mail_Title, N'') AS Mail_Title,
+                           rm.Mail_Title AS Mail_Title,
                            rm.Mail_Date AS Mail_Date,
                            " + TodayDateExpr() + @" AS As_Of_Date,
                            COUNT(1) OVER () AS Total_Customers
                     FROM CustomerBody cb
-                    INNER JOIN RankedMail rm ON (rm.C_BPartner_ID=cb.C_BPartner_ID AND rm.RN=1 AND COALESCE(rm.Is_Mail_Sent, N'') <> 'Y')
+                    INNER JOIN RankedMail rm ON (rm.C_BPartner_ID=cb.C_BPartner_ID AND rm.RN=1 AND COALESCE(rm.Is_Mail_Sent, 'N') <> 'Y')
                     LEFT OUTER JOIN AD_User owner ON (owner.AD_User_ID=cb.SalesRep_ID AND owner.AD_Client_ID = @Client_ID AND owner.IsActive = 'Y')
                     ORDER BY rm.Mail_Date ASC,
                              cb.Customer_Name ASC,
@@ -150,7 +151,9 @@ namespace VAS.Controllers
                 IDataReader dr = null;
                 try
                 {
-                    dr = DB.ExecuteReader(sql, new SqlParameter[] { new SqlParameter("@Client_ID", ctx.GetAD_Client_ID()) });
+                    // @Client_ID occurs twice (customer body + owner join): one bind per occurrence, in SQL order.
+                    SqlParameter[] mailParams = BindInOrder(ref sql, new Dictionary<string, object> { { "Client_ID", ctx.GetAD_Client_ID() } });
+                    dr = DB.ExecuteReader(sql, mailParams);
                     while (dr != null && dr.Read())
                     {
                         total = Util.GetValueOfInt(dr["Total_Customers"]);
@@ -172,7 +175,7 @@ namespace VAS.Controllers
                             customerId = Util.GetValueOfInt(dr["Customer_Id"]),
                             customerName = Util.GetValueOfString(dr["Customer_Name"]),
                             ownerName = Util.GetValueOfString(dr["Owner_Name"]),
-                            mailTitle = Util.GetValueOfString(dr["Mail_Title"]),
+                            mailTitle = Util.GetValueOfString(dr["Mail_Title"]) ?? "",
                             unrespDays = unrespDays
                         });
                     }
@@ -198,6 +201,36 @@ namespace VAS.Controllers
             }
         }
 
+        /// <summary>
+        /// Oracle binds positionally: every placeholder occurrence in the SQL text needs its own
+        /// bind, in order of appearance. A repeated named placeholder, or parameters listed in a
+        /// different order than they appear, raises ORA-01008 or silently binds the wrong value
+        /// (e.g. a language string into AD_Client_ID -> ORA-01722). Numbers each occurrence of a
+        /// known placeholder (@Client_ID -> @Client_ID_1, @Client_ID_2 ...) and returns one
+        /// parameter per occurrence, in SQL order. Call AFTER MRole.AddAccessSQL / concatenation.
+        /// </summary>
+        private static SqlParameter[] BindInOrder(ref string sql, Dictionary<string, object> values)
+        {
+            Dictionary<string, object> lookup = new Dictionary<string, object>(values, StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, int> seen = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            List<SqlParameter> list = new List<SqlParameter>();
+
+            sql = Regex.Replace(sql, @"@([A-Za-z_][A-Za-z0-9_]*)", delegate (Match m)
+            {
+                string name = m.Groups[1].Value;
+                object value;
+                if (!lookup.TryGetValue(name, out value)) { return m.Value; }
+                int n;
+                seen.TryGetValue(name, out n);
+                n++;
+                seen[name] = n;
+                string unique = "@" + name + "_" + n;
+                list.Add(new SqlParameter(unique, value));
+                return unique;
+            });
+
+            return list.ToArray();
+        }
         private void CloseReader(IDataReader reader)
         {
             if (reader == null) { return; }

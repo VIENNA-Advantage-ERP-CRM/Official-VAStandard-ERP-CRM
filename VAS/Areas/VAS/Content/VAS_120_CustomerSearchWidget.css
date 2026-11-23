@@ -30,7 +30,8 @@
     padding: 1.125em 0;
     overflow: visible;
     /* Widget root anchor — one lever; internal em values scale from this. */
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 20px);
+    container-type: inline-size;
+    font-size: clamp(16px, 1.2cqi, 20px);
     color: #102C3F;
     font-family: Roboto, sans-serif;
     background: transparent !important;
@@ -213,7 +214,7 @@
 
 .vas120-option-name {
     font-weight: 700;
-    font-size: 0.875em;
+    font-size: 0.75em;
     color: #102C3F;
     line-height: 1.2;
     white-space: nowrap;
@@ -323,7 +324,7 @@
     padding: 0.6em 0.65em;
     margin-top: 4px;                            /* px */
     border-top: 1px solid #EDF2F6;              /* px */
-    font-size: 0.78em;
+    font-size: 0.75em;
     font-weight: 600;
     color: #0083DA;
     cursor: pointer;

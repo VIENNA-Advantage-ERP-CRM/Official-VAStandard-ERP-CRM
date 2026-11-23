@@ -463,6 +463,26 @@ namespace VAS.Models
         // ─────────────────────────────────────────────────────────
 
         /// <summary>
+        /// Text of a location-type message key (VAS_105_ShipBillTo / ShipTo / BillTo / Site).
+        /// Msg.GetMsg returns the key itself in brackets ("[VAS_105_ShipBillTo]") when AD_Message
+        /// has no row for it; that raw key must never reach the screen, so an English fallback is
+        /// used until the message exists.
+        /// </summary>
+        private static string LocationTypeText(Ctx ctx, string key)
+        {
+            string text = Msg.GetMsg(ctx, key);
+            if (!string.IsNullOrEmpty(text) && !text.StartsWith("[") && text != key)
+                return text;
+            switch (key)
+            {
+                case "VAS_105_ShipBillTo": return "Ship To / Bill To";
+                case "VAS_105_ShipTo": return "Ship To";
+                case "VAS_105_BillTo": return "Bill To";
+                default: return "Site";
+            }
+        }
+
+        /// <summary>
         /// Returns all active locations (ship-to / bill-to addresses) for the
         /// specified C_BPartner.
         /// </summary>
@@ -528,7 +548,7 @@ namespace VAS.Models
                         item.postal = Util.GetValueOfString(row["postal"]);
                         item.regionName = Util.GetValueOfString(row["region_name"]);
                         item.country = Util.GetValueOfString(row["country"]);
-                        item.locType = Msg.GetMsg(ctx, Util.GetValueOfString(row["loc_type"]));
+                        item.locType = LocationTypeText(ctx, Util.GetValueOfString(row["loc_type"]));
                         item.primaryContact = Util.GetValueOfString(row["primary_contact"]);
                         items.Add(item);
                     }

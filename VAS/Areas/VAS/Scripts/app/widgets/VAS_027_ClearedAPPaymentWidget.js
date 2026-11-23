@@ -176,8 +176,14 @@
          */
         function formatHeaderAmount(
             value,
-            symbol
+            symbol,
+            isoCode
         ) {
+            // browser culture places sign, symbol and separators (whole numbers kept)
+            if (isoCode && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try { return VAS.formatAmountByBrowser(Number(value || 0) || 0, isoCode, 0, { symbol: symbol }); } catch (e) { if (window.console) { console.log(e); } }
+            }
+
             var numericValue = Number(value || 0);
 
             if (isNaN(numericValue)) {
@@ -207,10 +213,16 @@
         function formatExactAmount(
             value,
             precision,
-            symbol
+            symbol,
+            isoCode
         ) {
             var stdPrecision =
                 normalizePrecision(precision);
+
+            // browser culture places sign, symbol and separators
+            if (isoCode && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try { return VAS.formatAmountByBrowser(Number(value || 0) || 0, isoCode, stdPrecision, { symbol: symbol }); } catch (e) { if (window.console) { console.log(e); } }
+            }
 
             var numericValue = Number(value || 0);
 
@@ -974,7 +986,8 @@
             var totalAmountText =
                 formatHeaderAmount(
                     data.totalAmount,
-                    symbol
+                    symbol,
+                    data.currencyIso
                 );
 
             $dialogSubtitle.text(
@@ -1046,6 +1059,7 @@
                             row.amount,
                             stdPrecision,
                             row.curSymbol ||
+                            currencyIso,
                             currencyIso
                         );
 

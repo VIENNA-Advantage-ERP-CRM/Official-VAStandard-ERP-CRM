@@ -116,6 +116,7 @@
  * 61  | Overdue                               | VAS_259_Overdue
  * 62  | Act soon                              | VAS_259_ActSoon
  * ──────────────────────────────────────────────────────────────────────────
+ * Tooltip - 2026-11-18: compact amounts carry the full amount (browser culture, currency precision) as a hover tooltip; no K/M/B literals here.
  */
 ; VAS = window.VAS || {};
 
@@ -189,22 +190,11 @@
         return Math.round(n).toLocaleString(window.navigator.language);
     }
 
-    // Locale-formatted number with a fixed number of fraction digits.
-    function fmtNum(v, digits) {
-        try {
-            return v.toLocaleString(window.navigator.language, { minimumFractionDigits: digits, maximumFractionDigits: digits });
-        } catch (e) { return v.toFixed(digits); }
-    }
-
-    function fmtCompact(value, precision) {
-        var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
+    // Plain number in the browser culture - fallback only when VIS.Util.BrowserCultureFormatter.formatCompactAmount is unavailable.
+    function plainAmount(v, precision) {
         var p = Number(precision); if (isNaN(p) || p < 0) { p = 2; }
-        var abs = Math.abs(n);
-        var sign = n < 0 ? '-' : '';
-        if (abs >= 1e9) { return sign + fmtNum(abs / 1e9, 2) + 'B'; }
-        if (abs >= 1e6) { return sign + fmtNum(abs / 1e6, 2) + 'M'; }
-        if (abs >= 1e3) { return sign + fmtNum(abs / 1e3, 2) + 'K'; }
-        return sign + fmtNum(abs, p);
+        try { return v.toLocaleString(window.navigator.language, { minimumFractionDigits: p, maximumFractionDigits: p }); }
+        catch (e) { return String(v); }
     }
 
     // Currency symbol + its position for the browser locale (before/after
@@ -236,15 +226,35 @@
         var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
         var sign = n < 0 ? '-' : '';
         var num;
-        if (window.VIS && VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
-            num = VIS.Util.formatCompactAmount(Math.abs(n), iso || '', precision);
+        if (window.VIS && VIS.Util && VIS.Util.BrowserCultureFormatter && typeof VIS.Util.BrowserCultureFormatter.formatCompactAmount === 'function') {
+            num = VIS.Util.BrowserCultureFormatter.formatCompactAmount(Math.abs(n), iso || '', precision);
         } else {
-            num = fmtCompact(Math.abs(n), precision);
+            num = plainAmount(Math.abs(n), precision);
         }
         if (affix) {
             return sign + (affix.before ? affix.symbol + affix.gap + num : num + affix.gap + affix.symbol);
         }
         return sign + tag + num;
+    }
+
+    // Full (non-compact) amount for the hover tooltip: same value / ISO / precision as formatMoney.
+    function fullMoney(value, iso, precision) {
+        var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
+        if (window.VIS && VIS.Util && VIS.Util.BrowserCultureFormatter && typeof VIS.Util.BrowserCultureFormatter.formatFullAmount === 'function') {
+            return VIS.Util.BrowserCultureFormatter.formatFullAmount(n, iso || '', precision);
+        }
+        return '';
+    }
+
+    // ' title="..."' attribute carrying the full amount (empty when it is unavailable).
+    function titleAttr(value, iso, precision) {
+        var full = fullMoney(value, iso, precision);
+        return full ? ' title="' + escapeHtml(full) + '"' : '';
+    }
+
+    // Compact amount wrapped in a span whose tooltip is the full amount.
+    function moneyHtml(value, iso, symbol, precision) {
+        return '<span' + titleAttr(value, iso, precision) + '>' + escapeHtml(formatMoney(value, iso, symbol, precision)) + '</span>';
     }
 
     // Date for the browser culture (never numeric month). Date-only
@@ -460,13 +470,16 @@
         function rowHtml(row) {
             var overdue = !!row.NoticeOverdue;
             var meta = [noticeText(row.NoticeDeadlineDays), endTextLower(row.DaysToEnd), formatMoney(row.GrandTotal, row.CurrencyIso, row.CurrencySymbol, row.CurrencyPrecision)].join(' · ');
+            // Same text as meta, with the amount wrapped so it carries the full-amount tooltip.
+            var metaHtml = escapeHtml([noticeText(row.NoticeDeadlineDays), endTextLower(row.DaysToEnd)].join(' · ') + ' · ') +
+                moneyHtml(row.GrandTotal, row.CurrencyIso, row.CurrencySymbol, row.CurrencyPrecision);
             var chipClass = overdue ? 'vas259-chip-danger' : 'vas259-chip-warn';
             var chipText = overdue ? label('VAS_259_Overdue', 'Overdue') : label('VAS_259_ActSoon', 'Act soon');
             return '<div class="vas259-row" data-cid="' + Number(row.ContractId) + '">' +
                 '<span class="vas259-ic ' + (overdue ? 'vas259-ic-danger' : 'vas259-ic-warn') + '">' + icon('clock') + '</span>' +
                 '<span class="vas259-row-main">' +
                     '<span class="vas259-row-name" title="' + escapeHtml(row.CustomerName || '') + '">' + escapeHtml(row.CustomerName || '') + '</span>' +
-                    '<span class="vas259-row-meta" title="' + escapeHtml(meta) + '">' + escapeHtml(meta) + '</span>' +
+                    '<span class="vas259-row-meta" title="' + escapeHtml(meta) + '">' + metaHtml + '</span>' +
                 '</span>' +
                 '<span class="vas259-chip ' + chipClass + '"><span class="vas259-dot"></span>' + escapeHtml(chipText) + '</span>' +
                 '<button type="button" class="vas259-btn vas259-btn-ghost vas259-btn-sm" data-row-renew data-cid="' + Number(row.ContractId) + '">' + escapeHtml(label('VAS_259_Renew', 'Renew')) + '</button>' +
@@ -628,7 +641,7 @@
                         '<span class="vas259-row-meta">' + escapeHtml([row.DocumentNo, row.ProductName].filter(function (p) { return p; }).join(' · ')) + '</span>' +
                     '</span>' +
                 '</span>' +
-                '<span class="vas259-col-r"><b>' + escapeHtml(formatMoney(row.GrandTotal, row.CurrencyIso, row.CurrencySymbol, row.CurrencyPrecision)) + '</b></span>' +
+                '<span class="vas259-col-r"><b' + titleAttr(row.GrandTotal, row.CurrencyIso, row.CurrencyPrecision) + '>' + escapeHtml(formatMoney(row.GrandTotal, row.CurrencyIso, row.CurrencySymbol, row.CurrencyPrecision)) + '</b></span>' +
                 '<span class="vas259-col-r">' + escapeHtml(Number(row.DaysToEnd || 0) < 0 ? formatCount(-row.DaysToEnd) + label('VAS_259_DaysAgoSuffix', 'd ago') : formatCount(row.DaysToEnd) + label('VAS_259_DaysSuffix', 'd')) + '</span>' +
                 '<span class="vas259-col-r"><span class="vas259-chip ' + chipClass + '"><span class="vas259-dot"></span>' + escapeHtml(chipText) + '</span></span>' +
             '</div>';
@@ -765,10 +778,10 @@
             $confirm.removeClass('is-open').attr('aria-hidden', 'true');
         }
 
-        function statHtml(labelKey, fallback, value) {
+        function statHtml(labelKey, fallback, value, valueTitle) {
             return '<div class="vas259-stat">' +
                 '<span class="vas259-slabel">' + escapeHtml(label(labelKey, fallback)) + '</span>' +
-                '<span class="vas259-sval">' + escapeHtml(value == null ? '' : String(value)) + '</span>' +
+                '<span class="vas259-sval"' + (valueTitle ? ' title="' + escapeHtml(valueTitle) + '"' : '') + '>' + escapeHtml(value == null ? '' : String(value)) + '</span>' +
             '</div>';
         }
 
@@ -834,14 +847,13 @@
             }
 
             if (Number(row.OverdueDays || 0) > 0) {
-                var overdueDesc = label('VAS_259_NextPeriodOverdue', 'Next period {n}d overdue').replace('{n}', formatCount(row.OverdueDays)) +
-                    ' · ' + formatMoney(row.OverdueAmount, row.CurrencyIso, row.CurrencySymbol, row.CurrencyPrecision) +
-                    ' · ' + formatMoney(row.Unbilled, row.CurrencyIso, row.CurrencySymbol, row.CurrencyPrecision) + ' ' + label('VAS_259_UnbilledTotal', 'unbilled total');
+                var overdueDesc = escapeHtml(label('VAS_259_NextPeriodOverdue', 'Next period {n}d overdue').replace('{n}', formatCount(row.OverdueDays)) + ' · ') + moneyHtml(row.OverdueAmount, row.CurrencyIso, row.CurrencySymbol, row.CurrencyPrecision) +
+                    escapeHtml(' · ') + moneyHtml(row.Unbilled, row.CurrencyIso, row.CurrencySymbol, row.CurrencyPrecision) + escapeHtml(' ' + label('VAS_259_UnbilledTotal', 'unbilled total'));
                 cards += '<div class="vas259-attn-card">' +
                     '<span class="vas259-attn-ic">' + icon('invoice') + '</span>' +
                     '<span class="vas259-attn-main">' +
                         '<span class="vas259-attn-title2">' + escapeHtml(label('VAS_259_BillingOverdue', 'Billing overdue')) + '</span>' +
-                        '<span class="vas259-attn-desc">' + escapeHtml(overdueDesc) + '</span>' +
+                        '<span class="vas259-attn-desc">' + overdueDesc + '</span>' +
                     '</span>' +
                 '</div>';
             }
@@ -871,7 +883,7 @@
                 return '<div class="vas259-sched-row">' +
                     '<span class="vas259-sched-left">' + left + '</span>' +
                     '<span class="vas259-sched-right">' +
-                        '<span class="vas259-sched-amt">' + escapeHtml(formatMoney(period.Amount, row.CurrencyIso, row.CurrencySymbol, row.CurrencyPrecision)) + '</span>' +
+                        '<span class="vas259-sched-amt"' + titleAttr(period.Amount, row.CurrencyIso, row.CurrencyPrecision) + '>' + escapeHtml(formatMoney(period.Amount, row.CurrencyIso, row.CurrencySymbol, row.CurrencyPrecision)) + '</span>' +
                         '<span class="vas259-band ' + badgeClass + '">' + escapeHtml(badgeText) + '</span>' +
                     '</span>' +
                 '</div>';
@@ -905,14 +917,14 @@
                     '</span>' +
                 '</div>' +
                 '<div class="vas259-stats">' +
-                    statHtml('VAS_259_Value', 'Contract cycle value', formatMoney(row.GrandTotal, row.CurrencyIso, row.CurrencySymbol, row.CurrencyPrecision)) +
+                    statHtml('VAS_259_Value', 'Contract cycle value', formatMoney(row.GrandTotal, row.CurrencyIso, row.CurrencySymbol, row.CurrencyPrecision), fullMoney(row.GrandTotal, row.CurrencyIso, row.CurrencyPrecision)) +
                     statHtml('VAS_259_Status', 'Status', row.LifecycleStatus) +
                     statHtml('VAS_259_Type', 'Type', row.ContractType) +
                     statHtml('VAS_259_Renewal', 'Renewal', row.RenewalType) +
                     statHtml('VAS_259_Ends', 'Ends', endsText(row.DaysToEnd)) +
                     statHtml('VAS_259_NoticeDays', 'Notice days', row.NoticeDays != null ? formatCount(row.NoticeDays) : '') +
-                    statHtml('VAS_259_Billed', 'Billed amount', formatMoney(row.Billed, row.CurrencyIso, row.CurrencySymbol, row.CurrencyPrecision)) +
-                    statHtml('VAS_259_Unbilled', 'Unbilled amount', formatMoney(row.Unbilled, row.CurrencyIso, row.CurrencySymbol, row.CurrencyPrecision)) +
+                    statHtml('VAS_259_Billed', 'Billed amount', formatMoney(row.Billed, row.CurrencyIso, row.CurrencySymbol, row.CurrencyPrecision), fullMoney(row.Billed, row.CurrencyIso, row.CurrencyPrecision)) +
+                    statHtml('VAS_259_Unbilled', 'Unbilled amount', formatMoney(row.Unbilled, row.CurrencyIso, row.CurrencySymbol, row.CurrencyPrecision), fullMoney(row.Unbilled, row.CurrencyIso, row.CurrencyPrecision)) +
                 '</div>' +
                 attentionCards(row) +
                 scheduleHtml(row);

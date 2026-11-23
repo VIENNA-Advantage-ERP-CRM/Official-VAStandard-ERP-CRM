@@ -123,7 +123,7 @@
                     if (res && typeof res.count !== 'undefined') {
                         draftCount = res.count;
                         if ($valEl) {
-                            $valEl.text(draftCount);
+                            $valEl.text(Number(draftCount || 0).toLocaleString(window.navigator.language)); // VAS163 2026-11-12: locale count
                         }
                     }
                 },
@@ -274,15 +274,25 @@
             var endIndex = Math.min(startIndex + pageSize, totalItems);
             var pageItems = draftList.slice(startIndex, endIndex);
 
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            var formatIsoDate = function (iso, fallback) {
+                var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+                if (!m) { return fallback || ''; }
+                var d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+                return d.toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' });
+            };
+
             for (var i = 0; i < pageItems.length; i++) {
                 var item = pageItems[i];
+                var movementDateText = formatIsoDate(item.MovementDateIso, item.MovementDate);
+                var linesText = Number(item.Lines || 0).toLocaleString(window.navigator.language); // VAS163 2026-11-12: locale count
                 var $row = $(
                     '<div class="vas-opencountsheets-grid-row vas-opencountsheets-data-row" data-id="' + item.InventoryId + '">' +
                     '<div class="vas-opencountsheets-cell vas-opencountsheets-cell-doc vas-opencountsheets-doclink" role="link" tabindex="0" title="' + item.DocumentNo + '">' + item.DocumentNo + '</div>' +
                     '<div class="vas-opencountsheets-cell vas-opencountsheets-cell-text" title="' + item.Warehouse + '">' + item.Warehouse + '</div>' +
                     '<div class="vas-opencountsheets-cell vas-opencountsheets-cell-text" title="' + item.Locator + '">' + item.Locator + '</div>' +
-                    '<div class="vas-opencountsheets-cell vas-opencountsheets-cell-lines" title="' + item.Lines + '">' + item.Lines + '</div>' +
-                    '<div class="vas-opencountsheets-cell vas-opencountsheets-cell-date" title="' + item.MovementDate + '">' + item.MovementDate + '</div>' +
+                    '<div class="vas-opencountsheets-cell vas-opencountsheets-cell-lines" title="' + linesText + '">' + linesText + '</div>' +
+                    '<div class="vas-opencountsheets-cell vas-opencountsheets-cell-date" title="' + movementDateText + '">' + movementDateText + '</div>' +
                     '<div class="vas-opencountsheets-cell"><span class="vas-opencountsheets-status-chip status-' + String(item.DocStatus || '').toLowerCase() + '">' + item.Status + '</span></div>' +
                     '</div>'
                 );

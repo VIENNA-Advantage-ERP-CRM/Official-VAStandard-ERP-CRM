@@ -16,7 +16,8 @@
     min-height: 0;
     color: #102C3F;
     font-family: Roboto, sans-serif;
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 20px);
+    container-type: inline-size;
+    font-size: clamp(16px, 1.2cqi, 20px);
 }
 
     .vas300-root,
@@ -89,7 +90,7 @@
 }
 
 .vas300-sub {
-    font-size: 0.7em;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
     color: #717182;
     margin-top: 1px;                            /* px */
     white-space: nowrap;
@@ -115,7 +116,7 @@
     background: transparent;
     color: #5F7283;
     font-family: inherit;
-    font-size: 0.72em;
+    font-size: 0.75em;
     font-weight: 600;
     padding: 0.3em 0.7em;
     cursor: pointer;
@@ -186,7 +187,7 @@
 .vas300-wpgtext {
     min-width: 3em;
     text-align: center;
-    font-size: 0.8125em;
+    font-size: 0.75em;
     font-weight: 500;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
@@ -241,7 +242,7 @@
     padding: 0;
     font-family: inherit;
     color: #102C3F;
-    font-size: 0.8em;
+    font-size: 0.75em;
     cursor: pointer;
     text-align: left;
 }
@@ -265,7 +266,7 @@
 }
 
 .vas300-src-v {
-    font-size: 0.8em;
+    font-size: 0.75em;
     font-weight: 700;
     color: #102C3F;
     flex-shrink: 0;
@@ -286,7 +287,7 @@
 
 .vas300-state {
     padding: 0.9em 0.25em;
-    font-size: 0.82em;
+    font-size: 0.8125em;
     color: #748494;
     text-align: center;
 }
@@ -298,7 +299,7 @@
     color: #0083DA;
     border-radius: 999px;
     font-family: inherit;
-    font-size: 0.9em;
+    font-size: 0.8125em;
     padding: 2px 10px;                          /* px */
     cursor: pointer;
 }

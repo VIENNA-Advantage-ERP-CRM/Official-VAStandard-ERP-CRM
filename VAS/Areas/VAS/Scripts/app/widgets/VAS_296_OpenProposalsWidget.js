@@ -257,7 +257,7 @@
             var sign = n < 0 ? '-' : '';
             var iso = (cur && cur.iso) || '';
             var symbol = (cur && (cur.symbol || cur.iso)) || '';
-            var compact = VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
+            var compact = VIS.Util.BrowserCultureFormatter.formatCompactAmount(n, iso, precisionOf(cur));
             // Currency symbol placed per the browser locale (before / after the number).
             if (iso) {
                 try {
@@ -277,6 +277,17 @@
                 } catch (e) { /* fall back to the server symbol in front */ }
             }
             return sign + symbol + compact;
+        }
+        // 2026-11-18: hover tooltip - the FULL amount (browser culture, currency precision)
+        // behind a compact amount. fullTitleAttr() gives a ' title="..."' fragment (or '').
+        function fullTitleAttr(value, cur) {
+            if (!(window.VIS && VIS.Util && VIS.Util.BrowserCultureFormatter && typeof VIS.Util.BrowserCultureFormatter.formatFullAmount === 'function')) { return ''; }
+            var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
+            var full = VIS.Util.BrowserCultureFormatter.formatFullAmount(n, (cur && cur.iso) || '', precisionOf(cur));
+            return full ? ' title="' + escapeHtml(full) + '"' : '';
+        }
+        function moneyHtml(value, cur) {
+            return '<span' + fullTitleAttr(value, cur) + '>' + escapeHtml(formatMoney(value, cur)) + '</span>';
         }
         // Projects fact: name the customer's delivery project rather than only
         // counting it (matches VAS_138/295).
@@ -370,7 +381,7 @@
                     listTotal = Number(data.total || 0);
                     widgetCurrency = { symbol: data.currency_symbol || widgetCurrency.symbol, iso: data.currency_iso || widgetCurrency.iso, precision: data.std_precision };
                     var clientWord = listTotal === 1 ? label('VAS_296_Client', 'client') : label('VAS_296_Clients', 'clients');
-                    $sub.text(formatCount(listTotal) + ' ' + clientWord + ' · ' + formatMoney(data.total_value, widgetCurrency) + ' ' + label('VAS_296_Open2', 'open'));
+                    $sub.html(escapeHtml(formatCount(listTotal) + ' ' + clientWord + ' · ') + moneyHtml(data.total_value, widgetCurrency) + escapeHtml(' ' + label('VAS_296_Open2', 'open')));
                     renderRows(data.items || []);
                 },
                 error: function () { if (seq === rowsSeq) { renderErrorState(); } }
@@ -392,7 +403,7 @@
                     '<span class="vas296-row-meta" title="' + escapeHtml(meta) + '">' + escapeHtml(meta) + '</span>' +
                 '</span>' +
                 '<span class="vas296-row-amt">' +
-                    '<span class="vas296-amt-val">' + escapeHtml(formatMoney(item.proposalValue, cur)) + '</span>' +
+                    '<span class="vas296-amt-val"' + fullTitleAttr(item.proposalValue, cur) + '>' + escapeHtml(formatMoney(item.proposalValue, cur)) + '</span>' +
                 '</span>' +
                 '<button type="button" class="vas296-view" data-id="' + Number(item.customerId) + '">' + escapeHtml(label('VAS_296_View', 'View')) + '</button>' +
             '</div>';
@@ -555,10 +566,10 @@
                 fact(label('VAS_296_Tier', 'Tier'), tierLabel ? escapeHtml(tierLabel) : dash) +
                 fact(label('VAS_296_Segment', 'Segment'), escapeHtml(data.segment || dash)) +
                 fact(label('VAS_296_Owner', 'Owner'), escapeHtml(data.rep || dash)) +
-                fact(label('VAS_296_ARR', 'ARR'), escapeHtml(formatMoney(data.value, detailCurrency))) +
+                fact(label('VAS_296_ARR', 'ARR'), moneyHtml(data.value, detailCurrency)) +
                 fact(label('VAS_296_OpenTicketsFact', 'Open tickets'), escapeHtml(formatCount(data.openTickets || 0))) +
                 fact(label('VAS_296_Projects', 'Projects'), projectText(data.projectName, projects, dash)) +
-                fact(label('VAS_296_Pipeline', 'Pipeline'), pipeline > 0 ? escapeHtml(formatMoney(pipeline, detailCurrency)) : dash) +
+                fact(label('VAS_296_Pipeline', 'Pipeline'), pipeline > 0 ? moneyHtml(pipeline, detailCurrency) : dash) +
                 fact(label('VAS_296_Onboarding', 'Onboarding'), data.onboardingPercent == null ? dash : escapeHtml(formatPercent(Math.round(Number(data.onboardingPercent) || 0), 0))) +
             '</div>';
 
@@ -566,7 +577,7 @@
             var overdue = Number(data.overdueAmount || 0);
             if (overdue > 0) {
                 var invPart = data.overdueInvoice ? ' · ' + data.overdueInvoice : '';
-                signals += signalRow('cash', '#ED1C24', escapeHtml(formatMoney(overdue, detailCurrency) + ' ' + label('VAS_296_Overdue', 'overdue') + invPart),
+                signals += signalRow('cash', '#ED1C24', moneyHtml(overdue, detailCurrency) + escapeHtml(' ' + label('VAS_296_Overdue', 'overdue') + invPart),
                     formatCount(data.overdueDays || 0) + ' ' + label('VAS_296_DaysPastDue', 'days past due'));
             }
             var openT = Number(data.openTickets || 0);

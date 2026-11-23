@@ -77,6 +77,14 @@
             .replace(/'/g, "&#039;");
     }
 
+    // VAS163 2026-11-10: browser locale (6-Nov retest2).
+    function formatIsoDate(iso, fallback) {
+        var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+        if (!m) { return fallback || ''; }
+        var d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+        return d.toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
     function lbl(key) {
         return VIS.Msg.getMsg(key);
     }
@@ -284,7 +292,8 @@
 
             for (var i = 0; i < items.length; i++) {
                 var item = items[i];
-                var formattedQty = Number(item.onHand || 0).toLocaleString();
+                // VAS163 2026-11-12: explicit browser locale (was toLocaleString() with no locale).
+                var formattedQty = Number(item.onHand || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 4 });
 
                 // Product Type dropped from the meta line (user request): every result is
                 // ProductType = 'I' by definition, so the label carried no information.
@@ -348,7 +357,8 @@
             $dialog.append($header);
 
             // Read-Only Form Grid (3 Columns x 2 Rows = 6 Fields)
-            var formattedOnHand = Number(prodItem.onHand || 0).toLocaleString();
+            // VAS163 2026-11-12: explicit browser locale (was toLocaleString() with no locale).
+            var formattedOnHand = Number(prodItem.onHand || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 4 });
 
             /* Product Type field removed (user request): the search returns only ProductType = 'I',
                so the field always read "Item".
@@ -526,11 +536,13 @@
                 var $tr = $(
                     '<tr class="vas-stocksearch-count-row" data-invid="' + Number(c.inventoryId) + '" title="' + esc(lbl("VAS_164_OpenCountDocument")) + '">' +
                     '<td class="loc-code">' + esc(c.documentNo) + '</td>' +
-                    '<td>' + esc(c.movementDate) + '</td>' +
+                    '<td>' + esc(formatIsoDate(c.movementDateIso, c.movementDate)) + '</td>' +
                     '<td class="wh-name" title="' + esc(c.warehouse) + '">' + esc(c.warehouse) + '</td>' +
                     (hasAttribute ? '<td class="attr-val" title="' + esc(attrText) + '">' + esc(attrText) + '</td>' : '') +
-                    '<td class="qty-val">' + esc(Number(c.qtyBook || 0).toLocaleString()) + '</td>' +
-                    '<td class="qty-val">' + esc(Number(c.qtyCount || 0).toLocaleString()) + '</td>' +
+                    // VAS163 2026-11-12: explicit browser locale (was toLocaleString() with no locale).
+                    '<td class="qty-val">' + esc(Number(c.qtyBook || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 4 })) + '</td>' +
+                    // VAS163 2026-11-12: explicit browser locale (was toLocaleString() with no locale).
+                    '<td class="qty-val">' + esc(Number(c.qtyCount || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 4 })) + '</td>' +
                     '<td class="qty-val ' + varClass + '">' + esc(varText) + '</td>' +
                     '</tr>'
                 );
@@ -609,7 +621,8 @@
 
                 for (var i = 0; i < pageItems.length; i++) {
                     var item = pageItems[i];
-                    var formattedQty = Number(item.qty || 0).toLocaleString();
+                    // VAS163 2026-11-12: explicit browser locale (was toLocaleString() with no locale).
+                    var formattedQty = Number(item.qty || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 4 });
                     var attrText = cleanAttribute(item.attribute);
 
                     var $tr = $(

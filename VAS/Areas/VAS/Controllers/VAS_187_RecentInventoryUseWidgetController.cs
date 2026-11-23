@@ -3,6 +3,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Globalization;
 using System.Web.Mvc;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
@@ -51,6 +52,7 @@ namespace VIS.Controllers
         {
             string iso = "";
             string symbol = "";
+            int stdPrecision = 2; // VAS163 2026-11-12: currency precision sent to the UI (C_Currency.StdPrecision)
             int currencyId = ctx.GetContextAsInt("$C_Currency_ID");
             if (currencyId > 0)
             {
@@ -58,12 +60,13 @@ namespace VIS.Controllers
                 try
                 {
                     cdr = DB.ExecuteReader(
-                        "SELECT ISO_Code, CurSymbol FROM C_Currency WHERE C_Currency_ID = @Cur",
+                        "SELECT ISO_Code, CurSymbol, StdPrecision FROM C_Currency WHERE C_Currency_ID = @Cur",
                         new SqlParameter[] { new SqlParameter("@Cur", currencyId) });
                     if (cdr != null && cdr.Read())
                     {
                         iso = Util.GetValueOfString(cdr["ISO_Code"]);
                         symbol = Util.GetValueOfString(cdr["CurSymbol"]);
+                        stdPrecision = Util.GetValueOfInt(cdr["StdPrecision"]);
                     }
                 }
                 finally { if (cdr != null) { cdr.Close(); cdr.Dispose(); } }
@@ -75,7 +78,7 @@ namespace VIS.Controllers
                 try
                 {
                     string sql = @"
-                        SELECT c.ISO_Code, c.CurSymbol
+                        SELECT c.ISO_Code, c.CurSymbol, c.StdPrecision
                         FROM AD_ClientInfo ci
                         INNER JOIN C_AcctSchema cs ON (cs.C_AcctSchema_ID = ci.C_AcctSchema1_ID)
                         INNER JOIN C_Currency c ON (c.C_Currency_ID = cs.C_Currency_ID)
@@ -85,11 +88,12 @@ namespace VIS.Controllers
                     {
                         iso = Util.GetValueOfString(cdr["ISO_Code"]);
                         symbol = Util.GetValueOfString(cdr["CurSymbol"]);
+                        stdPrecision = Util.GetValueOfInt(cdr["StdPrecision"]);
                     }
                 }
                 finally { if (cdr != null) { cdr.Close(); cdr.Dispose(); } }
             }
-            return new { iso = iso, symbol = symbol };
+            return new { iso = iso, symbol = symbol, stdPrecision = stdPrecision };
         }
 // ===== NEW CODE END — currency format =====
         /// <summary>
@@ -179,8 +183,10 @@ namespace VIS.Controllers
                         org.Name AS OrgName,
                         wh.Name AS WarehouseName,
                         COUNT(line.M_InventoryLine_ID) AS LineCount,
-                        SUM(line.QtyInternalUse) AS TotalQty,
-                        SUM(line.QtyInternalUse * " + LineUnitCostSql + @") AS TotalValue,
+                        -- VAS163 2026-11-13: rows 23/45/46/52/53/76 one Inventory Use rule - qty in the line's
+                        -- selected UOM (QtyEntered), value = QtyInternalUse x M_InventoryLine.CurrentCostPrice.
+                        SUM(line.QtyEntered) AS TotalQty,
+                        SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, 0)) AS TotalValue,
                         ROW_NUMBER() OVER (ORDER BY ai.MovementDate DESC, ai.M_Inventory_ID DESC) AS RowSeq
                       FROM (" + invAccessSql + @") ai
                       INNER JOIN AD_Org org ON org.AD_Org_ID = ai.AD_Org_ID
@@ -191,7 +197,6 @@ namespace VIS.Controllers
                       -- lines yet is exactly the sort of row it exists to surface).
                       LEFT JOIN M_InventoryLine line ON line.M_Inventory_ID = ai.M_Inventory_ID
                                                     AND line.IsActive = 'Y'
-                      LEFT JOIN (" + ProductCurrentCostSql + @") pc ON pc.M_Product_ID = line.M_Product_ID
                       GROUP BY ai.M_Inventory_ID, ai.DocumentNo, ai.MovementDate, ai.DocStatus, org.Name, wh.Name
                     ) WHERE RowSeq > " + offset + " AND RowSeq <= " + (offset + pSize);
 
@@ -204,6 +209,8 @@ namespace VIS.Controllers
                             inventoryId = Util.GetValueOfInt(dr["M_Inventory_ID"]),
                             documentNo = Util.GetValueOfString(dr["DocumentNo"]),
                             movementDate = Convert.ToDateTime(dr["MovementDate"]).ToString("dd MMM yyyy"),
+                            // VAS163 2026-11-10: browser locale (6-Nov retest2) - client formats this ISO date.
+                            movementDateIso = Convert.ToDateTime(dr["MovementDate"]).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                             docStatus = Util.GetValueOfString(dr["DocStatus"]),
                             orgName = Util.GetValueOfString(dr["OrgName"]),
                             warehouseName = Util.GetValueOfString(dr["WarehouseName"]),

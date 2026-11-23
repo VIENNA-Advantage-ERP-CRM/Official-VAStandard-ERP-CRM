@@ -688,7 +688,7 @@
                         '<div class="vas-dssrch-rowmeta">' + rowMeta(item, term) + '</div>' +
                     '</div>' +
                     '<div class="vas-dssrch-meta">' +
-                        '<div class="vas-dssrch-amount">' + formatAmount(item.Amount, item.CurSymbol, item.StdPrecision) + '</div>' +
+                        '<div class="vas-dssrch-amount">' + formatAmount(item.Amount, item.CurSymbol, item.StdPrecision, item.CurrencyIso) + '</div>' +
                         '<div class="vas-dssrch-date">' + dsEsc(formatDate(item.DocDate)) + '</div>' +
                     '</div>' +
                 '</div>'
@@ -809,10 +809,19 @@
            are only a fallback for a payment with no currency on it. */
         /* Symbol sits directly against the number - "Rs289,100.00", no gap - with any
            minus sign ahead of the symbol ("-Rs289,100.00"). */
-        function formatAmount(number, symbol, precision) {
+        function formatAmount(number, symbol, precision, isoCode) {
             var n = (typeof number === 'number') ? number : parseFloat(number);
             if (isNaN(n)) { return ''; }
             var prec = (typeof precision === 'number' && precision >= 0) ? precision : (stdPrecision || 2);
+            // browser culture places sign, styled symbol and separators
+            if (isoCode && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(n, isoCode, prec, {
+                        symbol: symbol || curSymbol,
+                        symbolWrap: function (s) { return '<span class="vas-dssrch-cur">' + dsEsc(s) + '</span>'; }
+                    });
+                } catch (e) { if (window.console) { console.log(e); } }
+            }
             var sign = n < 0 ? '-' : '';
             var formatted = Math.abs(n).toLocaleString(window.navigator.language, { minimumFractionDigits: prec, maximumFractionDigits: prec });
             var sym = symbol || curSymbol;

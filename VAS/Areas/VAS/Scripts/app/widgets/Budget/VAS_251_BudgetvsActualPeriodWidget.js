@@ -1280,10 +1280,20 @@
 
            The helper returns a magnitude by contract, so a negative keeps its sign here - the
            amounts on this card are signed and a card that printed "-900" as "900" would state
-           the opposite of the figure behind it. */
-        function compactAmount(value) {
+           the opposite of the figure behind it. Composed by the shared browser-culture
+           formatter (it places the sign and the symbol; positiveSign marks amounts above
+           zero); the hand composition below is the fallback when it is not loaded. */
+        function compactAmount(value, positiveSign) {
             var v = Number(value) || 0;
             var magnitude;
+
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(v, isoCode(), precision(),
+                        { compact: true, symbol: symbol(), minusSign: '−', positiveSign: positiveSign });
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
 
             try {
                 if (VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
@@ -1294,7 +1304,7 @@
 
             if (magnitude === undefined) { magnitude = String(Math.abs(v)); }
 
-            return (v < 0 ? '−' : '') + symbol() + magnitude;
+            return (v < 0 ? '−' : (positiveSign || '')) + symbol() + magnitude;
         }
 
         /* Full, non-compact amount for the tooltips and the modal: the exact figure. Grouping
@@ -1323,10 +1333,10 @@
             return v < 0 ? text : '+' + text;
         }
 
+        /* Compact variance with its sign always printed ("+" above zero), composed in one
+           call by compactAmount. */
         function signedCompactAmount(value) {
-            var v = Number(value) || 0;
-            var text = compactAmount(v);
-            return v < 0 ? text : '+' + text;
+            return compactAmount(Number(value) || 0, '+');
         }
 
         /* The separator comes from the reader's own locale, never a hard-coded dot, which

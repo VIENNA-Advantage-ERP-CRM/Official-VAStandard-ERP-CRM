@@ -2442,7 +2442,10 @@ namespace VAdvantage.Model
 
                 // If lines are available and user is changing the pricelist, Order or Ship/Receipt on header than we have to restrict it because
                 // JID_0399_1: After change the receipt or order system will give the error message
-                if (!newRecord && (Is_ValueChanged("M_PriceList_ID") || Is_ValueChanged("Orig_Order_ID") || Is_ValueChanged("Orig_InOut_ID") || Is_ValueChanged("VAS_ContractMaster_ID")))//VIS430:When transactionline available for Contract refrence on header show error message
+                // A price list change the user accepted through the tab's Commit Warning is allowed while lines exist:
+                // the lines are re-priced after save (RepriceLinesForPriceList). The other columns still need the lines deleted.
+                if (!newRecord && ((Is_ValueChanged("M_PriceList_ID") && !IsCommitWarningConfirmed("M_PriceList_ID"))
+                    || Is_ValueChanged("Orig_Order_ID") || Is_ValueChanged("Orig_InOut_ID") || Is_ValueChanged("VAS_ContractMaster_ID")))//VIS430:When transactionline available for Contract refrence on header show error message
                 {
                     //MOrderLine[] lines = GetLines(false, null);
                     //if (lines.Length > 0)
@@ -2724,6 +2727,13 @@ namespace VAdvantage.Model
                     AfterSaveSync("M_Warehouse_ID");
                     AfterSaveSync("M_Shipper_ID");
                     AfterSaveSync("C_Currency_ID");
+
+                    // Price list changed through the Commit Warning (see BeforeSave): the header is saved,
+                    // now re-price the lines and recalculate their tax
+                    if (Is_ValueChanged("M_PriceList_ID") && IsCommitWarningConfirmed("M_PriceList_ID") && !RepriceLinesForPriceList())
+                    {
+                        return false;
+                    }
                 }
 
                 // Applied check for warning message on credit limit for Business Partner
@@ -2762,6 +2772,10 @@ namespace VAdvantage.Model
                     }
                 }
 
+                // Re-priced lines whose product has no price on the selected price list: price kept (same currency)
+                // or set to 0 (other currency), with their line numbers. Reported last, together with a warning
+                // raised above (only one warning reaches the client).
+                ReportPriceNotFoundLines();
             }
             catch (Exception ex)
             {
@@ -2770,6 +2784,267 @@ namespace VAdvantage.Model
                 return false;
             }
             return success;
+        }
+
+        /// <summary>
+        /// Lines ("Line (Product)") whose product has no price on the newly selected price list in this save:
+        /// kept their old price (same currency) / price set to 0 (other currency). Reported as one message at
+        /// the end of AfterSave.
+        /// </summary>
+        private string _priceKeptLines = "", _priceZeroLines = "";
+
+        /// <summary>
+        /// Raise the "no price on the selected price list" message for the lines collected by
+        /// RepriceLinesForPriceList - as a warning (combined with one already pending) and as the save's
+        /// Info (SetDocWFMsg), because records saved after AfterSave (timeline event, alerts, workflow)
+        /// reset the logger and the warning would be lost.
+        /// </summary>
+        private void ReportPriceNotFoundLines()
+        {
+            if (string.IsNullOrEmpty(_priceKeptLines) && string.IsNullOrEmpty(_priceZeroLines))
+            {
+                return;
+            }
+            string text = (string.IsNullOrEmpty(_priceZeroLines) ? ""
+                    : Msg.GetMsg(GetCtx(), "VAS_PriceNotFoundPriceZero") + " " + _priceZeroLines)
+                + (!string.IsNullOrEmpty(_priceZeroLines) && !string.IsNullOrEmpty(_priceKeptLines) ? " | " : "")
+                + (string.IsNullOrEmpty(_priceKeptLines) ? ""
+                    : Msg.GetMsg(GetCtx(), "VAS_PriceNotFoundPriceKept") + " " + _priceKeptLines);
+            _priceKeptLines = "";
+            _priceZeroLines = "";
+            ValueNamePair pending = VLogger.RetrieveWarning();
+            if (pending != null)
+            {
+                log.SaveWarning(pending.GetValue(), (string.IsNullOrEmpty(pending.GetName()) ? "" : pending.GetName() + " - ") + text);
+            }
+            else
+            {
+                log.SaveWarning("", text);
+            }
+            if (string.IsNullOrEmpty(GetDocWFMsg()))
+            {
+                SetDocWFMsg(text);
+            }
+        }
+
+        /// <summary>
+        /// True while several lines of this order are saved in one go (price list re-pricing, the order
+        /// line panels): a line save then skips the per-line order tax / header total update. The caller
+        /// runs FinishBulkLineUpdate once after the lines are saved. Lines must have this order object as
+        /// parent (MOrderLine.SetHeaderInfo / SetOrder).
+        /// </summary>
+        public bool IsBulkLineUpdate { get; set; }
+
+        /// <summary>
+        /// After lines were saved with IsBulkLineUpdate on: recalculate each order tax used by those lines
+        /// (from all lines) and the header TotalLines / GrandTotal once per tax rate instead of once per line,
+        /// then read the totals back into this object.
+        /// </summary>
+        /// <param name="savedLines">lines saved in the bulk update</param>
+        /// <returns>false when the tax / header update failed</returns>
+        public bool FinishBulkLineUpdate(IEnumerable<MOrderLine> savedLines)
+        {
+            Dictionary<int, MOrderLine> lineByTax = new Dictionary<int, MOrderLine>();
+            foreach (MOrderLine line in savedLines)
+            {
+                if (line != null && line.GetC_Tax_ID() > 0 && !lineByTax.ContainsKey(line.GetC_Tax_ID()))
+                {
+                    lineByTax[line.GetC_Tax_ID()] = line;
+                }
+            }
+            if (lineByTax.Count == 0)
+            {
+                return true;
+            }
+            _lines = null;
+
+            foreach (MOrderLine line in lineByTax.Values)
+            {
+                if (!line.UpdateHeaderTaxForOrder())
+                {
+                    return false;
+                }
+            }
+
+            // totals were written by SQL - bring this object up to date
+            DataSet ds = DB.ExecuteDataset("SELECT TotalLines, GrandTotal FROM C_Order WHERE C_Order_ID = @param1",
+                new SqlParameter[] { new SqlParameter("@param1", GetC_Order_ID()) }, Get_Trx());
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                SetTotalLines(Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["TotalLines"]));
+                SetGrandTotal(Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["GrandTotal"]));
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Products (with attribute set instance and UOM) that have an active price on this order's price
+        /// list, on a version valid on the order date - the selected price list only, without the base price
+        /// list fallback of MProductPricing. One query for all lines of the order.
+        /// </summary>
+        /// <param name="productUOM">filled with each product's base UOM</param>
+        /// <returns>keys "M_Product_ID|M_AttributeSetInstance_ID|C_UOM_ID"</returns>
+        private HashSet<string> GetPricedProductsOnPriceList(Dictionary<int, int> productUOM)
+        {
+            HashSet<string> priced = new HashSet<string>();
+            string sql = @"SELECT DISTINCT pp.M_Product_ID, NVL(pp.M_AttributeSetInstance_ID, 0) AS M_AttributeSetInstance_ID,
+                                pp.C_UOM_ID, p.C_UOM_ID AS ProductUOM
+                           FROM M_ProductPrice pp
+                           INNER JOIN M_PriceList_Version pv ON (pp.M_PriceList_Version_ID = pv.M_PriceList_Version_ID)
+                           INNER JOIN M_Product p ON (pp.M_Product_ID = p.M_Product_ID)
+                           WHERE pv.M_PriceList_ID = @param1 AND pv.IsActive = 'Y' AND pp.IsActive = 'Y'
+                           AND (pv.ValidFrom IS NULL OR pv.ValidFrom <= " + GlobalVariable.TO_DATE(GetDateOrdered(), true) + @")
+                           AND pp.M_Product_ID IN (SELECT ol.M_Product_ID FROM C_OrderLine ol WHERE ol.C_Order_ID = @param2)";
+            SqlParameter[] param = new SqlParameter[] {
+                new SqlParameter("@param1", GetM_PriceList_ID()),
+                new SqlParameter("@param2", GetC_Order_ID()) };
+            DataSet ds = DB.ExecuteDataset(sql, param, Get_Trx());
+            if (ds != null && ds.Tables.Count > 0)
+            {
+                foreach (DataRow dr in ds.Tables[0].Rows)
+                {
+                    int product = Util.GetValueOfInt(dr["M_Product_ID"]);
+                    priced.Add(product + "|" + Util.GetValueOfInt(dr["M_AttributeSetInstance_ID"]) + "|" + Util.GetValueOfInt(dr["C_UOM_ID"]));
+                    productUOM[product] = Util.GetValueOfInt(dr["ProductUOM"]);
+                }
+            }
+            return priced;
+        }
+
+        /// <summary>
+        /// After the header price list changed (Commit Warning confirmed): re-price every product line that has
+        /// a price on the new price list (line UOM or product UOM, same attribute instance) - also a price the
+        /// user typed. A product without a price on the new list keeps its old price when both price lists have
+        /// the same currency, and gets price 0 when the currency differs. Line net amount, tax and line total
+        /// are recalculated, then the order tax and header totals once (FinishBulkLineUpdate). A line is also
+        /// recalculated when only the price list's Tax Included setting differs. Charge lines keep their price.
+        /// </summary>
+        /// <returns>false when a line could not be saved (the header save is then rolled back)</returns>
+        private bool RepriceLinesForPriceList()
+        {
+            MOrderLine[] lines = GetLines(true, null);
+            if (lines.Length == 0)
+            {
+                return true;
+            }
+
+            int oldPriceList_ID = Util.GetValueOfInt(Get_ValueOld("M_PriceList_ID"));
+            MPriceList oldPL = oldPriceList_ID > 0 ? MPriceList.Get(GetCtx(), oldPriceList_ID, Get_TrxName()) : null;
+            MPriceList newPL = MPriceList.Get(GetCtx(), GetM_PriceList_ID(), Get_TrxName());
+            bool taxIncludedChanged = oldPL != null && oldPL.IsTaxIncluded() != newPL.IsTaxIncluded();
+            // Same currency on both price lists: a product without a price on the new list keeps its old price.
+            // Different currency: the old price means nothing in the new currency - it becomes 0.
+            bool sameCurrency = oldPL != null && oldPL.GetC_Currency_ID() == newPL.GetC_Currency_ID();
+
+            Dictionary<int, int> productUOM = new Dictionary<int, int>();
+            HashSet<string> priced = GetPricedProductsOnPriceList(productUOM);
+
+            List<string> keptLines = new List<string>(), zeroLines = new List<string>();
+            List<MOrderLine> saved = new List<MOrderLine>();
+            IsBulkLineUpdate = true;
+            try
+            {
+                foreach (MOrderLine line in lines)
+                {
+                    if (!line.IsActive() || line.IsDescription() || (line.GetM_Product_ID() == 0 && line.GetC_Charge_ID() == 0))
+                    {
+                        continue;
+                    }
+                    // A release-order line takes its price from its blanket order line (with price control the line
+                    // BeforeSave even refuses a price change - PriceCantChange): keep it, recalculate only on a
+                    // Tax Included change
+                    if (line.GetC_OrderLine_Blanket_ID() > 0 && !taxIncludedChanged)
+                    {
+                        continue;
+                    }
+                    // the line must see the new price list and the bulk flag
+                    line.SetHeaderInfo(this);
+                    bool changed = false;
+                    if (line.GetM_Product_ID() > 0 && line.GetC_OrderLine_Blanket_ID() <= 0)
+                    {
+                        string key = line.GetM_Product_ID() + "|" + line.GetM_AttributeSetInstance_ID() + "|";
+                        int baseUOM;
+                        bool onList = priced.Contains(key + line.GetC_UOM_ID())
+                            || (productUOM.TryGetValue(line.GetM_Product_ID(), out baseUOM) && priced.Contains(key + baseUOM));
+                        changed = onList && line.SetPriceFromPriceList(GetM_PriceList_ID());
+                        if (!changed)
+                        {
+                            string label = line.GetLine() + " (" + MProduct.Get(GetCtx(), line.GetM_Product_ID()).GetName() + ")";
+                            if (sameCurrency)
+                            {
+                                keptLines.Add(label);
+                            }
+                            else
+                            {
+                                line.SetPriceZeroNotOnPriceList();
+                                zeroLines.Add(label);
+                                changed = true;   // changed - save it
+                            }
+                        }
+                    }
+                    if (!changed && !taxIncludedChanged)
+                    {
+                        continue;
+                    }
+                    // Line BeforeSave recalculates LineNetAmt always, but the tax only when it is zero (or qty changed)
+                    line.SetTaxAmt(Env.ZERO);
+                    if (!line.Save(Get_Trx()))
+                    {
+                        ValueNamePair vp = VLogger.RetrieveError();
+                        string error = vp != null ? (!string.IsNullOrEmpty(vp.GetName()) ? vp.GetName() : vp.GetValue()) : "";
+                        log.SaveError("", Msg.GetMsg(GetCtx(), "VIS_LineNotSaved") + " " + line.GetLine() + (string.IsNullOrEmpty(error) ? "" : " - " + error));
+                        return false;
+                    }
+                    saved.Add(line);
+                }
+            }
+            finally
+            {
+                IsBulkLineUpdate = false;
+            }
+
+            if (!FinishBulkLineUpdate(saved))
+            {
+                log.SaveError("", Msg.GetMsg(GetCtx(), "VIS_LineNotSaved"));
+                return false;
+            }
+
+            // reported at the end of AfterSave (a line save above resets the logger)
+            _priceKeptLines = string.Join(", ", keptLines);
+            _priceZeroLines = string.Join(", ", zeroLines);
+            return true;
+        }
+
+        /// <summary>
+        /// True when the framework's Commit Warning was confirmed by the user for this save and the warning
+        /// covers the given column. The framework (ApplyCommitWarningContext) puts the matched rules in the
+        /// context for the duration of the save: CommitWarning_Matched = "Y", CommitWarning_Columns = comma
+        /// separated column names, CommitWarning_Conditions = ";;" separated conditions - as plain keys or as
+        /// window keys ("&lt;WindowNo&gt;|CommitWarning_Columns"); PO has no window number, so both are accepted.
+        /// </summary>
+        /// <param name="columnName">column changed on the header</param>
+        /// <returns>true if the change was accepted through the commit warning</returns>
+        private bool IsCommitWarningConfirmed(string columnName)
+        {
+            foreach (KeyValuePair<string, string> entry in GetCtx().GetMap())
+            {
+                if (entry.Key == null || !(entry.Key.Equals("CommitWarning_Columns") || entry.Key.EndsWith("|CommitWarning_Columns"))
+                    || string.IsNullOrEmpty(entry.Value))
+                {
+                    continue;
+                }
+                string prefix = entry.Key.Substring(0, entry.Key.Length - "CommitWarning_Columns".Length);
+                if (!"Y".Equals(GetCtx().GetContext(prefix + "CommitWarning_Matched")))
+                {
+                    continue;
+                }
+                if (entry.Value.Split(',').Any(c => c.Trim().Equals(columnName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    log.Fine("Commit warning confirmed for " + columnName + ", Conditions=" + GetCtx().GetContext(prefix + "CommitWarning_Conditions"));
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>
@@ -3876,6 +4151,15 @@ namespace VAdvantage.Model
                             }
                             #endregion
                         }
+
+                        // User Validation After Complete - a quotation / proposal completes here, so fire it here too
+                        String validOffer = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_COMPLETE);
+                        if (validOffer != null)
+                        {
+                            _processMsg = validOffer;
+                            return DocActionVariables.STATUS_INVALID;
+                        }
+
                         SetProcessed(true);
                         SetDocAction(DOCACTION_Close);
                         return DocActionVariables.STATUS_COMPLETED;

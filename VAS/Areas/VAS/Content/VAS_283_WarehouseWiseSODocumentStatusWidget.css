@@ -517,5 +517,7 @@
 .vas283-mchip-ok { background: #E7F7EF; color: #0B6B45; }
 .vas283-mchip-warn { background: #FFF6E2; color: #9A6500; }
 .vas283-mchip-neutral { background: #F1F4F8; color: #41576A; font-weight: 500; }
+/* VAS163 2026-11-11: Row 116 - Drafted / In Progress badges in orange (same colours as VAS_272). */
+.vas283-mchip-orange { background: #FFEBD6; color: #C25400; }
 
 .vas283-mstate { padding: 1em; font-size: .8125em; color: #5F7283; text-align: center; }

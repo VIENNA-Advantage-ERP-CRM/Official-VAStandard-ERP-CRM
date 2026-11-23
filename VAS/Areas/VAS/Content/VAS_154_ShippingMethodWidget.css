@@ -16,13 +16,14 @@
 .vas-shm-head-l { display: flex; align-items: center; gap: .625em; flex: 1 1 auto; min-width: 0; }
 .vas-shm-ico { width: 2em; height: 2em; flex: 0 0 2em; border-radius: 0.5em; background: #EEF6FF; border: 0.05em solid #E4EDF4; display: flex; align-items: center; justify-content: center; }
 .vas-shm-ico svg { width: 1em; height: 1em; }
-.vas-shm-titles { flex: 0 1 auto; min-width: 0; }
-.vas-shm-title { font-weight: 500; color: #102C3F; line-height: 1.2; font-size: .8125em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* VAS163 2026-11-11: Row 7 title + Month/Year filters on one line, subtitle below spanning the width. */
+.vas-shm-titles { flex: 1 1 auto; min-width: 0; }
+.vas-shm-titlerow { display: flex; align-items: center; justify-content: flex-start; gap: .5em; min-width: 0; }
+.vas-shm-title { font-weight: 500; color: #102C3F; line-height: 1.2; font-size: .8125em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 0; }
 .vas-shm-sub { font-weight: 400; font-size: .6875em; color: #748494; line-height: 1.25; margin-top: .125em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* Filters on their own row under the title, left-aligned with the widget edge
-   (5-Nov retest: beside the long subtitle they ended up at the far right). */
-.vas-shm-filters { display: flex; align-items: center; justify-content: flex-start; gap: .375em; flex-shrink: 0; margin-top: .5em; }
+/* VAS163 2026-11-11: Row 7 filters inline right after the title text, left-aligned, never shrinking. */
+.vas-shm-filters { display: flex; align-items: center; justify-content: flex-start; gap: .375em; flex: 0 0 auto; }
 .vas-shm-sel { position: relative; display: inline-flex; }
 .vas-shm-sel select {
     appearance: none !important;

@@ -212,6 +212,24 @@
             );
         }
 
+        // Signed amount in the browser culture via the shared formatter; fallback: "-" + symbol + fmtAmt(abs).
+        function fmtMoney(amount, precision, isoCode, symbol) {
+            var numericAmount = Number(amount || 0);
+
+            if (isNaN(numericAmount)) {
+                numericAmount = 0;
+            }
+
+            if (isoCode && window.VAS && typeof VAS.formatAmountByBrowser === "function") {
+                try {
+                    return VAS.formatAmountByBrowser(numericAmount, isoCode, precision, { symbol: symbol || "" });
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
+
+            return (numericAmount < 0 ? "-" : "") + (symbol || "") + fmtAmt(Math.abs(numericAmount), precision);
+        }
+
         function resolveTotalCount(totalCount, visibleCount, pageSize, totalPages) {
             var total =
                 Number(
@@ -1207,15 +1225,18 @@
                     amountNumber = 0;
                 }
 
-                var amountSign =
-                    amountNumber < 0 ? "-" : "";
+                var itemIso =
+                    item.ISOCode ||
+                    data.ISOCode ||
+                    data.currencyISO ||
+                    "";
 
                 var amountText =
-                    amountSign +
-                    itemSymbol +
-                    fmtAmt(
-                        Math.abs(amountNumber),
-                        itemPrecision
+                    fmtMoney(
+                        amountNumber,
+                        itemPrecision,
+                        itemIso,
+                        itemSymbol
                     );
 
                 var markerType =

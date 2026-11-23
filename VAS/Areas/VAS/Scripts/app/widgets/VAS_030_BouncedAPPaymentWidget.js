@@ -1410,6 +1410,24 @@
                         escapeHtml(amountText)
                         : escapeHtml(amountSign + amountText);
 
+                var amountTitle =
+                    amountSign +
+                    (currencySymbol ? currencySymbol : '') +
+                    amountText;
+
+                // browser culture places sign, styled symbol and separators
+                if (currency && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                    try {
+                        amountTitle = VAS.formatAmountByBrowser(amountValue, currency, precision, { symbol: currencySymbol });
+                        amountHtml = VAS.formatAmountByBrowser(amountValue, currency, precision, {
+                            symbol: currencySymbol,
+                            symbolWrap: function (s) {
+                                return '<span class="vas-bounced-ap-payment-currency-inline">' + escapeHtml(s) + '</span>';
+                            }
+                        });
+                    } catch (e) { if (window.console) { console.log(e); } }
+                }
+
                 var statusHtml =
                     status
                         ? '<span class="' +
@@ -1479,15 +1497,7 @@
                     '<td ' +
                     'class="vas-bounced-ap-payment-td-amount" ' +
                     'title="' +
-                    escapeHtml(
-                        amountSign +
-                        (
-                            currencySymbol
-                                ? currencySymbol
-                                : ''
-                        ) +
-                        amountText
-                    ) +
+                    escapeHtml(amountTitle) +
                     '">' +
                     amountHtml +
                     '</td>' +

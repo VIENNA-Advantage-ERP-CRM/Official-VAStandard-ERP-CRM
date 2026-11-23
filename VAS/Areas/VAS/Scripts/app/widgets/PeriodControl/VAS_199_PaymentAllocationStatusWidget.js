@@ -219,11 +219,16 @@
         /* Exact amount at the row's OWN currency precision, with that currency's
            symbol - this is a record list, not a KPI, so nothing is compacted and no
            symbol is ever hard-coded. */
-        function formatAmount(value, symbol, precision) {
+        function formatAmount(value, symbol, precision, iso) {
             var n = Number(value || 0);
             if (!isFinite(n)) { n = 0; }
             var p = Number(precision);
             if (!isFinite(p) || p < 0) { p = 2; }
+
+            /* Browser culture places sign, separators and currency sign (shared formatter). */
+            if (iso && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try { return VAS.formatAmountByBrowser(n, iso, p, { symbol: symbol || '' }); } catch (e) { if (window.console) { console.log(e); } }
+            }
 
             var sign = n < 0 ? '-' : '';
             var text = Math.abs(n).toLocaleString(window.navigator.language, {
@@ -535,6 +540,22 @@
             var amountText = formatCompactAmount(counts.UnallocatedAmount,
                 counts.BaseCurrencyIso, counts.BaseCurrencyPrecision);
             var iso = counts.BaseCurrencyIso || '';
+            var unit = iso;
+            var amountTip = amountText + (iso ? ' ' + iso : '');
+            // Browser culture: compact value with the currency sign placed by the culture
+            // ("$1.2M" / "1,2M $"); the hover shows the exact amount. No separate ISO unit then.
+            if (iso && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    var sym = counts.BaseCurrencySymbol || '';
+                    var compactText = VAS.formatAmountByBrowser(counts.UnallocatedAmount, iso,
+                        counts.BaseCurrencyPrecision, { compact: true, symbol: sym });
+                    amountTip = VAS.formatAmountByBrowser(counts.UnallocatedAmount, iso,
+                        counts.BaseCurrencyPrecision, { symbol: sym });
+                    amountText = compactText;
+                    unit = '';
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
 
             $foot.html(
                 statHtml(icon('calendar'),
@@ -543,7 +564,7 @@
                 '<span class="vas-199-stat-sep"></span>' +
                 statHtml(icon('money'),
                     label('VAS_199_UnallocatedValue', 'Unallocated value'),
-                    amountText, iso, amountText + (iso ? ' ' + iso : ''))
+                    amountText, unit, amountTip)
             );
         }
 
@@ -950,7 +971,7 @@
                user already knows from the Payment window, not a description this
                widget invents. */
             var typeText = row.DocTypeName || '';
-            var amount = formatAmount(row.PayAmt, row.CurrencySymbol, row.CurrencyPrecision);
+            var amount = formatAmount(row.PayAmt, row.CurrencySymbol, row.CurrencyPrecision, row.CurrencyIso);
             var partner = row.BusinessPartnerName || '';
             var iso = row.CurrencyIso || '';
             var docNo = row.DocumentNo || '';

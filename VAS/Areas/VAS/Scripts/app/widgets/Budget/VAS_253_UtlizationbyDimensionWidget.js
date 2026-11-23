@@ -943,10 +943,20 @@
            "$1.9M", "₹74K" - never "USD 1.9M", and only falling back to the ISO code when
            the currency has no symbol configured (which is what the server's own
            COALESCE(CurSymbol, ISO_Code) already resolved). The ISO code drives the scale,
-           so no lakh/crore or million step is ever assumed here. */
+           so no lakh/crore or million step is ever assumed here. Composed by the shared
+           browser-culture formatter (it places the minus and the symbol); the hand
+           composition below is the fallback when it is not loaded. */
         function compactAmount(value) {
             var v = Number(value) || 0;
             var magnitude;
+
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(v, isoCode(), precision(),
+                        { compact: true, symbol: symbol(), minusSign: '−' });
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
 
             try {
                 if (VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
@@ -962,11 +972,19 @@
 
         /* Full, non-compact amount for the tooltips: the exact figure behind the compact
            cell. Grouping and the decimal separator come from the browser locale, the
-           decimals from the schema currency's precision. */
+           decimals from the schema currency's precision. The shared formatter places the
+           minus and the currency sign the way the browser culture does, like the cell. */
         function fullAmount(value) {
             var v = Number(value) || 0;
             var p = precision();
             var text;
+
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(v, isoCode(), p, { symbol: symbol(), minusSign: '−' });
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
 
             try {
                 text = Math.abs(v).toLocaleString(window.navigator.language,

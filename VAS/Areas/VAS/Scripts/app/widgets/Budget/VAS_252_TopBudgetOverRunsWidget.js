@@ -888,18 +888,32 @@
            "$612K", "₹74K" - never "USD 612K", and only falling back to the ISO code when
            the currency has no symbol configured (which is what the server's own
            COALESCE(CurSymbol, ISO_Code) already resolved). The ISO code drives the scale,
-           so no lakh/crore or million step is ever assumed here. */
+           so no lakh/crore or million step is ever assumed here. Composed by signedMoney. */
         function compactAmount(value) {
-            var v = Number(value) || 0;
-            return (v < 0 ? '−' : '') + symbol() + magnitudeOf(v);
+            return signedMoney(value, '');
         }
 
         /* The variance, always with its sign. It is negative by construction on this card,
            so this is in practice always a minus - a TRUE minus sign, not a hyphen, so it
            matches the one the amount formatter prints elsewhere. */
         function signedCompactAmount(value) {
+            return signedMoney(value, '+');
+        }
+
+        /* Signed compact amount with the currency sign, composed by the shared
+           browser-culture formatter (it places the sign and the symbol; positiveSign marks
+           amounts above zero). Falls back to sign + symbol + magnitudeOf() when it is not
+           loaded. */
+        function signedMoney(value, positiveSign) {
             var v = Number(value) || 0;
-            return (v < 0 ? '−' : '+') + symbol() + magnitudeOf(v);
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(v, isoCode(), precision(),
+                        { compact: true, symbol: symbol(), minusSign: '−', positiveSign: positiveSign });
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
+            return (v < 0 ? '−' : (positiveSign || '')) + symbol() + magnitudeOf(v);
         }
 
         /* Full, non-compact amount for the tooltips: the exact figure behind the compact

@@ -282,6 +282,17 @@
                 var amtHtml = escapeHtml(amtSign) +
                     (sym ? '<span class="vas-unr-cur-inline">' + escapeHtml(sym) + '</span>' : '') +
                     escapeHtml(amtMagnitude);
+                var amtTitle = amtSign + (sym ? sym : '') + amtMagnitude;
+                /* Browser culture places sign, minus and the styled symbol span (VAS.formatAmountByBrowser). */
+                if (iso && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                    try {
+                        amtHtml = VAS.formatAmountByBrowser(rawAmt, iso, stdPrecision, {
+                            symbol: row.curSymbol || "",
+                            symbolWrap: function (s) { return '<span class="vas-unr-cur-inline">' + escapeHtml(s) + '</span>'; }
+                        });
+                        amtTitle = VAS.formatAmountByBrowser(rawAmt, iso, stdPrecision, { symbol: row.curSymbol || "" });
+                    } catch (e) { if (window.console) { console.log(e); } }
+                }
 
                 var $tr = $(
                     '<tr>' +
@@ -296,7 +307,7 @@
                     '<span class="vas-unr-truncate">' + escapeHtml(bankText) + '</span>' +
                     '</td>' +
                     '<td class="vas-unr-td-currency" title="' + escapeHtml(iso) + '">' + escapeHtml(iso) + '</td>' +
-                    '<td class="vas-unr-td-amount" title="' + escapeHtml(amtSign + (sym ? sym : '') + amtMagnitude) + '">' + amtHtml + '</td>' +
+                    '<td class="vas-unr-td-amount" title="' + escapeHtml(amtTitle) + '">' + amtHtml + '</td>' +
                     '</tr>'
                 );
 

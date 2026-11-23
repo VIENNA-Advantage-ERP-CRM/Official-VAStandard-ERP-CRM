@@ -583,12 +583,14 @@ namespace VAS.Controllers
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "s", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            return Util.GetValueOfDecimal(DB.ExecuteScalar(sql, new[]
+            // VAS163 2026-11-13: row 1029 stock is never shown negative (e.g. -6 for Mobile Phone) - 0
+            // when the warehouse has no free quantity (lines pop-up and GetFreeStock both use this).
+            return Math.Max(0m, Util.GetValueOfDecimal(DB.ExecuteScalar(sql, new[]
             {
                 new SqlParameter("@M_Product_ID", productId),
                 new SqlParameter("@M_Warehouse_ID", warehouseId),
                 new SqlParameter("@Asi_Id", attributeSetInstanceId)
-            }, null));
+            }, null)));
         }
 
         #endregion
@@ -1093,14 +1095,15 @@ namespace VAS.Controllers
         private List<CurrencyOption> LoadCurrencyOptions(int clientId)
         {
             List<CurrencyOption> list = new List<CurrencyOption>();
-            string sql = "SELECT C_Currency_ID AS Id, ISO_Code AS Code, CurSymbol AS Symbol FROM C_Currency WHERE IsActive='Y' ORDER BY ISO_Code";
+            // VAS163 2026-11-12: StdPrecision added so the wizard totals use the currency's precision.
+            string sql = "SELECT C_Currency_ID AS Id, ISO_Code AS Code, CurSymbol AS Symbol, StdPrecision AS Cur_Precision FROM C_Currency WHERE IsActive='Y' ORDER BY ISO_Code";
             IDataReader dr = null;
             try
             {
                 dr = DB.ExecuteReader(sql, new SqlParameter[0]);
                 while (dr != null && dr.Read())
                 {
-                    list.Add(new CurrencyOption { Id = Util.GetValueOfInt(dr["Id"]), Code = Util.GetValueOfString(dr["Code"]), Symbol = Util.GetValueOfString(dr["Symbol"]) });
+                    list.Add(new CurrencyOption { Id = Util.GetValueOfInt(dr["Id"]), Code = Util.GetValueOfString(dr["Code"]), Symbol = Util.GetValueOfString(dr["Symbol"]), Precision = dr["Cur_Precision"] == DBNull.Value ? 2 : Util.GetValueOfInt(dr["Cur_Precision"]) });
                 }
             }
             finally { CloseReader(dr); }
@@ -1737,6 +1740,8 @@ namespace VAS.Controllers
             public int Id { get; set; }
             public string Code { get; set; }
             public string Symbol { get; set; }
+            /// <summary>VAS163 2026-11-12: C_Currency.StdPrecision for amount display.</summary>
+            public int Precision { get; set; }
         }
 
         private class CreateOrderRequest

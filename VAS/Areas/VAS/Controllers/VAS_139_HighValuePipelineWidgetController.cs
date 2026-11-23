@@ -62,6 +62,10 @@ namespace VAS.Controllers
     ///                          and the account id is an int the action signature already
     ///                          model-bound and validated as > 0, so none of them can
     ///                          carry SQL text.
+    ///   VAI052      2026-11-19 ORA-12704 on Oracle in GetOpportunities (the row modal showed
+    ///                          "Unable to load pipeline"): COALESCE(owner.Name, '') mixed the
+    ///                          NVARCHAR2 AD_User.Name with a plain VARCHAR2 '' literal. The
+    ///                          empty-string fallback is now N'' (QueryRules N'' rule).
     /// </summary>
     public class VAS_139_HighValuePipelineWidgetController : Controller
     {
@@ -358,7 +362,7 @@ namespace VAS.Controllers
                     SELECT o.VAS_Opportunity_ID AS Opp_Id,
                            o.Value AS Search_Key,
                            o.Name AS Opp_Name,
-                           COALESCE(owner.Name, '') AS Owner_Name,
+                           COALESCE(owner.Name, N'') AS Owner_Name,
                            o.VAS_OppStage AS Status_Code,
                            ROUND(" + ConvertedAmtExpr(conversionTypeSql) + @", sc.Std_Precision) AS Value_Conv,
                            o.VAS_DecisionDate AS Close_Date,

@@ -21,6 +21,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Globalization;
 using System.Web.Mvc;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
@@ -314,9 +315,10 @@ namespace VIS.Controllers
                         {
                             PurchaseOrderId = poId,
                             PurchaseOrderNumber = docNo,
-                            OrderDate = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd") : "",
+                            // VAS163 2026-11-10: browser locale (6-Nov retest2). The widget formats OrderDate / PromisedDate (ISO) itself.
+                            OrderDate = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                             OrderDateFormatted = orderDate.HasValue ? orderDate.Value.ToString("dd MMM yyyy") : "",
-                            PromisedDate = promisedDate.HasValue ? promisedDate.Value.ToString("yyyy-MM-dd") : "",
+                            PromisedDate = promisedDate.HasValue ? promisedDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                             PromisedDateFormatted = promisedDate.HasValue ? promisedDate.Value.ToString("dd MMM yyyy") : "",
                             CompletionDatetime = completionDt.HasValue ? completionDt.Value.ToString("yyyy-MM-dd HH:mm:ss") : "",
                             DocumentStatus = docStatus,

@@ -167,7 +167,8 @@
    of at least 8px between them. A page with fewer rows stacks them from the top at the same
    spacing. */
 .vas-173-list {
-    --vas-173-row-gap: max(8px, 0.45em);
+    /* VAS163 2026-11-11: Row 9 wider spacing between records (was max(8px, 0.45em)). */
+    --vas-173-row-gap: max(14px, 0.8em);
     display: flex;
     flex-direction: column;
     gap: var(--vas-173-row-gap);

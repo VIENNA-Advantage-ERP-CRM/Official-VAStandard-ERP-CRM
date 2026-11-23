@@ -131,7 +131,20 @@
                 ? '<span class="vas-cashgl-cur">' + escapeHtml(symbol) + '</span>'
                 : '';
             if ($valueEl) {
-                $valueEl.html( escapeHtml(formatCompactAmount(todayAmount, precision)));
+                var isoCode = (data && data.isoCode) || "";
+                var shown = null;
+                // Browser-culture amount with the currency sign once the server sends the ISO code.
+                if (isoCode && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                    try {
+                        shown = VAS.formatAmountByBrowser(todayAmount, isoCode, getDisplayPrecision(precision),
+                            {
+                                symbol: symbol,
+                                symbolWrap: function (s) { return '<span class="vas-cashgl-cur">' + escapeHtml(s) + '</span>'; }
+                            });
+                    }
+                    catch (e) { if (window.console) { console.log(e); } }
+                }
+                $valueEl.html(shown !== null ? shown : escapeHtml(formatCompactAmount(todayAmount, precision)));
             }
 
             /* Delta: % change vs 7-day average */

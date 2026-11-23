@@ -419,6 +419,14 @@
             }
         }
 
+        // VAS163 2026-11-10: browser locale (6-Nov retest2). yyyy-MM-dd parsed by parts (no UTC shift).
+        function fmtIsoDateParts(v) {
+            var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v || ""));
+            if (!m) { return v || ""; }
+            return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+                .toLocaleDateString(window.navigator.language, { day: "2-digit", month: "short", year: "numeric" });
+        }
+
         function fieldHtml(label, value, strong, rawHtml) {
             var shown = value == null || value === "" ? "-" : value;
             return '<div class="vas-ra-field">' +
@@ -758,7 +766,7 @@
             var from = (poPageNo - 1) * poPageSize + 1;
             var to = Math.min(poPageNo * poPageSize, poTotalRecords);
             return '<div class="vas-ra-modal-pager">' +
-                '<span>' + escapeHtml(lbl("VAS_090_Showing", "Showing") + ' ' + from + '-' + to + ' ' + lbl("VAS_090_Of", "of") + ' ' + poTotalRecords) + '</span>' +
+                '<span>' + escapeHtml(lbl("VAS_090_Showing", "Showing") + ' ' + Number(from).toLocaleString(window.navigator.language) + '-' + Number(to).toLocaleString(window.navigator.language) + ' ' + lbl("VAS_090_Of", "of") + ' ' + Number(poTotalRecords).toLocaleString(window.navigator.language)) + '</span>' +
                 '<button type="button" class="vas-ra-pgbtn vas-ra-po-prev"' + (poPageNo <= 1 ? ' disabled' : '') + '>' + icon("chevL") + '</button>' +
                 '<span class="vas-ra-pgtext">' + escapeHtml(poPageNo + ' ' + lbl("VAS_090_Of", "of") + ' ' + poTotalPages) + '</span>' +
                 '<button type="button" class="vas-ra-pgbtn vas-ra-po-next"' + (poPageNo >= poTotalPages ? ' disabled' : '') + '>' + icon("chevR") + '</button>' +
@@ -1294,7 +1302,7 @@
             var from = (gcPageNo - 1) * gcPageSize + 1;
             var to = Math.min(gcPageNo * gcPageSize, gcTotalRecords);
             return '<div class="vas-ra-modal-pager">' +
-                '<span>' + escapeHtml(lbl("VAS_090_Showing", "Showing") + ' ' + from + '-' + to + ' ' + lbl("VAS_090_Of", "of") + ' ' + gcTotalRecords) + '</span>' +
+                '<span>' + escapeHtml(lbl("VAS_090_Showing", "Showing") + ' ' + Number(from).toLocaleString(window.navigator.language) + '-' + Number(to).toLocaleString(window.navigator.language) + ' ' + lbl("VAS_090_Of", "of") + ' ' + Number(gcTotalRecords).toLocaleString(window.navigator.language)) + '</span>' +
                 '<button type="button" class="vas-ra-pgbtn vas-ra-gc-prev"' + (gcPageNo <= 1 ? ' disabled' : '') + '>' + icon("chevL") + '</button>' +
                 '<span class="vas-ra-pgtext">' + escapeHtml(gcPageNo + ' ' + lbl("VAS_090_Of", "of") + ' ' + gcTotalPages) + '</span>' +
                 '<button type="button" class="vas-ra-pgbtn vas-ra-gc-next"' + (gcPageNo >= gcTotalPages ? ' disabled' : '') + '>' + icon("chevR") + '</button>' +
@@ -1397,7 +1405,7 @@
                 grnLinkFieldHtml(lbl("VAS_090_SourceGRN", "Source GRN"), header.grnNo, header.grnId) +
                 fieldHtml(lbl("VAS_090_Vendor", "Vendor"), header.supplier) +
                 fieldHtml(lbl("VAS_090_Warehouse", "Warehouse"), header.warehouseName) +
-                fieldHtml(lbl("VAS_090_MovementDate", "Movement Date"), header.docDate) +
+                fieldHtml(lbl("VAS_090_MovementDate", "Movement Date"), fmtIsoDateParts(header.docDate)) +
                 '</div>' +
                 '<div class="vas-ra-lines-title">' + escapeHtml(lbl("VAS_090_ConfirmationLines", "Confirmation Lines")) + '</div>' +
                 '<div class="vas-ra-gc-list vas-ra-gc-compact">';

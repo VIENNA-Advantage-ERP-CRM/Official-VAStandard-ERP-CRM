@@ -179,6 +179,7 @@ namespace VAS.Controllers
                        " + OrderValueExclTaxSql + @" AS Order_Value,
                        curr.CurSymbol AS Currency_Symbol,
                        curr.ISO_Code AS Currency_Code,
+                       curr.StdPrecision AS Currency_Precision,
                        o.Description AS Description,
                        o.POReference AS Po_Reference,
                        o.C_Order_Quotation AS Quotation_Order_Id,
@@ -327,7 +328,7 @@ namespace VAS.Controllers
                            OR UPPER(base.Location_City) LIKE @Search_Pattern_15 ESCAPE '\'
                      )
                 SELECT Category_Priority, Matched_Text, Order_Id, Document_No, Date_Ordered,
-                       Customer_Name, Doc_Status_Code, Order_Value, Currency_Symbol, Currency_Code,
+                       Customer_Name, Doc_Status_Code, Order_Value, Currency_Symbol, Currency_Code, Currency_Precision,
                        COUNT(1) OVER () AS Total_Matches
                   FROM matches
                  ORDER BY Category_Priority, Updated DESC, Document_No
@@ -367,7 +368,10 @@ namespace VAS.Controllers
                         CustomerName = Util.GetValueOfString(dr["Customer_Name"]),
                         DocumentStatus = DecodeLabel(docStatusMap, docStatusCode),
                         OrderValue = dr["Order_Value"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Order_Value"]),
-                        CurrencySymbol = CurrencyLabel(dr)
+                        CurrencySymbol = CurrencyLabel(dr),
+                        // VAS163 2026-11-12: ISO + precision of the order currency for client-side Intl formatting.
+                        CurrencyIso = Util.GetValueOfString(dr["Currency_Code"]),
+                        CurrencyPrecision = dr["Currency_Precision"] == DBNull.Value ? 2 : Util.GetValueOfInt(dr["Currency_Precision"])
                     });
                 }
                 result.Total = total;
@@ -537,6 +541,7 @@ namespace VAS.Controllers
                     DocumentStatusCode = docStatusCode,
                     OrderValue = dr["Order_Value"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Order_Value"]),
                     CurrencySymbol = CurrencyLabel(dr),
+                    CurrencyIso = Util.GetValueOfString(dr["Currency_Code"]), // VAS163 2026-11-12: order currency ISO for Intl formatting
                     CurrencyPrecision = stdPrecision,
                     WarehouseName = warehouseName,
                     DeliveryMode = DecodeLabel(GetDecodeMap("C_Order", "DeliveryViaRule", language), Util.GetValueOfString(dr["Delivery_Via_Rule"]))
@@ -579,7 +584,7 @@ namespace VAS.Controllers
             {
                 deliveryStatusKey = "VAS_268_DeliveryPending"; deliveryStatusFallback = "Pending";
             }
-            result.Order.DeliveryStatus = Msg.GetMsg(ctx, deliveryStatusKey) ?? deliveryStatusFallback;
+            result.Order.DeliveryStatus = Msg.GetMsg(ctx, deliveryStatusKey, true) ?? deliveryStatusFallback; // VAS163 2026-11-11: text-only label (3-arg GetMsg, no tip appended)
 
             return result;
         }
@@ -729,7 +734,8 @@ namespace VAS.Controllers
                         QtyOrdered = qtyOrdered,
                         QtyDelivered = qtyDelivered,
                         QtyPending = qtyPending,
-                        FreeStock = onHandBase,
+                        // VAS163 2026-11-11: row 58 In stock never negative - show 0.
+                        FreeStock = Math.Max(0m, onHandBase),
                         QtyShort = isItem ? Math.Max(0m, qtyPending - Math.Max(0m, onHandBase) * uomRatio) : 0m,
                         Rate = rate,
                         Amount = lineAmt
@@ -949,7 +955,7 @@ namespace VAS.Controllers
 
         private JsonResult ErrorResult(Ctx ctx)
         {
-            string message = Msg.GetMsg(ctx, "Error") ?? "Error";
+            string message = Msg.GetMsg(ctx, "Error", true) ?? "Error"; // VAS163 2026-11-11: text-only label (3-arg GetMsg, no tip appended)
             string json = JsonConvert.SerializeObject(new { Error = message });
             return Json(json, JsonRequestBehavior.AllowGet);
         }
@@ -971,6 +977,8 @@ namespace VAS.Controllers
             public string DocumentStatus { get; set; }
             public decimal OrderValue { get; set; }
             public string CurrencySymbol { get; set; }
+            public string CurrencyIso { get; set; }      // VAS163 2026-11-12
+            public int CurrencyPrecision { get; set; }   // VAS163 2026-11-12
         }
 
         private class RecentRow
@@ -1000,6 +1008,7 @@ namespace VAS.Controllers
             public string DocumentStatusCode { get; set; }
             public decimal OrderValue { get; set; }
             public string CurrencySymbol { get; set; }
+            public string CurrencyIso { get; set; }      // VAS163 2026-11-12
             public int CurrencyPrecision { get; set; }
             public string WarehouseName { get; set; }
             public string DeliveryMode { get; set; }

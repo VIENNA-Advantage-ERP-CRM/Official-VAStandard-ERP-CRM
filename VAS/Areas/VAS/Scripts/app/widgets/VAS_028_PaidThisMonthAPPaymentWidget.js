@@ -456,8 +456,14 @@
             );
         }
 
+        /* Compact amount; the browser culture places the currency sign and the minus
+           (VAS.formatAmountByBrowser, 20-Nov-2026). The hand-composed form below is the
+           fallback when the shared formatter is not loaded. */
         function formatMetric(value, symbol, currencyISO, precision) {
             var numericValue = Number(value || 0);
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                return VAS.formatAmountByBrowser(numericValue, currencyISO, precision, { compact: true, symbol: symbol });
+            }
             var sign = numericValue < 0 ? '-' : '';
             var absoluteValue = Math.abs(numericValue);
             var amountText =
@@ -1141,6 +1147,11 @@
             symbol,
             iso
         ) {
+            // browser culture places sign, symbol and separators (whole numbers kept)
+            if (iso && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try { return VAS.formatAmountByBrowser(Number(value || 0) || 0, iso, 0, { symbol: symbol }); } catch (e) { if (window.console) { console.log(e); } }
+            }
+
             var numericValue = Number(value || 0);
 
             if (isNaN(numericValue)) {
@@ -1180,6 +1191,11 @@
             iso,
             precision
         ) {
+            // browser culture places sign, symbol and separators
+            if (iso && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try { return VAS.formatAmountByBrowser(Number(value || 0) || 0, iso, precision, { symbol: symbol }); } catch (e) { if (window.console) { console.log(e); } }
+            }
+
             var numericValue = Number(value || 0);
 
             if (isNaN(numericValue)) {

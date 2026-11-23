@@ -176,7 +176,7 @@
             var sign = n < 0 ? '-' : '';
             var iso = (cur && cur.iso) || '';
             var symbol = (cur && (cur.symbol || cur.iso)) || '';
-            var compact = VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
+            var compact = VIS.Util.BrowserCultureFormatter.formatCompactAmount(n, iso, precisionOf(cur));
             // Currency symbol placed per the browser locale (before / after the number).
             if (iso) {
                 try {
@@ -196,6 +196,17 @@
                 } catch (e) { /* fall back to the server symbol in front */ }
             }
             return sign + symbol + compact;
+        }
+        // 2026-11-18: hover tooltip - the FULL amount (browser culture, currency precision)
+        // behind a compact amount. fullTitleAttr() gives a ' title="..."' fragment (or '').
+        function fullTitleAttr(value, cur) {
+            if (!(window.VIS && VIS.Util && VIS.Util.BrowserCultureFormatter && typeof VIS.Util.BrowserCultureFormatter.formatFullAmount === 'function')) { return ''; }
+            var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
+            var full = VIS.Util.BrowserCultureFormatter.formatFullAmount(n, (cur && cur.iso) || '', precisionOf(cur));
+            return full ? ' title="' + escapeHtml(full) + '"' : '';
+        }
+        function moneyHtml(value, cur) {
+            return '<span' + fullTitleAttr(value, cur) + '>' + escapeHtml(formatMoney(value, cur)) + '</span>';
         }
         var AVATAR_COLORS = ['#1F83FF', '#5F4AA6', '#0B6B45', '#D78B10', '#0083DA', '#A33F3F'];
         function avatarColor(text) {
@@ -253,7 +264,7 @@
                     if (data && data.error) { renderError(); return; }
                     widgetCurrency = { symbol: data.currency_symbol || '', iso: data.currency_iso || '', precision: data.std_precision };
                     var months = srcPeriod === 'biz6' ? 6 : 3;
-                    $sub.text(formatMoney(data.total, widgetCurrency) + ' · ' + label('VAS_300_LastMonths', 'last {0} months').replace('{0}', formatCount(months)));
+                    $sub.html(moneyHtml(data.total, widgetCurrency) + escapeHtml(' · ' + label('VAS_300_LastMonths', 'last {0} months').replace('{0}', formatCount(months))));
                     renderSources(data.items || [], Number(data.total || 0));
                 },
                 error: renderError
@@ -274,7 +285,7 @@
                         '<span class="vas300-sw" style="background:' + src.color + '"></span>' +
                         '<span class="vas300-src-name" title="' + escapeHtml(src.name) + '">' + escapeHtml(src.name) + '</span>' +
                     '</button>' +
-                    '<span class="vas300-src-v">' + escapeHtml(formatMoney(src.value, widgetCurrency)) + ' · ' + escapeHtml(formatPercent(share, 0)) + '</span>' +
+                    '<span class="vas300-src-v">' + moneyHtml(src.value, widgetCurrency) + ' · ' + escapeHtml(formatPercent(share, 0)) + '</span>' +
                 '</div>' +
                 '<div class="vas300-bar"><div style="width:' + share + '%;background:' + src.color + '"></div></div>' +
             '</div>';
@@ -370,7 +381,7 @@
                     '<span class="vas300-row-title" title="' + escapeHtml(name) + '">' + escapeHtml(name) + '</span>' +
                     '<span class="vas300-row-meta" title="' + escapeHtml(meta) + '">' + escapeHtml(meta) + '</span>' +
                 '</span>' +
-                '<span class="vas300-row-val">' + escapeHtml(formatMoney(item.amount, listCurrency)) + '</span>' +
+                '<span class="vas300-row-val"' + fullTitleAttr(item.amount, listCurrency) + '>' + escapeHtml(formatMoney(item.amount, listCurrency)) + '</span>' +
             '</button>';
         }
         function renderListRows(items) {

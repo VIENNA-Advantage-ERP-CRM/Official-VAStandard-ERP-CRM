@@ -87,7 +87,9 @@ namespace VAS.Controllers
 
             try
             {
-                string json = JsonConvert.SerializeObject(GetSummaryData(ctx));
+                SummaryResult data = GetSummaryData(ctx);
+                FillBaseCurrency(ctx, data);
+                string json = JsonConvert.SerializeObject(data);
                 return Json(json, JsonRequestBehavior.AllowGet);
             }
             catch (Exception ex)
@@ -180,6 +182,7 @@ namespace VAS.Controllers
         /// </summary>
         private static string BuildBaseOrdersSql()
         {
+            // VAS163 2026-11-11: Row 16 Currency_Id added (document currency for the Value column).
             return @"
                 SELECT o.C_Order_ID AS C_Order_ID,
                        o.DocumentNo AS Document_No,
@@ -190,7 +193,8 @@ namespace VAS.Controllers
                        " + TaxIncludedSql + @" AS Tax_Included,
                        o.C_BPartner_ID AS Bpartner_Id,
                        o.M_Warehouse_ID AS Warehouse_Id,
-                       o.SalesRep_ID AS Sales_Rep_Id
+                       o.SalesRep_ID AS Sales_Rep_Id,
+                       o.C_Currency_ID AS Currency_Id
                   FROM C_Order o
                  WHERE o.AD_Client_ID = @AD_Client_ID
                    AND o.IsActive = 'Y'
@@ -206,9 +210,14 @@ namespace VAS.Controllers
         /// 'Y' when the order's prices include tax - the order's own IsTaxIncluded flag
         /// (5-Nov Row 45: "SO has IsTaxIncluded = Y") or its price list's flag.
         /// </summary>
+        // VAS163 2026-11-17: Sr 93 the flags are not reliable (SO 50209: order N, price list Y,
+        // yet the tax was ADDED on top - GrandTotal 10,337.30 = TotalLines 9,722 + tax 615.30 - so
+        // the Value column showed 9,106.70 instead of 9,722). Tax-inclusive is now read from the
+        // order's own totals: the tax is inside TotalLines when GrandTotal is not raised by it
+        // (GrandTotal - TotalLines below half the C_OrderTax total).
         private const string TaxIncludedSql =
-            "(CASE WHEN COALESCE(o.IsTaxIncluded, 'N') = 'Y' " +
-            "OR COALESCE((SELECT pl.IsTaxIncluded FROM M_PriceList pl WHERE pl.M_PriceList_ID = o.M_PriceList_ID), 'N') = 'Y' " +
+            "(CASE WHEN 2 * (COALESCE(o.GrandTotal, 0) - COALESCE(o.TotalLines, 0)) < " +
+            "(SELECT COALESCE(SUM(COALESCE(ott.TaxAmt, 0)), 0) FROM C_OrderTax ott WHERE ott.C_Order_ID = o.C_Order_ID AND ott.IsActive = 'Y') " +
             "THEN 'Y' ELSE 'N' END)";
 
         /// <summary>
@@ -268,7 +277,8 @@ namespace VAS.Controllers
                         ol.C_Order_ID AS C_Order_ID,
                         SUM(COALESCE(ol.QtyOrdered, 0)) AS Ordered_Qty,
                         SUM(COALESCE(ol.QtyDelivered, 0)) AS Delivered_Qty,
-                        SUM(" + DeliveredValueSql + @") AS Delivered_Value
+                        SUM(" + DeliveredValueSql + @") AS Delivered_Value,
+                        SUM(CASE WHEN COALESCE(ol.QtyDelivered, 0) < COALESCE(ol.QtyOrdered, 0) THEN 1 ELSE 0 END) AS Pending_Lines
                       FROM base_orders bo
                      INNER JOIN C_OrderLine ol ON ( ol.C_Order_ID = bo.C_Order_ID AND ol.IsActive = 'Y' )
                      INNER JOIN M_Product p ON ( p.M_Product_ID = ol.M_Product_ID AND p.ProductType = 'I' )
@@ -293,6 +303,7 @@ namespace VAS.Controllers
                     COALESCE(ld.Ordered_Qty, 0) AS Ordered_Qty,
                     COALESCE(ld.Delivered_Qty, 0) AS Delivered_Qty,
                     COALESCE(ld.Delivered_Value, 0) AS Delivered_Value,
+                    COALESCE(ld.Pending_Lines, 0) AS Pending_Lines,
                     ls.Last_Shipment_Date AS Last_Shipment_Date
                   FROM base_orders o
                   LEFT OUTER JOIN line_delivery ld ON ( ld.C_Order_ID = o.C_Order_ID )
@@ -326,7 +337,13 @@ namespace VAS.Controllers
                     // the Item lines of every cohort order - fully AND partially delivered
                     // orders contribute their delivered portion; the undelivered rest never
                     // counts. (Supersedes the earlier "fully delivered orders only" rule.)
-                    deliveredValue += dr["Delivered_Value"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Delivered_Value"]);
+                    // VAS163 2026-11-13: row 885 Delivered value sums ONLY fully delivered SOs
+                    // (every Item line delivered); pending and partly delivered SOs are excluded.
+                    decimal pendingLines = dr["Pending_Lines"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Pending_Lines"]);
+                    if (orderedQty > 0m && pendingLines <= 0m)
+                    {
+                        deliveredValue += dr["Delivered_Value"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Delivered_Value"]);
+                    }
 
                     // 5-Nov Row 44: on-time shipment over every SO of this month's cohort.
                     //  - Fully delivered: on time when the last completed DO's movement date
@@ -406,9 +423,13 @@ namespace VAS.Controllers
                     COALESCE(rep.Name, N'') AS Representative_Name,
                     COALESCE(ls.Ordered_Qty, 0) AS Ordered_Qty,
                     COALESCE(ls.Delivered_Qty, 0) AS Delivered_Qty,
+                    curr.CurSymbol AS Currency_Symbol,
+                    curr.ISO_Code AS Currency_Code,
+                    curr.StdPrecision AS Currency_Precision,
                     COUNT(1) OVER () AS Total_Rows
                   FROM base_orders o
                   INNER JOIN C_BPartner bp ON ( bp.C_BPartner_ID = o.Bpartner_Id )
+                  LEFT OUTER JOIN C_Currency curr ON ( curr.C_Currency_ID = o.Currency_Id )
                   LEFT OUTER JOIN M_Warehouse w ON ( w.M_Warehouse_ID = o.Warehouse_Id )
                   LEFT OUTER JOIN AD_User rep ON ( rep.AD_User_ID = o.Sales_Rep_Id )
                   LEFT OUTER JOIN line_stats ls ON ( ls.C_Order_ID = o.C_Order_ID )
@@ -459,7 +480,11 @@ namespace VAS.Controllers
                         WarehouseName = Util.GetValueOfString(dr["Warehouse_Name"]),
                         RepresentativeName = Util.GetValueOfString(dr["Representative_Name"]),
                         OrderValue = dr["Order_Value"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Order_Value"]),
-                        DeliveryStatus = Msg.GetMsg(ctx, deliveryStatusKey) ?? deliveryStatusFallback,
+                        // VAS163 2026-11-11: Row 16 Value column in the order's own (price list) currency.
+                        CurrencyIso = (Util.GetValueOfString(dr["Currency_Code"]) ?? string.Empty).Trim(),
+                        CurrencySymbol = (Util.GetValueOfString(dr["Currency_Symbol"]) ?? string.Empty).Trim(),
+                        CurrencyPrecision = dr["Currency_Precision"] == DBNull.Value ? 2 : Util.GetValueOfInt(dr["Currency_Precision"]),
+                        DeliveryStatus = Msg.GetMsg(ctx, deliveryStatusKey, true) ?? deliveryStatusFallback, // VAS163 2026-11-11: text-only label (3-arg GetMsg, no tip appended)
                         DocumentStatus = DecodeLabel(docStatusMap, Util.GetValueOfString(dr["Doc_Status_Code"]))
                     });
                 }
@@ -542,6 +567,7 @@ namespace VAS.Controllers
                     DocumentStatusCode = docStatusCode,
                     OrderValue = dr["Order_Value"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Order_Value"]),
                     CurrencySymbol = (currencySymbol ?? "").Trim(),
+                    CurrencyIso = (Util.GetValueOfString(dr["Currency_Code"]) ?? "").Trim(), // VAS163 2026-11-12: document currency ISO for client-side Intl formatting
                     CurrencyPrecision = stdPrecision,
                     WarehouseName = Util.GetValueOfString(dr["Warehouse_Name"]),
                     DeliveryMode = DecodeLabel(GetDecodeMap("C_Order", "DeliveryViaRule", language), Util.GetValueOfString(dr["Delivery_Via_Rule"]))
@@ -580,7 +606,7 @@ namespace VAS.Controllers
             {
                 deliveryStatusKey = "VAS_270_DeliveryNone"; deliveryStatusFallback = "Not delivered";
             }
-            result.Order.DeliveryStatus = Msg.GetMsg(ctx, deliveryStatusKey) ?? deliveryStatusFallback;
+            result.Order.DeliveryStatus = Msg.GetMsg(ctx, deliveryStatusKey, true) ?? deliveryStatusFallback; // VAS163 2026-11-11: text-only label (3-arg GetMsg, no tip appended)
 
             return result;
         }
@@ -722,7 +748,8 @@ namespace VAS.Controllers
                         QtyOrdered = qtyOrdered,
                         QtyDelivered = qtyDelivered,
                         QtyPending = qtyPending,
-                        FreeStock = onHandBase,
+                        // VAS163 2026-11-11: Row 58 In stock never negative - 0 when the warehouse has no stock.
+                        FreeStock = Math.Max(0m, onHandBase),
                         QtyShort = isItem ? Math.Max(0m, qtyPending - Math.Max(0m, onHandBase) * uomRatio) : 0m,
                         Rate = rate,
                         Amount = lineAmt
@@ -925,14 +952,52 @@ namespace VAS.Controllers
             reader.Dispose();
         }
 
+        /// <summary>
+        /// VAS163 2026-11-10: base currency of the login client's primary accounting schema
+        /// (AD_ClientInfo.C_AcctSchema1_ID -> C_AcctSchema.C_Currency_ID, same lookup as
+        /// VAS_205) so the widget labels its amounts with it instead of a hard-coded rupee.
+        /// Left empty (client shows no symbol) when it cannot be resolved.
+        /// </summary>
+        private static void FillBaseCurrency(Ctx ctx, CurrencyPayload target)
+        {
+            if (ctx == null || target == null) { return; }
+            try
+            {
+                DataSet ds = DB.ExecuteDataset(@"
+                    SELECT c.ISO_Code AS Currency_Code, c.CurSymbol AS Currency_Symbol, c.StdPrecision AS Currency_Precision
+                      FROM AD_ClientInfo ci
+                     INNER JOIN C_AcctSchema cs ON ( cs.C_AcctSchema_ID = ci.C_AcctSchema1_ID )
+                     INNER JOIN C_Currency c ON ( c.C_Currency_ID = cs.C_Currency_ID )
+                     WHERE ci.AD_Client_ID = @AD_Client_ID",
+                    new[] { new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()) }, null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) { return; }
+                DataRow r = ds.Tables[0].Rows[0];
+                target.CurrencyIso = (Util.GetValueOfString(r["Currency_Code"]) ?? string.Empty).Trim();
+                target.CurrencySymbol = (Util.GetValueOfString(r["Currency_Symbol"]) ?? string.Empty).Trim();
+                if (r["Currency_Precision"] != DBNull.Value) { target.CurrencyPrecision = Util.GetValueOfInt(r["Currency_Precision"]); }
+            }
+            catch (Exception ex)
+            {
+                Log.Log(Level.WARNING, "FillBaseCurrency", ex);
+            }
+        }
+
+        /// <summary>VAS163 2026-11-10: base (accounting-schema) currency carried by the widget's first payload.</summary>
+        private class CurrencyPayload
+        {
+            public string CurrencyIso { get; set; } = string.Empty;
+            public string CurrencySymbol { get; set; } = string.Empty;
+            public int? CurrencyPrecision { get; set; }
+        }
+
         private JsonResult ErrorResult(Ctx ctx)
         {
-            string message = Msg.GetMsg(ctx, "Error") ?? "Error";
+            string message = Msg.GetMsg(ctx, "Error", true) ?? "Error"; // VAS163 2026-11-11: text-only label (3-arg GetMsg, no tip appended)
             string json = JsonConvert.SerializeObject(new { Error = message });
             return Json(json, JsonRequestBehavior.AllowGet);
         }
 
-        private class SummaryResult
+        private class SummaryResult : CurrencyPayload
         {
             public int CompletedCount { get; set; }
             public int DeliveredOrderCount { get; set; }
@@ -957,6 +1022,10 @@ namespace VAS.Controllers
             public string WarehouseName { get; set; }
             public string RepresentativeName { get; set; }
             public decimal OrderValue { get; set; }
+            // VAS163 2026-11-11: Row 16 document (price list) currency of OrderValue.
+            public string CurrencyIso { get; set; }
+            public string CurrencySymbol { get; set; }
+            public int CurrencyPrecision { get; set; }
             public string DeliveryStatus { get; set; }
             public string DocumentStatus { get; set; }
         }
@@ -977,6 +1046,7 @@ namespace VAS.Controllers
             public string DocumentStatus { get; set; }
             public string DocumentStatusCode { get; set; }
             public decimal OrderValue { get; set; }
+            public string CurrencyIso { get; set; } // VAS163 2026-11-12
             public string CurrencySymbol { get; set; }
             public int CurrencyPrecision { get; set; }
             public string WarehouseName { get; set; }

@@ -91,6 +91,21 @@
                 "";
         }
 
+        /* KPI amount in the browser culture: magnitude as before (direction is in the status line), currency ISO + precision from the response; the sign keeps the VAS-gljnd-prefix span. Null -> old composition. */
+        function formatAmountHtmlByBrowser(value, data) {
+            var iso = data.currencyISO || data.ISOCode;
+            var precision = (data.stdPrecision !== undefined && data.stdPrecision !== null) ? data.stdPrecision : data.StdPrecision;
+            if (iso && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(Math.abs(Number(value || 0)), iso, precision, {
+                        symbol: getCurrencyText(data),
+                        symbolWrap: function (sign) { return '<span class="VAS-gljnd-prefix">' + esc(sign) + '</span>'; }
+                    });
+                } catch (e) { if (window.console) { console.log(e); } }
+            }
+            return null;
+        }
+
         function formatCurrencyAmount(value, currencySymbol, currencyISO) {
             var numericValue = Math.abs(Number(value || 0));
             var stdPrecision = 2;
@@ -227,14 +242,20 @@
 
             var currencyText = getCurrencyText(data);
 
-            $kpiValue.html(
-                (
-                    currencyText
-                        ? '<span class="VAS-gljnd-prefix">' + esc(currencyText) + '</span>'
-                        : ''
-                ) +
-                '<span>' + esc(amountText) + '</span>'
-            );
+            var browserHtml = formatAmountHtmlByBrowser(netDiff, data);
+
+            if (browserHtml !== null) {
+                $kpiValue.html(browserHtml);
+            } else {
+                $kpiValue.html(
+                    (
+                        currencyText
+                            ? '<span class="VAS-gljnd-prefix">' + esc(currencyText) + '</span>'
+                            : ''
+                    ) +
+                    '<span>' + esc(amountText) + '</span>'
+                );
+            }
 
             $valueWrap.removeClass('VAS-gljnd-balanced VAS-gljnd-unbalanced');
             $statusText.removeClass('VAS-gljnd-status-ok VAS-gljnd-status-warn');

@@ -19,7 +19,9 @@
  * VAS_305_FullyReceived, VAS_305_Late, VAS_305_DueToday, VAS_305_DueIn, VAS_305_OnTime, VAS_305_NotOrdered,
  * VAS_305_PartOrdered, VAS_305_OrderedState, VAS_305_ReceivedState, VAS_305_DaysAgo, VAS_305_InDays,
  * VAS_305_Today, VAS_305_NoVendor, VAS_305_Loading, VAS_305_LoadError, VAS_305_NoRecord, VAS_305_NothingHere,
- * VAS_305_Showing, VAS_305_Of, VAS_305_Requester, VAS_305_Value, VAS_305_PrevPage, VAS_305_NextPage
+ * VAS_305_Showing, VAS_305_Of, VAS_305_Requester, VAS_305_Value, VAS_305_PrevPage, VAS_305_NextPage,
+ * VAS163 2026-11-13: VAS_305_Days, VAS_305_Attribute, VAS_305_UOM, VAS_305_NoLines, VAS_305_DocPO, VAS_305_DocBPO,
+ * VAS_305_DocMT, VAS_305_DocIU, VAS_305_DocRFQ
  */
 ; VAS = window.VAS || {};
 
@@ -70,6 +72,19 @@
         return Number(value || 0).toLocaleString(locale(), { minimumFractionDigits: 0, maximumFractionDigits: p });
     };
 
+    /**
+     * VAS163 2026-11-17: Sr 11 / Sr 14 - amount in the given currency (ISO + precision from the server) in the browser
+     * culture through VAS.formatAmountByBrowser; compact for the large hero / total figures.
+     */
+    U.docMoney = function (value, cur, compact) {
+        var v = Number(value || 0);
+        var p = (cur && cur.Precision != null) ? Number(cur.Precision) : 2;
+        if (typeof VAS.formatAmountByBrowser === 'function') {
+            return VAS.formatAmountByBrowser(v, cur ? cur.Iso : '', p, { compact: !!compact && Math.abs(v) >= 1e5, symbol: cur ? cur.Symbol : '' });
+        }
+        return compact ? U.money(v, cur) : ((cur && cur.Symbol ? cur.Symbol + ' ' : '') + U.amount(v, cur));
+    };
+
     U.num = function (value) {
         return Number(value || 0).toLocaleString(locale(), { maximumFractionDigits: 3 });
     };
@@ -115,9 +130,10 @@
     U.needChip = function (iso) {
         var d = U.daysFromToday(iso);
         if (d == null) { return ''; }
-        if (d < 0) { return U.chip('r', U.lbl('VAS_305_Late', 'Late') + ' ' + (-d) + 'd'); }
+        // VAS163 2026-11-13: row 1127 - full day text ('Late 63 days', 'Due in 1 day') instead of '63d'
+        if (d < 0) { return U.chip('r', U.lbl('VAS_305_Late', 'Late') + ' ' + (-d) + ' ' + U.unit(-d, 'VAS_305_Days', 'days')); }
         if (d === 0) { return U.chip('a', U.lbl('VAS_305_DueToday', 'Due today')); }
-        if (d <= 2) { return U.chip('a', U.lbl('VAS_305_DueIn', 'Due in') + ' ' + d + 'd'); }
+        if (d <= 2) { return U.chip('a', U.lbl('VAS_305_DueIn', 'Due in') + ' ' + d + ' ' + U.unit(d, 'VAS_305_Days', 'days')); }
         return U.chip('b', U.lbl('VAS_305_OnTime', 'On time'));
     };
 
@@ -310,10 +326,33 @@
             });
             return;
         }
-        if (VAS.ZoomUtil) {
-            VAS.ZoomUtil.zoomToRecord("M_Requisition_ID", requisitionId, U._reqWindowId || 0, "VAS_Requisition", "Requisition")
-                .done(function (id) { if (id > 0) { U._reqWindowId = id; } });
+        // VAS163 2026-11-17: Sr 15 - VAS.ZoomUtil.zoomToRecord opens the window with a plain zoom query and no action
+        // params, so the Requisition tab (AD_Tab 1000784) opens in its default layout TabLayout 'C' (card). Its bottom
+        // panel VAS_240 (AD_TabPanel 1000464, alignment B) is defined for ViewType 'Y' (single record) only, so it was
+        // not shown. The window is now opened the way the framework's own record links do (startWindow with action
+        // params), in the single-record layout - the same TabWhereClause / TabLayout 'Y' the in-window path uses.
+        var params = {
+            "TabWhereClause": "M_Requisition.M_Requisition_ID=" + Number(requisitionId),
+            "TabLayout": "Y",
+            "TabIndex": "0"
+        };
+        var zoom = function () {
+            if (VAS.ZoomUtil) {
+                VAS.ZoomUtil.zoomToRecord("M_Requisition_ID", requisitionId, U._reqWindowId || 0, "VAS_Requisition", "Requisition")
+                    .done(function (id) { if (id > 0) { U._reqWindowId = id; } });
+            }
+        };
+        var start = function (windowId) {
+            if (!(windowId > 0) || !window.VIS || !VIS.viewManager || typeof VIS.viewManager.startWindow !== 'function') { zoom(); return; }
+            U._reqWindowId = windowId;
+            try { VIS.viewManager.startWindow(windowId, null, params); } catch (e) { zoom(); }
+        };
+        if (U._reqWindowId > 0) { start(U._reqWindowId); return; }
+        if (VAS.ZoomUtil && typeof VAS.ZoomUtil.getWindowId === 'function') {
+            VAS.ZoomUtil.getWindowId("VAS_Requisition", "Requisition").done(start).fail(zoom);
+            return;
         }
+        zoom();
     };
 
     /* ---------- popup engine (Onfinity panel) ---------- */
@@ -331,7 +370,8 @@
             '<div class="vas-rqw-pb"></div><div class="vas-rqw-pf"></div></div></div>');
         $('body').append($ov);
         $ov.on('click', function (e) {
-            if (e.target === $ov[0]) { U.closeModal(); return; }
+            // VAS163 2026-11-13: row 1121 - a click on the dark backdrop no longer closes the popup (close icon / Close button only)
+            if (e.target === $ov[0]) { return; }
             var act = $(e.target).closest('[data-act]').attr('data-act');
             if (act === 'close') { U.closeModal(); }
             else if (act === 'back') { current = stack.pop(); paint(); }
@@ -373,29 +413,71 @@
     }
     U.table = table;
 
+    /** VAS163 2026-11-17: Sr 29 - rows per page of the requisition list popup. */
+    var LIST_PAGE = 12;
+
+    /** VAS163 2026-11-17: Sr 27 - currency of one list row (price-list currency of the requisition), else the list currency. */
+    function rowCurrency(r, cur) {
+        if (r && r.currencyIso) {
+            return { Iso: r.currencyIso, Symbol: r.currencySymbol || '', Precision: r.currencyPrecision != null && r.currencyPrecision >= 0 ? r.currencyPrecision : 2 };
+        }
+        return cur || null;
+    }
+
     /** Popup list of requisitions (KPI, donut slice, ...); a row opens the requisition. */
     U.showList = function (widget, title, subtitle, records, cur) {
         records = records || [];
-        var rows = records.map(function (r) {
+        var page = 0;
+        var pages = Math.max(1, Math.ceil(records.length / LIST_PAGE));
+        // VAS163 2026-11-17: Sr 27 / Sr 33 / Sr 34 - value in the requisition's price-list currency (full amount, wrapped
+        // when long, VAS.formatAmountByBrowser), Need by with the year (browser culture), Requested by = requester name.
+        var rowHtml = function (r) {
+            var hasDoc = r.docAmount != null && !!r.currencyIso;
+            var val = U.docMoney(hasDoc ? r.docAmount : r.amount, hasDoc ? rowCurrency(r, cur) : cur, false);
             return '<div class="vas-rqw-gr" data-r="' + r.requisitionId + '"><span class="b">' + U.esc(r.documentNo) + '</span>' +
-                '<span>' + U.esc(r.requester || '') + '</span><span class="m">' + U.esc(r.warehouse || '') + '</span>' +
-                '<span class="vas-rqw-r">' + U.date(r.needBy) + '</span><span class="vas-rqw-r">' + U.amount(r.amount, cur) + '</span>' +
+                '<span title="' + U.esc(r.requester || '') + '">' + U.esc(r.requester || '') + '</span><span class="m" title="' + U.esc(r.warehouse || '') + '">' + U.esc(r.warehouse || '') + '</span>' +
+                '<span class="vas-rqw-r">' + U.esc(U.dateLong(r.needBy)) + '</span><span class="vas-rqw-r vas-rqw-wrap" title="' + U.esc(val) + '">' + U.esc(val) + '</span>' +
                 '<span>' + (r.isLate ? U.needChip(r.needBy) : U.statusChip(r.status, r.statusName)) + '</span></div>';
-        });
-        var body = '<div class="vas-rqw-sh"><b>' + U.esc(title) + '</b><span>' + U.esc(subtitle || '') + '</span></div>' +
-            (rows.length ? table('minmax(0,1fr) minmax(0,1.3fr) minmax(0,1.3fr) 5em 6.5em 8em', [3, 4],
+        };
+        var listHtml = function () {
+            if (!records.length) { return '<div class="vas-rqw-msg">' + U.esc(U.lbl('VAS_305_NothingHere', 'Nothing here')) + '</div>'; }
+            var start = page * LIST_PAGE;
+            var slice = records.slice(start, start + LIST_PAGE);
+            // the Value heading carries no currency sign: each row shows its own currency (Sr 27)
+            var html = table('minmax(0,1fr) minmax(0,1.3fr) minmax(0,1.3fr) 6.6em minmax(7.5em,1.1fr) 8em', [3, 4],
                 [U.lbl('VAS_305_Requisition', 'Requisition'), U.lbl('VAS_305_Requester', 'Requested by'), U.lbl('VAS_305_Warehouse', 'Warehouse'),
-                U.lbl('VAS_305_NeedBy', 'Need by'), U.lbl('VAS_305_Value', 'Value') + (cur && cur.Symbol ? ' ' + cur.Symbol : ''), U.lbl('VAS_305_Status', 'Status')], rows)
-                : '<div class="vas-rqw-msg">' + U.esc(U.lbl('VAS_305_NothingHere', 'Nothing here')) + '</div>');
-        U.openModal({
+                U.lbl('VAS_305_NeedBy', 'Need by'), U.lbl('VAS_305_Value', 'Value'), U.lbl('VAS_305_Status', 'Status')], slice.map(rowHtml));
+            if (pages > 1) {
+                // VAS163 2026-11-17: Sr 29 - 12 rows per page, pager under the table
+                html += '<div class="vas-rqw-lpg"><span class="vas-rqw-hp">' + U.esc(U.lbl('VAS_305_Showing', 'Showing') + ' ' + (start + 1) + '–' + (start + slice.length) + ' ' +
+                    U.lbl('VAS_305_Of', 'of') + ' ' + records.length) + '</span><span class="vas-rqw-pg">' +
+                    '<button type="button" data-lp="-1" aria-label="' + U.esc(U.lbl('VAS_305_PrevPage', 'Previous page')) + '"' + (page ? '' : ' disabled') + '>' + U.icon.prev + '</button>' +
+                    (page + 1) + ' ' + U.esc(U.lbl('VAS_305_Of', 'of')) + ' ' + pages +
+                    '<button type="button" data-lp="1" aria-label="' + U.esc(U.lbl('VAS_305_NextPage', 'Next page')) + '"' + (page < pages - 1 ? '' : ' disabled') + '>' + U.icon.next + '</button></span></div>';
+            }
+            return html;
+        };
+        var bodyHtml = function () {
+            return '<div class="vas-rqw-sh"><b>' + U.esc(title) + '</b><span>' + U.esc(subtitle || '') + '</span></div>' +
+                '<div class="vas-rqw-lst">' + listHtml() + '</div>';
+        };
+        var view = {
             title: title,
-            body: body,
+            body: bodyHtml(),
             after: function ($m) {
-                $m.find('.vas-rqw-pb').off('click.rqwl').on('click.rqwl', '.vas-rqw-gr[data-r]', function () {
+                var $pb = $m.find('.vas-rqw-pb');
+                $pb.off('click.rqwl').on('click.rqwl', '.vas-rqw-gr[data-r]', function () {
                     U.showRequisition(widget, Number($(this).attr('data-r')));
                 });
+                $pb.off('click.rqwp').on('click.rqwp', '[data-lp]', function () {
+                    page = Math.max(0, Math.min(pages - 1, page + Number($(this).attr('data-lp'))));
+                    $pb.find('.vas-rqw-lst').html(listHtml());
+                    view.body = bodyHtml(); // Back from a requisition returns to this page
+                    $pb.scrollTop(0);
+                });
             }
-        });
+        };
+        U.openModal(view);
     };
 
     /** Popup of one requisition: header, detail card, lines with their PO / GRN / transfer documents. */
@@ -424,46 +506,94 @@
         var tone = h.isLate || h.docStatus === 'VO' ? 'risk' : (h.statusCode === 'DE' ? 'ok' : (h.statusCode === 'PO' || h.statusCode === 'PD' || h.statusCode === 'OR') ? 'warn' : '');
         var pillTxt = (h.docStatus === 'CO' ? h.statusName : h.docStatusName) + (h.isLate ? ' · ' + U.lbl('VAS_305_Late', 'Late') : '');
         var ed = U.daysFromToday(h.earliestNeedBy);
-        var edTxt = ed == null ? '' : ed < 0 ? (-ed) + ' ' + U.lbl('VAS_305_DaysAgo', 'days ago') : ed === 0 ? U.lbl('VAS_305_Today', 'Today') : U.lbl('VAS_305_InDays', 'In') + ' ' + ed + 'd';
+        // VAS163 2026-11-13: row 1127 - 'In 5 days' instead of 'In 5d'
+        var edTxt = ed == null ? '' : ed < 0 ? (-ed) + ' ' + U.lbl('VAS_305_DaysAgo', 'days ago') : ed === 0 ? U.lbl('VAS_305_Today', 'Today') : U.lbl('VAS_305_InDays', 'In') + ' ' + ed + ' ' + U.unit(ed, 'VAS_305_Days', 'days');
         var mc = function (l, v, cls, meta) {
             return '<div class="vas-rqw-mc"><div class="ml">' + U.esc(l) + '</div><div class="mv ' + (cls || '') + '" title="' + U.esc(v) + '">' + U.esc(v || '—') + '</div>' +
                 (meta ? '<div class="mm">' + U.esc(meta) + '</div>' : '') + '</div>';
         };
-        var rows = lines.map(function (l) {
-            var docs = (l.documents || []).map(function (x) {
-                var done = x.type === 'PO' ? (x.receivedQty >= x.qty) : (x.docStatus === 'CO' || x.docStatus === 'CL');
-                return U.chip(done ? 'g' : 'n', (x.type === 'PO' ? 'PO ' : 'MT ') + x.documentNo);
-            }).join(' ');
-            return '<div class="vas-rqw-gr"><span class="b" title="' + U.esc(l.product) + '">' + U.esc(l.product) + '</span>' +
-                '<span class="m" title="' + U.esc(l.category) + '">' + U.esc(l.category) + '</span>' +
-                '<span class="vas-rqw-r">' + U.num(l.qty) + ' ' + U.esc(l.uom || '') + '</span>' +
-                '<span class="vas-rqw-r">' + U.date(l.needBy) + '</span>' +
-                '<span class="vas-rqw-r">' + U.amount(l.amount, cur) + '</span>' +
-                '<span class="vas-rqw-r">' + U.num(l.orderedQty) + ' / ' + U.num(l.receivedQty) + '</span>' +
-                '<span class="vas-rqw-docs" style="white-space:normal">' + (docs || '<span class="m">—</span>') + '</span>' +
-                '<span>' + (h.docStatus === 'CO' ? U.stateChip(l.isLate ? 'late' : (l.state === 'ordered' && l.receivedQty > 0 ? 'partreceived' : l.state), l.needBy) : U.statusChip(h.docStatus === 'VO' || h.docStatus === 'RE' || h.docStatus === 'CL' ? 'CL' : 'DR', h.docStatusName)) + '</span></div>';
+        // VAS163 2026-11-13: row 1142 - document types raised from a requisition line (PO, blanket PO, material
+        // transfer, inventory use, RFQ); the chip keeps the short code, its hover title the full type name.
+        var DOC_TYPES = {
+            PO: function () { return U.lbl('VAS_305_DocPO', 'Purchase order'); },
+            BPO: function () { return U.lbl('VAS_305_DocBPO', 'Blanket purchase order'); },
+            MT: function () { return U.lbl('VAS_305_DocMT', 'Material transfer'); },
+            IU: function () { return U.lbl('VAS_305_DocIU', 'Inventory use'); },
+            RFQ: function () { return U.lbl('VAS_305_DocRFQ', 'RFQ'); }
+        };
+        var docOf = function (x) {
+            var done = x.type === 'PO' ? (x.receivedQty >= x.qty) : (x.docStatus === 'CO' || x.docStatus === 'CL');
+            var full = (DOC_TYPES[x.type] ? DOC_TYPES[x.type]() : x.type) + ' ' + x.documentNo;
+            return { html: '<span class="vas-rqw-chip ' + (done ? 'g' : 'n') + '" title="' + U.esc(full) + '">' + U.esc((x.type || '') + ' ' + x.documentNo) + '</span>', text: full };
+        };
+        var textOf = function (html) { return $('<div>').html(html).text(); };
+        var cell = function (cls, html, title) {
+            return '<span' + (cls ? ' class="' + cls + '"' : '') + ' title="' + U.esc(title == null ? textOf(html) : title) + '">' + html + '</span>';
+        };
+        // VAS163 2026-11-13: row 1134 - 'Ord. / Rcvd.' and 'Documents' only when at least one line has a value
+        var showOrd = lines.some(function (l) { return Number(l.orderedQty || 0) !== 0 || Number(l.receivedQty || 0) !== 0; });
+        var showDocs = lines.some(function (l) { return (l.documents || []).length > 0; });
+        // VAS163 2026-11-13: rows 1129 / 1130 / 1131 - separate UOM column (qty without unit), Attribute instead of
+        // Category (blank when the line has no attribute set instance), and a hover title on every value cell.
+        var cols = [
+            { w: 'minmax(0,1.7fr)', head: U.lbl('VAS_305_Product', 'Product'), cell: function (l) { return cell('b', U.esc(l.product), l.product); } },
+            { w: 'minmax(0,1fr)', head: U.lbl('VAS_305_Attribute', 'Attribute'), cell: function (l) { return cell('m', U.esc(l.attribute || ''), l.attribute || ''); } },
+            // VAS163 2026-11-17: Sr 7 - qty and Ord. / Rcvd. come from the server in the line's UOM (QtyEntered)
+            { w: '4.4em', right: true, head: U.lbl('VAS_305_Qty', 'Qty'), cell: function (l) { return cell('vas-rqw-r', U.esc(U.num(l.qty))); } },
+            { w: 'minmax(3.5em,0.6fr)', head: U.lbl('VAS_305_UOM', 'UOM'), cell: function (l) { return cell('m', U.esc(l.uom || ''), l.uom || ''); } },
+            { w: '4.6em', right: true, head: U.lbl('VAS_305_NeedBy', 'Need by'), cell: function (l) { return cell('vas-rqw-r', U.esc(U.date(l.needBy)), U.dateLong(l.needBy)); } },
+            // VAS163 2026-11-17: Sr 11 - line amount in the price-list currency of the requisition (server ISO + precision)
+            { w: '7.2em', right: true, head: U.lbl('VAS_305_Amount', 'Amount'), cell: function (l) { return cell('vas-rqw-r', U.esc(U.docMoney(l.amount, cur))); } }
+        ];
+        if (showOrd) {
+            cols.push({ w: '6em', right: true, head: U.lbl('VAS_305_OrderedReceived', 'Ord. / Rcvd.'), cell: function (l) { return cell('vas-rqw-r', U.esc(U.num(l.orderedQty) + ' / ' + U.num(l.receivedQty))); } });
+        }
+        if (showDocs) {
+            cols.push({
+                w: 'minmax(0,1.4fr)', head: U.lbl('VAS_305_Documents', 'Documents'), cell: function (l) {
+                    var ds = (l.documents || []).map(docOf);
+                    return '<span class="vas-rqw-docs" style="white-space:normal" title="' + U.esc(ds.map(function (x) { return x.text; }).join(', ')) + '">' +
+                        (ds.length ? ds.map(function (x) { return x.html; }).join(' ') : '<span class="m">—</span>') + '</span>';
+                }
+            });
+        }
+        cols.push({
+            w: '7.6em', head: U.lbl('VAS_305_Status', 'Status'), cell: function (l) {
+                return cell('', h.docStatus === 'CO' ? U.stateChip(l.isLate ? 'late' : (l.state === 'ordered' && l.receivedQty > 0 ? 'partreceived' : l.state), l.needBy) : U.statusChip(h.docStatus === 'VO' || h.docStatus === 'RE' || h.docStatus === 'CL' ? 'CL' : 'DR', h.docStatusName));
+            }
         });
+        var rows = lines.map(function (l) {
+            return '<div class="vas-rqw-gr">' + cols.map(function (c) { return c.cell(l); }).join('') + '</div>';
+        });
+        var right = [];
+        cols.forEach(function (c, i) { if (c.right) { right.push(i); } });
+        // VAS163 2026-11-17: Sr 22 - a requisition without lines shows only its header and detail card: the whole
+        // lines section (title, table / empty message and the totals under it) is left out.
+        var linesHtml = !lines.length ? '' :
+            '<div class="vas-rqw-sh"><b>' + U.esc(U.lbl('VAS_305_Lines', 'Lines')) + '</b><span>' + U.esc(lines.length + ' ' + U.unit(lines.length, 'VAS_305_LinesCount', 'lines')) + '</span></div>' +
+            table(cols.map(function (c) { return c.w; }).join(' '), right, cols.map(function (c) { return c.head; }), rows) +
+            // VAS163 2026-11-17: Sr 14 / Sr 11 - exact totals in the price-list currency
+            '<div class="vas-rqw-tot"><span>' + U.esc(U.lbl('VAS_305_Total', 'Total')) + ' <b>' + U.esc(U.docMoney(h.totalAmount, cur)) + '</b></span>' +
+            '<span>' + U.esc(U.lbl('VAS_305_StillOpen', 'Still to come')) + ' <b>' + U.esc(U.docMoney(h.openAmount, cur)) + '</b></span></div>';
         var body =
             '<div class="vas-rqw-hero ' + tone + '"><div class="top"><div><div class="t">' + U.esc(h.documentNo) + '</div>' +
-            '<div class="s">' + U.esc(U.lbl('VAS_305_RaisedBy', 'Raised') + ' ' + U.dateLong(h.dateDoc) + ' · ' + (h.requester || '')) + '</div></div>' +
+            // VAS163 2026-11-13: row 1122 - 'Raised' is the creation date of the requisition (Created), not the document date
+            '<div class="s">' + U.esc(U.lbl('VAS_305_RaisedBy', 'Raised') + ' ' + U.dateLong(h.created || h.dateDoc) + ' · ' + (h.requester || '')) + '</div></div>' +
             '<span class="pl">' + U.esc(pillTxt) + '</span></div>' +
-            '<div class="v">' + U.esc(U.money(h.totalAmount, cur)) + '<small>' + U.esc(h.lineCount + ' ' + U.unit(h.lineCount, 'VAS_305_LinesCount', 'lines') + ' · ' +
+            '<div class="v">' + U.esc(U.docMoney(h.totalAmount, cur, true)) + '<small>' + U.esc(h.lineCount + ' ' + U.unit(h.lineCount, 'VAS_305_LinesCount', 'lines') + ' · ' +
                 h.receivedLines + ' ' + U.lbl('VAS_305_FullyReceived', 'fully received')) + '</small></div></div>' +
+            // VAS163 2026-11-17: Sr 25 - three fields per line: Requested by, Priority, Requisition date /
+            // Warehouse, Source warehouse, Date required (3-column grid, see .vas-rqw-dcard)
             '<div class="vas-rqw-dcard">' +
             mc(U.lbl('VAS_305_RequestedBy', 'Requested by'), h.requester) +
             mc(U.lbl('VAS_305_Priority', 'Priority'), h.priority) +
+            mc(U.lbl('VAS_305_RequisitionDate', 'Requisition date'), U.dateLong(h.dateDoc)) +
             mc(U.lbl('VAS_305_Warehouse', 'Warehouse'), h.warehouse) +
             mc(U.lbl('VAS_305_SourceWarehouse', 'Source warehouse'), h.sourceWarehouse) +
-            mc(U.lbl('VAS_305_RequisitionDate', 'Requisition date'), U.dateLong(h.dateDoc)) +
+            // VAS163 2026-11-17: Sr 5 - the server now sends the header Date Required here (current after an edit)
             mc(U.lbl('VAS_305_EarliestNeedBy', 'Earliest need-by'), U.dateLong(h.earliestNeedBy), h.isLate ? 'risk' : '', edTxt) +
             '</div>' +
-            '<div class="vas-rqw-sh"><b>' + U.esc(U.lbl('VAS_305_Lines', 'Lines')) + '</b><span>' + U.esc(lines.length + ' ' + U.unit(lines.length, 'VAS_305_LinesCount', 'lines')) + '</span></div>' +
-            table('minmax(0,1.7fr) minmax(0,1fr) 5.2em 4.4em 5.6em 6em minmax(0,1.4fr) 6.4em', [2, 3, 4, 5],
-                [U.lbl('VAS_305_Product', 'Product'), U.lbl('VAS_305_Category', 'Category'), U.lbl('VAS_305_Qty', 'Qty'), U.lbl('VAS_305_NeedBy', 'Need by'),
-                U.lbl('VAS_305_Amount', 'Amount') + (cur && cur.Symbol ? ' ' + cur.Symbol : ''), U.lbl('VAS_305_OrderedReceived', 'Ord. / Rcvd.'),
-                U.lbl('VAS_305_Documents', 'Documents'), U.lbl('VAS_305_Status', 'Status')], rows) +
-            '<div class="vas-rqw-tot"><span>' + U.esc(U.lbl('VAS_305_Total', 'Total')) + ' <b>' + U.esc(U.money(h.totalAmount, cur)) + '</b></span>' +
-            '<span>' + U.esc(U.lbl('VAS_305_StillOpen', 'Still to come')) + ' <b>' + U.esc(U.money(h.openAmount, cur)) + '</b></span></div>';
+            linesHtml;
         return {
             title: U.lbl('VAS_305_Requisition', 'Requisition') + ' ' + (h.documentNo || ''),
             body: body,
@@ -508,11 +638,14 @@
                 $card.find('.vas-rqw-busy').addClass('on');
                 U.get(cfg.url).done(function (d) {
                     data = d;
+                    // VAS163 2026-11-17: Sr 33 - full amount (no L / Cr compact form) in the browser culture; it wraps
+                    // onto the next line when it does not fit (.vas-rqw-kv b.amt) instead of being cut off
+                    var amt = U.docMoney(d.amount, d.currency, false);
                     $card.find('.vas-rqw-kv').html('<b>' + U.esc(U.num(d.count)) + '</b><small>' + U.esc(cfg.unit(d)) + '</small>' +
-                        '<span class="sep"></span><b>' + U.esc(U.money(d.amount, d.currency)) + '</b>');
+                        '<span class="sep"></span><b class="amt" title="' + U.esc(amt) + '">' + U.esc(amt) + '</b>');
                     var meta = cfg.meta(d);
                     $card.find('.vas-rqw-km').text(meta).attr('title', meta);
-                    $card.attr('aria-label', T(cfg.title) + ': ' + d.count + ' ' + cfg.unit(d) + ', ' + U.money(d.amount, d.currency));
+                    $card.attr('aria-label', T(cfg.title) + ': ' + d.count + ' ' + cfg.unit(d) + ', ' + amt);
                 }).fail(function (err) {
                     data = null;
                     $card.find('.vas-rqw-kv').html('<b>–</b>');
@@ -558,3 +691,78 @@
     };
 
 })(VAS, jQuery);
+/* VAS163 2026-11-17: Sr 11 / Sr 14 - copied from VAS_217 (VAS163 2026-11-12): VAS.formatAmountByBrowser(value, isoCode, precision, { compact, symbol })
+   Amount in the BROWSER culture (window.navigator.language) with the currency the SERVER sent
+   (ISO code + precision; the server symbol only as a fallback). Defined in each widget / panel
+   that uses it - guarded, so the first file loaded defines it - so the shared util/CurrencyFormat.js
+   stays as shipped. Compact amounts keep that file's default scale (VIS.Util.formatCompactAmount:
+   L / Cr for Indian-numbering currencies, K / M / B otherwise, digits in the browser culture);
+   separators, decimals and the position of the currency sign come from the browser culture. */
+; (function () {
+    var V = window.VAS = window.VAS || {};
+    if (typeof V.formatAmountByBrowser === 'function') return;
+    function browserLocale() { try { return window.navigator.language || undefined; } catch (e) { return undefined; } }
+    function resolvePrecision(p) {
+        var n = Number(p);
+        if (p === null || p === undefined || p === '' || isNaN(n) || n < 0) {
+            try { n = VIS.Env.getCtx().getStdPrecision(); } catch (e) { n = 2; }
+        }
+        n = Math.round(Number(n));
+        return (isNaN(n) || n < 0) ? 2 : Math.min(n, 10);
+    }
+    function validIso(c) { c = String(c || '').trim().toUpperCase(); return /^[A-Z]{3}$/.test(c) ? c : ''; }
+    function numberFormat(o) {
+        try { return new Intl.NumberFormat(browserLocale(), o); } catch (e) { }
+        if (o.currencyDisplay === 'narrowSymbol') {
+            o.currencyDisplay = 'symbol';
+            try { return new Intl.NumberFormat(browserLocale(), o); } catch (e2) { }
+        }
+        return null;
+    }
+    /* Currency sign and where the browser culture puts it for this ISO code. */
+    var layoutCache = {};
+    function currencyLayout(iso) {
+        var key = browserLocale() + '|' + iso;
+        if (layoutCache[key]) return layoutCache[key];
+        var out = { sign: '', before: true, gap: '' };
+        var f = iso ? numberFormat({ style: 'currency', currency: iso, currencyDisplay: 'narrowSymbol' }) : null;
+        if (f && typeof f.formatToParts === 'function') {
+            try {
+                var parts = f.formatToParts(1234.5), ci = -1, ni = -1;
+                for (var i = 0; i < parts.length; i++) {
+                    if (parts[i].type === 'currency' && ci < 0) ci = i;
+                    if (parts[i].type === 'integer' && ni < 0) ni = i;
+                }
+                if (ci >= 0) {
+                    out.sign = parts[ci].value;
+                    if (ni >= 0) {
+                        out.before = ci < ni;
+                        var near = out.before ? parts[ci + 1] : parts[ci - 1];
+                        out.gap = (near && near.type === 'literal') ? near.value : '';
+                    }
+                }
+            } catch (e) { }
+        }
+        layoutCache[key] = out;
+        return out;
+    }
+    V.formatAmountByBrowser = function (value, isoCode, precision, options) {
+        options = options || {};
+        var num = Number(value) || 0;
+        var p = resolvePrecision(precision);
+        var iso = validIso(isoCode);
+        var body;
+        if (options.compact && window.VIS && VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
+            body = VIS.Util.formatCompactAmount(Math.abs(num), iso, p);
+        } else {
+            var f = numberFormat({ minimumFractionDigits: p, maximumFractionDigits: p });
+            try { body = f ? f.format(Math.abs(num)) : Math.abs(num).toFixed(p); } catch (e) { body = String(Math.abs(num)); }
+        }
+        var minus = (num < 0 && /[1-9]/.test(body)) ? '-' : '';
+        var lay = currencyLayout(iso);
+        var sign = lay.sign || options.symbol || iso;
+        if (!sign) return minus + body;
+        if (!lay.sign) return minus + sign + ' ' + body;
+        return lay.before ? (minus + sign + lay.gap + body) : (minus + body + lay.gap + sign);
+    };
+})();

@@ -60,48 +60,11 @@
          * @param {Object} currencyInfo - Currency meta object { iso: string, symbol: string }
          * @returns {string} Formatted string
          */
+        // VAS163 2026-11-12: no own Indian/international tiers, toFixed or fixed grouping -
+        // currency (iso/precision/symbol) from the server, culture from the browser (shared helper).
         function formatCurrency(val, currencyInfo) {
-            var iso = (currencyInfo && currencyInfo.iso) ? String(currencyInfo.iso).toUpperCase() : '';
-            var symbol = (currencyInfo && currencyInfo.symbol) ? String(currencyInfo.symbol) : '';
-            var num = Number(val);
-            if (val === null || val === undefined || isNaN(num)) {
-                num = 0;
-            }
-            var absNum = Math.abs(num);
-            var isNegative = num < 0;
-            var formattedStr = '';
-
-            var isIndian = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'].indexOf(iso) !== -1;
-
-            if (isIndian) {
-                if (absNum >= 10000000) {
-                    formattedStr = (absNum / 10000000).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1') + ' Cr';
-                } else if (absNum >= 100000) {
-                    formattedStr = (absNum / 100000).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1') + ' Lakh';
-                } else {
-                    var parts = absNum.toFixed(2).split('.');
-                    var intPart = parts[0];
-                    var decPart = parts[1] === '00' ? '' : '.' + parts[1];
-                    var lastThree = intPart.substring(intPart.length - 3);
-                    var otherNumbers = intPart.substring(0, intPart.length - 3);
-                    if (otherNumbers !== '') {
-                        lastThree = ',' + lastThree;
-                    }
-                    formattedStr = otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + lastThree + decPart;
-                }
-            } else {
-                if (absNum >= 1000000000) {
-                    formattedStr = (absNum / 1000000000).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1') + 'B';
-                } else if (absNum >= 1000000) {
-                    formattedStr = (absNum / 1000000).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1') + 'M';
-                } else {
-                    var parts = absNum.toFixed(2).split('.');
-                    var decPart = parts[1] === '00' ? '' : '.' + parts[1];
-                    formattedStr = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",") + decPart;
-                }
-            }
-
-            return (isNegative ? '-' : '') + (symbol ? symbol + ' ' : '') + formattedStr;
+            var c = currencyInfo || {};
+            return VAS.formatAmountByBrowser(val, c.iso || '', c.precision, { compact: true, symbol: c.symbol || '' });
         }
 // ===== NEW CODE END — currency format =====
 
@@ -111,12 +74,25 @@
 
         // Open the widget's configured window directly on a NEW record
         // through the widget framework's value-changed channel.
+        // VAS163 2026-11-12: resolved Inventory Move window id, kept for the next click (rules A.3).
+        var moveWindowId = 0;
+
         function openNewTransfer() {
-            var windowParam = {
-                "IsTabInNewMode": "true",
-                "TabIndex": "0"
-            };
-            $self.widgetFirevalueChanged(windowParam);
+            // VAS163 2026-11-12: hosted inside the Material Transfer window -> keep the
+            // existing new-record channel; otherwise open the Inventory Move window via
+            // VAS.ZoomUtil (Record_ID 0 = no record; silent no-op when unresolved).
+            if ($self.listener) {
+                var windowParam = {
+                    "IsTabInNewMode": "true",
+                    "TabIndex": "0"
+                };
+                $self.widgetFirevalueChanged(windowParam);
+                return;
+            }
+            if (VAS.ZoomUtil && VAS.ZoomUtil.zoomToRecord) {
+                VAS.ZoomUtil.zoomToRecord('M_Movement_ID', 0, moveWindowId, 'VAS_InventoryMove', 'Inventory Move')
+                    .then(function (id) { if (id > 0) { moveWindowId = id; } });
+            }
         }
 
         function createWidget() {
@@ -196,3 +172,78 @@
     };
 
 })(VAS, jQuery);
+/* VAS163 2026-11-12: VAS.formatAmountByBrowser(value, isoCode, precision, { compact, symbol })
+   Amount in the BROWSER culture (window.navigator.language) with the currency the SERVER sent
+   (ISO code + precision; the server symbol only as a fallback). Defined in each widget / panel
+   that uses it - guarded, so the first file loaded defines it - so the shared util/CurrencyFormat.js
+   stays as shipped. Compact amounts keep that file's default scale (VIS.Util.formatCompactAmount:
+   L / Cr for Indian-numbering currencies, K / M / B otherwise, digits in the browser culture);
+   separators, decimals and the position of the currency sign come from the browser culture. */
+; (function () {
+    var V = window.VAS = window.VAS || {};
+    if (typeof V.formatAmountByBrowser === 'function') return;
+    function browserLocale() { try { return window.navigator.language || undefined; } catch (e) { return undefined; } }
+    function resolvePrecision(p) {
+        var n = Number(p);
+        if (p === null || p === undefined || p === '' || isNaN(n) || n < 0) {
+            try { n = VIS.Env.getCtx().getStdPrecision(); } catch (e) { n = 2; }
+        }
+        n = Math.round(Number(n));
+        return (isNaN(n) || n < 0) ? 2 : Math.min(n, 10);
+    }
+    function validIso(c) { c = String(c || '').trim().toUpperCase(); return /^[A-Z]{3}$/.test(c) ? c : ''; }
+    function numberFormat(o) {
+        try { return new Intl.NumberFormat(browserLocale(), o); } catch (e) { }
+        if (o.currencyDisplay === 'narrowSymbol') {
+            o.currencyDisplay = 'symbol';
+            try { return new Intl.NumberFormat(browserLocale(), o); } catch (e2) { }
+        }
+        return null;
+    }
+    /* Currency sign and where the browser culture puts it for this ISO code. */
+    var layoutCache = {};
+    function currencyLayout(iso) {
+        var key = browserLocale() + '|' + iso;
+        if (layoutCache[key]) return layoutCache[key];
+        var out = { sign: '', before: true, gap: '' };
+        var f = iso ? numberFormat({ style: 'currency', currency: iso, currencyDisplay: 'narrowSymbol' }) : null;
+        if (f && typeof f.formatToParts === 'function') {
+            try {
+                var parts = f.formatToParts(1234.5), ci = -1, ni = -1;
+                for (var i = 0; i < parts.length; i++) {
+                    if (parts[i].type === 'currency' && ci < 0) ci = i;
+                    if (parts[i].type === 'integer' && ni < 0) ni = i;
+                }
+                if (ci >= 0) {
+                    out.sign = parts[ci].value;
+                    if (ni >= 0) {
+                        out.before = ci < ni;
+                        var near = out.before ? parts[ci + 1] : parts[ci - 1];
+                        out.gap = (near && near.type === 'literal') ? near.value : '';
+                    }
+                }
+            } catch (e) { }
+        }
+        layoutCache[key] = out;
+        return out;
+    }
+    V.formatAmountByBrowser = function (value, isoCode, precision, options) {
+        options = options || {};
+        var num = Number(value) || 0;
+        var p = resolvePrecision(precision);
+        var iso = validIso(isoCode);
+        var body;
+        if (options.compact && window.VIS && VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
+            body = VIS.Util.formatCompactAmount(Math.abs(num), iso, p);
+        } else {
+            var f = numberFormat({ minimumFractionDigits: p, maximumFractionDigits: p });
+            try { body = f ? f.format(Math.abs(num)) : Math.abs(num).toFixed(p); } catch (e) { body = String(Math.abs(num)); }
+        }
+        var minus = (num < 0 && /[1-9]/.test(body)) ? '-' : '';
+        var lay = currencyLayout(iso);
+        var sign = lay.sign || options.symbol || iso;
+        if (!sign) return minus + body;
+        if (!lay.sign) return minus + sign + ' ' + body;
+        return lay.before ? (minus + sign + lay.gap + body) : (minus + body + lay.gap + sign);
+    };
+})();

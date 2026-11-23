@@ -402,6 +402,9 @@ namespace VIS.Controllers
                             // Standard widget date format (dd MMM yyyy, e.g. 21 Aug 2026), as the other PO widgets show it
                             orderDate = orderDateN.HasValue
                                 ? orderDateN.Value.ToString("dd MMM yyyy", CultureInfo.InvariantCulture) : "",
+                            // VAS163 2026-11-10: browser locale (6-Nov retest2). The widget formats orderDateIso itself.
+                            orderDateIso = orderDateN.HasValue
+                                ? orderDateN.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                             docStatus = Util.GetValueOfString(row["document_status"]),
                             vendorName = Util.GetValueOfString(row["vendor_name"]),
                             warehouseName = Util.GetValueOfString(row["warehouse_name"]),

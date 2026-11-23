@@ -251,6 +251,9 @@
     background: #FBFDFF;
 }
 
+/* VAS163 2026-11-11: Rows 23/24 no separate footer bar when it holds nothing. */
+.vas271-mfoot:empty { display: none; }
+
 .vas271-foot-note { font-size: 13px; color: #5F7283; }
 
 .vas271-btn {
@@ -417,6 +420,10 @@
 
 .vas271-helper { font-size: .75em; color: #748494; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vas271-pager { display: flex; align-items: center; gap: 6px; flex: none; }
+/* VAS163 2026-11-11: Row 24 Back / Close on the lines table's pager row. */
+.vas271-mtfoot-right { display: flex; align-items: center; gap: .75em; flex: none; }
+.vas271-mtfoot-actions { display: flex; align-items: center; gap: .5em; flex: none; }
+.vas271-mtfoot-actions .vas271-btn { padding: .3em .875em; }
 
 .vas271-pbtn {
     width: 1.5em;

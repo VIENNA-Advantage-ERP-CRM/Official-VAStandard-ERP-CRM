@@ -213,17 +213,16 @@
             return 2;
         }
 
-        /* Compose the metric exactly like OverdueWidget: sign FIRST, then the
-           base-currency symbol, then the compact magnitude from the shared
-           VIS.Util.formatCompactAmount (Indian vs international numbering by iso,
-           kept to the currency precision). The symbol renders whenever it is
-           present — never gated behind a non-zero value, so 0 still shows it. */
+        /* Compose the metric like OverdueWidget: compact amount with the currency
+           sign in a styled span; the browser culture places the sign and the minus
+           (VAS.formatAmountByBrowser, 20-Nov-2026). */
         function formatMetric(value, symbol, isoCode, precision) {
             value = Number(value || 0);
-            var sign = value < 0 ? '-' : '';
-            var compact = VIS.Util.formatCompactAmount(value, isoCode, precision);
-            var sym = symbol ? '<span class="vas-oar-cur">' + escapeHtml(symbol) + '</span>' : '';
-            return sign + sym + compact;
+            return VAS.formatAmountByBrowser(value, isoCode, precision, {
+                compact: true,
+                symbol: symbol,
+                symbolWrap: function (s) { return '<span class="vas-oar-cur">' + escapeHtml(s) + '</span>'; }
+            });
         }
 
         function detailText(count) {
@@ -301,6 +300,17 @@
                    sign + symbol + locale-formatted number at the row's precision. */
                 var amtText = Math.abs(rawAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision });
                 var amtHtml = escapeHtml(amtSign) + (sym ? '<span class="vas-oar-cur-inline">' + escapeHtml(sym) + '</span>' : '') + escapeHtml(amtText);
+                var amtTitle = amtSign + (sym ? sym + ' ' : '') + amtText;
+                /* Browser culture places sign, minus and the styled symbol span (VAS.formatAmountByBrowser). */
+                if (iso && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                    try {
+                        amtHtml = VAS.formatAmountByBrowser(rawAmt, iso, stdPrecision, {
+                            symbol: row.curSymbol || "",
+                            symbolWrap: function (s) { return '<span class="vas-oar-cur-inline">' + escapeHtml(s) + '</span>'; }
+                        });
+                        amtTitle = VAS.formatAmountByBrowser(rawAmt, iso, stdPrecision, { symbol: row.curSymbol || "" });
+                    } catch (e) { if (window.console) { console.log(e); } }
+                }
 
                 var $tr = $(
                     '<tr>' +
@@ -315,7 +325,7 @@
                     '<span class="vas-oar-truncate">' + escapeHtml(bankText) + '</span>' +
                     '</td>' +
                     '<td class="vas-oar-td-currency" title="' + escapeHtml(iso) + '">' + escapeHtml(iso) + '</td>' +
-                    '<td class="vas-oar-td-amount" title="' + escapeHtml(amtSign + (sym ? sym + ' ' : '') + amtText) + '">' + amtHtml + '</td>' +
+                    '<td class="vas-oar-td-amount" title="' + escapeHtml(amtTitle) + '">' + amtHtml + '</td>' +
                     '</tr>'
                 );
 

@@ -872,6 +872,7 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\ExpectedThisWeekWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\TotalAmountReceivedThisMonthWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\util\CurrencyFormat.js" />
+    <Content Include="Areas\VAS\Scripts\app\util\BrowserCultureFormatter.js" />
     <Content Include="Areas\VAS\Scripts\app\util\AttributeControl.js" />
     <Content Include="Areas\VAS\Scripts\app\util\VAS_PanelUtil.js" />
     <Content Include="Areas\VAS\Scripts\app\util\VAS_ZoomUtil.js" />

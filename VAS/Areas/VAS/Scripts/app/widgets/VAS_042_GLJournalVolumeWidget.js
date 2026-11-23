@@ -71,8 +71,14 @@
         });
     }
 
-    function fmtMoney(amount, currency, precision) {
+    function fmtMoney(amount, currency, precision, isoCode) {
         var val = parseFloat(amount || 0);
+        /* With the ISO code the browser culture places sign, minus and separators. */
+        if (isoCode && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+            try {
+                return VAS.formatAmountByBrowser(val, isoCode, precision, { symbol: currency });
+            } catch (e) { if (window.console) { console.log(e); } }
+        }
         return (val < 0 ? '-' : '') + (currency || '') + fmtAmt(val, precision);
     }
 
@@ -98,7 +104,7 @@
     }
 
     // ── Build the entire SVG string from the day array ────────────────────────
-    function buildSVG(days, currency, precision) {
+    function buildSVG(days, currency, precision, isoCode) {
         var n = days.length;
 
         // No data guard
@@ -162,7 +168,7 @@
             var info = (d.DateStr || d.DayNum)
                 + ' - ' + d.JournalCount + ' ' + lbl('VAS_042_GLJEntries', 'Entries')
                 + ', ' + lbl('VAS_042_NetValueTrend', 'Net value trend')
-                + ': ' + fmtMoney(d.NetValue, currency, precision);
+                + ': ' + fmtMoney(d.NetValue, currency, precision, isoCode);
 
             parts.push('<rect class="VAS-gljv-bar" x="' + barX.toFixed(1) + '" y="' + by.toFixed(1)
                 + '" width="' + barW.toFixed(1) + '" height="' + bh.toFixed(1)
@@ -327,7 +333,7 @@
                             );
                             // Inject SVG
                             $root.find('#VAS-gljv-chart-' + id).html(
-                                buildSVG(data.Days, data.CurSymbol || data.ISOCode || '', data.StdPrecision)
+                                buildSVG(data.Days, data.CurSymbol || data.ISOCode || '', data.StdPrecision, data.ISOCode || '')
                             );
                         } else {
                             showError();

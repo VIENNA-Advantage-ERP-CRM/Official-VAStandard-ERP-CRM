@@ -980,6 +980,17 @@ namespace VASLogic.Models
                     row.Cells[companion] = NormalizeCell(dr[companion]);
                 }
 
+                /* The amount's ISO-code companion, carried the same way. */
+                for (int c = 0; c < spec.Columns.Count; c++)
+                {
+                    string isoCompanion = spec.Columns[c].IsoKey;
+                    if (string.IsNullOrEmpty(isoCompanion)) { continue; }
+                    if (row.Cells.ContainsKey(isoCompanion)) { continue; }
+                    if (!dt.Columns.Contains(isoCompanion)) { continue; }
+
+                    row.Cells[isoCompanion] = NormalizeCell(dr[isoCompanion]);
+                }
+
                 /* Reserved technical aliases - present only on document-backed rows. */
                 if (dt.Columns.Contains(TECH_TABLE)) { row.AD_Table_ID = Util.GetValueOfInt(dr[TECH_TABLE]); }
                 if (dt.Columns.Contains(TECH_RECORD)) { row.Record_ID = Util.GetValueOfInt(dr[TECH_RECORD]); }
@@ -2513,6 +2524,13 @@ namespace VASLogic.Models
             /// accounting schema's own currency.
             /// </summary>
             public string SymbolKey { get; set; }
+
+            /// <summary>
+            /// Amount columns only: the key of a SIBLING cell holding this row's currency
+            /// ISO code, which the client uses to format the figure in the browser culture.
+            /// Empty means the client keeps the symbol prefix.
+            /// </summary>
+            public string IsoKey { get; set; }
 
             /// <summary>
             /// Drops this column entirely when it carries no value anywhere in the result

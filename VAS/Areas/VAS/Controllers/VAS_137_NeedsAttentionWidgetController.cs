@@ -39,6 +39,8 @@ namespace VAS.Controllers
     ///               main physical table.
     /// Chronological development:
     ///   VAI052      2026-07-22 Created
+    ///   VAI052      2026-11-18 Oracle fixes: profile-completion score without a nested correlated
+    ///                          inline view (ORA-00904); each bind placeholder used once (ORA-01008)
     /// </summary>
     public class VAS_137_NeedsAttentionWidgetController : Controller
     {
@@ -47,17 +49,17 @@ namespace VAS.Controllers
         private const int MaxPageSize = 7;
 
         // Profile completion % (0..100): 20 points per profile section that has data.
-        // Correlated to the outer C_BPartner alias "bp". Same expression as VAS_136.
-        private const string ProfileCompletionExpr = @"COALESCE((
-                        SELECT SUM(t.Cnt)
-                        FROM (
-                            SELECT DISTINCT 20 AS Cnt FROM C_BPartner
-                            UNION ALL SELECT DISTINCT 20 AS Cnt FROM C_BPartner_Location bpl WHERE bpl.C_BPartner_ID = bp.C_BPartner_ID
-                            UNION ALL SELECT DISTINCT 20 AS Cnt FROM AD_User bpu WHERE bpu.C_BPartner_ID = bp.C_BPartner_ID
-                            UNION ALL SELECT DISTINCT 20 AS Cnt FROM C_BP_BankAccount bpb WHERE bpb.C_BPartner_ID = bp.C_BPartner_ID
-                            UNION ALL SELECT DISTINCT 20 AS Cnt FROM FRPT_BP_Customer_Acct bpc WHERE bpc.C_BPartner_ID = bp.C_BPartner_ID
-                        ) t
-                    ), 0)";
+        // Correlated to the outer C_BPartner alias "bp". Same score as VAS_136: the business
+        // partner record itself is 20, then 20 for each section that has a row (location,
+        // contact, bank account, customer accounting).
+        // Oracle: every EXISTS correlates ONE level up to "bp". The earlier form correlated
+        // from inside an inline view (SELECT SUM(t.Cnt) FROM (... WHERE x.C_BPartner_ID =
+        // bp.C_BPartner_ID) t), which Oracle rejects with ORA-00904 (invalid identifier).
+        private const string ProfileCompletionExpr = @"(20
+                    + CASE WHEN EXISTS (SELECT 1 FROM C_BPartner_Location bpl WHERE bpl.C_BPartner_ID = bp.C_BPartner_ID) THEN 20 ELSE 0 END
+                    + CASE WHEN EXISTS (SELECT 1 FROM AD_User bpu WHERE bpu.C_BPartner_ID = bp.C_BPartner_ID) THEN 20 ELSE 0 END
+                    + CASE WHEN EXISTS (SELECT 1 FROM C_BP_BankAccount bpb WHERE bpb.C_BPartner_ID = bp.C_BPartner_ID) THEN 20 ELSE 0 END
+                    + CASE WHEN EXISTS (SELECT 1 FROM FRPT_BP_Customer_Acct bpc WHERE bpc.C_BPartner_ID = bp.C_BPartner_ID) THEN 20 ELSE 0 END)";
 
         /// <summary>Overdue = due strictly before today (dialect-correct truncation).</summary>
         private string OverdueDateCondition()
@@ -145,15 +147,32 @@ namespace VAS.Controllers
             return ReadScalarInt(ctx, sql);
         }
 
-        private int CountOnbIncomplete(Ctx ctx)
+        /// <summary>
+        /// Active customers in MRole scope. Kept as a plain SELECT (no sub-select in the
+        /// select list): MRole.AddAccessSQL's parser rejects a main SELECT that has a FROM
+        /// inside its select list ("More than one FROM clause" / "TableName not correctly
+        /// parsed"), so the profile score is computed OUTSIDE this query, over the CTE.
+        /// </summary>
+        private string CustomerScopeSql(Ctx ctx, string extraColumns)
         {
-            string sql = @"
-                SELECT SUM(CASE WHEN " + ProfileCompletionExpr + @" < 100 THEN 1 ELSE 0 END) AS Cnt
+            string scopeSql = @"
+                SELECT bp.C_BPartner_ID AS C_BPartner_ID" + extraColumns + @"
                 FROM C_BPartner bp
                 WHERE bp.IsActive = 'Y'
                   AND bp.IsCustomer = 'Y'
                   AND bp.AD_Client_ID = @Client_ID";
-            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "bp", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            return MRole.GetDefault(ctx).AddAccessSQL(scopeSql, "bp", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+        }
+
+        private int CountOnbIncomplete(Ctx ctx)
+        {
+            // The outer FROM aliases the CTE as "bp" so ProfileCompletionExpr correlates to it.
+            string sql = @"
+                WITH Scope AS (
+                    " + CustomerScopeSql(ctx, "") + @"
+                )
+                SELECT SUM(CASE WHEN " + ProfileCompletionExpr + @" < 100 THEN 1 ELSE 0 END) AS Cnt
+                FROM Scope bp";
             return ReadScalarInt(ctx, sql);
         }
 
@@ -208,10 +227,8 @@ namespace VAS.Controllers
             string overdueSql = @"
                 SELECT i.C_BPartner_ID AS Bp_Id,
                        COUNT(DISTINCT i.C_Invoice_ID) AS Inv_Count,
-                       COALESCE(SUM(CASE
-                           WHEN i.IsReturnTrx = 'N' THEN CurrencyConvert(COALESCE(ips.DueAmt, 0), i.C_Currency_ID, @Ccy_ID, i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID)
-                           WHEN i.IsReturnTrx = 'Y' THEN -CurrencyConvert(COALESCE(ips.DueAmt, 0), i.C_Currency_ID, @Ccy_ID, i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID)
-                           ELSE 0 END), 0) AS Amt,
+                       COALESCE(SUM(CASE WHEN COALESCE(i.IsReturnTrx, 'N') = 'Y' THEN -1 ELSE 1 END
+                           * CurrencyConvert(COALESCE(ips.DueAmt, 0), i.C_Currency_ID, @Ccy_ID, i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID)), 0) AS Amt,
                        MIN(ips.DueDate) AS Oldest_Due
                 FROM C_InvoicePaySchedule ips
                 INNER JOIN C_Invoice i ON (ips.C_Invoice_ID=i.C_Invoice_ID AND i.IsActive = 'Y')
@@ -236,7 +253,7 @@ namespace VAS.Controllers
                        o.Oldest_Due AS Oldest_Due,
                        COUNT(1) OVER () AS Total
                 FROM Overdue o
-                INNER JOIN C_BPartner bpn ON (bpn.C_BPartner_ID=o.Bp_Id AND bpn.AD_Client_ID = @Client_ID)
+                INNER JOIN C_BPartner bpn ON (bpn.C_BPartner_ID=o.Bp_Id)
                 ORDER BY o.Oldest_Due ASC, o.Amt DESC, bpn.Name ASC
                 OFFSET " + offset + @" ROWS FETCH NEXT " + limit + @" ROWS ONLY";
 
@@ -245,10 +262,13 @@ namespace VAS.Controllers
             IDataReader dr = null;
             try
             {
+                // Oracle binds positionally: each placeholder appears once in the SQL, and the
+                // parameters are listed in the order they appear (@Ccy_ID in the SELECT list,
+                // then @Client_ID in the WHERE).
                 dr = DB.ExecuteReader(sql, new SqlParameter[]
                 {
-                    new SqlParameter("@Client_ID", ctx.GetAD_Client_ID()),
-                    new SqlParameter("@Ccy_ID", currency.CurrencyId)
+                    new SqlParameter("@Ccy_ID", currency.CurrencyId),
+                    new SqlParameter("@Client_ID", ctx.GetAD_Client_ID())
                 });
                 while (dr != null && dr.Read())
                 {
@@ -312,7 +332,7 @@ namespace VAS.Controllers
                        u.Oldest_Waiting AS Oldest_Waiting,
                        COUNT(1) OVER () AS Total
                 FROM Unresponded u
-                INNER JOIN C_BPartner bpn ON (bpn.C_BPartner_ID=u.Bp_Id AND bpn.AD_Client_ID = @Client_ID)
+                INNER JOIN C_BPartner bpn ON (bpn.C_BPartner_ID=u.Bp_Id)
                 ORDER BY u.Oldest_Waiting ASC, u.Req_Count DESC, bpn.Name ASC
                 OFFSET " + offset + @" ROWS FETCH NEXT " + limit + @" ROWS ONLY";
 
@@ -350,7 +370,7 @@ namespace VAS.Controllers
                 SELECT bp.C_BPartner_ID AS Id,
                        bp.Name AS Name,
                        bp.Value AS Code,
-                       COALESCE(rep.Name, N'') AS Rep,
+                       rep.Name AS Rep,
                        COUNT(1) OVER () AS Total
                 FROM C_BPartner bp
                 LEFT OUTER JOIN AD_User rep ON (rep.AD_User_ID=bp.SalesRep_ID AND rep.AD_Client_ID=bp.AD_Client_ID AND rep.IsActive = 'Y')
@@ -377,7 +397,7 @@ namespace VAS.Controllers
                         id = Util.GetValueOfInt(dr["Id"]),
                         name = Util.GetValueOfString(dr["Name"]),
                         code = Util.GetValueOfString(dr["Code"]),
-                        rep = Util.GetValueOfString(dr["Rep"])
+                        rep = Util.GetValueOfString(dr["Rep"]) ?? ""
                     });
                 }
             }
@@ -391,23 +411,20 @@ namespace VAS.Controllers
 
         private JsonResult OnbIncompleteList(Ctx ctx, int offset, int limit)
         {
-            string scopeSql = @"
-                SELECT bp.C_BPartner_ID AS Id,
-                       bp.Name AS Name,
-                       bp.Updated AS Updated_At,
-                       " + ProfileCompletionExpr + @" AS Progress
-                FROM C_BPartner bp
-                WHERE bp.IsActive = 'Y'
-                  AND bp.IsCustomer = 'Y'
-                  AND bp.AD_Client_ID = @Client_ID";
-            scopeSql = MRole.GetDefault(ctx).AddAccessSQL(scopeSql, "bp", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-
+            // Scope = MRole-filtered customers (plain SELECT); Scored adds the profile score
+            // over it (alias "bp" so ProfileCompletionExpr correlates to the CTE).
             string sql = @"
                 WITH Scope AS (
-                    " + scopeSql + @"
+                    " + CustomerScopeSql(ctx, ", bp.Name AS Name") + @"
+                ),
+                Scored AS (
+                    SELECT bp.C_BPartner_ID AS Id,
+                           bp.Name AS Name,
+                           " + ProfileCompletionExpr + @" AS Progress
+                    FROM Scope bp
                 )
                 SELECT s.Id, s.Name, s.Progress, COUNT(1) OVER () AS Total
-                FROM Scope s
+                FROM Scored s
                 WHERE s.Progress < 100
                 ORDER BY s.Progress ASC, s.Name ASC, s.Id ASC
                 OFFSET " + offset + @" ROWS FETCH NEXT " + limit + @" ROWS ONLY";

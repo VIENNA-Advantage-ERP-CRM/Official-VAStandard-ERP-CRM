@@ -287,13 +287,18 @@
            symbolText overrides the dialog's own currency for a row carrying its own -
            pass '' for none. Left undefined it falls back to withSymbol, so the two older
            call shapes are unchanged. */
-        function formatAmount(value, withSymbol, symbolText) {
+        function formatAmount(value, withSymbol, symbolText, iso) {
             var n = Number(value || 0);
             if (!isFinite(n)) { n = 0; }
             var p = precision();
 
             var sign = n < 0 ? '-' : '';
             var sym = symbolText != null ? String(symbolText) : (withSymbol ? symbol() : '');
+
+            /* Browser culture places sign, separators and currency sign (shared formatter). */
+            if (iso && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try { return VAS.formatAmountByBrowser(n, iso, p, { symbol: sym }); } catch (e) { if (window.console) { console.log(e); } }
+            }
 
             var text = Math.abs(n).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: p, maximumFractionDigits: p
@@ -1147,14 +1152,15 @@
             }
 
             if (type === 'DATE') { return textCell(formatDate(raw)); }
-            if (type === 'AMOUNT') { return textCell(formatAmount(raw, true), 'vas-195-dcell-num vas-195-dcell-amt'); }
+            if (type === 'AMOUNT') { return textCell(formatAmount(raw, true, null, _schema ? _schema.Iso : ''), 'vas-195-dcell-num vas-195-dcell-amt'); }
 
             /* A document amount is in the DOCUMENT's currency, so its symbol comes from a
                sibling cell the column names rather than from the dialog's own base
                currency. A check that declares no SymbolKey renders the bare figure. */
             if (type === 'DOCAMOUNT') {
                 var rowSymbol = column.SymbolKey ? (cells[column.SymbolKey] || '') : '';
-                return textCell(formatAmount(raw, false, rowSymbol),
+                var rowIso = column.IsoKey ? (cells[column.IsoKey] || '') : '';
+                return textCell(formatAmount(raw, false, rowSymbol, rowIso),
                     'vas-195-dcell-num vas-195-dcell-amt');
             }
             if (type === 'QTY') { return textCell(formatQty(raw), 'vas-195-dcell-num'); }

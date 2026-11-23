@@ -7,7 +7,8 @@
  * counterpart of VAS_082_NewGRNWidget and follows the same open-on-new-record
  * contract and the same tile design.
  *
- * Backend - VAS_204_NewPurchaseOrderWidget/GetPurchaseOrderWindowId
+ * Window id - VAS.ZoomUtil.getWindowId('VAS_PurchaseOrder', 'Purchase Order') (VAS163 2026-11-12;
+ *             was VAS_204_NewPurchaseOrderWidget/GetPurchaseOrderWindowId)
  *
  * Labels / Message Keys
  *  # | Current Text                              | Message Key
@@ -70,19 +71,16 @@
             loadPoWindowId(null);
         };
 
+        // VAS163 2026-11-12: window id resolved through the shared VAS.ZoomUtil
+        // (VAS_PurchaseOrder, old name 'Purchase Order') instead of a private endpoint call.
         function loadPoWindowId(onReady) {
-            $.ajax({
-                url: VIS.Application.contextUrl + 'VAS_204_NewPurchaseOrderWidget/GetPurchaseOrderWindowId',
-                type: 'GET',
-                cache: false,
-                success: function (response) {
-                    var result = parseResponse(response);
-                    poWindowId = Number((result && result.windowId) || 0);
-                    if (onReady) { onReady(poWindowId); }
-                },
-                error: function () {
-                    if (onReady) { onReady(0); }
-                }
+            if (!VAS.ZoomUtil) {
+                if (onReady) { onReady(0); }
+                return;
+            }
+            VAS.ZoomUtil.getWindowId('VAS_PurchaseOrder', 'Purchase Order').done(function (windowId) {
+                poWindowId = Number(windowId || 0);
+                if (onReady) { onReady(poWindowId); }
             });
         }
 
@@ -202,17 +200,10 @@
                 startWindowById(poWindowId);
                 return;
             }
+            // VAS163 2026-11-12: no window resolved -> the click simply does not navigate (no error dialog).
             loadPoWindowId(function (windowId) {
                 if (windowId > 0) {
                     startWindowById(windowId);
-                }
-                else {
-                    VIS.ADialog.error(
-                        'VAS_204_CouldntOpenWindow',
-                        true,
-                        '',
-                        lbl('VAS_204_CouldntOpenWindow', 'Unable to open the Purchase Order window.')
-                    );
                 }
             });
         }

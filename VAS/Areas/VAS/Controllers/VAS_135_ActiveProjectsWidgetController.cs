@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.Globalization;
+using System.Text.RegularExpressions;
 using System.Web.Mvc;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
@@ -154,7 +155,9 @@ namespace VAS.Controllers
                 IDataReader dr = null;
                 try
                 {
-                    dr = DB.ExecuteReader(sql, new SqlParameter[] { new SqlParameter("@Client_ID", ctx.GetAD_Client_ID()) });
+                    // @Client_ID occurs three times: one bind per occurrence, in SQL order.
+                    SqlParameter[] listParams = BindInOrder(ref sql, new Dictionary<string, object> { { "Client_ID", ctx.GetAD_Client_ID() } });
+                    dr = DB.ExecuteReader(sql, listParams);
                     while (dr != null && dr.Read())
                     {
                         total = Util.GetValueOfInt(dr["Total_Customers"]);
@@ -282,11 +285,16 @@ namespace VAS.Controllers
                 IDataReader dr = null;
                 try
                 {
-                    dr = DB.ExecuteReader(sql, new SqlParameter[]
+                    // The SQL asks for @BP_ID then @Client_ID in each of two blocks (PhaseState and
+                    // the project body). Oracle binds positionally, so passing (Client, BP) put the
+                    // client id into the customer slot and the query found no projects: one bind per
+                    // occurrence, in SQL order.
+                    SqlParameter[] projParams = BindInOrder(ref sql, new Dictionary<string, object>
                     {
-                        new SqlParameter("@Client_ID", ctx.GetAD_Client_ID()),
-                        new SqlParameter("@BP_ID", C_BPartner_ID)
+                        { "Client_ID", ctx.GetAD_Client_ID() },
+                        { "BP_ID", C_BPartner_ID }
                     });
+                    dr = DB.ExecuteReader(sql, projParams);
                     while (dr != null && dr.Read())
                     {
                         int total = Util.GetValueOfInt(dr["Total_Activities"]);
@@ -415,12 +423,14 @@ namespace VAS.Controllers
                 IDataReader dr = null;
                 try
                 {
-                    dr = DB.ExecuteReader(sql, new SqlParameter[]
+                    // SQL order is @BP_ID, @Client_ID, @State - not (Client, BP, State).
+                    SqlParameter[] actParams = BindInOrder(ref sql, new Dictionary<string, object>
                     {
-                        new SqlParameter("@Client_ID", ctx.GetAD_Client_ID()),
-                        new SqlParameter("@BP_ID", C_BPartner_ID),
-                        new SqlParameter("@State", SqlDbType.VarChar) { Value = wanted }
+                        { "Client_ID", ctx.GetAD_Client_ID() },
+                        { "BP_ID", C_BPartner_ID },
+                        { "State", wanted }
                     });
+                    dr = DB.ExecuteReader(sql, actParams);
                     while (dr != null && dr.Read())
                     {
                         items.Add(new
@@ -458,6 +468,37 @@ namespace VAS.Controllers
         private string FormatDate(DateTime? value)
         {
             return value.HasValue ? value.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "";
+        }
+
+        /// <summary>
+        /// Oracle binds positionally: every placeholder occurrence in the SQL text needs its own
+        /// bind, in order of appearance. Repeating a named placeholder, or listing the parameters
+        /// in a different order than they appear, either raises ORA-01008 or silently binds the
+        /// wrong values (e.g. the client id into a customer-id filter, giving an empty result).
+        /// Numbers each occurrence of a known placeholder (@BP_ID -> @BP_ID_1, @BP_ID_2 ...) and
+        /// returns one parameter per occurrence, in SQL order. Call AFTER MRole.AddAccessSQL.
+        /// </summary>
+        private static SqlParameter[] BindInOrder(ref string sql, Dictionary<string, object> values)
+        {
+            Dictionary<string, object> lookup = new Dictionary<string, object>(values, StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, int> seen = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            List<SqlParameter> list = new List<SqlParameter>();
+
+            sql = Regex.Replace(sql, @"@([A-Za-z_][A-Za-z0-9_]*)", delegate (Match m)
+            {
+                string name = m.Groups[1].Value;
+                object value;
+                if (!lookup.TryGetValue(name, out value)) { return m.Value; }
+                int n;
+                seen.TryGetValue(name, out n);
+                n++;
+                seen[name] = n;
+                string unique = "@" + name + "_" + n;
+                list.Add(new SqlParameter(unique, value));
+                return unique;
+            });
+
+            return list.ToArray();
         }
 
         private void CloseReader(IDataReader reader)

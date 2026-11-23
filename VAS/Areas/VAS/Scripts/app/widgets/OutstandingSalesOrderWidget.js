@@ -105,12 +105,20 @@
         }
 
         /* ── Format a currency amount into a compact, locale-aware string ──
-           Magnitude formatting (Indian vs international numbering by base currency,
-           kept to the currency precision) is delegated to VIS.Util.formatCompactAmount
-           (which always returns a non-negative string). The sign goes FIRST, then the
-           currency symbol, then the magnitude, e.g. -$623.864 (not $-623.864). */
+           The browser culture places the currency sign and the minus
+           (VAS.formatAmountByBrowser with compact: true, 20-Nov-2026). */
         function formatCurrency(value, symbol, isoCode, precision) {
-            return (value < 0 ? '-' : '') + (symbol || '') + VIS.Util.formatCompactAmount(value, isoCode, precision);
+            value = Number(value || 0);
+            /* Guarded call; fallback: minus + symbol + compact digits. */
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(value, isoCode, precision, { compact: true, symbol: symbol });
+                } catch (e) { if (window.console) { console.log(e); } }
+            }
+            var digits = (VIS.Util && typeof VIS.Util.formatCompactAmount === 'function')
+                ? VIS.Util.formatCompactAmount(value, isoCode, precision)
+                : Math.abs(value).toLocaleString(window.navigator.language);
+            return (value < 0 ? '-' : '') + (symbol || '') + digits;
         }
 
         /* ── Build the WHY explanatory copy from the optional count / top-customer data ── */
@@ -132,8 +140,7 @@
         /* ── Render metric values ── */
         function renderMetric(total, count, topCustomer, symbol, isoCode, precision) {
             if ($metricEl) {
-                /* Sign, then base-currency symbol (from the accounting schema), then amount:
-                   a negative shows as -$623.864, not $-623.864. */
+                /* Base-currency amount; the browser culture places the sign and the minus. */
                 $metricEl.text(formatCurrency(total, symbol, isoCode, precision));
             }
             if ($whyText) {

@@ -140,8 +140,18 @@
             );
         }
 
-        function formatCompactAmount(value) {
+        function formatCompactAmount(value, data) {
             value = Number(value || 0);
+
+            // Shared browser-culture formatter once the server sends the ISO code: currency sign
+            // placed by the culture, K/M/B (lakh/crore only for Indian-numbering currencies).
+            if (data && data.isoCode && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(value, data.isoCode, data.stdPrecision,
+                        { compact: true, symbol: data.curSymbol || '' });
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
 
             if (value >= 10000000) {
                 return (value / 10000000).toFixed(2).replace(/\.00$/, "") + "Cr";
@@ -241,7 +251,7 @@
 
             if ($overdueText) {
                 $overdueText.text(
-                    formatCompactAmount(overdueAmount) +
+                    formatCompactAmount(overdueAmount, data) +
                     " overdue across " +
                     overdueInvoiceCount +
                     " invoices"

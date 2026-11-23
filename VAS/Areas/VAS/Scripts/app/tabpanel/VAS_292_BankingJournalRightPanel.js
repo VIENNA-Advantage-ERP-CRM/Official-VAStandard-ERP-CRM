@@ -453,15 +453,23 @@
         }
 
         /* Bank account currency - header balances and the line summary. */
+        // With the account's ISO code the shared formatter places minus and currency sign in the browser culture.
         function money(value) {
             if (!data) return "";
+            if (data.CurISO && window.VAS && typeof VAS.formatAmountByBrowser === "function") {
+                try { return ltrToken(VAS.formatAmountByBrowser(value, data.CurISO, (data.StdPrecision >= 0 && data.StdPrecision <= 10) ? data.StdPrecision : 2, { symbol: data.CurSymbol || "" })); } catch (e) { if (window.console) { console.log(e); } }
+            }
             return fmtMoney(value, data.CurSymbol || data.CurISO, data.StdPrecision);
         }
 
         /* Magnitude with an explicit direction glyph in front, for figures whose
            sign is the message (net movement, line amounts). */
-        function signedMoney(value, symbol, precision) {
+        // With an ISO code the shared formatter places the "−" / "+" and currency sign in the browser culture.
+        function signedMoney(value, symbol, precision, iso) {
             var v = (+value) || 0;
+            if (iso && window.VAS && typeof VAS.formatAmountByBrowser === "function") {
+                try { return ltrToken(VAS.formatAmountByBrowser(v, iso, (precision >= 0 && precision <= 10) ? precision : 2, { symbol: symbol || "", minusSign: "−", positiveSign: "+" })); } catch (e) { if (window.console) { console.log(e); } }
+            }
             /* Sign sits flush against the symbol - "−$100.00", not "− $100.00". */
             var prefix = v < 0 ? "−" : (v > 0 ? "+" : "");
             /* Isolated as ONE token, sign included: isolating the figure on its
@@ -477,7 +485,7 @@
         function lineAmount(line) {
             var own = line && +line.C_Currency_ID > 0 && +line.C_Currency_ID !== +data.C_Currency_ID;
             return own
-                ? signedMoney(line.StmtAmt, line.CurSymbol || line.CurISO, line.StdPrecision)
+                ? signedMoney(line.StmtAmt, line.CurSymbol || line.CurISO, line.StdPrecision, line.CurISO)
                 : signedMoney(line.StmtAmt, "", data.StdPrecision);
         }
 
@@ -983,7 +991,7 @@
             var $emph = $('<div class="' + CLS + 'heroEmph"></div>');
             var $val = $('<div class="' + CLS + 'heroValueWrap"></div>');
             $val.append($('<div class="' + CLS + 'heroLabel"></div>').text(msg("VAS_292_NetBankMovement", "Net bank movement")));
-            var movement = signedMoney(data.NetMovement, data.CurSymbol || data.CurISO, data.StdPrecision);
+            var movement = signedMoney(data.NetMovement, data.CurSymbol || data.CurISO, data.StdPrecision, data.CurISO);
             var moveTone = (+data.NetMovement || 0) < 0 ? "risk" : "success";
             $val.append($('<div class="' + CLS + 'heroValue ' + CLS + 'tx-' + moveTone + '"></div>').text(movement).attr("title", movement));
             $emph.append($val);

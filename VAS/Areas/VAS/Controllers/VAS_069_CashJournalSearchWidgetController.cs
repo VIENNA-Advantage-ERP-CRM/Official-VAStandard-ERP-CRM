@@ -72,7 +72,7 @@ namespace VAS.Areas.VAS.Controllers
             int clientId = ctx.GetAD_Client_ID();
 
             int schemaCurrencyId = 0;
-            strQuery = @"SELECT cs.C_Currency_ID, c.CurSymbol, c.StdPrecision
+            strQuery = @"SELECT cs.C_Currency_ID, c.CurSymbol, c.ISO_Code, c.StdPrecision
                     FROM C_AcctSchema cs
                     INNER JOIN AD_ClientInfo ci ON (ci.C_AcctSchema1_ID = cs.C_AcctSchema_ID)
                     INNER JOIN C_Currency c ON (cs.C_Currency_ID = c.C_Currency_ID)
@@ -87,6 +87,7 @@ namespace VAS.Areas.VAS.Controllers
             {
                 schemaCurrencyId    = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["C_Currency_ID"]);
                 result.CurSymbol    = Util.GetValueOfString(cDs.Tables[0].Rows[0]["CurSymbol"]);
+                result.CurrencyISO  = Util.GetValueOfString(cDs.Tables[0].Rows[0]["ISO_Code"]);
                 result.StdPrecision = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["StdPrecision"]);
             }
             if (schemaCurrencyId == 0) { return result; }
@@ -198,6 +199,8 @@ namespace VAS.Areas.VAS.Controllers
         public class DocSearchResult
         {
             public string         CurSymbol    { get; set; }
+            /// <summary>ISO code of the schema currency (browser-culture amount formatting).</summary>
+            public string         CurrencyISO  { get; set; }
             public int            StdPrecision { get; set; }
             public int            WindowId     { get; set; }
             public List<SearchHit> Items       { get; set; }

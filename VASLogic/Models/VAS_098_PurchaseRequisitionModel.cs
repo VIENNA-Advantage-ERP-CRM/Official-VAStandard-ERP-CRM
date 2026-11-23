@@ -531,7 +531,8 @@ namespace VASLogic.Models
             LoadOrigin(ctx, M_Requisition_ID, result);
             result.Documents = LoadDocuments(M_Requisition_ID);
 
-            result.Activity = LoadActivity(M_Requisition_ID, result);
+            // VAS163 2026-11-10: Activity section commented out (6-Nov retest2, All Right Panels).
+            // result.Activity = LoadActivity(M_Requisition_ID, result);
 
             return result;
         }

@@ -837,6 +837,36 @@
                     partialHtml += escapeHtml(unallocatedText);
                 }
 
+                var amountTitle =
+                    amountSign +
+                    (
+                        currencySymbol
+                            ? currencySymbol
+                            : ""
+                    ) + amountText;
+
+                // browser culture places sign, styled symbol and separators
+                if (currencyCode && window.VAS && typeof VAS.formatAmountByBrowser === "function") {
+                    try {
+                        var browserOptions = {
+                            symbol: row.paymentCurrencySymbol,
+                            symbolWrap: function (s) {
+                                return '<span class="' + classPrefix + 'cur-inline">' + escapeHtml(s) + "</span>";
+                            }
+                        };
+                        var plainOptions = { symbol: row.paymentCurrencySymbol };
+
+                        amountTitle = VAS.formatAmountByBrowser(amountValue, currencyCode, getStdPrecision(), plainOptions);
+                        amountHtml = VAS.formatAmountByBrowser(amountValue, currencyCode, getStdPrecision(), browserOptions);
+
+                        if (row.isPartiallyAllocated) {
+                            var unallocatedNumber = Number(row.unallocatedAmt || 0) || 0;
+                            partialTitle = VAS.formatAmountByBrowser(unallocatedNumber, currencyCode, getStdPrecision(), plainOptions);
+                            partialHtml = VAS.formatAmountByBrowser(unallocatedNumber, currencyCode, getStdPrecision(), browserOptions);
+                        }
+                    } catch (e) { if (window.console) { console.log(e); } }
+                }
+
                 var rowHtml =
                     "<tr>" +
 
@@ -903,14 +933,7 @@
                     '<td class="' +
                     classPrefix +
                     'td-amount" title="' +
-                    escapeHtml(
-                        amountSign +
-                        (
-                            currencySymbol
-                                ? currencySymbol
-                                : ""
-                        ) + amountText
-                    ) +
+                    escapeHtml(amountTitle) +
                     '">' +
                     amountHtml +
                     "</td>" +

@@ -71,20 +71,23 @@
             loadDeliveryWindowId(null);
         };
 
+        // VAS163 2026-11-12: resolve the Delivery Order window through the shared
+        // VAS.ZoomUtil (VAS_DeliveryOrder -> 'Shipment (Customer)' -> zoom config)
+        // instead of the private VAS_150 GetDeliveryWindowId lookup. The window is still
+        // opened by startWindowById below, because the tile needs the core "new record"
+        // query and the reuse of an already-open DO window, which zoomToRecord does not do.
         function loadDeliveryWindowId(onReady) {
-            $.ajax({
-                url: VIS.Application.contextUrl + 'VAS_150_NewDeliveryOrderWidget/GetDeliveryWindowId',
-                type: 'GET',
-                cache: false,
-                success: function (response) {
-                    var result = parseResponse(response);
-                    deliveryWindowId = Number((result && result.windowId) || 0);
+            if (!window.VAS || !VAS.ZoomUtil || typeof VAS.ZoomUtil.getWindowId !== 'function') {
+                if (onReady) { onReady(0); }
+                return;
+            }
+            VAS.ZoomUtil.getWindowId('VAS_DeliveryOrder', 'Shipment (Customer)')
+                .then(function (windowId) {
+                    deliveryWindowId = Number(windowId || 0);
                     if (onReady) { onReady(deliveryWindowId); }
-                },
-                error: function () {
+                }, function () {
                     if (onReady) { onReady(0); }
-                }
-            });
+                });
         }
 
         /* The DO window must open on a NEW record and must never be duplicated.
@@ -193,16 +196,10 @@
                 return;
             }
             loadDeliveryWindowId(function (windowId) {
+                // VAS163 2026-11-12: no window resolved -> the click simply does not
+                // navigate (rules: no error dialog, same as VAS.ZoomUtil's no-op).
                 if (windowId > 0) {
                     startWindowById(windowId);
-                }
-                else {
-                    VIS.ADialog.error(
-                        'VAS_150_NDO_CouldntOpenWindow',
-                        true,
-                        '',
-                        lbl('VAS_150_NDO_CouldntOpenWindow', 'Unable to open the Delivery Order window.')
-                    );
                 }
             });
         }

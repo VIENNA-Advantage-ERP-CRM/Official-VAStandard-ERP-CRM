@@ -236,23 +236,63 @@
             return VIS.Msg.getMsg(key);
         }
 
+        /* ---------- amounts in the browser culture ----------
+           VAS.formatAmountByBrowser places separators, the minus and the currency sign the way
+           the browser culture does ("-$1,234.50" en-US, "-1.234,50 €" de-DE). It needs the ISO
+           code; callers mostly pass only a symbol, so symbol -> ISO pairs are remembered from
+           every response that carries both (invoice, accounting, payment, allocation, recurring).
+           A symbol seen with two different ISO codes is not resolved and keeps the old format. */
+        var symIso = {};
+        function rememberCur(sym, iso) {
+            if (!sym || !iso || !/^[A-Za-z]{3}$/.test(iso)) return;
+            iso = iso.toUpperCase();
+            if (symIso.hasOwnProperty(sym) && symIso[sym] !== iso) { symIso[sym] = ""; return; }
+            symIso[sym] = iso;
+        }
+        function isoFor(cur, iso) {
+            if (iso && /^[A-Za-z]{3}$/.test(iso)) return iso.toUpperCase();
+            if (cur && /^[A-Z]{3}$/.test(cur)) return cur;
+            return (cur && symIso[cur]) || "";
+        }
+        /* Signed amount with currency sign; null when the shared formatter can't be used. */
+        function cultureAmount(v, cur, p, iso) {
+            var code = isoFor(cur, iso);
+            if (!code || !(window.VAS && typeof VAS.formatAmountByBrowser === "function")) return null;
+            try { return VAS.formatAmountByBrowser(v, code, p, { symbol: cur || "" }); }
+            catch (e) { if (window.console) { console.log(e); } return null; }
+        }
+
         function fmtAmount(value, precision) {
             var v = +value || 0;
             var sign = v < 0 ? "-" : "";
             var abs = Math.abs(v);
             var cur = (data && (data.CurSymbol || data.CurISO)) || "";
             var p = (precision >= 0) ? precision : ((data && data.StdPrecision >= 0) ? data.StdPrecision : 2);
+            var shown = cultureAmount(v, cur, p, data && data.CurISO);
+            if (shown !== null) return shown;
             return sign + (cur ? cur : "") + abs.toLocaleString(window.navigator.language, {
                 minimumFractionDigits: p, maximumFractionDigits: p
             });
         }
 
-        function fmtAmountCur(value, cur, precision) {
+        /* Magnitude (no sign) with currency sign - existing contract of this helper. */
+        function fmtAmountCur(value, cur, precision, iso) {
             var v = +value || 0;
             var p = (precision >= 0) ? precision : 2;
+            var shown = cultureAmount(Math.abs(v), cur, p, iso);
+            if (shown !== null) return shown;
             return (cur ? cur : "") + Math.abs(v).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: p, maximumFractionDigits: p
             });
+        }
+
+        /* Signed amount with currency sign (minus placed by the culture). */
+        function fmtSignedCur(value, cur, precision, iso) {
+            var v = +value || 0;
+            var p = (precision >= 0) ? precision : 2;
+            var shown = cultureAmount(v, cur, p, iso);
+            if (shown !== null) return shown;
+            return (v < 0 ? "-" : "") + fmtAmountCur(v, cur, p);
         }
 
         function fmtNumber(value, precision) {
@@ -377,6 +417,7 @@
                 data: { C_Invoice_ID: recordID, IsSOTrx: !!$self.IsSOTrx },
                 success: function (raw) {
                     data = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
+                    if (data) { rememberCur(data.CurSymbol, data.CurISO); }
                     linePage = 0;
                     render();
                     // New record -> always start at the top (the scroll position must
@@ -1223,7 +1264,7 @@
                     $r.append($('<div class="col-c c"></div>').text(applied).attr("title", applied));
                     // Allocation amounts are stored in the allocation header currency.
                     $r.append($('<div class="col-d amt"></div>')
-                        .text(fmtAmountCur(a.Amount, a.CurSymbol || a.CurISO, a.StdPrecision)));
+                        .text(fmtAmountCur(a.Amount, a.CurSymbol || a.CurISO, a.StdPrecision, a.CurISO)));
                     $rows.append($r);
                 });
 
@@ -1418,6 +1459,7 @@
             // schema), so that currency's symbol is used - not the transaction one.
             var acctCur = pj.CurSymbol || "";
             var acctPrec = (pj.StdPrecision >= 0) ? pj.StdPrecision : 2;
+            rememberCur(acctCur, data.AcctCurISO);
 
             // Account / Debit / Credit always show; each dimension column is dropped
             // when NO row carries a value for it.
@@ -1551,7 +1593,7 @@
             var v = +value || 0;
             var $d = $('<div class="num ' + cls + '"></div>');
             if (v === 0) { $d.addClass("zero").text("—"); }
-            else { $d.text((v < 0 ? "-" : "") + fmtAmountCur(v, cur, prec)); }
+            else { $d.text(fmtSignedCur(v, cur, prec, data && data.AcctCurISO)); }
             return $d.attr("title", $d.text());
         }
 
@@ -1743,6 +1785,7 @@
             var isCN = meta.RecordMode === "AR_CREDIT_NOTE_ALLOCATION";
             var p = meta.StdPrecision >= 0 ? meta.StdPrecision : 2;
             var cur = meta.CurSymbol || meta.ISO_Code || "";
+            rememberCur(meta.CurSymbol, meta.ISO_Code);
 
             $scrim = $('<div class="' + CLS + 'scrim ' + (isCN ? "cn-mode" : "invoice-mode") +
                 '" role="dialog" aria-modal="true"></div>');
@@ -1872,9 +1915,12 @@
                         // invoice currency the invoice-currency equivalent rides along.
                         var rSym = r.CurSymbol || cur;
                         var rPrec = (r.StdPrecision >= 0) ? r.StdPrecision : p;
-                        var $amt = $('<div class="col-d amt"></div>').text(fmtAmountCur(r.AvailableAmount, rSym, rPrec));
+                        // The row's own ISO code when sent; same currency as the invoice -> the invoice's.
+                        var rIso = r.ISO_Code || r.CurrencyISO ||
+                            ((!r.C_Currency_ID || r.C_Currency_ID === meta.C_Currency_ID) ? meta.ISO_Code : "");
+                        var $amt = $('<div class="col-d amt"></div>').text(fmtAmountCur(r.AvailableAmount, rSym, rPrec, rIso));
                         if (r.C_Currency_ID && r.C_Currency_ID !== meta.C_Currency_ID) {
-                            $amt.append($('<span class="conv"></span>').text(fmtAmountCur(r.AvailableAmountInv, cur, p)));
+                            $amt.append($('<span class="conv"></span>').text(fmtAmountCur(r.AvailableAmountInv, cur, p, meta.ISO_Code)));
                         }
                         $row.append($amt);
 
@@ -2215,6 +2261,7 @@
                         if (resp && resp.Success) {
                             payCtx.curId = resp.C_Currency_ID;
                             payCtx.sym = resp.CurSymbol || (opt && opt.CurSymbol) || cur;
+                            rememberCur(payCtx.sym, resp.ISO_Code || (opt && opt.ISO_Code));
                             payCtx.prec = (resp.StdPrecision >= 0) ? resp.StdPrecision : p;
                             payCtx.rate = (resp.Rate > 0) ? resp.Rate : 1;
                             payCtx.noRate = false;
@@ -2225,6 +2272,7 @@
                             // amount to ZERO (nothing can be recorded without a rate).
                             payCtx.curId = (resp && resp.C_Currency_ID) ? resp.C_Currency_ID : curId;
                             payCtx.sym = (resp && resp.CurSymbol) || (opt && opt.CurSymbol) || cur;
+                            rememberCur(payCtx.sym, (resp && resp.ISO_Code) || (opt && opt.ISO_Code));
                             payCtx.prec = (resp && resp.StdPrecision >= 0) ? resp.StdPrecision : (opt && opt.StdPrecision >= 0 ? opt.StdPrecision : p);
                             payCtx.rate = 0;
                             payCtx.noRate = true;
@@ -2901,6 +2949,7 @@
             var rec = rmeta.Recurring || {};
             var prec = (rmeta.StdPrecision >= 0) ? rmeta.StdPrecision : 2;
             var curSym = rmeta.CurSymbol || rmeta.CurISO || "";
+            rememberCur(rmeta.CurSymbol, rmeta.CurISO);
             var previewLimit = rmeta.PreviewLimit > 0 ? rmeta.PreviewLimit : 20;
 
             // Editing an existing schedule seeds every field from it; a new one starts
@@ -3144,7 +3193,7 @@
                     .replace("{1}", lbl(t.unit, t.unitText)));
                 $remaining.html(escapeHtml(String(Math.max(0, runsMax - runs.length))) +
                     ' <small>' + escapeHtml(lbl("VAS_189_OfCount", "of {0}").replace("{0}", runsMax)) + '</small>');
-                $schedValue.html(escapeHtml(fmtAmountCur(rmeta.GrandTotal * runsMax, curSym, prec)) +
+                $schedValue.html(escapeHtml(fmtAmountCur(rmeta.GrandTotal * runsMax, curSym, prec, rmeta.CurISO)) +
                     ' <small>' + escapeHtml(rmeta.CurISO || "") + '</small>');
 
                 if (!start) {
@@ -3208,8 +3257,8 @@
                     // taxes / prices / rates are recalculated at run time.
                     $r.append($('<td class="c-amt right"></td>').text(done
                         ? fmtAmountCur(done.GrandTotal, done.CurSymbol || done.CurISO || curSym,
-                            (done.StdPrecision >= 0) ? done.StdPrecision : prec)
-                        : fmtAmountCur(rmeta.GrandTotal, curSym, prec)));
+                            (done.StdPrecision >= 0) ? done.StdPrecision : prec, done.CurISO || rmeta.CurISO)
+                        : fmtAmountCur(rmeta.GrandTotal, curSym, prec, rmeta.CurISO)));
 
                     $prows.append($r);
                 }
@@ -3218,7 +3267,7 @@
                     ' <small>· ' + escapeHtml(lbl("VAS_189_AfterRun", "after run {0}").replace("{0}", runsMax)) + '</small>');
                 $occHint.text(lbl("VAS_189_OccurrenceHint", "{0} invoice(s) · {1} each")
                     .replace("{0}", runsMax)
-                    .replace("{1}", fmtAmountCur(rmeta.GrandTotal, curSym, prec)));
+                    .replace("{1}", fmtAmountCur(rmeta.GrandTotal, curSym, prec, rmeta.CurISO)));
 
                 // Say plainly when the preview is truncated - never let a capped list
                 // read as the whole schedule.

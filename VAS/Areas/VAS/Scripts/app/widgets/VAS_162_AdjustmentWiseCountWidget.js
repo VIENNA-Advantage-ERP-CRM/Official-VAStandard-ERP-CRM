@@ -125,9 +125,9 @@
 
             // 3-letter month labels in the select (matches VAS_165_LocationWiseInventoryCountWidget) -
             // full names overflowed the fixed-width control ("Septemb").
-            var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-            for (var m = 0; m < months.length; m++) {
-                var $opt = $('<option value="' + (m + 1) + '">' + months[m] + '</option>');
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            for (var m = 0; m < 12; m++) {
+                var $opt = $('<option value="' + (m + 1) + '">' + new Date(2000, m, 1).toLocaleDateString(window.navigator.language, { month: 'short' }) + '</option>');
                 if (m + 1 === selectedMonth) {
                     $opt.attr('selected', 'selected');
                 }
@@ -248,19 +248,21 @@
                         var qtyDiffCount = res.qtyDiffRecordCount || 0;
                         var netDiff = res.netDiffQty || 0;
 
-                        $asOnCountVal.text(asOnCount);
+                        // VAS163 2026-11-12: counts / net qty rendered per browser locale (were raw numbers).
+                        var lng = window.navigator.language;
+                        $asOnCountVal.text(Number(asOnCount).toLocaleString(lng));
                         if (asOnCount === 0) {
                             $asOnCountMeta.text(lbl("VAS_162_NoAdjustmentsThisPeriod"));
                         } else {
-                            $asOnCountMeta.text(asOnCount + " " + lbl("VAS_162_AdjustmentsRecorded"));
+                            $asOnCountMeta.text(Number(asOnCount).toLocaleString(lng) + " " + lbl("VAS_162_AdjustmentsRecorded"));
                         }
 
-                        $qtyDiffVal.text(qtyDiffCount);
+                        $qtyDiffVal.text(Number(qtyDiffCount).toLocaleString(lng));
                         if (qtyDiffCount === 0) {
                             $qtyDiffMeta.text(lbl("VAS_162_NoAdjustmentsThisPeriod"));
                         } else {
                             var signPrefix = netDiff > 0 ? "+" : "";
-                            $qtyDiffMeta.text(lbl("VAS_162_NetDiffQtyLabel") + " " + signPrefix + netDiff);
+                            $qtyDiffMeta.text(lbl("VAS_162_NetDiffQtyLabel") + " " + signPrefix + Number(netDiff).toLocaleString(lng, { maximumFractionDigits: 4 }));
                         }
                     }
                 },
@@ -348,8 +350,8 @@
                 $modalOverlay.remove();
             }
 
-            var months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-            var monthName = months[selectedMonth - 1] || "";
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            var periodLabel = new Date(Number(selectedYear), Number(selectedMonth) - 1, 1).toLocaleDateString(window.navigator.language, { month: 'long', year: 'numeric' });
 
             var $overlay = $('<div class="vas-adjwisecount-modal-overlay">');
             var $dialog = $('<div class="vas-adjwisecount-modal-dialog" role="dialog" aria-modal="true">');
@@ -358,7 +360,7 @@
             var $header = $('<div class="vas-adjwisecount-modal-header">');
             var $headerLeft = $('<div class="vas-adjwisecount-modal-header-left">');
             var $title = $('<h3 class="vas-adjwisecount-modal-title">' + typeTitle + '</h3>');
-            var $subtitle = $('<span class="vas-adjwisecount-modal-subtitle">' + monthName + ' ' + selectedYear + '</span>');
+            var $subtitle = $('<span class="vas-adjwisecount-modal-subtitle">' + periodLabel + '</span>');
             $headerLeft.append($title).append($subtitle);
 
             var $closeBtn = $('<button type="button" class="vas-adjwisecount-modal-close" aria-label="' + lbl("VAS_162_CloseModal") + '">&times;</button>');
@@ -390,7 +392,7 @@
                 dataType: "json",
                 success: function (res) {
                     if (res && res.details && res.details.length > 0) {
-                        $subtitle.text(monthName + ' ' + selectedYear + ' · ' + res.details.length + ' ' + lbl("VAS_162_RecordsSuffix"));
+                        $subtitle.text(periodLabel + ' · ' + res.details.length + ' ' + lbl("VAS_162_RecordsSuffix"));
                         renderDetailGrid($body, res.details);
                     } else {
                         // Render the grid with no rows rather than replacing the body: the popup
@@ -486,11 +488,13 @@
                     var item = details[i];
                     var diffVal = Number(item.diffQty || 0);
                     var diffClass = "vas-adjwisecount-cell-num";
-                    var diffText = String(diffVal);
+                    // VAS163 2026-11-12: quantities rendered per browser locale (were raw numbers).
+                    var fq = function (v) { return Number(v || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 4 }); };
+                    var diffText = fq(diffVal);
 
                     if (diffVal > 0) {
                         diffClass = "vas-adjwisecount-diff-pos";
-                        diffText = "+" + diffVal;
+                        diffText = "+" + fq(diffVal);
                     } else if (diffVal < 0) {
                         diffClass = "vas-adjwisecount-diff-neg";
                     }
@@ -503,9 +507,9 @@
                         '<div class="vas-adjwisecount-cell vas-adjwisecount-cell-doc vas-adjwisecount-doclink" role="link" tabindex="0" title="' + esc(item.documentNo) + '">' + esc(item.documentNo) + '</div>' +
                         '<div class="vas-adjwisecount-cell vas-adjwisecount-cell-product" title="' + esc(item.product) + '">' + esc(item.product) + '</div>' +
                         '<div class="vas-adjwisecount-cell vas-adjwisecount-cell-attr" title="' + esc(attr) + '">' + esc(attr) + '</div>' +
-                        '<div class="vas-adjwisecount-cell vas-adjwisecount-cell-num" title="' + esc(item.qty) + '">' + esc(item.qty) + '</div>' +
+                        '<div class="vas-adjwisecount-cell vas-adjwisecount-cell-num" title="' + esc(fq(item.qty)) + '">' + esc(fq(item.qty)) + '</div>' +
                         '<div class="vas-adjwisecount-cell ' + diffClass + '" title="' + esc(diffText) + '">' + esc(diffText) + '</div>' +
-                        '<div class="vas-adjwisecount-cell vas-adjwisecount-cell-num" title="' + esc(item.asOnDateCount) + '">' + esc(item.asOnDateCount) + '</div>' +
+                        '<div class="vas-adjwisecount-cell vas-adjwisecount-cell-num" title="' + esc(fq(item.asOnDateCount)) + '">' + esc(fq(item.asOnDateCount)) + '</div>' +
                         '</div>'
                     );
 

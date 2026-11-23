@@ -20,7 +20,8 @@
     min-height: 0;
     color: #102C3F;
     font-family: Roboto, sans-serif;
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 20px);
+    container-type: inline-size;
+    font-size: clamp(16px, 1.2cqi, 20px);
 }
 
     .vas297-root,
@@ -94,7 +95,7 @@
 }
 
 .vas297-sub {
-    font-size: 0.7em;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
     color: #717182;
     margin-top: 1px;                            /* px */
     white-space: nowrap;
@@ -169,7 +170,7 @@
 }
 
 .vas297-row-title {
-    font-size: 0.85em;
+    font-size: 0.75em;
     font-weight: 700;
     color: #102C3F;
     white-space: nowrap;
@@ -178,7 +179,7 @@
 }
 
 .vas297-row-meta {
-    font-size: 0.72em;
+    font-size: 0.6875em;
     color: #5F7283;
     white-space: nowrap;
     overflow: hidden;
@@ -241,7 +242,7 @@
 .vas297-pgtext {
     min-width: 3em;
     text-align: center;
-    font-size: 0.8125em;
+    font-size: 0.75em;
     font-weight: 500;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
@@ -280,7 +281,7 @@
 
 .vas297-state {
     padding: 0.9em 0.25em;
-    font-size: 0.82em;
+    font-size: 0.8125em;
     color: #748494;
 }
 

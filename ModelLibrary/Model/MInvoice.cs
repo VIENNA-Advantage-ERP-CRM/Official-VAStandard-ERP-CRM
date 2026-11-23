@@ -1745,11 +1745,15 @@ namespace VAdvantage.Model
 
             // If lines are available and user is changing the pricelist/conversiontype on header than we have to restrict it because
             // those lines are saved as privious pricelist prices or Payment term.. standard sheet issue no : SI_0344 / JID_0564 / JID_1536_1 by Manjot
-            if (!newRecord && (Is_ValueChanged("M_PriceList_ID") || Is_ValueChanged("C_ConversionType_ID") || Is_ValueChanged("VAS_ContractMaster_ID")))//VIS430:When transactionline available for Contract refrence on header show error message
+            if (!newRecord && (Is_ValueChanged("M_PriceList_ID") || Is_ValueChanged("C_ConversionType_ID")
+                || Is_ValueChanged("VAS_ContractMaster_ID")))//VIS430:When transactionline available for Contract refrence on header show error message
             {
-                MInvoiceLine[] lines = GetLines(true);
+                // A changed column the user accepted through the tab's Commit Warning (confirmed on save)
+                // is allowed; any other changed column still requires the lines to be deleted first.
+                bool notConfirmed = (Is_ValueChanged("M_PriceList_ID") && !IsCommitWarningConfirmed("M_PriceList_ID"))
+                    || (Is_ValueChanged("C_ConversionType_ID") && !IsCommitWarningConfirmed("C_ConversionType_ID"));
 
-                if (lines.Length > 0)
+                if (notConfirmed && GetLines(true).Length > 0)
                 {
                     // Please Delete Lines First
                     log.SaveWarning("", Msg.GetMsg(GetCtx(), "VIS_CantChange"));
@@ -1759,7 +1763,10 @@ namespace VAdvantage.Model
             }
 
 
-            if (!newRecord && Is_ValueChanged("C_PaymentTerm_ID") && Env.IsModuleInstalled("VA009_"))
+            // A payment term change the user accepted through the tab's Commit Warning is allowed while lines exist
+            // (an advance payment term is still validated against the lines in PrepareIt)
+            if (!newRecord && Is_ValueChanged("C_PaymentTerm_ID") && Env.IsModuleInstalled("VA009_")
+                && !IsCommitWarningConfirmed("C_PaymentTerm_ID"))
             {
                 MInvoiceLine[] lines = GetLines(true);
 
@@ -1787,6 +1794,38 @@ namespace VAdvantage.Model
                     // Please Delete Lines First
                     log.SaveWarning("", Msg.GetMsg(GetCtx(), "VIS_CantChange"));
                     return false;
+                }
+            }
+            // Accepted through the Commit Warning: an advance payment term still needs every product line to come
+            // from an order line - checked here (as PrepareIt does) so the user is not stopped only at completion
+            else if (!newRecord && Is_ValueChanged("C_PaymentTerm_ID") && Env.IsModuleInstalled("VA009_")
+                && IsAdvancePaymentTerm(GetC_PaymentTerm_ID())
+                && Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT COUNT(C_InvoiceLine_ID) FROM C_InvoiceLine
+                        WHERE C_Invoice_ID = @param1 AND M_Product_ID > 0 AND NVL(C_OrderLine_ID, 0) = 0",
+                        new SqlParameter[] { new SqlParameter("@param1", GetC_Invoice_ID()) }, Get_Trx())) > 0)
+            {
+                log.SaveError("", Msg.GetMsg(GetCtx(), "VIS_SelectAdvancePaymentTerm"));
+                return false;
+            }
+
+            // Conversion type changed through the Commit Warning while lines exist: the tax amounts in base
+            // currency are recalculated after save (UpdateBaseCurrencyTaxAmounts) - refuse when the new type has no rate
+            _baseCurrencyRate = 0;
+            if (!newRecord && Is_ValueChanged("C_ConversionType_ID") && IsCommitWarningConfirmed("C_ConversionType_ID"))
+            {
+                int baseCurrency_ID = GetCtx().GetContextAsInt("$C_Currency_ID");
+                if (baseCurrency_ID > 0 && GetC_Currency_ID() != baseCurrency_ID && HasLines())
+                {
+                    _baseCurrencyRate = MConversionRate.GetRate(GetC_Currency_ID(), baseCurrency_ID, GetDateAcct(),
+                        GetC_ConversionType_ID(), GetAD_Client_ID(), GetAD_Org_ID());
+                    if (_baseCurrencyRate == 0)
+                    {
+                        MConversionType conv = MConversionType.Get(GetCtx(), GetC_ConversionType_ID());
+                        log.SaveError("", Msg.GetMsg(GetCtx(), "NoConversion") + MCurrency.GetISO_Code(GetCtx(), GetC_Currency_ID())
+                            + Msg.GetMsg(GetCtx(), "ToBaseCurrency") + MCurrency.GetISO_Code(GetCtx(), baseCurrency_ID)
+                            + " - " + Msg.GetMsg(GetCtx(), "ConversionType") + conv.GetName());
+                        return false;
+                    }
                 }
             }
 
@@ -1937,6 +1976,21 @@ namespace VAdvantage.Model
                     log.Fine("Lines -> #" + no);
                 }
 
+                // Price list changed while lines exist (allowed through the Commit Warning, see BeforeSave):
+                // the header is saved, now re-price the lines and recalculate their tax
+                if (Is_ValueChanged("M_PriceList_ID") && IsCommitWarningConfirmed("M_PriceList_ID") 
+                    && !RepriceLinesForPriceList())
+                {
+                    return false;
+                }
+
+                // Conversion type changed through the Commit Warning: tax amounts in base currency at the new rate
+                if (_baseCurrencyRate != 0 && Is_ValueChanged("C_ConversionType_ID") 
+                    && !UpdateBaseCurrencyTaxAmounts())
+                {
+                    return false;
+                }
+
                 // If User unselect Hold Payment on Invoice header, system should also mark all the payment schedule as false and vice versa
                 if (Get_ColumnIndex("IsHoldPayment") >= 0 && Is_ValueChanged("IsHoldPayment"))
                 {
@@ -2000,11 +2054,342 @@ namespace VAdvantage.Model
                 }
             }
 
+            // Re-priced lines whose product has no price on the selected price list: price kept (same currency)
+            // or set to 0 (other currency), with their line numbers. Reported last, together with a warning
+            // raised above (only one warning reaches the client).
+            if (!string.IsNullOrEmpty(_priceKeptLines) || !string.IsNullOrEmpty(_priceZeroLines))
+            {
+                string kept = (string.IsNullOrEmpty(_priceZeroLines) ? ""
+                        : Msg.GetMsg(GetCtx(), "VAS_PriceNotFoundPriceZero") + " " + _priceZeroLines)
+                    + (!string.IsNullOrEmpty(_priceZeroLines) && !string.IsNullOrEmpty(_priceKeptLines) ? " | " : "")
+                    + (string.IsNullOrEmpty(_priceKeptLines) ? ""
+                        : Msg.GetMsg(GetCtx(), "VAS_PriceNotFoundPriceKept") + " " + _priceKeptLines);
+                _priceKeptLines = "";
+                _priceZeroLines = "";
+                ValueNamePair pending = VLogger.RetrieveWarning();
+                if (pending != null)
+                {
+                    log.SaveWarning(pending.GetValue(), (string.IsNullOrEmpty(pending.GetName()) ? "" : pending.GetName() + " - ") + kept);
+                }
+                else
+                {
+                    log.SaveWarning("", kept);
+                }
+                // The warning above is lost when a record saved after AfterSave (timeline event, alert,
+                // workflow) resets the logger; the save then returns this message as its Info instead
+                if (string.IsNullOrEmpty(GetDocWFMsg()))
+                {
+                    SetDocWFMsg(kept);
+                }
+            }
+
             return success;
         }
 
         /// <summary>
-        /// check duplicate record against invoice reference and 
+        /// True while several lines of this invoice are saved in one go (price list re-pricing, the
+        /// invoice line panel): a line save then skips the per-line invoice tax / header total / hold
+        /// payment update. The caller runs FinishBulkLineUpdate once after the lines are saved.
+        /// Lines must have this invoice object as parent (MInvoiceLine.SetInvoice).
+        /// </summary>
+        public bool IsBulkLineUpdate { get; set; }
+
+        /// <summary>
+        /// Rate invoice currency -> base currency of the new conversion type, read in BeforeSave when the
+        /// conversion type was changed through the Commit Warning on an invoice with lines (0 = nothing to do).
+        /// </summary>
+        private decimal _baseCurrencyRate = 0;
+
+        /// <summary>
+        /// Does the invoice have lines (saved)?
+        /// </summary>
+        /// <returns>true when at least one line exists</returns>
+        private bool HasLines()
+        {
+            return Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(C_InvoiceLine_ID) FROM C_InvoiceLine WHERE C_Invoice_ID = @param1",
+                new SqlParameter[] { new SqlParameter("@param1", GetC_Invoice_ID()) }, Get_Trx())) > 0;
+        }
+
+        /// <summary>
+        /// Is the payment term an advance payment term (VA009) - the same test PrepareIt uses.
+        /// </summary>
+        /// <param name="C_PaymentTerm_ID">payment term</param>
+        /// <returns>true when advance</returns>
+        private bool IsAdvancePaymentTerm(int C_PaymentTerm_ID)
+        {
+            return Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT SUM(CASE WHEN pt.VA009_Advance != COALESCE(ps.VA009_Advance, 'N') THEN 1 ELSE 0 END)
+                    FROM C_PaymentTerm pt LEFT JOIN C_PaySchedule ps ON (pt.C_PaymentTerm_ID = ps.C_PaymentTerm_ID)
+                    WHERE pt.C_PaymentTerm_ID = @param1",
+                new SqlParameter[] { new SqlParameter("@param1", C_PaymentTerm_ID) }, Get_Trx())) > 0;
+        }
+
+        /// <summary>
+        /// After the conversion type changed (Commit Warning confirmed): recalculate the tax amount in base
+        /// currency on all lines and invoice taxes with the new type's rate - one UPDATE each instead of
+        /// re-saving every line. The rate was read (and checked) in BeforeSave.
+        /// </summary>
+        /// <returns>false when the update failed</returns>
+        private bool UpdateBaseCurrencyTaxAmounts()
+        {
+            int baseCurrency_ID = GetCtx().GetContextAsInt("$C_Currency_ID");
+            int precision = MCurrency.GetStdPrecision(GetCtx(), baseCurrency_ID);
+            decimal rate = _baseCurrencyRate;
+            _baseCurrencyRate = 0;
+
+            if (new X_C_InvoiceLine(GetCtx(), 0, null).Get_ColumnIndex("TaxBaseCurrencyAmt") >= 0)
+            {
+                int no = DB.ExecuteQuery("UPDATE C_InvoiceLine SET TaxBaseCurrencyAmt = ROUND(COALESCE(TaxAmt, 0) * @param1, " + precision + ")"
+                    + " WHERE C_Invoice_ID = @param2",
+                    new SqlParameter[] { new SqlParameter("@param1", rate), new SqlParameter("@param2", GetC_Invoice_ID()) }, Get_Trx());
+                if (no < 0)
+                {
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "VIS_LineNotSaved"));
+                    return false;
+                }
+                log.Fine("TaxBaseCurrencyAmt on lines -> #" + no);
+            }
+            if (new X_C_InvoiceTax(GetCtx(), 0, null).Get_ColumnIndex("TaxBaseCurrencyAmt") >= 0)
+            {
+                int no = DB.ExecuteQuery("UPDATE C_InvoiceTax SET TaxBaseCurrencyAmt = ROUND(COALESCE(TaxAmt, 0) * @param1, " + precision + ")"
+                    + " WHERE C_Invoice_ID = @param2",
+                    new SqlParameter[] { new SqlParameter("@param1", rate), new SqlParameter("@param2", GetC_Invoice_ID()) }, Get_Trx());
+                if (no < 0)
+                {
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "VIS_LineNotSaved"));
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Lines ("Line (Product)") whose product has no price on the newly selected price list in this save:
+        /// kept their old price (same currency) / price set to 0 (other currency). Reported as one message at
+        /// the end of AfterSave.
+        /// </summary>
+        private string _priceKeptLines = "", _priceZeroLines = "";
+
+        /// <summary>
+        /// After lines were saved with IsBulkLineUpdate on: recalculate each invoice tax used by those
+        /// lines (from all lines), the header TotalLines / GrandTotal and withholding, once per tax rate
+        /// instead of once per line, then the hold payment flag once.
+        /// </summary>
+        /// <param name="savedLines">lines saved in the bulk update</param>
+        /// <returns>false when the tax / header update failed</returns>
+        public bool FinishBulkLineUpdate(IEnumerable<MInvoiceLine> savedLines)
+        {
+            Dictionary<int, MInvoiceLine> lineByTax = new Dictionary<int, MInvoiceLine>();
+            MInvoiceLine anyLine = null;
+            foreach (MInvoiceLine line in savedLines)
+            {
+                if (line == null)
+                {
+                    continue;
+                }
+                anyLine = anyLine ?? line;
+                if (line.GetC_Tax_ID() > 0 && !lineByTax.ContainsKey(line.GetC_Tax_ID()))
+                {
+                    lineByTax[line.GetC_Tax_ID()] = line;
+                }
+            }
+            if (anyLine == null)
+            {
+                return true;
+            }
+            _lines = null;
+
+            foreach (MInvoiceLine line in lineByTax.Values)
+            {
+                if (!line.UpdateHeaderTax(this))
+                {
+                    return false;
+                }
+            }
+
+            // AP invoice from a purchase order on hold payment: the line save would set the header flag
+            if (Get_ColumnIndex("IsHoldPayment") > 0 && !IsSOTrx() && !IsProcessing() && !IsHoldPayment()
+                && !(!String.IsNullOrEmpty(GetConditionalFlag()) && GetConditionalFlag().Equals(CONDITIONALFLAG_Reversal)))
+            {
+                anyLine.UpdateHoldPaymentForInvoice();
+            }
+
+            // totals were written by SQL - bring this object up to date
+            DataSet ds = DB.ExecuteDataset("SELECT TotalLines, GrandTotal FROM C_Invoice WHERE C_Invoice_ID = @param1",
+                new SqlParameter[] { new SqlParameter("@param1", GetC_Invoice_ID()) }, Get_Trx());
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                SetTotalLines(Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["TotalLines"]));
+                SetGrandTotal(Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["GrandTotal"]));
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Products (with attribute set instance and UOM) that have an active price on this invoice's
+        /// price list, on a version valid on the invoice date - the selected price list only, without
+        /// the base price list fallback of MProductPricing. One query for all lines of the invoice.
+        /// </summary>
+        /// <param name="productUOM">filled with each product's base UOM</param>
+        /// <returns>keys "M_Product_ID|M_AttributeSetInstance_ID|C_UOM_ID"</returns>
+        private HashSet<string> GetPricedProductsOnPriceList(Dictionary<int, int> productUOM)
+        {
+            HashSet<string> priced = new HashSet<string>();
+            string sql = @"SELECT DISTINCT pp.M_Product_ID, NVL(pp.M_AttributeSetInstance_ID, 0) AS M_AttributeSetInstance_ID,
+                                pp.C_UOM_ID, p.C_UOM_ID AS ProductUOM
+                           FROM M_ProductPrice pp
+                           INNER JOIN M_PriceList_Version pv ON (pp.M_PriceList_Version_ID = pv.M_PriceList_Version_ID)
+                           INNER JOIN M_Product p ON (pp.M_Product_ID = p.M_Product_ID)
+                           WHERE pv.M_PriceList_ID = @param1 AND pv.IsActive = 'Y' AND pp.IsActive = 'Y'
+                           AND (pv.ValidFrom IS NULL OR pv.ValidFrom <= " + GlobalVariable.TO_DATE(GetDateInvoiced(), true) + @")
+                           AND pp.M_Product_ID IN (SELECT il.M_Product_ID FROM C_InvoiceLine il WHERE il.C_Invoice_ID = @param2)";
+            SqlParameter[] param = new SqlParameter[] {
+                new SqlParameter("@param1", GetM_PriceList_ID()),
+                new SqlParameter("@param2", GetC_Invoice_ID()) };
+            DataSet ds = DB.ExecuteDataset(sql, param, Get_Trx());
+            if (ds != null && ds.Tables.Count > 0)
+            {
+                foreach (DataRow dr in ds.Tables[0].Rows)
+                {
+                    int product = Util.GetValueOfInt(dr["M_Product_ID"]);
+                    priced.Add(product + "|" + Util.GetValueOfInt(dr["M_AttributeSetInstance_ID"]) + "|" + Util.GetValueOfInt(dr["C_UOM_ID"]));
+                    productUOM[product] = Util.GetValueOfInt(dr["ProductUOM"]);
+                }
+            }
+            return priced;
+        }
+
+        /// <summary>
+        /// After the header price list changed: re-price every product line that has a price on the new
+        /// price list (in the line UOM or the product UOM); a product without a price on it keeps its
+        /// current price. Line net amount, tax and line total are recalculated, then the invoice tax and
+        /// header totals once (FinishBulkLineUpdate). A line is also recalculated when only the price
+        /// list's Tax Included setting differs.
+        /// </summary>
+        /// <returns>false when a line could not be saved (the header save is then rolled back)</returns>
+        private bool RepriceLinesForPriceList()
+        {
+            MInvoiceLine[] lines = GetLines(true);
+            if (lines.Length == 0)
+            {
+                return true;
+            }
+
+            int oldPriceList_ID = Util.GetValueOfInt(Get_ValueOld("M_PriceList_ID"));
+            bool taxIncludedChanged = oldPriceList_ID > 0
+                && MPriceList.Get(GetCtx(), oldPriceList_ID, Get_TrxName()).IsTaxIncluded()
+                    != MPriceList.Get(GetCtx(), GetM_PriceList_ID(), Get_TrxName()).IsTaxIncluded();
+
+            // Same currency on both price lists: a product without a price on the new list keeps its old
+            // price. Different currency: the old price means nothing in the new currency - it becomes 0.
+            bool sameCurrency = oldPriceList_ID > 0
+                && MPriceList.Get(GetCtx(), oldPriceList_ID, Get_TrxName()).GetC_Currency_ID()
+                    == MPriceList.Get(GetCtx(), GetM_PriceList_ID(), Get_TrxName()).GetC_Currency_ID();
+
+            Dictionary<int, int> productUOM = new Dictionary<int, int>();
+            HashSet<string> priced = GetPricedProductsOnPriceList(productUOM);
+
+            List<string> keptLines = new List<string>(), zeroLines = new List<string>();
+            List<MInvoiceLine> saved = new List<MInvoiceLine>();
+            IsBulkLineUpdate = true;
+            try
+            {
+                foreach (MInvoiceLine line in lines)
+                {
+                    if (line.IsDescription() || (line.GetM_Product_ID() == 0 && line.GetC_Charge_ID() == 0))
+                    {
+                        continue;
+                    }
+                    bool repriced = false;
+                    if (line.GetM_Product_ID() > 0)
+                    {
+                        string key = line.GetM_Product_ID() + "|" + line.GetM_AttributeSetInstance_ID() + "|";
+                        int baseUOM;
+                        bool onList = priced.Contains(key + line.GetC_UOM_ID())
+                            || (productUOM.TryGetValue(line.GetM_Product_ID(), out baseUOM) && priced.Contains(key + baseUOM));
+                        repriced = onList && line.SetPriceFromPriceList(GetM_PriceList_ID(), GetC_BPartner_ID());
+                        if (!repriced)
+                        {
+                            string label = line.GetLine() + " (" + MProduct.Get(GetCtx(), line.GetM_Product_ID()).GetName() + ")";
+                            if (sameCurrency)
+                            {
+                                keptLines.Add(label);
+                            }
+                            else
+                            {
+                                line.SetPriceZeroNotOnPriceList();
+                                zeroLines.Add(label);
+                                repriced = true;   // changed - save it
+                            }
+                        }
+                    }
+                    if (!repriced && !taxIncludedChanged)
+                    {
+                        continue;
+                    }
+                    // Line BeforeSave recalculates LineNetAmt always, but the tax only when it is zero
+                    line.SetTaxAmt(Env.ZERO);
+                    if (!line.Save(Get_Trx()))
+                    {
+                        ValueNamePair vp = VLogger.RetrieveError();
+                        string error = vp != null ? (!string.IsNullOrEmpty(vp.GetName()) ? vp.GetName() : vp.GetValue()) : "";
+                        log.SaveError("", Msg.GetMsg(GetCtx(), "VIS_LineNotSaved") + " " + line.GetLine() + (string.IsNullOrEmpty(error) ? "" : " - " + error));
+                        return false;
+                    }
+                    saved.Add(line);
+                }
+            }
+            finally
+            {
+                IsBulkLineUpdate = false;
+            }
+
+            if (!FinishBulkLineUpdate(saved))
+            {
+                log.SaveError("", Msg.GetMsg(GetCtx(), "VIS_LineNotSaved"));
+                return false;
+            }
+
+            // reported at the end of AfterSave (a line save above resets the logger)
+            _priceKeptLines = string.Join(", ", keptLines);
+            _priceZeroLines = string.Join(", ", zeroLines);
+            return true;
+        }
+
+        /// <summary>
+        /// True when the framework's Commit Warning was confirmed by the user for this save and the
+        /// warning covers the given column. The framework (ApplyCommitWarningContext) puts the matched
+        /// rules in context for the duration of the save: CommitWarning_Matched = "Y",
+        /// CommitWarning_Columns = comma separated column names, CommitWarning_Conditions = ";;" separated conditions.
+        /// </summary>
+        /// <param name="columnName">column changed on the header</param>
+        /// <returns>true if the change was accepted through the commit warning</returns>
+        private bool IsCommitWarningConfirmed(string columnName)
+        {
+            // The client keeps these as window context ("<WindowNo>|CommitWarning_Columns"); PO has no window
+            // number, so accept the plain key or any window key that the framework copied into the context
+            foreach (KeyValuePair<string, string> entry in GetCtx().GetMap())
+            {
+                if (entry.Key == null || !(entry.Key.Equals("CommitWarning_Columns") || entry.Key.EndsWith("|CommitWarning_Columns"))
+                    || string.IsNullOrEmpty(entry.Value))
+                {
+                    continue;
+                }
+                string prefix = entry.Key.Substring(0, entry.Key.Length - "CommitWarning_Columns".Length);
+                if (!"Y".Equals(GetCtx().GetContext(prefix + "CommitWarning_Matched")))
+                {
+                    continue;
+                }
+                if (entry.Value.Split(',').Any(c => c.Trim().Equals(columnName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    log.Fine("Commit warning confirmed for " + columnName + ", Conditions=" + GetCtx().GetContext(prefix + "CommitWarning_Conditions"));
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// check duplicate record against invoice reference and
         /// should not check the uniqueness of invoice reference in case of reverse document
         /// if duplicate period or no period exist will show the message 
         /// </summary>
@@ -5436,7 +5821,7 @@ namespace VAdvantage.Model
                     }
 
                     //Create RecognoitionPlan and RecognitiontionRun
-                    if (Env.IsModuleInstalled("FRPT_") && line.Get_ColumnIndex("C_RevenueRecognition_ID") >= 0 && 
+                    if (Env.IsModuleInstalled("FRPT_") && line.Get_ColumnIndex("C_RevenueRecognition_ID") >= 0 &&
                         Util.GetValueOfInt(line.Get_Value("C_RevenueRecognition_ID")) > 0 && !IsReversal())
                     {
                         if (!MRevenueRecognition.CreateRevenueRecognitionPlan(line.GetC_InvoiceLine_ID(), Util.GetValueOfInt(line.Get_Value("C_RevenueRecognition_ID")), this))
@@ -5805,14 +6190,6 @@ namespace VAdvantage.Model
                 // JID_1290: Set the document number from completed document sequence after completed (if needed)
                 SetCompletedDocumentNo();
 
-                //VIS-383: 25/04/2024 User Validation After Complete
-                string valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_COMPLETE);
-                if (valid != null)
-                {
-                    _processMsg = valid;
-                    return DocActionVariables.STATUS_INVALID;
-                }
-
                 // VIS0060: Update Order Status on Order Header tab based on delivered and Invoiced qty on Order Line.
                 if (GetC_Order_ID() > 0)
                 {
@@ -5828,6 +6205,14 @@ namespace VAdvantage.Model
                             MOrder.UpdateOrderStatus(GetCtx(), Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Order_ID"]), Get_Trx());
                         }
                     }
+                }
+
+                //VIS-383: 25/04/2024 User Validation After Complete - last step, once all completion work is done
+                string valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_COMPLETE);
+                if (valid != null)
+                {
+                    _processMsg = valid;
+                    return DocActionVariables.STATUS_INVALID;
                 }
 
                 timeEstimation += " End at " + DateTime.Now.ToUniversalTime();

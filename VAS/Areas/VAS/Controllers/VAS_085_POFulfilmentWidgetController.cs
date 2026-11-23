@@ -113,8 +113,9 @@ namespace VIS.Controllers
                            COALESCE((SELECT SUM(RetInLine.MovementQty)
                                      FROM M_InOutLine RetInLine
                                      INNER JOIN M_InOut RetIn ON (RetIn.M_InOut_ID=RetInLine.M_InOut_ID)
-                                     INNER JOIN C_OrderLine RetLine ON (RetLine.C_OrderLine_ID=RetInLine.C_OrderLine_ID)
-                                     WHERE RetLine.Orig_OrderLine_ID=po.C_OrderLine_ID
+                                     LEFT JOIN C_OrderLine RetLine ON (RetLine.C_OrderLine_ID=RetInLine.C_OrderLine_ID)
+                                     WHERE (RetLine.Orig_OrderLine_ID=po.C_OrderLine_ID
+                                            OR RetInLine.C_OrderLine_ID=po.C_OrderLine_ID) -- VAS163 2026-11-11: Row 5 also a vendor return shipment whose line points straight at the PO line (no return order)
                                        AND RetIn.IsSOTrx='N'
                                        AND RetIn.IsReturnTrx='Y'
                                        AND RetIn.DocStatus IN ('CO', 'CL')), 0) AS ReturnedQty

@@ -63,6 +63,7 @@ namespace VIS.Controllers
                 SELECT ClientInfo.AD_Client_ID AS AD_Client_ID,
                        AcctSchema.C_Currency_ID AS Acct_Currency_ID,
                        Currency.StdPrecision AS StdPrecision,
+                       Currency.ISO_Code AS Iso_Code,
                        CASE WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol ELSE Currency.ISO_Code END AS Cur_Symbol
                 FROM AD_ClientInfo ClientInfo
                 INNER JOIN C_AcctSchema AcctSchema ON (AcctSchema.C_AcctSchema_ID=ClientInfo.C_AcctSchema1_ID)
@@ -156,7 +157,9 @@ namespace VIS.Controllers
                                           END), 0), MAX(SchemaCurrency.StdPrecision)) AS Total_Overdue_Outstanding_Amount,
                        COUNT(DISTINCT Invoice.C_Invoice_ID) AS Overdue_Invoice_Count,
                        MAX(SchemaCurrency.Acct_Currency_ID) AS C_Currency_ID,
-                       MAX(SchemaCurrency.Cur_Symbol) AS Cur_Symbol
+                       MAX(SchemaCurrency.Cur_Symbol) AS Cur_Symbol,
+                       MAX(SchemaCurrency.Iso_Code) AS Iso_Code,
+                       MAX(SchemaCurrency.StdPrecision) AS Std_Precision
                 FROM C_Invoice Invoice
                 INNER JOIN C_InvoicePaySchedule InvoicePaySchedule ON (InvoicePaySchedule.C_Invoice_ID=Invoice.C_Invoice_ID)
                 INNER JOIN SchemaCurrency SchemaCurrency ON (SchemaCurrency.AD_Client_ID=Invoice.AD_Client_ID)
@@ -229,6 +232,8 @@ namespace VIS.Controllers
                 )
                 SELECT OverdueAgg.C_Currency_ID AS C_Currency_ID,
                        OverdueAgg.Cur_Symbol AS CurSymbol,
+                       OverdueAgg.Iso_Code AS IsoCode,
+                       OverdueAgg.Std_Precision AS StdPrecision,
                        COALESCE(OverdueAgg.Total_Overdue_Outstanding_Amount, 0) AS OverdueAmount,
                        COALESCE(OverdueAgg.Overdue_Invoice_Count, 0) AS OverdueInvoiceCount,
                        COALESCE(DsoCalc.DsoDays, 0) AS DsoDays,
@@ -243,6 +248,8 @@ namespace VIS.Controllers
 
             int currencyId = 0;
             string curSymbol = "";
+            string isoCode = "";
+            int stdPrecision = 2;
             decimal overdueAmount = 0;
             int overdueInvoiceCount = 0;
             int dsoDays = 0;
@@ -259,6 +266,8 @@ namespace VIS.Controllers
                 {
                     currencyId = Util.GetValueOfInt(dr["C_Currency_ID"]);
                     curSymbol = Util.GetValueOfString(dr["CurSymbol"]);
+                    isoCode = Util.GetValueOfString(dr["IsoCode"]);
+                    if (dr["StdPrecision"] != DBNull.Value) { stdPrecision = Util.GetValueOfInt(dr["StdPrecision"]); }
                     overdueAmount = Util.GetValueOfDecimal(dr["OverdueAmount"]);
                     overdueInvoiceCount = Util.GetValueOfInt(dr["OverdueInvoiceCount"]);
                     dsoDays = Util.GetValueOfInt(dr["DsoDays"]);
@@ -293,6 +302,8 @@ namespace VIS.Controllers
             {
                 cCurrencyId = currencyId,
                 curSymbol = curSymbol,
+                isoCode = isoCode,
+                stdPrecision = stdPrecision,
                 overdueAmount = overdueAmount,
                 overdueInvoiceCount = overdueInvoiceCount,
                 dsoDays = dsoDays,

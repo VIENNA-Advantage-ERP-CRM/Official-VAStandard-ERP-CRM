@@ -145,9 +145,9 @@
             $monthSelect = $('<select class="vas-locwisecount-select">');
             $yearSelect = $('<select class="vas-locwisecount-select">');
 
-            var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-            for (var m = 0; m < months.length; m++) {
-                var $opt = $('<option value="' + (m + 1) + '">' + months[m] + '</option>');
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            for (var m = 0; m < 12; m++) {
+                var $opt = $('<option value="' + (m + 1) + '">' + new Date(2000, m, 1).toLocaleDateString(window.navigator.language, { month: 'short' }) + '</option>');
                 if (m + 1 === selectedMonth) {
                     $opt.attr('selected', 'selected');
                 }
@@ -257,9 +257,9 @@
         }
 
         function loadSummary() {
-            var monthsFull = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-            var mName = monthsFull[selectedMonth - 1] || "";
-            $subtitle.text(lbl("VAS_165_LocationsActiveCounts") + " · " + mName + " " + selectedYear);
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            var periodLabel = new Date(Number(selectedYear), Number(selectedMonth) - 1, 1).toLocaleDateString(window.navigator.language, { month: 'long', year: 'numeric' });
+            $subtitle.text(lbl("VAS_165_LocationsActiveCounts") + " · " + periodLabel);
 
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_165_LocationWiseInventoryCountWidget/GetLocationSummary?month=" + selectedMonth + "&year=" + selectedYear,
@@ -349,7 +349,9 @@
 
             for (var i = 0; i < pageItems.length; i++) {
                 var item = pageItems[i];
-                var formattedQty = Number(item.totalQtyCounted || 0).toLocaleString();
+                // VAS163 2026-11-12: explicit browser locale for qty / session count (were toLocaleString() / raw).
+                var formattedQty = Number(item.totalQtyCounted || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 4 });
+                var formattedSessions = Number(item.sessionCount || 0).toLocaleString(window.navigator.language);
 
                 /* Display the locator NAME. item.locator remains the CODE and is what
                    openDetailModal sends back as locatorCode - the endpoint filters on loc.Value,
@@ -360,7 +362,7 @@
                     '<button type="button" class="vas-locwisecount-row-btn vas-locwisecount-grid-template" aria-label="' + lbl("VAS_165_OpenCountDetailsForLocator") + ' ' + locName + '">' +
                     '<div class="vas-locwisecount-cell vas-locwisecount-loc-title" title="' + locName + '">' + locName + '</div>' +
                     '<div class="vas-locwisecount-cell vas-locwisecount-wh-text" title="' + item.warehouse + '">' + item.warehouse + '</div>' +
-                    '<div class="vas-locwisecount-cell vas-locwisecount-counts-num" title="' + item.sessionCount + '">' + item.sessionCount + '</div>' +
+                    '<div class="vas-locwisecount-cell vas-locwisecount-counts-num" title="' + formattedSessions + '">' + formattedSessions + '</div>' +
                     '<div class="vas-locwisecount-cell vas-locwisecount-qty-num" title="' + formattedQty + '">' + formattedQty + '</div>' +
                     '</button>'
                 );
@@ -427,8 +429,8 @@
                 $modalOverlay.remove();
             }
 
-            var monthsFull = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-            var monthName = monthsFull[selectedMonth - 1] || "";
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            var periodLabel = new Date(Number(selectedYear), Number(selectedMonth) - 1, 1).toLocaleDateString(window.navigator.language, { month: 'long', year: 'numeric' });
 
             var $overlay = $('<div class="vas-locwisecount-modal-overlay">');
             var $dialog = $('<div class="vas-locwisecount-modal-dialog" role="dialog" aria-modal="true">');
@@ -443,7 +445,7 @@
                without it those headings would read "Locator" with nothing after it. */
             var locName = escapeHtml(locItem.locatorName || locItem.locator);
             var $title = $('<h3 class="vas-locwisecount-modal-title" title="' + locName + '">' + escapeHtml(lbl('M_Locator_ID', 'Locator')) + ' ' + locName + '</h3>');
-            var $subtitle = $('<span class="vas-locwisecount-modal-subtitle">' + locItem.warehouse + ' · ' + monthName + ' ' + selectedYear + '</span>');
+            var $subtitle = $('<span class="vas-locwisecount-modal-subtitle">' + locItem.warehouse + ' · ' + periodLabel + '</span>');
             $headerLeft.append($title).append($subtitle);
 
             var $closeBtn = $('<button type="button" class="vas-locwisecount-modal-close" aria-label="' + lbl("VAS_165_CloseModal") + '">&times;</button>');
@@ -478,7 +480,7 @@
                 dataType: "json",
                 success: function (res) {
                     if (res && res.lines && res.lines.length > 0) {
-                        $subtitle.text(locItem.warehouse + ' · ' + monthName + ' ' + selectedYear + ' · ' + res.lines.length + ' ' + lbl("VAS_165_RecordsSuffix"));
+                        $subtitle.text(locItem.warehouse + ' · ' + periodLabel + ' · ' + res.lines.length + ' ' + lbl("VAS_165_RecordsSuffix"));
                         renderModalGrid($body, res);
                     } else {
                         $body.html('<div class="vas-locwisecount-message">' + lbl("VAS_165_NoCountLinesFoundLocation") + '</div>');
@@ -522,7 +524,7 @@
                 '<div class="vas-locwisecount-modal-footer">' +
                 '<div class="vas-locwisecount-modal-footer-left">' +
                 '<span class="vas-locwisecount-footer-text vas-modal-helper"></span>' +
-                '<span class="vas-locwisecount-modal-total-qty">' + lbl("VAS_165_TotalQty") + ' ' + Number(totalQty).toLocaleString() + '</span>' +
+                '<span class="vas-locwisecount-modal-total-qty">' + lbl("VAS_165_TotalQty") + ' ' + Number(totalQty).toLocaleString(window.navigator.language, { maximumFractionDigits: 4 }) + '</span>' +
                 '</div>' +
                 '<div class="vas-locwisecount-pager">' +
                 '<button type="button" class="vas-locwisecount-pager-btn vas-m-prev" aria-label="' + lbl("VAS_165_PreviousPage") + '">&lsaquo;</button>' +
@@ -560,7 +562,7 @@
 
                 for (var i = 0; i < paged.length; i++) {
                     var line = paged[i];
-                    var formattedQty = Number(line.qty || 0).toLocaleString();
+                    var formattedQty = Number(line.qty || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 4 });
                     var isCharge = line.inventoryType === 'Charge Account';
                     var chipClass = isCharge ? 'vas-locwisecount-chip-neutral' : 'vas-locwisecount-chip-info';
 

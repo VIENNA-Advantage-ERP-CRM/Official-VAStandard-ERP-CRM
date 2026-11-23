@@ -142,11 +142,18 @@
        "$-220.00": the symbol belongs to the number, the minus to the value. The
        amount is formatted from its absolute value so toLocaleString can't
        reintroduce its own minus after the symbol. */
-    function formatMoney(symbol, amount, precision) {
+    function formatMoney(symbol, amount, precision, isoCode) {
         var numericAmount = Number(amount || 0);
 
         if (isNaN(numericAmount)) {
             numericAmount = 0;
+        }
+
+        /* With the row's ISO code the browser culture places sign, minus and separators. */
+        if (isoCode && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+            try {
+                return VAS.formatAmountByBrowser(numericAmount, isoCode, precision, { symbol: symbol });
+            } catch (e) { if (window.console) { console.log(e); } }
         }
 
         return (
@@ -168,6 +175,11 @@
             );
 
         return symbol || fallbackSymbol || "";
+    }
+
+    /* The row's currency ISO code (for VAS.formatAmountByBrowser), else the response-level one. */
+    function rowCurrencyIso(row, fallbackIso) {
+        return (row && row.ISOCode) || fallbackIso || "";
     }
 
     function rowCurrencyPrecision(row, fallbackPrecision) {
@@ -1168,11 +1180,14 @@
                     var rowPrecision =
                         rowCurrencyPrecision(row, precision);
 
+                    var rowIso =
+                        rowCurrencyIso(row, data.ISOCode);
+
                     var debitText =
-                        formatMoney(rowSymbol, row.TotalDebit, rowPrecision);
+                        formatMoney(rowSymbol, row.TotalDebit, rowPrecision, rowIso);
 
                     var creditText =
-                        formatMoney(rowSymbol, row.TotalCredit, rowPrecision);
+                        formatMoney(rowSymbol, row.TotalCredit, rowPrecision, rowIso);
 
                     html +=
                         '<tr class="VAS-glju-entry-row" ' +
@@ -1433,6 +1448,9 @@
                     var rowPrecision =
                         rowCurrencyPrecision(row, precision);
 
+                    var rowIso =
+                        rowCurrencyIso(row, data.ISOCode);
+
                     table +=
                         "<tr>" +
                         "<td>" + esc(row.DocumentNo) + "</td>" +
@@ -1440,8 +1458,8 @@
                         "<td>" + esc(row.DateAcct) + "</td>" +
                         "<td>" + esc(row.Description) + "</td>" +
                         "<td>" + esc(row.StatusName || row.DocStatus) + "</td>" +
-                        "<td>" + esc(formatMoney(rowSymbol, row.TotalDebit, rowPrecision)) + "</td>" +
-                        "<td>" + esc(formatMoney(rowSymbol, row.TotalCredit, rowPrecision)) + "</td>" +
+                        "<td>" + esc(formatMoney(rowSymbol, row.TotalDebit, rowPrecision, rowIso)) + "</td>" +
+                        "<td>" + esc(formatMoney(rowSymbol, row.TotalCredit, rowPrecision, rowIso)) + "</td>" +
                         "</tr>";
                 }
 

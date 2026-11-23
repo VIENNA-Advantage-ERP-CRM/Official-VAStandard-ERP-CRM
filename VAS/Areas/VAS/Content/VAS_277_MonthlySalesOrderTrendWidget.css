@@ -471,6 +471,8 @@
 .vas277-chip-ok { background: #E7F7EF; color: #0B6B45; }
 .vas277-chip-warn { background: #FFF6E2; color: #9A6500; }
 .vas277-chip-prop { background: #EFEEFF; color: #5F4AA6; }
+/* VAS163 2026-11-17: Sr 208 Drafted / In Progress orders in orange. */
+.vas277-chip-orange { background: #FFEBD6; color: #B34D00; }
 
 .vas277-mstate { padding: 1em; font-size: .8125em; color: #5F7283; text-align: center; }
 

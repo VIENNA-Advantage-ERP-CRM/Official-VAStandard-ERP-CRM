@@ -141,7 +141,22 @@
             });
         }
 
+        /* Shared browser-culture formatter: the scale follows the currency (lakh / crore
+           only for Indian-numbering currencies, K / M / B otherwise) and the browser culture
+           places the minus and the currency sign. The local helpers are the fallback. */
+        function sharedAmount(value, compact) {
+            if (!(window.VAS && typeof VAS.formatAmountByBrowser === 'function')) { return null; }
+            try {
+                return VAS.formatAmountByBrowser(Number(value || 0), (trend && trend.CurrencyIso) || '',
+                    trend ? Number(trend.StdPrecision) : getStdPrecision(),
+                    { compact: compact, symbol: (trend && trend.CurrencySymbol) || '' });
+            }
+            catch (e) { if (window.console) { console.log(e); } return null; }
+        }
+
         function formatAmount(value) {
+            var shared = sharedAmount(value, true);
+            if (shared !== null) { return shared; }
             var sym = (trend && trend.CurrencySymbol) || "";
             var prec = trend ? Number(trend.StdPrecision) : getStdPrecision();
             var sign = (Number(value) < 0) ? '-' : '';
@@ -149,6 +164,8 @@
         }
 
         function formatExactAmount(value) {
+            var shared = sharedAmount(value, false);
+            if (shared !== null) { return shared; }
             var sym = (trend && trend.CurrencySymbol) || "";
             var prec = trend ? Number(trend.StdPrecision) : getStdPrecision();
             var sign = (Number(value) < 0) ? '-' : '';

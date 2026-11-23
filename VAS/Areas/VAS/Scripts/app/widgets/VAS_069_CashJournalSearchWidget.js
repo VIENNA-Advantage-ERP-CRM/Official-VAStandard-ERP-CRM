@@ -58,6 +58,7 @@
 
         var windowId = 0;
         var curSymbol = '';
+        var curIso = '';
         var stdPrecision = 2;
         var debounceTimer = null;
         var requestSeq = 0;
@@ -171,6 +172,7 @@
                     try { data = (typeof res === 'string') ? JSON.parse(res) : res; } catch (e) { }
                     if (data) {
                         curSymbol = data.CurSymbol || '';
+                        curIso = data.CurrencyISO || '';
                         stdPrecision = (typeof data.StdPrecision === 'number') ? data.StdPrecision : 2;
                         windowId = VIS.Utility.Util.getValueOfInt(data.WindowId);
                     }
@@ -373,6 +375,10 @@
             var n = (typeof number === 'number') ? number : parseFloat(number);
             if (isNaN(n)) { return ''; }
             var prec = VIS.Env.getCtx().getStdPrecision() || stdPrecision || 2;
+            // Browser culture places sign and currency via VAS.formatAmountByBrowser; escaped (goes into HTML).
+            if (curIso && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try { return dsEsc(VAS.formatAmountByBrowser(n, curIso, prec, { symbol: curSymbol })); } catch (e) { if (window.console) { console.log(e); } }
+            }
             var formatted = n.toLocaleString(window.navigator.language, { minimumFractionDigits: prec, maximumFractionDigits: prec });
             return (curSymbol ? curSymbol + ' ' : '') + formatted;
         }

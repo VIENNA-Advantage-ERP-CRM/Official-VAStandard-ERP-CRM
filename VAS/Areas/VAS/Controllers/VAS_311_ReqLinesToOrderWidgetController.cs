@@ -45,7 +45,7 @@ namespace VIS.Controllers
                     lineNo = l.LineNo,
                     product = l.ItemName,
                     productCode = l.ProductValue,
-                    qty = l.NotOrderedQty,
+                    qty = l.NotOrderedQty * l.UomFactor, // VAS163 2026-11-17: Sr 7 - qty in the line's UOM (shown with it)
                     uom = l.UomName,
                     amount = l.Amount(l.NotOrderedQty),
                     needBy = VAS_ReqWidgetData.D(l.NeedBy),

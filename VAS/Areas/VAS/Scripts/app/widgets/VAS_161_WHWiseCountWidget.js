@@ -132,9 +132,9 @@
             $monthSelect = $('<select class="vas-whwisecount-select">');
             $yearSelect = $('<select class="vas-whwisecount-select">');
 
-            var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-            for (var m = 0; m < months.length; m++) {
-                var $opt = $('<option value="' + (m + 1) + '">' + months[m] + '</option>');
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            for (var m = 0; m < 12; m++) {
+                var $opt = $('<option value="' + (m + 1) + '">' + new Date(2000, m, 1).toLocaleDateString(window.navigator.language, { month: 'short' }) + '</option>');
                 if (m + 1 === selectedMonth) {
                     $opt.attr('selected', 'selected');
                 }
@@ -244,9 +244,9 @@
         }
 
         function loadSummary() {
-            var monthsFull = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-            var mName = monthsFull[selectedMonth - 1] || "";
-            $subtitle.text(lbl("VAS_161_WarehousesActiveLocators") + " · " + mName + " " + selectedYear);
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            var periodLabel = new Date(Number(selectedYear), Number(selectedMonth) - 1, 1).toLocaleDateString(window.navigator.language, { month: 'long', year: 'numeric' });
+            $subtitle.text(lbl("VAS_161_WarehousesActiveLocators") + " · " + periodLabel);
 
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_161_WHWiseCountWidget/GetWarehouseSummary?month=" + selectedMonth + "&year=" + selectedYear,
@@ -347,7 +347,9 @@
 
             for (var i = 0; i < pageItems.length; i++) {
                 var item = pageItems[i];
-                var formattedQty = Number(item.totalQtyCounted || 0).toLocaleString();
+                // VAS163 2026-11-12: explicit browser locale for qty / session count (were toLocaleString() / raw).
+                var formattedQty = Number(item.totalQtyCounted || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 4 });
+                var formattedSessions = Number(item.sessionCount || 0).toLocaleString(window.navigator.language);
 
                 var $row = $(
                     '<button type="button" class="vas-whwisecount-row-btn vas-whwisecount-grid-template" aria-label="' + lbl("VAS_161_OpenCountDetailsFor") + ' ' + item.warehouseName + '">' +
@@ -355,7 +357,7 @@
                     '<div class="vas-whwisecount-wh-title" title="' + item.warehouseName + '">' + item.warehouseName + '</div>' +
                     '<div class="vas-whwisecount-wh-code" title="' + item.warehouseCode + '">' + item.warehouseCode + '</div>' +
                     '</div>' +
-                    '<div class="vas-whwisecount-cell vas-whwisecount-counts-num" title="' + item.sessionCount + '">' + item.sessionCount + '</div>' +
+                    '<div class="vas-whwisecount-cell vas-whwisecount-counts-num" title="' + formattedSessions + '">' + formattedSessions + '</div>' +
                     '<div class="vas-whwisecount-cell vas-whwisecount-qty-num" title="' + formattedQty + '">' + formattedQty + '</div>' +
                     '</button>'
                 );
@@ -423,8 +425,8 @@
                 $modalOverlay.remove();
             }
 
-            var monthsFull = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-            var monthName = monthsFull[selectedMonth - 1] || "";
+            // VAS163 2026-11-10: browser locale (6-Nov retest2).
+            var periodLabel = new Date(Number(selectedYear), Number(selectedMonth) - 1, 1).toLocaleDateString(window.navigator.language, { month: 'long', year: 'numeric' });
 
             var $overlay = $('<div class="vas-whwisecount-modal-overlay">');
             var $dialog = $('<div class="vas-whwisecount-modal-dialog" role="dialog" aria-modal="true">');
@@ -433,7 +435,7 @@
             var $header = $('<div class="vas-whwisecount-modal-header">');
             var $headerLeft = $('<div class="vas-whwisecount-modal-header-left">');
             var $title = $('<h3 class="vas-whwisecount-modal-title" title="' + whItem.warehouseName + '">' + whItem.warehouseName + '</h3>');
-            var $subtitle = $('<span class="vas-whwisecount-modal-subtitle">' + whItem.warehouseCode + ' · ' + monthName + ' ' + selectedYear + '</span>');
+            var $subtitle = $('<span class="vas-whwisecount-modal-subtitle">' + whItem.warehouseCode + ' · ' + periodLabel + '</span>');
             $headerLeft.append($title).append($subtitle);
 
             var $closeBtn = $('<button type="button" class="vas-whwisecount-modal-close" aria-label="' + lbl("VAS_161_CloseModal") + '">&times;</button>');
@@ -468,7 +470,7 @@
                 dataType: "json",
                 success: function (res) {
                     if (res && res.lines && res.lines.length > 0) {
-                        $subtitle.text(whItem.warehouseCode + ' · ' + monthName + ' ' + selectedYear + ' · ' + (res.locatorCount || 0) + ' ' + lbl("VAS_161_LocatorsSuffix"));
+                        $subtitle.text(whItem.warehouseCode + ' · ' + periodLabel + ' · ' + (res.locatorCount || 0) + ' ' + lbl("VAS_161_LocatorsSuffix"));
                         renderModalGrid($body, res);
                     } else {
                         $body.html('<div class="vas-whwisecount-message">' + lbl("VAS_161_NoCountLinesFoundWarehouse") + '</div>');
@@ -512,7 +514,7 @@
                 '<div class="vas-whwisecount-modal-footer">' +
                 '<div class="vas-whwisecount-modal-footer-left">' +
                 '<span class="vas-whwisecount-footer-text vas-modal-helper"></span>' +
-                '<span class="vas-whwisecount-modal-total-qty">' + lbl("VAS_161_TotalQty") + ' ' + Number(totalQty).toLocaleString() + '</span>' +
+                '<span class="vas-whwisecount-modal-total-qty">' + lbl("VAS_161_TotalQty") + ' ' + Number(totalQty).toLocaleString(window.navigator.language, { maximumFractionDigits: 4 }) + '</span>' +
                 '</div>' +
                 '<div class="vas-whwisecount-pager">' +
                 '<button type="button" class="vas-whwisecount-pager-btn vas-m-prev" aria-label="' + lbl("VAS_161_PreviousPage") + '">&lsaquo;</button>' +
@@ -550,7 +552,7 @@
 
                 for (var i = 0; i < paged.length; i++) {
                     var line = paged[i];
-                    var formattedQty = Number(line.qty || 0).toLocaleString();
+                    var formattedQty = Number(line.qty || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 4 });
                     var isCharge = line.inventoryType === 'Charge Account';
                     var chipClass = isCharge ? 'vas-whwisecount-chip-neutral' : 'vas-whwisecount-chip-info';
 

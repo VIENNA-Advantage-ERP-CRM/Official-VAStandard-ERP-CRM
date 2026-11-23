@@ -219,7 +219,7 @@
                     '<div class="vas-t5vwdg-lg-row">' +
                         '<span class="vas-t5vwdg-lg-dot" style="background:' + color + ';"></span>' +
                         '<span class="vas-t5vwdg-lg-name" title="' + t5vEsc(v.Name) + '">' + t5vEsc(v.Name) + '</span>' +
-                        '<span class="vas-t5vwdg-lg-val">' + t5vEsc(sym + t5vShort(v.CurrAmt) + ' · ' + pct + '%') + '</span>' +
+                        '<span class="vas-t5vwdg-lg-val">' + t5vEsc(t5vFmt(v.CurrAmt, sym, precision) + ' · ' + pct + '%') + '</span>' +
                     '</div>';
             }
             return out;
@@ -249,7 +249,7 @@
                 amounts.push(vendors[i].CurrAmt);
             }
 
-            var centerText  = sym + t5vShort(total);
+            var centerText  = t5vFmt(total, sym, data.StdPrecision);
             var totalLabel  = msg('VAS_023_Total', 'Total');
             var bgColors    = DONUT_COLORS.slice(0, n);
 
@@ -319,18 +319,13 @@
                 .replace(/"/g, '&quot;');
         }
 
-        /* Compact magnitude via the shared CurrencyFormat util (Indian vs international
-           per base-currency ISO), exactly like VAS_019/VAS_024. Returns the unsigned
-           magnitude only — callers prepend the sign/symbol. */
-        function t5vShort(val) {
-            var d = $self._kpiData || {};
-            return VIS.Util.formatCompactAmount(val, d.CurIso || '', d.StdPrecision);
-        }
-
+        /* Compact amount (Indian vs international per base-currency ISO) as plain text;
+           the browser culture places the currency sign and the minus
+           (VAS.formatAmountByBrowser, 20-Nov-2026). */
         function t5vFmt(amount, sym, precision) {
+            var d = $self._kpiData || {};
             amount = Number(amount || 0);
-            var sign = amount < 0 ? '-' : '';
-            return sign + sym + t5vShort(amount);
+            return VAS.formatAmountByBrowser(amount, d.CurIso || '', d.StdPrecision, { compact: true, symbol: sym });
         }
 
         /* ---- Busy indicator ---- */

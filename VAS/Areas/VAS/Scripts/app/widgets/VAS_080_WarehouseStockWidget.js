@@ -117,6 +117,11 @@
         }
 
         function formatAmount(value) {
+            // Browser culture places the minus before the currency sign ("-$751.69", not "$ -751.69").
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                return VAS.formatAmountByBrowser(value, warehouseStockState.currencyIso,
+                    warehouseStockState.stdPrecision, { symbol: warehouseStockState.currencySymbol });
+            }
             var number = Number(value || 0);
             var precision = getPrecision(warehouseStockState.stdPrecision);
             var currency = warehouseStockState.currencySymbol || warehouseStockState.currencyIso;
@@ -135,6 +140,10 @@
         // stays under its header instead of overflowing sideways. Indian-family
         // currencies use Cr/Lakh; others use K/M/B. Full value stays in the tooltip.
         function formatCompactAmount(value) {
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                return VAS.formatAmountByBrowser(value, warehouseStockState.currencyIso,
+                    warehouseStockState.stdPrecision, { compact: true, symbol: warehouseStockState.currencySymbol });
+            }
             var iso = warehouseStockState.currencyIso;
             var currency = warehouseStockState.currencySymbol || iso;
             var number = Number(value || 0);

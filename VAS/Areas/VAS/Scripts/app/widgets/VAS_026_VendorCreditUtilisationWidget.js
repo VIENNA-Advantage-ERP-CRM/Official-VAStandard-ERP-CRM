@@ -321,6 +321,12 @@
         }
 
         function vcuFmt(amount, sym, precision) {
+            // Browser culture + K/M/B (L/Cr only for Indian-numbering ISO) once the server sends CurIso;
+            // the payload has no ISO yet, so the old lakh/crore code below still runs until it does.
+            var iso = ($self._kpiData && $self._kpiData.CurIso) || '';
+            if (iso && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try { return VAS.formatAmountByBrowser(Number(amount) || 0, iso, precision, { compact: true, symbol: sym }); } catch (e) { if (window.console) { console.log(e); } }
+            }
             if (!amount || amount === 0) { return sym + '0'; }
             var abs  = Math.abs(amount);
             var loc  = window.navigator.language;

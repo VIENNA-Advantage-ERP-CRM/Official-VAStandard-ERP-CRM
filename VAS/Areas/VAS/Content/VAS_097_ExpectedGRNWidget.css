@@ -101,6 +101,9 @@
 
 /* document list (design .dl) - flat rows separated by dividers */
 .vas-egrn-rows {
+    /* VAS163 2026-11-13: rows 558/599 - row text uses the same anchor as Receipt Queue / Receipt Aging /
+       QA Holds cards (.vas-rq-card etc.) so the em sizes below give the same px (13.5 / 12.4 at 1440). */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 32px);
     flex: 1 1 auto;
     min-height: 0;
     display: flex;
@@ -175,7 +178,7 @@
 }
 
 .vas-egrn-no {
-    font-size: .64em;
+    font-size: .75em; /* VAS163 2026-11-13: rows 558/599 was .64em (= .vas-rq-cell .75em) */
     font-weight: 700;
     color: #102C3F;
     overflow: hidden;
@@ -186,7 +189,7 @@
 /* line count - plain bold dark text (design .dl-qty), no badge/circle */
 .vas-egrn-qty {
     flex: 0 0 auto;
-    font-size: .64em;
+    font-size: .75em; /* VAS163 2026-11-13: rows 558/599 was .64em */
     font-weight: 700;
     color: #102C3F;
 }
@@ -200,7 +203,7 @@
 }
 
 .vas-egrn-party {
-    font-size: .58em;
+    font-size: .6875em; /* VAS163 2026-11-13: rows 558/599 was .58em (= Receipt Queue secondary text) */
     color: #5F7283;
     flex: 1 1 auto;
     min-width: 0;
@@ -217,7 +220,7 @@
 }
 
 .vas-egrn-addr {
-    font-size: .54em;
+    font-size: .6875em; /* VAS163 2026-11-13: rows 558/599 was .54em */
     color: #748494;
     flex: 1 1 auto;
     min-width: 0;
@@ -227,14 +230,14 @@
 }
 
 .vas-egrn-wh {
-    font-size: .54em;
+    font-size: .6875em; /* VAS163 2026-11-13: rows 558/599 was .54em */
     color: #748494;
     flex: 0 0 auto;
     white-space: nowrap;
 }
 
 .vas-egrn-val {
-    font-size: .58em;
+    font-size: .6875em; /* VAS163 2026-11-13: rows 558/599 was .58em */
     font-weight: 700;
     color: #0083DA;
     flex: 0 0 auto;

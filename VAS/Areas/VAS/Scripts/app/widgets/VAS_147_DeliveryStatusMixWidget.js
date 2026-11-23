@@ -109,26 +109,55 @@
         }
 
         function monthNames() {
-            return lbl('VAS_147_DSM_Months', 'January,February,March,April,May,June,July,August,September,October,November,December').split(',');
+            // VAS163 2026-11-12: month names from the browser culture, not a fixed English list.
+            var list = [];
+            for (var i = 0; i < 12; i++) { list.push(new Date(2000, i, 1).toLocaleDateString(window.navigator.language, { month: 'long' })); }
+            return list;
         }
 
         var currency = {};
 
         // Formats an amount in the system currency (session base currency, returned
         // by the controller) instead of a hardcoded rupee.
-        function formatMoney(value) {
-            var num = Number(value || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
-            var token = currency.iso || currency.symbol || '';
-            return token ? (token + ' ' + num) : num;
+        // VAS163 2026-11-12: the server currency (a row carries its order's currency; the
+        // session currency otherwise) through the shared helper - no "token + ' ' + number",
+        // no fixed 0 decimals; the browser culture places the symbol.
+        function formatMoney(value, cur) {
+            var c = cur || currency;
+            return VAS.formatAmountByBrowser(Number(value || 0), c.iso || '', c.precision, { symbol: c.symbol || '' });
+        }
+
+        function rowCurrency(d) {
+            return (d && d.currencyIso) ? { iso: d.currencyIso, symbol: d.currencySymbol, precision: d.currencyPrecision } : currency;
+        }
+
+        // The modal total: one currency when every row shares it, else a plain number (never guessed).
+        function totalCurrency(list) {
+            var first = null;
+            for (var i = 0; i < list.length; i++) {
+                var rc = rowCurrency(list[i]);
+                if (first === null) { first = rc; } else if ((rc.iso || '') !== (first.iso || '')) { return { iso: '', symbol: '', precision: first.precision }; }
+            }
+            return first || currency;
+        }
+
+        function formatCount(value) {
+            return (Number(value) || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 0 });
+        }
+
+        function periodText() {
+            return new Date(selYear, selMonth - 1, 1).toLocaleDateString(window.navigator.language, { month: 'long', year: 'numeric' });
         }
 
         function formatDate(iso) {
             if (!iso) { return '-'; }
             var p = String(iso).split('-'); // yyyy-MM-dd
             if (p.length !== 3) { return iso; }
-            var mn = monthNames();
-            var mi = parseInt(p[1], 10) - 1;
-            return p[2] + ' ' + (mn[mi] || p[1]) + ' ' + p[0];
+            // VAS163 2026-11-12: browser-locale date (was a fixed "dd Month yyyy" pattern);
+            // parsed by parts as a local date.
+            var d = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
+            if (isNaN(d.getTime())) { return iso; }
+            return d.toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' });
         }
 
         function repLabel(r) {
@@ -246,17 +275,17 @@
                     seg('completed', r.completed, r.total) +
                     seg('voided', r.voided, r.total) +
                     '</span>' +
-                    '<span class="vas-dsm-total">' + r.total + '</span>' +
+                    '<span class="vas-dsm-total">' + formatCount(r.total) + '</span>' +
                     '</button>';
             }
             $body.html(html);
 
             var last = Math.min(start + rowsPerPage, rows.length);
             $root.find('.vas-dsm-foot').html(
-                '<span class="vas-dsm-help">' + escapeHtml(lbl('VAS_147_DSM_Showing', 'Showing')) + ' ' + (start + 1) + '–' + last + ' ' + escapeHtml(lbl('VAS_147_DSM_Of', 'of')) + ' ' + rows.length + '</span>' +
+                '<span class="vas-dsm-help">' + escapeHtml(lbl('VAS_147_DSM_Showing', 'Showing')) + ' ' + formatCount(start + 1) + '–' + formatCount(last) + ' ' + escapeHtml(lbl('VAS_147_DSM_Of', 'of')) + ' ' + formatCount(rows.length) + '</span>' +
                 '<span class="vas-dsm-pager">' +
                 '<button type="button" class="vas-dsm-pgbtn vas-dsm-prev"' + (page === 0 ? ' disabled' : '') + '>' + chevL() + '</button>' +
-                '<span class="vas-dsm-pgtext">' + (page + 1) + ' ' + escapeHtml(lbl('VAS_147_DSM_Of', 'of')) + ' ' + pageCount + '</span>' +
+                '<span class="vas-dsm-pgtext">' + formatCount(page + 1) + ' ' + escapeHtml(lbl('VAS_147_DSM_Of', 'of')) + ' ' + formatCount(pageCount) + '</span>' +
                 '<button type="button" class="vas-dsm-pgbtn vas-dsm-next"' + (page >= pageCount - 1 ? ' disabled' : '') + '>' + chevR() + '</button>' +
                 '</span>'
             );
@@ -287,8 +316,7 @@
             $dialog.removeClass('vas-dsm-hidden');
             $('body').addClass('vas-dsm-body-lock');
 
-            var mn = monthNames();
-            var periodLabel = (mn[selMonth - 1] || selMonth) + ' ' + selYear;
+            var periodLabel = periodText(); // VAS163 2026-11-12
             $dialog.find('.vas-dsm-mtitle').text(lbl('VAS_147_DSM_ModalTitle', 'Delivery Orders') + ' · ' + repLabel(entry));
             $dialog.find('.vas-dsm-msub').text(periodLabel);
             $dialog.find('.vas-dsm-mbody').html('<div class="vas-dsm-mloading">…</div>');
@@ -318,11 +346,10 @@
         }
 
         function renderModalPage(entry) {
-            var mn = monthNames();
-            var periodLabel = (mn[selMonth - 1] || selMonth) + ' ' + selYear;
+            var periodLabel = periodText(); // VAS163 2026-11-12
             var total = modalRows.length;
 
-            $dialog.find('.vas-dsm-msub').text(periodLabel + ' · ' + total + ' ' + lbl('VAS_147_DSM_Orders', 'orders'));
+            $dialog.find('.vas-dsm-msub').text(periodLabel + ' · ' + formatCount(total) + ' ' + lbl('VAS_147_DSM_Orders', 'orders'));
 
             var head =
                 '<div class="vas-dsm-dohead">' +
@@ -350,7 +377,7 @@
                     '<div class="vas-dsm-docell" title="' + escapeHtml(d.customerName) + '">' + escapeHtml(d.customerName || '-') + '</div>' +
                     '<div class="vas-dsm-docell">' + escapeHtml(formatDate(d.movementDate)) + '</div>' +
                     '<div><span class="vas-dsm-dostatus ' + st.bucket + '"><span class="vas-dsm-dot"></span>' + escapeHtml(stLabel) + '</span></div>' +
-                    '<div class="vas-dsm-doamount">' + escapeHtml(formatMoney(d.value)) + '</div>' +
+                    '<div class="vas-dsm-doamount">' + escapeHtml(formatMoney(d.value, rowCurrency(d))) + '</div>' +
                     '</div>';
             }
             if (!total) { body = '<div class="vas-dsm-empty">' + escapeHtml(lbl('VAS_147_DSM_Empty', 'No delivery orders')) + '</div>'; }
@@ -358,10 +385,10 @@
             $dialog.find('.vas-dsm-mbody').html(head + '<div class="vas-dsm-dolist">' + body + '</div>');
 
             var footHtml =
-                '<span class="vas-dsm-mtotal">' + escapeHtml(lbl('VAS_147_DSM_TotalValue', 'Total value')) + ' ' + escapeHtml(formatMoney(modalTotalValue)) + '</span>' +
+                '<span class="vas-dsm-mtotal">' + escapeHtml(lbl('VAS_147_DSM_TotalValue', 'Total value')) + ' ' + escapeHtml(formatMoney(modalTotalValue, totalCurrency(modalRows))) + '</span>' +
                 '<span class="vas-dsm-pager">' +
                 '<button type="button" class="vas-dsm-pgbtn vas-dsm-mprev"' + (modalPage <= 0 ? ' disabled' : '') + '>' + chevL() + '</button>' +
-                '<span class="vas-dsm-pgtext">' + (modalPage + 1) + ' ' + lbl('VAS_147_DSM_Of', 'of') + ' ' + pageCount + '</span>' +
+                '<span class="vas-dsm-pgtext">' + formatCount(modalPage + 1) + ' ' + lbl('VAS_147_DSM_Of', 'of') + ' ' + formatCount(pageCount) + '</span>' +
                 '<button type="button" class="vas-dsm-pgbtn vas-dsm-mnext"' + (modalPage >= pageCount - 1 ? ' disabled' : '') + '>' + chevR() + '</button>' +
                 '</span>';
             $dialog.find('.vas-dsm-mfoot').html(footHtml);
@@ -423,3 +450,78 @@
     };
 
 })(VAS, jQuery);
+/* VAS163 2026-11-12: VAS.formatAmountByBrowser(value, isoCode, precision, { compact, symbol })
+   Amount in the BROWSER culture (window.navigator.language) with the currency the SERVER sent
+   (ISO code + precision; the server symbol only as a fallback). Defined in each widget / panel
+   that uses it - guarded, so the first file loaded defines it - so the shared util/CurrencyFormat.js
+   stays as shipped. Compact amounts keep that file's default scale (VIS.Util.formatCompactAmount:
+   L / Cr for Indian-numbering currencies, K / M / B otherwise, digits in the browser culture);
+   separators, decimals and the position of the currency sign come from the browser culture. */
+; (function () {
+    var V = window.VAS = window.VAS || {};
+    if (typeof V.formatAmountByBrowser === 'function') return;
+    function browserLocale() { try { return window.navigator.language || undefined; } catch (e) { return undefined; } }
+    function resolvePrecision(p) {
+        var n = Number(p);
+        if (p === null || p === undefined || p === '' || isNaN(n) || n < 0) {
+            try { n = VIS.Env.getCtx().getStdPrecision(); } catch (e) { n = 2; }
+        }
+        n = Math.round(Number(n));
+        return (isNaN(n) || n < 0) ? 2 : Math.min(n, 10);
+    }
+    function validIso(c) { c = String(c || '').trim().toUpperCase(); return /^[A-Z]{3}$/.test(c) ? c : ''; }
+    function numberFormat(o) {
+        try { return new Intl.NumberFormat(browserLocale(), o); } catch (e) { }
+        if (o.currencyDisplay === 'narrowSymbol') {
+            o.currencyDisplay = 'symbol';
+            try { return new Intl.NumberFormat(browserLocale(), o); } catch (e2) { }
+        }
+        return null;
+    }
+    /* Currency sign and where the browser culture puts it for this ISO code. */
+    var layoutCache = {};
+    function currencyLayout(iso) {
+        var key = browserLocale() + '|' + iso;
+        if (layoutCache[key]) return layoutCache[key];
+        var out = { sign: '', before: true, gap: '' };
+        var f = iso ? numberFormat({ style: 'currency', currency: iso, currencyDisplay: 'narrowSymbol' }) : null;
+        if (f && typeof f.formatToParts === 'function') {
+            try {
+                var parts = f.formatToParts(1234.5), ci = -1, ni = -1;
+                for (var i = 0; i < parts.length; i++) {
+                    if (parts[i].type === 'currency' && ci < 0) ci = i;
+                    if (parts[i].type === 'integer' && ni < 0) ni = i;
+                }
+                if (ci >= 0) {
+                    out.sign = parts[ci].value;
+                    if (ni >= 0) {
+                        out.before = ci < ni;
+                        var near = out.before ? parts[ci + 1] : parts[ci - 1];
+                        out.gap = (near && near.type === 'literal') ? near.value : '';
+                    }
+                }
+            } catch (e) { }
+        }
+        layoutCache[key] = out;
+        return out;
+    }
+    V.formatAmountByBrowser = function (value, isoCode, precision, options) {
+        options = options || {};
+        var num = Number(value) || 0;
+        var p = resolvePrecision(precision);
+        var iso = validIso(isoCode);
+        var body;
+        if (options.compact && window.VIS && VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
+            body = VIS.Util.formatCompactAmount(Math.abs(num), iso, p);
+        } else {
+            var f = numberFormat({ minimumFractionDigits: p, maximumFractionDigits: p });
+            try { body = f ? f.format(Math.abs(num)) : Math.abs(num).toFixed(p); } catch (e) { body = String(Math.abs(num)); }
+        }
+        var minus = (num < 0 && /[1-9]/.test(body)) ? '-' : '';
+        var lay = currencyLayout(iso);
+        var sign = lay.sign || options.symbol || iso;
+        if (!sign) return minus + body;
+        if (!lay.sign) return minus + sign + ' ' + body;
+        return lay.before ? (minus + sign + lay.gap + body) : (minus + body + lay.gap + sign);
+    };
+})();

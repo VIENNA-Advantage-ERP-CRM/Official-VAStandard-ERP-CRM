@@ -275,14 +275,14 @@
         }
 
         // Compact "ARR"/value in the base (accounting-schema) currency. The magnitude
-        // comes from VIS.Util.formatCompactAmount, so the scale follows the base
+        // comes from VIS.Util.BrowserCultureFormatter.formatCompactAmount, so the scale follows the base
         // currency's numbering system (K/M/B or K/L/Cr) at the configured precision.
         function formatArr(value) {
             var n = Number(value || 0);
             if (!isFinite(n)) { n = 0; }
             var sign = n < 0 ? '-' : '';
             var affix = currencyAffixes(searchCurrency.symbol, searchCurrency.iso);
-            return sign + affix.before + VIS.Util.formatCompactAmount(Math.abs(n), searchCurrency.iso, currencyPrecision()) + affix.after;
+            return sign + affix.before + VIS.Util.BrowserCultureFormatter.formatCompactAmount(Math.abs(n), searchCurrency.iso, currencyPrecision()) + affix.after;
         }
         function formatArrFull(value) {
             var n = Number(value || 0);
@@ -305,6 +305,11 @@
             } catch (e) {
                 return sign + (symbol ? symbol + ' ' + abs.toFixed(precision) : abs.toFixed(precision));
             }
+        }
+
+        // 2026-11-18: compact amount with the full amount as its hover tooltip.
+        function amountHtml(value) {
+            return '<span title="' + escapeHtml(formatArrFull(value)) + '">' + escapeHtml(formatArr(value)) + '</span>';
         }
 
         // Segment = the marketing target list(s) the customer belongs to. The server
@@ -428,6 +433,7 @@
 
             var head = '<div class="vas126-grid-head">' +
                 '<span>' + escapeHtml(label('VAS_126_Customer', 'Customer')) + '</span>' +
+                '<span class="is-right">' + escapeHtml(label('VAS_126_OpenTickets', 'Open tickets')) + '</span>' +
                 '<span>' + escapeHtml(label('VAS_126_Tier', 'Tier')) + '</span>' +
                 '<span>' + escapeHtml(label('VAS_126_Owner', 'Owner')) + '</span>' +
                 '<span class="is-right">' + escapeHtml(label('VAS_126_ARR', 'ARR')) + '</span>' +
@@ -453,6 +459,7 @@
                             '<span class="vas126-c-contact" title="' + escapeHtml(contact) + '">' + escapeHtml(contact) + '</span>' +
                         '</span>' +
                     '</span>' +
+                    '<span class="vas126-c-arr is-right">' + escapeHtml(formatCount(customer.openTickets || 0)) + '</span>' +
                     '<span class="vas126-c-tier">' + tierTagHtml(customer.tier, customer.tierCode) + '</span>' +
                     '<span class="vas126-c-owner" title="' + escapeHtml(owner) + '">' + escapeHtml(owner) + '</span>' +
                     '<span class="vas126-c-arr is-right" title="' + escapeHtml(formatArrFull(customer.value)) + '">' + escapeHtml(arr) + '</span>' +
@@ -500,11 +507,25 @@
             closeTriage();
             try {
                 if ($self.windowNo >= 0) {
-                    $self.widgetFirevalueChanged({
-                        "TabLayout": "N",
-                        "TabIndex": "0",
-                        "ActionName": hostWindowName() || CUSTOMER_WINDOW_NAME,
-                        "ActionType": "W"
+                    // Filter the host grid to the customers that have open tickets. A flat
+                    // C_BPartner_ID IN (...) list is used (not a subquery): the host window's
+                    // grid SQL handling mishandles nested SELECTs in the tab where clause.
+                    $.ajax({
+                        url: VIS.Application.contextUrl + 'VAS_126_OpenTicketsWidget/GetOpenTicketCustomerIds',
+                        type: 'GET',
+                        cache: false,
+                        success: function (response) {
+                            var data = parseResponse(response);
+                            if (data && data.error) { return; }
+                            var ids = (data && data.ids) || [];
+                            $self.widgetFirevalueChanged({
+                                "TabWhereClause": "C_BPartner.C_BPartner_ID IN (" + (ids.length ? ids.join(',') : '-1') + ")",
+                                "TabLayout": "N",
+                                "TabIndex": "0",
+                                "ActionName": hostWindowName() || CUSTOMER_WINDOW_NAME,
+                                "ActionType": "W"
+                            });
+                        }
                     });
                 }
                 else {
@@ -625,10 +646,10 @@
                 fact('VAS_126_Tier', 'Tier', tierFactVal) +
                 fact('VAS_126_Segment', 'Segment', escapeHtml(data.segment || dash)) +
                 fact('VAS_126_Owner', 'Owner', escapeHtml(data.rep || dash)) +
-                fact('VAS_126_ARR', 'ARR', escapeHtml(formatArr(data.value))) +
+                fact('VAS_126_ARR', 'ARR', amountHtml(data.value)) +
                 fact('VAS_126_OpenTicketsFact', 'Open tickets', escapeHtml(formatCount(data.openTickets || 0))) +
                 fact('VAS_126_Projects', 'Projects', projectText(data.projectName, projects, dash)) +
-                fact('VAS_126_Pipeline', 'Pipeline', pipeline > 0 ? escapeHtml(formatArr(pipeline)) : dash) +
+                fact('VAS_126_Pipeline', 'Pipeline', pipeline > 0 ? amountHtml(pipeline) : dash) +
                 fact('VAS_126_Onboarding', 'Onboarding', data.onboardingPercent == null ? dash : escapeHtml(formatCount(data.onboardingPercent) + '%')) +
             '</div>';
 
@@ -643,7 +664,7 @@
             if (overdue > 0) {
                 var invPart = data.overdueInvoice ? ' · ' + data.overdueInvoice : '';
                 signals += signalRow('cash', '#ED1C24',
-                    escapeHtml(formatArr(overdue) + ' ' + label('VAS_126_Overdue', 'overdue') + invPart),
+                    amountHtml(overdue) + escapeHtml(' ' + label('VAS_126_Overdue', 'overdue') + invPart),
                     formatCount(data.overdueDays || 0) + ' ' + label('VAS_126_DaysPastDue', 'days past due'));
             }
             var signalsBlock = signals

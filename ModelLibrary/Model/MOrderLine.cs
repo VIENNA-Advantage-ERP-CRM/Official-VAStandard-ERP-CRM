@@ -327,6 +327,60 @@ namespace VAdvantage.Model
         }
 
         /// <summary>
+        /// Re-price the line from the given price list (the order header's price list was changed while lines
+        /// exist). Priced in the line UOM and attribute set instance on the order date. When no price is found the
+        /// line is not changed.
+        /// </summary>
+        /// <param name="M_PriceList_ID">price list to price from</param>
+        /// <returns>true when a price was found and set on the line</returns>
+        public bool SetPriceFromPriceList(int M_PriceList_ID)
+        {
+            if (GetM_Product_ID() == 0 || M_PriceList_ID == 0)
+                return false;
+            MProductPricing pp = GetProductPricing(M_PriceList_ID);
+            if (!pp.IsCalculated())
+            {
+                log.Fine("No price on M_PriceList_ID=" + M_PriceList_ID + " for M_Product_ID=" + GetM_Product_ID());
+                return false;
+            }
+            SetPriceActual(pp.GetPriceStd());
+            SetPriceList(pp.GetPriceList());
+            SetPriceLimit(pp.GetPriceLimit());
+            // price is already in the line UOM (see SetPrice)
+            SetPriceEntered(GetPriceActual());
+            SetDiscount(pp.GetDiscount());
+            return true;
+        }
+
+        /// <summary>
+        /// The order moved to a price list in another currency and the product has no price on it: the old
+        /// price means nothing in the new currency, so all prices become 0. The pricing object is set so
+        /// BeforeSave does not look a price up again (SetPrice when price is 0, with the base price list fallback).
+        /// </summary>
+        internal void SetPriceZeroNotOnPriceList()
+        {
+            SetPriceEntered(Env.ZERO);
+            SetPriceActual(Env.ZERO);
+            SetPriceList(Env.ZERO);
+            SetPriceLimit(Env.ZERO);
+            if (_productPrice == null)
+            {
+                _productPrice = new MProductPricing(GetAD_Client_ID(), GetAD_Org_ID(),
+                    GetM_Product_ID(), GetC_BPartner_ID(), GetQtyOrdered(), _IsSOTrx);
+            }
+        }
+
+        /// <summary>
+        /// Order tax for this line's tax and the header totals - run once per tax by
+        /// MOrder.FinishBulkLineUpdate after a bulk line save (the per-line save skips it then).
+        /// </summary>
+        /// <returns>true if updated</returns>
+        internal bool UpdateHeaderTaxForOrder()
+        {
+            return UpdateHeaderTax();
+        }
+
+        /// <summary>
         /// Get and calculate Product Pricing
         /// </summary>
         /// <param name="M_PriceList_ID">id</param>
@@ -5016,7 +5070,9 @@ namespace VAdvantage.Model
                 if (!(!String.IsNullOrEmpty(Ord.GetConditionalFlag()) &&
                     Ord.GetConditionalFlag().Equals(MOrder.CONDITIONALFLAG_PrepareIt)))
                 {
-                    if (!UpdateHeaderTax())
+                    // Bulk line save (price list re-pricing, line panels): the order runs the tax / header
+                    // update once for all lines (MOrder.FinishBulkLineUpdate)
+                    if (!Ord.IsBulkLineUpdate && !UpdateHeaderTax())
                         return false;
 
                     // Budget breach approval was given for the old lines, so check budget again on complete

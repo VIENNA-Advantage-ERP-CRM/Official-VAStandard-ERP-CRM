@@ -45,7 +45,8 @@
  *                  VIS.Util.formatCompactAmount helper
  *                  (Scripts/app/util/CurrencyFormat.js) - no tenant currency is ever
  *                  assumed. The three flow figures are bare magnitudes; only the
- *                  closing balance carries the symbol, because it is the row's one
+ *                  closing balance carries the symbol (via VAS.formatAmountByBrowser,
+ *                  compact), because it is the row's one
  *                  absolute figure and the account's ISO code is already under its
  *                  name.
  *
@@ -942,8 +943,18 @@
         }
 
         /* The closing balance is the row's one absolute figure, and the only place the
-           currency symbol appears. */
+           currency symbol appears. Composed by the shared browser-culture formatter with
+           the ROW's ISO code and symbol (signed, true minus); falls back to symbol +
+           compact() when it is not loaded. */
         function money(item, value) {
+            if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(Number(value) || 0,
+                        (item && item.CurrencyCode) ? item.CurrencyCode : '', precisionOf(item),
+                        { compact: true, symbol: symbolOf(item), minusSign: '−' });
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
             return symbolOf(item) + compact(item, value);
         }
 
@@ -972,17 +983,27 @@
         /* Full, non-compact amount for the tooltips: the exact figure behind the rounded
            cell. Grouping and the decimal separator come from the browser locale, the
            decimals from the ROW currency's precision. */
-        function amountText(item, value) {
+        // Full amount via the shared browser-culture formatter (row ISO, true minus); positiveSign for the net.
+        function amountText(item, value, positiveSign) {
+            var iso = (item && item.CurrencyCode) ? item.CurrencyCode : '';
+            if (iso && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(Number(value) || 0, iso, precisionOf(item),
+                        { symbol: symbolOf(item), minusSign: '−', positiveSign: positiveSign || '' });
+                }
+                catch (e) { if (window.console) { console.log(e); } }
+            }
             var abs = Math.abs(Number(value) || 0);
             var p = precisionOf(item);
             var text = abs.toLocaleString(window.navigator.language,
                 { minimumFractionDigits: p, maximumFractionDigits: p });
-            return (Number(value) < 0 ? '−' : '') + symbolOf(item) + text;
+            return (positiveSign && Number(value) >= 0 ? positiveSign : '') +
+                (Number(value) < 0 ? '−' : '') + symbolOf(item) + text;
         }
 
         function signedAmountText(item, value) {
             var v = Number(value) || 0;
-            return (v < 0 ? '' : '+') + amountText(item, v);
+            return amountText(item, v, '+');
         }
 
         function countSuffix(count) {

@@ -325,6 +325,9 @@
 }
 
 .vas279-btn:hover { background: #EEF8FF; }
+/* VAS163 2026-11-11: Row 114 - "Open Record" primary action, same look as VAS_268 / VAS_286. */
+.vas279-btn-primary { background: #0083DA; color: #fff; }
+.vas279-btn-primary:hover { background: #0069AE; }
 
 .vas279-mstats {
     display: grid;

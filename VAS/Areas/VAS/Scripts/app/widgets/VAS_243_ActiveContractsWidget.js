@@ -37,6 +37,7 @@
  *  3 | live                | VAS_243_Live
  *  4 | Couldn't load       | VAS_243_LoadError
  * ──────────────────────────────────────────────────────────────────────────
+ * Tooltip - 2026-11-18: compact amounts carry the full amount (browser culture, currency precision) as a hover tooltip; no K/M/B literals here.
  */
 ; VAS = window.VAS || {};
 
@@ -117,23 +118,11 @@
             return Math.round(n).toLocaleString(window.navigator.language);
         }
 
-        // Locale-formatted number with a fixed number of fraction digits.
-        function fmtNum(v, digits) {
-            try {
-                return v.toLocaleString(window.navigator.language, { minimumFractionDigits: digits, maximumFractionDigits: digits });
-            } catch (e) { return String(v); }
-        }
-
-        // Compact K/M/B magnitude, 2 decimals - matches the mock's "$20.85M".
-        function fmtCompact(value, precision) {
-            var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
+        // Plain number in the browser culture - fallback only when VIS.Util.BrowserCultureFormatter.formatCompactAmount is unavailable.
+        function plainAmount(v, precision) {
             var p = Number(precision); if (isNaN(p) || p < 0) { p = 2; }
-            var abs = Math.abs(n);
-            var sign = n < 0 ? '-' : '';
-            if (abs >= 1e9) { return sign + fmtNum(abs / 1e9, 2) + 'B'; }
-            if (abs >= 1e6) { return sign + fmtNum(abs / 1e6, 2) + 'M'; }
-            if (abs >= 1e3) { return sign + fmtNum(abs / 1e3, 2) + 'K'; }
-            return sign + fmtNum(abs, p);
+            try { return v.toLocaleString(window.navigator.language, { minimumFractionDigits: p, maximumFractionDigits: p }); }
+            catch (e) { return String(v); }
         }
 
         // Currency symbol + its position for the browser locale (before/after
@@ -165,15 +154,35 @@
             var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
             var sign = n < 0 ? '-' : '';
             var num;
-            if (window.VIS && VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
-                num = VIS.Util.formatCompactAmount(Math.abs(n), iso || '', precision);
+            if (window.VIS && VIS.Util && VIS.Util.BrowserCultureFormatter && typeof VIS.Util.BrowserCultureFormatter.formatCompactAmount === 'function') {
+                num = VIS.Util.BrowserCultureFormatter.formatCompactAmount(Math.abs(n), iso || '', precision);
             } else {
-                num = fmtCompact(Math.abs(n), precision);
+                num = plainAmount(Math.abs(n), precision);
             }
             if (affix) {
                 return sign + (affix.before ? affix.symbol + affix.gap + num : num + affix.gap + affix.symbol);
             }
             return sign + tag + num;
+        }
+
+        // Full (non-compact) amount for the hover tooltip: same value / ISO / precision as formatMoney.
+        function fullMoney(value, iso, precision) {
+            var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
+            if (window.VIS && VIS.Util && VIS.Util.BrowserCultureFormatter && typeof VIS.Util.BrowserCultureFormatter.formatFullAmount === 'function') {
+                return VIS.Util.BrowserCultureFormatter.formatFullAmount(n, iso || '', precision);
+            }
+            return '';
+        }
+
+        // ' title="..."' attribute carrying the full amount (empty when it is unavailable).
+        function titleAttr(value, iso, precision) {
+            var full = fullMoney(value, iso, precision);
+            return full ? ' title="' + escapeHtml(full) + '"' : '';
+        }
+
+        // Compact amount wrapped in a span whose tooltip is the full amount.
+        function moneyHtml(value, iso, symbol, precision) {
+            return '<span' + titleAttr(value, iso, precision) + '>' + escapeHtml(formatMoney(value, iso, symbol, precision)) + '</span>';
         }
 
         function createWidget() {
@@ -212,7 +221,8 @@
 
             $card.removeClass('is-error');
             $card.find('.vas243-value').removeClass('vas243-skel-value').text(formatCount(count));
-            $card.find('.vas243-sub').removeClass('vas243-skel-sub').text(money + ' ' + label('VAS_243_PortfolioValue', 'portfolio value'));
+            $card.find('.vas243-sub').removeClass('vas243-skel-sub').text(money + ' ' + label('VAS_243_PortfolioValue', 'portfolio value'))
+                .attr('title', fullMoney(data.LiveValueBase, data.CurrencyIso, data.CurrencyPrecision) || null);
             $card.find('.vas243-tag').text(label('VAS_243_Live', 'live'));
         }
 

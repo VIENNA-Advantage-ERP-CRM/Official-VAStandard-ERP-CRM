@@ -14,6 +14,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Globalization;
 using System.Web.Mvc;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
@@ -152,6 +153,7 @@ namespace VIS.Controllers
                         rep.Name AS representative_name,
                         c.CurSymbol AS doc_cur_symbol,
                         c.ISO_Code AS doc_cur_iso,
+                        c.StdPrecision AS doc_cur_precision,
                         -- PO value excludes taxes: on a tax-inclusive order TotalLines carries the
                         -- gross, so the extracted tax (C_OrderTax) is taken off to get the sub total.
                         " + PO_VALUE_EXCL_TAX_SQL + @" AS po_value,
@@ -229,6 +231,8 @@ namespace VIS.Controllers
                         string repName = Util.GetValueOfString(row["representative_name"]);
                         string docCurSymbol = Util.GetValueOfString(row["doc_cur_symbol"]);
                         string docCurIso = Util.GetValueOfString(row["doc_cur_iso"]);
+                        // VAS163 2026-11-12: document currency precision for the client-side amount format.
+                        int docCurPrecision = row["doc_cur_precision"] == DBNull.Value ? 2 : Util.GetValueOfInt(row["doc_cur_precision"]);
                         decimal poValue = Util.GetValueOfDecimal(row["po_value"]);
                         decimal orderedQty = Util.GetValueOfDecimal(row["ordered_qty"]);
                         decimal deliveredQty = Util.GetValueOfDecimal(row["delivered_qty"]);
@@ -297,9 +301,9 @@ namespace VIS.Controllers
                         {
                             PurchaseOrderID = poId,
                             PurchaseOrderNo = poNo,
-                            OrderDate = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd") : "",
+                            OrderDate = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                             OrderDateDisplay = orderDate.HasValue ? orderDate.Value.ToString("dd MMM yyyy") : "",
-                            PromisedDate = promisedDate.HasValue ? promisedDate.Value.ToString("yyyy-MM-dd") : "",
+                            PromisedDate = promisedDate.HasValue ? promisedDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                             PromisedDateDisplay = promisedDate.HasValue ? promisedDate.Value.ToString("dd MMM yyyy") : "",
                             PromisedDateShort = promisedDate.HasValue ? promisedDate.Value.ToString("dd MMM") : "",
                             VendorName = string.IsNullOrEmpty(vendorName) ? "—" : vendorName,
@@ -311,6 +315,7 @@ namespace VIS.Controllers
                             CurrencyID = orderCurId,
                             CurrencySymbol = docCurSymbol,
                             CurrencyISO = docCurIso,
+                            StdPrecision = docCurPrecision, // VAS163 2026-11-12
                             OrderedQty = orderedQty,
                             DeliveredQty = deliveredQty,
                             PendingQty = pendingQty,
@@ -640,6 +645,9 @@ namespace VIS.Controllers
                     vendorName = vendor,
                     orderDateFormatted = orderDate.HasValue ? orderDate.Value.ToString("dd MMM yyyy") : "",
                     promisedDateFormatted = promisedDate.HasValue ? promisedDate.Value.ToString("dd MMM yyyy") : "",
+                    // VAS163 2026-11-10: browser locale (6-Nov retest2). The widget formats the ISO dates itself.
+                    orderDateIso = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
+                    promisedDateIso = promisedDate.HasValue ? promisedDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                     warehouseName = warehouse,
                     representativeName = repName,
                     documentStatus = docStatusText,
@@ -730,9 +738,9 @@ namespace VIS.Controllers
                         {
                             PurchaseOrderID = Util.GetValueOfInt(hdrDr["purchase_order_id"]),
                             PurchaseOrderNo = Util.GetValueOfString(hdrDr["purchase_order_number"]),
-                            OrderDate = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd") : "",
+                            OrderDate = orderDate.HasValue ? orderDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                             OrderDateDisplay = orderDate.HasValue ? orderDate.Value.ToString("dd MMM yyyy") : "",
-                            PromisedDate = promisedDate.HasValue ? promisedDate.Value.ToString("yyyy-MM-dd") : "",
+                            PromisedDate = promisedDate.HasValue ? promisedDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                             PromisedDateDisplay = promisedDate.HasValue ? promisedDate.Value.ToString("dd MMM yyyy") : "",
                             DocStatus = rawDocStatus,
                             DocStatusDisplay = docStatusDisplay,
@@ -741,6 +749,7 @@ namespace VIS.Controllers
                             WarehouseName = Util.GetValueOfString(hdrDr["warehouse_name"]),
                             CreatedBy = Util.GetValueOfString(hdrDr["created_by_name"]),
                             CreatedOn = createdOn.HasValue ? createdOn.Value.ToString("dd MMM yyyy") : "",
+                            CreatedOnIso = createdOn.HasValue ? createdOn.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "", // VAS163 2026-11-10: browser locale (6-Nov retest2).
                             PaymentTerm = Util.GetValueOfString(hdrDr["payment_term_name"]),
                             CurrencySymbol = Util.GetValueOfString(hdrDr["cur_symbol"]),
                             CurrencyISO = Util.GetValueOfString(hdrDr["cur_iso"]),

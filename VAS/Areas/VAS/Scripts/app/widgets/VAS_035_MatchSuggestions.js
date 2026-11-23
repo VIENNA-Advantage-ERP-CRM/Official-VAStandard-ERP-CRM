@@ -169,8 +169,14 @@
                 .replace(/'/g, "&#039;");
         }
 
-        function formatAmount(amount, symbol, precision) {
+        function formatAmount(amount, symbol, precision, isoCode) {
             var raw = Number(amount || 0);
+            /* With an ISO code the browser culture places sign, minus and currency sign (VAS.formatAmountByBrowser). */
+            if (isoCode && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                try {
+                    return VAS.formatAmountByBrowser(raw, isoCode, Number(precision || 0), { symbol: symbol ? symbol.toString() : "" });
+                } catch (e) { if (window.console) { console.log(e); } }
+            }
             var sign = raw < 0 ? '-' : '';
             var text = Number(Math.abs(raw)).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: Number(precision || 0),
@@ -276,10 +282,10 @@
                 : (row.Confidence === 'REVIEW' ? 'vas-msug-tag-review' : 'vas-msug-tag-low');
             var tagText = row.Confidence === 'HIGH' ? lbl("VAS_035_High", "High")
                 : (row.Confidence === 'REVIEW' ? lbl("VAS_035_Review", "Review") : lbl("VAS_035_Low", "Low"));
-            var receiptAmt = formatAmount(row.ReceiptAmount, row.ReceiptCurrencySymbol, row.ReceiptPrecision);
+            var receiptAmt = formatAmount(row.ReceiptAmount, row.ReceiptCurrencySymbol, row.ReceiptPrecision, row.ReceiptCurrency);
             /* Invoice open amount arrives already converted to the receipt
                currency at the payment date — same symbol/precision as the receipt. */
-            var openAmt = formatAmount(row.OpenAmount, row.ReceiptCurrencySymbol, row.ReceiptPrecision);
+            var openAmt = formatAmount(row.OpenAmount, row.ReceiptCurrencySymbol, row.ReceiptPrecision, row.ReceiptCurrency);
 
             var $row = $(
                 '<div class="vas-msug-row" role="button" tabindex="0">' +
@@ -472,12 +478,12 @@
                 );
 
             /* 2 — two-pane compare with a link arrow between them. */
-            var receiptAmt = formatAmount(data.ReceiptAmount, data.ReceiptCurrencySymbol, data.ReceiptPrecision);
-            var grandTotal = formatAmount(grandSigned, data.InvoiceCurrencySymbol, data.InvoicePrecision);
-            var openAmt = formatAmount(openInvSigned, data.InvoiceCurrencySymbol, data.InvoicePrecision);
+            var receiptAmt = formatAmount(data.ReceiptAmount, data.ReceiptCurrencySymbol, data.ReceiptPrecision, data.ReceiptCurrency);
+            var grandTotal = formatAmount(grandSigned, data.InvoiceCurrencySymbol, data.InvoicePrecision, data.InvoiceCurrency);
+            var openAmt = formatAmount(openInvSigned, data.InvoiceCurrencySymbol, data.InvoicePrecision, data.InvoiceCurrency);
             /* Open amount converted to the receipt currency at the payment date —
                basis of the compare, balance line and amount signal. */
-            var openAmtPay = formatAmount(openPaySigned, data.ReceiptCurrencySymbol, data.ReceiptPrecision);
+            var openAmtPay = formatAmount(openPaySigned, data.ReceiptCurrencySymbol, data.ReceiptPrecision, data.ReceiptCurrency);
 
             var paymentPane =
                 '<div class="vas-msug-pane">' +
@@ -518,7 +524,7 @@
 
             /* 3 — balance strip (receipt currency): exact / short / over.
                Pass the raw signed balance; formatAmount prefixes + or -. */
-            var balanceAmt = formatAmount(balance, data.ReceiptCurrencySymbol, data.ReceiptPrecision);
+            var balanceAmt = formatAmount(balance, data.ReceiptCurrencySymbol, data.ReceiptPrecision, data.ReceiptCurrency);
             var balanceStrip;
             if (isShort) {
                 /* Receipt is short — the difference stays open on the schedule. */
@@ -535,7 +541,7 @@
             }
             else {
                 balanceStrip = '<div class="vas-msug-balance vas-msug-balance-exact">' +
-                    escapeHtml(formatAmount(0, data.ReceiptCurrencySymbol, data.ReceiptPrecision) + ' ' + lbl("VAS_035_FullySettles", "balance — fully settles the invoice")) +
+                    escapeHtml(formatAmount(0, data.ReceiptCurrencySymbol, data.ReceiptPrecision, data.ReceiptCurrency) + ' ' + lbl("VAS_035_FullySettles", "balance — fully settles the invoice")) +
                     '</div>';
             }
 

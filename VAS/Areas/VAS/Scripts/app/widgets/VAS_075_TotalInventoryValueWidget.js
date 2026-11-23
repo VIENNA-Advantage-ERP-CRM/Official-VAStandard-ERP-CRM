@@ -92,16 +92,25 @@
                     if (typeof result === 'string' && result) { result = JSON.parse(result); }
 
                     if (result && !result.error) {
-                        var formatted = formatAmount(
-                            result.total_inventory_value,
-                            result.currency_symbol,
-                            result.currency_iso,
-                            result.std_precision
-                        );
                         // KPI tile shows the compact form (₹3.42 Cr / $34.2M);
-                        // the tooltip keeps the exact amount.
-                        var compact = (result.currency_symbol || result.currency_iso || '')
-                            + formatCompactNumber(result.total_inventory_value, result.currency_iso);
+                        // the tooltip keeps the exact amount. Both in the browser culture,
+                        // so the minus goes before the currency sign ("-$748B", not "$-748B").
+                        var formatted, compact;
+                        if (window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                            formatted = VAS.formatAmountByBrowser(result.total_inventory_value,
+                                result.currency_iso, result.std_precision, { symbol: result.currency_symbol });
+                            compact = VAS.formatAmountByBrowser(result.total_inventory_value,
+                                result.currency_iso, result.std_precision, { compact: true, symbol: result.currency_symbol });
+                        } else {
+                            formatted = formatAmount(
+                                result.total_inventory_value,
+                                result.currency_symbol,
+                                result.currency_iso,
+                                result.std_precision
+                            );
+                            compact = (result.currency_symbol || result.currency_iso || '')
+                                + formatCompactNumber(result.total_inventory_value, result.currency_iso);
+                        }
                         $value.text(compact).attr('title', formatted);
                         return;
                     }
