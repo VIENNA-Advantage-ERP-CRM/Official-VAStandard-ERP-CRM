@@ -12,6 +12,8 @@
  *                  04-Nov-2026  New lines are numbered server-side above the opportunity's highest line no.;
  *                               a save that adds a line returns page 1 so the latest line shows on top
  *                  04-Nov-2026  Line callout prices by the selected attribute instance (MProductPricing)
+ *                  23-Nov-2026  Unit Standard Precision on the lines and the unit list (quantity precision); the
+ *                               product callout returns the product's Description
  ******************************************************/
 
 using ModelLibrary.Model;
@@ -266,7 +268,7 @@ namespace VASLogic.Models
                                   COALESCE(c.IsMandatory, 'N')    AS IsMandatory,
                                   c.AD_Reference_ID,
                                   COALESCE(c.AD_Reference_Value_ID, 0) AS AD_Reference_Value_ID,
-                                  COALESCE(f.Name, c.Name, c.ColumnName) AS FieldName,
+                                  COALESCE(NULLIF(ft.Name, N''), f.Name, c.Name, c.ColumnName) AS FieldName,
                                   COALESCE(c.IsUpdateable, 'Y')   AS IsUpdateable,
                                   COALESCE(c.FieldLength, 0)      AS FieldLength,
                                   " + roLogicExpr + @"  AS ReadOnlyLogic,
@@ -284,6 +286,8 @@ namespace VASLogic.Models
                            FROM AD_Field f
                            INNER JOIN AD_Tab t ON (f.AD_Tab_ID = t.AD_Tab_ID)
                            INNER JOIN AD_Column c ON (f.AD_Column_ID = c.AD_Column_ID)
+                           LEFT OUTER JOIN AD_Field_Trl ft ON (ft.AD_Field_ID = f.AD_Field_ID
+                                AND ft.AD_Language = @lang AND ft.IsActive = 'Y')
                            LEFT JOIN AD_Val_Rule vr ON (c.AD_Val_Rule_ID = vr.AD_Val_Rule_ID
                                 AND vr.IsActive = 'Y')
                            LEFT JOIN AD_Image img ON (img.AD_Image_ID = f.AD_Image_ID
@@ -293,7 +297,8 @@ namespace VASLogic.Models
                              AND c.IsActive = 'Y'
                            ORDER BY t.SeqNo, f.SeqNo";
 
-            DataSet ds = DB.ExecuteDataset(sql);
+            // VAI154: field names come from AD_Field, translated through AD_Field_Trl in the language of the user
+            DataSet ds = DB.ExecuteDataset(sql, new SqlParameter[] { new SqlParameter("@lang", ctx.GetAD_Language()) }, null);
             if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return false;
 
             HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -320,7 +325,12 @@ namespace VASLogic.Models
                                   COALESCE(c.IsMandatory, 'N')    AS IsMandatory,
                                   c.AD_Reference_ID,
                                   COALESCE(c.AD_Reference_Value_ID, 0) AS AD_Reference_Value_ID,
-                                  COALESCE(c.Name, c.ColumnName)  AS FieldName,
+                                  COALESCE((SELECT MIN(COALESCE(NULLIF(ft2.Name, N''), f2n.Name))
+                                                 FROM AD_Field f2n
+                                                 LEFT OUTER JOIN AD_Field_Trl ft2 ON (ft2.AD_Field_ID = f2n.AD_Field_ID
+                                                      AND ft2.AD_Language = @lang AND ft2.IsActive = 'Y')
+                                                 WHERE f2n.AD_Column_ID = c.AD_Column_ID AND f2n.IsActive = 'Y'),
+                                                c.Name, c.ColumnName) AS FieldName,
                                   COALESCE(c.IsUpdateable, 'Y')   AS IsUpdateable,
                                   COALESCE(c.FieldLength, 0)      AS FieldLength,
                                   " + roLogicExpr + @"  AS ReadOnlyLogic,
@@ -343,7 +353,7 @@ namespace VASLogic.Models
                            WHERE t.TableName = 'VAS_OppLines'
                              AND c.IsActive = 'Y'";
 
-            DataSet ds = DB.ExecuteDataset(sql);
+            DataSet ds = DB.ExecuteDataset(sql, new SqlParameter[] { new SqlParameter("@lang", ctx.GetAD_Language()) }, null);
             if (ds == null || ds.Tables.Count == 0) return;
             foreach (DataRow r in ds.Tables[0].Rows)
             {
@@ -414,7 +424,8 @@ namespace VASLogic.Models
         private List<OppUomItem> LoadUomList(Ctx ctx, int VAS_Opportunity_ID, Dictionary<string, string> rowVars)
         {
             List<OppUomItem> list = new List<OppUomItem>();
-            string uomSql = @"SELECT u.C_UOM_ID, u.Name AS UOMName
+            // VAI154: StdPrecision = decimals of a quantity in this unit
+            string uomSql = @"SELECT u.C_UOM_ID, u.Name AS UOMName, u.StdPrecision
                               FROM C_UOM u
                               WHERE u.IsActive = 'Y'";
             // Apply MRole on the base query BEFORE appending the val-rule predicate.
@@ -430,7 +441,8 @@ namespace VASLogic.Models
                     list.Add(new OppUomItem
                     {
                         C_UOM_ID = Util.GetValueOfInt(r["C_UOM_ID"]),
-                        Name = Util.GetValueOfString(r["UOMName"])
+                        Name = Util.GetValueOfString(r["UOMName"]),
+                        StdPrecision = (r["StdPrecision"] == DBNull.Value) ? (int?)null : Util.GetValueOfInt(r["StdPrecision"])
                     });
             return list;
         }
@@ -746,6 +758,7 @@ namespace VASLogic.Models
                 @"COALESCE(p.Name, N'') AS VASOLDISP_ProductName,
                   COALESCE(ch.Name, N'') AS VASOLDISP_ChargeName,
                   COALESCE(uom.Name, N'') AS VASOLDISP_UOMName,
+                  uom.StdPrecision AS VASOLDISP_UOMPrecision,
                   COALESCE(asi.Description, N'') AS VASOLDISP_AttrName,
                   COALESCE(p.M_AttributeSet_ID, 0) AS VASOLDISP_HasAttrSet,
                   COALESCE(p.ProductType, '') AS VASOLDISP_ProductType
@@ -779,6 +792,7 @@ namespace VASLogic.Models
                     @"COALESCE(p.Name, N'') AS VASOLDISP_ProductName,
                       COALESCE(ch.Name, N'') AS VASOLDISP_ChargeName,
                       COALESCE(uom.Name, N'') AS VASOLDISP_UOMName,
+                      uom.StdPrecision AS VASOLDISP_UOMPrecision,
                       COALESCE(asi.Description, N'') AS VASOLDISP_AttrName,
                       COALESCE(p.M_AttributeSet_ID, 0) AS VASOLDISP_HasAttrSet,
                       COALESCE(p.ProductType, '') AS VASOLDISP_ProductType
@@ -816,6 +830,8 @@ namespace VASLogic.Models
                 row.PlannedQty = Util.GetValueOfDecimal(r["PlannedQty"]);
                 row.C_UOM_ID = Util.GetValueOfInt(r["C_UOM_ID"]);
                 row.UOMName = Util.GetValueOfString(r["VASOLDISP_UOMName"]);
+                // VAI154: precision of the unit (null when the line has no unit)
+                row.UOMPrecision = (r["VASOLDISP_UOMPrecision"] == DBNull.Value) ? (int?)null : Util.GetValueOfInt(r["VASOLDISP_UOMPrecision"]);
                 row.PlannedPrice = Util.GetValueOfDecimal(r["PlannedPrice"]);
                 row.PlannedAmt = Util.GetValueOfDecimal(r["PlannedAmt"]);
                 row.M_AttributeSetInstance_ID = Util.GetValueOfInt(r["M_AttributeSetInstance_ID"]);
@@ -1198,6 +1214,15 @@ namespace VASLogic.Models
                 res.Values["M_Product_ID"] = req.M_Product_ID;
                 res.Values["C_Charge_ID"] = 0;
 
+                // VAI154: choosing a product sets the line's Description to the product's description (as the callout of
+                // the window); a product without a description leaves the Description as it is
+                if (column == "M_Product_ID")
+                {
+                    string productDescription = GetProductDescription(ctx, req.M_Product_ID);
+                    if (productDescription.Length > 0)
+                        res.Values["Description"] = productDescription;
+                }
+
                 // Look up all three prices (List, Std, Limit) from the opportunity's price list
                 // version unless the user has manually overridden the price on this line.
                 if (M_PriceList_Version_ID > 0)
@@ -1254,7 +1279,47 @@ namespace VASLogic.Models
             res.Values["PlannedAmt"] = req.PlannedQty * plannedPrice;
 
             res.Display["uomName"] = GetUomLabel(ctx, uomId);
+            // VAI154: precision of the unit the callout chose, so the client shows the quantity with it
+            int? uomPrecision = GetUomPrecision(ctx, uomId);
+            if (uomPrecision.HasValue)
+                res.Display["uomPrecision"] = uomPrecision.Value.ToString(CultureInfo.InvariantCulture);
             return res;
+        }
+
+        /// <summary>
+        /// VAI154: Description of a product (M_Product.Description) for the Description of a line.
+        /// </summary>
+        /// <param name="ctx">session context</param>
+        /// <param name="M_Product_ID">selected product</param>
+        /// <returns>the description, or an empty string when the product has none</returns>
+        private string GetProductDescription(Ctx ctx, int M_Product_ID)
+        {
+            if (M_Product_ID <= 0) return "";
+            string sql = @"SELECT COALESCE(p.Description, N'') AS Description
+                           FROM M_Product p
+                           WHERE p.M_Product_ID = @pid
+                             AND p.IsActive = 'Y'";
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            object o = DB.ExecuteScalar(sql, new SqlParameter[] { new SqlParameter("@pid", M_Product_ID) }, null);
+            return Util.GetValueOfString(o);
+        }
+
+        /// <summary>
+        /// VAI154: Standard Precision (C_UOM.StdPrecision) of a unit of measure.
+        /// </summary>
+        /// <param name="ctx">session context</param>
+        /// <param name="C_UOM_ID">unit of measure</param>
+        /// <returns>the precision, or null when the unit is not found</returns>
+        private int? GetUomPrecision(Ctx ctx, int C_UOM_ID)
+        {
+            if (C_UOM_ID <= 0) return null;
+            string sql = @"SELECT u.StdPrecision
+                           FROM C_UOM u
+                           WHERE u.C_UOM_ID = @uomId";
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "u", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            object o = DB.ExecuteScalar(sql, new SqlParameter[] { new SqlParameter("@uomId", C_UOM_ID) }, null);
+            if (o == null || o == DBNull.Value) return null;
+            return Util.GetValueOfInt(o);
         }
 
         private string ReadColumnCallout(Ctx ctx, string tableName, string columnName)
@@ -2152,6 +2217,8 @@ namespace VASLogic.Models
         public decimal PlannedQty { get; set; }
         public int C_UOM_ID { get; set; }
         public string UOMName { get; set; }
+        /// <summary>VAI154: C_UOM.StdPrecision of the line's unit (decimals of the quantity); null = not known.</summary>
+        public int? UOMPrecision { get; set; }
         public decimal PlannedPrice { get; set; }
         public decimal PlannedAmt { get; set; }
         public int M_AttributeSetInstance_ID { get; set; }
@@ -2226,6 +2293,8 @@ namespace VASLogic.Models
     {
         public int C_UOM_ID { get; set; }
         public string Name { get; set; }
+        /// <summary>VAI154: C_UOM.StdPrecision (decimals of a quantity in this unit); null = not known.</summary>
+        public int? StdPrecision { get; set; }
     }
 
     /// <summary>One Product or Charge row in the catalog autocomplete for the opportunity panel.</summary>
