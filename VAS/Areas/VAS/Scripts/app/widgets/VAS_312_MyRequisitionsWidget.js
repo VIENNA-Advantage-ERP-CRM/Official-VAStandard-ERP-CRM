@@ -53,7 +53,10 @@
                 '<div class="vas-rqw-ft"><span class="vas-rqw-hp"></span><span class="vas-rqw-pg"></span></div>' +
                 '<span class="vas-rqw-busy"><i></i></span></div>');
             $root.empty().append($card);
-            $card.find('[data-pill="open"]').before(buildFilter());
+            // VAS163 2026-11-25: Sr 80 the "N open" badge is removed; the month / year filter takes its place at the right.
+            var $openPill = $card.find('[data-pill="open"]');
+            $openPill.before(buildFilter());
+            $openPill.remove();
             $tb = $card.find('.vas-rqw-tb'); $help = $card.find('.vas-rqw-hp'); $pager = $card.find('.vas-rqw-pg');
             stopResize = U.onResize($root[0], function () { self.relayout(); });
             self.reload();
@@ -66,8 +69,7 @@
             // VAS163 2026-11-20: Sr 45 - requisitions of the selected month / year
             U.get('VAS_312_MyRequisitionsWidget/GetMyRequisitions', { year: Number($yearSel.val()), month: Number($monthSel.val()) }).done(function (d) {
                 if (mine !== req) { return; }
-                data = d;
-                $card.find('[data-pill="open"]').text(U.num(d.openCount) + ' ' + U.lbl('VAS_312_Open', 'open'));
+                data = d; // VAS163 2026-11-25: Sr 80 no "N open" badge any more
                 state.page = 0;
                 self.relayout();
             }).fail(function (err) {

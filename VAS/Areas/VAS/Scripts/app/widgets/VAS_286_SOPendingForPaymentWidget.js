@@ -807,7 +807,8 @@
                     cellHtml(line.ProductName, 'vas286-c-prim'),
                     showAttribute ? cellHtml(hasAttributeValue(line) ? line.AttributeText : '', 'vas286-c-std') : '',
                     cellHtml(line.UomName, 'vas286-c-std'),
-                    cellHtml(formatQty(line.QtyOrdered), 'vas286-c-std', 'right'),
+                    // VAS163 2026-11-25: Sr 238 non-item (service / charge) lines show '—' in Ordered too, like VAS_288
+                    cellHtml(isItem ? formatQty(line.QtyOrdered) : '—', 'vas286-c-std', 'right'),
                     cellHtml(isItem ? formatQty(line.QtyDelivered) : '—', 'vas286-c-std', 'right'),
                     cellHtml(isItem ? formatQty(line.QtyPending) : '—', 'vas286-c-prim', 'right'),
                     cellHtml(isItem ? inStockText(line) : '—', (isItem && Number(line.QtyShort) > 0 ? 'vas286-c-short' : 'vas286-c-ok'), 'right'),

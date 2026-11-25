@@ -20,7 +20,7 @@
  * 10  | Representative                       | VAS_Representative
  * 11  | Lines                                | VAS_Lines
  * 12  | Stage                                | VAS_207_Stage
- * 13  | drafted ·<br/>in process             | VAS_DraftedInProcessLabel
+ * 13  | drafted -<br/>in process             | VAS_DraftedInProcessLabel
  * 14  | Purchase order lines                 | VAS_207_POLines
  * 15  | Product                              | VAS_Product
  * 16  | Attribute                            | VAS_Attribute
@@ -174,9 +174,10 @@
                             '<p class="vas-207-kpi-meta"></p>' +
                         '</div>' +
                         '<div class="vas-207-kpi-side">' +
-                            '<div class="vas-207-side-v">— · —</div>' +
+                            // VAS163 2026-11-25: Sr 198 hyphen (not a dot) between the Drafted and In-Progress counts
+                            '<div class="vas-207-side-v">— - —</div>' +
                             '<div class="vas-207-side-l">' +
-                                esc(lbl("VAS_Drafted", "drafted")) + ' ·<br/>' +
+                                esc(lbl("VAS_Drafted", "drafted")) + ' -<br/>' +
                                 esc(lbl("VAS_207_InProgress", "in process")) +
                             '</div>' +
                         '</div>' +
@@ -261,7 +262,8 @@
             }
 
             if ($kpiSplit) {
-                var splitText = formatNumber(drafted) + ' · ' + formatNumber(inProgress);
+                // VAS163 2026-11-25: Sr 198 hyphen (not a dot) between the Drafted and In-Progress counts
+                var splitText = formatNumber(drafted) + ' - ' + formatNumber(inProgress);
                 $kpiSplit.text(splitText);
                 $kpiSplit.attr('title', splitText);
             }
@@ -283,7 +285,7 @@
                 $kpiMeta.attr('title', errText);
             }
             if ($kpiSplit) {
-                $kpiSplit.text('— · —');
+                $kpiSplit.text('— - —'); // VAS163 2026-11-25: Sr 198
                 $kpiSplit.removeAttr('title');
             }
         }

@@ -343,8 +343,14 @@
         function formatPercent(value) {
             if (value === null || value === undefined) { return '—'; }
             var num = Number(value);
-            try { return (num / 100).toLocaleString(window.navigator.language, { style: 'percent', maximumFractionDigits: 1 }); }
-            catch (e) { return (Math.round(num * 10) / 10) + '%'; }
+            // VAS163 2026-11-25: Sr 290 percentage always with 1 decimal (browser culture), never rounded off.
+            try { return (num / 100).toLocaleString(window.navigator.language, { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 }); }
+            catch (e) { return (Math.round(num * 10) / 10).toFixed(1) + '%'; }
+        }
+
+        // VAS163 2026-11-25: Sr 290 share rounded to one decimal (not to a whole percent).
+        function roundPercent1(value) {
+            return Math.round(Number(value || 0) * 10) / 10;
         }
 
         // VAS163 2026-11-10: browser locale (6-Nov retest2).
@@ -523,15 +529,17 @@
             });
 
             if (totalValue > 0) {
+                // VAS163 2026-11-25: Sr 290 shares to one decimal; the residue (in tenths) still goes to the
+                // largest share so the bars sum to exactly 100.0.
                 var sum = 0, largestIdx = 0, largestValue = -1;
                 scaffolded.forEach(function (r, i) {
-                    var pct = Math.round((r.Value / totalValue) * 100);
-                    r.Percent = pct;
-                    sum += pct;
+                    var tenths = Math.round((r.Value / totalValue) * 1000);
+                    r.Percent = tenths / 10;
+                    sum += tenths;
                     if (r.Value > largestValue) { largestValue = r.Value; largestIdx = i; }
                 });
-                var residue = 100 - sum;
-                if (residue !== 0) { scaffolded[largestIdx].Percent += residue; }
+                var residue = 1000 - sum;
+                if (residue !== 0) { scaffolded[largestIdx].Percent = (Math.round(scaffolded[largestIdx].Percent * 10) + residue) / 10; }
             }
 
             return scaffolded;
@@ -716,7 +724,7 @@
 
         function renderModeBody() {
             var summary = docState.summary;
-            var share = summary.TotalValue > 0 ? Math.round((summary.ModeValue / summary.TotalValue) * 100) : 0;
+            var share = summary.TotalValue > 0 ? roundPercent1((summary.ModeValue / summary.TotalValue) * 100) : 0; // VAS163 2026-11-25: Sr 290 one decimal
 
             var statsHtml = '<div class="vas282-mstats">' +
                 statTile(label('VAS_282_StatShare', 'Share of dispatch value'), formatPercent(share)) +
@@ -1006,7 +1014,7 @@
                     cellHtml(line.ProductName, 'vas282-c-prim'),
                     showAttribute ? cellHtml(hasAttributeValue(line) ? line.AttributeText : '', 'vas282-c-std') : '',
                     cellHtml(line.UomName, 'vas282-c-std'),
-                    cellHtml(formatQty(line.QtyOrdered), 'vas282-c-std', 'right'),
+                    cellHtml(isItem ? formatQty(line.QtyOrdered) : '—', 'vas282-c-std', 'right'), // VAS163 2026-11-25: Sr 249 non-item lines show '—' in Ordered too (as VAS_288)
                     cellHtml(isItem ? formatQty(line.QtyDelivered) : '—', 'vas282-c-std', 'right'),
                     cellHtml(isItem ? formatQty(line.QtyPending) : '—', 'vas282-c-prim', 'right'),
                     cellHtml(isItem ? inStockText(line) : '—', (isItem && Number(line.QtyShort) > 0 ? 'vas282-c-short' : 'vas282-c-ok'), 'right'),

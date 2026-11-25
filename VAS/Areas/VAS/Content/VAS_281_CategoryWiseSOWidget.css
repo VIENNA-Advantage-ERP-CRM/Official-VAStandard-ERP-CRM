@@ -142,7 +142,9 @@
     justify-content: center;
     pointer-events: none;
     text-align: center;
-    padding: 0 1em;
+    /* VAS163 2026-11-25: Sr 288 the centre text stays inside the ring's hole (inner diameter = 2 * (15.9 - 4) / 42
+       = 56.7 % of the chart width); the widget steps the value's font down until it fits (fitCenterText). */
+    padding: 0 22%;
 }
 
 .vas281-ctr b {
@@ -279,6 +281,11 @@
 
 .vas281-modal.sm { width: min(760px, 94vw); }
 .vas281-modal.md { width: min(1000px, 94vw); }
+
+/* VAS163 2026-11-25: Sr 276 one fixed pop-up height for every screen (category list, record, lines),
+   so the pop-up keeps its size when the user goes back from the lines pop-up; the tables size their
+   rows-per-page to the space left (fitAllTables). */
+.vas281-mask .vas281-modal { height: min(880px, 90dvh); }
 
 .vas281-mhead {
     height: 56px;
