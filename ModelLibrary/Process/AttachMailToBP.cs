@@ -169,11 +169,6 @@ namespace VAdvantage.Process
                 {
                     lastRun = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["DateLastRun"]);
                 }
-                // ImportMailbox: only the mails since the caller's previous import, not the whole window of the scheduled run
-                if (mailboxSince != null)
-                {
-                    lastRun = mailboxSince;
-                }
 
                 if (isAutoAttach == "N" && Env.IsModuleInstalled("VAI01_") && Convert.ToString(ds.Tables[0].Rows[i]["VAI01_IsCustomizeAttach"]).Trim() == "N")
                 {
@@ -185,6 +180,15 @@ namespace VAdvantage.Process
                 // OA = OAuth (Google, Microsoft), EX = Exchange Web Services: both fetch through VA101
                 protocol = Env.IsModuleInstalled("VA101_") ? Util.GetValueOfString(ds.Tables[0].Rows[i]["VA101_Protocol"]) : string.Empty;
                 isVA101Fetch = protocol.Equals("OA") || protocol.Equals("EX");
+
+                // ImportMailbox: only the mails since the caller's previous import, not the whole window of the scheduled run.
+                // Not for Exchange: its sync state already returns only what is new, and the date is used only when there is
+                // no sync state yet (new connection, reset). Then the import must read back to DateLastRun; the caller's
+                // previous import (a minute ago, possibly on another server) would drop every older mail for good.
+                if (mailboxSince != null && !protocol.Equals("EX"))
+                {
+                    lastRun = mailboxSince;
+                }
 
                 if (isVA101Fetch)
                 {
