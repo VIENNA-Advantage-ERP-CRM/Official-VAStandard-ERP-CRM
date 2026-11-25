@@ -5,6 +5,7 @@
  * Employee Code: VAI154
  * Date        : 20-Jul-2026
  * 2026-11-19  : WhatsApp chat date shown through fmtDateTime (browser culture).
+ * 2026-11-23  : Line detail "Open Record" opens the matching line in the window's Line child tab.
  ********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -2069,7 +2070,6 @@
             var productTypeName = line.productTypeName      || line.ProductTypeName || '';
             var lId             = line.c_OrderLine_ID      || line.C_OrderLine_ID || 0;
             var chargeId        = parseInt(line.c_Charge_ID  || line.C_Charge_ID  || 0, 10);
-            var productId       = parseInt(line.m_Product_ID || line.M_Product_ID || 0, 10);
 
             // For charge lines productTypeName is empty — show "Charge" label instead
             var typeDisplay = (chargeId > 0) ? msg('VAS_123_TypeCharge') : productTypeName;
@@ -2110,12 +2110,11 @@
                     '</div>' +
                 '</div>';
 
-            // Show "Open Record" button only when there is a product or charge to zoom to
-            var openRecordBtn = (productId > 0 || chargeId > 0)
+            // "Open Record" opens this line in the quotation window's Line tab
+            var openRecordBtn = (+lId > 0)
                 ? '<button class="vas_123_qrp-btn vas_123_qrp-btn--primary"' +
                       ' data-action="openRecordFromLine"' +
-                      ' data-product-id="' + productId + '"' +
-                      ' data-charge-id="'  + chargeId  + '">' +
+                      ' data-line-id="' + (+lId) + '">' +
                       SVG_LINK + ' ' + esc(msg('VAS_123_OpenRecord')) +
                   '</button>'
                 : '';
@@ -2960,6 +2959,16 @@
             } catch (e) { }
         }
 
+        // ── Open a quotation line in the Line (child) tab of THIS Sales Quotation window ──
+        // Shared helper VAS.TabNavUtil: switches the hosting window to the C_OrderLine tab (the
+        // quotation stays the parent), selects the clicked line once the rows arrive and shows
+        // it in single-row view. No second window is opened.
+        function openLineInChildTab(lineId) {
+            var record = +lineId || 0;
+            if (record <= 0 || !(window.VAS && VAS.TabNavUtil && typeof VAS.TabNavUtil.openChildRecord === 'function')) return;
+            VAS.TabNavUtil.openChildRecord($self, 'C_OrderLine', record, { singleRow: true, logPrefix: 'VAS_123' });
+        }
+
         // ── Action: Open a Sales Order record in the platform window viewer ───
         // The converted order is a sales order (IsSOTrx='Y', not quotation/blanket/return
         // per GetHeader's ConvertedOrder_ID filter) -> the VAS Sales Order window.
@@ -3099,16 +3108,13 @@
                 e.stopPropagation();
             });
 
-            // Open underlying product or charge record from line detail modal
+            // Open the clicked line in the quotation window's Line (child) tab
             $root.on('click', '[data-action="openRecordFromLine"]', function (e) {
-                var $btn      = $(this);
-                var productId = parseInt($btn.data('productId') || 0, 10);
-                var chargeId  = parseInt($btn.data('chargeId')  || 0, 10);
+                var lineId = parseInt($(this).data('lineId') || 0, 10);
                 if (!window.VIS) return;
                 closeModal();
-                // VAS163 2026-11-12: VAS.ZoomUtil with the VAS windows (was ZoomTarget by table).
-                if (chargeId > 0) zoomTo('C_Charge_ID', chargeId, 'VAS_Charge', 'Charge');
-                else zoomTo('M_Product_ID', productId, 'VAS_ProductMaster', 'Product');
+                if (window.console) console.log('VAS_123: Open Record -> Line tab, C_OrderLine_ID=' + lineId);
+                openLineInChildTab(lineId);
                 e.stopPropagation();
             });
 

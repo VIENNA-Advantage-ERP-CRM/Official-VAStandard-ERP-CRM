@@ -65,6 +65,22 @@ namespace VIS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+        /// <summary>
+        /// Get the description of a product (M_Product.Description) for the VAS_GetProductDescription callout
+        /// </summary>
+        /// <param name="fields">M_Product_ID</param>
+        /// <returns>Product description</returns>
+        public JsonResult GetProductDescription(string fields)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
+                MProductModel objProduct = new MProductModel();
+                retJSON = JsonConvert.SerializeObject(objProduct.GetProductDescription(ctx, fields));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
         // Added by amit
         public JsonResult GetTaxCategory(string fields)
         {
