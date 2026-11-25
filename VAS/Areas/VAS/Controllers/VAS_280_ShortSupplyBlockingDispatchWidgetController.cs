@@ -55,7 +55,8 @@ namespace VAS.Controllers
     ///     - Rate = the pending-quantity-weighted average of C_OrderLine.PriceActual
     ///       for that product/warehouse's demand (SUM(pendingQty*rate)/SUM(pendingQty)) -
     ///       the value at risk is the value of the actual commitment, never the item
-    ///       master's standard price.
+    ///       master's standard price. VAS163 2026-11-25: Sr 300 PriceActual is taken net of tax on
+    ///       tax-inclusive orders, so Rate and valueBlocked exclude tax.
     ///     - valueBlocked = shortQty * weightedRate - the sort key, descending.
     ///
     ///   Per the CTE/MRole rule (Prompt_Instructions.txt "Case 1"): the demand and
@@ -68,6 +69,8 @@ namespace VAS.Controllers
     ///   Read-only here; no writes.
     /// Chronological development:
     ///   VAI052      2026-09-14 Created
+    ///   VAS163      2026-11-25 Sr 295-304: stocked products only, SO values without tax, item-only
+    ///                          quantities / status, charge names, line UOM in the lines pop-up.
     /// </summary>
     [System.Web.Mvc.SessionState(System.Web.SessionState.SessionStateBehavior.ReadOnly)]
     public class VAS_280_ShortSupplyBlockingDispatchWidgetController : Controller
@@ -193,11 +196,35 @@ namespace VAS.Controllers
         /// left one occurrence unbound (ORA-01008) - distinct names per fragment make
         /// every occurrence unambiguous regardless of the driver's binding mode.
         /// </summary>
-        private static string BuildBaseOrderLinesSql(bool filterProductWarehouse, string suffix)
+        private static string BuildBaseOrderLinesSql(bool filterProductWarehouse, string suffix, int baseCurrencyId)
         {
             string filter = filterProductWarehouse
                 ? " AND ol.M_Product_ID = @M_Product_ID" + suffix + " AND o.M_Warehouse_ID = @M_Warehouse_ID" + suffix
                 : "";
+
+            // VAS163 2026-11-25: Sr 300 Value blocked and Rate exclude tax. On a tax-inclusive order (totals-based
+            // rule, as OrderValueExclTaxSql: 2 * (GrandTotal - TotalLines) < SUM(C_OrderTax.TaxAmt)) PriceActual is
+            // reduced by the net / gross ratio of the line's tax (as GetOrderTaxNetRatios: (gross - tax) / gross,
+            // gross = SUM(LineNetAmt) of the order's lines with that tax). Other orders keep PriceActual.
+            string netPriceSql = @"CASE WHEN 2 * (COALESCE(o.GrandTotal, 0) - COALESCE(o.TotalLines, 0)) <
+                                 (SELECT COALESCE(SUM(COALESCE(ot.TaxAmt, 0)), 0) FROM C_OrderTax ot
+                                   WHERE ot.C_Order_ID = o.C_Order_ID AND ot.IsActive = 'Y')
+                            THEN ol.PriceActual * COALESCE(1 -
+                                 (SELECT COALESCE(SUM(COALESCE(otx.TaxAmt, 0)), 0) FROM C_OrderTax otx
+                                   WHERE otx.C_Order_ID = o.C_Order_ID AND otx.C_Tax_ID = ol.C_Tax_ID AND otx.IsActive = 'Y')
+                                 / NULLIF((SELECT SUM(olx.LineNetAmt) FROM C_OrderLine olx
+                                            WHERE olx.C_Order_ID = o.C_Order_ID AND olx.C_Tax_ID = ol.C_Tax_ID AND olx.IsActive = 'Y'), 0), 1)
+                            ELSE ol.PriceActual
+                       END";
+
+            // VAS163 2026-11-25: Sr 304 the price is converted from the order currency to the base currency (as
+            // VAS_285: order's conversion type and accounting date) so Value blocked, its total and Rate are always
+            // in the base currency. A missing rate gives 0, as in the other SO widgets.
+            string priceSql = baseCurrencyId > 0
+                ? "CASE WHEN o.C_Currency_ID = " + baseCurrencyId + " THEN " + netPriceSql + " " +
+                  "ELSE COALESCE(currencyConvert(" + netPriceSql + ", o.C_Currency_ID, " + baseCurrencyId + ", " +
+                  "COALESCE(o.DateAcct, o.DateOrdered), o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID), 0) END"
+                : netPriceSql;
 
             return @"
                 SELECT o.C_Order_ID AS C_Order_ID,
@@ -205,7 +232,7 @@ namespace VAS.Controllers
                        o.M_Warehouse_ID AS M_Warehouse_ID,
                        ol.QtyOrdered AS Qty_Ordered,
                        ol.QtyDelivered AS Qty_Delivered,
-                       ol.PriceActual AS Price_Actual
+                       " + priceSql + @" AS Price_Actual
                   FROM C_Order o
                   INNER JOIN C_OrderLine ol ON ( ol.C_Order_ID = o.C_Order_ID AND ol.IsActive = 'Y' )
                  WHERE o.AD_Client_ID = @AD_Client_ID" + suffix + @"
@@ -247,7 +274,8 @@ namespace VAS.Controllers
         /// </summary>
         private string BuildShortageCalcCtesSql(Ctx ctx, bool filterProductWarehouse)
         {
-            string baseLinesSql = MRole.GetDefault(ctx).AddAccessSQL(BuildBaseOrderLinesSql(filterProductWarehouse, "L"), "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            // VAS163 2026-11-25: Sr 304 prices converted to the base currency.
+            string baseLinesSql = MRole.GetDefault(ctx).AddAccessSQL(BuildBaseOrderLinesSql(filterProductWarehouse, "L", GetBaseCurrencyId(ctx)), "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             string baseStockSql = MRole.GetDefault(ctx).AddAccessSQL(BuildBaseStockSql(filterProductWarehouse, "S"), "s", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
             string warehouseJoinFilter = filterProductWarehouse ? " AND l.M_Warehouse_ID = @M_Warehouse_IDS" : "";
@@ -313,6 +341,8 @@ namespace VAS.Controllers
             string language = GetLanguage(ctx);
             Dictionary<string, string> uomCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
+            // VAS163 2026-11-25: Sr 295 only stocked products (M_Product.IsStocked = 'Y'); products with
+            // IsStocked 'N' or empty are left out of the list, its count and the value-blocked total.
             string sql = @"
                 WITH " + BuildShortageCalcCtesSql(ctx, false) + @"
                 SELECT
@@ -334,6 +364,7 @@ namespace VAS.Controllers
                   LEFT OUTER JOIN C_UOM uom ON ( uom.C_UOM_ID = p.C_UOM_ID )
                   INNER JOIN M_Warehouse w ON ( w.M_Warehouse_ID = c.M_Warehouse_ID )
                  WHERE c.Short_Qty > 0
+                   AND p.IsStocked = 'Y'
                  ORDER BY (c.Short_Qty * c.Weighted_Rate) DESC, p.Name ASC
                  OFFSET @Row_Offset ROWS FETCH NEXT @Page_Size ROWS ONLY";
 
@@ -415,7 +446,9 @@ namespace VAS.Controllers
                   FROM calc c
                   INNER JOIN M_Product p ON ( p.M_Product_ID = c.M_Product_ID )
                   LEFT OUTER JOIN C_UOM uom ON ( uom.C_UOM_ID = p.C_UOM_ID )
-                  INNER JOIN M_Warehouse w ON ( w.M_Warehouse_ID = c.M_Warehouse_ID )";
+                  INNER JOIN M_Warehouse w ON ( w.M_Warehouse_ID = c.M_Warehouse_ID )
+                 WHERE p.IsStocked = 'Y'";
+            // VAS163 2026-11-25: Sr 295 a non-stocked product has no drill-down (it is not listed).
 
             IDataReader dr = null;
             try
@@ -451,13 +484,15 @@ namespace VAS.Controllers
             // happens in the outer line_pending CTE.
             string baseOrdersSql = MRole.GetDefault(ctx).AddAccessSQL(BuildBaseOrdersForWarehouseSql(), "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
+            // VAS163 2026-11-25: Sr 300 the order value without tax (totals-based tax-inclusive rule);
+            // Sr 303 the delivery status from Item-type product lines only (charges / services left out).
             string listSql = @"
                 WITH base_orders AS (" + baseOrdersSql + @"),
                 line_pending AS (
                     SELECT
                         bo.C_Order_ID AS C_Order_ID,
-                        SUM(COALESCE(ol.QtyOrdered, 0)) AS Qty_Ordered,
-                        SUM(COALESCE(ol.QtyDelivered, 0)) AS Qty_Delivered,
+                        SUM(CASE WHEN lpr.ProductType = 'I' THEN COALESCE(ol.QtyOrdered, 0) ELSE 0 END) AS Qty_Ordered,
+                        SUM(CASE WHEN lpr.ProductType = 'I' THEN COALESCE(ol.QtyDelivered, 0) ELSE 0 END) AS Qty_Delivered,
                         SUM(
                             CASE WHEN ol.M_Product_ID = @M_Product_ID
                                   AND COALESCE(ol.QtyOrdered, 0) > COALESCE(ol.QtyDelivered, 0)
@@ -467,11 +502,12 @@ namespace VAS.Controllers
                         ) AS Product_Pending_Qty
                       FROM base_orders bo
                       INNER JOIN C_OrderLine ol ON ( ol.C_Order_ID = bo.C_Order_ID AND ol.IsActive = 'Y' )
+                      LEFT OUTER JOIN M_Product lpr ON ( lpr.M_Product_ID = ol.M_Product_ID )
                      GROUP BY bo.C_Order_ID
                 ),
                 pending_orders AS (
                     SELECT bo.C_Order_ID AS C_Order_ID, bo.Document_No AS Document_No, bo.Date_Ordered AS Date_Ordered,
-                           bo.Order_Value AS Order_Value, bo.Doc_Status_Code AS Doc_Status_Code,
+                           " + OrderValueExclTaxSql + @" AS Order_Value, bo.Doc_Status_Code AS Doc_Status_Code,
                            bo.Bpartner_Id AS Bpartner_Id, bo.Warehouse_Id AS Warehouse_Id, bo.Sales_Rep_Id AS Sales_Rep_Id,
                            lp.Qty_Ordered AS Qty_Ordered, lp.Qty_Delivered AS Qty_Delivered,
                            bo.Currency_Id AS Currency_Id
@@ -574,7 +610,8 @@ namespace VAS.Controllers
                        o.C_BPartner_ID AS Bpartner_Id,
                        o.M_Warehouse_ID AS Warehouse_Id,
                        o.SalesRep_ID AS Sales_Rep_Id,
-                       o.C_Currency_ID AS Currency_Id
+                       o.C_Currency_ID AS Currency_Id,
+                       o.GrandTotal AS Grand_Total
                   FROM C_Order o
                  WHERE o.AD_Client_ID = @AD_Client_ID
                    AND o.IsActive = 'Y'
@@ -584,7 +621,20 @@ namespace VAS.Controllers
                    AND o.DocStatus = 'CO'
                    AND o.M_Warehouse_ID = @M_Warehouse_ID";
             // VAS163 2026-11-11: Row 93 - Currency_Id (document / price list currency) added for the SO list.
+            // VAS163 2026-11-25: Sr 300 Grand_Total added for the ex-tax order value (OrderValueExclTaxSql).
         }
+
+        /// <summary>
+        /// VAS163 2026-11-25: Sr 300 tax-inclusive rule of VAS_271 / VAS_288 (totals-based): the order's tax
+        /// is inside TotalLines when 2 * (GrandTotal - TotalLines) &lt; SUM(C_OrderTax.TaxAmt); the value then
+        /// has that tax taken off. Alias "bo" = base_orders (outer query, outside AddAccessSQL).
+        /// </summary>
+        private const string OrderTaxSumSql =
+            "(SELECT COALESCE(SUM(COALESCE(ot.TaxAmt, 0)), 0) FROM C_OrderTax ot WHERE ot.C_Order_ID = bo.C_Order_ID AND ot.IsActive = 'Y')";
+
+        private const string OrderValueExclTaxSql =
+            "CASE WHEN 2 * (COALESCE(bo.Grand_Total, 0) - COALESCE(bo.Order_Value, 0)) < " + OrderTaxSumSql +
+            " THEN COALESCE(bo.Order_Value, 0) - " + OrderTaxSumSql + " ELSE COALESCE(bo.Order_Value, 0) END";
 
         private OrderDetailResult GetSalesOrderDetailData(Ctx ctx, int orderId)
         {
@@ -601,6 +651,8 @@ namespace VAS.Controllers
                        o.DatePromised AS Date_Promised,
                        o.DocStatus AS Doc_Status_Code,
                        o.TotalLines AS Order_Value,
+                       o.GrandTotal AS Grand_Total,
+                       (SELECT COALESCE(SUM(COALESCE(ot.TaxAmt, 0)), 0) FROM C_OrderTax ot WHERE ot.C_Order_ID = o.C_Order_ID AND ot.IsActive = 'Y') AS Order_Tax_Amt,
                        o.DeliveryViaRule AS Delivery_Via_Rule,
                        o.M_Warehouse_ID AS Warehouse_Id,
                        COALESCE(bp.Name, N'') AS Customer_Name,
@@ -618,6 +670,8 @@ namespace VAS.Controllers
             headerSql = MRole.GetDefault(ctx).AddAccessSQL(headerSql, "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
             int warehouseId = 0;
+            bool taxIncluded = false;
+            int currencyPrecision = 2;
 
             IDataReader dr = null;
             try
@@ -635,6 +689,14 @@ namespace VAS.Controllers
                 DateTime? dateOrdered = dr["Date_Ordered"] == DBNull.Value ? (DateTime?)null : Util.GetValueOfDateTime(dr["Date_Ordered"]);
                 DateTime? datePromised = dr["Date_Promised"] == DBNull.Value ? (DateTime?)null : Util.GetValueOfDateTime(dr["Date_Promised"]);
 
+                // VAS163 2026-11-25: Sr 300 SO value without tax - totals-based tax-inclusive rule of
+                // VAS_271 / VAS_288 (tax is inside TotalLines when 2 * (GrandTotal - TotalLines) < SUM(C_OrderTax.TaxAmt)).
+                decimal totalLines = dr["Order_Value"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Order_Value"]);
+                decimal grandTotal = dr["Grand_Total"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Grand_Total"]);
+                decimal orderTax = dr["Order_Tax_Amt"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Order_Tax_Amt"]);
+                taxIncluded = orderTax > 0m && 2m * (grandTotal - totalLines) < orderTax;
+                currencyPrecision = dr["Header_Currency_Precision"] == DBNull.Value ? 2 : Util.GetValueOfInt(dr["Header_Currency_Precision"]);
+
                 result.Order = new OrderHeader
                 {
                     // VAS163 2026-11-12: order (document) currency of OrderValue / line amounts.
@@ -647,7 +709,7 @@ namespace VAS.Controllers
                     DatePromised = datePromised.HasValue ? datePromised.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                     CustomerName = Util.GetValueOfString(dr["Customer_Name"]),
                     DocumentStatus = DecodeLabel(docStatusMap, docStatusCode),
-                    OrderValue = dr["Order_Value"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Order_Value"]),
+                    OrderValue = taxIncluded ? totalLines - orderTax : totalLines,
                     WarehouseName = Util.GetValueOfString(dr["Warehouse_Name"]),
                     DeliveryMode = DecodeLabel(GetDecodeMap("C_Order", "DeliveryViaRule", language), Util.GetValueOfString(dr["Delivery_Via_Rule"]))
                 };
@@ -659,12 +721,16 @@ namespace VAS.Controllers
 
             if (result.Order == null) { return result; }
 
-            LoadOrderLines(ctx, result, orderId, warehouseId);
+            LoadOrderLines(ctx, result, orderId, warehouseId, taxIncluded, currencyPrecision);
 
+            // VAS163 2026-11-25: Sr 303 delivery status from Item-type product lines only (charges and
+            // other product types are left out), as VAS_288.
             bool anyDelivered = false, allDelivered = true;
-            bool hasLines = result.Lines.Count > 0;
+            bool hasLines = false;
             foreach (OrderLineRow line in result.Lines)
             {
+                if (!line.IsItem) { continue; }
+                hasLines = true;
                 if (line.QtyDelivered > 0) { anyDelivered = true; }
                 if (line.QtyDelivered < line.QtyOrdered) { allDelivered = false; }
             }
@@ -678,31 +744,66 @@ namespace VAS.Controllers
             return result;
         }
 
-        /// <summary>Every active line of the order, each carrying its own free-stock figure.</summary>
-        private void LoadOrderLines(Ctx ctx, OrderDetailResult result, int orderId, int headerWarehouseId)
+        /// <summary>
+        /// Every active line of the order, each carrying its own free-stock figure.
+        /// VAS163 2026-11-25: Sr 298/299/301/303/300 (same rules as VAS_288's lines pop-up):
+        ///  - charge lines show the charge name (C_Charge.Name);
+        ///  - Ordered / Delivered / Pending / In stock / Line status only for Item-type products
+        ///    (M_Product.ProductType = 'I'), flagged with IsItem;
+        ///  - quantities in the line's selected UOM: QtyEntered, delivered scaled by QtyEntered / QtyOrdered;
+        ///    In stock stays in the product's base UOM (its name is sent as BaseUomName);
+        ///  - Attribute only for lines with an attribute set instance (HasAttribute);
+        ///  - on a tax-inclusive order rate and amount are restated without tax (C_OrderTax ratio).
+        /// </summary>
+        /// <param name="ctx">Login context.</param>
+        /// <param name="result">Detail result the lines are added to.</param>
+        /// <param name="orderId">C_Order_ID.</param>
+        /// <param name="headerWarehouseId">Order warehouse (fallback for the line warehouse).</param>
+        /// <param name="taxIncluded">Order prices include tax - amounts restated without tax.</param>
+        /// <param name="stdPrecision">Order currency precision.</param>
+        private void LoadOrderLines(Ctx ctx, OrderDetailResult result, int orderId, int headerWarehouseId, bool taxIncluded, int stdPrecision)
         {
+            // ProductType is a CHAR column and the charge / product names are NVARCHAR - selected raw
+            // and resolved in C# (no COALESCE against a literal, see VAS_271).
             string sql = @"
                 SELECT ol.C_OrderLine_ID AS Line_Id,
                        ol.Line AS Line_No,
                        ol.M_Product_ID AS Product_Id,
+                       ol.C_Charge_ID AS Charge_Id,
+                       ol.Description AS Description,
                        ol.QtyOrdered AS Qty_Ordered,
+                       ol.QtyEntered AS Qty_Entered,
                        ol.QtyDelivered AS Qty_Delivered,
                        ol.PriceActual AS Price_Actual,
+                       ol.PriceEntered AS Price_Entered,
                        ol.LineNetAmt AS Line_Net_Amt,
+                       ol.TaxAmt AS Line_Tax_Amt,
+                       ol.C_Tax_ID AS Line_Tax_Id,
+                       tx.Rate AS Tax_Rate,
                        ol.M_AttributeSetInstance_ID AS Asi_Id,
                        ol.C_UOM_ID AS Uom_Id,
                        ol.M_Warehouse_ID AS Line_Warehouse_Id,
                        COALESCE(p.Name, p.Value) AS Product_Name,
+                       p.ProductType AS Product_Type,
+                       ch.Name AS Charge_Name,
                        COALESCE(asi.Description, N'') AS Attribute_Text,
-                       COALESCE(u.Name, N'') AS Uom_Name
+                       COALESCE(u.Name, N'') AS Uom_Name,
+                       u.StdPrecision AS Uom_Precision,
+                       COALESCE(bu.Name, N'') AS Base_Uom_Name,
+                       bu.StdPrecision AS Base_Uom_Precision
                   FROM C_OrderLine ol
                   LEFT OUTER JOIN M_Product p ON ( p.M_Product_ID = ol.M_Product_ID )
+                  LEFT OUTER JOIN C_Charge ch ON ( ch.C_Charge_ID = ol.C_Charge_ID )
+                  LEFT OUTER JOIN C_Tax tx ON ( tx.C_Tax_ID = ol.C_Tax_ID )
                   LEFT OUTER JOIN M_AttributeSetInstance asi ON ( asi.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID )
                   LEFT OUTER JOIN C_UOM u ON ( u.C_UOM_ID = ol.C_UOM_ID )
+                  LEFT OUTER JOIN C_UOM bu ON ( bu.C_UOM_ID = p.C_UOM_ID )
                  WHERE ol.C_Order_ID = @Order_Id
                    AND ol.IsActive = 'Y'
                  ORDER BY ol.Line ASC
                  OFFSET 0 ROWS FETCH NEXT @Max_Line_Rows ROWS ONLY";
+
+            Dictionary<int, decimal> netRatioByTax = taxIncluded ? GetOrderTaxNetRatios(orderId) : new Dictionary<int, decimal>();
 
             IDataReader dr = null;
             try
@@ -715,25 +816,80 @@ namespace VAS.Controllers
 
                 while (dr != null && dr.Read())
                 {
-                    decimal qtyOrdered = dr["Qty_Ordered"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Qty_Ordered"]);
-                    decimal qtyDelivered = dr["Qty_Delivered"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Qty_Delivered"]);
+                    decimal qtyOrderedBase = dr["Qty_Ordered"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Qty_Ordered"]);
+                    decimal qtyEntered = dr["Qty_Entered"] == DBNull.Value ? qtyOrderedBase : Util.GetValueOfDecimal(dr["Qty_Entered"]);
+                    decimal qtyDeliveredBase = dr["Qty_Delivered"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Qty_Delivered"]);
                     int productId = dr["Product_Id"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr["Product_Id"]);
                     int lineWarehouseId = dr["Line_Warehouse_Id"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr["Line_Warehouse_Id"]);
                     int warehouseId = lineWarehouseId > 0 ? lineWarehouseId : headerWarehouseId;
+                    int uomPrecision = dr["Uom_Precision"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr["Uom_Precision"]);
+
+                    // Sr 298: line UOM quantities (QtyOrdered / QtyDelivered / storage are base UOM).
+                    decimal uomRatio = qtyOrderedBase != 0m ? (qtyEntered / qtyOrderedBase) : 1m;
+                    decimal qtyOrdered = qtyEntered;
+                    decimal qtyDelivered = Math.Round(qtyDeliveredBase * uomRatio, Math.Max(0, Math.Min(uomPrecision, 12)), MidpointRounding.AwayFromZero);
+
+                    // Sr 303: quantities / stock / status only for Item-type products.
+                    bool isItem = productId > 0
+                        && string.Equals((Util.GetValueOfString(dr["Product_Type"]) ?? "").Trim(), "I", StringComparison.OrdinalIgnoreCase);
+
+                    // Sr 301: a charge line shows the charge's name.
+                    string productName = Util.GetValueOfString(dr["Product_Name"]);
+                    if (string.IsNullOrEmpty(productName)) { productName = Util.GetValueOfString(dr["Charge_Name"]); }
+                    if (string.IsNullOrEmpty(productName)) { productName = Util.GetValueOfString(dr["Description"]); }
+
+                    // Sr 300: amount / rate without tax on a tax-inclusive order (VAS_271 Row 20 rule).
+                    decimal lineGross = dr["Line_Net_Amt"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Line_Net_Amt"]);
+                    decimal lineAmt = lineGross;
+                    int lineTaxId = dr["Line_Tax_Id"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr["Line_Tax_Id"]);
+                    if (taxIncluded && netRatioByTax.ContainsKey(lineTaxId))
+                    {
+                        lineAmt = Math.Round(lineGross * netRatioByTax[lineTaxId], stdPrecision, MidpointRounding.AwayFromZero);
+                    }
+                    else if (taxIncluded)
+                    {
+                        decimal lineTax = dr["Line_Tax_Amt"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Line_Tax_Amt"]);
+                        decimal taxRate = dr["Tax_Rate"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Tax_Rate"]);
+                        if (lineTax == 0m && taxRate > 0m)
+                        {
+                            lineTax = Math.Round(lineGross * taxRate / (100m + taxRate), stdPrecision, MidpointRounding.AwayFromZero);
+                        }
+                        lineAmt = lineGross - lineTax;
+                    }
+
+                    // Rate per selected UOM (PriceEntered), falling back to PriceActual.
+                    decimal rate = dr["Price_Entered"] == DBNull.Value
+                        ? (dr["Price_Actual"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Price_Actual"]))
+                        : Util.GetValueOfDecimal(dr["Price_Entered"]);
+                    if (taxIncluded && lineGross != 0m)
+                    {
+                        rate = Math.Round(rate * lineAmt / lineGross, 6, MidpointRounding.AwayFromZero);
+                    }
+
+                    int asiId = dr["Asi_Id"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr["Asi_Id"]);
+                    // VAS163 2026-11-11: row 58 In stock never negative - show 0. Base UOM (Sr 304).
+                    decimal stockBase = isItem ? Math.Max(0m, ResolveFreeStock(ctx, productId, warehouseId)) : 0m;
+                    decimal qtyPending = isItem ? Math.Max(0m, qtyOrdered - qtyDelivered) : 0m;
 
                     result.Lines.Add(new OrderLineRow
                     {
                         LineNo = Util.GetValueOfInt(dr["Line_No"]),
-                        ProductName = Util.GetValueOfString(dr["Product_Name"]),
-                        AttributeText = Util.GetValueOfString(dr["Attribute_Text"]),
+                        ProductName = productName,
+                        HasAttribute = asiId > 0,
+                        AttributeText = asiId > 0 ? Util.GetValueOfString(dr["Attribute_Text"]) : string.Empty,
                         UomName = Util.GetValueOfString(dr["Uom_Name"]),
+                        UomPrecision = uomPrecision,
+                        BaseUomName = Util.GetValueOfString(dr["Base_Uom_Name"]),
+                        BaseUomPrecision = dr["Base_Uom_Precision"] == DBNull.Value ? uomPrecision : Util.GetValueOfInt(dr["Base_Uom_Precision"]),
+                        IsItem = isItem,
                         QtyOrdered = qtyOrdered,
-                        QtyDelivered = qtyDelivered,
-                        QtyPending = qtyOrdered - qtyDelivered,
-                        // VAS163 2026-11-11: row 58 In stock never negative - show 0.
-                        FreeStock = Math.Max(0m, ResolveFreeStock(ctx, productId, warehouseId)),
-                        Rate = dr["Price_Actual"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Price_Actual"]),
-                        Amount = dr["Line_Net_Amt"] == DBNull.Value ? 0m : Util.GetValueOfDecimal(dr["Line_Net_Amt"])
+                        QtyDelivered = isItem ? qtyDelivered : 0m,
+                        QtyPending = qtyPending,
+                        FreeStock = stockBase,
+                        // Shortage judged in the line UOM (stock is base UOM).
+                        QtyShort = isItem ? Math.Max(0m, qtyPending - stockBase * uomRatio) : 0m,
+                        Rate = rate,
+                        Amount = lineAmt
                     });
                 }
             }
@@ -741,6 +897,61 @@ namespace VAS.Controllers
             {
                 CloseReader(dr);
             }
+        }
+
+        /// <summary>
+        /// VAS163 2026-11-25: Sr 300 (copied from VAS_288 / VAS_271 Row 20). Tax-inclusive order only: per
+        /// C_Tax_ID, the share of the lines' gross (SUM(LineNetAmt)) that is not tax, from the order's
+        /// own tax summary (C_OrderTax.TaxAmt). A tax without a plausible summary row is left out and
+        /// the caller falls back to the line's own TaxAmt / rate.
+        /// </summary>
+        /// <param name="orderId">C_Order_ID.</param>
+        /// <returns>C_Tax_ID -&gt; net / gross ratio.</returns>
+        private static Dictionary<int, decimal> GetOrderTaxNetRatios(int orderId)
+        {
+            Dictionary<int, decimal> ratios = new Dictionary<int, decimal>();
+            try
+            {
+                Dictionary<int, decimal> grossByTax = new Dictionary<int, decimal>();
+                DataSet grossDs = DB.ExecuteDataset(@"
+                    SELECT ol.C_Tax_ID AS Tax_Id, COALESCE(SUM(ol.LineNetAmt), 0) AS Gross
+                      FROM C_OrderLine ol
+                     WHERE ol.C_Order_ID = @Order_Id
+                       AND ol.IsActive = 'Y'
+                     GROUP BY ol.C_Tax_ID", new[] { new SqlParameter("@Order_Id", orderId) }, null);
+                if (grossDs != null && grossDs.Tables.Count > 0)
+                {
+                    foreach (DataRow row in grossDs.Tables[0].Rows)
+                    {
+                        grossByTax[Util.GetValueOfInt(row["Tax_Id"])] = Util.GetValueOfDecimal(row["Gross"]);
+                    }
+                }
+
+                DataSet taxDs = DB.ExecuteDataset(@"
+                    SELECT ot.C_Tax_ID AS Tax_Id, COALESCE(SUM(ot.TaxAmt), 0) AS Tax_Amt
+                      FROM C_OrderTax ot
+                     WHERE ot.C_Order_ID = @Order_Id
+                       AND ot.IsActive = 'Y'
+                     GROUP BY ot.C_Tax_ID", new[] { new SqlParameter("@Order_Id", orderId) }, null);
+                if (taxDs != null && taxDs.Tables.Count > 0)
+                {
+                    foreach (DataRow row in taxDs.Tables[0].Rows)
+                    {
+                        int taxId = Util.GetValueOfInt(row["Tax_Id"]);
+                        decimal taxAmt = Util.GetValueOfDecimal(row["Tax_Amt"]);
+                        decimal gross;
+                        if (grossByTax.TryGetValue(taxId, out gross) && gross > 0m && taxAmt >= 0m && taxAmt < gross)
+                        {
+                            ratios[taxId] = (gross - taxAmt) / gross;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Log(Level.SEVERE, "VAS_280_ShortSupplyBlockingDispatchWidget.GetOrderTaxNetRatios", ex);
+            }
+            return ratios;
         }
 
         /// <summary>
@@ -899,6 +1110,31 @@ namespace VAS.Controllers
             }
         }
 
+        /// <summary>
+        /// VAS163 2026-11-25: Sr 304 C_Currency_ID of the login client's primary accounting schema
+        /// (same lookup as FillBaseCurrency / VAS_285); 0 when it cannot be resolved.
+        /// </summary>
+        /// <param name="ctx">Login context.</param>
+        /// <returns>Base currency id or 0.</returns>
+        private static int GetBaseCurrencyId(Ctx ctx)
+        {
+            if (ctx == null) { return 0; }
+            try
+            {
+                return Util.GetValueOfInt(DB.ExecuteScalar(@"
+                    SELECT cs.C_Currency_ID
+                      FROM AD_ClientInfo ci
+                     INNER JOIN C_AcctSchema cs ON ( cs.C_AcctSchema_ID = ci.C_AcctSchema1_ID )
+                     WHERE ci.AD_Client_ID = @AD_Client_ID",
+                    new[] { new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()) }, null));
+            }
+            catch (Exception ex)
+            {
+                Log.Log(Level.WARNING, "VAS_280_ShortSupplyBlockingDispatchWidget.GetBaseCurrencyId", ex);
+                return 0;
+            }
+        }
+
         /// <summary>VAS163 2026-11-10: base (accounting-schema) currency carried by the widget's first payload.</summary>
         private class CurrencyPayload
         {
@@ -1003,6 +1239,13 @@ namespace VAS.Controllers
             public string ProductName { get; set; }
             public string AttributeText { get; set; }
             public string UomName { get; set; }
+            /// <summary>VAS163 2026-11-25: Sr 298/299/303 line flags / UOM data (as VAS_288).</summary>
+            public bool HasAttribute { get; set; }
+            public bool IsItem { get; set; }
+            public int UomPrecision { get; set; }
+            public string BaseUomName { get; set; }
+            public int BaseUomPrecision { get; set; }
+            public decimal QtyShort { get; set; }
             public decimal QtyOrdered { get; set; }
             public decimal QtyDelivered { get; set; }
             public decimal QtyPending { get; set; }

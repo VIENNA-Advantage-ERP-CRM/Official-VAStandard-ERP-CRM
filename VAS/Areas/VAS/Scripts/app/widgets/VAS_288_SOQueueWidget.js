@@ -755,9 +755,10 @@
                 (qtyShort > 0 ? ' · ' + formatQty(qtyShort, qtyPrecision) + ' ' + label('VAS_288_QtyShortSuffix', 'qty short of stock') : '');
 
             // VAS163 2026-11-20: Sr 229 "Open Record" next to Close opens the order in the Sales Order window.
+            // VAS163 2026-11-25: Sr 306 same styling and order as SO Pending for Payment: Close, then the filled Open Record.
             $mFoot.html('<span class="vas288-foot-note">' + escapeHtml(footNote) + '</span>' +
-                '<span><button type="button" class="vas288-btn" id="vas288-mopen">' + escapeHtml(label('VAS_288_OpenRecord', 'Open Record')) + '</button> ' +
-                '<button type="button" class="vas288-btn" id="vas288-mclose">' + escapeHtml(label('VAS_288_Close', 'Close')) + '</button></span>');
+                '<span><button type="button" class="vas288-btn" id="vas288-mclose">' + escapeHtml(label('VAS_288_Close', 'Close')) + '</button> ' +
+                '<button type="button" class="vas288-btn vas288-btn-primary" id="vas288-mopen">' + escapeHtml(label('VAS_288_OpenRecord', 'Open Record')) + '</button></span>');
             $mFoot.find('#vas288-mopen').on('click', function () { openRecordInWindow(order.SalesOrderId); });
             $mFoot.find('#vas288-mclose').on('click', closeModal);
 

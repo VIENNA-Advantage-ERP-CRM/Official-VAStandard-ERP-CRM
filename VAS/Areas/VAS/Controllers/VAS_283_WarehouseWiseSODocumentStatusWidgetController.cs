@@ -198,10 +198,17 @@ namespace VAS.Controllers
         /// <summary>
         /// VAS163 2026-11-11: Row 124 - 'Y' when the order's prices include tax (the order's
         /// own IsTaxIncluded flag or its price list's flag) - same expression as VAS_270 / VAS_274.
+        /// VAS163 2026-11-25: Sr 256 the flags do not tell whether TotalLines holds the tax (e.g. SO 50243:
+        /// order N / price list Y, TotalLines 1200 = net, GrandTotal 1262.56; SO 50184: order Y, GrandTotal
+        /// above TotalLines), so the tax was taken off a net value. Totals-based rule of VAS_271 / VAS_288
+        /// instead: the tax is inside TotalLines when 2 * (GrandTotal - TotalLines) &lt; SUM(C_OrderTax.TaxAmt).
         /// </summary>
+        private const string OrderTaxSumSql =
+            "(SELECT COALESCE(SUM(COALESCE(ot.TaxAmt, 0)), 0) FROM C_OrderTax ot WHERE ot.C_Order_ID = o.C_Order_ID AND ot.IsActive = 'Y')";
+
         private const string TaxIncludedSql =
-            "(CASE WHEN COALESCE(o.IsTaxIncluded, 'N') = 'Y' " +
-            "OR COALESCE((SELECT pl.IsTaxIncluded FROM M_PriceList pl WHERE pl.M_PriceList_ID = o.M_PriceList_ID), 'N') = 'Y' " +
+            "(CASE WHEN " + OrderTaxSumSql + " > 0 " +
+            "AND 2 * (COALESCE(o.GrandTotal, 0) - COALESCE(o.TotalLines, 0)) < " + OrderTaxSumSql + " " +
             "THEN 'Y' ELSE 'N' END)";
 
         /// <summary>
@@ -211,7 +218,7 @@ namespace VAS.Controllers
         /// </summary>
         private const string OrderValueExclTaxSql =
             "CASE WHEN " + TaxIncludedSql + " = 'Y' " +
-            "THEN COALESCE(o.TotalLines, 0) - (SELECT COALESCE(SUM(COALESCE(ot.TaxAmt, 0)), 0) FROM C_OrderTax ot WHERE ot.C_Order_ID = o.C_Order_ID AND ot.IsActive = 'Y') " +
+            "THEN COALESCE(o.TotalLines, 0) - " + OrderTaxSumSql + " " +
             "ELSE COALESCE(o.TotalLines, 0) END";
 
         /// <summary>

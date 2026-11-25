@@ -32,8 +32,9 @@
 
         /** VAS163 2026-11-20: Sr 74 - share in the browser culture's percent format. */
         function pctText(p) {
-            try { return (p / 100).toLocaleString(window.navigator.language || 'en-US', { style: 'percent', maximumFractionDigits: 0 }); }
-            catch (e) { return p + '%'; }
+            // VAS163 2026-11-25: Sr 82 one decimal (not rounded to a whole percent)
+            try { return (p / 100).toLocaleString(window.navigator.language || 'en-US', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 }); }
+            catch (e) { return p.toFixed(1) + '%'; }
         }
 
         this.Initalize = function () {
@@ -76,7 +77,7 @@
                 head: U.gridHead([U.lbl('VAS_315_Category', 'Category'), U.lbl('VAS_315_Share', 'Share'),
                     U.lbl('VAS_315_Value', 'Value'), U.lbl('VAS_315_Reqs', 'Reqs')], [2, 3]),
                 cell: function (c) {
-                    var pct = pctText(data.total > 0 ? Math.round(c.amount / data.total * 100) : 0);
+                    var pct = pctText(data.total > 0 ? c.amount / data.total * 100 : 0); // VAS163 2026-11-25: Sr 82 exact share
                     var w = max > 0 ? (c.amount / max * 100) : 0;
                     var reqs = U.num(c.requisitions);
                     return '<span class="b" title="' + U.esc(c.name) + '">' + U.esc(c.name) + '</span>' +

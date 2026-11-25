@@ -224,7 +224,9 @@
         var currency = { iso: '', symbol: '', precision: null }; // VAS163: base currency from GetShortSupply
 
         var detailState = null;  // { productId, warehouseId, summary, docs:{page,size,total,rows} }
-        var lineState = null;    // { order, lines, page, size, tableId }
+        var lineState = null;    // { order, lines, page, size, tableId, showAttribute }
+        var ZOOM_WINDOW_NAME = 'VAS_SalesOrder'; // VAS163 2026-11-25: Sr 297 (as VAS_288)
+        var zoomWindowId = 0; // VAS163 2026-11-25: Sr 297 cached Sales Order window id (VAS.ZoomUtil)
         var cfgStack = [];
         var currentCfg = null;
 
@@ -339,6 +341,15 @@
         // VAS163 2026-11-10: browser locale (6-Nov retest2).
         function formatNum(value) {
             return Math.round(Number(value || 0)).toLocaleString(window.navigator.language);
+        }
+
+        // VAS163 2026-11-25: Sr 298 quantity in the browser culture with its UOM's precision
+        // (C_UOM.StdPrecision from the server) - no rounding to a whole number (e.g. 1,500.5 ml), as VAS_288.
+        function formatQty(value, precision) {
+            var p = Math.max(0, Math.min(10, Number(precision) || 0));
+            try {
+                return (Number(value) || 0).toLocaleString(window.navigator.language, { minimumFractionDigits: 0, maximumFractionDigits: p });
+            } catch (e) { return String(Number(value) || 0); }
         }
 
         // VAS163 2026-11-10: browser locale (6-Nov retest2).
@@ -635,7 +646,8 @@
                 var pageBtn = event.target.closest ? event.target.closest('[data-dir]') : null;
                 if (pageBtn) { turnPage(pageBtn.getAttribute('data-table'), Number(pageBtn.getAttribute('data-dir'))); return; }
                 var soBtn = event.target.closest ? event.target.closest('[data-so]') : null;
-                if (soBtn) { openRecordModal(Number(soBtn.getAttribute('data-so'))); return; }
+                // VAS163 2026-11-25: Sr 297 the document number navigates to the record on the Sales Order screen.
+                if (soBtn) { openRecordInWindow(Number(soBtn.getAttribute('data-so'))); return; }
                 var linesBtn = event.target.closest ? event.target.closest('[data-lines]') : null;
                 if (linesBtn) { openLinesModal(Number(linesBtn.getAttribute('data-lines'))); return; }
             });
@@ -681,6 +693,24 @@
             currentCfg = null;
             detailState = null;
             lineState = null;
+        }
+
+        /* VAS163 2026-11-25: Sr 297 opens the Sales Order record - same navigation as VAS_288 / VAS_282
+           (tab where-clause on a window screen, otherwise VAS.ZoomUtil with the cached window id). */
+        function openRecordInWindow(orderId) {
+            closeModal();
+            if (!orderId) { return; }
+            if ($self.windowNo >= 0) {
+                $self.widgetFirevalueChanged({
+                    "TabWhereClause": "C_Order.C_Order_ID=" + Number(orderId),
+                    "TabLayout": "Y",
+                    "TabIndex": "0"
+                });
+                return;
+            }
+            if (!window.VAS || !VAS.ZoomUtil) { return; }
+            VAS.ZoomUtil.zoomToRecord('C_Order_ID', orderId, zoomWindowId, ZOOM_WINDOW_NAME, 'Sales Order')
+                .done(function (id) { if (id > 0) { zoomWindowId = id; } });
         }
 
         function showLoading(title) {
@@ -768,17 +798,14 @@
                 statTile(label('VAS_280_StatCoverage', 'Coverage'), formatNum(coveragePercent) + '%') + // VAS163 2026-11-12: locale digits
                 statTile(label('VAS_280_ValueBlocked', 'Value blocked'), formatINR(summary.ValueBlocked)) +
                 statTile(label('VAS_280_StatSosAffected', 'SOs affected'), String(summary.AffectedOrderCount)) +
-                statTile(label('VAS_280_StatRate', 'Rate'), formatMoney(summary.Rate, currency.symbol, Math.max(2, (typeof currency.precision === 'number') ? currency.precision : 2), currency.iso)) +
+                // VAS163 2026-11-25: Sr 305 the Rate card is removed.
                 statTile(label('VAS_280_StatShipFrom', 'Ship-from warehouse'), summary.WarehouseName) +
             '</div>';
 
-            var noteHtml = '<div class="vas280-mnote">' + escapeHtml(label('VAS_280_Note',
-                'Free stock excludes quantity already allocated to picking and dispatch documents. Raise a purchase requisition or transfer stock from another warehouse to release these dispatches.'
-            )) + '</div>';
-
+            // VAS163 2026-11-25: Sr 302 the "Free stock excludes ..." note line under the cards is removed.
             var secHtml = '<div class="vas280-msec">' + escapeHtml(label('VAS_280_SectionHeading', 'Sales orders held on this product')) + '</div>';
 
-            $mBody.html(statsHtml + noteHtml + secHtml + '<div class="vas280-mtwrap"><div class="vas280-mtbl" id="vas280-docstbl"></div></div>');
+            $mBody.html(statsHtml + secHtml + '<div class="vas280-mtwrap"><div class="vas280-mtbl" id="vas280-docstbl"></div></div>');
             drawDocumentsTable();
 
             $mFoot.html('<span class="vas280-foot-note"></span><span><button type="button" class="vas280-btn" id="vas280-mclose">' + escapeHtml(label('VAS_280_Close', 'Close')) + '</button></span>');
@@ -922,7 +949,7 @@
             var secHtml = '<div class="vas280-msec">' + escapeHtml(label('VAS_280_SalesOrderLines', 'Sales order lines')) + '</div>';
             $mBody.html(soHeaderStats(order) + secHtml + '<div class="vas280-mtwrap"><div class="vas280-mtbl" id="vas280-linetbl-record"></div></div>');
 
-            lineState = { order: order, lines: lines, page: 0, size: MAX_ROWS_PER_PAGE, tableId: 'vas280-linetbl-record' };
+            lineState = { order: order, lines: lines, page: 0, size: MAX_ROWS_PER_PAGE, tableId: 'vas280-linetbl-record', showAttribute: hasAnyAttribute(lines) };
             drawLineTable('vas280-linetbl-record');
 
             $mFoot.html(lineFootHtml(order, lines));
@@ -930,18 +957,25 @@
             $mFoot.find('#vas280-mclose').on('click', closeModal);
         }
 
+        // VAS163 2026-11-25: Sr 299 the Attribute column only when a line has an attribute set instance.
+        function hasAnyAttribute(lines) {
+            return lines.some(function (l) { return !!l.HasAttribute; });
+        }
+
         function lineFootHtml(order, lines) {
-            var qtyOrdered = 0, qtyShort = 0;
+            // VAS163 2026-11-25: Sr 303 / Sr 298 Item-type product lines only (charges / other types left out);
+            // quantities are in each line's UOM, the shortage is computed on the server (QtyShort), as VAS_288.
+            var qtyOrdered = 0, qtyShort = 0, qtyPrecision = 0;
             lines.forEach(function (line) {
+                if (!line.IsItem) { return; }
                 qtyOrdered += Number(line.QtyOrdered) || 0;
-                var pending = Number(line.QtyPending) || 0;
-                var freeStock = Number(line.FreeStock) || 0;
-                if (pending > freeStock) { qtyShort += (pending - freeStock); }
+                qtyShort += Number(line.QtyShort) || 0;
+                qtyPrecision = Math.max(qtyPrecision, Number(line.UomPrecision) || 0);
             });
             var footNote = formatNum(lines.length) + ' ' + label('VAS_280_LinesSuffix', 'lines') +
-                ' · ' + formatNum(qtyOrdered) + ' ' + label('VAS_280_QtyOrderedSuffix', 'qty ordered') +
+                ' · ' + formatQty(qtyOrdered, qtyPrecision) + ' ' + label('VAS_280_QtyOrderedSuffix', 'qty ordered') +
                 ' · ' + order.DeliveryStatus +
-                (qtyShort > 0 ? ' · ' + formatNum(qtyShort) + ' ' + label('VAS_280_QtyShortSuffix', 'qty short of stock') : '');
+                (qtyShort > 0 ? ' · ' + formatQty(qtyShort, qtyPrecision) + ' ' + label('VAS_280_QtyShortSuffix', 'qty short of stock') : '');
 
             return '<span class="vas280-foot-note">' + escapeHtml(footNote) + '</span>' +
                 '<span><button type="button" class="vas280-btn" id="vas280-mback">' + escapeHtml(label('VAS_280_Back', 'Back')) + '</button> ' +
@@ -966,8 +1000,15 @@
         }
 
         function renderLinesBody(order, lines) {
-            var qtyOrdered = 0, qtyPending = 0;
-            lines.forEach(function (l) { qtyOrdered += Number(l.QtyOrdered) || 0; qtyPending += Number(l.QtyPending) || 0; });
+            // VAS163 2026-11-25: Sr 302 the Ordered / Pending cards count Item-type product lines only
+            // (charges and other product types left out), in the lines' UOM (Sr 298).
+            var qtyOrdered = 0, qtyPending = 0, qtyPrecision = 0;
+            lines.forEach(function (l) {
+                if (!l.IsItem) { return; }
+                qtyOrdered += Number(l.QtyOrdered) || 0;
+                qtyPending += Number(l.QtyPending) || 0;
+                qtyPrecision = Math.max(qtyPrecision, Number(l.UomPrecision) || 0);
+            });
 
             var breadcrumb = '<div class="vas280-mnote">' + escapeHtml(label('VAS_280_SalesOrderPrefix', 'Sales order')) +
                 ' <button type="button" class="vas280-lnk" data-so="' + order.SalesOrderId + '" style="display:inline">' + escapeHtml(order.SalesOrderNumber) + '</button>' +
@@ -976,14 +1017,14 @@
             var stats = '<div class="vas280-mstats">' +
                 statTile(label('VAS_280_StatLines', 'Lines'), formatNum(lines.length)) +
                 statTile(label('VAS_280_SoValue', 'SO value'), formatMoney(order.OrderValue, order.CurrencySymbol || '', order.CurrencyPrecision, order.CurrencyIso || '')) +
-                statTile(label('VAS_280_ColOrdered', 'Ordered'), formatNum(qtyOrdered)) +
-                statTile(label('VAS_280_ColPending', 'Pending'), formatNum(qtyPending)) +
+                statTile(label('VAS_280_ColOrdered', 'Ordered'), formatQty(qtyOrdered, qtyPrecision)) +
+                statTile(label('VAS_280_ColPending', 'Pending'), formatQty(qtyPending, qtyPrecision)) +
             '</div>';
 
             var secHtml = '<div class="vas280-msec">' + escapeHtml(label('VAS_280_SalesOrderLines', 'Sales order lines')) + '</div>';
             $mBody.html(breadcrumb + stats + secHtml + '<div class="vas280-mtwrap"><div class="vas280-mtbl" id="vas280-linetbl-lines"></div></div>');
 
-            lineState = { order: order, lines: lines, page: 0, size: MAX_ROWS_PER_PAGE, tableId: 'vas280-linetbl-lines' };
+            lineState = { order: order, lines: lines, page: 0, size: MAX_ROWS_PER_PAGE, tableId: 'vas280-linetbl-lines', showAttribute: hasAnyAttribute(lines) };
             drawLineTable('vas280-linetbl-lines');
 
             $mFoot.html(lineFootHtml(order, lines));
@@ -1009,30 +1050,40 @@
             var el = document.getElementById(tableId);
             if (!el || !lineState) { return; }
 
-            var tpl = LINE_COLS.map(function (c) { return 'minmax(0,' + c.w + 'fr)'; }).join(' ');
+            // VAS163 2026-11-25: Sr 299 Attribute column only when some line of the order has one.
+            var cols = LINE_COLS.filter(function (c) { return lineState.showAttribute || c.key !== 'attr'; });
+            var tpl = cols.map(function (c) { return 'minmax(0,' + c.w + 'fr)'; }).join(' ');
             var pages = Math.max(1, Math.ceil(lineState.lines.length / lineState.size));
             if (lineState.page > pages - 1) { lineState.page = pages - 1; }
             var start = lineState.page * lineState.size;
             var slice = lineState.lines.slice(start, start + lineState.size);
 
             var head = '<div class="vas280-mrow vas280-mhead-row" style="grid-template-columns:' + tpl + '">' +
-                LINE_COLS.map(function (c) { return '<span class="vas280-mcell' + (c.align === 'right' ? ' right' : '') + '" title="' + escapeHtml(c.label) + '">' + escapeHtml(c.label) + '</span>'; }).join('') +
+                cols.map(function (c) { return '<span class="vas280-mcell' + (c.align === 'right' ? ' right' : '') + '" title="' + escapeHtml(c.label) + '">' + escapeHtml(c.label) + '</span>'; }).join('') +
             '</div>';
 
             var body = slice.map(function (line) {
-                var st = lineStatus(line);
+                // VAS163 2026-11-25: Sr 303 Ordered / Delivered / Pending / In stock / Line status only for
+                // Item-type products - charges and other product types show a dash and no status (as VAS_288).
+                // Sr 298 quantities in the line UOM (its precision); In stock stays in the base UOM.
+                var isItem = !!line.IsItem;
+                var st = isItem ? lineStatus(line) : null;
+                var stockText = formatQty(line.FreeStock, line.BaseUomPrecision);
+                if (line.BaseUomName && line.BaseUomName !== line.UomName) { stockText += ' ' + line.BaseUomName; }
                 var cells = [
                     mcell(String(line.LineNo), 'vas280-c-std', 'right'),
                     mcell(line.ProductName, 'vas280-c-prim'),
-                    mcell(line.AttributeText, 'vas280-c-std'),
+                    lineState.showAttribute ? mcell(line.HasAttribute ? line.AttributeText : '', 'vas280-c-std') : '',
                     mcell(line.UomName, 'vas280-c-std'),
-                    mcell(formatNum(line.QtyOrdered), 'vas280-c-std', 'right'),
-                    mcell(formatNum(line.QtyDelivered), 'vas280-c-std', 'right'),
-                    mcell(formatNum(line.QtyPending), 'vas280-c-prim', 'right'),
-                    mcell(formatNum(line.FreeStock), (line.FreeStock < line.QtyPending ? 'vas280-c-short' : 'vas280-c-ok'), 'right'),
+                    mcell(isItem ? formatQty(line.QtyOrdered, line.UomPrecision) : '—', 'vas280-c-std', 'right'),
+                    mcell(isItem ? formatQty(line.QtyDelivered, line.UomPrecision) : '—', 'vas280-c-std', 'right'),
+                    mcell(isItem ? formatQty(line.QtyPending, line.UomPrecision) : '—', 'vas280-c-prim', 'right'),
+                    mcell(isItem ? stockText : '—', (isItem && Number(line.QtyShort) > 0 ? 'vas280-c-short' : 'vas280-c-ok'), 'right'),
                     mcell(formatMoney(line.Rate, lineState.order.CurrencySymbol || '', Math.max(2, (typeof lineState.order.CurrencyPrecision === 'number') ? lineState.order.CurrencyPrecision : 2), lineState.order.CurrencyIso || ''), 'vas280-c-std', 'right'),
                     mcell(formatMoney(line.Amount, lineState.order.CurrencySymbol || '', lineState.order.CurrencyPrecision, lineState.order.CurrencyIso || ''), 'vas280-c-emph', 'right')
-                ].join('') + '<span class="vas280-mcell"><span class="vas280-mchip ' + st.cls + '" title="' + escapeHtml(st.text) + '">' + escapeHtml(st.text) + '</span></span>';
+                ].join('') + (st
+                    ? '<span class="vas280-mcell"><span class="vas280-mchip ' + st.cls + '" title="' + escapeHtml(st.text) + '">' + escapeHtml(st.text) + '</span></span>'
+                    : '<span class="vas280-mcell"></span>');
                 return '<div class="vas280-mrow" style="grid-template-columns:' + tpl + '">' + cells + '</div>';
             }).join('');
 

@@ -372,6 +372,10 @@
 
 .vas288-btn:hover { background: #EEF8FF; }
 
+/* VAS163 2026-11-25: Sr 306 Open Record is the filled primary button, as in SO Pending for Payment */
+.vas288-btn-primary { background: #0083DA; color: #fff; }
+.vas288-btn-primary:hover { background: #0069AE; }
+
 .vas288-mstats {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
