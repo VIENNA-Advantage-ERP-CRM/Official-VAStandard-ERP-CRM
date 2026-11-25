@@ -34,7 +34,11 @@ namespace VIS.Controllers
             try
             {
                 VAS_ReqCurrency cur = VAS_ReqWidgetData.GetSchemaCurrency(ctx);
-                List<VAS_ReqLine> lines = VAS_ReqWidgetData.LoadLines(ctx, cur, "r.DocStatus = 'CO'", null)
+                // VAS163 2026-11-20: Sr 35 - completed requisitions only, and none against which any document has been
+                // created (PO / blanket PO, Material Transfer, Inventory Use, RFQ - drafts included, voided / reversed
+                // documents not): the same rule as Open Requisitions (VAS_307). Delivered requisitions drop out through
+                // NotOrderedQty > 0 (a fully delivered line has nothing left to order).
+                List<VAS_ReqLine> lines = VAS_ReqWidgetData.LoadLines(ctx, cur, "r.DocStatus = 'CO' AND " + VAS_ReqWidgetData.NoDocumentSql(), null)
                     .Where(l => l.NotOrderedQty > 0).ToList();
                 var data = new
                 {

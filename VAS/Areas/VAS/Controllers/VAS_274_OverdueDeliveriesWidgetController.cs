@@ -434,14 +434,24 @@ namespace VAS.Controllers
 
             // VAS163 2026-11-11: Row 48 - one row per overdue order; count / pending value /
             // average and worst days late are aggregated here on whole dates (see ComputeDaysLate).
+            // VAS163 2026-11-20: Sr 214 the card total is in the base currency: each order's pending
+            // value (document currency) is converted with the order's own conversion date / type /
+            // org (same arguments as VAS_271's currencyConvert) - columns read from C_Order here so
+            // the shared base_orders CTE stays unchanged.
+            int baseCurrencyId = GetBaseCurrencyId(ctx);
             string sql = @"
                 WITH " + BuildCommonCtesSql(ctx) + @"
                 SELECT
                     op.C_Order_ID AS C_Order_ID,
                     op.Pending_Value AS Pending_Value,
-                    bo.Date_Promised AS Date_Promised
+                    bo.Date_Promised AS Date_Promised,
+                    bo.Currency_Id AS Currency_Id,
+                    COALESCE(co.DateAcct, co.DateOrdered) AS Date_Acct,
+                    co.C_ConversionType_ID AS Conversion_Type_Id,
+                    co.AD_Org_ID AS Org_Id
                   FROM order_pending op
-                  INNER JOIN base_orders bo ON ( bo.C_Order_ID = op.C_Order_ID )";
+                  INNER JOIN base_orders bo ON ( bo.C_Order_ID = op.C_Order_ID )
+                  INNER JOIN C_Order co ON ( co.C_Order_ID = op.C_Order_ID )";
 
             IDataReader dr = null;
             try
@@ -466,6 +476,17 @@ namespace VAS.Controllers
                     // VAS163 2026-11-11: Row 61 - same per-line computation as the lines pop-up.
                     decimal orderPending;
                     pendingByOrder.TryGetValue(Util.GetValueOfInt(dr["C_Order_ID"]), out orderPending);
+                    // VAS163 2026-11-20: Sr 214 foreign-currency orders converted to the base currency
+                    // (one rate lookup per foreign order - the pending value is computed in C#, so the
+                    // conversion cannot be folded into the SQL; base-currency orders need no call).
+                    int orderCurrencyId = Util.GetValueOfInt(dr["Currency_Id"]);
+                    if (baseCurrencyId > 0 && orderCurrencyId > 0 && orderCurrencyId != baseCurrencyId && orderPending != 0m)
+                    {
+                        DateTime convDate = dr["Date_Acct"] == DBNull.Value ? DateTime.Today : Util.GetValueOfDateTime(dr["Date_Acct"]).Value;
+                        orderPending = MConversionRate.Convert(ctx, orderPending, orderCurrencyId, baseCurrencyId, convDate,
+                            Util.GetValueOfInt(dr["Conversion_Type_Id"]), ctx.GetAD_Client_ID(), Util.GetValueOfInt(dr["Org_Id"]));
+                        // No rate configured -> 0, the same as VAS_271's COALESCE(currencyConvert(...), 0).
+                    }
                     pendingValue += orderPending;
                 }
                 result.OverdueCount = count;
@@ -1061,6 +1082,32 @@ namespace VAS.Controllers
             catch (Exception ex)
             {
                 Log.Log(Level.WARNING, "FillBaseCurrency", ex);
+            }
+        }
+
+        /// <summary>
+        /// VAS163 2026-11-20: Sr 214 C_Currency_ID of the login client's primary accounting schema
+        /// (same lookup as FillBaseCurrency / VAS_271 GetBaseCurrencyId); 0 when it cannot be
+        /// resolved (the card then sums unconverted).
+        /// </summary>
+        /// <param name="ctx">Login context.</param>
+        /// <returns>Base C_Currency_ID or 0.</returns>
+        private static int GetBaseCurrencyId(Ctx ctx)
+        {
+            if (ctx == null) { return 0; }
+            try
+            {
+                return Util.GetValueOfInt(DB.ExecuteScalar(@"
+                    SELECT cs.C_Currency_ID
+                      FROM AD_ClientInfo ci
+                     INNER JOIN C_AcctSchema cs ON ( cs.C_AcctSchema_ID = ci.C_AcctSchema1_ID )
+                     WHERE ci.AD_Client_ID = @AD_Client_ID",
+                    new[] { new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()) }, null));
+            }
+            catch (Exception ex)
+            {
+                Log.Log(Level.WARNING, "VAS_274_OverdueDeliveriesWidget.GetBaseCurrencyId", ex);
+                return 0;
             }
         }
 

@@ -432,7 +432,31 @@
         function formatINR(value) {
             var cur = wizardCurrency();
             var prec = (typeof cur.Precision === 'number') ? cur.Precision : null;
-            return VAS.formatAmountByBrowser(Number(value || 0), String(cur.Code || '').trim(), prec, { compact: true, symbol: String(cur.Symbol || '').trim() });
+            // VAS163 2026-11-23: compact amount through the common VIS.Util.BrowserCultureFormatter, as the Sales Quotation /
+            // Customer Master / Service Contract widgets do: the unit (K / M / Mio. / L / Cr / 万 ...), digits and the currency
+            // symbol position come from the browser culture; ISO code, symbol and precision from the server.
+            var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
+            var sign = n < 0 ? '-' : '';
+            var isoCode = String(cur.Code || '').trim();
+            var compact = VIS.Util.BrowserCultureFormatter.formatCompactAmount(n, isoCode, prec);
+            if (isoCode) {
+                try {
+                    var parts = new Intl.NumberFormat(window.navigator.language, { style: 'currency', currency: isoCode }).formatToParts(1);
+                    var ci = -1, ni = -1;
+                    parts.forEach(function (p, idx) {
+                        if (p.type === 'currency' && ci < 0) { ci = idx; }
+                        if (p.type === 'integer' && ni < 0) { ni = idx; }
+                    });
+                    if (ci >= 0 && ni >= 0) {
+                        var sym = parts[ci].value;
+                        if (ci < ni) {
+                            return sign + sym + (parts[ci + 1] && parts[ci + 1].type === 'literal' ? parts[ci + 1].value : '') + compact;
+                        }
+                        return sign + compact + (parts[ci - 1] && parts[ci - 1].type === 'literal' ? parts[ci - 1].value : '') + sym;
+                    }
+                } catch (e) { /* fall back to the server symbol in front */ }
+            }
+            return sign + (String(cur.Symbol || '').trim() || isoCode) + compact;
         }
 
         // VAS163 2026-11-12: formatMoneyCompact was called (step 2 footer, step 3 "Order value")
@@ -631,8 +655,10 @@
                         '<span class="vas289-sub" style="display:block">' + escapeHtml(row.BusinessPartner) + '</span>' +
                     '</span>' +
                     cellHtml(formatNumDisplay(row.LineCount), 'vas289-c-dark', 'right') +
+                    // VAS163 2026-11-20: Sr 216 PendingQty is in each line's selected UOM (server).
                     cellHtml(formatNumDisplay(row.PendingQty), 'vas289-c-dark', 'right') +
-                    cellHtml(formatDateShort(row.ValidTillDate), 'vas289-c-std') +
+                    // VAS163 2026-11-20: Sr 215 / Sr 244 valid till with the year (browser culture).
+                    cellHtml(formatDateFull(row.ValidTillDate), 'vas289-c-std') +
                 '</button>';
             }).join(''));
 
@@ -867,7 +893,8 @@
             return {
                 step: 2,
                 title: q.DocumentNo,
-                subtitle: [q.BusinessPartner, label('VAS_289_ValidTillLabel', 'valid till') + ' ' + formatDateShort(q.ValidTillDate), label('VAS_289_Step2SubtitleSuffix', 'select the lines to raise a sales order against')].filter(function (p) { return p; }).join(' · '),
+                // VAS163 2026-11-20: Sr 215 / Sr 244 valid till with the year.
+                subtitle: [q.BusinessPartner, label('VAS_289_ValidTillLabel', 'valid till') + ' ' + formatDateFull(q.ValidTillDate),label('VAS_289_Step2SubtitleSuffix', 'select the lines to raise a sales order against')].filter(function (p) { return p; }).join(' · '),
                 size: '',
                 fixedHeight: true,
                 render: renderStep2

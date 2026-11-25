@@ -1,9 +1,8 @@
 /************************************************************
  * Module Name    : VAS
  * Purpose        : VAS_312 - My Requisitions (3x2) on the Requisition screen.
- *                  Requisitions of the logged-in user (requester, or creator when no requester
- *                  is set) dated in the last 12 months, newest first, with the live status.
- *                  Voided and reversed requisitions are left out (cancelled, nothing to follow up).
+ *                  Requisitions created by the logged-in user, dated in the selected month / year,
+ *                  newest first, with the live status; every document status (VAS163 2026-11-20: Sr 45 / Sr 46).
  * Author         : VAS
  * Date           : 05 November 2026
  ***********************************************************/
@@ -22,10 +21,12 @@ namespace VIS.Controllers
 {
     public class VAS_312_MyRequisitionsWidgetController : Controller
     {
-        /// <summary>The user's requisitions, newest first.</summary>
+        /// <summary>The user's requisitions of one month, newest first.</summary>
+        /// <param name="year">VAS163 2026-11-20: Sr 45 - year of the Month / Year filter (0 = current)</param>
+        /// <param name="month">VAS163 2026-11-20: Sr 45 - month 1-12 of the filter (0 = current)</param>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetMyRequisitions()
+        public JsonResult GetMyRequisitions(int year = 0, int month = 0)
         {
             Ctx ctx = Session["ctx"] as Ctx;
             if (ctx == null)
@@ -37,14 +38,26 @@ namespace VIS.Controllers
                 DateTime today = DateTime.Now.Date;
                 int userId = ctx.GetAD_User_ID();
                 VAS_ReqCurrency cur = VAS_ReqWidgetData.GetSchemaCurrency(ctx);
-                List<SqlParameter> p = new List<SqlParameter>
+                // VAS163 2026-11-20: Sr 45 - requisitions dated (DateDoc) in the selected month of the selected year
+                if (year < 1900 || year > 2999 || month < 1 || month > 12)
+                {
+                    year = today.Year;
+                    month = today.Month;
+                }
+                DateTime from = new DateTime(year, month, 1);
+                DateTime to = from.AddMonths(1);
+                // VAS163 2026-11-20: Sr 46 - requisitions of every document status (voided / reversed included), created
+                // by the logged-in user only (M_Requisition.CreatedBy; requester / preparer no longer counts)
+                const string reqWhere = "r.CreatedBy = @RQ_User1 AND r.DateDoc >= @RQ_From AND r.DateDoc < @RQ_To";
+                Func<List<SqlParameter>> prm = () => new List<SqlParameter>
                 {
                     new SqlParameter("@RQ_User1", userId),
-                    new SqlParameter("@RQ_User2", userId),
-                    new SqlParameter("@RQ_From", today.AddMonths(-12))
+                    new SqlParameter("@RQ_From", from),
+                    new SqlParameter("@RQ_To", to)
                 };
-                List<VAS_ReqLine> lines = VAS_ReqWidgetData.LoadLines(ctx, cur,
-                    VAS_ReqWidgetData.RequestedBySql() + " AND r.DateDoc >= @RQ_From AND r.DocStatus NOT IN ('VO', 'RE')", p);
+                List<VAS_ReqLine> lines = VAS_ReqWidgetData.LoadLines(ctx, cur, reqWhere, prm());
+                // VAS163 2026-11-20: Sr 46 / Sr 61 - drafts without lines appear too (header-only entry)
+                lines.AddRange(VAS_ReqWidgetData.LoadHeadersWithoutLines(ctx, reqWhere, prm()));
 
                 var rows = lines.GroupBy(l => l.RequisitionId).Select(g =>
                 {
@@ -58,7 +71,7 @@ namespace VIS.Controllers
                         dateDoc = VAS_ReqWidgetData.D(h.DateDoc),
                         needBy = VAS_ReqWidgetData.D(need),
                         amount = g.Sum(l => l.Amount(l.Qty)),
-                        lines = g.Count(),
+                        lines = g.Count(l => l.LineId > 0),
                         status = bucket,
                         statusName = VAS_ReqWidgetData.BucketName(ctx, bucket),
                         isOpen = h.DocStatus == "CO" && g.Any(l => l.OpenQty > 0),
@@ -69,6 +82,8 @@ namespace VIS.Controllers
 
                 var data = new
                 {
+                    year,
+                    month,
                     count = rows.Count,
                     openCount = rows.Count(r => r.isOpen),
                     currency = cur,

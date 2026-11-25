@@ -87,6 +87,8 @@ namespace VAS.Controllers
     ///                          warehouses/doc types, SO price lists, sales reps, SO taxes),
     ///                          customer search + customer defaults, mandatory/date checks,
     ///                          editable rate, Drafted/Completed document status.
+    ///   VAS163      2026-11-20 Sr 216 list pending qty in the line UOM; Sr 218 created SO line
+    ///                          PriceActual per selected UOM; Sr 219 status label via VAS_PartlyOrdered.
     /// </summary>
     [System.Web.Mvc.SessionState(System.Web.SessionState.SessionStateBehavior.ReadOnly)]
     public class VAS_289_OpenSalesQuotationsWidgetController : Controller
@@ -169,6 +171,9 @@ namespace VAS.Controllers
 
             string baseQuotationsSql = MRole.GetDefault(ctx).AddAccessSQL(BuildBaseQuotationsSql(), "q", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
+            // VAS163 2026-11-20: Sr 216 Pending_Qty in each quotation line's selected UOM: the base-UOM
+            // balance (QtyOrdered - already ordered) scaled by the line's QtyEntered / QtyOrdered (as the
+            // line-selection step shows it); ROUND keeps the PostgreSQL quotient inside System.Decimal.
             string sql = @"
                 WITH base_quotations AS (" + baseQuotationsSql + @"),
                 " + LinkedOrdersCte + @",
@@ -178,8 +183,10 @@ namespace VAS.Controllers
                            SUM(COALESCE(ql.QtyOrdered, 0)) AS Quoted_Qty,
                            SUM(COALESCE(lo.Already_Ordered_Qty, 0)) AS Already_Ordered_Qty,
                            SUM(
-                               CASE WHEN COALESCE(ql.QtyOrdered, 0) > COALESCE(lo.Already_Ordered_Qty, 0)
-                                    THEN COALESCE(ql.QtyOrdered, 0) - COALESCE(lo.Already_Ordered_Qty, 0)
+                               CASE WHEN COALESCE(ql.QtyOrdered, 0) > 0
+                                     AND COALESCE(ql.QtyOrdered, 0) > COALESCE(lo.Already_Ordered_Qty, 0)
+                                    THEN ROUND((COALESCE(ql.QtyOrdered, 0) - COALESCE(lo.Already_Ordered_Qty, 0))
+                                               * COALESCE(ql.QtyEntered, ql.QtyOrdered) / ql.QtyOrdered, 6)
                                     ELSE 0
                                END
                            ) AS Pending_Qty
@@ -235,7 +242,7 @@ namespace VAS.Controllers
 
                     string statusLabel, statusChip;
                     bool convertible;
-                    ClassifyQuotationStatus(docStatusCode, alreadyOrdered, out statusLabel, out statusChip, out convertible);
+                    ClassifyQuotationStatus(ctx, docStatusCode, alreadyOrdered, out statusLabel, out statusChip, out convertible);
 
                     result.Rows.Add(new QuotationRow
                     {
@@ -263,7 +270,7 @@ namespace VAS.Controllers
         }
 
         /// <summary>Quotation-specific status vocabulary matches 22-open-sales-quotations.html verbatim (confirmed by the user over the dev prompt's schema-label correction) - "Accepted"/"Partly ordered"/"Awaiting approval" are UI workflow labels, never written back to C_Order.DocStatus.</summary>
-        private static void ClassifyQuotationStatus(string docStatus, decimal alreadyOrdered, out string label, out string chipClass, out bool convertible)
+        private static void ClassifyQuotationStatus(Ctx ctx, string docStatus, decimal alreadyOrdered, out string label, out string chipClass, out bool convertible)
         {
             if (docStatus == "IP")
             {
@@ -272,7 +279,9 @@ namespace VAS.Controllers
             }
             if (alreadyOrdered > 0)
             {
-                label = "Partly ordered"; chipClass = "warn"; convertible = true;
+                // VAS163 2026-11-20: Sr 219 the label comes from the existing message VAS_PartlyOrdered
+                // (also used by VAS_217 Open Requisitions); the current text stays as the fallback.
+                label = GetMsgTextOrDefault(ctx, "VAS_PartlyOrdered", "Partly ordered"); chipClass = "warn"; convertible = true;
                 return;
             }
             label = "Accepted"; chipClass = "ok"; convertible = true;
@@ -463,7 +472,7 @@ namespace VAS.Controllers
             result.Quotation.AlreadyOrderedQty = result.Lines.Sum(l => l.AlreadyOrderedQty);
             result.Quotation.PendingQty = result.Lines.Sum(l => l.PendingQty);
             string statusLabel, statusChip; bool convertible;
-            ClassifyQuotationStatus(result.Quotation.DocStatus, result.Quotation.AlreadyOrderedQty, out statusLabel, out statusChip, out convertible);
+            ClassifyQuotationStatus(ctx, result.Quotation.DocStatus, result.Quotation.AlreadyOrderedQty, out statusLabel, out statusChip, out convertible);
             result.Quotation.StatusLabel = statusLabel;
             result.Quotation.StatusChipClass = statusChip;
 
@@ -1422,11 +1431,15 @@ namespace VAS.Controllers
                     ol.SetM_Product_ID(snap.ProductId);
                     if (snap.AsiId > 0) { ol.SetM_AttributeSetInstance_ID(snap.AsiId); }
                     ol.SetC_UOM_ID(snap.UomId);
-                    // Qty/rate are in the line UOM (QtyEntered/PriceEntered); QtyOrdered/PriceActual in the base UOM.
+                    // Qty/rate are in the line UOM (QtyEntered/PriceEntered); QtyOrdered in the base UOM.
+                    // VAS163 2026-11-20: Sr 218 PriceActual is the price per SELECTED UOM as well - the
+                    // platform's MOrderLine.SetLineNetAmt() (run in BeforeSave) computes LineNetAmt =
+                    // PriceActual x QtyEntered, so both must be in the same UOM. The former base-UOM
+                    // price (rate x QtyEntered / QtyOrdered) gave 1,000 ml x 400/l = 4,00,000 instead of 400.
                     ol.SetQtyEntered(snap.Qty);
                     ol.SetQtyOrdered(snap.QtyBase);
                     ol.SetPriceEntered(snap.Rate);
-                    ol.SetPriceActual(snap.QtyBase != 0 ? (snap.Rate * snap.Qty / snap.QtyBase) : snap.Rate);
+                    ol.SetPriceActual(snap.Rate);
                     if (snap.TaxId > 0) { ol.SetC_Tax_ID(snap.TaxId); }
                     ol.SetDatePromised(snap.DatePromised ?? newOrder.GetDatePromised());
                     if (!string.IsNullOrEmpty(snap.Description)) { ol.SetDescription(snap.Description); }
@@ -1563,6 +1576,23 @@ namespace VAS.Controllers
         {
             string text = Msg.GetMsg(ctx, key);
             return (string.IsNullOrEmpty(text) || text == key) ? fallback : text;
+        }
+
+        /// <summary>
+        /// VAS163 2026-11-20: Sr 219 text-only message (3-arg GetMsg, no tooltip appended); the English
+        /// fallback when the key is not defined (GetMsg echoes the key, bare or as "[KEY]").
+        /// </summary>
+        /// <param name="ctx">Context.</param>
+        /// <param name="key">AD_Message value.</param>
+        /// <param name="fallback">English text used when the key is missing.</param>
+        /// <returns>Message text or fallback.</returns>
+        private static string GetMsgTextOrDefault(Ctx ctx, string key, string fallback)
+        {
+            if (ctx == null) { return fallback; }
+            string text = Msg.GetMsg(ctx, key, true);
+            string trimmed = (text ?? string.Empty).Trim();
+            if (trimmed.Length == 0 || trimmed == key || trimmed == "[" + key + "]") { return fallback; }
+            return text;
         }
 
         private JsonResult ErrorResult(Ctx ctx)

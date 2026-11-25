@@ -1,7 +1,8 @@
 /**
  * VAS_314_RequisitionStatusWidget - 3x2 donut on the Requisition screen (and its Home copy).
  * Requisitions of the last 12 months by the system requisition status (Open, Partially Ordered,
- * Ordered, Partially Delivered, Delivered - evaluated live) plus Draft and Closed / Voided.
+ * Ordered, Partially Delivered, Delivered - evaluated live) plus Draft, Closed and Voided
+ * (VAS163 2026-11-20: Sr 57 - separate; requisitions without lines are included, Sr 61).
  * Pastel palette (checked for colour-blind separation; legend carries the labels and values).
  * Hover = tooltip, slice / legend click = list popup, list row = requisition popup.
  * Backend: VAS_314_RequisitionStatusWidget/GetStatusSummary
@@ -12,14 +13,17 @@
  *  VAS_314_Total                 total
  *  VAS_314_Requisitions          requisitions
  *  VAS_314_Draft                 Draft             (server)
- *  VAS_314_ClosedVoided          Closed / Voided   (server)
+ *  VAS_314_Closed                Closed            (server, VAS163 2026-11-20: Sr 57, new)
+ *  VAS_314_Voided                Voided            (server, VAS163 2026-11-20: Sr 57, new)
+ *  VAS_314_RequisitionStatus     Requisition status (VAS163 2026-11-20: Sr 60, new - list popup column)
  *  VAS_314_Empty                 No requisitions in the last 12 months.
  */
 ; (function (VAS, $) {
     "use strict";
     var U = VAS.RequisitionWidgetUtil;
     // pastel, one hue family per status; order = slice order (validated: CVD dE 11.9, normal dE 15.1)
-    var COLORS = { OP: '#7AB6EE', PO: '#F2BC62', OR: '#5FB8C9', PD: '#C9D86F', DE: '#5CC2A0', DR: '#A797EE', CL: '#F6A08E' };
+    // VAS163 2026-11-20: Sr 57 - Closed (CL, now grey-blue) and Voided (VO, salmon) are separate slices
+    var COLORS = { OP: '#7AB6EE', PO: '#F2BC62', OR: '#5FB8C9', PD: '#C9D86F', DE: '#5CC2A0', DR: '#A797EE', CL: '#AAB8C6', VO: '#F6A08E' };
 
     VAS.VAS_314_RequisitionStatusWidget = function () {
         var self = this;
@@ -96,7 +100,11 @@
                 .on('click.rqw', '[data-s]', function () {
                     $tip.hide();
                     var s = by[$(this).attr('data-s')];
-                    if (s) { U.showList(self, s.name, U.num(s.count) + ' ' + U.unit(s.count, 'VAS_314_Requisitions', 'requisitions') + ' · ' + U.money(s.amount, cur), s.records, cur); }
+                    // VAS163 2026-11-20: Sr 60 - extra 'Requisition status' column (document status) before Status
+                    if (s) {
+                        U.showList(self, s.name, U.num(s.count) + ' ' + U.unit(s.count, 'VAS_314_Requisitions', 'requisitions') + ' · ' + U.money(s.amount, cur), s.records, cur,
+                            { docStatusLabel: U.lbl('VAS_314_RequisitionStatus', 'Requisition status') });
+                    }
                 });
         }
 
