@@ -178,11 +178,18 @@
    (document-root-relative), matching the mock's own .prow/.na-ic/.row-title/
    .row-meta literally - NOT em relative to .vas267-root's own dashboard-
    scaled font-size (see the file-header note). */
+/* Each of the 4 body rows (BODY_PAGE = 4) gets an equal quarter of the list height
+   (flex-basis 25%, min-height 0), so rows are always identical in height and the
+   last row is never cut off; a short last page keeps the same row height instead
+   of stretching. Content is vertically centred by align-items. */
 .vas267-row {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 0.5rem 0;
+    flex: 0 1 25%;
+    min-height: 0;
+    padding: 0.25rem 0;
+    overflow: hidden;
     border-bottom: 1px solid #EDF2F6;
     cursor: pointer;
     border-radius: 6px;

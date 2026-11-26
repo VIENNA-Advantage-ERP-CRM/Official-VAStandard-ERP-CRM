@@ -283,7 +283,7 @@ namespace VAS.Controllers
             IDataReader dr = null;
             try
             {
-                dr = DB.ExecuteReader(sql, BuildPredicateParameters(ctx));
+                dr = VAS_ContractSqlCompat.ExecuteReader(sql, BuildPredicateParameters(ctx));
                 if (dr != null && dr.Read())
                 {
                     result.OpenTicketTotal = dr["Open_Ticket_Total"] == DBNull.Value ? 0 : Util.GetValueOfInt(dr["Open_Ticket_Total"]);
@@ -337,7 +337,7 @@ namespace VAS.Controllers
                 parameters.Add(new SqlParameter("@Off", offset));
                 parameters.Add(new SqlParameter("@Lim", limit));
 
-                dr = DB.ExecuteReader(listSql, parameters.ToArray());
+                dr = VAS_ContractSqlCompat.ExecuteReader(listSql, parameters.ToArray());
                 while (dr != null && dr.Read())
                 {
                     result.Rows.Add(new ServiceUnderContractDrillRow
@@ -358,7 +358,7 @@ namespace VAS.Controllers
             IDataReader countReader = null;
             try
             {
-                countReader = DB.ExecuteReader(countSql, BuildPredicateParameters(ctx));
+                countReader = VAS_ContractSqlCompat.ExecuteReader(countSql, BuildPredicateParameters(ctx));
                 if (countReader != null && countReader.Read())
                 {
                     result.Total = Util.GetValueOfInt(countReader["Total_Count"]);
@@ -402,7 +402,7 @@ namespace VAS.Controllers
                 List<SqlParameter> parameters = new List<SqlParameter>(BuildPredicateParameters(ctx));
                 parameters.Add(new SqlParameter("@MaxIds", MaxZoomIds));
 
-                dr = DB.ExecuteReader(sql, parameters.ToArray());
+                dr = VAS_ContractSqlCompat.ExecuteReader(sql, parameters.ToArray());
                 while (dr != null && dr.Read())
                 {
                     ids.Add(Util.GetValueOfInt(dr["Contract_Id"]));

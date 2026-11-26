@@ -133,7 +133,6 @@
 
     .vas261-tile:hover {
         border-color: #BFE4FF;
-        transform: translateY(-2px);
     }
 
     .vas261-tile:focus-visible {

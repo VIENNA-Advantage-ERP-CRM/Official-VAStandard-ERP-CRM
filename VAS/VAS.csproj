@@ -234,6 +234,7 @@
     <Compile Include="Areas\VAS\Controllers\VAS_265_ServiceUnderContractWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_266_BillingProgressWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_267_NewContractsWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_ContractSqlCompat.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_268_GlobalSalesSearchWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_270_SalesOrdersCompletedMTDWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_271_SOsPendingDeliveryWidgetController.cs" />

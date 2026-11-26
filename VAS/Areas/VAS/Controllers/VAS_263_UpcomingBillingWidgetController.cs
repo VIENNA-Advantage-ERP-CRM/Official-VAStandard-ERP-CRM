@@ -242,7 +242,7 @@ namespace VAS.Controllers
                 List<SqlParameter> parameters = new List<SqlParameter>(BuildPredicateParameters(ctx));
                 parameters.Add(new SqlParameter("@BaseCurrency_ID", baseCurrencyId));
 
-                dr = DB.ExecuteReader(sql, parameters.ToArray());
+                dr = VAS_ContractSqlCompat.ExecuteReader(sql, parameters.ToArray());
                 if (dr != null && dr.Read())
                 {
                     result.DuePeriodCount = Util.GetValueOfInt(dr["Due_Period_Count"]);
@@ -305,7 +305,7 @@ namespace VAS.Controllers
                 parameters.Add(new SqlParameter("@Off", offset));
                 parameters.Add(new SqlParameter("@Lim", limit));
 
-                dr = DB.ExecuteReader(listSql, parameters.ToArray());
+                dr = VAS_ContractSqlCompat.ExecuteReader(listSql, parameters.ToArray());
                 while (dr != null && dr.Read())
                 {
                     DateTime? fromDate = dr["From_Date"] == DBNull.Value ? (DateTime?)null : Util.GetValueOfDateTime(dr["From_Date"]);
@@ -337,7 +337,7 @@ namespace VAS.Controllers
                 List<SqlParameter> countParameters = new List<SqlParameter>(BuildPredicateParameters(ctx));
                 countParameters.Add(new SqlParameter("@BaseCurrency_ID", baseCurrencyId));
 
-                countReader = DB.ExecuteReader(countSql, countParameters.ToArray());
+                countReader = VAS_ContractSqlCompat.ExecuteReader(countSql, countParameters.ToArray());
                 if (countReader != null && countReader.Read())
                 {
                     result.Total = Util.GetValueOfInt(countReader["Total_Count"]);
@@ -381,7 +381,7 @@ namespace VAS.Controllers
                 List<SqlParameter> parameters = new List<SqlParameter>(BuildPredicateParameters(ctx));
                 parameters.Add(new SqlParameter("@MaxIds", MaxZoomIds));
 
-                dr = DB.ExecuteReader(sql, parameters.ToArray());
+                dr = VAS_ContractSqlCompat.ExecuteReader(sql, parameters.ToArray());
                 while (dr != null && dr.Read())
                 {
                     ids.Add(Util.GetValueOfInt(dr["Contract_Id"]));
@@ -407,7 +407,7 @@ namespace VAS.Controllers
                 SELECT cs.C_Currency_ID AS Acct_Currency_ID,
                        cur.StdPrecision AS Std_Precision,
                        cur.ISO_Code     AS ISO_Code,
-                       CASE WHEN cur.CurSymbol IS NOT NULL THEN cur.CurSymbol ELSE cur.ISO_Code END AS Cur_Symbol
+                       CASE WHEN cur.CurSymbol IS NOT NULL THEN cur.CurSymbol ELSE " + VAS_ContractSqlCompat.AsNationalText("cur.ISO_Code") + @" END AS Cur_Symbol
                   FROM AD_ClientInfo ci
                   INNER JOIN C_AcctSchema cs ON ( cs.C_AcctSchema_ID = ci.C_AcctSchema1_ID AND cs.IsActive = 'Y' )
                   INNER JOIN C_Currency cur  ON ( cur.C_Currency_ID  = cs.C_Currency_ID    AND cur.IsActive = 'Y' )
@@ -431,7 +431,7 @@ namespace VAS.Controllers
             IDataReader dr = null;
             try
             {
-                dr = DB.ExecuteReader(SchemaCurrencySql(), new[] { new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()) });
+                dr = VAS_ContractSqlCompat.ExecuteReader(SchemaCurrencySql(), new[] { new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()) });
                 if (dr != null && dr.Read())
                 {
                     baseCurrencyId = Util.GetValueOfInt(dr["Acct_Currency_ID"]);

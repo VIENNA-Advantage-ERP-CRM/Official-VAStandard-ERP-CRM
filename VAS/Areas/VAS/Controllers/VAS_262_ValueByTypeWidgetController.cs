@@ -196,7 +196,7 @@ namespace VAS.Controllers
 
             string baseSql = @"
                 SELECT co.ContractType AS Type_Code,
-                       COALESCE(rlt.Name, rl.Name, rl.Value) AS Type_Label,
+                       COALESCE(rlt.Name, rl.Name, " + VAS_ContractSqlCompat.AsNationalText("rl.Value") + @") AS Type_Label,
                        COUNT(co.C_Contract_ID) AS Contract_Count,
                        SUM( CurrencyConvert(co.GrandTotal, co.C_Currency_ID, @BaseCurrency_ID,
                               CURRENT_DATE, co.C_ConversionType_ID, co.AD_Client_ID, co.AD_Org_ID) ) AS Type_Value_Base
@@ -211,13 +211,13 @@ namespace VAS.Controllers
             baseSql = MRole.GetDefault(ctx).AddAccessSQL(baseSql, "co", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
             string sql = baseSql + @"
-                GROUP BY co.ContractType, COALESCE(rlt.Name, rl.Name, rl.Value)
+                GROUP BY co.ContractType, COALESCE(rlt.Name, rl.Name, " + VAS_ContractSqlCompat.AsNationalText("rl.Value") + @")
                 ORDER BY Type_Value_Base DESC";
 
             IDataReader dr = null;
             try
             {
-                dr = DB.ExecuteReader(sql, new[]
+                dr = VAS_ContractSqlCompat.ExecuteReader(sql, new[]
                 {
                     new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
                     new SqlParameter("@BaseCurrency_ID", baseCurrencyId),
@@ -302,7 +302,7 @@ namespace VAS.Controllers
                     new SqlParameter("@Lim", limit)
                 };
 
-                dr = DB.ExecuteReader(listSql, parameters.ToArray());
+                dr = VAS_ContractSqlCompat.ExecuteReader(listSql, parameters.ToArray());
                 while (dr != null && dr.Read())
                 {
                     string renewalTypeCode = Util.GetValueOfString(dr["Renewal_Type_Code"]);
@@ -340,7 +340,7 @@ namespace VAS.Controllers
                     new SqlParameter("@ContractType", SqlDbType.NVarChar) { Value = typeCode }
                 };
 
-                countReader = DB.ExecuteReader(countSql, countParameters.ToArray());
+                countReader = VAS_ContractSqlCompat.ExecuteReader(countSql, countParameters.ToArray());
                 if (countReader != null && countReader.Read())
                 {
                     result.Total = Util.GetValueOfInt(countReader["Total_Count"]);
@@ -385,7 +385,7 @@ namespace VAS.Controllers
             IDataReader dr = null;
             try
             {
-                dr = DB.ExecuteReader(sql, new[]
+                dr = VAS_ContractSqlCompat.ExecuteReader(sql, new[]
                 {
                     new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
                     new SqlParameter("@ContractType", SqlDbType.NVarChar) { Value = typeCode },
@@ -417,7 +417,7 @@ namespace VAS.Controllers
                 SELECT cs.C_Currency_ID AS Acct_Currency_ID,
                        cur.StdPrecision AS Std_Precision,
                        cur.ISO_Code     AS ISO_Code,
-                       CASE WHEN cur.CurSymbol IS NOT NULL THEN cur.CurSymbol ELSE cur.ISO_Code END AS Cur_Symbol
+                       CASE WHEN cur.CurSymbol IS NOT NULL THEN cur.CurSymbol ELSE " + VAS_ContractSqlCompat.AsNationalText("cur.ISO_Code") + @" END AS Cur_Symbol
                   FROM AD_ClientInfo ci
                   INNER JOIN C_AcctSchema cs ON ( cs.C_AcctSchema_ID = ci.C_AcctSchema1_ID AND cs.IsActive = 'Y' )
                   INNER JOIN C_Currency cur  ON ( cur.C_Currency_ID  = cs.C_Currency_ID    AND cur.IsActive = 'Y' )
@@ -441,7 +441,7 @@ namespace VAS.Controllers
             IDataReader dr = null;
             try
             {
-                dr = DB.ExecuteReader(SchemaCurrencySql(), new[] { new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()) });
+                dr = VAS_ContractSqlCompat.ExecuteReader(SchemaCurrencySql(), new[] { new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()) });
                 if (dr != null && dr.Read())
                 {
                     baseCurrencyId = Util.GetValueOfInt(dr["Acct_Currency_ID"]);
@@ -486,7 +486,7 @@ namespace VAS.Controllers
             if (columnId > 0)
             {
                 string sql = @"
-                    SELECT rl.Value AS Code, COALESCE(rlt.Name, rl.Name, rl.Value) AS Label
+                    SELECT rl.Value AS Code, COALESCE(rlt.Name, rl.Name, " + VAS_ContractSqlCompat.AsNationalText("rl.Value") + @") AS Label
                       FROM AD_Ref_List rl
                       INNER JOIN AD_Column col ON ( col.AD_Reference_Value_ID = rl.AD_Reference_ID )
                       LEFT OUTER JOIN AD_Ref_List_Trl rlt ON ( rlt.AD_Ref_List_ID = rl.AD_Ref_List_ID AND rlt.AD_Language = @AD_Language )
@@ -496,7 +496,7 @@ namespace VAS.Controllers
                 IDataReader dr = null;
                 try
                 {
-                    dr = DB.ExecuteReader(sql, new[]
+                    dr = VAS_ContractSqlCompat.ExecuteReader(sql, new[]
                     {
                         new SqlParameter("@AD_Column_ID", columnId),
                         new SqlParameter("@AD_Language", SqlDbType.NVarChar) { Value = language }
@@ -532,7 +532,7 @@ namespace VAS.Controllers
             int cached;
             if (ColumnIdCache.TryGetValue(cacheKey, out cached)) { return cached; }
 
-            int columnId = Util.GetValueOfInt(DB.ExecuteScalar(
+            int columnId = Util.GetValueOfInt(VAS_ContractSqlCompat.ExecuteScalar(
                 "SELECT AD_Column_ID FROM AD_Column WHERE ColumnName = @Col AND AD_Table_ID = (SELECT AD_Table_ID FROM AD_Table WHERE TableName = @Tbl)",
                 new[]
                 {
