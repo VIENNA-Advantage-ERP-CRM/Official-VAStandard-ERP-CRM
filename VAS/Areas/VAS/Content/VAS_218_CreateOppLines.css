@@ -336,7 +336,7 @@
     /* 8 columns: checkbox | line no | product | description | qty/uom | price | amount | undo.
        The last track holds the row Undo icon (same layout as the Create Order panel).
        VAI154: the 2nd track (3.5em) is the Line No column. */
-    grid-template-columns: 1.75em 3.5em minmax(0, 1.9fr) minmax(0, 1.4fr) minmax(7em, 1fr) minmax(6em, 0.7fr) minmax(6.75em, 0.85fr) 3.5em;
+    grid-template-columns: 1.75em 3.5em minmax(0, 1.9fr) minmax(0, 1.4fr) minmax(7em, 1fr) minmax(6em, 0.7fr) minmax(6.75em, 0.85fr) 1.75em;
     gap: 0.75em;
     align-items: center;
     padding: 0.75em 0;
@@ -362,6 +362,12 @@
         overflow: hidden;
         white-space: nowrap;
         text-overflow: ellipsis;
+    }
+
+    /* text-overflow needs a block box: in a flex cell the heading was clipped (on the left
+       for right-aligned columns) with no "..." */
+    .vas-ol-row--head .vas-ol-cell:not(.vas-ol-cell--check) {
+        display: block;
     }
 
 
@@ -2006,7 +2012,7 @@
 @media (max-width: 60em) {
     .vas-ol-row {
         /* VAI154: Line No track added after the check box */
-        grid-template-columns: 1.75em 3.5em minmax(0, 1.6fr) 7em 6em 6em 3.5em;
+        grid-template-columns: 1.75em 3.5em minmax(0, 1.6fr) 7em 6em 6em 1.75em;
     }
 
     /* Description (4, after Line No) is hidden on narrow widths; Amount (7) stays visible beside the Undo cell (8). */
