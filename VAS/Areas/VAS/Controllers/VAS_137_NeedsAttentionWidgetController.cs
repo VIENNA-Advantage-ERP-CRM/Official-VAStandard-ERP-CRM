@@ -29,7 +29,8 @@ namespace VAS.Controllers
     ///                                (C_InvoicePaySchedule, same rule as VAS_124).
     ///                 unresponded  - customers with an active, unresolved, open
     ///                                R_Request (CloseDate NULL, not resolved/processed).
-    ///                 unsegmented  - active customers with C_BP_Group_ID IS NULL.
+    ///                 unsegmented  - active customers with no active membership in any active
+    ///                                segment (target list) - same rule as VAS_141 / VAS_302.
     ///                 onbIncomplete- active customers whose profile completion &lt; 100,
     ///                                scored 20 points per profile section (same rule
     ///                                as VAS_136; the C_Project onboarding columns
@@ -41,6 +42,8 @@ namespace VAS.Controllers
     ///   VAI052      2026-07-22 Created
     ///   VAI052      2026-11-18 Oracle fixes: profile-completion score without a nested correlated
     ///                          inline view (ORA-00904); each bind placeholder used once (ORA-01008)
+    ///   VAI052      2026-11-26 Unsegmented = no active target-list membership (as VAS_141 / VAS_302);
+    ///                          the old C_BP_Group_ID IS NULL test always counted 0
     /// </summary>
     public class VAS_137_NeedsAttentionWidgetController : Controller
     {
@@ -134,6 +137,22 @@ namespace VAS.Controllers
             return ReadScalarInt(ctx, sql);
         }
 
+        /// <summary>
+        /// "Unsegmented" = no active membership in any active segment (Onfinity target list:
+        /// C_TargetList -> C_MasterTargetList) - the same population as VAS_141.GetUnsegmented and
+        /// VAS_302. (It used to test C_BP_Group_ID IS NULL; that is the mandatory business partner
+        /// group, so it was always 0.) The tenant is matched on bp.AD_Client_ID, not a second
+        /// @Client_ID bind, because this controller binds each placeholder once.
+        /// </summary>
+        private const string UnsegmentedCondition = @"
+                  AND NOT EXISTS (
+                      SELECT 1 FROM C_TargetList tl
+                      INNER JOIN C_MasterTargetList mtl ON (mtl.C_MasterTargetList_ID=tl.C_MasterTargetList_ID AND mtl.AD_Client_ID=tl.AD_Client_ID AND mtl.IsActive = 'Y')
+                      WHERE tl.C_BPartner_ID=bp.C_BPartner_ID
+                        AND tl.IsActive = 'Y'
+                        AND tl.AD_Client_ID = bp.AD_Client_ID
+                  )";
+
         private int CountUnsegmented(Ctx ctx)
         {
             string sql = @"
@@ -141,8 +160,7 @@ namespace VAS.Controllers
                 FROM C_BPartner bp
                 WHERE bp.IsActive = 'Y'
                   AND bp.IsCustomer = 'Y'
-                  AND bp.AD_Client_ID = @Client_ID
-                  AND bp.C_BP_Group_ID IS NULL";
+                  AND bp.AD_Client_ID = @Client_ID" + UnsegmentedCondition;
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "bp", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             return ReadScalarInt(ctx, sql);
         }
@@ -376,8 +394,7 @@ namespace VAS.Controllers
                 LEFT OUTER JOIN AD_User rep ON (rep.AD_User_ID=bp.SalesRep_ID AND rep.AD_Client_ID=bp.AD_Client_ID AND rep.IsActive = 'Y')
                 WHERE bp.IsActive = 'Y'
                   AND bp.IsCustomer = 'Y'
-                  AND bp.AD_Client_ID = @Client_ID
-                  AND bp.C_BP_Group_ID IS NULL";
+                  AND bp.AD_Client_ID = @Client_ID" + UnsegmentedCondition;
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "bp", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             sql += @"
                 ORDER BY bp.Updated DESC, bp.Name ASC

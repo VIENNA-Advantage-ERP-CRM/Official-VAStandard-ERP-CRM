@@ -238,7 +238,7 @@
 .vas126-grid-head,
 .vas126-grid-row {
     display: grid;
-    grid-template-columns: minmax(0, 2.4fr) minmax(0, 0.9fr) minmax(0, 0.8fr) minmax(0, 1.2fr) minmax(0, 0.9fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 2.1fr) minmax(0, 0.9fr) minmax(0, 0.8fr) minmax(0, 1.1fr) minmax(0, 0.9fr) minmax(0, 1.5fr);
     gap: 12px;                                  /* px */
     align-items: center;
 }
@@ -280,6 +280,17 @@
 .is-right {
     text-align: right;
     justify-self: end;
+}
+
+/* Inside the customer grid a right-aligned cell must stay inside its own column: with
+   justify-self:end it sized to its full text width and a long (translated) header or
+   segment value spilled left over the neighbouring ARR column. Stretch to the column and
+   let the text align right, so overflow is clipped with an ellipsis instead. */
+.vas126-grid-head .is-right,
+.vas126-grid-row .is-right {
+    justify-self: stretch;
+    min-width: 0;
+    max-width: 100%;
 }
 
 /* Customer cell — avatar + name + contact. */

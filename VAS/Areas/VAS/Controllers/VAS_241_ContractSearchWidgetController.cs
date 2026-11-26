@@ -274,7 +274,7 @@ namespace VAS.Controllers
             string sql = "SELECT 1 FROM C_Contract co WHERE co.C_Contract_ID = @Contract_ID AND co.AD_Client_ID = @AD_Client_ID AND co.IsActive = 'Y'";
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "co", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            object value = DB.ExecuteScalar(sql, new[]
+            object value = VAS_ContractSqlCompat.ExecuteScalar(sql, new[]
             {
                 new SqlParameter("@Contract_ID", contractId),
                 new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
@@ -308,7 +308,7 @@ namespace VAS.Controllers
                    AND c.IsActive = 'Y'
                    AND c.AD_Process_ID IS NOT NULL";
 
-            int processId = Util.GetValueOfInt(DB.ExecuteScalar(sql, new[]
+            int processId = Util.GetValueOfInt(VAS_ContractSqlCompat.ExecuteScalar(sql, new[]
             {
                 new SqlParameter("@Tbl", SqlDbType.NVarChar) { Value = tableName },
                 new SqlParameter("@Col", SqlDbType.NVarChar) { Value = columnName }
@@ -422,7 +422,7 @@ namespace VAS.Controllers
                      OR UPPER(COALESCE(pr.Name, N'')) LIKE UPPER(@Search_Product) ESCAPE '\'
                      OR UPPER(COALESCE(sr.Name, N'')) LIKE UPPER(@Search_SalesRep) ESCAPE '\'
                      OR UPPER(COALESCE(fr.Name, N'')) LIKE UPPER(@Search_Frequency) ESCAPE '\'
-                     OR UPPER(COALESCE(cur.ISO_Code, N'')) LIKE UPPER(@Search_Currency) ESCAPE '\'
+                     OR UPPER(COALESCE(" + VAS_ContractSqlCompat.AsNationalText("cur.ISO_Code") + @", N'')) LIKE UPPER(@Search_Currency) ESCAPE '\'
                      OR UPPER(COALESCE(pt.Name, N'')) LIKE UPPER(@Search_PaymentTerm) ESCAPE '\'
                      OR EXISTS (
                           SELECT 1
@@ -431,7 +431,7 @@ namespace VAS.Controllers
                             LEFT JOIN AD_Ref_List_Trl rlt ON ( rlt.AD_Ref_List_ID = rl.AD_Ref_List_ID AND rlt.AD_Language = @AD_Language_Status )
                            WHERE col.AD_Column_ID = @AD_Column_ID_DocStatus
                              AND rl.Value = co.DocStatus
-                             AND UPPER(COALESCE(rlt.Name, rl.Name, rl.Value)) LIKE UPPER(@Search_Status) ESCAPE '\' )
+                             AND UPPER(COALESCE(rlt.Name, rl.Name, " + VAS_ContractSqlCompat.AsNationalText("rl.Value") + @")) LIKE UPPER(@Search_Status) ESCAPE '\' )
                      OR EXISTS (
                           SELECT 1
                             FROM AD_Ref_List rl2
@@ -439,7 +439,7 @@ namespace VAS.Controllers
                             LEFT JOIN AD_Ref_List_Trl rlt2 ON ( rlt2.AD_Ref_List_ID = rl2.AD_Ref_List_ID AND rlt2.AD_Language = @AD_Language_Type )
                            WHERE col2.AD_Column_ID = @AD_Column_ID_ContractType
                              AND rl2.Value = co.ContractType
-                             AND UPPER(COALESCE(rlt2.Name, rl2.Name, rl2.Value)) LIKE UPPER(@Search_Type) ESCAPE '\' )
+                             AND UPPER(COALESCE(rlt2.Name, rl2.Name, " + VAS_ContractSqlCompat.AsNationalText("rl2.Value") + @")) LIKE UPPER(@Search_Type) ESCAPE '\' )
                      OR EXISTS (
                           SELECT 1
                             FROM AD_Ref_List rl3
@@ -447,7 +447,7 @@ namespace VAS.Controllers
                             LEFT JOIN AD_Ref_List_Trl rlt3 ON ( rlt3.AD_Ref_List_ID = rl3.AD_Ref_List_ID AND rlt3.AD_Language = @AD_Language_Renewal )
                            WHERE col3.AD_Column_ID = @AD_Column_ID_RenewalType
                              AND rl3.Value = co.RenewalType
-                             AND UPPER(COALESCE(rlt3.Name, rl3.Name, rl3.Value)) LIKE UPPER(@Search_Renewal) ESCAPE '\' )
+                             AND UPPER(COALESCE(rlt3.Name, rl3.Name, " + VAS_ContractSqlCompat.AsNationalText("rl3.Value") + @")) LIKE UPPER(@Search_Renewal) ESCAPE '\' )
                    )";
         }
 
@@ -496,7 +496,7 @@ namespace VAS.Controllers
                 SELECT cs.C_Currency_ID AS Acct_Currency_ID,
                        cur.StdPrecision AS Std_Precision,
                        cur.ISO_Code     AS ISO_Code,
-                       CASE WHEN cur.CurSymbol IS NOT NULL THEN cur.CurSymbol ELSE cur.ISO_Code END AS Cur_Symbol
+                       CASE WHEN cur.CurSymbol IS NOT NULL THEN cur.CurSymbol ELSE " + VAS_ContractSqlCompat.AsNationalText("cur.ISO_Code") + @" END AS Cur_Symbol
                   FROM AD_ClientInfo ci
                   JOIN C_AcctSchema cs ON ( cs.C_AcctSchema_ID = ci.C_AcctSchema1_ID AND cs.IsActive = 'Y' )
                   JOIN C_Currency cur  ON ( cur.C_Currency_ID  = cs.C_Currency_ID    AND cur.IsActive = 'Y' )
@@ -514,7 +514,7 @@ namespace VAS.Controllers
             IDataReader dr = null;
             try
             {
-                dr = DB.ExecuteReader(SchemaCurrencySql(), new[] { new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()) });
+                dr = VAS_ContractSqlCompat.ExecuteReader(SchemaCurrencySql(), new[] { new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()) });
                 if (dr != null && dr.Read())
                 {
                     baseCurrencyId = Util.GetValueOfInt(dr["Acct_Currency_ID"]);
@@ -581,7 +581,7 @@ namespace VAS.Controllers
                 suggestParams.Add(new SqlParameter("@Off", offset));
                 suggestParams.Add(new SqlParameter("@Lim", limit));
 
-                dr = DB.ExecuteReader(suggestSql, suggestParams.ToArray());
+                dr = VAS_ContractSqlCompat.ExecuteReader(suggestSql, suggestParams.ToArray());
                 while (dr != null && dr.Read())
                 {
                     result.Rows.Add(ReadRow(ctx, dr, docStatusMap, contractTypeMap, renewalTypeMap, baseCurrencyIso, baseCurrencySymbol, baseCurrencyPrecision));
@@ -595,7 +595,7 @@ namespace VAS.Controllers
             IDataReader countReader = null;
             try
             {
-                countReader = DB.ExecuteReader(countSql,
+                countReader = VAS_ContractSqlCompat.ExecuteReader(countSql,
                     BuildSearchParameters(clientId, likeValue, language, docStatusColumnId, contractTypeColumnId, renewalTypeColumnId, baseCurrencyId));
                 if (countReader != null && countReader.Read())
                 {
@@ -685,7 +685,7 @@ namespace VAS.Controllers
             IDataReader dr = null;
             try
             {
-                dr = DB.ExecuteReader(headerSql, new[]
+                dr = VAS_ContractSqlCompat.ExecuteReader(headerSql, new[]
                 {
                     new SqlParameter("@Contract_ID", contractId),
                     new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
@@ -780,7 +780,7 @@ namespace VAS.Controllers
             IDataReader dr = null;
             try
             {
-                dr = DB.ExecuteReader(sql, new[]
+                dr = VAS_ContractSqlCompat.ExecuteReader(sql, new[]
                 {
                     new SqlParameter("@Contract_ID", detail.ContractId),
                     new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
@@ -861,7 +861,7 @@ namespace VAS.Controllers
             IDataReader dr = null;
             try
             {
-                dr = DB.ExecuteReader(sql, new[]
+                dr = VAS_ContractSqlCompat.ExecuteReader(sql, new[]
                 {
                     new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
                     new SqlParameter("@BPartner_ID", bPartnerId)
@@ -1002,7 +1002,7 @@ namespace VAS.Controllers
             if (columnId > 0)
             {
                 string sql = @"
-                    SELECT rl.Value AS Code, COALESCE(rlt.Name, rl.Name, rl.Value) AS Label
+                    SELECT rl.Value AS Code, COALESCE(rlt.Name, rl.Name, " + VAS_ContractSqlCompat.AsNationalText("rl.Value") + @") AS Label
                       FROM AD_Ref_List rl
                       JOIN AD_Column col ON ( col.AD_Reference_Value_ID = rl.AD_Reference_ID )
                       LEFT JOIN AD_Ref_List_Trl rlt ON ( rlt.AD_Ref_List_ID = rl.AD_Ref_List_ID AND rlt.AD_Language = @AD_Language )
@@ -1012,7 +1012,7 @@ namespace VAS.Controllers
                 IDataReader dr = null;
                 try
                 {
-                    dr = DB.ExecuteReader(sql, new[]
+                    dr = VAS_ContractSqlCompat.ExecuteReader(sql, new[]
                     {
                         new SqlParameter("@AD_Column_ID", columnId),
                         new SqlParameter("@AD_Language", SqlDbType.NVarChar) { Value = language }
@@ -1046,7 +1046,7 @@ namespace VAS.Controllers
             int cached;
             if (ColumnIdCache.TryGetValue(cacheKey, out cached)) { return cached; }
 
-            int columnId = Util.GetValueOfInt(DB.ExecuteScalar(
+            int columnId = Util.GetValueOfInt(VAS_ContractSqlCompat.ExecuteScalar(
                 "SELECT AD_Column_ID FROM AD_Column WHERE ColumnName = @Col AND AD_Table_ID = (SELECT AD_Table_ID FROM AD_Table WHERE TableName = @Tbl)",
                 new[]
                 {

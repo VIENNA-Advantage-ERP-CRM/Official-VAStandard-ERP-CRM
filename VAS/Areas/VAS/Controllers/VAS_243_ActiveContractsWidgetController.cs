@@ -94,7 +94,7 @@ namespace VAS.Controllers
                 SELECT cs.C_Currency_ID AS Acct_Currency_ID,
                        cur.StdPrecision AS Std_Precision,
                        cur.ISO_Code     AS ISO_Code,
-                       CASE WHEN cur.CurSymbol IS NOT NULL THEN cur.CurSymbol ELSE cur.ISO_Code END AS Cur_Symbol
+                       CASE WHEN cur.CurSymbol IS NOT NULL THEN cur.CurSymbol ELSE " + VAS_ContractSqlCompat.AsNationalText("cur.ISO_Code") + @" END AS Cur_Symbol
                   FROM AD_ClientInfo ci
                   JOIN C_AcctSchema cs ON ( cs.C_AcctSchema_ID = ci.C_AcctSchema1_ID AND cs.IsActive = 'Y' )
                   JOIN C_Currency cur  ON ( cur.C_Currency_ID  = cs.C_Currency_ID    AND cur.IsActive = 'Y' )
@@ -121,7 +121,7 @@ namespace VAS.Controllers
             IDataReader cdr = null;
             try
             {
-                cdr = DB.ExecuteReader(SchemaCurrencySql(), new[] { new SqlParameter("@AD_Client_ID", clientId) });
+                cdr = VAS_ContractSqlCompat.ExecuteReader(SchemaCurrencySql(), new[] { new SqlParameter("@AD_Client_ID", clientId) });
                 if (cdr != null && cdr.Read())
                 {
                     baseCurrencyId = Util.GetValueOfInt(cdr["Acct_Currency_ID"]);
@@ -152,7 +152,7 @@ namespace VAS.Controllers
             IDataReader dr = null;
             try
             {
-                dr = DB.ExecuteReader(sql, new[]
+                dr = VAS_ContractSqlCompat.ExecuteReader(sql, new[]
                 {
                     new SqlParameter("@BaseCurrency_ID", baseCurrencyId),
                     new SqlParameter("@AD_Client_ID", clientId),

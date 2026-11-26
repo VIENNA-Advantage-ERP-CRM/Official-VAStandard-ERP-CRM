@@ -31,8 +31,8 @@ namespace VAS.Controllers
     ///               (share of the segmented total). A segment drills to its customers
     ///               (ranked by customer value); "Segment ->" opens the top unsegmented
     ///               customers plus the active target lists for a bulk assignment.
-    ///               Customer value = COALESCE(PotentialLifeTimeValue,
-    ///               ActualLifeTimeValue, 0) (no native ARR column here). A customer
+    ///               Customer value = ActualLifeTimeValue, or PotentialLifeTimeValue when the
+    ///               actual value is zero (no native ARR column here). A customer
     ///               may belong to several lists, so per-segment counts can exceed the
     ///               distinct segmented total. MRole (tenant + org + record access) is
     ///               applied to the main physical table of each query/CTE.
@@ -40,6 +40,8 @@ namespace VAS.Controllers
     ///   VAI052      2026-07-23 Created
     ///   VAI052      2026-11-18 Oracle fixes: totals query has a FROM (ORA-00923); every placeholder
     ///                          occurrence is bound in SQL order (ORA-01008)
+    ///   VAI052      2026-11-25 Customer value shows ActualLifeTimeValue first (Potential only when the
+    ///                          actual is zero); the old COALESCE(Potential, Actual) always gave 0.00
     /// </summary>
     public class VAS_141_CustomersBySegmentWidgetController : Controller
     {
@@ -49,8 +51,13 @@ namespace VAS.Controllers
         private const int MaxListPageSize = 25;
         private const int MaxAssignCustomers = 500;
 
-        /// <summary>Customer value used for ranking/display (no native ARR column).</summary>
-        private const string ValueExpr = "COALESCE(bp.PotentialLifeTimeValue, bp.ActualLifeTimeValue, 0)";
+        /// <summary>
+        /// Customer value used for ranking/display (no native ARR column): the same ActualLifeTimeValue
+        /// the other customer widgets show (VAS_122/126/301/302), falling back to PotentialLifeTimeValue
+        /// only when the actual value is zero (prospects). Both columns are NOT NULL-defaulting-to-0
+        /// numerics, so a COALESCE(Potential, Actual) always returned the 0 potential value.
+        /// </summary>
+        private const string ValueExpr = "CASE WHEN COALESCE(bp.ActualLifeTimeValue, 0) <> 0 THEN bp.ActualLifeTimeValue ELSE COALESCE(bp.PotentialLifeTimeValue, 0) END";
 
         /// <summary>Single-row tenant accounting currency (for value formatting).</summary>
         private const string SchemaCurrencySql = @"
