@@ -449,7 +449,7 @@
         /**
          * Formats a quantity value in the browser culture. VAI154: it shows exactly the Standard Precision
          * of its unit of measure (0 = no decimals, 3 = three); when the precision is not known the number
-         * keeps its own digits (up to 6). Display only - the editable Qty input uses fmtQtyEdit.
+         * keeps its own digits (up to 6). Display only - the editable Qty input uses the generic fmtEditNumber (as SIT01_008).
          * @param {number} n
          * @param {number} [prec] - StdPrecision of the unit (undefined / null = not known)
          * @returns {string}
@@ -464,27 +464,6 @@
             } catch (e) {
                 return known ? v.toFixed(p) : String(v);
             }
-        }
-
-        /**
-         * Plain "8.50" text for the editable Qty input (decimal point, no grouping). VAI154: with a known
-         * unit precision the box holds exactly that many decimals; otherwise at least 2 decimal places
-         * (up to 6), trailing zeros beyond the 2nd place stripped.
-         * @param {number} n
-         * @param {number} [prec] - StdPrecision of the unit (undefined / null = not known)
-         * @returns {string}
-         */
-        function fmtQtyEdit(n, prec) {
-            var known = (prec != null && prec !== "" && !isNaN(prec) && +prec >= 0);
-            if (known) {
-                var kv = (n == null || isNaN(n)) ? 0 : parseFloat(n);
-                if (Math.abs(kv) > AMOUNT_MAX_VALUE) kv = AMOUNT_MAX_VALUE;
-                return kv.toFixed(Math.min(+prec, 20));
-            }
-            if (n == null || isNaN(n)) return "0.00";
-            var v = parseFloat(n);
-            if (Math.abs(v) > AMOUNT_MAX_VALUE) v = AMOUNT_MAX_VALUE;
-            return fmtEditNumber(v, 2, 6);
         }
 
         /**
@@ -2471,7 +2450,10 @@
                 var $q = $('<input type="text" class="vas-ol-cell-edit__input vas-ol-qtyval" inputmode="decimal" />');
                 // VAI154: the box holds, and accepts, the decimals of the unit (0 = integer only)
                 var qPrec = qtyPrec(line);
-                $q.val(v.PlannedQty ? fmtQtyEdit(v.PlannedQty, qPrec) : "").css("text-align", "right");
+                // Same approach as SIT01_008: generic amount-input text (browser decimal mark,
+                // no grouping) with the unit's decimals (2 when the unit precision is unknown).
+                var qEditP = (qPrec != null) ? Math.min(qPrec, 20) : 2;
+                $q.val(v.PlannedQty ? fmtEditNumber(Math.max(-AMOUNT_MAX_VALUE, Math.min(AMOUNT_MAX_VALUE, parseNum(v.PlannedQty))), qEditP, qEditP) : "").css("text-align", "right");
                 limitNumericInput($q, "PlannedQty", qPrec);
                 $q.on("blur", function () {
                     var n = parseInputNum($q.val());

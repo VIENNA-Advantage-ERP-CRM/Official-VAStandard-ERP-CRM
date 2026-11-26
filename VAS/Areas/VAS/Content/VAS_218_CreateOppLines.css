@@ -182,11 +182,10 @@
     padding: 0 16px;
     /*border-bottom: 1px solid #D9E2EB;*/
     display: flex;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;        /* as VAS_107: buttons drop to the next line instead of being cut */
     align-items: center;
     justify-content: space-between;
     gap: 0.75em;
-    overflow: hidden;
 }
 
 .vas-ol-panel__title {
@@ -195,10 +194,6 @@
     font-weight: 700;
     letter-spacing: -0.01em;
     color: var(--cil-text-strong);
-    min-width: 0;           /* allow title to shrink so buttons never wrap */
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 .vas-ol-panel__subtitle {
@@ -209,10 +204,9 @@
 
 .vas-ol-panel__actions {
     display: flex;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.625em;
-    flex-shrink: 0;  /* actions block never shrinks — title yields first */
 }
 
 /* ---------- buttons ---------- */
