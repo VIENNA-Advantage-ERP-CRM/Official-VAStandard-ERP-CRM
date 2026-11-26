@@ -1421,6 +1421,11 @@
             // Last (blank) header cell: the row Undo icon has its own grid column, as in the
             // Create Order panel. Opportunity lines have no Additional Info modal, so no "..." here.
             $row.append('<div class="vas-ol-cell vas-ol-cell--more" role="columnheader"></div>');
+            // Full heading on hover, for the ones cut off with "..."
+            $row.children('[role="columnheader"]').each(function () {
+                var text = $(this).text();
+                if (text) this.title = text;
+            });
             return $row;
         }
 
