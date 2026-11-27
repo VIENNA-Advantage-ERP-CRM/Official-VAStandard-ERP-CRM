@@ -79,8 +79,23 @@
     transition: background 0.15s;
 }
 
-.VAS-relprod-root .VAS-rp-close:hover {
+.VAS-relprod-root .VAS-rp-close,
+.VAS-relprod-root .VAS-rp-close:focus,
+.VAS-relprod-root .VAS-rp-close:active {
+    outline: 0;
+    border: 0;
+    box-shadow: none;
+}
+
+.VAS-relprod-root .VAS-rp-close:hover,
+.VAS-relprod-root .VAS-rp-close:focus-visible {
     background: var(--vas-rp-divider);
+}
+
+/* the form has its own header: hide the dialog title bar of the framework (class set by the form; :has as fallback) */
+.ui-dialog.VAS-rp-dialog > .ui-dialog-titlebar,
+.ui-dialog:has(.VAS-relprod-root) > .ui-dialog-titlebar {
+    display: none;
 }
 
 .VAS-relprod-root .VAS-rp-title {

@@ -757,6 +757,14 @@
         this.initalize();
         this.intialLoad();
         this.frame.getContentGrid().append(this.getRoot());
+        // The form shows its own header with a close cross, so the dialog title bar of the framework is hidden.
+        // The dialog is opened after init, so mark it once it exists.
+        var $root = this.getRoot();
+        window.setTimeout(function () {
+            if ($root) {
+                $root.closest(".ui-dialog").addClass("VAS-rp-dialog");
+            }
+        }, 0);
     };
 
     VIS.CreateRelatedLines.prototype.setHeight = function () {
