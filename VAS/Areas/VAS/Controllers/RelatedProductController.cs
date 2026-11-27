@@ -65,11 +65,11 @@ namespace VIS.Controllers
         /// <param name="Data">Related Product Data</param>
         /// <param name="Table_ID">Table ID</param>
         /// <param name="Record_ID">Record ID</param>
-        /// <returns>message as string</returns>
+        /// <returns>Saved and total count, summary message and failed lines</returns>
         [HttpPost]
         public JsonResult SaveRelatedLines(List<RelatedProductData> Data, int Table_ID, int Record_ID)
         {
-            string result = "";
+            RelatedLinesResult result = null;
             if (Session["ctx"] != null)
             {
                 var ctx = Session["ctx"] as Ctx;
@@ -77,6 +77,24 @@ namespace VIS.Controllers
                 result = obj.CreateRelatedLines(ctx, Data, Table_ID, Record_ID);
             }
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>
+        /// Header details of the order or opportunity: document number, business partner, price list and currency
+        /// </summary>
+        /// <param name="Table_ID">Table ID</param>
+        /// <param name="Record_ID">Record ID</param>
+        /// <returns>Header details in json format</returns>
+        public JsonResult GetHeaderInfo(int Table_ID, int Record_ID)
+        {
+            string result = string.Empty;
+            if (Session["ctx"] != null)
+            {
+                var ctx = Session["ctx"] as Ctx;
+                RelatedProductModel obj = new RelatedProductModel();
+                result = JsonConvert.SerializeObject(obj.GetHeaderInfo(ctx, Table_ID, Record_ID));
+            }
+            return Json(result, JsonRequestBehavior.AllowGet);
         }
     }
 }

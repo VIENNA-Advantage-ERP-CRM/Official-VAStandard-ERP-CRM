@@ -1,0 +1,574 @@
+﻿/* Add Related Products pop-up (VIS.CreateRelatedLines). Onfinity design, as in the VAMFG BOM Management dialog.
+   Everything is scoped under .VAS-relprod-root; 1em = 16px. */
+
+.VAS-relprod-root {
+    --vas-rp-primary: #0083DA;
+    --vas-rp-primary-hover: #0069AE;
+    --vas-rp-primary-pressed: #004F83;
+    --vas-rp-text: #102C3F;
+    --vas-rp-text-2: #5F7283;
+    --vas-rp-muted: #748494;
+    --vas-rp-border: #E4EDF4;
+    --vas-rp-divider: #EDF2F6;
+    --vas-rp-faint: #FBFDFF;
+    --vas-rp-soft: #E5F3FB;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 32em;
+    font-family: Roboto, "Segoe UI", Arial, sans-serif;
+    font-size: 0.875em;
+    color: var(--vas-rp-text);
+    background: #FFFFFF;
+    box-sizing: border-box;
+}
+
+.VAS-relprod-root *,
+.VAS-relprod-root *::before,
+.VAS-relprod-root *::after {
+    box-sizing: border-box;
+}
+
+/* ---------- context line ---------- */
+.VAS-relprod-root .VAS-rp-context {
+    padding: 0.75em 1.25em 0;
+}
+
+.VAS-relprod-root .VAS-rp-eyebrow {
+    font-size: 0.75em;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--vas-rp-primary);
+}
+
+.VAS-relprod-root .VAS-rp-eyebrow strong {
+    font-weight: 700;
+}
+
+/* ---------- product strip ---------- */
+.VAS-relprod-root .VAS-rp-product {
+    margin: 0.75em 1.25em 0;
+    padding: 0.875em 1em;
+    border: 1px solid var(--vas-rp-border);
+    border-radius: 0.75em;
+    background: linear-gradient(180deg, rgba(234, 248, 255, 0.55) 0%, rgba(255, 255, 255, 0) 100%);
+}
+
+.VAS-relprod-root .VAS-rp-label {
+    display: block;
+    margin-bottom: 0.375em;
+    font-size: 0.8125em;
+    font-weight: 600;
+    color: var(--vas-rp-text-2);
+}
+
+.VAS-relprod-root .VAS-rp-req {
+    color: #8F2D2D;
+}
+
+.VAS-relprod-root .VAS-rp-search .vis-input-wrap {
+    max-width: 36em;
+    margin: 0;
+}
+
+.VAS-relprod-root .VAS-rp-picked {
+    display: none;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75em;
+}
+
+.VAS-relprod-root .VAS-rp-product.VAS-rp-has-product .VAS-rp-search {
+    display: none;
+}
+
+.VAS-relprod-root .VAS-rp-product.VAS-rp-has-product .VAS-rp-picked {
+    display: flex;
+}
+
+.VAS-relprod-root .VAS-rp-picked-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 2.25em;
+    width: 2.25em;
+    height: 2.25em;
+    border-radius: 0.625em;
+    background: var(--vas-rp-soft);
+    color: var(--vas-rp-primary);
+    font-size: 1.125em;
+}
+
+.VAS-relprod-root .VAS-rp-picked-text {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 12em;
+    min-width: 0;
+}
+
+.VAS-relprod-root .VAS-rp-picked-text .VAS-rp-name {
+    font-size: 1.0625em;
+    font-weight: 700;
+}
+
+.VAS-relprod-root .VAS-rp-picked-fields {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.625em;
+}
+
+.VAS-relprod-root .VAS-rp-picked-fields label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25em;
+    margin: 0;
+    font-size: 0.75em;
+    font-weight: 600;
+    color: var(--vas-rp-muted);
+}
+
+.VAS-relprod-root .VAS-rp-picked-fields .VAS-rp-input {
+    font-size: 1.1667em;
+}
+
+.VAS-relprod-root .VAS-rp-uom-text {
+    padding-bottom: 0.5em;
+    color: var(--vas-rp-text-2);
+}
+
+.VAS-relprod-root .VAS-rp-picked-detail {
+    flex: 1 1 100%;
+}
+
+.VAS-relprod-root .VAS-rp-picked-detail:empty {
+    display: none;
+}
+
+/* ---------- body ---------- */
+.VAS-relprod-root .VAS-rp-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0.75em 1.25em;
+    overflow: auto;
+}
+
+.VAS-relprod-root .VAS-rp-list {
+    display: none;
+}
+
+.VAS-relprod-root .VAS-rp-body.VAS-rp-has-product .VAS-rp-list {
+    display: block;
+}
+
+.VAS-relprod-root .VAS-rp-body.VAS-rp-has-product .VAS-rp-empty {
+    display: none;
+}
+
+.VAS-relprod-root .VAS-rp-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1 1 auto;
+    padding: 2.5em 1em;
+    text-align: center;
+}
+
+.VAS-relprod-root .VAS-rp-empty-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 3.5em;
+    height: 3.5em;
+    margin-bottom: 0.875em;
+    border-radius: 50%;
+    background: var(--vas-rp-soft);
+    color: var(--vas-rp-primary);
+    font-size: 1.25em;
+}
+
+.VAS-relprod-root .VAS-rp-empty-title {
+    font-size: 1.0625em;
+    font-weight: 700;
+}
+
+.VAS-relprod-root .VAS-rp-empty-text {
+    max-width: 30em;
+    margin-top: 0.375em;
+    color: var(--vas-rp-text-2);
+}
+
+/* ---------- filter chips ---------- */
+.VAS-relprod-root .VAS-rp-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5em;
+    margin-bottom: 0.75em;
+}
+
+.VAS-relprod-root .VAS-rp-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375em;
+    padding: 0.1875em 0.625em;
+    border: 1px solid transparent;
+    border-radius: 62.5em;
+    font-size: 0.75em;
+    font-weight: 700;
+    line-height: 1.5;
+    white-space: nowrap;
+}
+
+.VAS-relprod-root .VAS-rp-filter {
+    padding: 0.3125em 0.875em;
+    border-color: var(--vas-rp-border);
+    background: #FFFFFF;
+    color: var(--vas-rp-text-2);
+    font-size: 0.8125em;
+    cursor: pointer;
+}
+
+.VAS-relprod-root .VAS-rp-filter span {
+    color: var(--vas-rp-muted);
+    font-weight: 600;
+}
+
+.VAS-relprod-root .VAS-rp-filter:hover {
+    border-color: var(--vas-rp-primary);
+    color: var(--vas-rp-primary);
+}
+
+.VAS-relprod-root .VAS-rp-filter.VAS-rp-on {
+    border-color: var(--vas-rp-primary);
+    background: var(--vas-rp-primary);
+    color: #FFFFFF;
+}
+
+.VAS-relprod-root .VAS-rp-filter.VAS-rp-on span {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.VAS-relprod-root .VAS-rp-chip.VAS-rp-danger { background: #FAD7D7; color: #8F2D2D; }
+.VAS-relprod-root .VAS-rp-chip.VAS-rp-info { background: #E5F3FB; color: #004F83; }
+.VAS-relprod-root .VAS-rp-chip.VAS-rp-accent { background: #E5E2FA; color: #5F4AA6; }
+.VAS-relprod-root .VAS-rp-chip.VAS-rp-ok { background: #CCEFDD; color: #0C5D38; }
+.VAS-relprod-root .VAS-rp-chip.VAS-rp-warn { background: #FFEDD2; color: #6B3D05; }
+.VAS-relprod-root .VAS-rp-chip.VAS-rp-mute { background: var(--vas-rp-divider); color: var(--vas-rp-text-2); }
+
+/* ---------- table ---------- */
+.VAS-relprod-root .VAS-rp-tablewrap {
+    border: 1px solid var(--vas-rp-border);
+    border-radius: 0.75em;
+    overflow: hidden;
+}
+
+.VAS-relprod-root .VAS-rp-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.VAS-relprod-root .VAS-rp-table th {
+    padding: 0.625em 0.75em;
+    border-bottom: 1px solid #C5D2DD;
+    background: var(--vas-rp-faint);
+    color: var(--vas-rp-muted);
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-align: start;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.VAS-relprod-root .VAS-rp-table td {
+    padding: 0.5em 0.75em;
+    border-bottom: 1px solid #E2EAF1;
+    vertical-align: middle;
+}
+
+.VAS-relprod-root .VAS-rp-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.VAS-relprod-root .VAS-rp-row:hover td {
+    background: rgba(234, 248, 255, 0.4);
+}
+
+.VAS-relprod-root .VAS-rp-row.VAS-rp-selected td {
+    background: rgba(229, 243, 251, 0.45);
+}
+
+.VAS-relprod-root .VAS-rp-col-check {
+    width: 2.5em;
+    text-align: center;
+}
+
+.VAS-relprod-root .VAS-rp-col-type {
+    width: 1%;
+}
+
+.VAS-relprod-root .VAS-rp-table th.VAS-rp-col-num,
+.VAS-relprod-root .VAS-rp-table th.VAS-rp-col-amt,
+.VAS-relprod-root .VAS-rp-col-amt {
+    text-align: end;
+}
+
+.VAS-relprod-root .VAS-rp-col-num {
+    width: 7.5em;
+}
+
+.VAS-relprod-root .VAS-rp-col-uom {
+    width: 1%;
+    color: var(--vas-rp-text-2);
+    white-space: nowrap;
+}
+
+.VAS-relprod-root .VAS-rp-col-amt {
+    width: 8em;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.VAS-relprod-root .VAS-rp-col-more {
+    width: 2.75em;
+    text-align: center;
+}
+
+.VAS-relprod-root .VAS-rp-table .VAS-rp-name {
+    display: block;
+    font-weight: 600;
+}
+
+.VAS-relprod-root .VAS-rp-code {
+    display: block;
+    font-family: Consolas, "Roboto Mono", monospace;
+    font-size: 0.8125em;
+    color: var(--vas-rp-primary-pressed);
+}
+
+.VAS-relprod-root .VAS-rp-table input[type="checkbox"] {
+    width: 1em;
+    height: 1em;
+    margin: 0;
+    accent-color: var(--vas-rp-primary);
+    cursor: pointer;
+}
+
+.VAS-relprod-root .VAS-rp-table input[type="checkbox"]:disabled {
+    cursor: not-allowed;
+}
+
+.VAS-relprod-root .VAS-rp-input {
+    width: 100%;
+    min-width: 5.5em;
+    height: 2em;
+    padding: 0 0.5em;
+    border: 1px solid var(--vas-rp-border);
+    border-radius: 0.5em;
+    background: #FFFFFF;
+    color: var(--vas-rp-text);
+    font: inherit;
+    text-align: end;
+}
+
+.VAS-relprod-root .VAS-rp-input:focus {
+    border-color: var(--vas-rp-primary);
+    outline: 0;
+    box-shadow: 0 0 0 0.1875em rgba(0, 131, 218, 0.15);
+}
+
+.VAS-relprod-root .VAS-rp-iconbtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.875em;
+    height: 1.875em;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--vas-rp-muted);
+    cursor: pointer;
+}
+
+.VAS-relprod-root .VAS-rp-iconbtn:hover {
+    border-color: var(--vas-rp-border);
+    color: var(--vas-rp-primary);
+}
+
+.VAS-relprod-root .VAS-rp-iconbtn i {
+    transition: transform 0.15s ease;
+}
+
+.VAS-relprod-root .VAS-rp-iconbtn.VAS-rp-open i {
+    transform: rotate(180deg);
+}
+
+.VAS-relprod-root .VAS-rp-detailrow td {
+    background: var(--vas-rp-faint);
+}
+
+/* ---------- details (unit, attribute, list price) ---------- */
+.VAS-relprod-root .VAS-rp-detail,
+.VAS-relprod-root .VAS-rp-picked-detail {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75em 1em;
+    padding: 0.25em 0;
+}
+
+.VAS-relprod-root .VAS-rp-picked-detail {
+    padding-top: 0.75em;
+    border-top: 1px solid var(--vas-rp-divider);
+}
+
+.VAS-relprod-root .VAS-rp-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25em;
+    flex: 1 1 12em;
+    max-width: 18em;
+}
+
+.VAS-relprod-root .VAS-rp-field > label {
+    margin: 0;
+    font-size: 0.75em;
+    font-weight: 600;
+    color: var(--vas-rp-muted);
+}
+
+.VAS-relprod-root .VAS-rp-field .VAS-rp-input {
+    text-align: end;
+}
+
+.VAS-relprod-root .VAS-rp-attr {
+    flex-wrap: nowrap;
+}
+
+.VAS-relprod-root .VAS-rp-none {
+    display: none;
+    padding: 1.5em 1em;
+    color: var(--vas-rp-text-2);
+    text-align: center;
+}
+
+/* ---------- result banner ---------- */
+.VAS-relprod-root .VAS-rp-result {
+    display: none;
+    gap: 0.625em;
+    margin-top: 0.75em;
+    padding: 0.75em 0.875em;
+    border-radius: 0.75em;
+}
+
+.VAS-relprod-root .VAS-rp-result.VAS-rp-ok {
+    display: flex;
+    background: #CCEFDD;
+    color: #0C5D38;
+}
+
+.VAS-relprod-root .VAS-rp-result.VAS-rp-warn {
+    display: flex;
+    background: #FFEDD2;
+    color: #6B3D05;
+}
+
+.VAS-relprod-root .VAS-rp-result > i {
+    margin-top: 0.125em;
+    font-size: 1.125em;
+}
+
+.VAS-relprod-root .VAS-rp-result ul {
+    margin: 0.25em 0 0;
+    padding-inline-start: 1.25em;
+}
+
+/* ---------- footer ---------- */
+.VAS-relprod-root .VAS-rp-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75em;
+    padding: 0.75em 1.25em;
+    border-top: 1px solid var(--vas-rp-border);
+    background: var(--vas-rp-faint);
+}
+
+.VAS-relprod-root .VAS-rp-hint {
+    color: var(--vas-rp-text-2);
+}
+
+.VAS-relprod-root .VAS-rp-hint strong {
+    color: var(--vas-rp-text);
+}
+
+.VAS-relprod-root .VAS-rp-actions {
+    display: flex;
+    gap: 0.5em;
+    margin-inline-start: auto;
+}
+
+.VAS-relprod-root .VAS-rp-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4375em;
+    height: 2.2857em;
+    padding: 0 1.1429em;
+    border: 1px solid var(--vas-rp-border);
+    border-radius: 62.5em;
+    background: #FFFFFF;
+    color: var(--vas-rp-text);
+    font: inherit;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.VAS-relprod-root .VAS-rp-btn-secondary:hover:not(:disabled) {
+    border-color: var(--vas-rp-primary);
+    color: var(--vas-rp-primary);
+}
+
+.VAS-relprod-root .VAS-rp-btn-primary {
+    border-color: var(--vas-rp-primary);
+    background: var(--vas-rp-primary);
+    color: #FFFFFF;
+}
+
+.VAS-relprod-root .VAS-rp-btn-primary:hover:not(:disabled) {
+    border-color: var(--vas-rp-primary-hover);
+    background: var(--vas-rp-primary-hover);
+}
+
+.VAS-relprod-root .VAS-rp-btn-primary:active:not(:disabled) {
+    background: var(--vas-rp-primary-pressed);
+}
+
+.VAS-relprod-root .VAS-rp-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.VAS-relprod-root .VAS-rp-btn-small {
+    height: 2em;
+    padding: 0 0.875em;
+    font-size: 0.875em;
+}
+
+.VAS-relprod-root .VAS-rp-busy {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+}
+
+/* narrow pop-up */
+@media (max-width: 48em) {
+    .VAS-relprod-root .VAS-rp-col-uom,
+    .VAS-relprod-root .VAS-rp-col-type {
+        display: none;
+    }
+}

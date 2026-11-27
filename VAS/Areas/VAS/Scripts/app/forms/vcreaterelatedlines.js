@@ -1,764 +1,701 @@
-﻿; VIS = window.VIS || {};
+﻿/************************************************************
+ * Module Name    : VAS
+ * Purpose        : Add Related Products pop-up (AD_Form CreateRelatedLines) on Sales Order and Opportunity.
+ *                  Pick a product, then add it together with its related products (mandatory, supplemental,
+ *                  alternative, service, web promotion) as lines. Layout follows the Onfinity design used by
+ *                  the VAMFG BOM Management dialog.
+ * Message keys   : M_Product_ID, Type, QtyEntered, C_UOM_ID, PriceActual, LineNetAmt, PriceList,
+ *                  M_AttributeSetInstance_ID, All, Change, Details, Cancel, VIS_PlzSelLines,
+ *                  VAS_RelProdPickTitle, VAS_RelProdPickHelp, VAS_RelProdNoRelated, VAS_RelProdPickStart,
+ *                  VAS_RelProdLinesToAdd, VAS_RelProdAddContinue, VAS_RelProdAddLines,
+ *                  VAS_RelProdMandatory, VAS_RelProdNotAdded
+ * Chronological development
+ * 27 Nov 2026    : Redesigned (single related list with type filters, row details, result inside the pop-up)
+ ***********************************************************/
+; VIS = window.VIS || {};
 ; (function (VIS, $) {
     VIS.CreateRelatedLines = function () {
         this.frame;
         this.windowNo;
         this.Record_ID;
         this.Table_ID;
+        var $self = this;
+        var $root = $('<div class="VAS-relprod-root">');
         var $bsyDiv;
-        var $self = this; //scoped self pointer
-        var $OkBtn;
-        var $ApplyBtn;
-        var $CancelBtn;
-        var $root = $('<div>');
-        var SelectedRecords;
-        var _ProductLookUp;
-        var _ProductCtrl;
-        var pattrLookup;
-        var _CmbRelatedType;
-        var lookupRelatedType = null;
-        var ctrlRelatedType = null;
-        var prdCtrl;
-        var puomLookup = null;
-        var pruomLookup = null;
-        var PAttrCtrl;
-        var PRAttrCtrl;
-        var PUomCtrl = null;
-        var PRUomCtrl = null;
-        var ProductGrid;
-        var $DivProductGrid;
-        var RelatedGrid;
-        var $DivRelatedGrid;
-        var product_ID = 0;
-        var relType = "";
-        var BPartner_ID = 0;
-        var isSOTrx;
-        var PriceList_ID = 0;
-        var precision = 2;
-        VIS.translatedTexts = null;
+        var $eyebrow, $productArea, $body, $chips, $rows, $selectAll, $result, $hint, $btnCancel, $btnContinue, $btnAdd;
+
+        var ctx = VIS.Env.getCtx();
+        var msgs = null;
         var format = VIS.DisplayType.GetNumberFormat(VIS.DisplayType.Amount);
         var dotFormatter = VIS.Env.isDecimalPoint();
 
+        // Framework controls
+        var productLookup = null, prdCtrl = null;
+        var uomLookup = null, attrLookup = null;
+        var detailCtrls = [];
+
+        // State
+        var header = { DocumentNo: "", BPName: "", M_PriceList_ID: 0, ISO_Code: "", StdPrecision: 2 };
+        var mainItem = null;        // the picked product line
+        var related = [];           // related product lines
+        var filter = "all";
+        var openDetail = -1;        // index of the related row whose details are open (-2 = main product)
+
+        // Chip colours per related product type (M_RelatedProduct Type list values)
+        var typeClass = { M: "danger", S: "info", A: "accent", E: "ok", P: "warn" };
+
+        /* ---------- helpers ---------- */
+
+        function msg(key) {
+            return VIS.Msg.getMsg(key);
+        };
+
+        function esc(text) {
+            return $('<div>').text(text == null ? "" : String(text)).html();
+        };
+
+        function num(value) {
+            var n = parseFloat(value);
+            return isNaN(n) ? 0 : n;
+        };
+
+        // Text for a number input in the user's decimal format
+        function toInput(value) {
+            var v = format.GetFormatAmount(num(value), "init", dotFormatter);
+            return format.GetConvertedString(v, dotFormatter);
+        };
+
+        // Number from a number input typed in the user's decimal format
+        function fromInput(text) {
+            var v = format.GetConvertedNumber(String(text == null ? "" : text), dotFormatter);
+            return isNaN(v) ? 0 : v;
+        };
+
+        // Amount in the record currency, laid out by the browser culture
+        function money(value) {
+            var precision = header.StdPrecision >= 0 ? header.StdPrecision : 2;
+            if (header.ISO_Code && window.VAS && typeof VAS.formatAmountByBrowser === 'function') {
+                return VAS.formatAmountByBrowser(num(value), header.ISO_Code, precision);
+            }
+            // Older shells without the shared helper: the browser culture still places separators and currency sign
+            var opts = { minimumFractionDigits: precision, maximumFractionDigits: precision };
+            if (header.ISO_Code) {
+                opts.style = "currency";
+                opts.currency = header.ISO_Code;
+            }
+            try {
+                return num(value).toLocaleString(navigator.language, opts);
+            }
+            catch (e) {
+                return num(value).toLocaleString(navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision });
+            }
+        };
+
+        function setBusy(busy) {
+            $bsyDiv[0].style.visibility = busy ? "visible" : "hidden";
+        };
+
+        /* ---------- layout ---------- */
+
         this.initalize = function () {
+            msgs = VIS.Msg.translate(ctx, ["M_Product_ID", "QtyEntered", "C_UOM_ID", "PriceActual", "LineNetAmt",
+                "PriceList", "M_AttributeSetInstance_ID"], true);
 
-            var elements = [
-                "RelatedProductType",
-                "M_Product_ID",
-                "SearchKeyValue",
-                "ASI",
-                "C_UOM_ID",
-                "QtyEntered",
-                "PriceActual",
-                "PriceList",
-
-            ];
-
-            VIS.translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true);
-
-            $root.append('<div class="VIS_Pref_show vis-formouterwrpdiv">'
-                + '<div class= "VIS_Pref_dd">'
-                + '<div class="input-group vis-input-wrap" id="VIS_Product_' + $self.windowNo + '" ></div>'
+            var w = $self.windowNo;
+            $root.append(
+                '<div class="VAS-rp-context"><span class="VAS-rp-eyebrow" id="VAS_RPEyebrow_' + w + '"></span></div>'
+                + '<div class="VAS-rp-product" id="VAS_RPProduct_' + w + '">'
+                + '  <div class="VAS-rp-search">'
+                + '    <label class="VAS-rp-label" data-msgkey="M_Product_ID">' + esc(msgs.M_Product_ID) + ' <span class="VAS-rp-req">*</span></label>'
+                + '    <div class="input-group vis-input-wrap" id="VAS_RPProductCtrl_' + w + '"></div>'
+                + '  </div>'
+                + '  <div class="VAS-rp-picked" id="VAS_RPPicked_' + w + '"></div>'
                 + '</div>'
-                + '<div class= "VIS_Pref_dd"><div class="input-group vis-input-wrap">'
-                + '<div class="vis-control-wrap" id="VIS_RelatedType_' + $self.windowNo + '"><label class="VIS_Pref_Label_Font" > '
-                + VIS.translatedTexts.RelatedProductType + '</label ></div></div>'
-                + '</div></div>');
-            $root.append('<div class="vis-crtfrm-datawrp" style="height: 15.5%;"><div id="VIS_ProductGrd_' + $self.windowNo + '" style="height:80px;" ></div></div>');
-            $root.append('<div class="vis-crtfrm-datawrp" style="height: 48.5%;"><div id="VIS_RelatedGrd_' + $self.windowNo + '" style="height:250px;" ></div></div>');
-            $root.append('<div class="vis-ctrfrm-btnwrp">'
-                + '<input id="VIS_CancelBtn_' + $self.windowNo + '" class= "VIS_Pref_btn-2" type = "button" value = "' + VIS.Msg.getMsg("Cancel") + '">'
-                + '<input id="VIS_ApplyBtn_' + $self.windowNo + '" class="VIS_Pref_btn-2" type="button" value="' + VIS.Msg.getMsg("Apply") + '">'
-                + '<input id="VIS_OKBtn_' + $self.windowNo + '" class="VIS_Pref_btn-2" type="button" value="' + VIS.Msg.getMsg("OK") + '">'
+                + '<div class="VAS-rp-body" id="VAS_RPBody_' + w + '">'
+                + '  <div class="VAS-rp-empty" id="VAS_RPEmpty_' + w + '">'
+                + '    <div class="VAS-rp-empty-icon"><i class="fa fa-link" aria-hidden="true"></i></div>'
+                + '    <div class="VAS-rp-empty-title" data-msgkey="VAS_RelProdPickTitle">' + esc(msg("VAS_RelProdPickTitle")) + '</div>'
+                + '    <div class="VAS-rp-empty-text" data-msgkey="VAS_RelProdPickHelp">' + esc(msg("VAS_RelProdPickHelp")) + '</div>'
+                + '  </div>'
+                + '  <div class="VAS-rp-list" id="VAS_RPList_' + w + '">'
+                + '    <div class="VAS-rp-chips" id="VAS_RPChips_' + w + '"></div>'
+                + '    <div class="VAS-rp-tablewrap">'
+                + '      <table class="VAS-rp-table">'
+                + '        <thead><tr>'
+                + '          <th class="VAS-rp-col-check"><input type="checkbox" id="VAS_RPAll_' + w + '"></th>'
+                + '          <th data-msgkey="M_Product_ID">' + esc(msgs.M_Product_ID) + '</th>'
+                + '          <th class="VAS-rp-col-type" data-msgkey="Type">' + esc(msg("Type")) + '</th>'
+                + '          <th class="VAS-rp-col-num" data-msgkey="QtyEntered">' + esc(msgs.QtyEntered) + '</th>'
+                + '          <th class="VAS-rp-col-uom" data-msgkey="C_UOM_ID">' + esc(msgs.C_UOM_ID) + '</th>'
+                + '          <th class="VAS-rp-col-num" data-msgkey="PriceActual">' + esc(msgs.PriceActual) + '</th>'
+                + '          <th class="VAS-rp-col-amt" data-msgkey="LineNetAmt">' + esc(msgs.LineNetAmt) + '</th>'
+                + '          <th class="VAS-rp-col-more"></th>'
+                + '        </tr></thead>'
+                + '        <tbody id="VAS_RPRows_' + w + '"></tbody>'
+                + '      </table>'
+                + '      <div class="VAS-rp-none" id="VAS_RPNone_' + w + '" data-msgkey="VAS_RelProdNoRelated">' + esc(msg("VAS_RelProdNoRelated")) + '</div>'
+                + '    </div>'
+                + '  </div>'
+                + '  <div class="VAS-rp-result" id="VAS_RPResult_' + w + '"></div>'
+                + '</div>'
+                + '<div class="VAS-rp-footer">'
+                + '  <span class="VAS-rp-hint" id="VAS_RPHint_' + w + '"></span>'
+                + '  <div class="VAS-rp-actions">'
+                + '    <button type="button" class="VAS-rp-btn VAS-rp-btn-secondary" id="VAS_RPCancel_' + w + '" data-msgkey="Cancel">' + esc(msg("Cancel")) + '</button>'
+                + '    <button type="button" class="VAS-rp-btn VAS-rp-btn-secondary" id="VAS_RPContinue_' + w + '" data-msgkey="VAS_RelProdAddContinue">' + esc(msg("VAS_RelProdAddContinue")) + '</button>'
+                + '    <button type="button" class="VAS-rp-btn VAS-rp-btn-primary" id="VAS_RPAdd_' + w + '" data-msgkey="VAS_RelProdAddLines"><i class="fa fa-check" aria-hidden="true"></i>' + esc(msg("VAS_RelProdAddLines")) + '</button>'
+                + '  </div>'
                 + '</div>');
-            createBusyIndicator();
-            $bsyDiv[0].style.visibility = "visible";
-        };
 
-        // Get controls from design
-        this.intialLoad = function () {
-            $OkBtn = $root.find("#VIS_OKBtn_" + $self.windowNo);
-            $ApplyBtn = $root.find("#VIS_ApplyBtn_" + $self.windowNo);
-            $CancelBtn = $root.find("#VIS_CancelBtn_" + $self.windowNo);
-            _ProductCtrl = $root.find("#VIS_Product_" + $self.windowNo);
-            _CmbRelatedType = $root.find("#VIS_RelatedType_" + $self.windowNo);
-            $DivProductGrid = $root.find("#VIS_ProductGrd_" + $self.windowNo);
-            $DivRelatedGrid = $root.find("#VIS_RelatedGrd_" + $self.windowNo);
-            LoadControls();
-            InitEvents();
-            $bsyDiv[0].style.visibility = "hidden";
-        };
-
-        // load dynamic vienna controls
-        function LoadControls() {
-            // Related Type Control
-            lookupRelatedType = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, 10853, VIS.DisplayType.List);
-            ctrlRelatedType = new VIS.Controls.VComboBox("RelatedProductType", false, false, true, lookupRelatedType, 50);
-            _CmbRelatedType.prepend(ctrlRelatedType.getControl());
-
-            // Product Control
-            _ProductLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, 2221, VIS.DisplayType.Search);
-            prdCtrl = new VIS.Controls.VTextBoxButton("M_Product_ID", true, false, true, VIS.DisplayType.Search, _ProductLookUp);
-
-            var _ProductCtrlWrap = $('<div class="vis-control-wrap">');
-            var _ProductBtnWrap = $('<div class="input-group-append">');
-            _ProductCtrl.append(_ProductCtrlWrap);
-            _ProductCtrlWrap.append(prdCtrl.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label>' + VIS.translatedTexts.M_Product_ID + '</label>');
-            _ProductCtrl.append(_ProductBtnWrap);
-            _ProductBtnWrap.append(prdCtrl.getBtn(0));
-            _ProductBtnWrap.append(prdCtrl.getBtn(1));
-
-            VIS.Env.getCtx().setContext($self.windowNo, "M_Product_ID", null);
-
-            pattrLookup = new VIS.MPAttributeLookup(VIS.context, $self.windowNo);
-            PAttrCtrl = new VIS.Controls.VPAttribute("M_AttributeSetInstance_ID", false, false, true, VIS.DisplayType.PAttribute, pattrLookup, $self.windowNo, false, false, false, true);
-            PRAttrCtrl = new VIS.Controls.VPAttribute("M_AttributeSetInstance_ID", false, false, true, VIS.DisplayType.PAttribute, pattrLookup, $self.windowNo, false, false, false, true);
-
-            // UOM Control
-            puomLookup = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, 2222, VIS.DisplayType.TableDir);
-            pruomLookup = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, 2222, VIS.DisplayType.TableDir);
-            PUomCtrl = new VIS.Controls.VComboBox("C_UOM_ID", true, false, true, puomLookup, 50);
-            PRUomCtrl = new VIS.Controls.VComboBox("C_UOM_ID", true, false, true, pruomLookup, 50);
-
-            BPartner_ID = VIS.Env.getCtx().getContextAsInt($self.windowNo, "C_BPartner_ID", false);
-            isSOTrx = VIS.Env.getCtx().getWindowContext($self.windowNo, "IsSOTrx", true) == "Y";
-            PriceList_ID = VIS.Env.getCtx().getContextAsInt($self.windowNo, "M_PriceList_ID", false);
-        };
-
-        // load Details of selected Product
-        function GetProductDetails(product_ID, attribute_ID, uom_ID, pricelist_ID) {
-
-            VIS.dataContext.getJSONData(VIS.Application.contextUrl + "RelatedProduct/GetProductData", {
-                "M_Product_ID": product_ID, "M_AttributeSetInstance_ID": attribute_ID, "C_UOM_ID": uom_ID,
-                "M_PriceList_ID": pricelist_ID, "Table_ID": $self.Table_ID, "Record_ID": $self.Record_ID
-            }, CallbackProductDetails);
-        };
-
-        // Callback Product Details
-        function CallbackProductDetails(data) {
-            if (data != null) {
-                ProductGrid.add(data);
-            }
-            GetRelatedProducts(product_ID, 0, 0, PriceList_ID)
-        };
-
-        // load Related Products of selected product
-        function GetRelatedProducts(product_ID, attribute_ID, uom_ID, pricelist_ID) {
-            VIS.dataContext.getJSONData(VIS.Application.contextUrl + "RelatedProduct/GetRelatedProduct", {
-                "M_Product_ID": product_ID, "M_AttributeSetInstance_ID": attribute_ID, "C_UOM_ID": uom_ID, "M_PriceList_ID": pricelist_ID,
-                "RelatedProductType": relType, "Table_ID": $self.Table_ID, "Record_ID": $self.Record_ID
-            }, CallbackRelatedProduct);
-        };
-
-        // Callback Related Product
-        function CallbackRelatedProduct(data) {
-            if (data != null) {
-                RelatedGrid.add(data);
-            }
-
-            if (RelatedGrid.records.length > 0) {
-                for (var i = 0; i < RelatedGrid.records.length; i++) {
-                    if (RelatedGrid.records[i].RelatedProductType == 'M') {
-                        $($("#grid_" + RelatedGrid.name + "_rec_" + (i + 1)).find("input[type=checkbox]")).prop("checked", true).attr('disabled', true);
-                        //$("#grid_" + RelatedGrid.name + "_rec_" + (i + 1) + ' ' + ' input[type=checkbox]').attr('disabled', true);
-                    }
-                }
-            }
-            $bsyDiv[0].style.visibility = "hidden";
-        };
-
-        // Events
-        function InitEvents() {
-            prdCtrl.fireValueChanged = function () {
-                if (prdCtrl.value != null) {
-                    $bsyDiv[0].style.visibility = "visible";
-                    product_ID = prdCtrl.value;
-                    ProductGrid.clear();
-                    RelatedGrid.clear();
-                    GetProductDetails(product_ID, 0, 0, PriceList_ID);
-                }
-                else {
-                    product_ID = 0;
-                    ProductGrid.clear();
-                    RelatedGrid.clear();
-                }
-            };
-
-            ctrlRelatedType.fireValueChanged = function (e) {
-                $bsyDiv[0].style.visibility = "visible";
-                relType = ctrlRelatedType.getValue();
-                RelatedGrid.clear();
-                GetRelatedProducts(product_ID, 0, 0, PriceList_ID);
-            };
-
-            $OkBtn.on("click touchstart", function (ev) {
-                if (RelatedGrid.records.length > 0) {
-                    for (var i = 0; i < RelatedGrid.records.length; i++) {
-                        if (RelatedGrid.records[i].RelatedProductType == 'M') {
-                            RelatedGrid.select(i + 1);
-                        }
-                    }
-                }
-
-                if (ProductGrid.records.length > 0) {
-                    $bsyDiv[0].style.visibility = "visible";
-                    GetSelectedRecords();
-                    CreateLines(false);
-                }
-                else {
-                    VIS.ADialog.error("VIS_PlzSelLines");
-                }
-            });
-
-            $ApplyBtn.on("click touchstart", function (ev) {
-                if (RelatedGrid.records.length > 0) {
-                    for (var i = 0; i < RelatedGrid.records.length; i++) {
-                        if (RelatedGrid.records[i].RelatedProductType == 'M') {
-                            RelatedGrid.select(i + 1);
-                        }
-                    }
-                }
-                if (ProductGrid.records.length > 0) {
-                    $bsyDiv[0].style.visibility = "visible";
-                    GetSelectedRecords();
-                    CreateLines(true);
-                }
-                else {
-                    VIS.ADialog.error("VIS_PlzSelLines");
-                }
-            });
-
-            $CancelBtn.on("click touchstart", function (ev) {
-                $self.frame.close();
-            });
-
-        };
-
-        // load Product grid
-        this.LoadProductGrid = function () {
-            ProductGrid = null;
-            ProductGrid = $DivProductGrid.w2grid({
-                name: "VIS_ProductGrid_" + $self.windowNo,
-                recordHeight: 25,
-                show: {
-                    toolbar: false,  // indicates if toolbar is v isible
-                    //columnHeaders: true,   // indicates if columns is visible
-                    //lineNumbers: true,  // indicates if line numbers column is visible
-                    selectColumn: false,  // indicates if select column is visible
-                    toolbarReload: false,   // indicates if toolbar reload button is visible
-                    toolbarColumns: true,   // indicates if toolbar columns button is visible
-                    toolbarSearch: false,   // indicates if toolbar search controls are visible
-                    toolbarAdd: false,   // indicates if toolbar add new button is visible
-                    toolbarDelete: true,   // indicates if toolbar delete button is visible
-                    toolbarSave: true,   // indicates if toolbar save button is visible
-                },
-                multiSelect: true,
-                columns: [
-                    {
-                        field: 'Product_ID', caption: VIS.translatedTexts.M_Product_ID, size: '20%', display: false
-                    },
-                    {
-                        field: 'Value', caption: VIS.translatedTexts.SearchKeyValue, size: '150px'
-                    },
-                    {
-                        field: 'Product', caption: VIS.translatedTexts.M_Product_ID, size: '200px'
-                    },
-                    {
-                        field: "M_AttributeSetInstance_ID", caption: VIS.translatedTexts.ASI, sortable: false, size: '150px', editable: { type: 'custom', ctrl: PAttrCtrl, showAll: true },
-                        render: function (record, index, col_index) {
-                            var l = pattrLookup;
-                            var val = record["M_AttributeSetInstance_ID"];
-                            if (record.changes && typeof record.changes["M_AttributeSetInstance_ID"] != 'undefined') {
-                                val = record.changes["M_AttributeSetInstance_ID"];
-                            }
-                            var d;
-                            if (l) {
-                                d = l.getDisplay(val, true);
-                            }
-                            return d;
-                        }
-                    },
-                    {
-                        //field: 'UOM', caption: VIS.translatedTexts.C_UOM_ID, size: '120px'
-                        field: "UOM_ID", caption: VIS.translatedTexts.C_UOM_ID, sortable: false, size: '120px', editable: { type: 'custom', ctrl: PUomCtrl, showAll: true },
-                        render: function (record, index, col_index) {
-                            var l = puomLookup;
-                            var val = record["UOM_ID"];
-                            if (record.changes && typeof record.changes["UOM_ID"] != 'undefined') {
-                                val = record.changes["UOM_ID"];
-                            }
-                            var d;
-                            if (l) {
-                                d = l.getDisplay(val);
-                            }
-                            return d;
-                        }
-                    },
-                    {
-                        field: 'UOM', caption: VIS.translatedTexts.C_UOM_ID, size: '20%', display: false
-                    },
-                    {
-                        field: "QtyEntered", caption: '<div ><span>' + VIS.translatedTexts.QtyEntered + '</span></div>', sortable: false, size: '120px', min: 80, hidden: false, editable: { type: 'number' },
-                        render: function (record, index, col_index) {
-                            var val = record["QtyEntered"];
-                            val = checkcommaordot(event, val);
-                            return parseFloat(val).toLocaleString();
-                        }
-                    },
-                    {
-                        field: "PriceStd", caption: '<div ><span>' + VIS.translatedTexts.PriceActual + '</span></div>', sortable: false, size: '120px', min: 80, hidden: false, editable: { type: 'number' },
-
-                        render: function (record, index, col_index) {
-                            var val = record["PriceStd"];
-                            val = checkcommaordot(event, val);
-                            return parseFloat(val).toLocaleString();
-                        }
-                    },
-                    {
-                        field: "PriceList", caption: '<div ><span>' + VIS.translatedTexts.PriceList + '</span></div>', sortable: false, size: '120px', min: 80, hidden: false, editable: { type: 'number' },
-
-                        render: function (record, index, col_index) {
-                            var val = record["PriceList"];
-                            val = checkcommaordot(event, val);
-                            return parseFloat(val).toLocaleString();
-                        }
-                    }
-                ],
-                onEditField: function (event) {
-                    id = event.recid;
-                    if (event.column == 6 || event.column == 7 || event.column == 8) {
-                        ProductGrid.records[event.index][ProductGrid.columns[event.column].field] = checkcommaordot(event, ProductGrid.records[event.index][ProductGrid.columns[event.column].field]);
-                        var _value = format.GetFormatAmount(ProductGrid.records[event.index][ProductGrid.columns[event.column].field], "init", dotFormatter);
-                        ProductGrid.records[event.index][ProductGrid.columns[event.column].field] = format.GetConvertedString(_value, dotFormatter);
-                        $("#grid_VIS_ProductGrid_" + $self.windowNo + "_rec_" + id).keydown(function (event) {
-                            if (!dotFormatter && (event.keyCode == 190 || event.keyCode == 110)) {// , separator
-                                return false;
-                            }
-                            else if (dotFormatter && event.keyCode == 188) { // . separator
-                                return false;
-                            }
-                            if (event.target.value.contains(".") && (event.which == 110 || event.which == 190 || event.which == 188)) {
-                                if (event.target.value.indexOf('.') > -1) {
-                                    event.target.value = event.target.value.replace('.', '');
-                                }
-                            }
-                            else if (event.target.value.contains(",") && (event.which == 110 || event.which == 190 || event.which == 188)) {
-                                if (event.target.value.indexOf(',') > -1) {
-                                    event.target.value = event.target.value.replace(',', '');
-                                }
-                            }
-                            if (event.keyCode != 8 && event.keyCode != 9 && (event.keyCode < 37 || event.keyCode > 40) &&
-                                (event.keyCode < 48 || event.keyCode > 57) && (event.keyCode < 96 || event.keyCode > 105)
-                                && event.keyCode != 109 && event.keyCode != 189 && event.keyCode != 110
-                                && event.keyCode != 144 && event.keyCode != 188 && event.keyCode != 190) {
-                                return false;
-                            }
-                        });
-                    }
-                },
-
-                onChange: function (event) {
-                    if (event.column == 8) {
-                        var _val = format.GetConvertedNumber(event.value_new, dotFormatter);
-                        ProductGrid.records[event.index]["PriceList"] = _val.toFixed(precision);
-
-                    }
-                    else if (event.column == 7) {
-                        var _val = format.GetConvertedNumber(event.value_new, dotFormatter);
-                        ProductGrid.records[event.index]["PriceStd"] = _val.toFixed(precision);
-                    }
-                    else if (event.column == 6) {
-                        var _val = format.GetConvertedNumber(event.value_new, dotFormatter);
-                        ProductGrid.records[event.index]["QtyEntered"] = _val.toFixed(precision);
-                    }
-                    else if (event.column == 3) {
-                        if (event.value_new != null) {
-                            ProductGrid.records[event.index]["M_AttributeSetInstance_ID"] = event.value_new;
-
-                            VIS.dataContext.getJSONData(VIS.Application.contextUrl + "RelatedProduct/GetProductData", {
-                                "M_Product_ID": product_ID, "M_AttributeSetInstance_ID": event.value_new, "C_UOM_ID": VIS.Utility.Util.getValueOfInt(ProductGrid.records[event.index]["UOM_ID"]),
-                                "M_PriceList_ID": PriceList_ID, "Table_ID": $self.Table_ID, "Record_ID": $self.Record_ID
-                            }, function (data) {
-                                if (data != null) {
-                                    ProductGrid.records[event.index]["PriceStd"] = data.PriceStd;
-                                    ProductGrid.records[event.index]["PriceList"] = data.PriceList;
-                                    ProductGrid.refreshCell(event.recid, "PriceStd");
-                                    ProductGrid.refreshCell(event.recid, "PriceList");
-                                }
-                            });
-                        }
-                    }
-                    else if (event.column == 4) {
-                        if (event.value_new != null) {
-                            ProductGrid.records[event.index]["UOM_ID"] = event.value_new;
-
-                            VIS.dataContext.getJSONData(VIS.Application.contextUrl + "RelatedProduct/GetProductData", {
-                                "M_Product_ID": product_ID, "M_AttributeSetInstance_ID": VIS.Utility.Util.getValueOfInt(ProductGrid.records[event.index]["M_AttributeSetInstance_ID"]),
-                                "C_UOM_ID": event.value_new, "M_PriceList_ID": PriceList_ID, "Table_ID": $self.Table_ID, "Record_ID": $self.Record_ID
-                            }, function (data) {
-                                if (data != null) {
-                                    ProductGrid.records[event.index]["PriceStd"] = data.PriceStd;
-                                    ProductGrid.records[event.index]["PriceList"] = data.PriceList;
-                                    ProductGrid.refreshCell(event.recid, "PriceStd");
-                                    ProductGrid.refreshCell(event.recid, "PriceList");
-                                }
-                            });
-                        }
-                    }
-                },
-
-                onClick: function (event) {
-                    VIS.Env.getCtx().setContext($self.windowNo, "M_Product_ID", VIS.Utility.Util.getValueOfInt(ProductGrid.records[event.recid - 1]["Product_ID"]));
-                }
-            });
-            ProductGrid.hideColumn('Product_ID');
-            //ProductGrid.hideColumn('AttributeSetInstance_ID');
-            ProductGrid.hideColumn('UOM');
-        };
-
-        // load related product grid
-        this.LoadRelatedGrid = function () {
-            RelatedGrid = null;
-            RelatedGrid = $DivRelatedGrid.w2grid({
-                name: "VIS_RelatedGrid_" + $self.windowNo,
-                recordHeight: 25,
-                show: {
-                    toolbar: false,  // indicates if toolbar is v isible
-                    //columnHeaders: true,   // indicates if columns is visible
-                    //lineNumbers: true,  // indicates if line numbers column is visible
-                    selectColumn: true,  // indicates if select column is visible
-                    toolbarReload: false,   // indicates if toolbar reload button is visible
-                    toolbarColumns: true,   // indicates if toolbar columns button is visible
-                    toolbarSearch: false,   // indicates if toolbar search controls are visible
-                    toolbarAdd: false,   // indicates if toolbar add new button is visible
-                    toolbarDelete: true,   // indicates if toolbar delete button is visible
-                    toolbarSave: true,   // indicates if toolbar save button is visible
-                },
-                multiSelect: true,
-                columns: [
-                    {
-                        field: 'Product_ID', caption: VIS.translatedTexts.M_Product_ID, size: '20%', display: false
-                    },
-                    {
-                        field: 'Value', caption: VIS.translatedTexts.SearchKeyValue, size: '150px'
-                    },
-                    {
-                        field: 'Product', caption: VIS.translatedTexts.M_Product_ID, size: '200px'
-                    },
-                    {
-                        field: 'RelatedProductType', caption: VIS.translatedTexts.RelatedProductType, size: '150px'
-                    },
-                    {
-                        field: 'RelatedType', caption: VIS.translatedTexts.RelatedProductType, size: '150px'
-                    },
-                    {
-                        field: "M_AttributeSetInstance_ID", caption: VIS.translatedTexts.ASI, sortable: false, size: '150px', editable: { type: 'custom', ctrl: PRAttrCtrl, showAll: true },
-                        render: function (record, index, col_index) {
-                            var l = pattrLookup;
-                            var val = record["M_AttributeSetInstance_ID"];
-                            if (record.changes && typeof record.changes["M_AttributeSetInstance_ID"] != 'undefined') {
-                                val = record.changes["M_AttributeSetInstance_ID"];
-                            }
-                            var d;
-                            if (l) {
-                                d = l.getDisplay(val, true);
-                            }
-                            return d;
-                        }
-                    },
-                    {
-                        //field: 'UOM', caption: VIS.translatedTexts.C_UOM_ID, size: '100px'
-                        field: "UOM_ID", caption: VIS.translatedTexts.C_UOM_ID, sortable: false, size: '100px', editable: { type: 'custom', ctrl: PRUomCtrl, showAll: true },
-                        render: function (record, index, col_index) {
-                            var l = pruomLookup;
-                            var val = record["UOM_ID"];
-                            if (record.changes && typeof record.changes["UOM_ID"] != 'undefined') {
-                                val = record.changes["UOM_ID"];
-                            }
-                            var d;
-                            if (l) {
-                                d = l.getDisplay(val);
-                            }
-                            return d;
-                        }
-                    },
-                    {
-                        field: 'UOM', caption: VIS.translatedTexts.C_UOM_ID, size: '20%', display: false
-                    },
-                    {
-                        field: "QtyEntered", caption: '<div ><span>' + VIS.translatedTexts.QtyEntered + '</span></div>', sortable: false, size: '100px', min: 80, hidden: false, editable: { type: 'number' },
-                        render: function (record, index, col_index) {
-                            var val = record["QtyEntered"];
-                            val = checkcommaordot(event, val);
-                            return parseFloat(val).toLocaleString();
-                        }
-                    },
-                    {
-                        field: "PriceStd", caption: '<div ><span>' + VIS.translatedTexts.PriceActual + '</span></div>', sortable: false, size: '100px', min: 80, hidden: false, editable: { type: 'number' },
-
-                        render: function (record, index, col_index) {
-                            var val = record["PriceStd"];
-                            val = checkcommaordot(event, val);
-                            return parseFloat(val).toLocaleString();
-                        }
-                    },
-                    {
-                        field: "PriceList", caption: '<div ><span>' + VIS.translatedTexts.PriceList + '</span></div>', sortable: false, size: '100px', min: 80, hidden: false, editable: { type: 'number' },
-
-                        render: function (record, index, col_index) {
-                            var val = record["PriceList"];
-                            val = checkcommaordot(event, val);
-                            return parseFloat(val).toLocaleString();
-                        }
-                    }
-                ],
-                onUnselect: function (event) {
-                    if (event.all) {
-                        event.onComplete = function () {
-                            if (RelatedGrid.records.length > 0) {
-                                for (var i = 0; i < RelatedGrid.records.length; i++) {
-                                    if (RelatedGrid.records[i].RelatedProductType == 'M') {
-                                        $($("#grid_" + RelatedGrid.name + "_rec_" + (i + 1)).find("input[type=checkbox]")).prop("checked", true).attr('disabled', true);
-                                        //$("#grid_" + RelatedGrid.name + "_rec_" + (i + 1) + ' ' + ' input[type=checkbox]').attr('disabled', true);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    else {
-                        event.onComplete = function () {
-                            if (RelatedGrid.records[event.index].RelatedProductType == 'M') {
-                                $($("#grid_" + RelatedGrid.name + "_rec_" + event.recid).find("input[type=checkbox]")).prop("checked", true).attr('disabled', true);
-                                //$("#grid_" + RelatedGrid.name + "_rec_" + RelatedGrid 3.records[i].recid + ' ' + ' input[type=checkbox]').attr('disabled', true);
-                            }
-                        }
-                    }
-                },
-                onEditField: function (event) {
-                    id = event.recid;
-                    if (event.column == 8 || event.column == 9 || event.column == 10) {
-                        RelatedGrid.records[event.index][RelatedGrid.columns[event.column].field] = checkcommaordot(event, RelatedGrid.records[event.index][RelatedGrid.columns[event.column].field]);
-                        var _value = format.GetFormatAmount(RelatedGrid.records[event.index][RelatedGrid.columns[event.column].field], "init", dotFormatter);
-                        RelatedGrid.records[event.index][RelatedGrid.columns[event.column].field] = format.GetConvertedString(_value, dotFormatter);
-                        $("#grid_VIS_RelatedGrid_" + $self.windowNo + "_rec_" + id).keydown(function (event) {
-                            if (!dotFormatter && (event.keyCode == 190 || event.keyCode == 110)) {// , separator
-                                return false;
-                            }
-                            else if (dotFormatter && event.keyCode == 188) { // . separator
-                                return false;
-                            }
-                            if (event.target.value.contains(".") && (event.which == 110 || event.which == 190 || event.which == 188)) {
-                                if (event.target.value.indexOf('.') > -1) {
-                                    event.target.value = event.target.value.replace('.', '');
-                                }
-                            }
-                            else if (event.target.value.contains(",") && (event.which == 110 || event.which == 190 || event.which == 188)) {
-                                if (event.target.value.indexOf(',') > -1) {
-                                    event.target.value = event.target.value.replace(',', '');
-                                }
-                            }
-                            if (event.keyCode != 8 && event.keyCode != 9 && (event.keyCode < 37 || event.keyCode > 40) &&
-                                (event.keyCode < 48 || event.keyCode > 57) && (event.keyCode < 96 || event.keyCode > 105)
-                                && event.keyCode != 109 && event.keyCode != 189 && event.keyCode != 110
-                                && event.keyCode != 144 && event.keyCode != 188 && event.keyCode != 190) {
-                                return false;
-                            }
-                        });
-                    }
-                    else if (event.column == 5) {
-                        VIS.Env.getCtx().setContext($self.windowNo, "M_Product_ID", VIS.Utility.Util.getValueOfInt(RelatedGrid.records[event.recid - 1]["Product_ID"]));
-                    }
-                },
-
-                onChange: function (event) {
-                    if (event.column == 10) {
-                        var _val = format.GetConvertedNumber(event.value_new, dotFormatter);
-                        RelatedGrid.records[event.index]["PriceList"] = _val.toFixed(precision);
-                    }
-                    else if (event.column == 9) {
-                        var _val = format.GetConvertedNumber(event.value_new, dotFormatter);
-                        RelatedGrid.records[event.index]["PriceStd"] = _val.toFixed(precision);
-                    }
-                    else if (event.column == 8) {
-                        var _val = format.GetConvertedNumber(event.value_new, dotFormatter);
-                        RelatedGrid.records[event.index]["QtyEntered"] = _val.toFixed(precision);
-                    }
-                    else if (event.column == 5) {
-                        if (event.value_new != null) {
-                            RelatedGrid.records[event.index]["M_AttributeSetInstance_ID"] = event.value_new;
-
-                            VIS.dataContext.getJSONData(VIS.Application.contextUrl + "RelatedProduct/GetProductData", {
-                                "M_Product_ID": RelatedGrid.records[event.index]["Product_ID"], "M_AttributeSetInstance_ID": event.value_new,
-                                "C_UOM_ID": VIS.Utility.Util.getValueOfInt(RelatedGrid.records[event.index]["UOM_ID"]), "M_PriceList_ID": PriceList_ID, "Table_ID": $self.Table_ID, "Record_ID": $self.Record_ID
-                            }, function (data) {
-                                if (data != null) {
-                                    RelatedGrid.records[event.index]["PriceStd"] = data.PriceStd;
-                                    RelatedGrid.records[event.index]["PriceList"] = data.PriceList;
-                                    RelatedGrid.refreshCell(event.recid, "PriceStd");
-                                    RelatedGrid.refreshCell(event.recid, "PriceList");
-                                }
-                            });
-                        }
-                    }
-                    else if (event.column == 6) {
-                        if (event.value_new != null) {
-                            RelatedGrid.records[event.index]["UOM_ID"] = event.value_new;
-
-                            VIS.dataContext.getJSONData(VIS.Application.contextUrl + "RelatedProduct/GetProductData", {
-                                "M_Product_ID": RelatedGrid.records[event.index]["Product_ID"], "M_AttributeSetInstance_ID": VIS.Utility.Util.getValueOfInt(RelatedGrid.records[event.index]["M_AttributeSetInstance_ID"]),
-                                "C_UOM_ID": event.value_new, "M_PriceList_ID": PriceList_ID, "Table_ID": $self.Table_ID, "Record_ID": $self.Record_ID
-                            }, function (data) {
-                                if (data != null) {
-                                    RelatedGrid.records[event.index]["PriceStd"] = data.PriceStd;
-                                    RelatedGrid.records[event.index]["PriceList"] = data.PriceList;
-                                    RelatedGrid.refreshCell(event.recid, "PriceStd");
-                                    RelatedGrid.refreshCell(event.recid, "PriceList");
-                                }
-                            });
-                        }
-                    }
-                },
-
-                onClick: function (event) {
-                    VIS.Env.getCtx().setContext($self.windowNo, "M_Product_ID", VIS.Utility.Util.getValueOfInt(RelatedGrid.records[event.recid - 1]["Product_ID"]));
-                }
-            });
-
-            RelatedGrid.hideColumn('RelatedProductType');
-            RelatedGrid.hideColumn('Product_ID');
-            RelatedGrid.hideColumn('UOM');
-        };
-
-        // Get selected records from Grid
-        function GetSelectedRecords() {
-            SelectedRecords = [];
-
-            SelectedRecords.push(
-                {
-                    Product_ID: ProductGrid.records[0].Product_ID,
-                    Product: ProductGrid.records[0].Product,
-                    AttributeSetInstance_ID: ProductGrid.records[0].M_AttributeSetInstance_ID,
-                    UOM_ID: ProductGrid.records[0].UOM_ID,
-                    UOM: ProductGrid.records[0].UOM_ID,
-                    RelatedProductType: ProductGrid.records[0].RelatedProductType,
-                    RelatedType: ProductGrid.records[0].RelatedType,
-                    Value: ProductGrid.records[0].Value,
-                    QtyEntered: ProductGrid.records[0].QtyEntered,
-                    PriceStd: ProductGrid.records[0].PriceStd,
-                    PriceList: ProductGrid.records[0].PriceList
-                });
-
-
-            var selection = RelatedGrid.getSelection();
-            for (var i = 0; i < selection.length; i++) {
-                SelectedRecords.push(
-                    {
-                        Product_ID: RelatedGrid.records[selection[i] - 1].Product_ID,
-                        Product: RelatedGrid.records[selection[i] - 1].Product,
-                        AttributeSetInstance_ID: RelatedGrid.records[selection[i] - 1].M_AttributeSetInstance_ID,
-                        UOM_ID: RelatedGrid.records[selection[i] - 1].UOM_ID,
-                        UOM: RelatedGrid.records[selection[i] - 1].UOM_ID,
-                        RelatedProductType: RelatedGrid.records[selection[i] - 1].RelatedProductType,
-                        RelatedType: RelatedGrid.records[selection[i] - 1].RelatedType,
-                        Value: RelatedGrid.records[selection[i] - 1].Value,
-                        QtyEntered: RelatedGrid.records[selection[i] - 1].QtyEntered,
-                        PriceStd: RelatedGrid.records[selection[i] - 1].PriceStd,
-                        PriceList: RelatedGrid.records[selection[i] - 1].PriceList
-                    });
-            }
-        };
-
-        // function to check comma or dot from given value and return new value
-        function checkcommaordot(event, val) {
-            var foundComma = false;
-            event.value_new = VIS.Utility.Util.getValueOfString(val);
-            if (event.value_new.contains(".")) {
-                foundComma = true;
-                var indices = [];
-                for (var i = 0; i < event.value_new.length; i++) {
-                    if (event.value_new[i] === ".")
-                        indices.push(i);
-                }
-                if (indices.length > 1) {
-                    event.value_new = removeAllButLast(event.value_new, '.');
-                }
-            }
-            if (event.value_new.contains(",")) {
-                if (foundComma) {
-                    event.value_new = removeAllButLast(event.value_new, ',');
-                }
-                else {
-                    var indices = [];
-                    for (var i = 0; i < event.value_new.length; i++) {
-                        if (event.value_new[i] === ",")
-                            indices.push(i);
-                    }
-                    if (indices.length > 1) {
-                        event.value_new = removeAllButLast(event.value_new, ',');
-                    }
-                    else {
-                        event.value_new = event.value_new.replace(",", ".");
-                    }
-                }
-            }
-            if (event.value_new == "") {
-                event.value_new = "0";
-            }
-            return event.value_new;
-        };
-
-        // Remove all seperator but only bring last seperator
-        function removeAllButLast(amt, seprator) {
-            var parts = amt.split(seprator);
-            amt = parts.slice(0, -1).join('') + '.' + parts.slice(-1);
-            if (amt.indexOf('.') == (amt.length - 1)) {
-                amt = amt.replace(".", "");
-            }
-            return amt;
-        };
-
-        // Create busy indicator
-        function createBusyIndicator() {
-            $bsyDiv = $("<div class='vis-apanel-busy'>");
-            $bsyDiv.css({
-                "position": "absolute", "width": "98%", "height": "97%", 'text-align': 'center', 'z-index': '999'
-            });
-            $bsyDiv[0].style.visibility = "visible";
+            $bsyDiv = $("<div class='vis-apanel-busy VAS-rp-busy'>");
             $root.append($bsyDiv);
+            setBusy(true);
         };
 
-        // Create Related Products lines
-        CreateLines = function (fromApply) {
+        this.intialLoad = function () {
+            var w = $self.windowNo;
+            $eyebrow = $root.find("#VAS_RPEyebrow_" + w);
+            $productArea = $root.find("#VAS_RPProduct_" + w);
+            $body = $root.find("#VAS_RPBody_" + w);
+            $chips = $root.find("#VAS_RPChips_" + w);
+            $rows = $root.find("#VAS_RPRows_" + w);
+            $selectAll = $root.find("#VAS_RPAll_" + w);
+            $result = $root.find("#VAS_RPResult_" + w);
+            $hint = $root.find("#VAS_RPHint_" + w);
+            $btnCancel = $root.find("#VAS_RPCancel_" + w);
+            $btnContinue = $root.find("#VAS_RPContinue_" + w);
+            $btnAdd = $root.find("#VAS_RPAdd_" + w);
+
+            loadControls();
+            bindEvents();
+            showEmpty();
+            loadHeader();
+        };
+
+        // Product search (framework control), attribute and UOM lookups for the row details
+        function loadControls() {
+            productLookup = VIS.MLookupFactory.getMLookUp(ctx, $self.windowNo, 2221, VIS.DisplayType.Search);
+            prdCtrl = new VIS.Controls.VTextBoxButton("M_Product_ID", true, false, true, VIS.DisplayType.Search, productLookup);
+            var $wrap = $('<div class="vis-control-wrap">');
+            var $btns = $('<div class="input-group-append">');
+            $wrap.append(prdCtrl.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' '));
+            var $ctrl = $root.find("#VAS_RPProductCtrl_" + $self.windowNo);
+            $ctrl.append($wrap).append($btns);
+            for (var i = 0; i < prdCtrl.getBtnCount(); i++) {
+                $btns.append(prdCtrl.getBtn(i));
+            }
+            ctx.setContext($self.windowNo, "M_Product_ID", null);
+
+            attrLookup = new VIS.MPAttributeLookup(VIS.context, $self.windowNo);
+            uomLookup = VIS.MLookupFactory.getMLookUp(ctx, $self.windowNo, 2222, VIS.DisplayType.TableDir);
+        };
+
+        // Document number, business partner, price list and currency of the order / opportunity
+        function loadHeader() {
+            VIS.dataContext.getJSONData(VIS.Application.contextUrl + "RelatedProduct/GetHeaderInfo",
+                { "Table_ID": $self.Table_ID, "Record_ID": $self.Record_ID }, function (data) {
+                    if (data != null) {
+                        header = data;
+                        $eyebrow.html('<strong>' + esc(data.DocumentNo) + '</strong>' + (data.BPName ? ' · ' + esc(data.BPName) : ''));
+                    }
+                    setBusy(false);
+                });
+        };
+
+        /* ---------- data ---------- */
+
+        function loadProduct(productId) {
+            setBusy(true);
+            clearResult();
+            VIS.dataContext.getJSONData(VIS.Application.contextUrl + "RelatedProduct/GetProductData", {
+                "M_Product_ID": productId, "M_AttributeSetInstance_ID": 0, "C_UOM_ID": 0,
+                "M_PriceList_ID": header.M_PriceList_ID, "Table_ID": $self.Table_ID, "Record_ID": $self.Record_ID
+            }, function (data) {
+                if (data == null) {
+                    setBusy(false);
+                    return;
+                }
+                mainItem = toItem(data, true);
+                VIS.dataContext.getJSONData(VIS.Application.contextUrl + "RelatedProduct/GetRelatedProduct", {
+                    "M_Product_ID": productId, "M_AttributeSetInstance_ID": 0, "C_UOM_ID": 0,
+                    "M_PriceList_ID": header.M_PriceList_ID, "RelatedProductType": "",
+                    "Table_ID": $self.Table_ID, "Record_ID": $self.Record_ID
+                }, function (list) {
+                    related = [];
+                    if (list != null) {
+                        for (var i = 0; i < list.length; i++) {
+                            related.push(toItem(list[i], false));
+                        }
+                    }
+                    filter = "all";
+                    openDetail = -1;
+                    showPicked();
+                    setBusy(false);
+                });
+            });
+        };
+
+        function toItem(d, isMain) {
+            var mandatory = !isMain && d.RelatedProductType == "M";
+            return {
+                Product_ID: d.Product_ID, Product: d.Product, Value: d.Value,
+                RelatedProductType: d.RelatedProductType, RelatedType: d.RelatedType,
+                AttributeSetInstance_ID: d.AttributeSetInstance_ID || 0, UOM_ID: d.UOM_ID,
+                QtyEntered: num(d.QtyEntered) || 1, PriceStd: num(d.PriceStd), PriceList: num(d.PriceList),
+                selected: isMain || mandatory, mandatory: mandatory
+            };
+        };
+
+        // New price after the unit or attribute of a line changed
+        function reprice(item, onDone) {
+            VIS.dataContext.getJSONData(VIS.Application.contextUrl + "RelatedProduct/GetProductData", {
+                "M_Product_ID": item.Product_ID, "M_AttributeSetInstance_ID": item.AttributeSetInstance_ID,
+                "C_UOM_ID": item.UOM_ID, "M_PriceList_ID": header.M_PriceList_ID,
+                "Table_ID": $self.Table_ID, "Record_ID": $self.Record_ID
+            }, function (data) {
+                if (data != null) {
+                    item.PriceStd = num(data.PriceStd);
+                    item.PriceList = num(data.PriceList);
+                }
+                onDone();
+            });
+        };
+
+        /* ---------- rendering ---------- */
+
+        function showEmpty() {
+            mainItem = null;
+            related = [];
+            disposeDetailCtrls();
+            $productArea.removeClass("VAS-rp-has-product");
+            $body.removeClass("VAS-rp-has-product");
+            prdCtrl.setValue(null, false, true);
+            updateFooter();
+        };
+
+        function showPicked() {
+            $productArea.addClass("VAS-rp-has-product");
+            $body.addClass("VAS-rp-has-product");
+            renderPicked();
+            renderChips();
+            renderRows();
+            updateFooter();
+        };
+
+        function renderPicked() {
+            var it = mainItem;
+            var w = $self.windowNo;
+            var html = '<div class="VAS-rp-picked-icon"><i class="fa fa-cube" aria-hidden="true"></i></div>'
+                + '<div class="VAS-rp-picked-text">'
+                + '  <span class="VAS-rp-code">' + esc(it.Value) + '</span>'
+                + '  <span class="VAS-rp-name">' + esc(it.Product) + '</span>'
+                + '</div>'
+                + '<div class="VAS-rp-picked-fields">'
+                + '  <label data-msgkey="QtyEntered">' + esc(msgs.QtyEntered)
+                + '    <input type="text" inputmode="decimal" class="VAS-rp-input VAS-rp-qty" data-main="qty" value="' + esc(toInput(it.QtyEntered)) + '"></label>'
+                + '  <span class="VAS-rp-uom-text">' + esc(uomDisplay(it.UOM_ID)) + '</span>'
+                + '  <label data-msgkey="PriceActual">' + esc(msgs.PriceActual)
+                + '    <input type="text" inputmode="decimal" class="VAS-rp-input VAS-rp-price" data-main="price" value="' + esc(toInput(it.PriceStd)) + '"></label>'
+                + '</div>'
+                + '<button type="button" class="VAS-rp-btn VAS-rp-btn-secondary VAS-rp-btn-small" data-main="details" data-msgkey="Details">'
+                + '<i class="fa fa-sliders" aria-hidden="true"></i>' + esc(msg("Details")) + '</button>'
+                + '<button type="button" class="VAS-rp-btn VAS-rp-btn-secondary VAS-rp-btn-small" id="VAS_RPChange_' + w + '" data-msgkey="Change">'
+                + '<i class="fa fa-search" aria-hidden="true"></i>' + esc(msg("Change")) + '</button>'
+                + '<div class="VAS-rp-picked-detail" id="VAS_RPMainDetail_' + w + '"></div>';
+            $root.find("#VAS_RPPicked_" + w).html(html);
+            if (openDetail == -2) {
+                buildDetail(mainItem, $root.find("#VAS_RPMainDetail_" + w));
+            }
+        };
+
+        function uomDisplay(uomId) {
+            var d = uomLookup ? uomLookup.getDisplay(uomId) : "";
+            return d == null ? "" : d;
+        };
+
+        function renderChips() {
+            var counts = {}, names = {}, order = [];
+            for (var i = 0; i < related.length; i++) {
+                var t = related[i].RelatedProductType;
+                if (!counts[t]) {
+                    counts[t] = 0;
+                    names[t] = related[i].RelatedType || t;
+                    order.push(t);
+                }
+                counts[t]++;
+            }
+            var html = '<button type="button" class="VAS-rp-chip VAS-rp-filter' + (filter == "all" ? ' VAS-rp-on' : '') + '" data-filter="all" data-msgkey="All">'
+                + esc(msg("All")) + ' <span>' + related.length + '</span></button>';
+            for (var j = 0; j < order.length; j++) {
+                html += '<button type="button" class="VAS-rp-chip VAS-rp-filter' + (filter == order[j] ? ' VAS-rp-on' : '') + '" data-filter="' + esc(order[j]) + '">'
+                    + esc(names[order[j]]) + ' <span>' + counts[order[j]] + '</span></button>';
+            }
+            $chips.html(html).toggle(related.length > 0);
+        };
+
+        function renderRows() {
+            disposeDetailCtrls();
+            var html = "";
+            var visible = 0;
+            for (var i = 0; i < related.length; i++) {
+                var it = related[i];
+                if (filter != "all" && it.RelatedProductType != filter) {
+                    continue;
+                }
+                visible++;
+                var chip = typeClass[it.RelatedProductType] || "mute";
+                html += '<tr class="VAS-rp-row' + (it.selected ? ' VAS-rp-selected' : '') + '" data-index="' + i + '">'
+                    + '<td class="VAS-rp-col-check"><input type="checkbox" data-index="' + i + '"' + (it.selected ? ' checked' : '')
+                    + (it.mandatory ? ' disabled title="' + esc(msg("VAS_RelProdMandatory")) + '" data-msgkey="VAS_RelProdMandatory"' : '') + '></td>'
+                    + '<td><span class="VAS-rp-name">' + esc(it.Product) + '</span><span class="VAS-rp-code">' + esc(it.Value) + '</span></td>'
+                    + '<td class="VAS-rp-col-type"><span class="VAS-rp-chip VAS-rp-' + chip + '">' + esc(it.RelatedType || it.RelatedProductType) + '</span></td>'
+                    + '<td class="VAS-rp-col-num"><input type="text" inputmode="decimal" class="VAS-rp-input VAS-rp-qty" data-qty="' + i + '" value="' + esc(toInput(it.QtyEntered)) + '"></td>'
+                    + '<td class="VAS-rp-col-uom">' + esc(uomDisplay(it.UOM_ID)) + '</td>'
+                    + '<td class="VAS-rp-col-num"><input type="text" inputmode="decimal" class="VAS-rp-input VAS-rp-price" data-price="' + i + '" value="' + esc(toInput(it.PriceStd)) + '"></td>'
+                    + '<td class="VAS-rp-col-amt" data-amt="' + i + '">' + esc(money(it.QtyEntered * it.PriceStd)) + '</td>'
+                    + '<td class="VAS-rp-col-more"><button type="button" class="VAS-rp-iconbtn' + (openDetail == i ? ' VAS-rp-open' : '') + '" data-detail="' + i + '" title="' + esc(msg("Details")) + '" data-msgkey="Details">'
+                    + '<i class="fa fa-chevron-down" aria-hidden="true"></i></button></td>'
+                    + '</tr>';
+                if (openDetail == i) {
+                    html += '<tr class="VAS-rp-detailrow"><td></td><td colspan="7"><div class="VAS-rp-detail" data-detailfor="' + i + '"></div></td></tr>';
+                }
+            }
+            $rows.html(html);
+            $root.find("#VAS_RPNone_" + $self.windowNo).toggle(related.length == 0);
+            $root.find(".VAS-rp-tablewrap table").toggle(related.length > 0);
+            if (openDetail >= 0) {
+                buildDetail(related[openDetail], $rows.find('[data-detailfor="' + openDetail + '"]'));
+            }
+            updateSelectAll();
+        };
+
+        // Unit, attribute set instance and list price of one line, with the framework controls
+        function buildDetail(item, $container) {
+            ctx.setContext($self.windowNo, "M_Product_ID", item.Product_ID);
+            // Not mandatory: a line always has a unit, and the mandatory style would show it red
+            var uomCtrl = new VIS.Controls.VComboBox("C_UOM_ID", false, false, true, uomLookup, 50);
+            var attrCtrl = new VIS.Controls.VPAttribute("M_AttributeSetInstance_ID", false, false, true, VIS.DisplayType.PAttribute,
+                attrLookup, $self.windowNo, false, false, false, true);
+            detailCtrls.push(uomCtrl, attrCtrl);
+
+            var $uom = $('<div class="VAS-rp-field"><label data-msgkey="C_UOM_ID">' + esc(msgs.C_UOM_ID) + '</label></div>');
+            $uom.append(uomCtrl.getControl());
+            var $attr = $('<div class="VAS-rp-field"><label data-msgkey="M_AttributeSetInstance_ID">' + esc(msgs.M_AttributeSetInstance_ID) + '</label><div class="VAS-rp-attr input-group"></div></div>');
+            $attr.find(".VAS-rp-attr").append(attrCtrl.getControl());
+            for (var b = 0; b < attrCtrl.getBtnCount(); b++) {
+                $attr.find(".VAS-rp-attr").append(attrCtrl.getBtn(b));
+            }
+            var $list = $('<div class="VAS-rp-field"><label data-msgkey="PriceList">' + esc(msgs.PriceList) + '</label>'
+                + '<input type="text" inputmode="decimal" class="VAS-rp-input" value="' + esc(toInput(item.PriceList)) + '"></div>');
+            $container.empty().append($uom).append($attr).append($list);
+
+            uomCtrl.setValue(item.UOM_ID);
+            attrCtrl.setValue(item.AttributeSetInstance_ID || 0);
+
+            uomCtrl.fireValueChanged = function () {
+                var v = VIS.Utility.Util.getValueOfInt(uomCtrl.getValue());
+                if (v > 0 && v != item.UOM_ID) {
+                    item.UOM_ID = v;
+                    reprice(item, refreshAll);
+                }
+            };
+            attrCtrl.fireValueChanged = function () {
+                item.AttributeSetInstance_ID = VIS.Utility.Util.getValueOfInt(attrCtrl.getValue());
+                reprice(item, refreshAll);
+            };
+            $list.find("input").on("change", function () {
+                item.PriceList = fromInput($(this).val());
+                $(this).val(toInput(item.PriceList));
+            });
+        };
+
+        function refreshAll() {
+            renderPicked();
+            renderRows();
+            updateFooter();
+        };
+
+        function disposeDetailCtrls() {
+            for (var i = 0; i < detailCtrls.length; i++) {
+                if (detailCtrls[i] && detailCtrls[i].dispose) {
+                    detailCtrls[i].dispose();
+                }
+            }
+            detailCtrls = [];
+        };
+
+        function updateSelectAll() {
+            var all = true, any = false;
+            for (var i = 0; i < related.length; i++) {
+                if (related[i].mandatory || (filter != "all" && related[i].RelatedProductType != filter)) {
+                    continue;
+                }
+                any = true;
+                if (!related[i].selected) {
+                    all = false;
+                }
+            }
+            $selectAll.prop("checked", any && all).prop("disabled", !any);
+        };
+
+        function selectedLines() {
+            var lines = [];
+            if (mainItem == null) {
+                return lines;
+            }
+            lines.push(mainItem);
+            for (var i = 0; i < related.length; i++) {
+                if (related[i].selected) {
+                    lines.push(related[i]);
+                }
+            }
+            return lines;
+        };
+
+        function updateFooter() {
+            var lines = selectedLines();
+            if (lines.length == 0) {
+                $hint.text(msg("VAS_RelProdPickStart")).attr("data-msgkey", "VAS_RelProdPickStart");
+            }
+            else {
+                var total = 0;
+                for (var i = 0; i < lines.length; i++) {
+                    total += lines[i].QtyEntered * lines[i].PriceStd;
+                }
+                $hint.html('<span data-msgkey="VAS_RelProdLinesToAdd">' + esc(msg("VAS_RelProdLinesToAdd")) + '</span> <strong>'
+                    + lines.length + '</strong> · <strong>' + esc(money(total)) + '</strong>').removeAttr("data-msgkey");
+            }
+            $btnContinue.prop("disabled", lines.length == 0);
+            $btnAdd.prop("disabled", lines.length == 0);
+        };
+
+        /* ---------- result ---------- */
+
+        function clearResult() {
+            $result.removeClass("VAS-rp-ok VAS-rp-warn").empty().hide();
+        };
+
+        function showResult(res) {
+            var ok = res.Errors == null || res.Errors.length == 0;
+            var html = '<i class="fa ' + (ok ? 'fa-check-circle' : 'fa-exclamation-triangle') + '" aria-hidden="true"></i><div>'
+                + '<div>' + esc(res.Message) + '</div>';
+            if (!ok) {
+                html += '<div><span data-msgkey="VAS_RelProdNotAdded">' + esc(msg("VAS_RelProdNotAdded")) + '</span></div><ul>';
+                for (var i = 0; i < res.Errors.length; i++) {
+                    html += '<li><strong>' + esc(res.Errors[i].Product) + '</strong>'
+                        + (res.Errors[i].Error ? ' — ' + esc(res.Errors[i].Error) : '') + '</li>';
+                }
+                html += '</ul>';
+            }
+            html += '</div>';
+            $result.removeClass("VAS-rp-ok VAS-rp-warn").addClass(ok ? "VAS-rp-ok" : "VAS-rp-warn").html(html).show();
+        };
+
+        /* ---------- save ---------- */
+
+        function save(closeAfter) {
+            var lines = selectedLines();
+            if (lines.length == 0) {
+                VIS.ADialog.error("VIS_PlzSelLines");
+                return;
+            }
+            var data = [];
+            for (var i = 0; i < lines.length; i++) {
+                data.push({
+                    Product_ID: lines[i].Product_ID, Product: lines[i].Product, Value: lines[i].Value,
+                    AttributeSetInstance_ID: lines[i].AttributeSetInstance_ID, UOM_ID: lines[i].UOM_ID,
+                    RelatedProductType: lines[i].RelatedProductType, RelatedType: lines[i].RelatedType,
+                    QtyEntered: lines[i].QtyEntered, PriceStd: lines[i].PriceStd, PriceList: lines[i].PriceList
+                });
+            }
+            setBusy(true);
             $.ajax({
                 url: VIS.Application.contextUrl + "RelatedProduct/SaveRelatedLines",
                 type: "POST",
                 dataType: "json",
                 contentType: "application/json; charset=utf-8",
-                data: JSON.stringify({ Data: SelectedRecords, Table_ID: $self.Table_ID, Record_ID: $self.Record_ID }),
-
-                success: function (data) {
-                    if (JSON.parse(data) != "") {
-                        prdCtrl.setValue(null, false, true);
-                        ProductGrid.clear();
-                        RelatedGrid.clear();
-                        VIS.ADialog.info("", true, JSON.parse(data), "");
+                data: JSON.stringify({ Data: data, Table_ID: $self.Table_ID, Record_ID: $self.Record_ID }),
+                success: function (result) {
+                    setBusy(false);
+                    var res = result ? JSON.parse(result) : null;
+                    if (res == null) {
+                        return;
                     }
-                    $bsyDiv[0].style.visibility = "hidden";
-                    // Refresh the window so the saved lines are shown
-                    if ($self.frame && $self.frame.gridDataRefreshAll) {
+                    // Show the saved lines in the window behind the pop-up
+                    if (res.Saved > 0 && $self.frame && $self.frame.gridDataRefreshAll) {
                         $self.frame.gridDataRefreshAll();
                     }
-                    if (!fromApply) {
-                        $self.frame.close();
+                    var failed = res.Errors || [];
+                    if (failed.length == 0) {
+                        if (closeAfter) {
+                            $self.frame.close();
+                            return;
+                        }
+                        showEmpty();
+                        showResult(res);
+                        return;
                     }
+                    keepFailedLines(lines, failed);
+                    showResult(res);
                 },
                 error: function () {
-                    $bsyDiv[0].style.visibility = "hidden";
+                    setBusy(false);
                 }
-            })
+            });
+        };
+
+        // After a partial save only the failed lines stay in the pop-up, so a retry does not add the others twice
+        function keepFailedLines(sent, failed) {
+            var failedItems = [];
+            for (var i = 0; i < failed.length; i++) {
+                if (sent[failed[i].LineIndex]) {
+                    failedItems.push(sent[failed[i].LineIndex]);
+                }
+            }
+            if (failedItems.indexOf(mainItem) < 0) {
+                // Main product was added: keep the remaining related lines as optional extra lines
+                mainItem.selected = false;
+            }
+            var keep = [];
+            for (var j = 0; j < related.length; j++) {
+                if (failedItems.indexOf(related[j]) >= 0) {
+                    keep.push(related[j]);
+                }
+            }
+            related = keep;
+            if (failedItems.indexOf(mainItem) < 0) {
+                // The main product is on the order now; offer the failed related lines on their own
+                if (related.length > 0) {
+                    mainItem = related.shift();
+                    mainItem.selected = true;
+                    mainItem.mandatory = false;
+                }
+                else {
+                    showEmpty();
+                    return;
+                }
+            }
+            openDetail = -1;
+            filter = "all";
+            showPicked();
+        };
+
+        /* ---------- events ---------- */
+
+        function bindEvents() {
+            prdCtrl.fireValueChanged = function () {
+                if (prdCtrl.value != null) {
+                    loadProduct(prdCtrl.value);
+                }
+            };
+
+            $productArea.on("click", "#VAS_RPChange_" + $self.windowNo, function () {
+                clearResult();
+                showEmpty();
+            });
+
+            $productArea.on("click", '[data-main="details"]', function () {
+                openDetail = openDetail == -2 ? -1 : -2;
+                disposeDetailCtrls();
+                renderPicked();
+            });
+
+            $productArea.on("change", '[data-main="qty"]', function () {
+                mainItem.QtyEntered = fromInput($(this).val()) || 1;
+                $(this).val(toInput(mainItem.QtyEntered));
+                updateFooter();
+            });
+
+            $productArea.on("change", '[data-main="price"]', function () {
+                mainItem.PriceStd = fromInput($(this).val());
+                $(this).val(toInput(mainItem.PriceStd));
+                updateFooter();
+            });
+
+            $chips.on("click", ".VAS-rp-filter", function () {
+                filter = $(this).attr("data-filter");
+                openDetail = -1;
+                renderChips();
+                renderRows();
+            });
+
+            $rows.on("change", 'input[type="checkbox"]', function () {
+                var it = related[VIS.Utility.Util.getValueOfInt($(this).attr("data-index"))];
+                if (it && !it.mandatory) {
+                    it.selected = $(this).prop("checked");
+                    $(this).closest("tr").toggleClass("VAS-rp-selected", it.selected);
+                    updateSelectAll();
+                    updateFooter();
+                }
+            });
+
+            $rows.on("change", "[data-qty]", function () {
+                var i = VIS.Utility.Util.getValueOfInt($(this).attr("data-qty"));
+                related[i].QtyEntered = fromInput($(this).val()) || 1;
+                $(this).val(toInput(related[i].QtyEntered));
+                $rows.find('[data-amt="' + i + '"]').text(money(related[i].QtyEntered * related[i].PriceStd));
+                updateFooter();
+            });
+
+            $rows.on("change", "[data-price]", function () {
+                var i = VIS.Utility.Util.getValueOfInt($(this).attr("data-price"));
+                related[i].PriceStd = fromInput($(this).val());
+                $(this).val(toInput(related[i].PriceStd));
+                $rows.find('[data-amt="' + i + '"]').text(money(related[i].QtyEntered * related[i].PriceStd));
+                updateFooter();
+            });
+
+            $rows.on("click", "[data-detail]", function () {
+                var i = VIS.Utility.Util.getValueOfInt($(this).attr("data-detail"));
+                openDetail = openDetail == i ? -1 : i;
+                renderRows();
+            });
+
+            $selectAll.on("change", function () {
+                var on = $(this).prop("checked");
+                for (var i = 0; i < related.length; i++) {
+                    if (!related[i].mandatory && (filter == "all" || related[i].RelatedProductType == filter)) {
+                        related[i].selected = on;
+                    }
+                }
+                renderRows();
+                updateFooter();
+            });
+
+            $btnCancel.on("click", function () {
+                $self.frame.close();
+            });
+
+            $btnContinue.on("click", function () {
+                save(false);
+            });
+
+            $btnAdd.on("click", function () {
+                save(true);
+            });
         };
 
         this.getRoot = function () {
             return $root;
+        };
+
+        this.disposeComponent = function () {
+            disposeDetailCtrls();
+            if ($root) {
+                $root.off().find("*").off();
+                $root.remove();
+            }
+            if (prdCtrl && prdCtrl.dispose) {
+                prdCtrl.dispose();
+            }
+            prdCtrl = null;
+            productLookup = null;
+            uomLookup = null;
+            attrLookup = null;
+            related = null;
+            mainItem = null;
+            $root = null;
+            $bsyDiv = null;
         };
     };
 
@@ -770,44 +707,19 @@
         this.initalize();
         this.intialLoad();
         this.frame.getContentGrid().append(this.getRoot());
-        var ssef = this;
-        window.setTimeout(function () {
-            ssef.LoadProductGrid();
-            ssef.LoadRelatedGrid();
-        }, 50);
-        window.setTimeout(function () {
+    };
 
-        }, 50);
-    };
     VIS.CreateRelatedLines.prototype.setHeight = function () {
-        return "575";
+        return "620";
     };
+
     VIS.CreateRelatedLines.prototype.setWidth = function () {
-        return "1050";
+        return "900";
     };
 
     VIS.CreateRelatedLines.prototype.dispose = function () {
-        w2ui['VIS_ProductGrid_' + this.windowNo].destroy();
-        w2ui['VIS_RelatedGrid_' + this.windowNo].destroy();
+        this.disposeComponent();
         this.frame = null;
         this.windowNo = null;
-        $bsyDiv = null;
-        $self = null;
-        $OkBtn = null;
-        $ApplyBtn = null;
-        $root = null;
-        _ProductLookUp = null;
-        pattrLookup = null;
-        puomLookup = null;
-        pruomLookup = null;
-        PUomCtrl = null;
-        PRUomCtrl = null;
-        _ProductCtrl = null;
-        _CmbRelatedType = null;
-        lookupRelatedType = null;
-        ctrlRelatedType = null;
-        PAttrCtrl = null;
-        PRAttrCtrl = null;
-        SelectedRecords = null;
     };
 })(VIS, jQuery);
