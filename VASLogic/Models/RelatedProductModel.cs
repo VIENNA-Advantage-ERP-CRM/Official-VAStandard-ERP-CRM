@@ -98,7 +98,8 @@ namespace VIS.Models
 
             // Only the parameters actually used: a null entry makes ExecuteDataset fail when no type is selected
             List<SqlParameter> param = new List<SqlParameter>();
-            string sql = @"SELECT P.M_Product_ID, " + (C_UOM_ID > 0 ? C_UOM_ID.ToString() : "P.C_UOM_ID") + @" AS C_UOM_ID, P.Value, R.Name, 1 AS QtyEntered,
+            // P.Name is the related product itself; R.Name is the name of the relation (shown as a second line)
+            string sql = @"SELECT P.M_Product_ID, " + (C_UOM_ID > 0 ? C_UOM_ID.ToString() : "P.C_UOM_ID") + @" AS C_UOM_ID, P.Value, P.Name AS ProductName, R.Name AS RelationName, 1 AS QtyEntered,
                     R.RelatedProductType, (SELECT Name FROM AD_Ref_List WHERE AD_Reference_ID=(SELECT AD_Reference_ID FROM AD_Reference WHERE Name='M_RelatedProduct Type')
                     AND Value = R.RelatedProductType) AS RelatedType,
                     BOMPRICELISTUOM(P.M_PRODUCT_ID, PR.M_PRICELIST_VERSION_ID, PR.M_ATTRIBUTESETINSTANCE_ID, PR.C_UOM_ID) AS PriceList,
@@ -106,7 +107,7 @@ namespace VIS.Models
                     BOMPRICELIMITUOM(P.M_PRODUCT_ID, PR.M_PRICELIST_VERSION_ID, PR.M_ATTRIBUTESETINSTANCE_ID, PR.C_UOM_ID) AS LimitPrice
                     FROM M_RelatedProduct R INNER JOIN M_PRODUCT P ON (p.M_Product_ID = R.RelatedProduct_ID) LEFT JOIN M_PRODUCTPRICE PR ON ( P.M_PRODUCT_ID = PR.M_PRODUCT_ID AND PR.ISACTIVE = 'Y' 
                     AND NVL(PR.M_AttributeSetInstance_ID, 0) = " + M_AttributeSetInstance_ID + " AND PR.M_PRICELIST_VERSION_ID = " + M_PriceList_Version_ID
-                    + " AND PR.C_UOM_ID = " + (C_UOM_ID > 0 ? C_UOM_ID.ToString() : "P.C_UOM_ID") + @") WHERE R.M_Product_ID = " + M_Product_ID;
+                    + " AND PR.C_UOM_ID = " + (C_UOM_ID > 0 ? C_UOM_ID.ToString() : "P.C_UOM_ID") + @") WHERE R.IsActive = 'Y' AND R.M_Product_ID = " + M_Product_ID;
             if (!string.IsNullOrEmpty(Relatedtype))
             {
                 param.Add(new SqlParameter("@type", Relatedtype));
@@ -120,7 +121,8 @@ namespace VIS.Models
                 {
                     res = new RelatedProductData();
                     res.Product_ID = Util.GetValueOfInt(_ds.Tables[0].Rows[i]["M_Product_ID"]);
-                    res.Product = Util.GetValueOfString(_ds.Tables[0].Rows[i]["Name"]);
+                    res.Product = Util.GetValueOfString(_ds.Tables[0].Rows[i]["ProductName"]);
+                    res.RelationName = Util.GetValueOfString(_ds.Tables[0].Rows[i]["RelationName"]);
                     res.RelatedProductType = Util.GetValueOfString(_ds.Tables[0].Rows[i]["RelatedProductType"]);
                     res.RelatedType = Util.GetValueOfString(_ds.Tables[0].Rows[i]["RelatedType"]);
                     res.AttributeSetInstance_ID = M_AttributeSetInstance_ID;
@@ -151,17 +153,21 @@ namespace VIS.Models
             if (MOrder.Table_ID.Equals(Table_ID))
             {
                 alias = "o";
-                sql = @"SELECT o.DocumentNo, bp.Name AS BPName, o.M_PriceList_ID, c.ISO_Code, c.StdPrecision
+                sql = @"SELECT o.DocumentNo, bp.Name AS BPName, o.M_PriceList_ID, c.ISO_Code, c.StdPrecision,
+                        COALESCE(dtt.Name, dt.Name) AS DocTypeName
                         FROM C_Order o
                         INNER JOIN C_BPartner bp ON (bp.C_BPartner_ID=o.C_BPartner_ID)
                         INNER JOIN C_Currency c ON (c.C_Currency_ID=o.C_Currency_ID)
+                        LEFT OUTER JOIN C_DocType dt ON (dt.C_DocType_ID=o.C_DocTypeTarget_ID)
+                        LEFT OUTER JOIN C_DocType_Trl dtt ON (dtt.C_DocType_ID=dt.C_DocType_ID AND dtt.AD_Language=@lang)
                         WHERE o.IsActive='Y' AND o.C_Order_ID=@recordId";
             }
             else if (MProject.Table_ID.Equals(Table_ID))
             {
                 alias = "p";
                 sql = @"SELECT p.Value AS DocumentNo, bp.Name AS BPName,
-                        COALESCE(plv.M_PriceList_ID, p.M_PriceList_ID) AS M_PriceList_ID, c.ISO_Code, c.StdPrecision
+                        COALESCE(plv.M_PriceList_ID, p.M_PriceList_ID) AS M_PriceList_ID, c.ISO_Code, c.StdPrecision,
+                        NULL AS DocTypeName
                         FROM C_Project p
                         LEFT OUTER JOIN C_BPartner bp ON (bp.C_BPartner_ID=p.C_BPartner_ID)
                         LEFT OUTER JOIN M_PriceList_Version plv ON (plv.M_PriceList_Version_ID=p.M_PriceList_Version_ID)
@@ -174,8 +180,13 @@ namespace VIS.Models
             }
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, alias, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-            SqlParameter[] param = new SqlParameter[] { new SqlParameter("@recordId", Record_ID) };
-            DataSet ds = DB.ExecuteDataset(sql, param, null);
+            List<SqlParameter> param = new List<SqlParameter>();
+            if (alias == "o")
+            {
+                param.Add(new SqlParameter("@lang", ctx.GetAD_Language()));
+            }
+            param.Add(new SqlParameter("@recordId", Record_ID));
+            DataSet ds = DB.ExecuteDataset(sql, param.ToArray(), null);
             if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
             {
                 return null;
@@ -188,6 +199,7 @@ namespace VIS.Models
             info.M_PriceList_ID = Util.GetValueOfInt(dr["M_PriceList_ID"]);
             info.ISO_Code = Util.GetValueOfString(dr["ISO_Code"]);
             info.StdPrecision = Util.GetValueOfInt(dr["StdPrecision"]);
+            info.DocTypeName = Util.GetValueOfString(dr["DocTypeName"]);
             return info;
         }
 
@@ -374,6 +386,8 @@ namespace VIS.Models
         public int M_PriceList_ID { get; set; }
         public string ISO_Code { get; set; }
         public int StdPrecision { get; set; }
+        /// <summary>Document type of the order (translated); empty for an opportunity</summary>
+        public string DocTypeName { get; set; }
     }
 
     /// <summary>
@@ -411,6 +425,8 @@ namespace VIS.Models
         public string Product { get; set; }
         public string RelatedType { get; set; }
         public string RelatedProductType { get; set; }
+        /// <summary>Name of the relation (M_RelatedProduct.Name); Product holds the product name</summary>
+        public string RelationName { get; set; }
         // public string UOM { get; set; }
         public int UOM_ID { get; set; }
         public decimal QtyEntered { get; set; }
