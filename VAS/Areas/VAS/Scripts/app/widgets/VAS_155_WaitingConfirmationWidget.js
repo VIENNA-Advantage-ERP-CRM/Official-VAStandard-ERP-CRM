@@ -51,6 +51,17 @@
  * 24 | Save Line                                        | VAS_155_WC_SaveLine
  * 25 | Saving...                                        | VAS_155_WC_Saving
  * 26 | Save failed. / Not found.                        | VAS_155_WC_SaveFailed / VAS_155_WC_NotFound
+ * VAS163 2026-11-27 (Sr 54-62):
+ * 27 | Confirmed / Scrapped Quantity cannot be greater than Target Quantity. | VAS_090_ConfirmedAboveTarget / VAS_090_ScrappedAboveTarget (reused)
+ * 28 | Quantity should not be greater than Target Quantity | VAS_172_ConfScrapExceedsTarget (reused)
+ * 29 | Quantity exceeds the decimal places allowed for this UOM: (precision appended) | VAS_155_WC_QtyPrecision (new)
+ * 30 | Confirmed / Scrapped quantity must be zero or a positive number. | VAS_155_WC_InvalidConfirmedQty / VAS_155_WC_InvalidScrappedQty
+ * 31 | Quality Control / Test Parameter / Acceptable Value / Actual Value | VAS_090_QualityControl / VAS_104_TestParameter / VAS_104_AcceptableValue / VAS_104_ActualValue (reused)
+ * 32 | Select / Save                                    | VAS_Select / VAS_Save (reused)
+ * 33 | No quality parameters for this line.             | VAS_155_WC_NoQualityParams (new)
+ * 34 | Select an Actual Value for at least one quality parameter. | VAS_155_WC_QcSelectValue (new)
+ * Backend (Sr 62) - VAS_155_WaitingConfirmationWidget/GetLineQualityParameters
+ *                   VAS_155_WaitingConfirmationWidget/SaveLineQualityParameters
  */
 ; VAS = window.VAS || {};
 
@@ -81,7 +92,7 @@
         var $root = $('<div class="MPC-wc-root">');
         var $card, $body, $footHelper, $pager, $pageText, $prevButton, $nextButton;
         var $modal, $modalTitleGroup, $modalBody, $modalFooter, $modalClose;
-        var listRequest, detailRequest, locatorsRequest;
+        var listRequest, detailRequest, locatorsRequest, qcRequest; // VAS163 2026-11-27: Sr 62 qcRequest
         var eventNamespace = 'MPCWaitingConfirmation';
         var modalEventNamespace = '.MPCWcModal';
         var lastFocusedEl = null;
@@ -115,7 +126,10 @@
         };
 
         function lbl(key, fallback) {
-            return VIS.Msg.getMsg(key);
+            // VAS163 2026-11-27: Sr 54-62 English fallback while a new key is not yet seeded in AD_Message.
+            var text = VIS.Msg.getMsg(key);
+            if (!text || text === key || String(text).charAt(0) === '[') { return fallback || key; }
+            return text;
         }
 
         function el(tag, className, text) {
@@ -123,6 +137,64 @@
             if (className) { node.className = className; }
             if (text != null) { node.textContent = text; }
             return node;
+        }
+
+        // VAS163 2026-11-27: Sr 48 hover text (title) so clipped values can always be read.
+        function tip(node, text) {
+            if (node && text != null && String(text).trim()) { node.title = String(text); }
+            return node;
+        }
+
+        // VAS163 2026-11-27: Sr 48 a label element that records its message key.
+        function keyed(node, key) {
+            if (node && key) { node.setAttribute('data-msgkey', key); }
+            return node;
+        }
+
+        // VAS163 2026-11-27: Sr 51 open the Delivery Order record (copied from VAS_145 / VAS_288 openRecordInWindow).
+        var ZOOM_WINDOW_NAME_NEW = 'VAS_DeliveryOrder';
+        var ZOOM_WINDOW_NAME_OLD = 'Shipment (Customer)';
+        var doWindowId = 0;
+        function openRecordInWindow(doId) {
+            var recordId = Number(doId || 0);
+            if (recordId <= 0) { return; }
+            closeModal();
+            if ($self.windowNo >= 0) {
+                $self.widgetFirevalueChanged({
+                    "TabWhereClause": "M_InOut.M_InOut_ID=" + recordId,
+                    "TabLayout": "Y",
+                    "TabIndex": "0"
+                });
+                return;
+            }
+            if (!window.VAS || !VAS.ZoomUtil || typeof VAS.ZoomUtil.zoomToRecord !== 'function') { return; }
+            VAS.ZoomUtil.zoomToRecord('M_InOut_ID', recordId, doWindowId, ZOOM_WINDOW_NAME_NEW, ZOOM_WINDOW_NAME_OLD)
+                .done(function (id) { if (id > 0) { doWindowId = id; } });
+        }
+
+        // VAS163 2026-11-27: Sr 57 number of decimals typed in a culture-neutral number string.
+        function decimalPlaces(value) {
+            var s = String(value == null ? '' : value).trim();
+            var i = s.indexOf('.');
+            if (i < 0) { return 0; }
+            return s.substring(i + 1).replace(/0+$/, '').length;
+        }
+
+        // VAS163 2026-11-27: Sr 54-57 quantity rules of the Review Confirmation Line form; '' when valid.
+        function validateLineQty(line, confirmedText, scrappedText) {
+            var target = Number(line.targetQty) || 0;
+            var precision = Math.max(0, Number(line.uomPrecision) || 0);
+            var c = parseFloat(confirmedText) || 0;
+            var s = parseFloat(scrappedText) || 0;
+            if (decimalPlaces(confirmedText) > precision || decimalPlaces(scrappedText) > precision) {
+                return lbl('VAS_155_WC_QtyPrecision', 'Quantity exceeds the decimal places allowed for this UOM:') + ' ' + precision;
+            }
+            if (c < 0) { return lbl('VAS_155_WC_InvalidConfirmedQty', 'Confirmed quantity must be zero or a positive number.'); }
+            if (s < 0) { return lbl('VAS_155_WC_InvalidScrappedQty', 'Scrapped quantity must be zero or a positive number.'); }
+            if (c > target) { return lbl('VAS_090_ConfirmedAboveTarget', 'Confirmed Quantity cannot be greater than Target Quantity.'); }
+            if (s > target) { return lbl('VAS_090_ScrappedAboveTarget', 'Scrapped Quantity cannot be greater than Target Quantity.'); }
+            if (Math.round((c + s) * 1000000) > Math.round(target * 1000000)) { return lbl('VAS_172_ConfScrapExceedsTarget', 'Quantity should not be greater than Target Quantity'); }
+            return '';
         }
 
         function svg(paths) {
@@ -134,6 +206,7 @@
         function statusPill(statusKey) {
             var meta = STATUS_META[statusKey] || STATUS_META.drafted;
             var pill = el('span', 'MPC-wc-pill ' + meta.cls, lbl(meta.msgKey, meta.fallback));
+            pill.setAttribute('data-msgkey', meta.msgKey); // VAS163 2026-11-27: Sr 48
             return pill;
         }
 
@@ -174,10 +247,12 @@
             head.appendChild(titles);
 
             var gridHead = el('div', 'MPC-wc-row MPC-wc-ghead');
-            gridHead.appendChild(el('span', null, lbl('VAS_155_WC_ColConfirmation', 'Confirmation')));
-            gridHead.appendChild(el('span', null, lbl('VAS_155_WC_ColCustomer', 'Customer')));
-            gridHead.appendChild(el('span', null, lbl('VAS_155_WC_ColLines', 'Lines')));
-            gridHead.appendChild(el('span', 'MPC-wc-col-status', lbl('VAS_155_WC_ColStatus', 'Status')));
+            // VAS163 2026-11-27: Sr 48 column headings carry hover text (the "Confirmation" heading clips).
+            [['VAS_155_WC_ColConfirmation', 'Confirmation', null], ['VAS_155_WC_ColCustomer', 'Customer', null],
+            ['VAS_155_WC_ColLines', 'Lines', null], ['VAS_155_WC_ColStatus', 'Status', 'MPC-wc-col-status']].forEach(function (h) {
+                var text = lbl(h[0], h[1]);
+                gridHead.appendChild(keyed(tip(el('span', h[2], text), text), h[0]));
+            });
 
             $body = $('<div class="MPC-wc-rows"></div>');
 
@@ -297,11 +372,15 @@
             row.type = 'button';
             row.setAttribute('data-id', item.confirmId);
 
-            row.appendChild(el('span', 'MPC-wc-c-primary', item.confirmNo || ''));
-            row.appendChild(el('span', 'MPC-wc-c-body', item.customer || ''));
-            row.appendChild(el('span', 'MPC-wc-c-body', formatQty(item.lineCount)));
+            // VAS163 2026-11-27: Sr 48 every cell carries its full value as hover text.
+            row.appendChild(tip(el('span', 'MPC-wc-c-primary', item.confirmNo || ''), item.confirmNo));
+            row.appendChild(tip(el('span', 'MPC-wc-c-body', item.customer || ''), item.customer));
+            var linesText = formatQty(item.lineCount);
+            row.appendChild(tip(el('span', 'MPC-wc-c-body', linesText), linesText));
             var statusCell = el('span', 'MPC-wc-col-status');
-            statusCell.appendChild(statusPill(item.status));
+            var pill = statusPill(item.status);
+            tip(statusCell, pill.textContent);
+            statusCell.appendChild(pill);
             row.appendChild(statusCell);
 
             return row;
@@ -334,7 +413,8 @@
         /* ---- Modal: open / close ---- */
         function openModal(confirmId, triggerEl) {
             lastFocusedEl = triggerEl || null;
-            modalState = { view: 'detail', confirmId: confirmId, header: null, lines: [], linePage: 0, lineIdx: null, locators: [], locatorsLoadedFor: 0, saving: false, error: '' };
+            // VAS163 2026-11-27: Sr 54-62 draft (typed line values), qc (quality rows), qcAfterLoad (line to open in Quality Control).
+            modalState = { view: 'detail', confirmId: confirmId, header: null, lines: [], linePage: 0, lineIdx: null, locators: [], locatorsLoadedFor: 0, saving: false, error: '', draft: null, qc: null, qcAfterLoad: 0 };
 
             var $overlay = $modal.data('overlay');
             $overlay.addClass('MPC-wc-open').attr('aria-hidden', 'false');
@@ -385,7 +465,22 @@
                 modalState.header = data.header;
                 modalState.lines = data.lines || [];
                 modalState.view = 'detail';
-                modalState.linePage = 0;
+                // VAS163 2026-11-27: Sr 62 after Save Line, a line with unanswered quality parameters opens Quality Control.
+                var qcLineId = modalState.qcAfterLoad;
+                modalState.qcAfterLoad = 0;
+                var qcIdx = -1;
+                if (qcLineId > 0) {
+                    for (var i = 0; i < modalState.lines.length; i++) {
+                        if (modalState.lines[i].lineConfirmId === qcLineId) { qcIdx = i; break; }
+                    }
+                }
+                if (qcIdx >= 0) {
+                    modalState.lineIdx = qcIdx;
+                    modalState.draft = null;
+                    openQualityControl();
+                    return;
+                }
+                modalState.linePage = Math.min(modalState.linePage || 0, Math.max(0, Math.ceil(modalState.lines.length / LINES_PER_PAGE) - 1));
                 renderModal();
             }).catch(function (err) {
                 if (err && err.name === 'AbortError') { return; }
@@ -394,7 +489,9 @@
         }
 
         function renderModal() {
-            if (modalState.view === 'line') { renderLineView(); } else { renderDetailView(); }
+            if (modalState.view === 'line') { renderLineView(); }
+            else if (modalState.view === 'qc') { renderQualityView(); } // VAS163 2026-11-27: Sr 62
+            else { renderDetailView(); }
         }
 
         function renderDetailView() {
@@ -406,10 +503,22 @@
             $modalBody.empty();
 
             var fieldGrid = el('div', 'MPC-wc-form-grid');
-            fieldGrid.appendChild(fieldRO(lbl('VAS_155_WC_FieldSourceDO', 'Source DO'), header.doNo));
-            fieldGrid.appendChild(fieldRO(lbl('VAS_155_WC_FieldCustomer', 'Customer'), header.customer));
-            fieldGrid.appendChild(fieldRO(lbl('VAS_155_WC_FieldWarehouse', 'Warehouse'), header.warehouseName));
-            fieldGrid.appendChild(fieldRO(lbl('VAS_155_WC_FieldDate', 'Date'), formatDate(header.confirmDate)));
+            // VAS163 2026-11-27: Sr 51 Source DO is a link that opens the Delivery Order record.
+            var doField = fieldRO(lbl('VAS_155_WC_FieldSourceDO', 'Source DO'), header.doNo, 'VAS_155_WC_FieldSourceDO');
+            if (header.doId > 0 && header.doNo) {
+                var doValue = doField.querySelector('.MPC-wc-fvalue');
+                var doLink = el('button', 'MPC-wc-link', header.doNo);
+                doLink.type = 'button';
+                tip(doLink, header.doNo);
+                doLink.addEventListener('click', function () { openRecordInWindow(header.doId); });
+                doValue.textContent = '';
+                doValue.appendChild(doLink);
+            }
+            fieldGrid.appendChild(doField);
+            fieldGrid.appendChild(fieldRO(lbl('VAS_155_WC_FieldCustomer', 'Customer'), header.customer, 'VAS_155_WC_FieldCustomer'));
+            fieldGrid.appendChild(fieldRO(lbl('VAS_155_WC_FieldWarehouse', 'Warehouse'), header.warehouseName, 'VAS_155_WC_FieldWarehouse'));
+            // VAS163 2026-11-27: Sr 61 the field shows the delivery order's Movement Date (label text: message issue on VAS_155_WC_FieldDate).
+            fieldGrid.appendChild(fieldRO(lbl('VAS_155_WC_FieldDate', 'Movement Date'), formatDate(header.movementDate || header.confirmDate), 'VAS_155_WC_FieldDate'));
             $modalBody.append(fieldGrid);
 
             $modalBody.append(el('div', 'MPC-wc-section-title', lbl('VAS_155_WC_LinesSectionTitle', 'Confirmation Lines')));
@@ -460,13 +569,13 @@
             disputeBtn.disabled = header.status === 'dispute' || modalState.saving;
             disputeBtn.addEventListener('click', markInDispute);
 
-            var allMatched = lines.length > 0 && lines.every(function (l) { return l.matched; });
+            // VAS163 2026-11-27: Sr 60 Complete Confirmation is always available: the core
+            // MInOutConfirm.PrepareIt/CompleteIt completes with differences (sets In Dispute and
+            // splits the shipment); any document error comes back from the server doc action.
             var completeBtn = el('button', 'MPC-wc-btn MPC-wc-btn-complete', lbl('VAS_155_WC_CompleteConfirmation', 'Complete Confirmation'));
             completeBtn.type = 'button';
-            completeBtn.disabled = !allMatched || modalState.saving;
-            if (!allMatched) {
-                completeBtn.title = lbl('VAS_155_WC_CompleteDisabledHint', 'Complete all confirmation lines before processing the confirmation.');
-            }
+            completeBtn.setAttribute('data-msgkey', 'VAS_155_WC_CompleteConfirmation');
+            completeBtn.disabled = lines.length === 0 || modalState.saving;
             completeBtn.addEventListener('click', completeConfirmation);
 
             $modalFooter.append(disputeBtn, completeBtn);
@@ -476,10 +585,12 @@
             });
         }
 
-        function fieldRO(label, value) {
+        function fieldRO(label, value, msgKey) {
             var wrap = el('div', 'MPC-wc-field-ro');
-            wrap.appendChild(el('div', 'MPC-wc-flabel', label));
-            wrap.appendChild(el('div', 'MPC-wc-fvalue', value && String(value).trim() ? value : '—'));
+            // VAS163 2026-11-27: Sr 48 / 50 label records its key; label and value carry hover text.
+            wrap.appendChild(keyed(tip(el('div', 'MPC-wc-flabel', label), label), msgKey));
+            var hasValue = value != null && String(value).trim();
+            wrap.appendChild(tip(el('div', 'MPC-wc-fvalue', hasValue ? value : '—'), hasValue ? value : null));
             return wrap;
         }
 
@@ -490,7 +601,7 @@
 
             var left = el('span', 'MPC-wc-line-left');
             left.appendChild(el('span', 'MPC-wc-line-name', lbl('VAS_155_WC_LinePrefix', 'Line') + ' ' + line.lineNo));
-            left.appendChild(el('span', 'MPC-wc-line-meta', line.productName || ''));
+            left.appendChild(tip(el('span', 'MPC-wc-line-meta', line.productName || ''), line.productName)); // VAS163 2026-11-27: Sr 48
 
             var right = el('span', 'MPC-wc-line-right');
             right.appendChild(el('span', 'MPC-wc-line-qty', formatQty(line.confirmedQty) + ' / ' + formatQty(line.targetQty)));
@@ -509,6 +620,8 @@
             modalState.view = 'line';
             modalState.lineIdx = idx;
             modalState.error = '';
+            modalState.draft = null; // VAS163 2026-11-27: Sr 54-57 fresh form values for this line
+            modalState.qc = null;
             renderModal();
 
             var warehouseId = modalState.header ? modalState.header.warehouseId : 0;
@@ -549,96 +662,167 @@
             backLink.type = 'button';
             backLink.appendChild(svg('<path d="m15 18-6-6 6-6"/>'));
             backLink.appendChild(document.createTextNode(lbl('VAS_155_WC_BackTo', 'Back to') + ' ' + (modalState.header.confirmNo || '')));
+            backLink.setAttribute('data-msgkey', 'VAS_155_WC_BackTo');
             backLink.addEventListener('click', function () {
                 modalState.view = 'detail';
                 modalState.lineIdx = null;
                 modalState.error = '';
+                modalState.draft = null; // VAS163 2026-11-27: Sr 54-57
                 renderModal();
             });
             $modalBody.append(backLink);
 
             var grid = el('div', 'MPC-wc-line-form-grid');
 
-            grid.appendChild(fieldRO(lbl('VAS_155_WC_FieldDOLine', 'DO Line'), line.lineNo + ' - ' + (line.productName || '')));
-            grid.appendChild(fieldRO(lbl('VAS_155_WC_FieldUom', 'UOM'), line.uomName));
-            grid.appendChild(fieldRO(lbl('VAS_155_WC_FieldAttrSetInstance', 'Attribute Set Instance'), line.attributeSetInstance));
+            // VAS163 2026-11-27: Sr 54-57 typed values survive re-renders (saving, locator load, errors).
+            var draft = modalState.draft || {
+                scrapLocatorId: line.scrapLocatorId || 0,
+                confirmedQty: String(line.confirmedQty != null ? line.confirmedQty : 0),
+                scrappedQty: String(line.scrappedQty != null ? line.scrappedQty : 0),
+                description: line.description || ''
+            };
+            modalState.draft = draft;
+            var precision = Math.max(0, Number(line.uomPrecision) || 0);
+            // VAS163 2026-11-27: Sr 57 input step follows the line UOM's StdPrecision (0 -> whole numbers).
+            var qtyStep = precision > 0 ? (1 / Math.pow(10, precision)).toFixed(precision) : '1';
+
+            grid.appendChild(fieldRO(lbl('VAS_155_WC_FieldDOLine', 'DO Line'), line.lineNo + ' - ' + (line.productName || ''), 'VAS_155_WC_FieldDOLine'));
+            grid.appendChild(fieldRO(lbl('VAS_155_WC_FieldUom', 'UOM'), line.uomName, 'VAS_155_WC_FieldUom'));
+            grid.appendChild(fieldRO(lbl('VAS_155_WC_FieldAttrSetInstance', 'Attribute Set Instance'), line.attributeSetInstance, 'VAS_155_WC_FieldAttrSetInstance'));
+
+            function fieldLabel(key, fallback, suffix) {
+                var text = lbl(key, fallback);
+                return keyed(tip(el('div', 'MPC-wc-flabel', text + (suffix || '')), text), key);
+            }
 
             var locatorField = el('div', 'MPC-wc-field');
-            locatorField.appendChild(el('div', 'MPC-wc-flabel', lbl('VAS_155_WC_FieldScrapLocator', 'Scrap Locator')));
+            locatorField.appendChild(fieldLabel('VAS_155_WC_FieldScrapLocator', 'Scrap Locator'));
             var locatorSelect = document.createElement('select');
             locatorSelect.className = 'MPC-wc-select';
             var emptyOpt = document.createElement('option');
             emptyOpt.value = '0';
             emptyOpt.textContent = lbl('VAS_155_WC_SelectLocator', 'Select a locator');
+            emptyOpt.setAttribute('data-msgkey', 'VAS_155_WC_SelectLocator');
             locatorSelect.appendChild(emptyOpt);
+            var hasCurrent = false;
             modalState.locators.forEach(function (loc) {
                 var opt = document.createElement('option');
                 opt.value = String(loc.locatorId);
                 opt.textContent = loc.locatorName;
+                opt.title = loc.locatorName;
+                if (Number(loc.locatorId) === Number(draft.scrapLocatorId)) { hasCurrent = true; }
                 locatorSelect.appendChild(opt);
             });
-            locatorSelect.value = String(line.scrapLocatorId || 0);
+            // Keep the saved locator selectable even before / without the list.
+            if (!hasCurrent && Number(draft.scrapLocatorId) > 0 && Number(draft.scrapLocatorId) === Number(line.scrapLocatorId) && line.scrapLocatorValue) {
+                var curOpt = document.createElement('option');
+                curOpt.value = String(line.scrapLocatorId);
+                curOpt.textContent = line.scrapLocatorValue;
+                locatorSelect.appendChild(curOpt);
+            }
+            locatorSelect.value = String(draft.scrapLocatorId || 0);
+            if (locatorSelect.selectedIndex >= 0) { tip(locatorSelect, locatorSelect.options[locatorSelect.selectedIndex].textContent); }
             locatorField.appendChild(locatorSelect);
             grid.appendChild(locatorField);
 
-            grid.appendChild(fieldRO(lbl('VAS_155_WC_FieldTargetQty', 'Target Quantity'), formatQty(line.targetQty)));
+            grid.appendChild(fieldRO(lbl('VAS_155_WC_FieldTargetQty', 'Target Quantity'), formatQty(line.targetQty), 'VAS_155_WC_FieldTargetQty'));
+
+            function qtyInput(value) {
+                var input = document.createElement('input');
+                input.type = 'number';
+                input.min = '0';
+                input.step = qtyStep;
+                input.className = 'MPC-wc-input';
+                input.value = value;
+                return input;
+            }
 
             var confirmedField = el('div', 'MPC-wc-field');
-            confirmedField.appendChild(el('div', 'MPC-wc-flabel', lbl('VAS_155_WC_FieldConfirmedQty', 'Confirmed Quantity') + ' *'));
-            var confirmedInput = document.createElement('input');
-            confirmedInput.type = 'number';
-            confirmedInput.min = '0';
-            confirmedInput.step = 'any';
-            confirmedInput.className = 'MPC-wc-input';
-            confirmedInput.value = String(line.confirmedQty != null ? line.confirmedQty : 0);
+            confirmedField.appendChild(fieldLabel('VAS_155_WC_FieldConfirmedQty', 'Confirmed Quantity', ' *'));
+            var confirmedInput = qtyInput(draft.confirmedQty);
             confirmedField.appendChild(confirmedInput);
             grid.appendChild(confirmedField);
 
             var diffField = el('div', 'MPC-wc-field MPC-wc-field-ro');
-            diffField.appendChild(el('div', 'MPC-wc-flabel', lbl('VAS_155_WC_FieldDifference', 'Difference')));
-            var diffValue = el('div', 'MPC-wc-fvalue', formatQty(line.targetQty - (line.confirmedQty || 0) - (line.scrappedQty || 0)));
+            diffField.appendChild(fieldLabel('VAS_155_WC_FieldDifference', 'Difference'));
+            var diffValue = el('div', 'MPC-wc-fvalue', '');
             diffField.appendChild(diffValue);
             grid.appendChild(diffField);
 
             var scrappedField = el('div', 'MPC-wc-field');
-            scrappedField.appendChild(el('div', 'MPC-wc-flabel', lbl('VAS_155_WC_FieldScrappedQty', 'Scrapped Quantity')));
-            var scrappedInput = document.createElement('input');
-            scrappedInput.type = 'number';
-            scrappedInput.min = '0';
-            scrappedInput.step = 'any';
-            scrappedInput.className = 'MPC-wc-input';
-            scrappedInput.value = String(line.scrappedQty != null ? line.scrappedQty : 0);
+            scrappedField.appendChild(fieldLabel('VAS_155_WC_FieldScrappedQty', 'Scrapped Quantity'));
+            var scrappedInput = qtyInput(draft.scrappedQty);
             scrappedField.appendChild(scrappedInput);
             grid.appendChild(scrappedField);
 
             var descField = el('div', 'MPC-wc-field MPC-wc-field-wide');
-            descField.appendChild(el('div', 'MPC-wc-flabel', lbl('VAS_155_WC_FieldDescription', 'Description')));
+            descField.appendChild(fieldLabel('VAS_155_WC_FieldDescription', 'Description'));
             var descArea = document.createElement('textarea');
             descArea.className = 'MPC-wc-textarea';
-            descArea.value = line.description || '';
+            descArea.maxLength = 255; // VAS163 2026-11-27: Sr 53 M_InOutLineConfirm.Description is 255 characters.
+            descArea.value = draft.description;
             descField.appendChild(descArea);
             grid.appendChild(descField);
 
             $modalBody.append(grid);
 
+            // VAS163 2026-11-27: Sr 54-57 on-screen info message for the quantity rules (live).
+            var infoBox = el('div', 'MPC-wc-m-info');
+            infoBox.setAttribute('role', 'status');
+            infoBox.style.display = 'none';
+            $modalBody.append(infoBox);
+
+            function showQtyInfo(message) {
+                infoBox.textContent = message || '';
+                infoBox.style.display = message ? '' : 'none';
+            }
+
+            // VAS163 2026-11-27: Sr 56 Difference = Target - Confirmed - Scrapped, recalculated live.
             function updateDiff() {
+                draft.confirmedQty = confirmedInput.value;
+                draft.scrappedQty = scrappedInput.value;
                 var t = Number(line.targetQty) || 0;
                 var c = parseFloat(confirmedInput.value) || 0;
                 var s = parseFloat(scrappedInput.value) || 0;
-                diffValue.textContent = formatQty(t - c - s);
+                var diffText = formatQty(Math.round((t - c - s) * 1000000) / 1000000);
+                diffValue.textContent = diffText;
+                diffValue.title = diffText;
+                var message = validateLineQty(line, confirmedInput.value, scrappedInput.value);
+                showQtyInfo(message);
+                return message;
             }
             confirmedInput.addEventListener('input', updateDiff);
             scrappedInput.addEventListener('input', updateDiff);
+            locatorSelect.addEventListener('change', function () {
+                draft.scrapLocatorId = Number(locatorSelect.value) || 0;
+                locatorSelect.title = locatorSelect.selectedIndex >= 0 ? locatorSelect.options[locatorSelect.selectedIndex].textContent : '';
+            });
+            descArea.addEventListener('input', function () { draft.description = descArea.value; });
+            updateDiff();
 
             if (modalState.error) {
                 $modalBody.append(el('div', 'MPC-wc-m-error', modalState.error));
             }
 
             $modalFooter.empty().show();
-            var saveBtn = el('button', 'MPC-wc-btn MPC-wc-btn-complete', lbl(modalState.saving ? 'VAS_155_WC_Saving' : 'VAS_155_WC_SaveLine', modalState.saving ? 'Saving...' : 'Save Line'));
+            // VAS163 2026-11-27: Sr 62 Quality Control entry point when the line has VA010 quality parameters.
+            if (Number(line.qcCount) > 0) {
+                var qcBtn = el('button', 'MPC-wc-btn MPC-wc-btn-dispute', lbl('VAS_090_QualityControl', 'Quality Control'));
+                qcBtn.type = 'button';
+                qcBtn.setAttribute('data-msgkey', 'VAS_090_QualityControl');
+                qcBtn.disabled = modalState.saving;
+                qcBtn.addEventListener('click', function () { openQualityControl(); });
+                $modalFooter.append(qcBtn);
+            }
+            var saveKey = modalState.saving ? 'VAS_155_WC_Saving' : 'VAS_155_WC_SaveLine';
+            var saveBtn = el('button', 'MPC-wc-btn MPC-wc-btn-complete', lbl(saveKey, modalState.saving ? 'Saving...' : 'Save Line'));
             saveBtn.type = 'button';
+            saveBtn.setAttribute('data-msgkey', saveKey);
             saveBtn.disabled = modalState.saving;
             saveBtn.addEventListener('click', function () {
+                // VAS163 2026-11-27: Sr 54-57 block Save Line while a quantity rule is broken.
+                var message = updateDiff();
+                if (message) { showQtyInfo(message); return; }
                 saveLine(line, {
                     scrapLocatorId: Number(locatorSelect.value) || 0,
                     confirmedQty: confirmedInput.value,
@@ -647,6 +831,183 @@
                 });
             });
             $modalFooter.append(saveBtn);
+        }
+
+        /* ---- Quality Control state (VAS163 2026-11-27: Sr 62) ---- */
+        function openQualityControl() {
+            var line = modalState.lines[modalState.lineIdx];
+            if (!line) { return; }
+            modalState.view = 'qc';
+            modalState.qc = null;
+            modalState.error = '';
+            renderModal();
+
+            if (qcRequest && typeof qcRequest.abort === 'function') {
+                try { qcRequest.abort(); } catch (ignored) { }
+            }
+            qcRequest = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+
+            var url = VIS.Application.contextUrl + 'VAS_155_WaitingConfirmationWidget/GetLineQualityParameters?lineConfirmId=' + encodeURIComponent(line.lineConfirmId);
+            fetch(url, {
+                method: 'GET',
+                credentials: 'same-origin',
+                signal: qcRequest ? qcRequest.signal : undefined
+            }).then(function (res) { return res.text(); }).then(function (text) {
+                var data = parseResponse(text);
+                if (!data || data.error) {
+                    modalState.qc = [];
+                    modalState.error = (data && (data.message || data.error)) || lbl('VAS_155_WC_NotFound', 'Not found.');
+                } else {
+                    modalState.qc = data.rows || [];
+                }
+                if (modalState.view === 'qc') { renderQualityView(); }
+            }).catch(function (err) {
+                if (err && err.name === 'AbortError') { return; }
+                modalState.qc = [];
+                modalState.error = lbl('VAS_155_WC_NotFound', 'Not found.');
+                if (modalState.view === 'qc') { renderQualityView(); }
+            });
+        }
+
+        function renderQualityView() {
+            var line = modalState.lines[modalState.lineIdx];
+            if (!line) { modalState.view = 'detail'; renderModal(); return; }
+
+            $modalTitleGroup.empty();
+            $modalTitleGroup.append(keyed(el('span', 'MPC-wc-m-title', lbl('VAS_090_QualityControl', 'Quality Control')), 'VAS_090_QualityControl'));
+
+            $modalBody.empty();
+            var backLink = el('button', 'MPC-wc-back-link');
+            backLink.type = 'button';
+            backLink.appendChild(svg('<path d="m15 18-6-6 6-6"/>'));
+            backLink.appendChild(document.createTextNode(lbl('VAS_155_WC_BackTo', 'Back to') + ' ' + lbl('VAS_155_WC_LinePrefix', 'Line') + ' ' + line.lineNo));
+            backLink.setAttribute('data-msgkey', 'VAS_155_WC_BackTo, VAS_155_WC_LinePrefix');
+            backLink.addEventListener('click', function () {
+                modalState.view = 'line';
+                modalState.error = '';
+                renderModal();
+            });
+            $modalBody.append(backLink);
+
+            var lineTitle = line.lineNo + ' - ' + (line.productName || '');
+            $modalBody.append(tip(el('div', 'MPC-wc-section-title', lineTitle), lineTitle));
+
+            var rows = modalState.qc;
+            if (rows === null) {
+                $modalBody.append(keyed(el('div', 'MPC-wc-m-state', lbl('VAS_155_WC_LinesLoading', 'Loading confirmation lines...')), 'VAS_155_WC_LinesLoading'));
+                $modalFooter.empty().hide();
+                return;
+            }
+
+            var selects = [];
+            if (!rows.length) {
+                $modalBody.append(keyed(el('div', 'MPC-wc-m-state', lbl('VAS_155_WC_NoQualityParams', 'No quality parameters for this line.')), 'VAS_155_WC_NoQualityParams'));
+            } else {
+                var table = el('div', 'MPC-wc-qc-table');
+                var head = el('div', 'MPC-wc-qc-row MPC-wc-qc-head');
+                [['VAS_104_TestParameter', 'Test Parameter'], ['VAS_104_AcceptableValue', 'Acceptable Value'], ['VAS_104_ActualValue', 'Actual Value']].forEach(function (h) {
+                    var text = lbl(h[0], h[1]);
+                    head.appendChild(keyed(tip(el('span', null, text), text), h[0]));
+                });
+                table.appendChild(head);
+
+                rows.forEach(function (r) {
+                    var row = el('div', 'MPC-wc-qc-row');
+                    row.appendChild(tip(el('span', 'MPC-wc-qc-cell', r.testParameter || '—'), r.testParameter));
+                    row.appendChild(tip(el('span', 'MPC-wc-qc-cell', r.acceptableValue || '—'), r.acceptableValue));
+                    var sel = document.createElement('select');
+                    sel.className = 'MPC-wc-select MPC-wc-qc-select';
+                    var none = document.createElement('option');
+                    none.value = '0';
+                    none.textContent = lbl('VAS_Select', 'Select');
+                    none.setAttribute('data-msgkey', 'VAS_Select');
+                    sel.appendChild(none);
+                    (r.options || []).forEach(function (o) {
+                        var opt = document.createElement('option');
+                        opt.value = String(o.valueId);
+                        opt.textContent = o.valueName;
+                        opt.title = o.valueName;
+                        sel.appendChild(opt);
+                    });
+                    sel.value = String(r.draftValueId != null ? r.draftValueId : (r.actualValueId || 0));
+                    if (sel.selectedIndex < 0) { sel.value = '0'; }
+                    tip(sel, sel.options[sel.selectedIndex].textContent);
+                    sel.addEventListener('change', function () {
+                        r.draftValueId = Number(sel.value) || 0;
+                        sel.title = sel.options[sel.selectedIndex].textContent;
+                    });
+                    sel.disabled = !!modalState.saving;
+                    var cell = el('span', 'MPC-wc-qc-cell');
+                    cell.appendChild(sel);
+                    row.appendChild(cell);
+                    table.appendChild(row);
+                    selects.push({ row: r, select: sel });
+                });
+                $modalBody.append(table);
+            }
+
+            if (modalState.error) {
+                $modalBody.append(el('div', 'MPC-wc-m-error', modalState.error));
+            }
+
+            $modalFooter.empty().show();
+            if (rows.length) {
+                var saveKey = modalState.saving ? 'VAS_155_WC_Saving' : 'VAS_Save';
+                var saveBtn = el('button', 'MPC-wc-btn MPC-wc-btn-complete', lbl(saveKey, modalState.saving ? 'Saving...' : 'Save'));
+                saveBtn.type = 'button';
+                saveBtn.setAttribute('data-msgkey', saveKey);
+                saveBtn.disabled = !!modalState.saving;
+                saveBtn.addEventListener('click', function () {
+                    var values = [];
+                    selects.forEach(function (s) {
+                        var id = Number(s.select.value) || 0;
+                        if (id > 0) { values.push({ qaRecordId: s.row.qaRecordId, actualValueId: id }); }
+                    });
+                    saveQualityValues(line, values);
+                });
+                $modalFooter.append(saveBtn);
+            }
+        }
+
+        function saveQualityValues(line, values) {
+            if (modalState.saving) { return; }
+            if (!values.length) {
+                modalState.error = lbl('VAS_155_WC_QcSelectValue', 'Select an Actual Value for at least one quality parameter.');
+                renderQualityView();
+                return;
+            }
+            modalState.saving = true;
+            modalState.error = '';
+            renderQualityView();
+
+            var url = VIS.Application.contextUrl + 'VAS_155_WaitingConfirmationWidget/SaveLineQualityParameters';
+            fetch(url, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+                body: 'lineConfirmId=' + encodeURIComponent(line.lineConfirmId) + '&values=' + encodeURIComponent(JSON.stringify(values))
+            }).then(function (res) { return res.text(); }).then(function (text) {
+                var data = parseResponse(text);
+                modalState.saving = false;
+                if (!data || data.error || data.success === false) {
+                    modalState.error = (data && (data.message || data.error)) || lbl('VAS_155_WC_SaveFailed', 'Save failed.');
+                    renderQualityView();
+                    return;
+                }
+                var missing = 0;
+                (modalState.qc || []).forEach(function (r) {
+                    if (r.draftValueId != null) { r.actualValueId = r.draftValueId; r.draftValueId = null; }
+                    if (!(Number(r.actualValueId) > 0)) { missing++; }
+                });
+                line.qcMissing = missing;
+                modalState.view = 'line';
+                modalState.error = '';
+                renderModal();
+            }).catch(function () {
+                modalState.saving = false;
+                modalState.error = lbl('VAS_155_WC_SaveFailed', 'Save failed.');
+                renderQualityView();
+            });
         }
 
         /* ---- Actions ---- */
@@ -677,6 +1038,9 @@
                 }
                 modalState.view = 'detail';
                 modalState.lineIdx = null;
+                modalState.draft = null;
+                // VAS163 2026-11-27: Sr 62 open Quality Control next when this line still has unanswered quality parameters.
+                if (Number(line.qcMissing) > 0) { modalState.qcAfterLoad = line.lineConfirmId; }
                 loadConfirmationDetail();
             }).catch(function () {
                 modalState.saving = false;
@@ -761,6 +1125,7 @@
             if (listRequest && typeof listRequest.abort === 'function') { try { listRequest.abort(); } catch (ignored) { } }
             if (detailRequest && typeof detailRequest.abort === 'function') { try { detailRequest.abort(); } catch (ignored) { } }
             if (locatorsRequest && typeof locatorsRequest.abort === 'function') { try { locatorsRequest.abort(); } catch (ignored) { } }
+            if (qcRequest && typeof qcRequest.abort === 'function') { try { qcRequest.abort(); } catch (ignored) { } } // VAS163 2026-11-27: Sr 62
             $root.off('.' + eventNamespace);
             $body.off('.' + eventNamespace);
             if ($modal) {

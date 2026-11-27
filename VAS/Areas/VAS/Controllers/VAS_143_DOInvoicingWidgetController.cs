@@ -506,6 +506,7 @@ namespace VAS.Controllers
                     JOIN C_BPartner bp ON (bp.C_BPartner_ID = bi.C_BPartner_ID AND bp.IsActive = 'Y')
                 )
                 SELECT COUNT(*) OVER() AS total_count,
+                       C_Invoice_ID AS invoice_id,
                        InvoiceNo AS invoice_no, InvoiceDate AS invoice_date,
                        RefNo AS ref_no, RefType AS ref_type, RefDate AS ref_date,
                        CustomerName AS customer_name, Amount AS amount, StatusLabel AS status,
@@ -541,6 +542,8 @@ namespace VAS.Controllers
 
                     rows.Add(new
                     {
+                        // VAS163 2026-11-27: Sr 68 invoice id so the widget can open the AR Invoice record.
+                        invoiceId = Util.GetValueOfInt(dr["invoice_id"]),
                         invoiceNo = Util.GetValueOfString(dr["invoice_no"]),
                         invoiceDate = invDate.HasValue ? invDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                         refNo = Util.GetValueOfString(dr["ref_no"]),

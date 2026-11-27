@@ -37,7 +37,10 @@ namespace VIS.Controllers
                 VAS_ReqCurrency cur = VAS_ReqWidgetData.GetSchemaCurrency(ctx);
                 List<VAS_ReqLine> lines = VAS_ReqWidgetData.LoadLines(ctx, cur, "r.DocStatus = 'CO'", null)
                     .Where(l => l.NotOrderedQty > 0)
-                    .OrderBy(l => l.NeedBy ?? DateTime.MaxValue).ThenBy(l => l.DocumentNo).ThenBy(l => l.LineNo).ToList();
+                    // VAS163 2026-11-27: Sr 79 ordered / shown by the requisition's own Date Required (header), the date
+                    // shown on the Requisition screen and in the requisition pop-up; the line date is used only when the
+                    // header has none (900120: header 23 Nov, line 10 23 Dec -> 23 Nov).
+                    .OrderBy(l => (l.DateRequired ?? l.NeedBy) ?? DateTime.MaxValue).ThenBy(l => l.DocumentNo).ThenBy(l => l.LineNo).ToList();
                 var rows = lines.Select(l => new
                 {
                     requisitionId = l.RequisitionId,
@@ -54,8 +57,8 @@ namespace VIS.Controllers
                     currencyIso = l.CurrencyId > 0 ? l.DocCurrencyIso : "",
                     currencySymbol = l.CurrencyId > 0 ? l.DocCurrencySymbol : "",
                     currencyPrecision = l.CurrencyId > 0 ? l.DocCurrencyPrecision : -1,
-                    needBy = VAS_ReqWidgetData.D(l.NeedBy),
-                    daysToNeed = l.NeedBy.HasValue ? (int)(l.NeedBy.Value.Date - today).TotalDays : 9999,
+                    needBy = VAS_ReqWidgetData.D(l.DateRequired ?? l.NeedBy), // VAS163 2026-11-27: Sr 79 header Date Required
+                    daysToNeed = (l.DateRequired ?? l.NeedBy).HasValue ? (int)((l.DateRequired ?? l.NeedBy).Value.Date - today).TotalDays : 9999,
                     vendor = l.VendorName,
                     sourceWarehouse = l.SourceWarehouseName,
                     partlyOrdered = l.NotOrderedQty < l.Qty

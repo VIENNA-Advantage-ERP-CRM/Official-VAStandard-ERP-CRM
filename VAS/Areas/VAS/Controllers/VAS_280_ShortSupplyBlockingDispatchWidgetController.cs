@@ -206,15 +206,20 @@ namespace VAS.Controllers
             // rule, as OrderValueExclTaxSql: 2 * (GrandTotal - TotalLines) < SUM(C_OrderTax.TaxAmt)) PriceActual is
             // reduced by the net / gross ratio of the line's tax (as GetOrderTaxNetRatios: (gross - tax) / gross,
             // gross = SUM(LineNetAmt) of the order's lines with that tax). Other orders keep PriceActual.
+            // VAS163 2026-11-27: Sr 304 PriceActual is a price per line (entered) UOM while the pending quantity is in
+            // the product UOM (QtyOrdered - QtyDelivered), so the price is first turned into a price per product UOM:
+            // PriceActual * QtyEntered / QtyOrdered (e.g. SO 50207: 100,000 per metre = 100 per millimetre).
+            string uomPriceSql = "(CASE WHEN COALESCE(ol.QtyOrdered, 0) <> 0 AND COALESCE(ol.QtyEntered, 0) <> 0 " +
+                                 "THEN ol.PriceActual * ol.QtyEntered / ol.QtyOrdered ELSE ol.PriceActual END)";
             string netPriceSql = @"CASE WHEN 2 * (COALESCE(o.GrandTotal, 0) - COALESCE(o.TotalLines, 0)) <
                                  (SELECT COALESCE(SUM(COALESCE(ot.TaxAmt, 0)), 0) FROM C_OrderTax ot
                                    WHERE ot.C_Order_ID = o.C_Order_ID AND ot.IsActive = 'Y')
-                            THEN ol.PriceActual * COALESCE(1 -
+                            THEN " + uomPriceSql + @" * COALESCE(1 -
                                  (SELECT COALESCE(SUM(COALESCE(otx.TaxAmt, 0)), 0) FROM C_OrderTax otx
                                    WHERE otx.C_Order_ID = o.C_Order_ID AND otx.C_Tax_ID = ol.C_Tax_ID AND otx.IsActive = 'Y')
                                  / NULLIF((SELECT SUM(olx.LineNetAmt) FROM C_OrderLine olx
                                             WHERE olx.C_Order_ID = o.C_Order_ID AND olx.C_Tax_ID = ol.C_Tax_ID AND olx.IsActive = 'Y'), 0), 1)
-                            ELSE ol.PriceActual
+                            ELSE " + uomPriceSql + @"
                        END";
 
             // VAS163 2026-11-25: Sr 304 the price is converted from the order currency to the base currency (as

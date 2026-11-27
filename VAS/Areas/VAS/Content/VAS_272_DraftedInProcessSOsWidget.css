@@ -123,6 +123,36 @@
     margin-top: 2px;
 }
 
+/* VAS163 2026-11-27: Sr 310 "Drafted - 103" / "In Progress - 7": label, hyphen and count in aligned columns */
+.vas272-st {
+    display: grid;
+    grid-template-columns: auto auto auto;
+    align-items: baseline;
+    column-gap: .75em;
+    row-gap: .15em;
+    text-align: left;
+}
+
+.vas272-st-l {
+    font-size: .5em;
+    font-weight: 400;
+    color: #5F7283;
+    white-space: nowrap;
+}
+
+.vas272-st-s {
+    font-size: .5em;
+    font-weight: 400;
+    color: #5F7283;
+}
+
+.vas272-st-n {
+    color: #0083DA;
+    font-weight: 700;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
 .vas272-skel {
     display: block;
     width: 5.5em;

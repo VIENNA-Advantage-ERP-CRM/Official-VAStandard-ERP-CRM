@@ -626,9 +626,15 @@
         var showDocs = lines.some(function (l) { return (l.documents || []).length > 0; });
         // VAS163 2026-11-13: rows 1129 / 1130 / 1131 - separate UOM column (qty without unit), Attribute instead of
         // Category (blank when the line has no attribute set instance), and a hover title on every value cell.
+        // VAS163 2026-11-27: Sr 85 Attribute column only when at least one line has an attribute set instance
+        var showAttr = lines.some(function (l) { return String(l.attribute || '').trim() !== ''; });
         var cols = [
-            { w: 'minmax(0,1.7fr)', head: U.lbl('VAS_305_Product', 'Product'), cell: function (l) { return cell('b', U.esc(l.product), l.product); } },
-            { w: 'minmax(0,1fr)', head: U.lbl('VAS_305_Attribute', 'Attribute'), cell: function (l) { return cell('m', U.esc(l.attribute || ''), l.attribute || ''); } },
+            { w: 'minmax(0,1.7fr)', head: U.lbl('VAS_305_Product', 'Product'), cell: function (l) { return cell('b', U.esc(l.product), l.product); } }
+        ];
+        if (showAttr) {
+            cols.push({ w: 'minmax(0,1fr)', head: U.lbl('VAS_305_Attribute', 'Attribute'), cell: function (l) { return cell('m', U.esc(l.attribute || ''), l.attribute || ''); } });
+        }
+        cols = cols.concat([
             // VAS163 2026-11-17: Sr 7 - qty and Ord. / Rcvd. come from the server in the line's UOM (QtyEntered)
             { w: '4.4em', right: true, head: U.lbl('VAS_305_Qty', 'Qty'), cell: function (l) { return cell('vas-rqw-r', U.esc(U.num(l.qty))); } },
             { w: 'minmax(3.5em,0.6fr)', head: U.lbl('VAS_305_UOM', 'UOM'), cell: function (l) { return cell('m', U.esc(l.uom || ''), l.uom || ''); } },
@@ -636,7 +642,7 @@
             { w: '6.6em', right: true, head: U.lbl('VAS_305_NeedBy', 'Need by'), cell: function (l) { return cell('vas-rqw-r', U.esc(U.date(l.needBy)), U.dateLong(l.needBy)); } },
             // VAS163 2026-11-17: Sr 11 - line amount in the price-list currency of the requisition (server ISO + precision)
             { w: '7.2em', right: true, head: U.lbl('VAS_305_Amount', 'Amount'), cell: function (l) { return cell('vas-rqw-r', U.esc(U.docMoney(l.amount, cur))); } }
-        ];
+        ]);
         if (showOrd) {
             cols.push({ w: '6em', right: true, head: U.lbl('VAS_305_OrderedReceived', 'Ord. / Rcvd.'), cell: function (l) { return cell('vas-rqw-r', U.esc(U.num(l.orderedQty) + ' / ' + U.num(l.receivedQty))); } });
         }
