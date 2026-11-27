@@ -4,7 +4,7 @@
  *                  Pick a product, then add it together with its related products (mandatory, supplemental,
  *                  alternative, service, web promotion) as lines. Layout follows the Onfinity design used by
  *                  the VAMFG BOM Management dialog.
- * Message keys   : M_Product_ID, Type, QtyEntered, C_UOM_ID, PriceActual, LineNetAmt, PriceList,
+ * Message keys   : C_Order_ID, C_Project_ID, C_BPartner_ID, Close, M_Product_ID, Type, QtyEntered, C_UOM_ID, PriceActual, LineNetAmt, PriceList,
  *                  M_AttributeSetInstance_ID, All, Change, Details, Cancel, VIS_PlzSelLines,
  *                  VAS_RelProdPickTitle, VAS_RelProdPickHelp, VAS_RelProdNoRelated, VAS_RelProdPickStart,
  *                  VAS_RelProdLinesToAdd, VAS_RelProdAddContinue, VAS_RelProdAddLines,
@@ -32,14 +32,16 @@
         // Framework controls
         var productLookup = null, prdCtrl = null;
         var uomLookup = null, attrLookup = null;
-        var detailCtrls = [];
+        var detailCtrls = [];       // controls in the open row details
+        var mainCtrls = [];         // controls in the main product strip
 
         // State
         var header = { DocumentNo: "", BPName: "", M_PriceList_ID: 0, ISO_Code: "", StdPrecision: 2 };
         var mainItem = null;        // the picked product line
         var related = [];           // related product lines
         var filter = "all";
-        var openDetail = -1;        // index of the related row whose details are open (-2 = main product)
+        var openDetail = -1;        // index of the related row whose details are open
+        var mainDetailOpen = false; // details of the main product open
 
         // Chip colours per related product type (M_RelatedProduct Type list values)
         var typeClass = { M: "danger", S: "info", A: "accent", E: "ok", P: "warn" };
@@ -99,11 +101,20 @@
 
         this.initalize = function () {
             msgs = VIS.Msg.translate(ctx, ["M_Product_ID", "QtyEntered", "C_UOM_ID", "PriceActual", "LineNetAmt",
-                "PriceList", "M_AttributeSetInstance_ID"], true);
+                "PriceList", "M_AttributeSetInstance_ID", "C_Order_ID", "C_Project_ID", "C_BPartner_ID"], true);
 
             var w = $self.windowNo;
             $root.append(
-                '<div class="VAS-rp-context"><span class="VAS-rp-eyebrow" id="VAS_RPEyebrow_' + w + '"></span></div>'
+                // Header: document (type and number) as eyebrow, customer as title
+                '<div class="VAS-rp-header">'
+                + '  <div class="VAS-rp-header-icon"><i class="fa fa-file-text-o" aria-hidden="true"></i></div>'
+                + '  <div class="VAS-rp-title-wrap">'
+                + '    <span class="VAS-rp-eyebrow" id="VAS_RPEyebrow_' + w + '"></span>'
+                + '    <span class="VAS-rp-title" id="VAS_RPTitle_' + w + '"></span>'
+                + '  </div>'
+                + '  <button type="button" class="VAS-rp-close" id="VAS_RPClose_' + w + '" title="' + esc(msg("Close")) + '" aria-label="' + esc(msg("Close")) + '" data-msgkey="Close">'
+                + '<i class="fa fa-times" aria-hidden="true"></i></button>'
+                + '</div>'
                 + '<div class="VAS-rp-product" id="VAS_RPProduct_' + w + '">'
                 + '  <div class="VAS-rp-search">'
                 + '    <label class="VAS-rp-label" data-msgkey="M_Product_ID">' + esc(msgs.M_Product_ID) + ' <span class="VAS-rp-req">*</span></label>'
@@ -196,7 +207,14 @@
                 { "Table_ID": $self.Table_ID, "Record_ID": $self.Record_ID }, function (data) {
                     if (data != null) {
                         header = data;
-                        $eyebrow.html('<strong>' + esc(data.DocumentNo) + '</strong>' + (data.BPName ? ' · ' + esc(data.BPName) : ''));
+                        // Document type of the order (from the server, translated); otherwise the element name
+                        var docKey = $self.Table_ID == 259 ? "C_Order_ID" : "C_Project_ID";
+                        var docLabel = data.DocTypeName
+                            ? '<span>' + esc(data.DocTypeName) + '</span>'
+                            : '<span data-msgkey="' + docKey + '">' + esc(msgs[docKey]) + '</span>';
+                        $eyebrow.html(docLabel + ' · <strong>' + esc(data.DocumentNo) + '</strong>');
+                        $root.find("#VAS_RPTitle_" + $self.windowNo).text(data.BPName || "")
+                            .attr("title", msgs.C_BPartner_ID + ": " + (data.BPName || "")).attr("data-msgkey", "C_BPartner_ID");
                     }
                     setBusy(false);
                 });
@@ -229,6 +247,7 @@
                     }
                     filter = "all";
                     openDetail = -1;
+                    mainDetailOpen = false;
                     showPicked();
                     setBusy(false);
                 });
@@ -238,7 +257,7 @@
         function toItem(d, isMain) {
             var mandatory = !isMain && d.RelatedProductType == "M";
             return {
-                Product_ID: d.Product_ID, Product: d.Product, Value: d.Value,
+                Product_ID: d.Product_ID, Product: d.Product, Value: d.Value, RelationName: d.RelationName || "",
                 RelatedProductType: d.RelatedProductType, RelatedType: d.RelatedType,
                 AttributeSetInstance_ID: d.AttributeSetInstance_ID || 0, UOM_ID: d.UOM_ID,
                 QtyEntered: num(d.QtyEntered) || 1, PriceStd: num(d.PriceStd), PriceList: num(d.PriceList),
@@ -297,14 +316,17 @@
                 + '  <label data-msgkey="PriceActual">' + esc(msgs.PriceActual)
                 + '    <input type="text" inputmode="decimal" class="VAS-rp-input VAS-rp-price" data-main="price" value="' + esc(toInput(it.PriceStd)) + '"></label>'
                 + '</div>'
+                + '<div class="VAS-rp-picked-actions">'
                 + '<button type="button" class="VAS-rp-btn VAS-rp-btn-secondary VAS-rp-btn-small" data-main="details" data-msgkey="Details">'
                 + '<i class="fa fa-sliders" aria-hidden="true"></i>' + esc(msg("Details")) + '</button>'
                 + '<button type="button" class="VAS-rp-btn VAS-rp-btn-secondary VAS-rp-btn-small" id="VAS_RPChange_' + w + '" data-msgkey="Change">'
                 + '<i class="fa fa-search" aria-hidden="true"></i>' + esc(msg("Change")) + '</button>'
+                + '</div>'
                 + '<div class="VAS-rp-picked-detail" id="VAS_RPMainDetail_' + w + '"></div>';
+            disposeCtrls(mainCtrls);
             $root.find("#VAS_RPPicked_" + w).html(html);
-            if (openDetail == -2) {
-                buildDetail(mainItem, $root.find("#VAS_RPMainDetail_" + w));
+            if (mainDetailOpen) {
+                buildDetail(mainItem, $root.find("#VAS_RPMainDetail_" + w), mainCtrls, true);
             }
         };
 
@@ -334,7 +356,7 @@
         };
 
         function renderRows() {
-            disposeDetailCtrls();
+            disposeCtrls(detailCtrls);
             var html = "";
             var visible = 0;
             for (var i = 0; i < related.length; i++) {
@@ -347,7 +369,8 @@
                 html += '<tr class="VAS-rp-row' + (it.selected ? ' VAS-rp-selected' : '') + '" data-index="' + i + '">'
                     + '<td class="VAS-rp-col-check"><input type="checkbox" data-index="' + i + '"' + (it.selected ? ' checked' : '')
                     + (it.mandatory ? ' disabled title="' + esc(msg("VAS_RelProdMandatory")) + '" data-msgkey="VAS_RelProdMandatory"' : '') + '></td>'
-                    + '<td><span class="VAS-rp-name">' + esc(it.Product) + '</span><span class="VAS-rp-code">' + esc(it.Value) + '</span></td>'
+                    + '<td><span class="VAS-rp-name">' + esc(it.Product) + '</span><span class="VAS-rp-sub"><span class="VAS-rp-code">' + esc(it.Value) + '</span>'
+                    + (it.RelationName && it.RelationName != it.Product ? '<span class="VAS-rp-relname">' + esc(it.RelationName) + '</span>' : '') + '</span></td>'
                     + '<td class="VAS-rp-col-type"><span class="VAS-rp-chip VAS-rp-' + chip + '">' + esc(it.RelatedType || it.RelatedProductType) + '</span></td>'
                     + '<td class="VAS-rp-col-num"><input type="text" inputmode="decimal" class="VAS-rp-input VAS-rp-qty" data-qty="' + i + '" value="' + esc(toInput(it.QtyEntered)) + '"></td>'
                     + '<td class="VAS-rp-col-uom">' + esc(uomDisplay(it.UOM_ID)) + '</td>'
@@ -364,44 +387,60 @@
             $root.find("#VAS_RPNone_" + $self.windowNo).toggle(related.length == 0);
             $root.find(".VAS-rp-tablewrap table").toggle(related.length > 0);
             if (openDetail >= 0) {
-                buildDetail(related[openDetail], $rows.find('[data-detailfor="' + openDetail + '"]'));
+                buildDetail(related[openDetail], $rows.find('[data-detailfor="' + openDetail + '"]'), detailCtrls, true);
             }
             updateSelectAll();
         };
 
-        // Unit, attribute set instance and list price of one line, with the framework controls
-        function buildDetail(item, $container) {
+        // Attribute set instance field of one line (framework control). The attribute dialog reads the product
+        // from the context, so it is set again whenever the user works with this field.
+        function buildAttr(item, $container, ctrls) {
+            ctx.setContext($self.windowNo, "M_Product_ID", item.Product_ID);
+            var attrCtrl = new VIS.Controls.VPAttribute("M_AttributeSetInstance_ID", false, false, true, VIS.DisplayType.PAttribute,
+                attrLookup, $self.windowNo, false, false, false, true);
+            ctrls.push(attrCtrl);
+            var $wrap = $('<div class="VAS-rp-attr input-group"></div>');
+            $wrap.append(attrCtrl.getControl());
+            for (var b = 0; b < attrCtrl.getBtnCount(); b++) {
+                $wrap.append(attrCtrl.getBtn(b));
+            }
+            $wrap.on("mousedown focusin", function () {
+                ctx.setContext($self.windowNo, "M_Product_ID", item.Product_ID);
+            });
+            $container.empty().append('<label data-msgkey="M_AttributeSetInstance_ID">' + esc(msgs.M_AttributeSetInstance_ID) + '</label>').append($wrap);
+            attrCtrl.setValue(item.AttributeSetInstance_ID || 0);
+            attrCtrl.fireValueChanged = function () {
+                item.AttributeSetInstance_ID = VIS.Utility.Util.getValueOfInt(attrCtrl.getValue());
+                reprice(item, refreshAll);
+            };
+        };
+
+        // Unit, attribute set instance and list price of a line (opened with Details)
+        function buildDetail(item, $container, ctrls, withAttr) {
             ctx.setContext($self.windowNo, "M_Product_ID", item.Product_ID);
             // Not mandatory: a line always has a unit, and the mandatory style would show it red
             var uomCtrl = new VIS.Controls.VComboBox("C_UOM_ID", false, false, true, uomLookup, 50);
-            var attrCtrl = new VIS.Controls.VPAttribute("M_AttributeSetInstance_ID", false, false, true, VIS.DisplayType.PAttribute,
-                attrLookup, $self.windowNo, false, false, false, true);
-            detailCtrls.push(uomCtrl, attrCtrl);
+            ctrls.push(uomCtrl);
 
             var $uom = $('<div class="VAS-rp-field"><label data-msgkey="C_UOM_ID">' + esc(msgs.C_UOM_ID) + '</label></div>');
             $uom.append(uomCtrl.getControl());
-            var $attr = $('<div class="VAS-rp-field"><label data-msgkey="M_AttributeSetInstance_ID">' + esc(msgs.M_AttributeSetInstance_ID) + '</label><div class="VAS-rp-attr input-group"></div></div>');
-            $attr.find(".VAS-rp-attr").append(attrCtrl.getControl());
-            for (var b = 0; b < attrCtrl.getBtnCount(); b++) {
-                $attr.find(".VAS-rp-attr").append(attrCtrl.getBtn(b));
-            }
             var $list = $('<div class="VAS-rp-field"><label data-msgkey="PriceList">' + esc(msgs.PriceList) + '</label>'
                 + '<input type="text" inputmode="decimal" class="VAS-rp-input" value="' + esc(toInput(item.PriceList)) + '"></div>');
-            $container.empty().append($uom).append($attr).append($list);
+            $container.empty().append($uom);
+            if (withAttr) {
+                var $attr = $('<div class="VAS-rp-field"></div>');
+                $container.append($attr);
+                buildAttr(item, $attr, ctrls);
+            }
+            $container.append($list);
 
             uomCtrl.setValue(item.UOM_ID);
-            attrCtrl.setValue(item.AttributeSetInstance_ID || 0);
-
             uomCtrl.fireValueChanged = function () {
                 var v = VIS.Utility.Util.getValueOfInt(uomCtrl.getValue());
                 if (v > 0 && v != item.UOM_ID) {
                     item.UOM_ID = v;
                     reprice(item, refreshAll);
                 }
-            };
-            attrCtrl.fireValueChanged = function () {
-                item.AttributeSetInstance_ID = VIS.Utility.Util.getValueOfInt(attrCtrl.getValue());
-                reprice(item, refreshAll);
             };
             $list.find("input").on("change", function () {
                 item.PriceList = fromInput($(this).val());
@@ -415,13 +454,20 @@
             updateFooter();
         };
 
-        function disposeDetailCtrls() {
-            for (var i = 0; i < detailCtrls.length; i++) {
-                if (detailCtrls[i] && detailCtrls[i].dispose) {
-                    detailCtrls[i].dispose();
+        // Disposes the framework controls in the list and empties it (the same array stays in use)
+        function disposeCtrls(ctrls) {
+            for (var i = 0; i < ctrls.length; i++) {
+                if (ctrls[i] && ctrls[i].dispose) {
+                    ctrls[i].dispose();
                 }
             }
-            detailCtrls = [];
+            ctrls.length = 0;
+        };
+
+        // Controls of the main product strip and of the open row details
+        function disposeDetailCtrls() {
+            disposeCtrls(mainCtrls);
+            disposeCtrls(detailCtrls);
         };
 
         function updateSelectAll() {
@@ -595,8 +641,7 @@
             });
 
             $productArea.on("click", '[data-main="details"]', function () {
-                openDetail = openDetail == -2 ? -1 : -2;
-                disposeDetailCtrls();
+                mainDetailOpen = !mainDetailOpen;
                 renderPicked();
             });
 
@@ -666,6 +711,11 @@
                 $self.frame.close();
             });
 
+            // Cross in the header closes the form, same as Cancel
+            $root.find("#VAS_RPClose_" + $self.windowNo).on("click", function () {
+                $self.frame.close();
+            });
+
             $btnContinue.on("click", function () {
                 save(false);
             });
@@ -710,7 +760,7 @@
     };
 
     VIS.CreateRelatedLines.prototype.setHeight = function () {
-        return "620";
+        return "540";
     };
 
     VIS.CreateRelatedLines.prototype.setWidth = function () {

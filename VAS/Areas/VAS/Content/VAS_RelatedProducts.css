@@ -1,10 +1,12 @@
-﻿/* Add Related Products pop-up (VIS.CreateRelatedLines). Onfinity design, as in the VAMFG BOM Management dialog.
-   Everything is scoped under .VAS-relprod-root; 1em = 16px. */
+﻿/* Add Related Products pop-up (VIS.CreateRelatedLines). Onfinity design: sizes, colours and spacing follow the
+   VAMFG BOM Management dialog (VAMFG_BOMManagement.css). Everything is scoped under .VAS-relprod-root.
+   The root keeps the page font size, as the BOM root does; every size below is relative to it. */
 
 .VAS-relprod-root {
     --vas-rp-primary: #0083DA;
     --vas-rp-primary-hover: #0069AE;
     --vas-rp-primary-pressed: #004F83;
+    --vas-rp-action-blue: #1F83FF;
     --vas-rp-text: #102C3F;
     --vas-rp-text-2: #5F7283;
     --vas-rp-muted: #748494;
@@ -16,9 +18,8 @@
     display: flex;
     flex-direction: column;
     height: 100%;
-    min-height: 32em;
-    font-family: Roboto, "Segoe UI", Arial, sans-serif;
-    font-size: 0.875em;
+    min-height: 25em;
+    font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     color: var(--vas-rp-text);
     background: #FFFFFF;
     box-sizing: border-box;
@@ -30,42 +31,104 @@
     box-sizing: border-box;
 }
 
-/* ---------- context line ---------- */
-.VAS-relprod-root .VAS-rp-context {
-    padding: 0.75em 1.25em 0;
+/* ---------- header (BOM modal header: eyebrow + title) ---------- */
+.VAS-relprod-root .VAS-rp-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    padding: 0.75em;
+    border-bottom: 0.0625em solid var(--vas-rp-border);
+    flex-shrink: 0;
+}
+
+.VAS-relprod-root .VAS-rp-header-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 2.25em;
+    width: 2.25em;
+    height: 2.25em;
+    border-radius: 0.625em;
+    background: var(--vas-rp-soft);
+    color: var(--vas-rp-primary);
+}
+
+.VAS-relprod-root .VAS-rp-title-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25em;
+    min-width: 0;
+}
+
+/* close cross (BOM modal close button) */
+.VAS-relprod-root .VAS-rp-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 2em;
+    width: 2em;
+    height: 2em;
+    margin-inline-start: auto;
+    padding: 0;
+    border: 0;
+    border-radius: 0.5em;
+    background: transparent;
+    color: var(--vas-rp-text);
+    font-size: 1em;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.VAS-relprod-root .VAS-rp-close:hover {
+    background: var(--vas-rp-divider);
+}
+
+.VAS-relprod-root .VAS-rp-title {
+    overflow: hidden;
+    font-size: 1.125em;
+    font-weight: 700;
+    letter-spacing: -0.00625em;
+    color: var(--vas-rp-text);
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .VAS-relprod-root .VAS-rp-eyebrow {
-    font-size: 0.75em;
+    font-size: 0.71875em;
     font-weight: 600;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.025em;
     text-transform: uppercase;
     color: var(--vas-rp-primary);
 }
 
 .VAS-relprod-root .VAS-rp-eyebrow strong {
-    font-weight: 700;
+    font-family: 'Roboto Mono', 'Roboto', monospace;
+    letter-spacing: 0.0375em;
+    color: var(--vas-rp-primary-pressed);
 }
 
 /* ---------- product strip ---------- */
 .VAS-relprod-root .VAS-rp-product {
-    margin: 0.75em 1.25em 0;
-    padding: 0.875em 1em;
-    border: 1px solid var(--vas-rp-border);
-    border-radius: 0.75em;
-    background: linear-gradient(180deg, rgba(234, 248, 255, 0.55) 0%, rgba(255, 255, 255, 0) 100%);
+    margin: 0.75em 0.75em 0;
+    padding: 0.75em;
+    border: 0.0625em solid var(--vas-rp-divider);
+    border-radius: 0.875em;
+    background: linear-gradient(180deg, rgba(234, 248, 255, 0.55), rgba(248, 252, 255, 0.7));
 }
 
 .VAS-relprod-root .VAS-rp-label {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 0.25em;
     margin-bottom: 0.375em;
-    font-size: 0.8125em;
+    font-size: 0.78125em;
     font-weight: 600;
     color: var(--vas-rp-text-2);
 }
 
 .VAS-relprod-root .VAS-rp-req {
-    color: #8F2D2D;
+    color: #ED1C24;
+    font-weight: 700;
 }
 
 .VAS-relprod-root .VAS-rp-search .vis-input-wrap {
@@ -96,46 +159,67 @@
     width: 2.25em;
     height: 2.25em;
     border-radius: 0.625em;
-    background: var(--vas-rp-soft);
-    color: var(--vas-rp-primary);
-    font-size: 1.125em;
+    background: linear-gradient(180deg, #1F83FF, #0069AE);
+    box-shadow: 0 0.25em 0.625em rgba(31, 131, 255, 0.25);
+    color: #FFFFFF;
 }
 
 .VAS-relprod-root .VAS-rp-picked-text {
     display: flex;
     flex-direction: column;
-    flex: 1 1 12em;
+    gap: 0.0625em;
+    flex: 1 1 10em;
     min-width: 0;
 }
 
-.VAS-relprod-root .VAS-rp-picked-text .VAS-rp-name {
-    font-size: 1.0625em;
+.VAS-relprod-root .VAS-rp-picked-text .VAS-rp-code {
+    font-size: 0.71875em;
     font-weight: 700;
+    letter-spacing: 0.025em;
+}
+
+.VAS-relprod-root .VAS-rp-picked-text .VAS-rp-name {
+    overflow: hidden;
+    font-size: 0.875em;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .VAS-relprod-root .VAS-rp-picked-fields {
     display: flex;
+    flex-wrap: wrap;
     align-items: flex-end;
-    gap: 0.625em;
+    gap: 0.5em 0.625em;
 }
 
-.VAS-relprod-root .VAS-rp-picked-fields label {
+.VAS-relprod-root .VAS-rp-picked-fields > label {
     display: flex;
     flex-direction: column;
-    gap: 0.25em;
+    gap: 0.375em;
+    width: 6.5em;
     margin: 0;
-    font-size: 0.75em;
+    font-size: 0.78125em;
     font-weight: 600;
-    color: var(--vas-rp-muted);
+    color: var(--vas-rp-text-2);
 }
 
-.VAS-relprod-root .VAS-rp-picked-fields .VAS-rp-input {
-    font-size: 1.1667em;
+/* the label is 0.78125em, the input inside goes back to the input size (0.84375em of the root) */
+.VAS-relprod-root .VAS-rp-picked-fields > label .VAS-rp-input {
+    font-size: 1.08em;
+    font-weight: 400;
 }
 
 .VAS-relprod-root .VAS-rp-uom-text {
-    padding-bottom: 0.5em;
+    padding-bottom: 0.6em;
+    font-size: 0.84375em;
     color: var(--vas-rp-text-2);
+}
+
+.VAS-relprod-root .VAS-rp-picked-actions {
+    display: flex;
+    gap: 0.5em;
+    margin-inline-start: auto;
 }
 
 .VAS-relprod-root .VAS-rp-picked-detail {
@@ -152,16 +236,20 @@
     flex-direction: column;
     flex: 1 1 auto;
     min-height: 0;
-    padding: 0.75em 1.25em;
+    padding: 0.75em;
     overflow: auto;
 }
 
+/* the related list fills the body; only its table scrolls, chips stay on top */
 .VAS-relprod-root .VAS-rp-list {
     display: none;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
 }
 
 .VAS-relprod-root .VAS-rp-body.VAS-rp-has-product .VAS-rp-list {
-    display: block;
+    display: flex;
 }
 
 .VAS-relprod-root .VAS-rp-body.VAS-rp-has-product .VAS-rp-empty {
@@ -182,27 +270,29 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 3.5em;
-    height: 3.5em;
-    margin-bottom: 0.875em;
+    width: 3em;
+    height: 3em;
+    margin-bottom: 0.75em;
     border-radius: 50%;
     background: var(--vas-rp-soft);
     color: var(--vas-rp-primary);
-    font-size: 1.25em;
+    font-size: 1.125em;
 }
 
 .VAS-relprod-root .VAS-rp-empty-title {
-    font-size: 1.0625em;
+    font-size: 1.125em;
     font-weight: 700;
+    letter-spacing: -0.00625em;
 }
 
 .VAS-relprod-root .VAS-rp-empty-text {
-    max-width: 30em;
+    max-width: 32em;
     margin-top: 0.375em;
+    font-size: 0.875em;
     color: var(--vas-rp-text-2);
 }
 
-/* ---------- filter chips ---------- */
+/* ---------- filter chips (BOM filter tabs) ---------- */
 .VAS-relprod-root .VAS-rp-chips {
     display: flex;
     flex-wrap: wrap;
@@ -213,28 +303,31 @@
 .VAS-relprod-root .VAS-rp-chip {
     display: inline-flex;
     align-items: center;
-    gap: 0.375em;
-    padding: 0.1875em 0.625em;
-    border: 1px solid transparent;
-    border-radius: 62.5em;
+    gap: 0.3125em;
+    padding: 0.25em 0.625em;
+    border: 0.0625em solid transparent;
+    border-radius: 62.4375em;
+    font-family: inherit;
     font-size: 0.75em;
     font-weight: 700;
-    line-height: 1.5;
+    line-height: 1.4;
     white-space: nowrap;
 }
 
 .VAS-relprod-root .VAS-rp-filter {
-    padding: 0.3125em 0.875em;
+    padding: 0.375em 0.875em;
     border-color: var(--vas-rp-border);
     background: #FFFFFF;
     color: var(--vas-rp-text-2);
     font-size: 0.8125em;
+    font-weight: 600;
     cursor: pointer;
 }
 
 .VAS-relprod-root .VAS-rp-filter span {
     color: var(--vas-rp-muted);
-    font-weight: 600;
+    font-size: 0.85em;
+    font-weight: 700;
 }
 
 .VAS-relprod-root .VAS-rp-filter:hover {
@@ -252,6 +345,12 @@
     color: rgba(255, 255, 255, 0.85);
 }
 
+/* type tag in the table: 12px-like, readable next to 13px row text */
+.VAS-relprod-root .VAS-rp-table .VAS-rp-chip {
+    padding: 0.3em 0.75em;
+    font-size: 0.9231em;
+}
+
 .VAS-relprod-root .VAS-rp-chip.VAS-rp-danger { background: #FAD7D7; color: #8F2D2D; }
 .VAS-relprod-root .VAS-rp-chip.VAS-rp-info { background: #E5F3FB; color: #004F83; }
 .VAS-relprod-root .VAS-rp-chip.VAS-rp-accent { background: #E5E2FA; color: #5F4AA6; }
@@ -259,39 +358,60 @@
 .VAS-relprod-root .VAS-rp-chip.VAS-rp-warn { background: #FFEDD2; color: #6B3D05; }
 .VAS-relprod-root .VAS-rp-chip.VAS-rp-mute { background: var(--vas-rp-divider); color: var(--vas-rp-text-2); }
 
-/* ---------- table ---------- */
+/* ---------- table (BOM table: 0.8125em, header same size, uppercase) ---------- */
 .VAS-relprod-root .VAS-rp-tablewrap {
-    border: 1px solid var(--vas-rp-border);
-    border-radius: 0.75em;
-    overflow: hidden;
+    flex: 0 1 auto;
+    min-height: 0;
+    border: 0.0625em solid var(--vas-rp-border);
+    border-radius: 0.875em;
+    overflow: auto;
+}
+
+.VAS-relprod-root .VAS-rp-tablewrap::-webkit-scrollbar {
+    width: 0.5em;
+    height: 0.5em;
+}
+
+.VAS-relprod-root .VAS-rp-tablewrap::-webkit-scrollbar-thumb {
+    border-radius: 0.25em;
+    background: rgba(95, 114, 131, 0.25);
 }
 
 .VAS-relprod-root .VAS-rp-table {
     width: 100%;
     border-collapse: collapse;
+    font-family: 'Roboto', sans-serif;
+    font-size: 0.8125em;
 }
 
 .VAS-relprod-root .VAS-rp-table th {
-    padding: 0.625em 0.75em;
-    border-bottom: 1px solid #C5D2DD;
+    padding: 0.625em;
+    border-bottom: 0.0625em solid #C5D2DD;
     background: var(--vas-rp-faint);
     color: var(--vas-rp-muted);
-    font-size: 0.6875em;
+    font-size: 1em;
     font-weight: 700;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.03125em;
     text-align: start;
     text-transform: uppercase;
     white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 1;
 }
 
 .VAS-relprod-root .VAS-rp-table td {
-    padding: 0.5em 0.75em;
-    border-bottom: 1px solid #E2EAF1;
+    padding: 0.5625em 0.625em;
+    border-bottom: 0.0625em solid #E2EAF1;
     vertical-align: middle;
 }
 
 .VAS-relprod-root .VAS-rp-table tbody tr:last-child td {
     border-bottom: 0;
+}
+
+.VAS-relprod-root .VAS-rp-row {
+    transition: background 0.12s;
 }
 
 .VAS-relprod-root .VAS-rp-row:hover td {
@@ -303,7 +423,7 @@
 }
 
 .VAS-relprod-root .VAS-rp-col-check {
-    width: 2.5em;
+    width: 2.75em;
     text-align: center;
 }
 
@@ -318,7 +438,7 @@
 }
 
 .VAS-relprod-root .VAS-rp-col-num {
-    width: 7.5em;
+    width: 8em;
 }
 
 .VAS-relprod-root .VAS-rp-col-uom {
@@ -328,31 +448,44 @@
 }
 
 .VAS-relprod-root .VAS-rp-col-amt {
-    width: 8em;
-    font-weight: 600;
+    width: 8.5em;
+    font-weight: 700;
     white-space: nowrap;
 }
 
 .VAS-relprod-root .VAS-rp-col-more {
-    width: 2.75em;
+    width: 3em;
     text-align: center;
 }
 
 .VAS-relprod-root .VAS-rp-table .VAS-rp-name {
     display: block;
+    font-size: 1.0769em;
     font-weight: 600;
 }
 
+.VAS-relprod-root .VAS-rp-sub {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.125em 0.625em;
+    margin-top: 0.125em;
+}
+
 .VAS-relprod-root .VAS-rp-code {
-    display: block;
-    font-family: Consolas, "Roboto Mono", monospace;
-    font-size: 0.8125em;
+    font-family: 'Roboto Mono', 'Roboto', monospace;
+    font-size: 0.875em;
     color: var(--vas-rp-primary-pressed);
 }
 
+.VAS-relprod-root .VAS-rp-relname {
+    font-size: 0.875em;
+    color: var(--vas-rp-muted);
+}
+
 .VAS-relprod-root .VAS-rp-table input[type="checkbox"] {
-    width: 1em;
-    height: 1em;
+    width: 1.1em;
+    height: 1.1em;
     margin: 0;
     accent-color: var(--vas-rp-primary);
     cursor: pointer;
@@ -362,41 +495,49 @@
     cursor: not-allowed;
 }
 
+/* inputs: BOM form inputs (0.84375em, 2.375em high) */
 .VAS-relprod-root .VAS-rp-input {
     width: 100%;
-    min-width: 5.5em;
-    height: 2em;
-    padding: 0 0.5em;
-    border: 1px solid var(--vas-rp-border);
+    min-width: 5em;
+    height: 2.375em;
+    padding: 0 0.75em;
+    border: 0.0625em solid var(--vas-rp-border);
     border-radius: 0.5em;
     background: #FFFFFF;
     color: var(--vas-rp-text);
-    font: inherit;
+    font-family: inherit;
+    font-size: 0.84375em;
     text-align: end;
+    outline: 0;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.VAS-relprod-root .VAS-rp-table .VAS-rp-input {
+    font-size: 1em;
 }
 
 .VAS-relprod-root .VAS-rp-input:focus {
     border-color: var(--vas-rp-primary);
-    outline: 0;
-    box-shadow: 0 0 0 0.1875em rgba(0, 131, 218, 0.15);
+    box-shadow: 0 0 0 0.1875em rgba(31, 131, 255, 0.16);
 }
 
 .VAS-relprod-root .VAS-rp-iconbtn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 1.875em;
-    height: 1.875em;
+    width: 2em;
+    height: 2em;
     padding: 0;
-    border: 1px solid transparent;
-    border-radius: 50%;
+    border: 0.0625em solid transparent;
+    border-radius: 0.5em;
     background: transparent;
     color: var(--vas-rp-muted);
+    font-size: 1em;
     cursor: pointer;
 }
 
 .VAS-relprod-root .VAS-rp-iconbtn:hover {
-    border-color: var(--vas-rp-border);
+    background: var(--vas-rp-divider);
     color: var(--vas-rp-primary);
 }
 
@@ -417,52 +558,68 @@
 .VAS-relprod-root .VAS-rp-picked-detail {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.75em 1em;
+    gap: 0.75em 0.875em;
     padding: 0.25em 0;
+}
+
+.VAS-relprod-root .VAS-rp-table .VAS-rp-detail {
+    font-size: 1.2308em; /* back to the root size inside the 0.8125em table */
 }
 
 .VAS-relprod-root .VAS-rp-picked-detail {
     padding-top: 0.75em;
-    border-top: 1px solid var(--vas-rp-divider);
+    border-top: 0.0625em solid var(--vas-rp-divider);
 }
 
 .VAS-relprod-root .VAS-rp-field {
     display: flex;
     flex-direction: column;
-    gap: 0.25em;
+    gap: 0.375em;
     flex: 1 1 12em;
     max-width: 18em;
 }
 
 .VAS-relprod-root .VAS-rp-field > label {
     margin: 0;
-    font-size: 0.75em;
+    font-size: 0.78125em;
     font-weight: 600;
-    color: var(--vas-rp-muted);
+    color: var(--vas-rp-text-2);
 }
 
-.VAS-relprod-root .VAS-rp-field .VAS-rp-input {
-    text-align: end;
-}
-
+/* attribute field: the input shrinks so its button stays inside the field */
 .VAS-relprod-root .VAS-rp-attr {
+    display: flex;
     flex-wrap: nowrap;
+    width: 100%;
+}
+
+.VAS-relprod-root .VAS-rp-attr > input {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+}
+
+.VAS-relprod-root .VAS-rp-attr > button {
+    flex: 0 0 auto;
 }
 
 .VAS-relprod-root .VAS-rp-none {
     display: none;
     padding: 1.5em 1em;
+    font-size: 0.875em;
     color: var(--vas-rp-text-2);
     text-align: center;
 }
 
-/* ---------- result banner ---------- */
+/* ---------- result banner (BOM modal error box) ---------- */
 .VAS-relprod-root .VAS-rp-result {
     display: none;
     gap: 0.625em;
     margin-top: 0.75em;
-    padding: 0.75em 0.875em;
-    border-radius: 0.75em;
+    padding: 0.625em 0.75em;
+    border-radius: 0.5em;
+    font-size: 0.875em;
+    font-weight: 500;
 }
 
 .VAS-relprod-root .VAS-rp-result.VAS-rp-ok {
@@ -479,7 +636,6 @@
 
 .VAS-relprod-root .VAS-rp-result > i {
     margin-top: 0.125em;
-    font-size: 1.125em;
 }
 
 .VAS-relprod-root .VAS-rp-result ul {
@@ -487,19 +643,20 @@
     padding-inline-start: 1.25em;
 }
 
-/* ---------- footer ---------- */
+/* ---------- footer (BOM modal footer) ---------- */
 .VAS-relprod-root .VAS-rp-footer {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.75em;
-    padding: 0.75em 1.25em;
-    border-top: 1px solid var(--vas-rp-border);
+    gap: 0.5em;
+    padding: 0.75em;
+    border-top: 0.0625em solid var(--vas-rp-divider);
     background: var(--vas-rp-faint);
 }
 
 .VAS-relprod-root .VAS-rp-hint {
-    color: var(--vas-rp-text-2);
+    font-size: 0.875em;
+    color: var(--vas-rp-muted);
 }
 
 .VAS-relprod-root .VAS-rp-hint strong {
@@ -515,25 +672,28 @@
 .VAS-relprod-root .VAS-rp-btn {
     display: inline-flex;
     align-items: center;
-    gap: 0.4375em;
-    height: 2.2857em;
-    padding: 0 1.1429em;
-    border: 1px solid var(--vas-rp-border);
-    border-radius: 62.5em;
+    gap: 0.375em;
+    height: 2em;
+    padding: 0 1em;
+    border: 0.0625em solid var(--vas-rp-border);
+    border-radius: 62.4375em;
     background: #FFFFFF;
     color: var(--vas-rp-text);
-    font: inherit;
+    font-family: inherit;
+    font-size: 1em;
     font-weight: 600;
     white-space: nowrap;
     cursor: pointer;
+    transition: all 0.15s;
 }
 
 .VAS-relprod-root .VAS-rp-btn-secondary:hover:not(:disabled) {
-    border-color: var(--vas-rp-primary);
-    color: var(--vas-rp-primary);
+    border-color: var(--vas-rp-text-2);
+    background: #F8FBFD;
 }
 
 .VAS-relprod-root .VAS-rp-btn-primary {
+    padding-inline-start: 0.875em;
     border-color: var(--vas-rp-primary);
     background: var(--vas-rp-primary);
     color: #FFFFFF;
@@ -545,18 +705,27 @@
 }
 
 .VAS-relprod-root .VAS-rp-btn-primary:active:not(:disabled) {
+    border-color: var(--vas-rp-primary-pressed);
     background: var(--vas-rp-primary-pressed);
 }
 
 .VAS-relprod-root .VAS-rp-btn:disabled {
-    opacity: 0.5;
+    opacity: 0.6;
     cursor: not-allowed;
 }
 
+/* small pale-blue buttons in the product strip (BOM detail action buttons) */
 .VAS-relprod-root .VAS-rp-btn-small {
-    height: 2em;
+    height: 2.2857em;
     padding: 0 0.875em;
+    border-color: #CFE6F7;
+    color: var(--vas-rp-primary);
     font-size: 0.875em;
+}
+
+.VAS-relprod-root .VAS-rp-btn-small:hover:not(:disabled) {
+    border-color: var(--vas-rp-primary);
+    background: var(--vas-rp-soft);
 }
 
 .VAS-relprod-root .VAS-rp-busy {
