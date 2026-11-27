@@ -457,9 +457,86 @@
     padding: 0.375em 0.625em;
 }
 
+/* VAS163 2026-11-27: Sr 50 field headings bold in the detail and Review Confirmation Line pop-ups;
+   Sr 48 headings clip with an ellipsis (full text in the title). */
 .MPC-wc-flabel {
     font-size: 0.6875em;
+    font-weight: 700;
     color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* VAS163 2026-11-27: Sr 51 Source DO number is a link to the Delivery Order record. */
+.MPC-wc-link {
+    border: none;
+    background: transparent;
+    padding: 0;
+    font-family: inherit;
+    font-size: inherit;
+    color: #0083DA;
+    cursor: pointer;
+    text-decoration: underline;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-wc-link:hover,
+.MPC-wc-link:focus {
+    color: #0069AE;
+}
+
+/* VAS163 2026-11-27: Sr 54-57 on-screen info message for the quantity rules. */
+.MPC-wc-m-info {
+    margin-top: 0.75em;
+    padding: 0.5em 0.75em;
+    border-radius: 8px;
+    background: #EAF4FD;
+    color: #106AB0;
+    font-size: 0.8125em;
+}
+
+/* VAS163 2026-11-27: Sr 62 Quality Control parameter list. */
+.MPC-wc-qc-table {
+    display: flex;
+    flex-direction: column;
+}
+
+.MPC-wc-qc-row {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1.2fr;
+    column-gap: 0.75em;
+    align-items: center;
+    padding: 0.375em 0.25em;
+    border-bottom: 1px solid #EDF2F6;
+}
+
+.MPC-wc-qc-row > * {
+    min-width: 0;
+}
+
+.MPC-wc-qc-head > span {
+    font-size: 0.6875em;
+    font-weight: 700;
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-wc-qc-cell {
+    font-size: 0.8125em;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-wc-qc-cell .MPC-wc-qc-select {
+    margin-top: 0;
 }
 
 .MPC-wc-fvalue {
@@ -643,9 +720,18 @@
     background: #FFFFFF;
     border: 1px solid #D9E2EB;
     border-radius: 8px;
-    padding: 0.35em 0.75em;
-    text-align: center;
-    text-align-last: center;
+    /* VAS163 2026-11-27: Sr 52 options left aligned (start, so RTL follows) with normal inner padding. */
+    padding: 0.375em 0.625em;
+    text-align: start;
+    text-align-last: start;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-wc-select option {
+    text-align: start;
+    padding: 0.25em 0.625em;
 }
 .MPC-wc-select:hover {
     background: #EEF8FF;

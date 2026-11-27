@@ -94,18 +94,25 @@ namespace VAS.Controllers
                   AND io.IsReturnTrx = 'N'
                   AND io.MovementType = 'C-'
                   AND io.DocStatus IN ('CO', 'CL')
-                  AND io.MovementDate >= CURRENT_DATE
-                      - (CAST(EXTRACT(DAY FROM CURRENT_DATE) AS INTEGER) - 1)
-                  AND io.MovementDate < CURRENT_DATE + 1
+                  AND io.MovementDate >= @Month_Start
+                  AND io.MovementDate < @Tomorrow
                   AND lpd.latest_promised_date IS NOT NULL";
+            // VAS163 2026-11-27: Sr 43 month-to-date window as whole days. Oracle CURRENT_DATE carries the time of
+            // day, so "< CURRENT_DATE + 1" also took DOs dated tomorrow (DO 500173 on 26 Nov) and ">= 1st of the
+            // month at the current time" dropped DOs dated the 1st. Now: from the 1st 00:00 to before tomorrow 00:00.
 
             outerSql = MRole.GetDefault(ctx).AddAccessSQL(outerSql, "io", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
             string sql = "WITH latest_promised_dates AS (" + cteSql + ")" + outerSql;
 
+            DateTime today = DateTime.Today;
             try
             {
-                decimal rate = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, new SqlParameter[0], null));
+                decimal rate = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, new[]
+                {
+                    new SqlParameter("@Month_Start", new DateTime(today.Year, today.Month, 1)),
+                    new SqlParameter("@Tomorrow", today.AddDays(1))
+                }, null));
                 return Ok(new { onTimeRate = rate });
             }
             catch (Exception ex)

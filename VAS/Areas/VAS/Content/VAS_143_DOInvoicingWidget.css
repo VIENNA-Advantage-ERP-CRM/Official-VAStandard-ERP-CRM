@@ -469,6 +469,19 @@
     text-overflow: ellipsis;
 }
 
+/* VAS163 2026-11-27: Sr 68 Invoice number link to the AR Invoice record. */
+.MPC-dis-invlink {
+    display: block;
+    color: #0083DA;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.MPC-dis-invlink:hover,
+.MPC-dis-invlink:focus {
+    text-decoration: underline;
+}
+
 .MPC-dis-cell-body {
     font-weight: 400;
     color: #5F7283;
