@@ -137,28 +137,89 @@ namespace VIS.Models
         }
 
         /// <summary>
+        /// Header details of the order or opportunity the pop-up adds lines to: document number,
+        /// business partner, price list and currency (ISO code and precision for amount display)
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="Table_ID">C_Order or C_Project</param>
+        /// <param name="Record_ID">Record ID</param>
+        /// <returns>Header details, or null when the record is not found</returns>
+        public RelatedHeaderInfo GetHeaderInfo(Ctx ctx, int Table_ID, int Record_ID)
+        {
+            string sql;
+            string alias;
+            if (MOrder.Table_ID.Equals(Table_ID))
+            {
+                alias = "o";
+                sql = @"SELECT o.DocumentNo, bp.Name AS BPName, o.M_PriceList_ID, c.ISO_Code, c.StdPrecision
+                        FROM C_Order o
+                        INNER JOIN C_BPartner bp ON (bp.C_BPartner_ID=o.C_BPartner_ID)
+                        INNER JOIN C_Currency c ON (c.C_Currency_ID=o.C_Currency_ID)
+                        WHERE o.IsActive='Y' AND o.C_Order_ID=@recordId";
+            }
+            else if (MProject.Table_ID.Equals(Table_ID))
+            {
+                alias = "p";
+                sql = @"SELECT p.Value AS DocumentNo, bp.Name AS BPName,
+                        COALESCE(plv.M_PriceList_ID, p.M_PriceList_ID) AS M_PriceList_ID, c.ISO_Code, c.StdPrecision
+                        FROM C_Project p
+                        LEFT OUTER JOIN C_BPartner bp ON (bp.C_BPartner_ID=p.C_BPartner_ID)
+                        LEFT OUTER JOIN M_PriceList_Version plv ON (plv.M_PriceList_Version_ID=p.M_PriceList_Version_ID)
+                        LEFT OUTER JOIN C_Currency c ON (c.C_Currency_ID=p.C_Currency_ID)
+                        WHERE p.IsActive='Y' AND p.C_Project_ID=@recordId";
+            }
+            else
+            {
+                return null;
+            }
+
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, alias, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            SqlParameter[] param = new SqlParameter[] { new SqlParameter("@recordId", Record_ID) };
+            DataSet ds = DB.ExecuteDataset(sql, param, null);
+            if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+            {
+                return null;
+            }
+
+            DataRow dr = ds.Tables[0].Rows[0];
+            RelatedHeaderInfo info = new RelatedHeaderInfo();
+            info.DocumentNo = Util.GetValueOfString(dr["DocumentNo"]);
+            info.BPName = Util.GetValueOfString(dr["BPName"]);
+            info.M_PriceList_ID = Util.GetValueOfInt(dr["M_PriceList_ID"]);
+            info.ISO_Code = Util.GetValueOfString(dr["ISO_Code"]);
+            info.StdPrecision = Util.GetValueOfInt(dr["StdPrecision"]);
+            return info;
+        }
+
+        /// <summary>
         /// Creatd Related Product Lines
         /// </summary>
         /// <param name="ctx">Context</param>
         /// <param name="ReqLines">Related Product Data</param>
         /// <param name="Table_ID">Table ID</param>
         /// <param name="Record_ID">Record ID</param>
-        /// <returns>Message as string</returns>
-        public string CreateRelatedLines(Ctx ctx, List<RelatedProductData> ReqLines, int Table_ID, int Record_ID)
+        /// <returns>Saved and total line count, summary message and the reason each failed line was not saved</returns>
+        public RelatedLinesResult CreateRelatedLines(Ctx ctx, List<RelatedProductData> ReqLines, int Table_ID, int Record_ID)
         {
-            string _msg = "";
+            RelatedLinesResult result = new RelatedLinesResult();
+
+            if (ReqLines == null || ReqLines.Count == 0)
+            {
+                result.Message = Msg.GetMsg(ctx, "VIS_PlzSelLines");
+                return result;
+            }
 
             if (MOrder.Table_ID.Equals(Table_ID))
             {
-                _msg = CreateSQLines(ctx, ReqLines, Record_ID);
+                result = CreateSQLines(ctx, ReqLines, Record_ID);
             }
 
             else if (MProject.Table_ID.Equals(Table_ID))
             {
-                _msg = CreateOppLines(ctx, ReqLines, Record_ID);
+                result = CreateOppLines(ctx, ReqLines, Record_ID);
             }
 
-            return _msg;
+            return result;
         }
 
         /// <summary>
@@ -167,13 +228,12 @@ namespace VIS.Models
         /// <param name="ctx"></param>
         /// <param name="ReqLines">Related Product data</param>
         /// <param name="Record_ID">Record ID</param>
-        /// <returns>Message as string</returns>
-        public string CreateSQLines(Ctx ctx, List<RelatedProductData> ReqLines, int Record_ID)
+        /// <returns>Saved and total line count, summary message and failed lines</returns>
+        public RelatedLinesResult CreateSQLines(Ctx ctx, List<RelatedProductData> ReqLines, int Record_ID)
         {
             int TotalCount, SavedCount = 0;
             int LineNo;
-            string msg;
-            StringBuilder errors = new StringBuilder();
+            RelatedLinesResult result = new RelatedLinesResult();
             MOrderLine POLine;
 
             LineNo = Util.GetValueOfInt(DB.ExecuteScalar("SELECT MAX(Line) FROM C_OrderLine WHERE C_Order_ID=" + Record_ID));
@@ -202,34 +262,46 @@ namespace VIS.Models
                 }
                 else
                 {
-                    AppendSaveError(ctx, errors, ReqLines[i]);
+                    AddSaveError(ctx, result, ReqLines[i], i);
                 }
             }
-            if (TotalCount == SavedCount)
-            {
-                msg = Msg.GetMsg(ctx, "VIS_SuccessFullyInserted");
-            }
-            else
-            {
-                msg = SavedCount + Msg.GetMsg(ctx, "VIS_NoOfLineSaved") + TotalCount + "." + errors.ToString();
-            }
-            return msg;
+            SetResultMessage(ctx, result, SavedCount, TotalCount);
+            return result;
         }
 
         /// <summary>
-        /// Adds the reason a line was not saved (product and save error) to the message
+        /// Adds the line that was not saved, with the reason from the save error, to the result
         /// </summary>
         /// <param name="ctx">Context</param>
-        /// <param name="errors">Collected errors</param>
+        /// <param name="result">Result being built</param>
         /// <param name="line">Line that was not saved</param>
-        private void AppendSaveError(Ctx ctx, StringBuilder errors, RelatedProductData line)
+        /// <param name="index">Position of the line in the request, so the pop-up keeps only the failed lines</param>
+        private void AddSaveError(Ctx ctx, RelatedLinesResult result, RelatedProductData line, int index)
         {
             ValueNamePair pp = VLogger.RetrieveError();
+            // Model classes may save only a message key as the error value (e.g. VIS_OrderDateGrtrThanPromisedDate)
             string err = pp == null ? "" : (!string.IsNullOrEmpty(pp.GetName()) ? pp.GetName() : Msg.GetMsg(ctx, pp.GetValue()));
-            errors.Append(" ").Append(line.Product);
-            if (!string.IsNullOrEmpty(err))
+            result.Errors.Add(new RelatedLineError { LineIndex = index, Product = line.Product, Error = err });
+        }
+
+        /// <summary>
+        /// Sets the counts and the summary message of the result
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="result">Result being built</param>
+        /// <param name="savedCount">Lines saved</param>
+        /// <param name="totalCount">Lines requested</param>
+        private void SetResultMessage(Ctx ctx, RelatedLinesResult result, int savedCount, int totalCount)
+        {
+            result.Saved = savedCount;
+            result.Total = totalCount;
+            if (totalCount == savedCount)
             {
-                errors.Append(": ").Append(err);
+                result.Message = Msg.GetMsg(ctx, "VIS_SuccessFullyInserted");
+            }
+            else
+            {
+                result.Message = savedCount + Msg.GetMsg(ctx, "VIS_NoOfLineSaved") + totalCount + ".";
             }
         }
 
@@ -239,14 +311,13 @@ namespace VIS.Models
         /// <param name="ctx"></param>
         /// <param name="ReqLines">Related Product data</param>
         /// <param name="Record_ID">Record ID</param>
-        /// <returns>Message as string</returns>
-        public string CreateOppLines(Ctx ctx, List<RelatedProductData> ReqLines, int Record_ID)
+        /// <returns>Saved and total line count, summary message and failed lines</returns>
+        public RelatedLinesResult CreateOppLines(Ctx ctx, List<RelatedProductData> ReqLines, int Record_ID)
         {
             int TotalCount, SavedCount = 0;
             int LineNo;
             Decimal Discount;
-            string msg;
-            StringBuilder errors = new StringBuilder();
+            RelatedLinesResult result = new RelatedLinesResult();
             MProjectLine POLine;
 
             LineNo = Util.GetValueOfInt(DB.ExecuteScalar("SELECT MAX(Line) FROM C_ProjectLine WHERE C_Project_ID=" + Record_ID));
@@ -285,19 +356,45 @@ namespace VIS.Models
                 }
                 else
                 {
-                    AppendSaveError(ctx, errors, ReqLines[i]);
+                    AddSaveError(ctx, result, ReqLines[i], i);
                 }
             }
-            if (TotalCount == SavedCount)
-            {
-                msg = Msg.GetMsg(ctx, "VIS_SuccessFullyInserted");
-            }
-            else
-            {
-                msg = SavedCount + Msg.GetMsg(ctx, "VIS_NoOfLineSaved") + TotalCount + "." + errors.ToString();
-            }
-            return msg;
+            SetResultMessage(ctx, result, SavedCount, TotalCount);
+            return result;
         }
+    }
+
+    /// <summary>
+    /// Header details shown at the top of the Add Related Products pop-up
+    /// </summary>
+    public class RelatedHeaderInfo
+    {
+        public string DocumentNo { get; set; }
+        public string BPName { get; set; }
+        public int M_PriceList_ID { get; set; }
+        public string ISO_Code { get; set; }
+        public int StdPrecision { get; set; }
+    }
+
+    /// <summary>
+    /// Result of saving related product lines
+    /// </summary>
+    public class RelatedLinesResult
+    {
+        public int Saved { get; set; }
+        public int Total { get; set; }
+        public string Message { get; set; }
+        public List<RelatedLineError> Errors { get; set; } = new List<RelatedLineError>();
+    }
+
+    /// <summary>
+    /// A line that was not saved and why
+    /// </summary>
+    public class RelatedLineError
+    {
+        public int LineIndex { get; set; }
+        public string Product { get; set; }
+        public string Error { get; set; }
     }
 
     public class RelatedType

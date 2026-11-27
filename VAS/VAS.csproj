@@ -557,6 +557,7 @@
     <Content Include="Areas\VAS\Content\VAS_236_ReceiptvsPaymentWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_238_UnreconciledBankLineWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_218_CreateOppLines.css" />
+    <Content Include="Areas\VAS\Content\VAS_RelatedProducts.css" />
     <Content Include="Areas\VAS\Content\VAS_247_MaterialTransferBottomPanel.css" />
     <Content Include="Areas\VAS\Content\VAS_248_DeliveryOrderBottomPanel.css" />
     <Content Include="Areas\VAS\Content\VAS_249_GRNBottomPanel.css" />
