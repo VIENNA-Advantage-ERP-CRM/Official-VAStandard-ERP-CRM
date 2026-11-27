@@ -96,7 +96,8 @@ namespace VIS.Models
             int M_PriceList_Version_ID = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT M_PriceList_Version_ID FROM M_PriceList_Version WHERE IsActive = 'Y' 
                                 AND M_PriceList_ID = " + M_PriceList_ID + @" AND ValidFrom <= " + DB.TO_DATE(validFrom, true) + " ORDER BY ValidFrom DESC"));
 
-            SqlParameter[] param = new SqlParameter[1];
+            // Only the parameters actually used: a null entry makes ExecuteDataset fail when no type is selected
+            List<SqlParameter> param = new List<SqlParameter>();
             string sql = @"SELECT P.M_Product_ID, " + (C_UOM_ID > 0 ? C_UOM_ID.ToString() : "P.C_UOM_ID") + @" AS C_UOM_ID, P.Value, R.Name, 1 AS QtyEntered,
                     R.RelatedProductType, (SELECT Name FROM AD_Ref_List WHERE AD_Reference_ID=(SELECT AD_Reference_ID FROM AD_Reference WHERE Name='M_RelatedProduct Type')
                     AND Value = R.RelatedProductType) AS RelatedType,
@@ -108,10 +109,10 @@ namespace VIS.Models
                     + " AND PR.C_UOM_ID = " + (C_UOM_ID > 0 ? C_UOM_ID.ToString() : "P.C_UOM_ID") + @") WHERE R.M_Product_ID = " + M_Product_ID;
             if (!string.IsNullOrEmpty(Relatedtype))
             {
-                param[0] = new SqlParameter("@type", Relatedtype);
+                param.Add(new SqlParameter("@type", Relatedtype));
                 sql += " AND R.RelatedProductType=@type";
             }
-            DataSet _ds = DB.ExecuteDataset(sql, param, null);
+            DataSet _ds = DB.ExecuteDataset(sql, param.Count > 0 ? param.ToArray() : null, null);
             if (_ds != null && _ds.Tables[0].Rows.Count > 0)
             {
                 retData = new List<RelatedProductData>();
