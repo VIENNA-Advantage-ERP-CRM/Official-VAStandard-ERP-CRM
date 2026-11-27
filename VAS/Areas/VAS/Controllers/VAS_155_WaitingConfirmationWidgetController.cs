@@ -6,6 +6,7 @@ using System.Data.SqlClient;
 using System.Globalization;
 using System.Web.Mvc;
 using VAdvantage.DataBase;
+using VAdvantage.Logging;
 using VAdvantage.Model;
 using VAdvantage.Utility;
 using VIS.Filters;
@@ -39,6 +40,8 @@ namespace VAS.Controllers
     /// Widget number 155.
     /// Chronological development:
     ///   &lt;EmpCode&gt;   2026-07-21 Created
+    ///   VAS163      2026-11-27 Sr 53-62: quantity / precision / description checks, window locator rule,
+    ///                          complete with differences, Movement Date, Quality Control (VA010) endpoints
     /// </summary>
     public class VAS_155_WaitingConfirmationWidgetController : Controller
     {
@@ -160,6 +163,7 @@ namespace VAS.Controllers
                        Confirm.Created AS Confirm_Date,
                        InOut.M_InOut_ID AS DO_ID,
                        InOut.DocumentNo AS DO_No,
+                       InOut.MovementDate AS Movement_Date,
                        InOut.M_Warehouse_ID AS Warehouse_ID,
                        BPartner.Name AS Customer_Name,
                        Warehouse.Name AS Warehouse_Name
@@ -182,6 +186,9 @@ namespace VAS.Controllers
                        InOutLine.Line AS Line_No,
                        Product.Name AS Product_Name,
                        COALESCE(UomInfo.Name, UomInfo.UOMSymbol) AS UOM_Name,
+                       UomInfo.StdPrecision AS UOM_Precision,
+                       __QC_COUNT__ AS QC_Count,
+                       __QC_MISSING__ AS QC_Missing,
                        AttributeInstance.Description AS Attribute_Description,
                        LineConfirm.M_Locator_ID AS Scrap_Locator_ID,
                        " + scrapLocatorSql + @" AS Scrap_Locator_Value,
@@ -201,6 +208,25 @@ namespace VAS.Controllers
                   AND LineConfirm.AD_Client_ID=@AD_Client_ID3";
 
             linesSql = MRole.GetDefault(ctx).AddAccessSQL(linesSql, "LineConfirm", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            // VAS163 2026-11-27: Sr 62 quality parameter counts (VA010_ShipConfParameters) per line, injected AFTER
+            // AddAccessSQL like the line count above (a subquery alias must not reach the outer access predicate).
+            // The VA010 module is optional: without its table both counts are 0.
+            if (HasQualityModule())
+            {
+                linesSql = linesSql.Replace("__QC_COUNT__", @"(SELECT COUNT(1)
+                           FROM VA010_ShipConfParameters QAParam
+                           WHERE QAParam.M_InOutLineConfirm_ID=LineConfirm.M_InOutLineConfirm_ID
+                             AND QAParam.IsActive='Y')");
+                linesSql = linesSql.Replace("__QC_MISSING__", @"(SELECT COUNT(1)
+                           FROM VA010_ShipConfParameters QAMissing
+                           WHERE QAMissing.M_InOutLineConfirm_ID=LineConfirm.M_InOutLineConfirm_ID
+                             AND QAMissing.IsActive='Y'
+                             AND (QAMissing.VA010_ActualValue IS NULL OR QAMissing.VA010_ActualValue='' OR QAMissing.VA010_ActualValue='0'))");
+            }
+            else
+            {
+                linesSql = linesSql.Replace("__QC_COUNT__", "0").Replace("__QC_MISSING__", "0");
+            }
             linesSql += @"
                 ORDER BY InOutLine.Line, LineConfirm.M_InOutLineConfirm_ID";
 
@@ -218,8 +244,11 @@ namespace VAS.Controllers
                 if (dr != null && dr.Read())
                 {
                     DateTime? confirmDate = Util.GetValueOfDateTime(dr["Confirm_Date"]);
+                    // VAS163 2026-11-27: Sr 61 the "Movement Date" field shows the delivery order's MovementDate.
+                    DateTime? movementDate = Util.GetValueOfDateTime(dr["Movement_Date"]);
                     header = new
                     {
+                        movementDate = movementDate.HasValue ? movementDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                         confirmId = Util.GetValueOfInt(dr["Confirm_ID"]),
                         confirmNo = Util.GetValueOfString(dr["Confirm_No"]),
                         doId = Util.GetValueOfInt(dr["DO_ID"]),
@@ -258,6 +287,9 @@ namespace VAS.Controllers
                         lineNo = Util.GetValueOfInt(dr["Line_No"]),
                         productName = Util.GetValueOfString(dr["Product_Name"]),
                         uomName = Util.GetValueOfString(dr["UOM_Name"]),
+                        uomPrecision = Util.GetValueOfInt(dr["UOM_Precision"]), // VAS163 2026-11-27: Sr 57
+                        qcCount = Util.GetValueOfInt(dr["QC_Count"]),           // VAS163 2026-11-27: Sr 62
+                        qcMissing = Util.GetValueOfInt(dr["QC_Missing"]),
                         attributeSetInstance = string.IsNullOrEmpty(attr) ? null : attr,
                         scrapLocatorId = Util.GetValueOfInt(dr["Scrap_Locator_ID"]),
                         scrapLocatorValue = Util.GetValueOfString(dr["Scrap_Locator_Value"]),
@@ -298,8 +330,11 @@ namespace VAS.Controllers
             }
 
             Ctx ctx = Session["ctx"] as Ctx;
-            if (warehouseId <= 0) { return Ok(new { rows = new List<object>() }); }
 
+            // VAS163 2026-11-27: Sr 58/59 same options as the M_Locator_ID field of the M_InOutLineConfirm tab
+            // (Ship/Receipt Confirm and VAS_ShipReceiptConfirm windows): Table reference 191 (M_Locator) with no
+            // validation rule and no reference WHERE clause, i.e. every active locator of the tenant the role can
+            // access - not only the delivery order's warehouse. The DO warehouse's locators are listed first.
             string locatorNameSql = HasColumn("M_Locator", "LocatorCombination")
                 ? "COALESCE(Locator.LocatorCombination, Locator.Value)"
                 : "Locator.Value";
@@ -307,12 +342,17 @@ namespace VAS.Controllers
             string sql = @"
                 SELECT Locator.M_Locator_ID AS Locator_ID,
                        " + locatorNameSql + @" AS Locator_Name,
-                       Locator.IsDefault AS Is_Default
+                       Locator.IsDefault AS Is_Default,
+                       Locator.M_Warehouse_ID AS Warehouse_ID,
+                       Warehouse.Name AS Warehouse_Name
                 FROM M_Locator Locator
+                LEFT OUTER JOIN M_Warehouse Warehouse ON (Warehouse.M_Warehouse_ID=Locator.M_Warehouse_ID)
                 WHERE Locator.IsActive='Y'
-                  AND Locator.AD_Client_ID=@AD_Client_ID
-                  AND Locator.M_Warehouse_ID=@Warehouse_ID
-                ORDER BY Locator.IsDefault DESC, " + locatorNameSql;
+                  AND Locator.AD_Client_ID=@AD_Client_ID";
+
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "Locator", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            sql += @"
+                ORDER BY (CASE WHEN Locator.M_Warehouse_ID=@Warehouse_ID THEN 0 ELSE 1 END), Warehouse.Name, Locator.IsDefault DESC, " + locatorNameSql;
 
             List<object> rows = new List<object>();
             IDataReader dr = null;
@@ -326,10 +366,19 @@ namespace VAS.Controllers
                 });
                 while (dr != null && dr.Read())
                 {
+                    string locatorName = Util.GetValueOfString(dr["Locator_Name"]);
+                    string warehouseName = Util.GetValueOfString(dr["Warehouse_Name"]);
+                    int locatorWarehouseId = Util.GetValueOfInt(dr["Warehouse_ID"]);
+                    // Locators of another warehouse carry the warehouse name so equal locator values stay distinguishable.
+                    if (locatorWarehouseId != warehouseId && !string.IsNullOrEmpty(warehouseName))
+                    {
+                        locatorName = locatorName + " (" + warehouseName + ")";
+                    }
                     rows.Add(new
                     {
                         locatorId = Util.GetValueOfInt(dr["Locator_ID"]),
-                        locatorName = Util.GetValueOfString(dr["Locator_Name"]),
+                        locatorName = locatorName,
+                        warehouseId = locatorWarehouseId,
                         isDefault = Util.GetValueOfString(dr["Is_Default"]) == "Y"
                     });
                 }
@@ -379,6 +428,11 @@ namespace VAS.Controllers
             {
                 return Fail(Msg.GetMsg(ctx, "VAS_155_WC_ScrapLocatorRequired") ?? "Scrap Locator is required when Scrapped Quantity is greater than zero.");
             }
+            // VAS163 2026-11-27: Sr 53 M_InOutLineConfirm.Description holds at most 255 characters.
+            if (description != null && description.Length > 255)
+            {
+                return Fail(MsgOr(ctx, "VAS_155_WC_DescriptionTooLong", "Description cannot be longer than 255 characters."));
+            }
 
             try
             {
@@ -388,10 +442,27 @@ namespace VAS.Controllers
                     return Fail(Msg.GetMsg(ctx, "NotFound") ?? "Not found");
                 }
 
+                // VAS163 2026-11-27: Sr 54/55/56 the same quantity rules (and messages) as the widget.
                 decimal target = line.GetTargetQty();
+                if (confirmed > target)
+                {
+                    return Fail(MsgOr(ctx, "VAS_090_ConfirmedAboveTarget", "Confirmed Quantity cannot be greater than Target Quantity."));
+                }
+                if (scrapped > target)
+                {
+                    return Fail(MsgOr(ctx, "VAS_090_ScrappedAboveTarget", "Scrapped Quantity cannot be greater than Target Quantity."));
+                }
                 if (confirmed + scrapped > target)
                 {
-                    return Fail(Msg.GetMsg(ctx, "VAS_155_WC_OverTarget") ?? "Confirmed plus Scrapped quantity cannot exceed the Target quantity.");
+                    return Fail(MsgOr(ctx, "VAS_172_ConfScrapExceedsTarget", "Quantity should not be greater than Target Quantity"));
+                }
+
+                // VAS163 2026-11-27: Sr 57 decimals limited to the line UOM's StdPrecision (0 -> whole numbers).
+                int precision = GetLineUomPrecision(ctx, line);
+                if (precision >= 0 && (decimal.Round(confirmed, precision) != confirmed || decimal.Round(scrapped, precision) != scrapped))
+                {
+                    return Fail(MsgOr(ctx, "VAS_155_WC_QtyPrecision", "Quantity exceeds the decimal places allowed for this UOM:")
+                        + " " + precision.ToString(CultureInfo.InvariantCulture));
                 }
 
                 MInOutConfirm parent = new MInOutConfirm(ctx, line.GetM_InOutConfirm_ID(), null);
@@ -406,21 +477,23 @@ namespace VAS.Controllers
 
                 if (scrapLocatorId > 0)
                 {
+                    // VAS163 2026-11-27: Sr 58/59 aligned with the window's M_Locator_ID field (reference 191, no
+                    // validation rule): any active, role-accessible locator of the tenant - no warehouse restriction.
                     string checkSql = @"
-                        SELECT COUNT(*)
+                        SELECT COUNT(1)
                         FROM M_Locator Locator
-                        INNER JOIN M_InOut InOut ON (InOut.M_InOut_ID = @DO_ID)
                         WHERE Locator.M_Locator_ID = @Locator_ID
                           AND Locator.IsActive = 'Y'
-                          AND Locator.M_Warehouse_ID = InOut.M_Warehouse_ID";
+                          AND Locator.AD_Client_ID = @AD_Client_ID";
+                    checkSql = MRole.GetDefault(ctx).AddAccessSQL(checkSql, "Locator", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
                     int match = Util.GetValueOfInt(DB.ExecuteScalar(checkSql, new SqlParameter[]
                     {
                         new SqlParameter("@Locator_ID", scrapLocatorId),
-                        new SqlParameter("@DO_ID", parent.GetM_InOut_ID())
+                        new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
                     }, null));
                     if (match <= 0)
                     {
-                        return Fail(Msg.GetMsg(ctx, "VAS_155_WC_ScrapLocatorWrongWarehouse") ?? "The selected Scrap Locator does not belong to the delivery order's warehouse.");
+                        return Fail(MsgOr(ctx, "VAS_155_WC_ScrapLocatorInvalid", "The selected Scrap Locator is not valid."));
                     }
                 }
 
@@ -434,7 +507,10 @@ namespace VAS.Controllers
 
                 if (!line.Save())
                 {
-                    return Fail(Msg.GetMsg(ctx, "SaveError") ?? "Save failed.");
+                    // VAS163 2026-11-27: Sr 59 show the model's own save error when there is one.
+                    var saveError = VLogger.RetrieveError();
+                    string saveText = saveError != null ? (saveError.GetName() ?? "") : "";
+                    return Fail(!string.IsNullOrEmpty(saveText) ? saveText : (Msg.GetMsg(ctx, "SaveError") ?? "Save failed."));
                 }
 
                 return Ok(new
@@ -525,21 +601,10 @@ namespace VAS.Controllers
                     return Fail(Msg.GetMsg(ctx, "VAS_155_WC_ConfirmationCompleted") ?? "This confirmation is already completed.");
                 }
 
-                string unaccountedSql = @"
-                    SELECT COUNT(*)
-                    FROM M_InOutLineConfirm LineConfirm
-                    WHERE LineConfirm.M_InOutConfirm_ID = @Confirm_ID
-                      AND LineConfirm.IsActive = 'Y'
-                      AND (COALESCE(LineConfirm.ConfirmedQty,0) + COALESCE(LineConfirm.ScrappedQty,0)) <> COALESCE(LineConfirm.TargetQty,0)";
-                int unaccounted = Util.GetValueOfInt(DB.ExecuteScalar(unaccountedSql, new SqlParameter[]
-                {
-                    new SqlParameter("@Confirm_ID", confirmId)
-                }, null));
-                if (unaccounted > 0)
-                {
-                    return Fail(Msg.GetMsg(ctx, "VAS_155_WC_LinesNotAccounted") ?? "Complete all confirmation lines before processing the confirmation.");
-                }
-
+                // VAS163 2026-11-27: Sr 60 no widget-side "all lines matched" block any more. The core
+                // MInOutConfirm.PrepareIt marks a confirmation with differences In Dispute and CompleteIt
+                // completes it (splitting the shipment when the document type says so); every refusal
+                // (quality parameters, split document type, package, ...) comes back as the process message.
                 bool processed = confirm.ProcessIt(X_M_InOutConfirm.DOCACTION_Complete);
                 confirm.Save();
 
@@ -557,6 +622,296 @@ namespace VAS.Controllers
             {
                 return Fail(ex.Message);
             }
+        }
+
+        /// <summary>
+        /// VAS163 2026-11-27: Sr 62 the quality parameters (VA010_ShipConfParameters) of one customer
+        /// confirmation line, with the Actual Value options of each (VA010_TestPrmtrList of the row's test
+        /// parameter - the VA010_PrmList validation rule of the VA010_ActualValue column).
+        /// </summary>
+        /// <param name="lineConfirmId">M_InOutLineConfirm_ID.</param>
+        /// <returns>JSON { rows[] } of qaRecordId, testParameter, acceptableValue, actualValueId, options[].</returns>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetLineQualityParameters(int lineConfirmId = 0)
+        {
+            if (Session["ctx"] == null)
+            {
+                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+            List<object> rows = new List<object>();
+            if (lineConfirmId <= 0 || !HasQualityModule()) { return Ok(new { rows = rows }); }
+
+            string paramSql = @"
+                SELECT QAParam.VA010_ShipConfParameters_ID AS QA_Record_ID,
+                       QAParam.VA010_TestParameter_ID AS Test_Parameter_ID,
+                       TestParam.VA010_TestPrmtrName AS Test_Parameter_Name,
+                       QualParam.VA010_ParameterName AS Quality_Parameter_Name,
+                       Acceptable.VA010_ParameterValue AS Acceptable_Value,
+                       QAParam.VA010_ActualValue AS Actual_Value
+                FROM VA010_ShipConfParameters QAParam
+                INNER JOIN M_InOutLineConfirm LineConfirm ON (LineConfirm.M_InOutLineConfirm_ID=QAParam.M_InOutLineConfirm_ID AND LineConfirm.IsActive='Y')
+                LEFT OUTER JOIN VA010_TestParameter TestParam ON (TestParam.VA010_TestParameter_ID=QAParam.VA010_TestParameter_ID)
+                LEFT OUTER JOIN VA010_QualityParameters QualParam ON (QualParam.VA010_QualityParameters_ID=QAParam.VA010_QualityParameters_ID)
+                LEFT OUTER JOIN VA010_TestPrmtrList Acceptable ON (Acceptable.VA010_TestPrmtrList_ID=QAParam.VA010_TestPrmtrList_ID)
+                WHERE QAParam.IsActive='Y'
+                  AND QAParam.M_InOutLineConfirm_ID=@Line_Confirm_ID
+                  AND QAParam.AD_Client_ID=@AD_Client_ID";
+            paramSql = MRole.GetDefault(ctx).AddAccessSQL(paramSql, "QAParam", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            paramSql += " ORDER BY QAParam.VA010_ShipConfParameters_ID";
+
+            // One query for the options of every test parameter of the line (no query per parameter).
+            string optionSql = @"
+                SELECT ValueList.VA010_TestPrmtrList_ID AS Value_ID,
+                       ValueList.VA010_TestParameter_ID AS Test_Parameter_ID,
+                       ValueList.VA010_ParameterValue AS Value_Name
+                FROM VA010_TestPrmtrList ValueList
+                WHERE ValueList.IsActive='Y'
+                  AND ValueList.AD_Client_ID=@AD_Client_ID2
+                  AND ValueList.VA010_TestParameter_ID IN (__QC_PARAMS__)";
+            optionSql = MRole.GetDefault(ctx).AddAccessSQL(optionSql, "ValueList", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            optionSql = optionSql.Replace("__QC_PARAMS__", @"SELECT QAOption.VA010_TestParameter_ID
+                      FROM VA010_ShipConfParameters QAOption
+                      WHERE QAOption.M_InOutLineConfirm_ID=@Line_Confirm_ID2
+                        AND QAOption.IsActive='Y'");
+            optionSql += " ORDER BY ValueList.VA010_TestParameter_ID, ValueList.VA010_TestPrmtrList_ID";
+
+            try
+            {
+                if (!IsOpenCustomerLine(ctx, lineConfirmId)) { return Fail(MsgOr(ctx, "VAS_155_WC_NotFound", "Not found.")); }
+
+                Dictionary<int, List<object>> options = new Dictionary<int, List<object>>();
+                DataSet optionDs = DB.ExecuteDataset(optionSql, new SqlParameter[]
+                {
+                    new SqlParameter("@AD_Client_ID2", ctx.GetAD_Client_ID()),
+                    new SqlParameter("@Line_Confirm_ID2", lineConfirmId)
+                }, null);
+                if (optionDs != null && optionDs.Tables.Count > 0)
+                {
+                    foreach (DataRow r in optionDs.Tables[0].Rows)
+                    {
+                        int testParameterId = Util.GetValueOfInt(r["Test_Parameter_ID"]);
+                        if (!options.ContainsKey(testParameterId)) { options[testParameterId] = new List<object>(); }
+                        options[testParameterId].Add(new
+                        {
+                            valueId = Util.GetValueOfInt(r["Value_ID"]),
+                            valueName = Util.GetValueOfString(r["Value_Name"])
+                        });
+                    }
+                }
+
+                DataSet ds = DB.ExecuteDataset(paramSql, new SqlParameter[]
+                {
+                    new SqlParameter("@Line_Confirm_ID", lineConfirmId),
+                    new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+                }, null);
+                if (ds != null && ds.Tables.Count > 0)
+                {
+                    foreach (DataRow r in ds.Tables[0].Rows)
+                    {
+                        int testParameterId = Util.GetValueOfInt(r["Test_Parameter_ID"]);
+                        string name = Util.GetValueOfString(r["Test_Parameter_Name"]);
+                        if (string.IsNullOrEmpty(name)) { name = Util.GetValueOfString(r["Quality_Parameter_Name"]); }
+                        int actualValueId;
+                        string rawActual = Util.GetValueOfString(r["Actual_Value"]);
+                        if (!int.TryParse(rawActual, NumberStyles.Integer, CultureInfo.InvariantCulture, out actualValueId)) { actualValueId = 0; }
+                        rows.Add(new
+                        {
+                            qaRecordId = Util.GetValueOfInt(r["QA_Record_ID"]),
+                            testParameterId = testParameterId,
+                            testParameter = System.Net.WebUtility.HtmlDecode(name ?? ""),
+                            acceptableValue = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(r["Acceptable_Value"]) ?? ""),
+                            actualValueId = actualValueId,
+                            options = options.ContainsKey(testParameterId) ? options[testParameterId] : new List<object>()
+                        });
+                    }
+                }
+
+                return Ok(new { rows = rows });
+            }
+            catch (Exception ex)
+            {
+                return Fail(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// VAS163 2026-11-27: Sr 62 saves the Actual Value of the quality parameters of one customer
+        /// confirmation line (VA010_ShipConfParameters.VA010_ActualValue = chosen VA010_TestPrmtrList_ID)
+        /// through the table's PO in one transaction. Only open (DR/IP) customer confirmations.
+        /// </summary>
+        /// <param name="lineConfirmId">M_InOutLineConfirm_ID.</param>
+        /// <param name="values">JSON array of { qaRecordId, actualValueId }.</param>
+        /// <returns>JSON { success, saved } or { error }.</returns>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        [HttpPost]
+        public JsonResult SaveLineQualityParameters(int lineConfirmId = 0, string values = "")
+        {
+            if (Session["ctx"] == null)
+            {
+                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+            if (lineConfirmId <= 0 || !HasQualityModule()) { return Fail(MsgOr(ctx, "VAS_155_WC_NotFound", "Not found.")); }
+
+            List<QualityValueInput> input;
+            try
+            {
+                input = JsonConvert.DeserializeObject<List<QualityValueInput>>(values ?? "") ?? new List<QualityValueInput>();
+            }
+            catch (JsonException)
+            {
+                input = new List<QualityValueInput>();
+            }
+            input.RemoveAll(v => v == null || v.qaRecordId <= 0 || v.actualValueId <= 0);
+            if (input.Count == 0)
+            {
+                return Fail(MsgOr(ctx, "VAS_155_WC_QcSelectValue", "Select an Actual Value for at least one quality parameter."));
+            }
+
+            Trx trx = null;
+            try
+            {
+                if (!IsOpenCustomerLine(ctx, lineConfirmId))
+                {
+                    return Fail(MsgOr(ctx, "VAS_155_WC_ConfirmationCompleted", "This confirmation is already completed and can no longer be edited."));
+                }
+
+                // Valid (record, value) pairs of this line in one query: the value must belong to the record's own test parameter.
+                string validSql = @"
+                    SELECT QAParam.VA010_ShipConfParameters_ID AS QA_Record_ID,
+                           ValueList.VA010_TestPrmtrList_ID AS Value_ID
+                    FROM VA010_ShipConfParameters QAParam
+                    INNER JOIN VA010_TestPrmtrList ValueList ON (ValueList.VA010_TestParameter_ID=QAParam.VA010_TestParameter_ID AND ValueList.IsActive='Y')
+                    WHERE QAParam.IsActive='Y'
+                      AND QAParam.M_InOutLineConfirm_ID=@Line_Confirm_ID
+                      AND QAParam.AD_Client_ID=@AD_Client_ID";
+                validSql = MRole.GetDefault(ctx).AddAccessSQL(validSql, "QAParam", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW);
+                DataSet validDs = DB.ExecuteDataset(validSql, new SqlParameter[]
+                {
+                    new SqlParameter("@Line_Confirm_ID", lineConfirmId),
+                    new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+                }, null);
+                HashSet<string> valid = new HashSet<string>();
+                if (validDs != null && validDs.Tables.Count > 0)
+                {
+                    foreach (DataRow r in validDs.Tables[0].Rows)
+                    {
+                        valid.Add(Util.GetValueOfInt(r["QA_Record_ID"]) + "_" + Util.GetValueOfInt(r["Value_ID"]));
+                    }
+                }
+                foreach (QualityValueInput v in input)
+                {
+                    if (!valid.Contains(v.qaRecordId + "_" + v.actualValueId))
+                    {
+                        return Fail(MsgOr(ctx, "VAS_155_WC_QcInvalidValue", "Select a valid Actual Value."));
+                    }
+                }
+
+                trx = Trx.GetTrx(Trx.CreateTrxName("VAS155QC"));
+                foreach (QualityValueInput v in input)
+                {
+                    PO qaRecord = MTable.GetPO(ctx, "VA010_ShipConfParameters", v.qaRecordId, trx);
+                    if (qaRecord == null || qaRecord.Get_ID() != v.qaRecordId)
+                    {
+                        trx.Rollback();
+                        return Fail(MsgOr(ctx, "VAS_155_WC_NotFound", "Not found."));
+                    }
+                    // VA010_ActualValue is a Table reference (AD_Reference 18 -> key of VA010_TestPrmtrList, an
+                    // integer for the PO) stored in a VARCHAR2(10) column - the same value the window's lookup writes.
+                    qaRecord.Set_Value("VA010_ActualValue", v.actualValueId);
+                    if (!qaRecord.Save())
+                    {
+                        var saveError = VLogger.RetrieveError();
+                        string saveText = saveError != null ? (saveError.GetName() ?? "") : "";
+                        trx.Rollback();
+                        return Fail(!string.IsNullOrEmpty(saveText) ? saveText : (Msg.GetMsg(ctx, "SaveError") ?? "Save failed."));
+                    }
+                }
+                trx.Commit();
+                return Ok(new { success = true, saved = input.Count });
+            }
+            catch (Exception ex)
+            {
+                if (trx != null) { trx.Rollback(); }
+                return Fail(ex.Message);
+            }
+            finally
+            {
+                if (trx != null) { trx.Close(); }
+            }
+        }
+
+        /// <summary>VAS163 2026-11-27: Sr 62 one Actual Value posted by the Quality Control pop-up.</summary>
+        public class QualityValueInput
+        {
+            public int qaRecordId { get; set; }
+            public int actualValueId { get; set; }
+        }
+
+        /// <summary>
+        /// VAS163 2026-11-27: Sr 62 true when the line belongs to an open (DR/IP) customer delivery
+        /// confirmation of this tenant that the role can access.
+        /// </summary>
+        private bool IsOpenCustomerLine(Ctx ctx, int lineConfirmId)
+        {
+            string sql = @"
+                SELECT COUNT(1)
+                FROM M_InOutLineConfirm LineConfirm
+                INNER JOIN M_InOutConfirm Confirm ON (Confirm.M_InOutConfirm_ID=LineConfirm.M_InOutConfirm_ID AND Confirm.IsActive='Y')
+                INNER JOIN M_InOut InOut ON (InOut.M_InOut_ID=Confirm.M_InOut_ID AND InOut.IsActive='Y')
+                WHERE LineConfirm.IsActive='Y'
+                  AND LineConfirm.M_InOutLineConfirm_ID=@Line_Confirm_ID
+                  AND LineConfirm.AD_Client_ID=@AD_Client_ID
+                  AND InOut.IsSOTrx='Y'
+                  AND InOut.MovementType='C-'
+                  AND Confirm.DocStatus IN ('DR','IP')";
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "LineConfirm", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql, new SqlParameter[]
+            {
+                new SqlParameter("@Line_Confirm_ID", lineConfirmId),
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+            }, null)) > 0;
+        }
+
+        /// <summary>VAS163 2026-11-27: Sr 62 true when the VA010 quality module table is present.</summary>
+        private bool HasQualityModule()
+        {
+            return HasColumn("VA010_ShipConfParameters", "VA010_ShipConfParameters_ID")
+                && HasColumn("VA010_TestPrmtrList", "VA010_ParameterValue")
+                && HasColumn("VA010_TestParameter", "VA010_TestPrmtrName")
+                && HasColumn("VA010_QualityParameters", "VA010_ParameterName");
+        }
+
+        /// <summary>
+        /// VAS163 2026-11-27: Sr 57 StdPrecision of the confirmation line's UOM (line UOM, else the
+        /// shipment line's, else the product's); -1 when no UOM is found (no check).
+        /// </summary>
+        private int GetLineUomPrecision(Ctx ctx, MInOutLineConfirm line)
+        {
+            int uomId = Util.GetValueOfInt(line.Get_Value("C_UOM_ID"));
+            if (uomId <= 0 && line.GetM_InOutLine_ID() > 0)
+            {
+                MInOutLine inOutLine = new MInOutLine(ctx, line.GetM_InOutLine_ID(), null);
+                uomId = inOutLine.GetC_UOM_ID();
+                if (uomId <= 0 && inOutLine.GetM_Product_ID() > 0)
+                {
+                    uomId = MProduct.Get(ctx, inOutLine.GetM_Product_ID()).GetC_UOM_ID();
+                }
+            }
+            return uomId > 0 ? MUOM.GetPrecision(ctx, uomId) : -1;
+        }
+
+        /// <summary>VAS163 2026-11-27: message text, or the English fallback while the key is not seeded.</summary>
+        private static string MsgOr(Ctx ctx, string key, string fallback)
+        {
+            string text = Msg.GetMsg(ctx, key);
+            if (string.IsNullOrEmpty(text) || text == key || text.StartsWith("[")) { return fallback; }
+            return text;
         }
 
         /// <summary>True when the physical column exists on the active database.</summary>

@@ -8,7 +8,7 @@
  * total value). Clicking a method (donut segment or legend row) opens a
  * read-only drill-down modal of that method's Delivery Orders. The Delivery
  * Order amount is the backend-computed value (line MovementQty x Sales Order
- * line unit price incl. tax) - the obsolete VA077_TotalSalesAmt column is not
+ * line unit price without tax, in the base currency - VAS163 2026-11-27: Sr 65/66) - the obsolete VA077_TotalSalesAmt column is not
  * used. Never creates/updates/deletes. Plain DOM/jQuery at the framework
  * boundary only.
  * Backend - VAS_154_ShippingMethodWidget/{GetSummary, GetDrillDown}
@@ -202,10 +202,7 @@
                 '<div class="vas-shm-donut"></div>' +
                 '<div class="vas-shm-legend"></div>' +
                 '</div>' +
-                '<div class="vas-shm-foot">' +
-                '<span class="vas-shm-foot-l"></span>' +
-                '<span class="vas-shm-foot-r">' + escapeHtml(lbl('VAS_154_SHM_FooterHint', 'Click a method for DO details')) + '</span>' +
-                '</div>' +
+                // VAS163 2026-11-27: Sr 46 footer line ("27 delivery orders - Nov 2026" / "Click a method for DO details") removed.
                 '</div>'
             );
         }
@@ -272,15 +269,12 @@
                 '<button type="button" class="vas-shm-retry">' + escapeHtml(lbl('VAS_154_SHM_Retry', 'Retry')) + '</button>' +
                 '</div>'
             );
-            $root.find('.vas-shm-foot-l').text('');
         }
 
         function render() {
             $root.find('.vas-shm-donut').html(donutSvg());
             $root.find('.vas-shm-legend').html(legendHtml());
-
-            var periodLabel = periodText(selMonth, selYear, 'short'); // VAS163 2026-11-12
-            $root.find('.vas-shm-foot-l').text(formatCount(totalCount) + ' ' + lbl('VAS_154_SHM_DeliveryOrders', 'delivery orders') + ' - ' + periodLabel);
+            // VAS163 2026-11-27: Sr 46 no footer line any more.
         }
 
         function donutSvg() {
@@ -321,13 +315,15 @@
             for (var i = 0; i < METHODS.length; i++) {
                 var m = METHODS[i];
                 var d = methodData(m.code);
-                var pct = totalCount > 0 ? Math.round((d.count / totalCount) * 100) : 0;
+                // VAS163 2026-11-27: Sr 67 share with 1 decimal (7.4%, 85.2%), browser culture.
+                var pct = totalCount > 0 ? (d.count / totalCount) * 100 : 0;
+                var pctText = Number(pct).toLocaleString(window.navigator.language, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
                 html +=
                     '<button type="button" class="vas-shm-lg" data-method="' + m.code + '" aria-label="' + escapeHtml(methodName(m.code)) + '">' +
                     '<span class="vas-shm-sw" style="background:' + m.color + '"></span>' +
                     '<span class="vas-shm-lg-name">' + escapeHtml(methodName(m.code)) + '</span>' +
                     '<span class="vas-shm-lg-count">' + formatCount(d.count) + '</span>' +
-                    '<span class="vas-shm-lg-pct">' + formatCount(pct) + '%</span>' +
+                    '<span class="vas-shm-lg-pct" title="' + escapeHtml(pctText + '%') + '">' + escapeHtml(pctText) + '%</span>' +
                     '<span class="vas-shm-lg-amt">' + escapeHtml(formatMoneyShort(d.amount)) + '</span>' +
                     '</button>';
             }
@@ -354,6 +350,11 @@
             $dialog.on('click', '.vas-shm-dolink', function (e) {
                 e.preventDefault();
                 zoomDeliveryOrder($(this).attr('data-id'));
+            });
+            // VAS163 2026-11-27: Sr 63 SO Number opens the Sales Order.
+            $dialog.on('click', '.vas-shm-solink', function (e) {
+                e.preventDefault();
+                openRecordInWindow($(this).attr('data-id'));
             });
             $('body').append($dialog);
         }
@@ -429,7 +430,10 @@
                 body +=
                     '<div class="vas-shm-dorow">' +
                     '<div class="vas-shm-doid"><a href="javascript:void(0)" class="vas-shm-dolink" data-id="' + Number(d.doId || 0) + '" title="' + escapeHtml(d.doNumber) + '">' + escapeHtml(d.doNumber) + '</a></div>' +
-                    '<div class="vas-shm-docell">' + escapeHtml(d.soNumber || '-') + '</div>' +
+                    // VAS163 2026-11-27: Sr 63 SO Number as a link to the Sales Order (plain text when the DO has no SO).
+                    (Number(d.soId || 0) > 0
+                        ? '<div class="vas-shm-doid"><a href="javascript:void(0)" class="vas-shm-solink" data-id="' + Number(d.soId) + '" title="' + escapeHtml(d.soNumber) + '">' + escapeHtml(d.soNumber || '-') + '</a></div>'
+                        : '<div class="vas-shm-docell">' + escapeHtml(d.soNumber || '-') + '</div>') +
                     '<div class="vas-shm-docell" title="' + escapeHtml(d.customerName) + '">' + escapeHtml(d.customerName || '-') + '</div>' +
                     '<div class="vas-shm-docell">' + escapeHtml(formatDate(d.doDate)) + '</div>' +
                     '<div class="vas-shm-doamount">' + escapeHtml(formatMoney(d.doAmount, rowCurrency(d))) + '</div>' +
@@ -478,6 +482,22 @@
                     .done(function (id) {
                         if (id > 0) { doWindowId = id; closeModal(); }
                     });
+            } catch (e) { /* best-effort */ }
+        }
+
+        /* VAS163 2026-11-27: Sr 63 open the Sales Order of a drill-down row (as VAS_288 openRecordInWindow). The
+           widget's host window is the Delivery Order window (M_InOut), so a C_Order TabWhereClause cannot be applied
+           there: the Sales Order always opens in its own window through VAS.ZoomUtil (VAS_SalesOrder, else
+           Sales Order). The resolved window id is cached. */
+        var SO_ZOOM_WINDOW_NAME = 'VAS_SalesOrder';
+        var soWindowId = 0;
+        function openRecordInWindow(orderId) {
+            var recordId = Number(orderId || 0);
+            if (recordId <= 0) { return; }
+            if (!window.VAS || !VAS.ZoomUtil || typeof VAS.ZoomUtil.zoomToRecord !== 'function') { return; }
+            try {
+                VAS.ZoomUtil.zoomToRecord('C_Order_ID', recordId, soWindowId, SO_ZOOM_WINDOW_NAME, 'Sales Order')
+                    .done(function (id) { if (id > 0) { soWindowId = id; closeModal(); } });
             } catch (e) { /* best-effort */ }
         }
 

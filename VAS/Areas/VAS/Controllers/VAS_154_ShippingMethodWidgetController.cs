@@ -48,17 +48,62 @@ namespace VAS.Controllers
     /// Widget number 154.
     /// Chronological development:
     ///   &lt;EmpCode&gt;   2026-07-22 Created (amount = computed line unit price + tax x DO qty)
+    ///   VAS163      2026-11-27 Sr 65/66 amount = delivered qty x SO price without tax (per product UOM),
+    ///                          converted to the base currency; totals summed from the converted amounts.
     /// </summary>
     public class VAS_154_ShippingMethodWidgetController : Controller
     {
-        // Computed DO amount expression, correlated to the outer M_InOut alias "i".
-        private const string DoAmountSubquery = @"
-            (SELECT COALESCE(SUM(iol.MovementQty * COALESCE(ol.PriceActual, 0)
-                                 * (1 + COALESCE(t.Rate, 0) / 100)), 0)
+        /// <summary>
+        /// VAS163 2026-11-27: Sr 65/66 computed DO amount, correlated to the outer M_InOut alias "i": the sum over
+        /// the DO's active lines of MovementQty (product UOM) x the SO line price per product UOM without tax
+        /// (PriceActual * QtyEntered / QtyOrdered; on a tax-inclusive order - totals-based rule as VAS_285 / VAS_280:
+        /// 2 * (GrandTotal - TotalLines) &lt; SUM(C_OrderTax.TaxAmt) - reduced by the net / gross ratio of the line's
+        /// tax), converted from the SO currency to the base currency with the SO's conversion type and
+        /// COALESCE(DateAcct, DateOrdered). A missing rate gives 0, as in the other SO widgets.
+        /// </summary>
+        /// <param name="baseCurrencyId">Base currency (accounting schema 1 of the tenant); 0 = no conversion.</param>
+        /// <returns>Scalar sub query text.</returns>
+        private static string BuildDoAmountSubquery(int baseCurrencyId)
+        {
+            string uomPriceSql = "(CASE WHEN COALESCE(ol.QtyOrdered, 0) <> 0 AND COALESCE(ol.QtyEntered, 0) <> 0 " +
+                                 "THEN ol.PriceActual * ol.QtyEntered / ol.QtyOrdered ELSE COALESCE(ol.PriceActual, 0) END)";
+            string netPriceSql = @"(CASE WHEN 2 * (COALESCE(so.GrandTotal, 0) - COALESCE(so.TotalLines, 0)) <
+                                 (SELECT COALESCE(SUM(COALESCE(ot.TaxAmt, 0)), 0) FROM C_OrderTax ot
+                                   WHERE ot.C_Order_ID = so.C_Order_ID AND ot.IsActive = 'Y')
+                            THEN " + uomPriceSql + @" * COALESCE(1 -
+                                 (SELECT COALESCE(SUM(COALESCE(otx.TaxAmt, 0)), 0) FROM C_OrderTax otx
+                                   WHERE otx.C_Order_ID = so.C_Order_ID AND otx.C_Tax_ID = ol.C_Tax_ID AND otx.IsActive = 'Y')
+                                 / NULLIF((SELECT SUM(olx.LineNetAmt) FROM C_OrderLine olx
+                                            WHERE olx.C_Order_ID = so.C_Order_ID AND olx.C_Tax_ID = ol.C_Tax_ID AND olx.IsActive = 'Y'), 0), 1)
+                            ELSE " + uomPriceSql + @" END)";
+            string amountSql = "COALESCE(iol.MovementQty, 0) * " + netPriceSql;
+            string convertedSql = baseCurrencyId > 0
+                ? "(CASE WHEN so.C_Currency_ID = " + baseCurrencyId + " THEN " + amountSql + " " +
+                  "ELSE COALESCE(currencyConvert(" + amountSql + ", so.C_Currency_ID, " + baseCurrencyId + ", " +
+                  "COALESCE(so.DateAcct, so.DateOrdered), so.C_ConversionType_ID, so.AD_Client_ID, so.AD_Org_ID), 0) END)"
+                : amountSql;
+
+            return @"
+            (SELECT COALESCE(SUM(" + convertedSql + @"), 0)
              FROM M_InOutLine iol
-             JOIN C_OrderLine ol ON ol.C_OrderLine_ID = iol.C_OrderLine_ID
-             LEFT JOIN C_Tax t ON t.C_Tax_ID = ol.C_Tax_ID
+             INNER JOIN C_OrderLine ol ON (ol.C_OrderLine_ID = iol.C_OrderLine_ID)
+             INNER JOIN C_Order so ON (so.C_Order_ID = ol.C_Order_ID)
              WHERE iol.M_InOut_ID = i.M_InOut_ID AND iol.IsActive = 'Y')";
+        }
+
+        /// <summary>VAS163 2026-11-27: Sr 66 base currency = currency of the tenant's accounting schema 1 (as VAS_285).</summary>
+        /// <param name="ctx">Context.</param>
+        /// <returns>C_Currency_ID or 0.</returns>
+        private static int GetBaseCurrencyId(Ctx ctx)
+        {
+            if (ctx == null) { return 0; }
+            return Util.GetValueOfInt(DB.ExecuteScalar(@"
+                SELECT cs.C_Currency_ID
+                  FROM AD_ClientInfo ci
+                 INNER JOIN C_AcctSchema cs ON (cs.C_AcctSchema_ID = ci.C_AcctSchema1_ID)
+                 WHERE ci.AD_Client_ID = @AD_Client_ID",
+                new[] { new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()) }, null));
+        }
 
         // Delivery Order qualification filter shared by summary and drill-down.
         private const string DoFilter = @"
@@ -95,24 +140,27 @@ namespace VAS.Controllers
             try
             {
                 List<int> years = GetYears(ctx, today.Year);
+                int baseCurrencyId = GetBaseCurrencyId(ctx);
 
-                string sql = @"
+                // VAS163 2026-11-27: Sr 65/66 one row per DO with its amount (without tax, base currency), summed per
+                // method outside. AddAccessSQL runs on the M_InOut-only inner query, the amount sub query is injected
+                // afterwards (its aliases must not reach AddAccessSQL) and the GROUP BY sits on the outer query.
+                string innerSql = @"
                     SELECT i.DeliveryViaRule AS Method_Code,
-                           COUNT(DISTINCT i.M_InOut_ID) AS Do_Count,
-                           COALESCE(SUM(iol.MovementQty * COALESCE(ol.PriceActual, 0)
-                                        * (1 + COALESCE(t.Rate, 0) / 100)), 0) AS Total_Amount
+                           i.M_InOut_ID AS M_InOut_ID,
+                           __DO_AMOUNT__ AS Do_Amount
                     FROM M_InOut i
-                    LEFT JOIN M_InOutLine iol ON iol.M_InOut_ID = i.M_InOut_ID AND iol.IsActive = 'Y'
-                    LEFT JOIN C_OrderLine ol ON ol.C_OrderLine_ID = iol.C_OrderLine_ID
-                    LEFT JOIN C_Tax t ON t.C_Tax_ID = ol.C_Tax_ID
                     WHERE " + DoFilter + @"
                       AND i.DeliveryViaRule IN ('D', 'P', 'S')";
+                innerSql = MRole.GetDefault(ctx).AddAccessSQL(innerSql, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                innerSql = innerSql.Replace("__DO_AMOUNT__", BuildDoAmountSubquery(baseCurrencyId));
 
-                // AddAccessSQL appends its access predicate to the END of the string,
-                // so apply it BEFORE the GROUP BY is attached - otherwise the
-                // predicate lands after GROUP BY (ORA-00933 -> "Data unavailable").
-                sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-                sql += " GROUP BY i.DeliveryViaRule";
+                string sql = @"
+                    SELECT x.Method_Code AS Method_Code,
+                           COUNT(DISTINCT x.M_InOut_ID) AS Do_Count,
+                           COALESCE(SUM(x.Do_Amount), 0) AS Total_Amount
+                    FROM (" + innerSql + @") x
+                    GROUP BY x.Method_Code";
 
                 List<object> rows = new List<object>();
                 int totalDoCount = 0;
@@ -141,7 +189,7 @@ namespace VAS.Controllers
                     if (dr != null) { dr.Close(); dr.Dispose(); }
                 }
 
-                return Ok(new { rows = rows, totalDoCount = totalDoCount, month = month, year = year, years = years, currency = GetCurrencyInfo(ctx) });
+                return Ok(new { rows = rows, totalDoCount = totalDoCount, month = month, year = year, years = years, currency = GetCurrencyInfo(baseCurrencyId) });
             }
             catch (Exception ex)
             {
@@ -195,17 +243,19 @@ namespace VAS.Controllers
             // the subquery earlier would expose its iol/ol/t aliases to AddAccessSQL,
             // which appends predicates for them to the outer WHERE (ORA-00904); and
             // AddAccessSQL must precede ORDER BY or the predicate lands after it.
-            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-            sql = sql.Replace("__DO_AMOUNT__", DoAmountSubquery);
-            sql += " ORDER BY i.MovementDate ASC, i.DocumentNo ASC";
-
             List<object> rows = new List<object>();
             decimal totalAmount = 0;
-            // VAS163 2026-11-12: each DO amount carries its order's currency (ISO / symbol / precision).
-            Dictionary<int, object[]> curCache = new Dictionary<int, object[]>();
+            // VAS163 2026-11-27: Sr 66 every DO amount is in the base currency, so each row carries the base currency.
+            object[] cur = null;
             IDataReader dr = null;
             try
             {
+                int baseCurrencyId = GetBaseCurrencyId(ctx);
+                cur = LookupCurrency(baseCurrencyId);
+                sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                sql = sql.Replace("__DO_AMOUNT__", BuildDoAmountSubquery(baseCurrencyId));
+                sql += " ORDER BY i.MovementDate ASC, i.DocumentNo ASC";
+
                 dr = DB.ExecuteReader(sql, new SqlParameter[]
                 {
                     new SqlParameter("@Start_Date", start),
@@ -217,9 +267,6 @@ namespace VAS.Controllers
                     decimal amount = Util.GetValueOfDecimal(dr["Do_Amount"]);
                     totalAmount += amount;
                     DateTime? d = Util.GetValueOfDateTime(dr["Do_Date"]);
-                    int curId = Util.GetValueOfInt(dr["Currency_Id"]);
-                    if (!curCache.ContainsKey(curId)) { curCache[curId] = LookupCurrency(curId); }
-                    object[] cur = curCache[curId];
                     rows.Add(new
                     {
                         doId = Util.GetValueOfInt(dr["Do_Id"]),
@@ -244,7 +291,7 @@ namespace VAS.Controllers
                 if (dr != null) { dr.Close(); dr.Dispose(); }
             }
 
-            return Ok(new { rows = rows, totalRecords = rows.Count, totalAmount = totalAmount, currency = GetCurrencyInfo(ctx) });
+            return Ok(new { rows = rows, totalRecords = rows.Count, totalAmount = totalAmount, currency = new { iso = (string)cur[0], symbol = (string)cur[1], precision = (int)cur[2] } });
         }
 
         /// <summary>Distinct years with qualifying Delivery Order activity (desc), current year guaranteed present.</summary>
@@ -253,10 +300,11 @@ namespace VAS.Controllers
         /// ISO code + symbol, so amounts show in the tenant's real currency instead
         /// of a hardcoded rupee. Returns empties if unavailable.
         /// </summary>
-        private object GetCurrencyInfo(Ctx ctx)
+        private object GetCurrencyInfo(int baseCurrencyId)
         {
             // VAS163 2026-11-12: StdPrecision sent too (the widget showed 0 decimals).
-            object[] cur = LookupCurrency(ctx.GetContextAsInt("$C_Currency_ID"));
+            // VAS163 2026-11-27: Sr 66 the base currency of the accounting schema (the amounts are converted to it).
+            object[] cur = LookupCurrency(baseCurrencyId);
             return new { iso = (string)cur[0], symbol = (string)cur[1], precision = (int)cur[2] };
         }
 

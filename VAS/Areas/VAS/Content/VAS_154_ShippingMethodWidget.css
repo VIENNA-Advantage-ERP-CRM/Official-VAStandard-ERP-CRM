@@ -32,19 +32,24 @@
     background-image: none !important;
     font-family: inherit;
     font-weight: 500;
-    font-size: .75em;
+    /* VAS163 2026-11-27: Sr 47 compact Month / Year filter as the Sales Order widgets (VAS_285 .vas285-msel):
+       smaller font, padding and height (the select no longer takes the framework's default height). */
+    font-size: .6em;
     color: #102C3F;
     background: #FFFFFF;
     border: 1px solid #D9E2EB;
     border-radius: 8px;
-    padding: .35em .75em;
+    padding: .2em .5em;
+    height: auto !important;
+    min-height: 0 !important;
     cursor: pointer;
-    line-height: 1.2;
+    line-height: 1.1;
     text-align: left;
     text-align-last: left;
 }
-.vas-shm-sel select.vas-shm-month-sel { min-width: 7.5em; }
-.vas-shm-sel select.vas-shm-year-sel { min-width: 5.2em; }
+/* VAS163 2026-11-27: Sr 47 narrower minimum widths (the year still shows 4 digits). */
+.vas-shm-sel select.vas-shm-month-sel { min-width: 0; flex: 0 0 auto; }
+.vas-shm-sel select.vas-shm-year-sel { min-width: 0; flex: 0 0 auto; }
 .vas-shm-sel select:hover { background: #EEF8FF; border-color: #0083DA; }
 .vas-shm-sel select:focus { outline: 2px solid #0083DA; outline-offset: 1px; }
 
@@ -117,6 +122,9 @@
 .vas-shm-doid { font-weight: 700; font-size: .8em; color: #0083DA; white-space: nowrap; }
 .vas-shm-dolink { color: inherit; text-decoration: none; cursor: pointer; }
 .vas-shm-dolink:hover, .vas-shm-dolink:focus { text-decoration: underline; }
+/* VAS163 2026-11-27: Sr 63 SO Number link, same look as the DO Number link. */
+.vas-shm-solink { color: inherit; text-decoration: none; cursor: pointer; }
+.vas-shm-solink:hover, .vas-shm-solink:focus { text-decoration: underline; }
 .vas-shm-docell { font-weight: 400; font-size: .8em; color: #5F7283; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vas-shm-doamount { font-weight: 700; font-size: .8em; color: #102C3F; text-align: right; white-space: nowrap; }
 

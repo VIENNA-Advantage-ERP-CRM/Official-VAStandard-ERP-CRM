@@ -372,12 +372,8 @@
             $track.setAttribute('aria-valuenow', String(coveragePct));
             $track.setAttribute('aria-label', lbl('VAS_143_DIS_CoverageLabel', 'Invoiced vs DO value') + ' ' + fmtNum(coveragePct) + '%');
 
-            var trendFragment = '';
-            if (s.trendPct != null) {
-                var sign = s.trendPct > 0 ? '+' : '';
-                trendFragment = ' · ' + sign + fmtNum(s.trendPct) + '% ' + s.trendLabel;
-            }
-            $footHelper.text(fmtNum(s.doCount) + ' ' + lbl('VAS_143_DIS_DOsWord', 'DOs') + trendFragment);
+            // VAS163 2026-11-27: Sr 69 the "+100% vs prior month" trend text is removed; only "21 DOs" stays.
+            $footHelper.text(fmtNum(s.doCount) + ' ' + lbl('VAS_143_DIS_DOsWord', 'DOs'));
         }
 
         function showSummaryError() {
@@ -413,6 +409,22 @@
             loadDrillDown();
 
             $modalClose.focus();
+        }
+
+        /* VAS163 2026-11-27: Sr 68 open the AR Invoice of a drill-down row (as VAS_288 openRecordInWindow). The
+           widget's host window is the Delivery Order window (M_InOut), so a C_Invoice TabWhereClause cannot be
+           applied there: the invoice always opens in its own window through VAS.ZoomUtil (VAS_ARInvoice, else
+           Invoice (Customer)). The resolved window id is cached. */
+        var INVOICE_ZOOM_WINDOW_NAME = 'VAS_ARInvoice';
+        var invoiceWindowId = 0;
+        function openInvoiceInWindow(invoiceId) {
+            var recordId = Number(invoiceId || 0);
+            if (recordId <= 0) { return; }
+            if (!window.VAS || !VAS.ZoomUtil || typeof VAS.ZoomUtil.zoomToRecord !== 'function') { return; }
+            try {
+                VAS.ZoomUtil.zoomToRecord('C_Invoice_ID', recordId, invoiceWindowId, INVOICE_ZOOM_WINDOW_NAME, 'Invoice (Customer)')
+                    .done(function (id) { if (id > 0) { invoiceWindowId = id; closeModal(); } });
+            } catch (e) { /* best-effort */ }
         }
 
         function closeModal() {
@@ -491,7 +503,23 @@
 
             rows.forEach(function (row) {
                 var invoiceCell = el('div', 'MPC-dis-gc');
-                invoiceCell.appendChild(el('div', 'MPC-dis-cell-primary', row.invoiceNo || ''));
+                // VAS163 2026-11-27: Sr 68 Invoice number as a link to the AR Invoice record.
+                var invoiceId = Number(row.invoiceId || 0);
+                if (invoiceId > 0) {
+                    var invoiceLink = el('a', 'MPC-dis-cell-primary MPC-dis-invlink', row.invoiceNo || '');
+                    invoiceLink.href = 'javascript:void(0)';
+                    invoiceLink.title = row.invoiceNo || '';
+                    invoiceLink.setAttribute('data-id', String(invoiceId));
+                    invoiceLink.addEventListener('click', function (e) {
+                        e.preventDefault();
+                        openInvoiceInWindow(Number(this.getAttribute('data-id')));
+                    });
+                    var invoiceLinkWrap = el('div', '');
+                    invoiceLinkWrap.appendChild(invoiceLink);
+                    invoiceCell.appendChild(invoiceLinkWrap);
+                } else {
+                    invoiceCell.appendChild(el('div', 'MPC-dis-cell-primary', row.invoiceNo || ''));
+                }
                 invoiceCell.appendChild(el('div', 'MPC-dis-cell-sub', formatDate(row.invoiceDate)));
                 grid.appendChild(invoiceCell);
 

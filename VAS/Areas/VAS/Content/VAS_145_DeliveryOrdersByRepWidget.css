@@ -138,24 +138,32 @@
     background-image: none !important;
     font-family: inherit;
     font-weight: 500;
-    font-size: 0.75em;
+    /* VAS163 2026-11-27: Sr 47 compact Month / Year filter as the Sales Order widgets (VAS_285 .vas285-msel):
+       smaller font, padding and height (the select no longer takes a framework default height). */
+    font-size: 0.6em;
     color: #102C3F;
     background: #FFFFFF;
     border: 1px solid #D9E2EB;
     border-radius: 8px;
-    padding: 0.35em 0.75em;
+    padding: 0.2em 0.5em;
+    flex: 0 0 auto; /* VAS163 2026-11-27: Sr 47 each select as wide as its own text (a shared flex: 1 cut "November") */
+    height: auto !important;
+    min-height: 0 !important;
     cursor: pointer;
-    line-height: 1.2;
+    line-height: 1.1;
     text-align: left;
     text-align-last: left;
 }
 
+/* VAS163 2026-11-27: Sr 47 narrower minimum widths (the year still shows 4 digits). */
 .MPC-dor-select.MPC-dor-month {
-    min-width: 7.5em;
+    min-width: 0;
+    flex: 0 0 auto;
 }
 
 .MPC-dor-select.MPC-dor-year {
-    min-width: 5.2em;
+    min-width: 0;
+    flex: 0 0 auto;
 }
 
 .MPC-dor-select:hover {

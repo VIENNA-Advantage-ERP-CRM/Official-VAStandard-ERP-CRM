@@ -455,8 +455,18 @@
 
             $tile.removeAttr('aria-disabled');
             $val.removeClass().addClass('vas272-val info').text(formatNum(summary.TotalCount));
-            // VAS163 2026-11-20: Sr 232 hyphen (not a dot) between the Drafted and In-Progress counts.
-            $sideV.text(formatNum(summary.DraftedCount) + ' - ' + formatNum(summary.InProcessCount));
+            // VAS163 2026-11-27: Sr 310 each status followed by its count, one per row, labels and counts aligned:
+            // "Drafted - 103" / "In Progress - 7" (replaces the "103 - 7" figure over stacked labels).
+            var draftedLabel = label('VAS_272_StatDrafted', 'Drafted');
+            var inProgressLabel = label('VAS_272_SideLabelInProgress', 'In Progress');
+            $sideL.empty();
+            $sideV.html(
+                '<span class="vas272-st">' +
+                    '<span class="vas272-st-l" title="' + escapeHtml(draftedLabel) + '">' + escapeHtml(draftedLabel) + '</span><span class="vas272-st-s">-</span>' +
+                    '<span class="vas272-st-n" title="' + escapeHtml(formatNum(summary.DraftedCount)) + '">' + escapeHtml(formatNum(summary.DraftedCount)) + '</span>' +
+                    '<span class="vas272-st-l" title="' + escapeHtml(inProgressLabel) + '">' + escapeHtml(inProgressLabel) + '</span><span class="vas272-st-s">-</span>' +
+                    '<span class="vas272-st-n" title="' + escapeHtml(formatNum(summary.InProcessCount)) + '">' + escapeHtml(formatNum(summary.InProcessCount)) + '</span>' +
+                '</span>');
 
             if (summary.TotalCount <= 0) {
                 $meta.text(label('VAS_272_ZeroState', 'No documents in progress'));
