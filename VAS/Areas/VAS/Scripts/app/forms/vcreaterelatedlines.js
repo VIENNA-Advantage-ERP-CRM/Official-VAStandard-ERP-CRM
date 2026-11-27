@@ -743,6 +743,10 @@
                         VIS.ADialog.info("", true, JSON.parse(data), "");
                     }
                     $bsyDiv[0].style.visibility = "hidden";
+                    // Refresh the window so the saved lines are shown
+                    if ($self.frame && $self.frame.gridDataRefreshAll) {
+                        $self.frame.gridDataRefreshAll();
+                    }
                     if (!fromApply) {
                         $self.frame.close();
                     }

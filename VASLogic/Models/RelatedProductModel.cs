@@ -173,6 +173,7 @@ namespace VIS.Models
             int TotalCount, SavedCount = 0;
             int LineNo;
             string msg;
+            StringBuilder errors = new StringBuilder();
             MOrderLine POLine;
 
             LineNo = Util.GetValueOfInt(DB.ExecuteScalar("SELECT MAX(Line) FROM C_OrderLine WHERE C_Order_ID=" + Record_ID));
@@ -189,13 +190,19 @@ namespace VIS.Models
                 POLine.SetQtyOrdered(ReqLines[i].QtyEntered);
                 POLine.SetDatePromised(PO.GetDatePromised());
                 POLine.SetLine(LineNo);
-                POLine.SetDateOrdered(DateTime.Now);
+                // Line dates follow the order: today's date fails when the order is dated earlier than today
+                // (line DateOrdered later than DatePromised -> VIS_OrderDateGrtrThanPromisedDate)
+                POLine.SetDateOrdered(PO.GetDateOrdered());
                 POLine.SetPriceEntered(ReqLines[i].PriceStd);
                 POLine.SetPriceActual(ReqLines[i].PriceStd);
                 POLine.SetPriceList(ReqLines[i].PriceList);
                 if (POLine.Save())
                 {
                     SavedCount++;
+                }
+                else
+                {
+                    AppendSaveError(ctx, errors, ReqLines[i]);
                 }
             }
             if (TotalCount == SavedCount)
@@ -204,9 +211,26 @@ namespace VIS.Models
             }
             else
             {
-                msg = SavedCount + Msg.GetMsg(ctx, "VIS_NoOfLineSaved") + TotalCount + ".";
+                msg = SavedCount + Msg.GetMsg(ctx, "VIS_NoOfLineSaved") + TotalCount + "." + errors.ToString();
             }
             return msg;
+        }
+
+        /// <summary>
+        /// Adds the reason a line was not saved (product and save error) to the message
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="errors">Collected errors</param>
+        /// <param name="line">Line that was not saved</param>
+        private void AppendSaveError(Ctx ctx, StringBuilder errors, RelatedProductData line)
+        {
+            ValueNamePair pp = VLogger.RetrieveError();
+            string err = pp == null ? "" : (!string.IsNullOrEmpty(pp.GetName()) ? pp.GetName() : Msg.GetMsg(ctx, pp.GetValue()));
+            errors.Append(" ").Append(line.Product);
+            if (!string.IsNullOrEmpty(err))
+            {
+                errors.Append(": ").Append(err);
+            }
         }
 
         /// <summary>
@@ -222,6 +246,7 @@ namespace VIS.Models
             int LineNo;
             Decimal Discount;
             string msg;
+            StringBuilder errors = new StringBuilder();
             MProjectLine POLine;
 
             LineNo = Util.GetValueOfInt(DB.ExecuteScalar("SELECT MAX(Line) FROM C_ProjectLine WHERE C_Project_ID=" + Record_ID));
@@ -258,6 +283,10 @@ namespace VIS.Models
                 {
                     SavedCount++;
                 }
+                else
+                {
+                    AppendSaveError(ctx, errors, ReqLines[i]);
+                }
             }
             if (TotalCount == SavedCount)
             {
@@ -265,7 +294,7 @@ namespace VIS.Models
             }
             else
             {
-                msg = SavedCount + Msg.GetMsg(ctx, "VIS_NoOfLineSaved") + TotalCount + ".";
+                msg = SavedCount + Msg.GetMsg(ctx, "VIS_NoOfLineSaved") + TotalCount + "." + errors.ToString();
             }
             return msg;
         }
